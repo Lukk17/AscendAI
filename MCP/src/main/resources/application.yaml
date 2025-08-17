@@ -1,0 +1,44 @@
+server:
+  port: 9998
+
+spring:
+  application:
+    name: MCP
+#  for STDIO no web server needed
+  main:
+    web-application-type: none
+    banner-mode: off
+
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: ascend-mcp-server
+        version: 0.0.1
+
+        # Communication type. SYNC for request/response, ASYNC for streaming.
+        type: SYNC
+
+        stdio: true
+
+        # A top-level instruction given to the LLM about this server's overall purpose.
+        instructions: "This server provides weather information tools and resources"
+
+        # The specific URL path for the Server-Sent Events (SSE) communication stream. Default is:
+#        sse-message-endpoint: /mcp/message
+
+        capabilities:
+          # Enables discovery of @Tool annotated methods.
+          tool: true
+          # Enables RAG capabilities.
+          resource: false
+          # Server can act as a simple prompt proxy.
+          prompt: false
+          # Server can act as a simple completion proxy - used only in old versions of models like GPT-3.
+          completion: false
+
+
+# for MCP stdio all logging to the console needs to be disabled
+logging:
+  pattern:
+    console:

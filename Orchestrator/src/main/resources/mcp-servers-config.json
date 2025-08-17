@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "weather-server": {
+      "command": "java",
+      "args": [
+        "-jar",
+        "D:/Development/projekty-IT/AscendAI/MCP/build/libs/MCP-0.0.1.jar"
+      ],
+      "env": {}
+    }
+  }
+}

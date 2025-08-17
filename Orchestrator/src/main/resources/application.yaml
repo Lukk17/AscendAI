@@ -1,0 +1,50 @@
+server:
+  port: 9999
+
+spring:
+  application:
+    name: Orchestrator
+  ai:
+    mcp:
+      client:
+        enabled: true
+        name: AscendAI-Orchestrator
+        version: 0.0.1
+        request-timeout: 30s
+
+        type: SYNC
+
+        toolcallback:
+          enabled: true
+
+        stdio:
+          servers-configuration: classpath:mcp-servers-config.json
+
+    #        sse:
+#          connections:
+#            # This is the bean name.
+#            ascend-mcp:
+#              url: http://localhost:9998/sse
+
+    openai:
+      api-key: "not-needed" # Not required for local LM Studio
+      chat:
+        options:
+          model: "meta-llama-3.1-8b-instruct" # The exact model ID to be used
+          temperature: 0.7
+          max-tokens: -1
+        base-url: "http://127.0.0.1:1234"
+
+logging:
+  level:
+    org.springframework.ai: TRACE
+    org.springframework.ai.mcp: TRACE
+    org.springframework.ai.tool: TRACE
+    org.springframework.ai.mcp.client.autoconfigure: TRACE
+    org.springframework.core.io: TRACE
+    io.modelcontextprotocol.client: TRACE
+    io.modelcontextprotocol.spec: TRACE
+
+    org.springframework.web.client: DEBUG
+    org.apache.http: DEBUG
+
