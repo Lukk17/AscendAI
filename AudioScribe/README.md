@@ -1,9 +1,14 @@
 
-# BitScribe
+# AudioScribe
 
 ---
 
 ## Prerequisites
+
+### Python
+Version 3.11
+
+Create [Virtual environment](#Virtual-environment)
 
 ### ffmpeg
 Install for audio loading, chunking/resampling.
@@ -22,7 +27,11 @@ or https://ffmpeg.org/download.html
 
 ### Installing python dependencies
 
-Using `requirements.txt` file
+Using `requirements.txt` file  
+PyTorch (CUDA 12.1)
+```shell
+pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
+```
 ```shell
 pip install -r requirements.txt
 ```
@@ -56,7 +65,7 @@ uvicorn main:app --host 0.0.0.0 --port 7017 --reload
 
 #### Build docker image
 ```shell
-docker build -t bit-scribe:latest .
+docker build -t audio-scribe:latest .
 ```
 
 #### Run docker image
@@ -70,7 +79,7 @@ exists and is shared with Docker Desktop (Settings > Resources > File Sharing).
 Linux:
 ```shell
 docker run -d \
-  --name bit-scribe \
+  --name audio-scribe \
   --gpus all \
   -p 7017:7017 \
   -e OPENAI_API_KEY="sk-..." \
@@ -82,7 +91,7 @@ docker run -d \
 Windows PowerShell
 ```PowerShell
 docker run -d `
-  --name bit-scribe `
+  --name audio-scribe `
   --gpus all `
   -p 7017:7017 `
   -e OPENAI_API_KEY="sk" `
@@ -103,7 +112,7 @@ If you pass a model repo id (e.g., openai/whisper-large-v3) to from_pretrained, 
 Linux:
 ```shell
 docker run -d \
-  --name bit-scribe \
+  --name audio-scribe \
   --gpus all \
   -p 7017:7017 \
   -e OPENAI_API_KEY="sk-..." \
@@ -116,7 +125,7 @@ docker run -d \
 Windows powershell:
 ```PowerShell
 docker run -d `
-  --name bit-scribe `
+  --name audio-scribe `
   --gpus all `
   -p 7017:7017 `
   -e OPENAI_API_KEY="sk-..." `
@@ -141,6 +150,12 @@ pip freeze > requirements.txt
 
 ---
 ## Virtual environment
+
+### Using Intellij 
+
+Settings > Project > Project Interpreter > Add > Create Virtual Environment
+
+### Using python shell
 
 Create venv in the project root directory: 
 ```powershell

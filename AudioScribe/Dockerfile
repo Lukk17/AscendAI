@@ -1,22 +1,24 @@
-# PyTorch with CUDA 12.1 and cuDNN, Ubuntu 22.04
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     TORCHCODEC_DISABLE=1
 
-# System deps for soundfile
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates ffmpeg libsndfile1 && \
+    ca-certificates ffmpeg libgomp1 libsndfile1 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
+      "torch==2.5.1+cu121" && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY main.py ./main.py
+COPY src/ ./src/
 
 EXPOSE 7017
 # Run the application using Uvicorn

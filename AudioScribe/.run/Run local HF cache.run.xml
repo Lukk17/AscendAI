@@ -1,0 +1,44 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run local HF cache" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+    <deployment type="dockerfile">
+      <settings>
+        <option name="imageTag" value="latest" />
+        <option name="containerName" value="audio-scribe" />
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="OPENAI_API_KEY" />
+              <option name="value" value="sk" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="WHISPER_MODEL_PATH" />
+              <option name="value" value="openai/whisper-large-v3" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="HF_HOME" />
+              <option name="value" value="/hf-cache" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="portBindings">
+          <list>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="7017" />
+              <option name="hostPort" value="7017" />
+            </DockerPortBindingImpl>
+          </list>
+        </option>
+        <option name="sourceFilePath" value="AudioScribe/Dockerfile" />
+        <option name="volumeBindings">
+          <list>
+            <DockerVolumeBindingImpl>
+              <option name="containerPath" value="/hf-cache" />
+              <option name="hostPath" value="$PROJECT_DIR$/../../AI/hf-cache" />
+            </DockerVolumeBindingImpl>
+          </list>
+        </option>
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>
