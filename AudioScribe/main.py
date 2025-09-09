@@ -16,11 +16,6 @@ async def root():
     return {"message": "Welcome to the Transcription API"}
 
 
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
-
-
 @app.post("/transcribe/local")
 async def transcribe_local_endpoint(file: UploadFile = File(...)):
     """

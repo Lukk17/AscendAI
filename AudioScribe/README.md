@@ -28,6 +28,10 @@ or https://ffmpeg.org/download.html
 ### Installing python dependencies
 
 Using `requirements.txt` file  
+
+```shell
+python.exe -m pip install --upgrade pip
+```
 PyTorch (CUDA 12.1)
 ```shell
 pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
@@ -37,6 +41,9 @@ pip install -r requirements.txt
 ```
 
 Manually
+```shell
+python.exe -m pip install --upgrade pi
+```
 ```shell
 # PyTorch (CUDA 12.1)
 pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
@@ -57,6 +64,13 @@ pip install python-multipart
 Run with port selection:
 
 ### Local
+User run configuration in `.run` directory named `AudioScribe`
+
+Or run from the terminal with env variables:
+```
+WHISPER_MODEL_PATH=D:\Development\AI\models\LLM\safetensor\whisper-large-v3-speach-to-text;
+OPENAI_API_KEY=sk
+```
 ```shell
 uvicorn main:app --host 0.0.0.0 --port 7017 --reload
 ```
@@ -85,7 +99,7 @@ docker run -d \
   -e OPENAI_API_KEY="sk-..." \
   -e WHISPER_MODEL_PATH=/models/whisper \
   -v /absolute/path/to/whisper-large-v3:/models/whisper \
-  bit-scribe:latest
+  audio-scribe:latest
 ```
 
 Windows PowerShell
@@ -97,7 +111,7 @@ docker run -d `
   -e OPENAI_API_KEY="sk" `
   -e WHISPER_MODEL_PATH=/models/whisper `
   -v "D:/Development/AI/models/LLM/safetensor/whisper-large-v3-speach-to-text:/models/whisper" `
-  bit-scribe:latest
+  audio-scribe:latest
 ```
 - `--gpus all` tells Docker to allocate all available GPUs to the container.
 - `-e WHISPER_MODEL_PATH` tells your app where the local Whisper model is located.
@@ -119,7 +133,7 @@ docker run -d \
   -e WHISPER_MODEL_PATH="openai/whisper-large-v3" \
   -e HF_HOME=/hf-cache \
   -v /host/hf-cache:/hf-cache \
-  bit-scribe:latest
+  audio-scribe:latest
 ```
 
 Windows powershell:
@@ -132,7 +146,7 @@ docker run -d `
   -e WHISPER_MODEL_PATH="openai/whisper-large-v3" `
   -e HF_HOME=/hf-cache `
   -v "D:/Development/AI/hf-cache:/hf-cache" `
-  bit-scribe:latest
+  audio-scribe:latest
 ```
 `-e HF_HOME=/hf-cache -v /host/hf-cache:/hf-cache` sets the cache dir to `/hf-cache` in the container  
     and maps it on your machine
