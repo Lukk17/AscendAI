@@ -1,17 +1,13 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="AudioScribe" type="Python.FastAPI">
-    <option name="additionalOptions" value="--reload --port 7017" />
-    <option name="file" value="$PROJECT_DIR$/AudioScribe/main.py" />
-    <module name="AudioScribe" />
+  <configuration default="false" name="AudioForge" type="Python.FastAPI">
+    <option name="additionalOptions" value="--reload --port 7018" />
+    <option name="file" value="$PROJECT_DIR$/AudioForge/main.py" />
+    <module name="AudioForge" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
-    <envs>
-      <env name="WHISPER_MODEL_PATH" value="D:\Development\AI\models\LLM\safetensor\whisper-large-v3-speach-to-text" />
-      <env name="OPENAI_API_KEY" value="sk" />
-    </envs>
-    <option name="SDK_HOME" value="$PROJECT_DIR$/AudioScribe/.venv/Scripts/python.exe" />
-    <option name="SDK_NAME" value="Python 3.11 (AscendAI)" />
+    <option name="SDK_HOME" value="$PROJECT_DIR$/AudioForge/.venv/Scripts/python.exe" />
+    <option name="SDK_NAME" value="Python 3.13 virtualenv at D:\Development\projekty-IT\AscendAI\AudioForge\.venv" />
     <option name="WORKING_DIRECTORY" value="" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />
