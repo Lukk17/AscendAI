@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 import mimetypes
 import os
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Iterable, Optional
 
+import aiofiles
 from fastapi import UploadFile
 
 from src.audio.analyzer import get_audio_duration
@@ -55,16 +55,28 @@ def _safe_suffix_from_filename(filename: str) -> str:
         return ""
 
 
-def save_upload_to_temp(upload: UploadFile) -> str:
+def _create_temp_file(suffix: str = "") -> str:
     """
-    Persist an UploadFile to a non-deleting NamedTemporaryFile and return the file path.
+    Create a temporary file synchronously and return its path.
+    """
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        return tmp.name
+
+
+async def save_upload_to_temp_async(upload: UploadFile) -> str:
+    """
+    Asynchronously save an UploadFile to a temporary file and return the file path.
     """
     suffix = _safe_suffix_from_filename(upload.filename or "")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        upload.file.seek(0)
 
-        shutil.copyfileobj(upload.file, tmp)  # type: ignore | tmp is already the correct type for copyfileobj
-        return tmp.name
+    temp_path = _create_temp_file(suffix)
+
+    await upload.seek(0)
+    async with aiofiles.open(temp_path, 'wb') as out_file:
+        content = await upload.read()
+        await out_file.write(content)
+
+    return temp_path
 
 
 def create_temp_path(extension: Optional[str] = None, prefix: str = "", suffix: Optional[str] = None) -> str:

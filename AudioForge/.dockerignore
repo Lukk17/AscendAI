@@ -1,0 +1,32 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.dist-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# VCS and IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Caches and logs
+.cache/
+.huggingface/
+.env
+*.log
+
+# Data and large local assets (mount at runtime instead)
+data/
+datasets/
+models/
+checkpoints/
+hf-cache/
+.DS_Store

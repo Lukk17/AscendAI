@@ -1,19 +1,20 @@
-import os
+import logging
 
+from src.config.constants import WHISPER_MODEL_PATH
 from src.transcription.openai_api_speach_to_text import openai_transcript
 from src.transcription.speech_to_text import transcript_speach
 
-WHISPER_MODEL_PATH = os.getenv("WHISPER_MODEL_PATH")
+logger = logging.getLogger(__name__)
 
 
 def openai_speech_transcription(audio_file_path: str):
     response = openai_transcript(audio_file_path)
-    print(f"\n[LLM] {response.text}\n")
+    logger.info(f"\n[LLM] {response.text}\n")
     return response.text
 
 
 def local_speech_transcription(audio_file_path: str):
-    print("\n[LLM] Starting transcription...")
+    logger.info("\n[LLM] Starting transcription...")
     chunks, duration_time = transcript_speach(WHISPER_MODEL_PATH,
                                               audio_file_path)
     transcription_json = [
@@ -25,5 +26,5 @@ def local_speech_transcription(audio_file_path: str):
         for chunk in chunks
     ]
 
-    print(f"\n[LLM] {duration_time}\n")
+    logger.info(f"\n[LLM] {duration_time}\n")
     return transcription_json, duration_time

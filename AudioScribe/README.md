@@ -2,6 +2,21 @@
 # AudioScribe
 
 ---
+### OpenApi documentation
+
+Swagger
+http://localhost:7017/docs
+
+Redoc
+http://localhost:7017/redoc
+
+---
+
+## Temporary files
+
+Removed after each request.
+
+---
 
 ## Prerequisites
 
@@ -51,10 +66,10 @@ python.exe -m pip install --upgrade pip
 pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
 ```
 ```shell
-pip install "transformers==4.56.1" "tokenizers==0.22.0" "soundfile==0.13.1" "scipy==1.16.1" "openai==1.107.0" "numpy<2.0.0"
+pip install "transformers==4.56.1" "tokenizers==0.22.0" "soundfile==0.13.1" "scipy==1.16.1" "openai==1.107.0" "numpy<2.0.0" 
 ```
 ```shell
-pip install "fastapi==0.116.1" "uvicorn==0.35.0"
+pip install "fastapi==0.116.1" "uvicorn==0.35.0" "aiofiles==24.1.0" "colorlog==6.9.0"
 ```
 
 ```shell

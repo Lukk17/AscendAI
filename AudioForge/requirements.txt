@@ -1,10 +1,13 @@
+aiofiles==24.1.0
 annotated-types==0.7.0
 anyio==4.10.0
 click==8.2.1
 colorama==0.4.6
+colorlog==6.9.0
 fastapi==0.116.1
 h11==0.16.0
 idna==3.10
+mutagen==1.47.0
 pydantic==2.11.7
 pydantic_core==2.33.2
 python-multipart==0.0.20

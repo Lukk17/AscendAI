@@ -1,5 +1,8 @@
+import logging
 import os
 from datetime import datetime
+
+from src.config.constants import WHISPER_SAMPLING_RATE
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
@@ -8,19 +11,19 @@ import transformers
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import soundfile as sf
 
-WHISPER_SAMPLING_RATE = 16000
+logger = logging.getLogger(__name__)
 
 
 def print_configuration(model_folder, audio_path):
-    print(f"[LLM] Config:\n"
-          f"Model default sampling rate: {WHISPER_SAMPLING_RATE}\n"
-          f"Model folder: {model_folder}\n"
-          f"Audio path: {audio_path}\n"
-          "Library versions:\n"
-          f"transformers: {transformers.__version__}\n"
-          f"torch: {torch.__version__}\n"
-          f"soundfile: {sf.__version__}\n"
-          "\n")
+    logger.info(f"[LLM] Config:\n"
+                f"Model default sampling rate: {WHISPER_SAMPLING_RATE}\n"
+                f"Model folder: {model_folder}\n"
+                f"Audio path: {audio_path}\n"
+                "Library versions:\n"
+                f"transformers: {transformers.__version__}\n"
+                f"torch: {torch.__version__}\n"
+                f"soundfile: {sf.__version__}\n"
+                "\n")
 
 
 def initialize_model(model_folder):
@@ -73,7 +76,7 @@ def calculate_duration(start_time, stop_time):
 
 def transcript_speach(model_folder, audio_path):
     start_time = datetime.now()
-    print(f"[LLM] Start Time:{start_time.strftime('%Y-%m-%d %H:%M:%S')} \n")
+    logger.info(f"[LLM] Start Time:{start_time.strftime('%Y-%m-%d %H:%M:%S')} \n")
 
     print_configuration(model_folder, audio_path)
     pipe = initialize_model(model_folder)
@@ -82,6 +85,6 @@ def transcript_speach(model_folder, audio_path):
     result = process_audio(audio_path, pipe)
 
     stop_time = datetime.now()
-    print(f"\n[LLM] Stop Time: {stop_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"\n[LLM] Stop Time: {stop_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     return result['chunks'], calculate_duration(start_time, stop_time)

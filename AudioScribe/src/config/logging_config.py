@@ -4,16 +4,20 @@ import colorlog
 
 def setup_logging():
     """Configure application-wide logging with colors."""
+
+    custom_log_colors = {
+        'DEBUG': 'cyan',
+        'INFO': 'green',  # Message color
+        'WARNING': 'yellow',
+        'ERROR': 'red',
+        'CRITICAL': 'red',
+    }
+
+    """Configure application-wide logging with colors."""
     app_formatter = colorlog.ColoredFormatter(
-        '%(white)s[AudioForge] %(asctime)s - %(levelname)s - %(module)s%(reset)s\n%(log_color)s%(message)s',
+        '%(white)s[AudioScribe] %(asctime)s - %(levelname)s - %(module)s%(reset)s\n%(log_color)s%(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        log_colors={
-            'DEBUG': 'cyan',
-            'INFO': 'green',      # Message color
-            'WARNING': 'yellow',
-            'ERROR': 'red',
-            'CRITICAL': 'bold_red',
-        },
+        log_colors=custom_log_colors,
         secondary_log_colors={
             'white': {
                 'DEBUG': 'white',

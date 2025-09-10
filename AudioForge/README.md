@@ -2,6 +2,28 @@
 # AudioForge
 
 ---
+## OpenApi documentation
+
+Swagger
+http://localhost:7018/docs#/
+
+Redoc
+http://localhost:7018/redoc
+
+---
+
+## Temporary files
+1. **Windows**  
+    Stored in the user's temp directory `C:\Users\[username]\AppData\Local\Temp`
+
+2. **Linux**  
+    Usually stored in `/tmp`
+
+3. **Docker**  
+    Stored inside the container's filesystem in `/tmp`, which will be cleared when the container is restarted,  
+    but could fill up during container runtime
+
+---
 
 ## Prerequisites
 
@@ -67,12 +89,24 @@ docker build -t audio-forge:latest .
 
 Linux:
 ```shell
-
+docker run -d \
+  --name audio-forge \
+  -p 7018:7018 \
+  audio-forge:latest
 ```
 
 Windows PowerShell
 ```powershell
+docker run -d `
+  --name audio-forge `
+  -p 7018:7018 `
+  audio-forge:latest
+```
 
+### OpenApi documentation
+
+```
+http://localhost:7018/docs
 ```
 
 ### Curl
@@ -118,7 +152,7 @@ Windows:
 ```
 Linux:
 ```shell
-.\AudioForge\.venv\Scripts\activate
+./AudioForge/.venv/Scripts/activate
 ```
 
 ---

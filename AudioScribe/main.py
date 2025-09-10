@@ -1,22 +1,28 @@
 import os
-import shutil
-import tempfile
+from fastapi import FastAPI, UploadFile, File, HTTPException
 
-from fastapi import FastAPI,UploadFile, File, HTTPException
-
-
+from src.config.logging_config import setup_logging
+from src.io.file_service import save_upload_to_temp_async, cleanup_temp_file_async
 from src.scribe import openai_speech_transcription, local_speech_transcription
 
-app = FastAPI()
-
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+setup_logging()
+app = FastAPI(
+    title="AudioScribe",
+    description="Speech-to-text transcription service with local and OpenAI processing options",
+    version="0.0.1",
+    contact={
+        "name": "Lukk",
+        "url": "https://lukksarna.com",
+        "email": "luksarna@gmail.com",
+    },
+)
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Transcription API"}
+    return {"message": "Welcome to the transcription API"}
 
 
-@app.post("/transcribe/local")
+@app.post("/api/v1/transcribe/local", summary="Transcription audio files")
 async def transcribe_local_endpoint(file: UploadFile = File(...)):
     """
     Accepts an audio file upload and transcribes it using the local Whisper model.
@@ -24,9 +30,7 @@ async def transcribe_local_endpoint(file: UploadFile = File(...)):
     temp_file_path = None
 
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            shutil.copyfileobj(file.file, temp_file)
-            temp_file_path = temp_file.name
+        temp_file_path = await save_upload_to_temp_async(file)
 
         transcription, duration = local_speech_transcription(audio_file_path=temp_file_path)
 
@@ -36,12 +40,12 @@ async def transcribe_local_endpoint(file: UploadFile = File(...)):
             "transcription": transcription
         }
     finally:
-        if temp_file_path in locals() and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        if temp_file_path:
+            cleanup_temp_file_async(temp_file_path)
         await file.close()
 
 
-@app.post("/transcribe/openai")
+@app.post("/api/v1/transcribe/openai")
 async def transcribe_openai_endpoint(file: UploadFile = File(...)):
     """
     Accepts an audio file upload and transcribes it using the OpenAI Whisper API.
@@ -52,9 +56,7 @@ async def transcribe_openai_endpoint(file: UploadFile = File(...)):
     temp_file_path = None
 
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            shutil.copyfileobj(file.file, temp_file)
-            temp_file_path = temp_file.name
+        temp_file_path = await save_upload_to_temp_async(file)
 
         response_text = openai_speech_transcription(audio_file_path=temp_file_path)
 
@@ -63,6 +65,6 @@ async def transcribe_openai_endpoint(file: UploadFile = File(...)):
             "transcription": response_text
         }
     finally:
-        if temp_file_path in locals() and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        if temp_file_path:
+            cleanup_temp_file_async(temp_file_path)
         await file.close()

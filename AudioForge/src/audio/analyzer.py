@@ -1,9 +1,9 @@
 import mimetypes
-from typing import Dict
+from typing import Dict, Set
 
 from mutagen import File as MutagenFile
 
-from src.constants import PRESERVE_SAMPLE_RATE
+from src.config.constants import PRESERVE_SAMPLE_RATE
 
 
 def _is_same_extension(input_ext: str, output_format: str) -> bool:
@@ -25,6 +25,17 @@ def _create_audio_mime_to_extension_map() -> Dict[str, str]:
             mime_to_ext[mime_type] = clean_ext
 
     return mime_to_ext
+
+
+def get_supported_audio_formats() -> Set[str]:
+    """
+    Returns a list of supported audio format extensions.
+    """
+    mime_to_ext_map = _create_audio_mime_to_extension_map()
+    formats = list(mime_to_ext_map.values())
+    formats.sort()  # Sort alphabetically for a better presentation
+
+    return set(formats)
 
 
 def remove_leading_dot(ext: str) -> str:

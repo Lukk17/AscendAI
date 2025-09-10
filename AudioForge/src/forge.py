@@ -5,7 +5,7 @@ import subprocess
 from typing import List
 
 from src.audio.analyzer import is_conversion_required
-from src.constants import DEFAULT_FORMAT, WAVE_FORMAT, PRESERVE_SAMPLE_RATE, DEFAULT_SILENCE_DURATION, \
+from src.config.constants import DEFAULT_FORMAT, WAVE_FORMAT, PRESERVE_SAMPLE_RATE, DEFAULT_SILENCE_DURATION, \
     DEFAULT_SILENCE_THRESHOLD
 from src.error.forge_error import ForgeError
 from src.io.file_service import create_temp_path, ensure_parent_dir, get_file_extension, print_file_info
