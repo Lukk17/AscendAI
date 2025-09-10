@@ -27,6 +27,8 @@ or https://ffmpeg.org/download.html
 
 ### Installing python dependencies
 
+[Active correct(!) venv](#activate-venv)
+
 Using `requirements.txt` file  
 
 ```shell
@@ -42,7 +44,7 @@ pip install -r requirements.txt
 
 Manually
 ```shell
-python.exe -m pip install --upgrade pi
+python.exe -m pip install --upgrade pip
 ```
 ```shell
 # PyTorch (CUDA 12.1)
@@ -151,9 +153,6 @@ docker run -d `
 `-e HF_HOME=/hf-cache -v /host/hf-cache:/hf-cache` sets the cache dir to `/hf-cache` in the container  
     and maps it on your machine
 
-
-
-
 ---
 ## Creating requirements
 
@@ -173,17 +172,17 @@ Settings > Project > Project Interpreter > Add > Create Virtual Environment
 
 Create venv in the project root directory: 
 ```powershell
-C:\Python311\python.exe -m venv venv
+C:\Python311\python.exe -m venv .venv
 ```
 
-Activate venv:
+#### Activate venv
 Windows:
 ```powershell
-.\venv\Scripts\activate.ps1
+.\AudioScribe\.venv\Scripts\activate.ps1
 ```
 Linux:
 ```shell
-.\venv\Scripts\activate
+.\AudioScribe\.venv\Scripts\activate
 ```
 
 ---
