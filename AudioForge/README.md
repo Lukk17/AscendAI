@@ -112,7 +112,7 @@ http://localhost:7018/docs
 ### Curl
 
 ```powershell
-curl -X POST "http://localhost:7018/process-full?sample_rate=16000&output_format=wav" `
+curl -X POST "http://localhost:7018/api/v1/audio/process?mode=full&output_format=wav&sample_rate=16000&silence_duration=0.5&silence_threshold=0.05" `
   -F "file=@C:\Users\Lukk\Desktop\recording.flac" `
   -o processed_audio.wav
 ```

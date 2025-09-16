@@ -45,7 +45,7 @@ def initialize_model(model_folder):
         feature_extractor=processor.feature_extractor,
         max_new_tokens=128,
         chunk_length_s=30,
-        batch_size=16,
+        batch_size=4,
         dtype=dtype,
         device=device,
         ignore_warning=True,
