@@ -202,6 +202,105 @@ Linux:
 
 ---
 
+## Run as an MCP server (Model Context Protocol)
+
+AudioScribe can also run as an MCP server so AI agents and compatible editors (e.g., Claude Desktop) can call its tools directly.
+
+Prerequisites:
+- Ensure ffmpeg and model dependencies are installed as in the regular setup.
+- Install the MCP Python SDK dependency (already listed in requirements.txt as `mcp`).
+
+Local run:
+```shell
+python mcp_server.py
+```
+This starts an MCP server over stdio. MCP-aware clients will spawn it and communicate via stdio.
+
+Environment variables respected:
+- OPENAI_API_KEY: required for the transcribe_openai tool.
+- WHISPER_MODEL_PATH: path or HF model id for the local model used by transcribe_local.
+
+Exposed MCP tools:
+- health() -> "ok"
+- transcribe_local(file_path: str) -> JSON string with keys: source, duration, transcription (segment list)
+- transcribe_openai(file_path: str) -> JSON string with keys: source, transcription
+
+
+
+#### Docker (MCP mode)
+
+Use the same image but override the command to run the MCP server instead of FastAPI.
+
+Build docker image
+```shell
+docker build -f Dockerfile.mcp -t audio-scribe:latest .
+```
+
+Linux:
+```shell
+docker run -it --rm \
+  --name audio-scribe-mcp \
+  --gpus all \
+  -e OPENAI_API_KEY="sk-..." \
+  -e WHISPER_MODEL_PATH=/models/whisper \
+  -v /absolute/path/to/whisper-large-v3:/models/whisper \
+  audio-scribe:latest \
+  python mcp_server.py
+```
+
+Windows PowerShell:
+```PowerShell
+docker run -it --rm `
+  --name audio-scribe-mcp `
+  --gpus all `
+  -e OPENAI_API_KEY="sk-..." `
+  -e WHISPER_MODEL_PATH=/models/whisper `
+  -v "D:/Development/AI/models/LLM/safetensor/whisper-large-v3-speach-to-text:/models/whisper" `
+  audio-scribe:latest `
+  python mcp_server.py
+```
+
+Claude Desktop example configuration (tools section) referencing this server by command:
+```json
+{
+  "mcpServers": {
+    "audio-scribe": {
+      "command": "python",
+      "args": ["mcp_server.py"],
+      "env": {
+        "OPENAI_API_KEY": "sk-...",
+        "WHISPER_MODEL_PATH": "openai/whisper-large-v3"
+      }
+    }
+  }
+}
+```
+if run from Docker:
+```json
+{
+  "mcpServers": {
+    "audio-scribe": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "--name", "audio-scribe-mcp",
+        "-e", "OPENAI_API_KEY=${env.OPENAI_API_KEY}",
+        "-e", "WHISPER_MODEL_PATH=/models/whisper",
+        "-v", "/path/to/your/models:/models/whisper",
+        "audio-scribe-mcp:latest"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
+```
+
+Notes:
+- The MCP server operates over stdio; the client is responsible for spawning it in the working directory where audio files are accessible (or use absolute paths mounted into the container).
+- For OpenAI transcription, ensure network egress is allowed.
+
 ## Troubleshooting
 
 ### CUDA version

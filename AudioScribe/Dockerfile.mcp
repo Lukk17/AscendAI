@@ -1,0 +1,27 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TORCHCODEC_DISABLE=1
+
+# Install system dependencies including ffmpeg
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates ffmpeg libgomp1 libsndfile1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
+      "torch==2.5.1+cu121" && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy the application code
+COPY mcp_server.py .
+COPY src/ ./src/
+
+# The command to run the MCP server by default
+CMD ["python", "mcp_server.py"]

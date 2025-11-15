@@ -156,3 +156,62 @@ Linux:
 ```
 
 ---
+
+---
+
+## Run as an MCP server (Model Context Protocol)
+
+AudioForge can also run as an MCP server so AI agents and compatible editors (e.g., Claude Desktop) can call its tools directly.
+
+Prerequisites:
+- Ensure ffmpeg and sox are installed and available in PATH (same as for the regular setup).
+- Install the MCP Python SDK dependency (already listed in requirements.txt as `mcp`).
+
+Local run:
+```shell
+python mcp_server.py
+```
+This starts an MCP server over stdio. MCP-aware clients will spawn it and communicate via stdio.
+
+Exposed MCP tools:
+- health() -> "ok"
+- convert_audio(file_path: str, output_format?: str, sample_rate?: int) -> JSON with: source, operation, output_path, media_type, filename
+- remove_silence(file_path: str, silence_duration?: str, silence_threshold?: str) -> JSON with: source, operation, output_path, media_type, filename
+- process_full(file_path: str, output_format?: str, sample_rate?: int, silence_duration?: str, silence_threshold?: str) -> JSON with: source, operation, output_path, media_type, filename
+
+Docker (MCP mode):
+Use the same image but override the command to run the MCP server instead of FastAPI.
+
+Linux:
+```shell
+docker run -it --rm \
+  --name audio-forge-mcp \
+  -v /absolute/path/to/audio-files:/data \
+  audio-forge:latest \
+  python mcp_server.py
+```
+
+Windows PowerShell:
+```PowerShell
+docker run -it --rm `
+  --name audio-forge-mcp `
+  -v "D:/path/to/audio-files:/data" `
+  audio-forge:latest `
+  python mcp_server.py
+```
+
+Claude Desktop example configuration (tools section) referencing this server by command:
+```json
+{
+  "mcpServers": {
+    "audio-forge": {
+      "command": "python",
+      "args": ["mcp_server.py"]
+    }
+  }
+}
+```
+
+Notes:
+- The MCP server operates over stdio; the client is responsible for spawning it in the working directory where audio files are accessible (or use absolute paths mounted into the container).
+- Output files are written to temporary directories; capture the returned output_path to retrieve the processed file.
