@@ -1,5 +1,5 @@
-import logging
 import colorlog
+import logging
 
 
 def setup_logging():
@@ -15,13 +15,13 @@ def setup_logging():
 
     """Configure application-wide logging with colors."""
     app_formatter = colorlog.ColoredFormatter(
-        '%(white)s[AudioScribe] %(asctime)s - %(levelname)s - %(module)s%(reset)s\n%(log_color)s%(message)s',
+        '%(log_color)s[AudioScribe] %(asctime)s - %(levelname)s - %(module)s\n%(reset)s%(log_color)s%(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
         log_colors=custom_log_colors,
         secondary_log_colors={
             'white': {
                 'DEBUG': 'white',
-                'INFO': 'white',    # Header always white
+                'INFO': 'white',  # Header always white
                 'WARNING': 'white',
                 'ERROR': 'white',
                 'CRITICAL': 'white',

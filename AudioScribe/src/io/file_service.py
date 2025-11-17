@@ -42,9 +42,9 @@ async def save_upload_to_temp_async(upload: UploadFile) -> str:
     return temp_path
 
 
-def cleanup_temp_file_async(file_path: Optional[str]) -> None:
+def cleanup_temp_file(file_path: Optional[str]) -> None:
     """
-    Asynchronously clean up a temporary file if it exists.
+    Clean up a temporary file if it exists.
     """
     if file_path and os.path.exists(file_path):
         try:

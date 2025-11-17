@@ -1,27 +1,40 @@
+# Use a specific version for reproducibility
 FROM python:3.11-slim
 
+# Set environment variables for Python and the application
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    TORCHCODEC_DISABLE=1
+    APP_USER=appuser
 
+# Create a non-root user and group for security
+RUN groupadd -r "$APP_USER" && useradd -r -g "$APP_USER" "$APP_USER"
+
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates ffmpeg libgomp1 libsndfile1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /app
 
-
+# Copy only requirements first to leverage Docker layer caching
 COPY requirements.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
       "torch==2.5.1+cu121" && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY main.py ./main.py
-COPY src/ ./src/
+# Copy the rest of the application code and set ownership
+COPY --chown="$APP_USER":"$APP_USER" . .
 
+# Switch to the non-root user
+USER $APP_USER
+
+# Expose the port the app runs on
 EXPOSE 7017
-# Run the application using Uvicorn
-# The host 0.0.0.0 makes the app accessible from outside the container
+
+# The command to run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7017"]

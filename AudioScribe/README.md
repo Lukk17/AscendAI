@@ -1,320 +1,264 @@
-
 # AudioScribe
 
----
-### OpenApi documentation
-
-Swagger
-http://localhost:7017/docs
-
-Redoc
-http://localhost:7017/redoc
+AudioScribe is a versatile, dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models. The transcription model is chosen **per-request**, allowing for maximum flexibility.
 
 ---
+### API Documentation
 
-## Temporary files
+The REST API is self-documenting via Swagger and Redoc. While the server is running, you can access:
 
-Removed after each request.
+*   **Swagger UI**: [http://localhost:7017/docs](http://localhost:7017/docs)
+*   **Redoc**: [http://localhost:7017/redoc](http://localhost:7017/redoc)
 
 ---
 
 ## Prerequisites
 
-### Python
-Version 3.11
+*   **Python 3.11**
+*   **Nvidia CUDA**
+    * https://developer.nvidia.com/cuda-12-6-0-download-archive
+    * https://developer.nvidia.com/cudnn-downloads
+*   **PyTorch**
+    * https://pytorch.org/get-started/locally/ 
+*   **ffmpeg**: Required for audio processing.
+    *   Linux: `sudo apt install ffmpeg`
+    *   Windows: `choco install ffmpeg`
 
-Create [Virtual environment](#Virtual-environment)
-
-### ffmpeg
-Install for audio loading, chunking/resampling.
-
-Linux:
-```shell
-sudo apt install ffmpeg
-```
-
-Windows admin terminal
-```PowerShell
-choco install ffmpeg
-```
-or https://ffmpeg.org/download.html
-
-
-### Installing python dependencies
-
-[Active correct(!) venv](#activate-venv)
-
-Using `requirements.txt` file  
-
-```shell
-python.exe -m pip install --upgrade pip
-```
-PyTorch (CUDA 12.1)
-```shell
-pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
-```
-```shell
-pip install -r requirements.txt
-```
-
-Manually
-```shell
-python.exe -m pip install --upgrade pip
-```
-```shell
-# PyTorch (CUDA 12.1)
-pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
-```
-```shell
-pip install "transformers==4.56.1" "tokenizers==0.22.0" "soundfile==0.13.1" "scipy==1.16.1" "openai==1.107.0" "numpy<2.0.0" 
-```
-```shell
-pip install "fastapi==0.116.1" "uvicorn==0.35.0" "aiofiles==24.1.0" "colorlog==6.9.0"
-```
-
-```shell
-pip install python-multipart
-```
+Python default packages repository:
+https://pypi.org/
 
 ---
-## Run
-Run with port selection:
 
-### Local
-User run configuration in `.run` directory named `AudioScribe`
+## Configuration (Environment Variables)
 
-Or run from the terminal with env variables:
-```
-WHISPER_MODEL_PATH=D:\Development\AI\models\LLM\safetensor\whisper-large-v3-speach-to-text;
-OPENAI_API_KEY=sk
-```
+For the service to function, certain environment variables must be set.  
+For local development, it is best practice to set these in your operating system's environment variables,  
+as they include secrets and user-specific paths.
+
+*   `OPENAI_API_KEY`: **(Secret)** Your secret key for the OpenAI API.
+*   `HF_TOKEN`: **(Secret)** Your Hugging Face token. Required for downloading models and for using the Hugging Face API provider.
+*   `HF_HOME`: **(Local Path)** The directory where Hugging Face will cache downloaded models. This prevents re-downloading large models every time.
+
+**Example `HF_HOME` and Model Parameter:**
+
+If you set your `HF_HOME` environment variable to `D:\Development\AI\hf-cache`,  
+the `transformers` library will automatically use this folder.  
+When you make an API request, you still use the public model *identifier* in the `model` field.  
+The library handles the mapping.
+
+*   **Environment Variable:** `HF_HOME=D:\Development\AI\hf-cache`
+*   **API `model` parameter:** `openai/whisper-large-v3`
+
+---
+
+## Running the Service
+
+### Running as a standard Python App (without Docker)
+
+This method is suitable for local development.  
+Ensure you have set the **environment variables** mentioned above.
+
+1.  **Install Dependencies:**
+    In `./AudioScribe` directory in terminal:
+
+    ```shell
+    python -m venv .venv
+    ```
+    Activate the virtual environment
+    Windows
+    ```PowerShell
+    .\.venv\Scripts\activate.ps1
+    ```
+    Unix
+    ```shell
+    ./.venv/bin/activate
+    ```
+    Install PyTorch separately from its specific index
+    ```shell
+    pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
+    ```
+    Install all other application requirements
+    ```shell
+    pip install -r pytorch-requirements.txt -r requirements.txt
+    ```
+    without cache:
+    ```shell
+    pip install --no-cache-dir -r pytorch-requirements.txt -r requirements.txt
+    ```
+
+2.  **Run the Uvicorn Server:**
+    ```shell
+    uvicorn main:app --host 0.0.0.0 --port 7017 --reload
+    ```
+
+### Running with Docker (Recommended)
+
+This is the recommended method for a stable deployment.
+
+**1. Build the Docker image:**
 ```shell
-uvicorn main:app --host 0.0.0.0 --port 7017 --reload
-```
-
-### Docker
-
-#### Build docker image
-```shell
+# Build the main image for the REST API
 docker build -t audio-scribe:latest .
+
+# Or, build the image for the MCP server
+docker build -f Dockerfile.mcp -t audio-scribe-mcp:latest .
 ```
 
-#### Run docker image
+**2. Run the container:**
 
-Make sure the directory `D:/Development/AI/models/LLM/safetensor/whisper-large-v3-speach-to-text` 
-exists and is shared with Docker Desktop (Settings > Resources > File Sharing).
-
-
-##### Using a local Whisper model
-
-Linux:
+**For Linux/macOS:**
 ```shell
 docker run -d \
   --name audio-scribe \
   --gpus all \
   -p 7017:7017 \
   -e OPENAI_API_KEY="sk-..." \
-  -e WHISPER_MODEL_PATH=/models/whisper \
-  -v /absolute/path/to/whisper-large-v3:/models/whisper \
-  audio-scribe:latest
-```
-
-Windows PowerShell
-```PowerShell
-docker run -d `
-  --name audio-scribe `
-  --gpus all `
-  -p 7017:7017 `
-  -e OPENAI_API_KEY="sk" `
-  -e WHISPER_MODEL_PATH=/models/whisper `
-  -v "D:/Development/AI/models/LLM/safetensor/whisper-large-v3-speach-to-text:/models/whisper" `
-  audio-scribe:latest
-```
-- `--gpus all` tells Docker to allocate all available GPUs to the container.
-- `-e WHISPER_MODEL_PATH` tells your app where the local Whisper model is located.
-- `-v` is a bind mount: it does not copy. It makes the host folder visible at `/models/whisper` inside the container.  
-    Your app should then load the model from that path.
-- `-e OPENAI_API_KEY="sk-..."` sets `OPENAI_API_KEY` as environment variable.
-
-
-##### Using HF cache
-If you pass a model repo id (e.g., openai/whisper-large-v3) to from_pretrained, Transformers will download to the HF cache.
-
-Linux:
-```shell
-docker run -d \
-  --name audio-scribe \
-  --gpus all \
-  -p 7017:7017 \
-  -e OPENAI_API_KEY="sk-..." \
-  -e WHISPER_MODEL_PATH="openai/whisper-large-v3" \
+  -e HF_TOKEN="hf_..." \
   -e HF_HOME=/hf-cache \
-  -v /host/hf-cache:/hf-cache \
+  -v ~/hf-cache:/hf-cache \
   audio-scribe:latest
 ```
 
-Windows powershell:
+**For Windows (PowerShell):**
 ```PowerShell
 docker run -d `
   --name audio-scribe `
   --gpus all `
   -p 7017:7017 `
   -e OPENAI_API_KEY="sk-..." `
-  -e WHISPER_MODEL_PATH="openai/whisper-large-v3" `
+  -e HF_TOKEN="hf_..." `
   -e HF_HOME=/hf-cache `
-  -v "D:/Development/AI/hf-cache:/hf-cache" `
+  -v "D:/path/to/your/hf-cache:/hf-cache" `
   audio-scribe:latest
 ```
-`-e HF_HOME=/hf-cache -v /host/hf-cache:/hf-cache` sets the cache dir to `/hf-cache` in the container  
-    and maps it on your machine
+*   `--gpus all`: **Required** for local transcription to run on the GPU.
+*   `-v ...:/hf-cache`: **Recommended**. Mounts a local directory to cache models.
 
 ---
-## Creating requirements
 
-To create requirements with a current python local installation type:
+## Making API Requests
+
+You specify the model in the body of your `POST` request.
+
+**Example using `curl` for local transcription:**
+
+**For Linux/macOS:**
 ```shell
-pip freeze > requirements.txt
+curl -X POST "http://localhost:7017/api/v1/transcribe/local" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@$HOME/Desktop/audio.wav" \
+  -F "model=openai/whisper-large-v3"
+```
+
+**For Windows (Command Prompt):**
+```cmd
+curl -X POST "http://localhost:7017/api/v1/transcribe/local" ^
+  -H "Content-Type: multipart/form-data" ^
+  -F "file=@%USERPROFILE%\Desktop\audio.wav" ^
+  -F "model=openai/whisper-large-v3"
 ```
 
 ---
-## Virtual environment
 
-### Using Intellij 
+## MCP Server Mode
 
-Settings > Project > Project Interpreter > Add > Create Virtual Environment
+The MCP server runs on the same port (`7017`) and uses the same unified container. It also accepts the model per-request.
 
-### Using python shell
+**Exposed MCP Tools:**
+*   `health()`
+*   `transcribe_local(file_path: str, model: str)`
+*   `transcribe_openai(file_path: str, model: str)`
+*   `transcribe_hf(file_path: str, model: str)`
 
-Create venv in the project root directory: 
-```powershell
-C:\Python311\python.exe -m venv .venv
+### Example MCP Client Configurations
+
+To use these tools, configure your AI-powered editor or client to connect to the running server's URL.
+
+**For Claude Desktop / Generic Clients:**
+```json
+{
+  "mcpServers": {
+    "audio-scribe": {
+      "url": "http://localhost:7017"
+    }
+  }
+}
 ```
 
-#### Activate venv
+---
+
+## Dependencies
+
+To update dependency versions in `requirements.txt` excluding ones which should be manually updated,  
+due to torch compatibility  
 Windows:
-```powershell
-.\AudioScribe\.venv\Scripts\activate.ps1
+```PowerShell
+pip freeze | Select-String -NotMatch -Pattern '^(torch|numpy|sympy|networkx|mpmath|filelock|fsspec|jinja2|typing_extensions)$' > requirements.txt
 ```
-Linux:
+Unix:
 ```shell
-.\AudioScribe\.venv\Scripts\activate
+pip freeze | grep -v -E '^(torch|numpy|sympy|networkx|mpmath|filelock|fsspec|jinja2|typing_extensions)$' > requirements.txt
 ```
 
 ---
-
-## Run as an MCP server (Model Context Protocol)
-
-AudioScribe can also run as an MCP server so AI agents and compatible editors (e.g., Claude Desktop) can call its tools directly.
-
-Prerequisites:
-- Ensure ffmpeg and model dependencies are installed as in the regular setup.
-- Install the MCP Python SDK dependency (already listed in requirements.txt as `mcp`).
-
-Local run:
-```shell
-python mcp_server.py
-```
-This starts an MCP server over stdio. MCP-aware clients will spawn it and communicate via stdio.
-
-Environment variables respected:
-- OPENAI_API_KEY: required for the transcribe_openai tool.
-- WHISPER_MODEL_PATH: path or HF model id for the local model used by transcribe_local.
-
-Exposed MCP tools:
-- health() -> "ok"
-- transcribe_local(file_path: str) -> JSON string with keys: source, duration, transcription (segment list)
-- transcribe_openai(file_path: str) -> JSON string with keys: source, transcription
-
-
-
-#### Docker (MCP mode)
-
-Use the same image but override the command to run the MCP server instead of FastAPI.
-
-Build docker image
-```shell
-docker build -f Dockerfile.mcp -t audio-scribe:latest .
-```
-
-Linux:
-```shell
-docker run -it --rm \
-  --name audio-scribe-mcp \
-  --gpus all \
-  -e OPENAI_API_KEY="sk-..." \
-  -e WHISPER_MODEL_PATH=/models/whisper \
-  -v /absolute/path/to/whisper-large-v3:/models/whisper \
-  audio-scribe:latest \
-  python mcp_server.py
-```
-
-Windows PowerShell:
-```PowerShell
-docker run -it --rm `
-  --name audio-scribe-mcp `
-  --gpus all `
-  -e OPENAI_API_KEY="sk-..." `
-  -e WHISPER_MODEL_PATH=/models/whisper `
-  -v "D:/Development/AI/models/LLM/safetensor/whisper-large-v3-speach-to-text:/models/whisper" `
-  audio-scribe:latest `
-  python mcp_server.py
-```
-
-Claude Desktop example configuration (tools section) referencing this server by command:
-```json
-{
-  "mcpServers": {
-    "audio-scribe": {
-      "command": "python",
-      "args": ["mcp_server.py"],
-      "env": {
-        "OPENAI_API_KEY": "sk-...",
-        "WHISPER_MODEL_PATH": "openai/whisper-large-v3"
-      }
-    }
-  }
-}
-```
-if run from Docker:
-```json
-{
-  "mcpServers": {
-    "audio-scribe": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "--name", "audio-scribe-mcp",
-        "-e", "OPENAI_API_KEY=${env.OPENAI_API_KEY}",
-        "-e", "WHISPER_MODEL_PATH=/models/whisper",
-        "-v", "/path/to/your/models:/models/whisper",
-        "audio-scribe-mcp:latest"
-      ],
-      "env": {
-        "OPENAI_API_KEY": "sk-..."
-      }
-    }
-  }
-}
-```
-
-Notes:
-- The MCP server operates over stdio; the client is responsible for spawning it in the working directory where audio files are accessible (or use absolute paths mounted into the container).
-- For OpenAI transcription, ensure network egress is allowed.
-
 ## Troubleshooting
 
-### CUDA version
-If not working with CUDA 12.1, try to install CUDA 11.8:
+### Checking lib versions
+
+#### nvidia drivers
 ```shell
-# PyTorch (CUDA 11.8)
-pip install --index-url https://download.pytorch.org/whl/cu118 "torch==2.5.1+cu118"
+nvidia-smi
+```
+#### torch
+```python
+import torch
+print(torch.cuda.is_available())
 ```
 
-### Additional libs
+#### cudnn
 
-`torchaudio` should not be needed, but anyway to install it:
-
-```shell
-pip install --index-url https://download.pytorch.org/whl/cu121 "torchaudio==2.5.1+cu121"
-
+```python
+import torch
+print(torch.backends.cudnn.version())
 ```
+
+### Hugging Face Symlinks Warning on Windows
+
+When running the application on Windows, you may see a `UserWarning` about symlinks not being supported.
+
+**Why it happens:** The `huggingface_hub` library uses symbolic links by default to efficiently manage its cache. Standard user accounts on Windows cannot create symlinks without special permissions. This is a warning, not an error, and the cache will still function, but it may take up more disk space.
+
+**Solution 1 (Recommended): Set Environment Variable**
+
+The easiest way to resolve this is to disable the warning by setting an environment variable:
+```
+HF_HUB_DISABLE_SYMLINKS_WARNING=1
+```
+
+**Solution 2: Enable Developer Mode**
+
+Alternatively, you can enable Developer Mode on Windows to allow your user account to create symlinks.
+1.  Open **Settings**.
+2.  Go to **System** > **Advanced** > **For developers**.
+3.  Toggle **Developer Mode** to **On**.
+You may need to restart your terminal or IDE for the change to take effect.
+
+---
+
+### Reinstalling python dependencies
+Terminal in your activated virtual environment.  
+
+This creates a temporary list of everything that's currently installed.
+```shell
+pip freeze > temp_requirements.txt
+```
+Now, use that list to uninstall everything.  
+The -y flag automatically confirms all the uninstallations so you don't have to do it one by one.
+```shell
+pip uninstall -y -r temp_requirements.txt
+```
+Then reinstall:
+```shell
+pip install --no-cache-dir -r pytorch-requirements.txt -r requirements.txt
+```
+Now you can remove `temp_requirements.txt` file.

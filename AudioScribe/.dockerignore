@@ -1,3 +1,14 @@
+# VCS and IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Docker specific
+Dockerfile
+Dockerfile.*
+.dockerignore
+
 # Python artifacts
 __pycache__/
 *.py[cod]
@@ -10,12 +21,6 @@ __pycache__/
 # Virtual environments
 .venv/
 venv/
-
-# VCS and IDE
-.git/
-.gitignore
-.idea/
-.vscode/
 
 # Caches and logs
 .cache/
@@ -30,3 +35,12 @@ models/
 checkpoints/
 hf-cache/
 .DS_Store
+
+# Documentation
+README.md
+
+# Testing
+tests/
+.pytest_cache/
+coverage.xml
+.coverage

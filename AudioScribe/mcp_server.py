@@ -1,81 +1,106 @@
 import asyncio
 import json
 import os
-from typing import Optional
 
-from src.scribe import openai_speech_transcription, local_speech_transcription
+from src.config.settings import settings
+from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
 
 try:
-    # MCP Python SDK (Anthropic Model Context Protocol)
     from mcp.server import Server
     from mcp.types import TextContent
-    from mcp.server.stdio import stdio_server
-except Exception as e:  # pragma: no cover
+    from mcp.server.http import http_server
+except Exception as e:
     raise RuntimeError(
         "The 'mcp' package is required to run the MCP server. Install it via `pip install mcp`."
     ) from e
 
-
 server = Server("audio-scribe")
 
+def create_error_response(message: str):
+    """Creates a standardized MCP error response."""
+    return {"content": [TextContent(type="text", text=message)], "is_error": True}
 
 @server.tool(
     name="transcribe_local",
-    description=(
-        "Transcribe an audio file using the local Whisper model. "
-        "Input: file_path (str) pointing to an accessible audio file within the container or host. "
-        "Returns JSON with keys: transcription (list of segments with start,end,text) and duration (seconds)."
-    ),
+    description="Transcribes a file with a local model. This is a STREAMING tool.",
+    is_streaming=True
 )
-async def transcribe_local(file_path: str):
+async def transcribe_local(file_path: str, model: str = "Systran/faster-whisper-large-v3"):
     if not file_path or not os.path.exists(file_path):
-        return {
-            "content": [TextContent(type="text", text=f"File not found: {file_path}")],
-            "is_error": True,
-        }
+        yield create_error_response(f"File not found: {file_path}")
+        return
 
-    transcription, duration = local_speech_transcription(audio_file_path=file_path)
-    payload = {"source": "local", "duration": duration, "transcription": transcription}
-    return {"content": [TextContent(type="text", text=json.dumps(payload))]}
+    try:
+        # The core function is now an async generator. We can iterate over it directly.
+        async for segment in local_speech_transcription(
+            audio_file_path=file_path,
+            model_path=model
+        ):
+            chunk = {
+                "text": segment.text.strip(),
+                "timestamp": (segment.start, segment.end)
+            }
+            yield {"content": [TextContent(type="text", text=json.dumps(chunk))]}
 
+    except (ValueError, IOError) as e:
+        yield create_error_response(str(e))
+    except Exception as e:
+        yield create_error_response(f"An unexpected error occurred: {e}")
 
 @server.tool(
     name="transcribe_openai",
-    description=(
-        "Transcribe an audio file using the OpenAI Whisper API. Requires OPENAI_API_KEY in the environment. "
-        "Input: file_path (str). Returns JSON with keys: source, transcription."
-    ),
+    description="Transcribes a file with the OpenAI API. Args: file_path (str), model (str, optional, e.g., 'whisper-1')."
 )
-async def transcribe_openai(file_path: str):
-    if not os.environ.get("OPENAI_API_KEY"):
-        return {
-            "content": [TextContent(type="text", text="OPENAI_API_KEY is not configured on the server.")],
-            "is_error": True,
-        }
+async def transcribe_openai(file_path: str, model: str = "whisper-1"):
+    if not settings.OPENAI_API_KEY:
+        return create_error_response("OPENAI_API_KEY is not configured on the server.")
     if not file_path or not os.path.exists(file_path):
-        return {
-            "content": [TextContent(type="text", text=f"File not found: {file_path}")],
-            "is_error": True,
-        }
+        return create_error_response(f"File not found: {file_path}")
 
-    response_text = openai_speech_transcription(audio_file_path=file_path)
-    payload = {"source": "openai", "transcription": response_text}
-    return {"content": [TextContent(type="text", text=json.dumps(payload))]}
-
+    try:
+        response_text = await asyncio.to_thread(
+            openai_speech_transcription,
+            audio_file_path=file_path,
+            model=model
+        )
+        payload = {"source": "openai", "model": model, "transcription": response_text}
+        return {"content": [TextContent(type="text", text=json.dumps(payload))]}
+    except (ValueError, IOError) as e:
+        return create_error_response(str(e))
+    except Exception as e:
+        return create_error_response(f"An unexpected error occurred: {e}")
 
 @server.tool(
-    name="health",
-    description="Simple health check tool returning 'ok' if the server is responsive.",
+    name="transcribe_hf",
+    description="Transcribes a file with a Hugging Face provider. Args: file_path (str), model (str, optional)."
 )
-async def health():
-    return {"content": [TextContent(type="text", text="ok")]} 
+async def transcribe_hf(file_path: str, model: str = "openai/whisper-large-v3"):
+    if not settings.HF_TOKEN:
+        return create_error_response("HF_TOKEN is not configured on the server.")
+    if not file_path or not os.path.exists(file_path):
+        return create_error_response(f"File not found: {file_path}")
 
+    try:
+        response_text = await asyncio.to_thread(
+            hf_speech_transcription,
+            audio_file_path=file_path,
+            model=model
+        )
+        payload = {"source": "huggingface", "model": model, "transcription": response_text}
+        return {"content": [TextContent(type="text", text=json.dumps(payload))]}
+    except (ValueError, IOError) as e:
+        return create_error_response(str(e))
+    except Exception as e:
+        return create_error_response(f"An unexpected error occurred: {e}")
+
+@server.tool(name="health", description="Simple health check tool.")
+async def health():
+    return {"content": [TextContent(type="text", text="ok")]}
 
 async def main() -> None:
-    # Run the MCP server over stdio (recommended for editor integration)
-    async with stdio_server() as (read_stream, write_stream):
+    print(f"Starting MCP HTTP server on {settings.MCP_HOST}:{settings.MCP_PORT}")
+    async with http_server(host=settings.MCP_HOST, port=settings.MCP_PORT) as (read_stream, write_stream):
         await server.run(read_stream, write_stream)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
