@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
-
+from typing import Optional, List, Dict, Union
 
 class AppSettings(BaseSettings):
     """
@@ -9,16 +8,30 @@ class AppSettings(BaseSettings):
     """
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    # API Keys
+    # --- API Keys ---
     OPENAI_API_KEY: Optional[str] = None
     HF_TOKEN: Optional[str] = None
 
-    # MCP Server settings
+    # --- Server Settings ---
     MCP_HOST: str = "0.0.0.0"
     MCP_PORT: int = 7017
+    API_TIMEOUT_SECONDS: int = 30 * 60  # 30 minutes
 
-    # Audio processing constants
-    WHISPER_SAMPLING_RATE: int = 16000
+    # --- Transcription Settings ---
+    TRANSCRIPTION_LANGUAGE: str = "pl"
+    
+    # --- Local Transcription (faster-whisper) ---
+    CHUNK_LENGTH_MINUTES: int = 15
+    TEMPERATURE: List[float] = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    VAD_PARAMETERS: Dict[str, Union[int, float]] = {'min_silence_duration_ms': 1000, 'threshold': 0.4}
+    VAD_FILTER: bool = True
+    CONDITION_ON_PREVIOUS_TEXT: bool = True
+    BEST_OF: int = 5
+    BEAM_SIZE: int = 5
+
+    # --- OpenAI Transcription ---
+    OPENAI_API_LIMIT_BYTES: int = 25 * 1024 * 1024
+    TARGET_CHUNK_SIZE_BYTES: int = 20 * 1024 * 1024
 
 
 # Create a single, importable instance of the settings

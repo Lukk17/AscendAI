@@ -1,115 +1,144 @@
-from concurrent.futures import ProcessPoolExecutor
-
 import asyncio
 import logging
+import multiprocessing as mp
 import os
 import tempfile
 import torch
 from faster_whisper import WhisperModel
 from pydub import AudioSegment
 
+from src.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
-CHUNK_LENGTH_MINUTES = 15
-CHUNK_LENGTH_MS = CHUNK_LENGTH_MINUTES * 60 * 1000
+CHUNK_LENGTH_MS = settings.CHUNK_LENGTH_MINUTES * 60 * 1000
 
 
-def _transcribe_chunk(model_path: str, audio_chunk_path: str) -> list:
+def _transcribe_and_communicate(
+        model_path: str,
+        audio_path: str,
+        result_queue: mp.Queue,
+        shutdown_event: mp.Event
+):
     """
-    This function runs in a separate process.
-    It loads the model, transcribes a single audio chunk, and returns the segments.
-    This isolates the memory-intensive work from the main server process.
+    This is the target function for the worker process.
     """
-    logger.info(f"[Worker] Loading model '{model_path}' for chunk '{audio_chunk_path}'...")
+    setup_logging()
+    process_id = os.getpid()
+    logger.info(f"[Worker {process_id}] Process started.")
+
+    temp_audio_chunk_files = []
     try:
+        logger.info(f"[Worker {process_id}] Loading model '{model_path}'...")
         if torch.cuda.is_available():
             device, compute_type = "cuda", "float16"
         else:
             device, compute_type = "cpu", "int8"
-
         model = WhisperModel(model_path, device=device, compute_type=compute_type)
+        logger.info(f"[Worker {process_id}] Model loaded successfully.")
 
-        logger.info(f"[Worker] Transcribing chunk '{audio_chunk_path}'...")
-        segments, _ = model.transcribe(audio_chunk_path, beam_size=5, language="pl")
+        audio = AudioSegment.from_file(audio_path)
+        logger.info(f"[Worker {process_id}] Audio loaded. Duration: {len(audio) / 1000:.2f}s.")
 
-        # The result from the generator needs to be converted to a list to be returned
-        return list(segments)
+        num_chunks = (len(audio) // CHUNK_LENGTH_MS) + 1
+        logger.info(f"[Worker {process_id}] Slicing audio into {num_chunks} chunks.")
+
+        all_segments = []
+        for i, start_ms in enumerate(range(0, len(audio), CHUNK_LENGTH_MS)):
+            chunk_num = i + 1
+            logger.info(f"[Worker {process_id}] Processing chunk {chunk_num}/{num_chunks}...")
+            end_ms = start_ms + CHUNK_LENGTH_MS
+            chunk = audio[start_ms:end_ms]
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
+                chunk.export(tmp_audio.name, format="wav")
+                temp_audio_chunk_files.append(tmp_audio.name)
+
+                segments_chunk, _ = model.transcribe(
+                    tmp_audio.name,
+                    beam_size=settings.BEAM_SIZE,
+                    language=settings.TRANSCRIPTION_LANGUAGE,
+                    best_of=settings.BEST_OF,
+                    condition_on_previous_text=settings.CONDITION_ON_PREVIOUS_TEXT,
+                    vad_filter=settings.VAD_FILTER,
+                    vad_parameters=settings.VAD_PARAMETERS,
+                    temperature=settings.TEMPERATURE
+                )
+
+                time_offset = start_ms / 1000
+                for segment in segments_chunk:
+                    all_segments.append({
+                        "text": segment.text.strip(),
+                        "start": segment.start + time_offset,
+                        "end": segment.end + time_offset
+                    })
+            logger.info(f"[Worker {process_id}] Chunk {chunk_num}/{num_chunks} complete.")
+
+        logger.info(
+            f"[Worker {process_id}] All chunks processed. Sending {len(all_segments)} segments back to main process.")
+        result_queue.put(all_segments)
 
     except Exception as e:
-        logger.exception(f"[Worker] Error processing chunk '{audio_chunk_path}'.")
-        # Re-raise the exception so the main process knows the task failed
-        raise e
+        logger.exception(f"[Worker {process_id}] An error occurred.")
+        result_queue.put(e)
+    finally:
+        logger.info(f"[Worker {process_id}] Waiting for shutdown signal from main process.")
+        shutdown_event.wait()
+
+        for f_path in temp_audio_chunk_files:
+            try:
+                os.remove(f_path)
+            except OSError:
+                pass
+        logger.info(f"[Worker {process_id}] Shutdown signal received. Exiting.")
 
 
 async def local_speech_transcription_stream(model_path: str, audio_path: str):
     """
-    Splits a long audio file into chunks and transcribes them in separate processes
-    to prevent memory-related crashes. Yields segments with corrected timestamps.
+    Launches and manages a worker process to safely transcribe a long audio file.
     """
-    logger.info(f"Starting transcription for '{audio_path}' with chunking.")
-
     try:
-        audio = AudioSegment.from_file(audio_path)
-        logger.info(f"Audio loaded successfully. Duration: {len(audio) / 1000:.2f}s")
-    except Exception as e:
-        logger.exception("Pydub failed to load the audio file.")
-        raise IOError("Failed to load audio file. It may be corrupt or an unsupported format.") from e
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass
 
-    # Create a ProcessPoolExecutor to run transcriptions in separate processes
-    # max_workers=1 ensures only one chunk is processed at a time, conserving GPU memory.
-    with ProcessPoolExecutor(max_workers=1) as executor:
-        loop = asyncio.get_running_loop()
-        tasks = []
-        temp_files = []
+    ctx = mp.get_context('spawn')
+    result_queue = ctx.Queue()
+    shutdown_event = ctx.Event()
 
-        for i, start_ms in enumerate(range(0, len(audio), CHUNK_LENGTH_MS)):
-            end_ms = start_ms + CHUNK_LENGTH_MS
-            chunk = audio[start_ms:end_ms]
+    logger.info(f"[Master process] Spawning worker for transcription of '{audio_path}'.")
+    worker_process = ctx.Process(
+        target=_transcribe_and_communicate,
+        args=(model_path, audio_path, result_queue, shutdown_event)
+    )
+    worker_process.start()
 
-            # Export chunk to a temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                chunk.export(tmp.name, format="wav")
-                temp_files.append(tmp.name)
-                logger.info(
-                    f"Created audio chunk {i + 1} ({start_ms / 1000:.2f}s to {end_ms / 1000:.2f}s) at '{tmp.name}'")
+    logger.info("[Master process] Waiting for results from worker process...")
+    result = await asyncio.to_thread(result_queue.get)
+    logger.info("[Master process] Results received from worker.")
 
-                # Schedule the transcription task to run in the process pool
-                task = loop.run_in_executor(
-                    executor, _transcribe_chunk, model_path, tmp.name
-                )
-                tasks.append((task, start_ms / 1000))  # Store task and its time offset
+    logger.info("[Master process] Sending shutdown signal to worker.")
+    shutdown_event.set()
 
-        logger.info(f"Scheduled {len(tasks)} transcription tasks.")
+    if isinstance(result, Exception):
+        logger.error("[Master process] Worker process failed with an exception.")
+        raise result
 
-        for i, (task, time_offset) in enumerate(tasks):
-            try:
-                logger.info(f"Waiting for chunk {i + 1}/{len(tasks)} to complete...")
-                segments = await task
-                logger.info(f"Chunk {i + 1} completed. Processing {len(segments)} segments.")
+    logger.info(f"[Master process] Yielding {len(result)} segments.")
+    for segment_dict in result:
+        yield type('Segment', (), {
+            'text': segment_dict['text'],
+            'start': segment_dict['start'],
+            'end': segment_dict['end']
+        })()
 
-                # Yield segments with corrected timestamps
-                for segment in segments:
-                    corrected_start = segment.start + time_offset
-                    corrected_end = segment.end + time_offset
+    await asyncio.to_thread(worker_process.join, timeout=10)
+    if worker_process.is_alive():
+        logger.warning("[Master process] Worker process did not terminate cleanly. Forcing termination.")
+        worker_process.terminate()
 
-                    # Create a new object to yield to avoid modifying the original
-                    yield type('Segment', (), {
-                        'text': segment.text,
-                        'start': corrected_start,
-                        'end': corrected_end
-                    })()
+    logger.info("[Master process] Transcription stream finished.")
 
-            except Exception as e:
-                logger.exception(f"A worker process for chunk {i + 1} failed.")
-                # We can choose to stop or continue. For now, we stop.
-                raise RuntimeError(f"Transcription failed on chunk {i + 1}. See logs for details.") from e
-            finally:
-                # Clean up the temporary file for this chunk
-                if temp_files[i]:
-                    try:
-                        os.remove(temp_files[i])
-                        logger.info(f"Cleaned up temp file: {temp_files[i]}")
-                    except OSError:
-                        pass
 
-    logger.info("Finished processing all chunks.")
+# This import is needed for the worker process to find the logging setup function
+from src.config.logging_config import setup_logging

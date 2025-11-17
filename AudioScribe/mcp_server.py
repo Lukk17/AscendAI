@@ -16,9 +16,11 @@ except Exception as e:
 
 server = Server("audio-scribe")
 
+
 def create_error_response(message: str):
     """Creates a standardized MCP error response."""
     return {"content": [TextContent(type="text", text=message)], "is_error": True}
+
 
 @server.tool(
     name="transcribe_local",
@@ -31,10 +33,9 @@ async def transcribe_local(file_path: str, model: str = "Systran/faster-whisper-
         return
 
     try:
-        # The core function is now an async generator. We can iterate over it directly.
         async for segment in local_speech_transcription(
-            audio_file_path=file_path,
-            model_path=model
+                audio_file_path=file_path,
+                model_path=model
         ):
             chunk = {
                 "text": segment.text.strip(),
@@ -46,6 +47,7 @@ async def transcribe_local(file_path: str, model: str = "Systran/faster-whisper-
         yield create_error_response(str(e))
     except Exception as e:
         yield create_error_response(f"An unexpected error occurred: {e}")
+
 
 @server.tool(
     name="transcribe_openai",
@@ -70,6 +72,7 @@ async def transcribe_openai(file_path: str, model: str = "whisper-1"):
     except Exception as e:
         return create_error_response(f"An unexpected error occurred: {e}")
 
+
 @server.tool(
     name="transcribe_hf",
     description="Transcribes a file with a Hugging Face provider. Args: file_path (str), model (str, optional)."
@@ -93,14 +96,17 @@ async def transcribe_hf(file_path: str, model: str = "openai/whisper-large-v3"):
     except Exception as e:
         return create_error_response(f"An unexpected error occurred: {e}")
 
+
 @server.tool(name="health", description="Simple health check tool.")
 async def health():
     return {"content": [TextContent(type="text", text="ok")]}
+
 
 async def main() -> None:
     print(f"Starting MCP HTTP server on {settings.MCP_HOST}:{settings.MCP_PORT}")
     async with http_server(host=settings.MCP_HOST, port=settings.MCP_PORT) as (read_stream, write_stream):
         await server.run(read_stream, write_stream)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

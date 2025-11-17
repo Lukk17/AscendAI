@@ -7,18 +7,18 @@ from src.transcription.speech_to_text import local_speech_transcription_stream
 logger = logging.getLogger(__name__)
 
 def openai_speech_transcription(audio_file_path: str, model: str):
+    logger.info("[OpenAI] Starting transcription...")
     response = openai_transcript(audio_file_path, model=model)
-    logger.info(f"\n[LLM] {response}\n")
+    logger.info(f"[OpenAI] {response}\n")
     return response
 
 def hf_speech_transcription(audio_file_path: str, model: str):
-    logger.info("\n[HF] Starting transcription...")
-    response_text = hf_transcript(audio_file_path, model=model)
-    logger.info(f"\n[HF] {response_text}\n")
-    return response_text
+    logger.info("[HF] Starting transcription...")
+    response = hf_transcript(audio_file_path, model=model)
+    logger.info(f"[HF] {response}\n")
+    return response
 
-# This function is now a proper async generator that yields from the core stream
 async def local_speech_transcription(audio_file_path: str, model_path: str):
-    logger.info("\n[LLM] Starting transcription stream...")
+    logger.info("[Master process] Starting transcription stream...")
     async for segment in local_speech_transcription_stream(model_path, audio_file_path):
         yield segment

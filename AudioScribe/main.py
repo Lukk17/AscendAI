@@ -32,7 +32,6 @@ async def local_transcription_generator(temp_file_path: str, model: str) -> Asyn
 
     is_first_segment = True
     try:
-        # ** THE FIX: Use 'async for' to correctly iterate over the async generator **
         async for segment in local_speech_transcription(
             audio_file_path=temp_file_path,
             model_path=model
