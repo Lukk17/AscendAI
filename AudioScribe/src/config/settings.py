@@ -18,7 +18,7 @@ class AppSettings(BaseSettings):
     API_TIMEOUT_SECONDS: int = 30 * 60  # 30 minutes
 
     # --- Transcription Settings ---
-    TRANSCRIPTION_LANGUAGE: str = "pl"
+    TRANSCRIPTION_LANGUAGE: str = "en"
     
     # --- Local Transcription (faster-whisper) ---
     CHUNK_LENGTH_MINUTES: int = 15
@@ -27,11 +27,11 @@ class AppSettings(BaseSettings):
     VAD_FILTER: bool = True
     CONDITION_ON_PREVIOUS_TEXT: bool = True
     BEST_OF: int = 5
-    BEAM_SIZE: int = 5
+    BEAM_SIZE: int = 10
 
     # --- OpenAI Transcription ---
     OPENAI_API_LIMIT_BYTES: int = 25 * 1024 * 1024
-    TARGET_CHUNK_SIZE_BYTES: int = 20 * 1024 * 1024
+    TARGET_CHUNK_SIZE_BYTES: int = 23 * 1024 * 1024
 
 
 # Create a single, importable instance of the settings

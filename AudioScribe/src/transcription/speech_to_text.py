@@ -17,6 +17,7 @@ CHUNK_LENGTH_MS = settings.CHUNK_LENGTH_MINUTES * 60 * 1000
 def _transcribe_and_communicate(
         model_path: str,
         audio_path: str,
+        language: str,
         result_queue: mp.Queue,
         shutdown_event: mp.Event
 ):
@@ -43,6 +44,15 @@ def _transcribe_and_communicate(
         num_chunks = (len(audio) // CHUNK_LENGTH_MS) + 1
         logger.info(f"[Worker {process_id}] Slicing audio into {num_chunks} chunks.")
 
+        logger.info(
+            f"[Worker {process_id}] Transcription Parameters: "
+            f"Language='{language}', "
+            f"ChunkMinutes={settings.CHUNK_LENGTH_MINUTES}, "
+            f"BeamSize={settings.BEAM_SIZE}, "
+            f"BestOf={settings.BEST_OF}, "
+            f"VAD_Params={settings.VAD_PARAMETERS}"
+        )
+
         all_segments = []
         for i, start_ms in enumerate(range(0, len(audio), CHUNK_LENGTH_MS)):
             chunk_num = i + 1
@@ -57,7 +67,7 @@ def _transcribe_and_communicate(
                 segments_chunk, _ = model.transcribe(
                     tmp_audio.name,
                     beam_size=settings.BEAM_SIZE,
-                    language=settings.TRANSCRIPTION_LANGUAGE,
+                    language=language,
                     best_of=settings.BEST_OF,
                     condition_on_previous_text=settings.CONDITION_ON_PREVIOUS_TEXT,
                     vad_filter=settings.VAD_FILTER,
@@ -93,7 +103,7 @@ def _transcribe_and_communicate(
         logger.info(f"[Worker {process_id}] Shutdown signal received. Exiting.")
 
 
-async def local_speech_transcription_stream(model_path: str, audio_path: str):
+async def local_speech_transcription_stream(model_path: str, audio_path: str, language: str):
     """
     Launches and manages a worker process to safely transcribe a long audio file.
     """
@@ -109,7 +119,7 @@ async def local_speech_transcription_stream(model_path: str, audio_path: str):
     logger.info(f"[Master process] Spawning worker for transcription of '{audio_path}'.")
     worker_process = ctx.Process(
         target=_transcribe_and_communicate,
-        args=(model_path, audio_path, result_queue, shutdown_event)
+        args=(model_path, audio_path, language, result_queue, shutdown_event)
     )
     worker_process.start()
 
