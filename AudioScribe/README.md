@@ -140,23 +140,73 @@ docker run -d `
 
 ## Making API Requests
 
-You specify the model in the body of your `POST` request.
+You specify the model and other parameters in the body of your `POST` request.
 
-**Example using `curl` for local transcription:**
+### Local Transcription
+Uses `faster-whisper` and requires a pre-converted model format.
+*   **model**: (e.g., `Systran/faster-whisper-large-v3`)
+*   **language**: (optional, e.g., `en`, `pl`)
+*   **with_timestamps**: (optional, `true` or `false`, defaults to `true`)
 
-**For Linux/macOS:**
+**Example `curl` (Linux/macOS):**
 ```shell
 curl -X POST "http://localhost:7017/api/v1/transcribe/local" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@$HOME/Desktop/audio.wav" \
+  -F "model=Systran/faster-whisper-large-v3" \
+  -F "language=en" \
+  -F "with_timestamps=false"
+```
+
+**Example `curl` (Windows PowerShell):**
+```powershell
+curl -X POST "http://localhost:7017/api/v1/transcribe/local" `
+  -H "Content-Type: multipart/form-data" `
+  -F "file=@$env:USERPROFILE\Desktop\audio.wav" `
+  -F "model=Systran/faster-whisper-large-v3" `
+  -F "language=en" `
+  -F "with_timestamps=false"
+```
+
+### OpenAI Transcription
+*   **model**: (e.g., `whisper-1`)
+*   **language**: (optional, e.g., `en`, `pl`)
+
+**Example `curl` (Linux/macOS):**
+```shell
+curl -X POST "http://localhost:7017/api/v1/transcribe/openai" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@$HOME/Desktop/audio.wav" \
+  -F "model=whisper-1" \
+  -F "language=en"
+```
+
+**Example `curl` (Windows PowerShell):**
+```powershell
+curl -X POST "http://localhost:7017/api/v1/transcribe/openai" `
+  -H "Content-Type: multipart/form-data" `
+  -F "file=@$env:USERPROFILE\Desktop\audio.wav" `
+  -F "model=whisper-1" `
+  -F "language=en"
+```
+
+### Hugging Face Transcription
+*   **model**: (e.g., `openai/whisper-large-v3`)
+*   **hf_provider**: (optional, defaults to `hf-inference`)
+
+**Example `curl` (Linux/macOS):**
+```shell
+curl -X POST "http://localhost:7017/api/v1/transcribe/hf" \
   -H "Content-Type: multipart/form-data" \
   -F "file=@$HOME/Desktop/audio.wav" \
   -F "model=openai/whisper-large-v3"
 ```
 
-**For Windows (Command Prompt):**
-```cmd
-curl -X POST "http://localhost:7017/api/v1/transcribe/local" ^
-  -H "Content-Type: multipart/form-data" ^
-  -F "file=@%USERPROFILE%\Desktop\audio.wav" ^
+**Example `curl` (Windows PowerShell):**
+```powershell
+curl -X POST "http://localhost:7017/api/v1/transcribe/hf" `
+  -H "Content-Type: multipart/form-data" `
+  -F "file=@$env:USERPROFILE\Desktop\audio.wav" `
   -F "model=openai/whisper-large-v3"
 ```
 
@@ -164,13 +214,13 @@ curl -X POST "http://localhost:7017/api/v1/transcribe/local" ^
 
 ## MCP Server Mode
 
-The MCP server runs on the same port (`7017`) and uses the same unified container. It also accepts the model per-request.
+The MCP server runs on the same port (`7017`) and uses the same unified container.
 
 **Exposed MCP Tools:**
 *   `health()`
-*   `transcribe_local(file_path: str, model: str)`
-*   `transcribe_openai(file_path: str, model: str)`
-*   `transcribe_hf(file_path: str, model: str)`
+*   `transcribe_local(file_path: str, model: str, language: str, with_timestamps: bool)`
+*   `transcribe_openai(file_path: str, model: str, language: str)`
+*   `transcribe_hf(file_path: str, model: str, hf_provider: str)`
 
 ### Example MCP Client Configurations
 
