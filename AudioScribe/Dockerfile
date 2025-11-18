@@ -18,13 +18,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy only requirements first to leverage Docker layer caching
+# Copy requirements files first to leverage Docker layer caching
 COPY requirements.txt .
+COPY pytorch-requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies in two steps
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
-      "torch==2.5.1+cu121" && \
+    pip install --no-cache-dir -r pytorch-requirements.txt && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code and set ownership
