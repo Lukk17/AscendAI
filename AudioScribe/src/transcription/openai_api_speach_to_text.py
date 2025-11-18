@@ -3,13 +3,15 @@ import os
 import tempfile
 import httpx
 from openai import OpenAI, APIError
-from pydub import AudioSegment
 
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-client = OpenAI(timeout=httpx.Timeout(settings.API_TIMEOUT_SECONDS))
+client = OpenAI(
+    timeout=httpx.Timeout(settings.API_TIMEOUT_SECONDS),
+    max_retries=5,
+)
 
 def _transcribe_single_chunk(audio_chunk_path: str, model: str, language: str) -> str:
     """Helper function to transcribe a single audio chunk."""
@@ -31,7 +33,7 @@ def openai_transcript(audio_file_path: str, model: str, language: str):
     Handles large files by automatically splitting them into chunks.
     """
     file_size = os.path.getsize(audio_file_path)
-
+    
     logger.info(
         f"[OpenAI] Transcription Parameters: "
         f"Language='{language}', "

@@ -36,7 +36,9 @@ For local development, it is best practice to set these in your operating system
 as they include secrets and user-specific paths.
 
 *   `OPENAI_API_KEY`: **(Secret)** Your secret key for the OpenAI API.
+    https://platform.openai.com/settings/organization/api-keys
 *   `HF_TOKEN`: **(Secret)** Your Hugging Face token. Required for downloading models and for using the Hugging Face API provider.
+    https://huggingface.co/settings/tokens
 *   `HF_HOME`: **(Local Path)** The directory where Hugging Face will cache downloaded models. This prevents re-downloading large models every time.
 
 **Example `HF_HOME` and Model Parameter:**

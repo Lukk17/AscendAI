@@ -15,7 +15,7 @@ class AppSettings(BaseSettings):
     # --- Server Settings ---
     MCP_HOST: str = "0.0.0.0"
     MCP_PORT: int = 7017
-    API_TIMEOUT_SECONDS: int = 30 * 60  # 30 minutes
+    API_TIMEOUT_SECONDS: int = 120  # 2 minutes
 
     # --- Transcription Settings ---
     TRANSCRIPTION_LANGUAGE: str = "en"
@@ -32,6 +32,9 @@ class AppSettings(BaseSettings):
     # --- OpenAI Transcription ---
     OPENAI_API_LIMIT_BYTES: int = 25 * 1024 * 1024
     TARGET_CHUNK_SIZE_BYTES: int = 23 * 1024 * 1024
+
+    # --- Hugging Face Transcription ---
+    HF_CHUNK_LENGTH_SECONDS: int = 20
 
 
 # Create a single, importable instance of the settings

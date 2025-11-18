@@ -8,16 +8,16 @@ logger = logging.getLogger(__name__)
 
 def openai_speech_transcription(audio_file_path: str, model: str, language: str):
     response = openai_transcript(audio_file_path, model, language)
-    logger.info(f"\n[OpenAI] {response}\n")
+    logger.info(f"[OpenAI] {response}\n")
     return response
 
-def hf_speech_transcription(audio_file_path: str, model: str, language: str):
-    logger.info("\n[HF] Starting transcription...")
-    response_text = hf_transcript(audio_file_path, model, language)
-    logger.info(f"\n[HF] {response_text}\n")
+def hf_speech_transcription(audio_file_path: str, model: str, provider: str):
+    logger.info("[HF] Starting transcription...")
+    response_text = hf_transcript(audio_file_path, model, provider)
+    logger.info(f"[HF] {response_text}\n")
     return response_text
 
 async def local_speech_transcription(audio_file_path: str, model_path: str, language: str):
-    logger.info("\n[LLM] Starting transcription stream...")
+    logger.info("[LLM] Starting transcription stream...")
     async for segment in local_speech_transcription_stream(model_path, audio_file_path, language):
         yield segment
