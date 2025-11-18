@@ -20,9 +20,11 @@ def _safe_suffix_from_filename(filename: str) -> str:
     Returns an empty string if the filename has no extension.
     """
     try:
+        if not filename:
+            return ""
         suffix = Path(filename).suffix  # includes a leading dot if any
         return suffix if suffix else ""
-    except Exception:
+    except (TypeError, ValueError):
         return ""
 
 
@@ -49,5 +51,5 @@ def cleanup_temp_file(file_path: Optional[str]) -> None:
     if file_path and os.path.exists(file_path):
         try:
             os.remove(file_path)
-        except Exception:
+        except OSError:
             pass

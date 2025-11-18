@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 import tempfile
 from huggingface_hub import InferenceClient
 from huggingface_hub.inference._generated.types import AutomaticSpeechRecognitionOutput
@@ -9,6 +9,7 @@ from pydub import AudioSegment
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
 
 def _transcribe_single_chunk(client: InferenceClient, audio_chunk_path: str, model: str) -> str:
     """Helper function to transcribe a single audio chunk with the HF API."""
@@ -20,7 +21,8 @@ def _transcribe_single_chunk(client: InferenceClient, audio_chunk_path: str, mod
         return result.get("text", "")
     except HfHubHTTPError as e:
         logger.error(f"Hugging Face API error during chunk transcription for model '{model}': {e}")
-        raise ValueError(f"Hugging Face API failed to process an audio chunk.") from e
+        raise ValueError("Hugging Face API failed to process an audio chunk.") from e
+
 
 def hf_transcript(audio_file_path: str, model: str, provider: str):
     """
@@ -42,10 +44,10 @@ def hf_transcript(audio_file_path: str, model: str, provider: str):
         raise IOError("Failed to load audio file for chunking. It may be corrupt or an unsupported format.") from e
 
     chunk_length_ms = settings.HF_CHUNK_LENGTH_SECONDS * 1000
-    
+
     full_transcription = []
     temp_files = []
-    
+
     try:
         num_chunks = (len(audio) // chunk_length_ms) + 1
         logger.info(f"Splitting audio into {num_chunks} chunks of {settings.HF_CHUNK_LENGTH_SECONDS} seconds each.")
@@ -54,28 +56,25 @@ def hf_transcript(audio_file_path: str, model: str, provider: str):
             chunk_num = i + 1
             end_ms = start_ms + chunk_length_ms
             chunk = audio[start_ms:end_ms]
-            
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
                 chunk.export(tmp_audio.name, format="wav")
                 temp_files.append(tmp_audio.name)
                 logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
-                
+
                 chunk_transcription = _transcribe_single_chunk(client, tmp_audio.name, model)
                 full_transcription.append(chunk_transcription)
                 logger.info(f"Chunk {chunk_num}/{num_chunks} complete.")
 
         return " ".join(full_transcription)
 
+    except (ValueError, IOError):
+        # Re-raise exceptions we expect and handle
+        raise
     except Exception as e:
-        # Catch exceptions from the loop (e.g., from the helper function)
-        logger.error(f"An error occurred during the HF chunking process: {e}")
-        # Re-raise the original error if it's one of our specific ones
-        if isinstance(e, (ValueError, IOError)):
-            raise e
-        # Raise a generic error for unexpected issues
+        logger.error(f"An unexpected error occurred during the HF chunking process: {e}")
         raise RuntimeError("An unexpected error occurred during Hugging Face transcription.") from e
     finally:
-        # Clean up all temporary audio chunk files
         for f_path in temp_files:
             try:
                 os.remove(f_path)

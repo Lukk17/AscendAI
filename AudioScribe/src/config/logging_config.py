@@ -2,6 +2,7 @@ import colorlog
 import logging
 import re
 
+
 class CenteredLevelFormatter(colorlog.ColoredFormatter):
     def format(self, record):
         # Let the parent class handle the initial formatting and coloring
@@ -15,6 +16,7 @@ class CenteredLevelFormatter(colorlog.ColoredFormatter):
             centered_level = level_text.center(8)
             s = s[:match.start(2)] + centered_level + s[match.end(2):]
         return s
+
 
 def setup_logging():
     """Configure application-wide logging with colors."""
@@ -46,6 +48,7 @@ def setup_logging():
         handlers=[handler],
         force=True
     )
+
 
 def get_logger(name: str) -> logging.Logger:
     """Get a logger instance for the given module name."""

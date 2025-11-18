@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List, Dict, Union
 
+
 class AppSettings(BaseSettings):
     """
     Centralized application settings.
@@ -19,7 +20,7 @@ class AppSettings(BaseSettings):
 
     # --- Transcription Settings ---
     TRANSCRIPTION_LANGUAGE: str = "en"
-    
+
     # --- Local Transcription (faster-whisper) ---
     CHUNK_LENGTH_MINUTES: int = 15
     TEMPERATURE: List[float] = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]

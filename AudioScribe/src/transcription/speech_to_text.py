@@ -1,11 +1,11 @@
 import asyncio
 import logging
 import multiprocessing as mp
-from multiprocessing.synchronize import Event as EventClass
 import os
 import tempfile
 import torch
 from faster_whisper import WhisperModel
+from multiprocessing.synchronize import Event as EventClass
 from pydub import AudioSegment
 
 from src.config.settings import settings
@@ -143,7 +143,7 @@ async def local_speech_transcription_stream(model_path: str, audio_path: str, la
 
     for segment_dict in result:
         yield segment_dict
-    
+
     await asyncio.to_thread(worker_process.join, timeout=10)
     if worker_process.is_alive():
         logger.warning("[Master process] Worker process did not terminate cleanly. Forcing termination.")
