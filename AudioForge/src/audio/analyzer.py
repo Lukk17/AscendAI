@@ -1,7 +1,7 @@
 import mimetypes
 from typing import Dict, Set
 
-from mutagen import File as MutagenFile
+from mutagen import File as MutagenFile, MutagenError
 
 from src.config.constants import PRESERVE_SAMPLE_RATE
 
@@ -60,7 +60,7 @@ def _get_audio_info_mutagen(file_path: str) -> tuple[None, int] | tuple[str, int
         sample_rate = getattr(audio_file.info, 'sample_rate', PRESERVE_SAMPLE_RATE)
 
         return format_name.lower(), int(sample_rate)
-    except Exception:
+    except (IOError, MutagenError):
         return None, 0
 
 
@@ -117,6 +117,5 @@ def get_audio_duration(file_path: str) -> float:
 
         duration = getattr(audio_file.info, 'length', 0.0)
         return float(duration)
-    except Exception:
+    except (IOError, MutagenError):
         return 0.0
-

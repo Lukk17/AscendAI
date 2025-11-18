@@ -51,7 +51,7 @@ def _safe_suffix_from_filename(filename: str) -> str:
     try:
         suffix = Path(filename).suffix  # includes a leading dot if any
         return suffix if suffix else ""
-    except Exception:
+    except (TypeError, ValueError):
         return ""
 
 
@@ -112,7 +112,7 @@ def cleanup_paths(paths: Iterable[Optional[str]]) -> None:
         try:
             if os.path.exists(p):
                 os.remove(p)
-        except Exception:
+        except OSError:
             pass
 
 

@@ -75,8 +75,8 @@ async def convert_audio(
             "filename": filename,
         }
         return {"content": [TextContent(type="text", text=json.dumps(payload))]}
-    except ForgeError as e:
-        return {"content": [TextContent(type="text", text=str(e))], "is_error": True}
+    except ForgeError as error:
+        return {"content": [TextContent(type="text", text=str(error))], "is_error": True}
 
 
 @server.tool(
@@ -111,8 +111,8 @@ async def remove_silence(
             "filename": filename,
         }
         return {"content": [TextContent(type="text", text=json.dumps(payload))]}
-    except ForgeError as e:
-        return {"content": [TextContent(type="text", text=str(e))], "is_error": True}
+    except ForgeError as error:
+        return {"content": [TextContent(type="text", text=str(error))], "is_error": True}
 
 
 @server.tool(
@@ -157,8 +157,8 @@ async def process_full(
             "filename": filename,
         }
         return {"content": [TextContent(type="text", text=json.dumps(payload))]}
-    except ForgeError as e:
-        return {"content": [TextContent(type="text", text=str(e))], "is_error": True}
+    except ForgeError as error:
+        return {"content": [TextContent(type="text", text=str(error))], "is_error": True}
 
 
 async def main() -> None:

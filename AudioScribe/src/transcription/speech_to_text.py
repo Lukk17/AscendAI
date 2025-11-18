@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import multiprocessing as mp
+from multiprocessing.synchronize import Event as EventClass
 import os
 import tempfile
 import torch
@@ -19,7 +20,7 @@ def _transcribe_and_communicate(
         audio_path: str,
         language: str,
         result_queue: mp.Queue,
-        shutdown_event: mp.Event
+        shutdown_event: EventClass
 ):
     """
     This is the target function for the worker process.
@@ -50,6 +51,7 @@ def _transcribe_and_communicate(
             f"ChunkMinutes={settings.CHUNK_LENGTH_MINUTES}, "
             f"BeamSize={settings.BEAM_SIZE}, "
             f"BestOf={settings.BEST_OF}, "
+            f"VAD={settings.VAD_FILTER}, "
             f"VAD_Params={settings.VAD_PARAMETERS}"
         )
 
@@ -107,6 +109,7 @@ async def local_speech_transcription_stream(model_path: str, audio_path: str, la
     """
     Launches and manages a worker process to safely transcribe a long audio file.
     """
+    start_time = asyncio.get_event_loop().time()
     try:
         mp.set_start_method('spawn', force=True)
     except RuntimeError:
@@ -130,24 +133,23 @@ async def local_speech_transcription_stream(model_path: str, audio_path: str, la
     logger.info("[Master process] Sending shutdown signal to worker.")
     shutdown_event.set()
 
+    end_time = asyncio.get_event_loop().time()
+    total_duration = end_time - start_time
+    logger.info(f"[Master process] Full transcription task took {total_duration:.2f} seconds.")
+
     if isinstance(result, Exception):
         logger.error("[Master process] Worker process failed with an exception.")
         raise result
 
-    logger.info(f"[Master process] Yielding {len(result)} segments.")
     for segment_dict in result:
-        yield type('Segment', (), {
-            'text': segment_dict['text'],
-            'start': segment_dict['start'],
-            'end': segment_dict['end']
-        })()
-
+        yield segment_dict
+    
     await asyncio.to_thread(worker_process.join, timeout=10)
     if worker_process.is_alive():
         logger.warning("[Master process] Worker process did not terminate cleanly. Forcing termination.")
         worker_process.terminate()
 
-    logger.info("[Master process] Transcription stream finished.")
+    logger.info("[Master process] Finished processing transcription.")
 
 
 # This import is needed for the worker process to find the logging setup function

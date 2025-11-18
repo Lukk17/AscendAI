@@ -9,6 +9,7 @@ from src.scribe import openai_speech_transcription, local_speech_transcription, 
 try:
     from mcp.server import Server
     from mcp.types import TextContent
+    # noinspection PyUnresolvedReferences
     from mcp.server.http import http_server
 except Exception as e:
     raise RuntimeError(
@@ -21,10 +22,10 @@ def create_error_response(message: str):
     """Creates a standardized MCP error response."""
     return {"content": [TextContent(type="text", text=message)], "is_error": True}
 
+# noinspection PyUnresolvedReferences
 @server.tool(
     name="transcribe_local",
-    description="Transcribes a file with a local model. Args: file_path (str), model (str, optional), language (str, optional), with_timestamps (bool, optional).",
-    is_streaming=True
+    description="Transcribes a file with a local model. Args: file_path (str), model (str, optional), language (str, optional), with_timestamps (bool, optional)."
 )
 async def transcribe_local(
     file_path: str,
@@ -33,37 +34,32 @@ async def transcribe_local(
     with_timestamps: bool = True
 ):
     if not file_path or not os.path.exists(file_path):
-        yield create_error_response(f"File not found: {file_path}")
-        return
+        return create_error_response(f"File not found: {file_path}")
 
     lang = language if language else settings.TRANSCRIPTION_LANGUAGE
     try:
-        segment_generator = local_speech_transcription(
+        all_segments = [segment async for segment in local_speech_transcription(
             audio_file_path=file_path,
             model_path=model,
             language=lang
-        )
+        )]
 
         if with_timestamps:
-            # Stream each segment with its timestamp
-            async for segment in segment_generator:
-                chunk = {
-                    "text": segment.text.strip(),
-                    "timestamp": (segment.start, segment.end)
-                }
-                yield {"content": [TextContent(type="text", text=json.dumps(chunk))]}
+            transcription_data = [
+                {"text": s['text'], "timestamp": (s['start'], s['end'])} for s in all_segments
+            ]
         else:
-            # Consume the generator and yield a single text block at the end
-            all_text_parts = [segment.text.strip() async for segment in segment_generator]
-            full_text = " ".join(all_text_parts)
-            payload = {"source": "local", "model": model, "language": lang, "transcription": full_text}
-            yield {"content": [TextContent(type="text", text=json.dumps(payload))]}
+            transcription_data = " ".join([s['text'] for s in all_segments])
+        
+        payload = {"source": "local", "model": model, "language": lang, "transcription": transcription_data}
+        return {"content": [TextContent(type="text", text=json.dumps(payload))]}
 
-    except (ValueError, IOError) as e:
-        yield create_error_response(str(e))
-    except Exception as e:
-        yield create_error_response(f"An unexpected error occurred: {e}")
+    except (ValueError, IOError) as error:
+        return create_error_response(str(error))
+    except Exception as error:
+        return create_error_response(f"An unexpected error occurred: {error}")
 
+# noinspection PyUnresolvedReferences
 @server.tool(
     name="transcribe_openai",
     description="Transcribes a file with the OpenAI API. Args: file_path (str), model (str, optional), language (str, optional)."
@@ -88,11 +84,12 @@ async def transcribe_openai(
         )
         payload = {"source": "openai", "model": model, "language": lang, "transcription": response_text}
         return {"content": [TextContent(type="text", text=json.dumps(payload))]}
-    except (ValueError, IOError) as e:
-        return create_error_response(str(e))
-    except Exception as e:
-        return create_error_response(f"An unexpected error occurred: {e}")
+    except (ValueError, IOError) as error:
+        return create_error_response(str(error))
+    except Exception as error:
+        return create_error_response(f"An unexpected error occurred: {error}")
 
+# noinspection PyUnresolvedReferences
 @server.tool(
     name="transcribe_hf",
     description="Transcribes a file with a Hugging Face provider. Args: file_path (str), model (str, optional), hf_provider (str, optional)."
@@ -116,11 +113,12 @@ async def transcribe_hf(
         )
         payload = {"source": "huggingface", "model": model, "provider": hf_provider, "transcription": response_text}
         return {"content": [TextContent(type="text", text=json.dumps(payload))]}
-    except (ValueError, IOError) as e:
-        return create_error_response(str(e))
-    except Exception as e:
-        return create_error_response(f"An unexpected error occurred: {e}")
+    except (ValueError, IOError) as error:
+        return create_error_response(str(error))
+    except Exception as error:
+        return create_error_response(f"An unexpected error occurred: {error}")
 
+# noinspection PyUnresolvedReferences
 @server.tool(name="health", description="Simple health check tool.")
 async def health():
     return {"content": [TextContent(type="text", text="ok")]}
@@ -128,7 +126,11 @@ async def health():
 async def main() -> None:
     print(f"Starting MCP HTTP server on {settings.MCP_HOST}:{settings.MCP_PORT}")
     async with http_server(host=settings.MCP_HOST, port=settings.MCP_PORT) as (read_stream, write_stream):
-        await server.run(read_stream, write_stream)
+        await server.run(
+            read_stream,
+            write_stream,
+            initialization_options=None
+        )
 
 if __name__ == "__main__":
     asyncio.run(main())

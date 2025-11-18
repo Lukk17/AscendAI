@@ -1,19 +1,23 @@
-# Use a specific version for reproducibility
-FROM python:3.11-slim
+# Use the official NVIDIA image with the correct CUDA and cuDNN versions
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
-# Set environment variables for Python and the application
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     APP_USER=appuser
 
-# Create a non-root user and group for security
-RUN groupadd -r "$APP_USER" && useradd -r -g "$APP_USER" "$APP_USER"
-
-# Install system dependencies
+# Install Python, pip, and other system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates ffmpeg libgomp1 libsndfile1 && \
+    ca-certificates \
+    ffmpeg \
+    libsndfile1 \
+    python3.11 \
+    python3-pip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user and group for security
+RUN groupadd -r "$APP_USER" && useradd -r -g "$APP_USER" "$APP_USER"
 
 # Set working directory
 WORKDIR /app
@@ -22,10 +26,10 @@ WORKDIR /app
 COPY requirements.txt .
 COPY pytorch-requirements.txt .
 
-# Install Python dependencies in two steps
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r pytorch-requirements.txt && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir -r pytorch-requirements.txt && \
+    python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code and set ownership
 COPY --chown="$APP_USER":"$APP_USER" . .

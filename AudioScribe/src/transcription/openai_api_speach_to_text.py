@@ -3,6 +3,7 @@ import os
 import tempfile
 import httpx
 from openai import OpenAI, APIError
+from pydub import AudioSegment
 
 from src.config.settings import settings
 
@@ -25,7 +26,7 @@ def _transcribe_single_chunk(audio_chunk_path: str, model: str, language: str) -
         return response.text
     except APIError as e:
         logger.error(f"OpenAI API error during chunk transcription for model '{model}': {e}")
-        raise ValueError(f"OpenAI API failed to process an audio chunk. It may be an invalid model or the API may be unavailable.") from e
+        raise ValueError("OpenAI API failed to process an audio chunk. It may be an invalid model or the API may be unavailable.") from e
 
 def openai_transcript(audio_file_path: str, model: str, language: str):
     """

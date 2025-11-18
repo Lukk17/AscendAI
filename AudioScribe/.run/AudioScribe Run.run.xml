@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="AudioScribe Run local" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+  <configuration default="false" name="AudioScribe Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
     <deployment type="dockerfile">
       <settings>
         <option name="imageTag" value="audio-scribe:latest" />
@@ -7,12 +7,8 @@
         <option name="envVars">
           <list>
             <DockerEnvVarImpl>
-              <option name="name" value="OPENAI_API_KEY" />
-              <option name="value" value="sk" />
-            </DockerEnvVarImpl>
-            <DockerEnvVarImpl>
-              <option name="name" value="WHISPER_MODEL_PATH" />
-              <option name="value" value="/models/whisper" />
+              <option name="name" value="HF_HOME" />
+              <option name="value" value="/hf-cache" />
             </DockerEnvVarImpl>
           </list>
         </option>
@@ -24,13 +20,13 @@
             </DockerPortBindingImpl>
           </list>
         </option>
-        <option name="commandLineOptions" value="--gpus all" />
+        <option name="commandLineOptions" value="--gpus all --env HF_TOKEN --env OPENAI_API_KEY" />
         <option name="sourceFilePath" value="AudioScribe/Dockerfile" />
         <option name="volumeBindings">
           <list>
             <DockerVolumeBindingImpl>
-              <option name="containerPath" value="/models/whisper" />
-              <option name="hostPath" value="$PROJECT_DIR$/../../AI/models/LLM/safetensor/whisper-large-v3-speach-to-text" />
+              <option name="containerPath" value="/hf-cache" />
+              <option name="hostPath" value="$PROJECT_DIR$/../../AI/hf-cache" />
             </DockerVolumeBindingImpl>
           </list>
         </option>
