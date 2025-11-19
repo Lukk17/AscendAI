@@ -109,6 +109,7 @@ async def local_speech_transcription_stream(model_path: str, audio_path: str, la
     """
     Launches and manages a worker process to safely transcribe a long audio file.
     """
+    setup_logging()
     start_time = asyncio.get_event_loop().time()
     try:
         mp.set_start_method('spawn', force=True)

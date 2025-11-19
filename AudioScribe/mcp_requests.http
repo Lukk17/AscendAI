@@ -1,0 +1,236 @@
+@audio_file_path = C:/Users/Lukk/Desktop/audio.wav
+@mcp_protocol_version = 2024-11-05
+
+###
+# This file contains example HTTP requests for the AudioScribe MCP server.
+# You can run these directly from within a compatible IDE
+#
+# ==========================================================================================
+# IMPORTANT SETUP:
+# 1. Make sure the mcp_server.py is running.
+# 2. **EDIT THE LINE BELOW** to set the absolute path to your test audio file.
+# ==========================================================================================
+
+# For Linux / macOS:
+# @audio_file_path = ~/Desktop/audio.wav
+
+# mcp session id is returned in 'mcp-session-id' response header after below 'initialize' request
+@mcp_session_id = REPLACE_WITH_SESSION_ID
+
+###
+# @name initialize
+# Initialize a Streamable HTTP MCP session.
+# IMPORTANT:
+# - After you send this, copy the "mcp-session-id" response header value
+#   into the mcp_session_id variable below.
+# - Keep the protocolVersion consistent across requests; copy it to
+#   mcp_protocol_version.
+POST http://localhost:7017/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "0.1.0" }
+  }
+}
+
+###
+
+###
+# @name list_tools
+# List available tools. Requires session headers from initialization.
+POST http://localhost:7017/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+# @name transcribe_local
+# Transcribe an audio file using a local faster-whisper model via tools/call.
+POST http://localhost:7017/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_local",
+    "arguments": {
+      "file_path": "{{audio_file_path}}",
+      "model": "Systran/faster-whisper-large-v3",
+      "language": "pl",
+      "with_timestamps": false
+    }
+  }
+}
+
+###
+# @name transcribe_openai
+# Transcribe an audio file using the OpenAI API via tools/call.
+POST http://localhost:7017/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_openai",
+    "arguments": {
+      "file_path": "{{audio_file_path}}",
+      "model": "whisper-1",
+      "language": "pl"
+    }
+  }
+}
+
+###
+# @name transcribe_hf
+# Transcribe an audio file using a Hugging Face provider via tools/call.
+POST http://localhost:7017/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_hf",
+    "arguments": {
+      "file_path": "{{audio_file_path}}",
+      "model": "openai/whisper-large-v3",
+      "hf_provider": "hf-inference"
+    }
+  }
+}
+
+
+###
+# SSE TRANSPORT EXAMPLES
+# ------------------------------------------------------------------------------------------
+# The server is also exposing an SSE transport mounted under "/sse-root".
+# SSE is a long-lived GET connection for server-to-client events, and a POST endpoint
+# for client-to-server messages.
+#
+# Flow:
+# 1) Start the SSE stream (GET). The first event will contain the message POST path like:
+#      /sse-root/messages/?session_id=<session_id_hex>
+# 2) Copy that path into the variable below and use it for JSON-RPC POSTs.
+# ------------------------------------------------------------------------------------------
+
+###
+# @name sse_connect
+# Start an SSE stream. Your HTTP client must support text/event-stream to keep the
+# connection open and display events. If it doesn't, use curl:
+#   curl -N -H "Accept: text/event-stream" http://localhost:7017/sse-root/sse
+GET http://localhost:7017/sse-root/sse
+Accept: text/event-stream
+
+
+###
+# Paste the messages path you received in the very first SSE event here.
+# Example value: /sse-root/messages/?session_id=6f3a5e0a0a1b4cd294a0b9b8b39f1234
+@sse_messages_path = /sse-root/messages/?session_id=REPLACE_WITH_SESSION_ID
+
+
+###
+# @name sse_initialize
+# Initialize the MCP session over SSE by POSTing to the messages path.
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 100,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "0.1.0" }
+  }
+}
+
+
+###
+# @name sse_transcribe_local
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 101,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_local",
+    "arguments": {
+      "file_path": "{{audio_file_path}}",
+      "model": "Systran/faster-whisper-large-v3",
+      "language": "pl",
+      "with_timestamps": false
+    }
+  }
+}
+
+
+###
+# @name sse_transcribe_openai
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 102,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_openai",
+    "arguments": {
+      "file_path": "{{audio_file_path}}",
+      "model": "whisper-1",
+      "language": "en"
+    }
+  }
+}
+
+
+###
+# @name sse_transcribe_hf
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 103,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_hf",
+    "arguments": {
+      "file_path": "{{audio_file_path}}",
+      "model": "openai/whisper-large-v3",
+      "hf_provider": "hf-inference"
+    }
+  }
+}

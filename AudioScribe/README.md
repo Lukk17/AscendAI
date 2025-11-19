@@ -222,6 +222,25 @@ The MCP server runs on the same port (`7017`) and uses the same unified containe
 *   `transcribe_openai(file_path: str, model: str, language: str)`
 *   `transcribe_hf(file_path: str, model: str, hf_provider: str)`
 
+### How to run (both transports enabled):
+
+```shell
+uvicorn mcp_server:app --host 0.0.0.0 --port 7017
+```
+
+Streamable HTTP (bidirectional over HTTP):
+  - Endpoint: POST http://localhost:7017/mcp
+  - Headers:  Content-Type: application/json
+              Accept: application/json, text/event-stream
+
+SSE transport (server-sent events + POST messages):
+  - Stream:   GET  http://localhost:7017/sse-root/sse
+              Accept: text/event-stream
+  - Messages: POST http://localhost:7017/sse-root/messages/
+              Headers: Content-Type: application/json
+              Note: The messages path includes a required `session_id` query param
+                    provided by the server in the first SSE event named "endpoint".
+
 ### Example MCP Client Configurations
 
 To use these tools, configure your AI-powered editor or client to connect to the running server's URL.

@@ -37,8 +37,8 @@ COPY --chown="$APP_USER":"$APP_USER" . .
 # Switch to the non-root user
 USER $APP_USER
 
-# Expose the port the MCP HTTP server will run on
+# Expose the port the MCP server will run on
 EXPOSE 7017
 
-# The command to run the MCP server by default
-CMD ["python3", "mcp_server.py"]
+# The command to run the FastMCP application with uvicorn (Streamable HTTP app adn SSE)
+CMD ["uvicorn", "mcp_server:app", "--host", "0.0.0.0", "--port", "7017"]
