@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.transcription.speech_to_text import local_speech_transcription_stream, _transcribe_and_communicate
+from src.transcription.local_speech_to_text import local_speech_transcription_stream, _transcribe_and_communicate
 
 
 @pytest.mark.asyncio
-@patch('src.transcription.speech_to_text.mp.get_context')
+@patch('src.transcription.local_speech_to_text.mp.get_context')
 async def test_local_speech_transcription_stream_success(mock_get_context):
     mock_queue = MagicMock()
     mock_queue.get.return_value = [{'text': 'Hello'}]
@@ -22,7 +22,7 @@ async def test_local_speech_transcription_stream_success(mock_get_context):
 
 
 @pytest.mark.asyncio
-@patch('src.transcription.speech_to_text.mp.get_context')
+@patch('src.transcription.local_speech_to_text.mp.get_context')
 async def test_local_speech_transcription_stream_worker_error(mock_get_context):
     mock_queue = MagicMock()
     mock_queue.get.return_value = ValueError("Worker Error")
@@ -34,10 +34,10 @@ async def test_local_speech_transcription_stream_worker_error(mock_get_context):
         _ = [s async for s in local_speech_transcription_stream("f", "f", "en")]
 
 
-@patch('src.transcription.speech_to_text.setup_logging')
-@patch('src.transcription.speech_to_text.torch.cuda.is_available', return_value=False)
-@patch('src.transcription.speech_to_text.WhisperModel')
-@patch('src.transcription.speech_to_text.AudioSegment')
+@patch('src.transcription.local_speech_to_text.setup_logging')
+@patch('src.transcription.local_speech_to_text.torch.cuda.is_available', return_value=False)
+@patch('src.transcription.local_speech_to_text.WhisperModel')
+@patch('src.transcription.local_speech_to_text.AudioSegment')
 def test_worker_cpu_path(mock_audio_segment, mock_whisper, mock_cuda_check, mock_logging):
     mock_queue = MagicMock()
     mock_event = MagicMock()
@@ -51,8 +51,8 @@ def test_worker_cpu_path(mock_audio_segment, mock_whisper, mock_cuda_check, mock
     mock_whisper.assert_called_with("f", device="cpu", compute_type="int8")
 
 
-@patch('src.transcription.speech_to_text.setup_logging')
-@patch('src.transcription.speech_to_text.WhisperModel', side_effect=Exception("Model Load Fail"))
+@patch('src.transcription.local_speech_to_text.setup_logging')
+@patch('src.transcription.local_speech_to_text.WhisperModel', side_effect=Exception("Model Load Fail"))
 def test_worker_internal_exception(mock_whisper, mock_logging):
     mock_queue = MagicMock()
     mock_event = MagicMock()
@@ -64,10 +64,10 @@ def test_worker_internal_exception(mock_whisper, mock_logging):
     assert isinstance(mock_queue.put.call_args[0][0], Exception)
 
 
-@patch('src.transcription.speech_to_text.setup_logging')
-@patch('src.transcription.speech_to_text.WhisperModel')
-@patch('src.transcription.speech_to_text.AudioSegment')
-@patch('src.transcription.speech_to_text.os.remove', side_effect=OSError("Cleanup fail"))
+@patch('src.transcription.local_speech_to_text.setup_logging')
+@patch('src.transcription.local_speech_to_text.WhisperModel')
+@patch('src.transcription.local_speech_to_text.AudioSegment')
+@patch('src.transcription.local_speech_to_text.os.remove', side_effect=OSError("Cleanup fail"))
 def test_worker_cleanup_os_error(mock_remove, mock_audio, mock_whisper, mock_logging):
     mock_queue = MagicMock()
     mock_event = MagicMock()

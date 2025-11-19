@@ -2,7 +2,7 @@ import logging
 
 from src.transcription.huggingface_api_speach_to_text import hf_transcript
 from src.transcription.openai_api_speach_to_text import openai_transcript
-from src.transcription.speech_to_text import local_speech_transcription_stream
+from src.transcription.local_speech_to_text import local_speech_transcription_stream
 
 logger = logging.getLogger(__name__)
 
