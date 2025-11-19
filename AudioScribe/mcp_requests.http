@@ -1,21 +1,18 @@
 @audio_file_path = C:/Users/Lukk/Desktop/audio.wav
-@mcp_protocol_version = 2024-11-05
-
-###
-# This file contains example HTTP requests for the AudioScribe MCP server.
-# You can run these directly from within a compatible IDE
-#
-# ==========================================================================================
-# IMPORTANT SETUP:
-# 1. Make sure the mcp_server.py is running.
-# 2. **EDIT THE LINE BELOW** to set the absolute path to your test audio file.
-# ==========================================================================================
-
 # For Linux / macOS:
 # @audio_file_path = ~/Desktop/audio.wav
 
-# mcp session id is returned in 'mcp-session-id' response header after below 'initialize' request
-@mcp_session_id = REPLACE_WITH_SESSION_ID
+@mcp_protocol_version = 2024-11-05
+
+# Streamable HTTP mcp_session_id is returned in 'mcp-session-id' response header after below 'initialize' request
+# Update below ID after each initialize request
+@mcp_session_id = adf44c45673d4c128e703011dfcca235
+
+# Paste the messages path you received in the very first SSE event here.
+# Update below ID after each initialize request
+@sse_messages_path = /sse-root/messages/?session_id=8d473e5bb0bb4487b22bff83f0b203e7
+
+###
 
 ###
 # @name initialize
@@ -152,9 +149,6 @@ Accept: text/event-stream
 
 
 ###
-# Paste the messages path you received in the very first SSE event here.
-# Example value: /sse-root/messages/?session_id=6f3a5e0a0a1b4cd294a0b9b8b39f1234
-@sse_messages_path = /sse-root/messages/?session_id=REPLACE_WITH_SESSION_ID
 
 
 ###

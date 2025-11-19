@@ -1,14 +1,15 @@
 import asyncio
 import logging
 import multiprocessing as mp
+from multiprocessing.synchronize import Event as EventClass
 import os
 import tempfile
 import torch
 from faster_whisper import WhisperModel
-from multiprocessing.synchronize import Event as EventClass
 from pydub import AudioSegment
 
 from src.config.settings import settings
+from src.config.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +23,9 @@ def _transcribe_and_communicate(
         result_queue: mp.Queue,
         shutdown_event: EventClass
 ):
-    """
-    This is the target function for the worker process.
-    """
+    # This is the entry point for the new process, so logging must be configured here.
     setup_logging()
+    
     process_id = os.getpid()
     logger.info(f"[Worker {process_id}] Process started.")
 
@@ -106,10 +106,6 @@ def _transcribe_and_communicate(
 
 
 async def local_speech_transcription_stream(model_path: str, audio_path: str, language: str):
-    """
-    Launches and manages a worker process to safely transcribe a long audio file.
-    """
-    setup_logging()
     start_time = asyncio.get_event_loop().time()
     try:
         mp.set_start_method('spawn', force=True)
@@ -144,14 +140,10 @@ async def local_speech_transcription_stream(model_path: str, audio_path: str, la
 
     for segment_dict in result:
         yield segment_dict
-
+    
     await asyncio.to_thread(worker_process.join, timeout=10)
     if worker_process.is_alive():
         logger.warning("[Master process] Worker process did not terminate cleanly. Forcing termination.")
         worker_process.terminate()
 
     logger.info("[Master process] Finished processing transcription.")
-
-
-# This import is needed for the worker process to find the logging setup function
-from src.config.logging_config import setup_logging
