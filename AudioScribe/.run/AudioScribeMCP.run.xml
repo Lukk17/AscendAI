@@ -1,7 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="AudioScribe" type="Python.FastAPI" folderName="AudioScribe">
-    <option name="additionalOptions" value="--port 7017" />
-    <option name="file" value="$PROJECT_DIR$/AudioScribe/main.py" />
+  <configuration default="false" name="AudioScribeMCP" type="Python.FastAPI" folderName="AudioScribe">
+    <option name="additionalOptions" value="--port 7016" />
+    <option name="appName" value="app" />
+    <option name="file" value="$PROJECT_DIR$/AudioScribe/mcp_server.py" />
     <module name="AudioScribe" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />

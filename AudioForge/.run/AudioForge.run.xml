@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="AudioForge" type="Python.FastAPI">
+  <configuration default="false" name="AudioForge" type="Python.FastAPI" folderName="AudioForge">
     <option name="additionalOptions" value="--port 7018" />
     <option name="file" value="$PROJECT_DIR$/AudioForge/main.py" />
     <module name="AudioForge" />
