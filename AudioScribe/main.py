@@ -37,7 +37,7 @@ async def transcribe_local_endpoint(
         file: UploadFile = File(...),
         model: str = Form("Systran/faster-whisper-large-v3"),
         language: Optional[str] = Form(None),
-        with_timestamps: bool = Form(True)
+        with_timestamps: bool = Form(False)
 ):
     """
     Transcribes an audio file using a faster-whisper compatible model.

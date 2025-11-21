@@ -1,17 +1,20 @@
 import asyncio
 import json
 import os
+from contextlib import asynccontextmanager
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
+from starlette.applications import Starlette
+from starlette.routing import Mount
+from starlette.types import ASGIApp, Scope, Receive, Send, Message
 from typing import Optional
 
+from src.io.download_service import download_to_temp_async
+from src.io.file_service import cleanup_temp_file
 from src.config.logging_config import setup_logging
 from src.config.settings import settings
 from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
-from starlette.applications import Starlette
-from starlette.routing import Mount
-from contextlib import asynccontextmanager
-from starlette.types import ASGIApp, Scope, Receive, Send, Message
+
 
 class ForceJSONUTF8Middleware:
     def __init__(self, app: ASGIApp):
@@ -68,6 +71,7 @@ class ForceJSONUTF8Middleware:
 
         await self.app(scope, receive, send_wrapper)
 
+
 def create_app() -> Starlette:
     setup_logging()
 
@@ -97,8 +101,7 @@ def create_app() -> Starlette:
         ],
         lifespan=_parent_lifespan,
     )
-    
-    # Wrap the final app in the middleware
+
     wrapped_app = ForceJSONUTF8Middleware(app)
 
     def create_error_response(message: str):
@@ -106,21 +109,26 @@ def create_app() -> Starlette:
 
     @scribe_mcp_server.tool(
         name="transcribe_local",
-        description="Transcribes a file with a local model. Args: file_path (str), model (str, optional), language (str, optional), with_timestamps (bool, optional)."
+        description="Transcribes audio from a URI with a local model. Args: audio_uri (str), model (str, optional), language (str, optional), with_timestamps (bool, optional)."
     )
     async def transcribe_local(
-            file_path: str,
+            audio_uri: str,  # Changed: Now audio_uri instead of file_path
             model: str = "Systran/faster-whisper-large-v3",
             language: Optional[str] = None,
             with_timestamps: bool = True
     ):
-        if not file_path or not os.path.exists(file_path):
-            return create_error_response(f"File not found: {file_path}")
+        if not audio_uri:
+            return create_error_response("URI not provided")
 
-        lang = language if language else settings.TRANSCRIPTION_LANGUAGE
+        temp_file_path = None
         try:
+            temp_file_path = await download_to_temp_async(audio_uri)  # New: Download to temp
+            if not os.path.exists(temp_file_path):
+                return create_error_response(f"File not accessible after download: {temp_file_path}")
+
+            lang = language if language else settings.TRANSCRIPTION_LANGUAGE
             all_segments = [segment async for segment in local_speech_transcription(
-                audio_file_path=file_path,
+                audio_file_path=temp_file_path,  # Use temp path
                 model_path=model,
                 language=lang
             )]
@@ -139,26 +147,34 @@ def create_app() -> Starlette:
             return create_error_response(str(error))
         except Exception as error:
             return create_error_response(f"An unexpected error occurred: {error}")
+        finally:
+            if temp_file_path:
+                cleanup_temp_file(temp_file_path)  # Cleanup like in main.py
 
     @scribe_mcp_server.tool(
         name="transcribe_openai",
-        description="Transcribes a file with the OpenAI API. Args: file_path (str), model (str, optional), language (str, optional)."
+        description="Transcribes audio from a URI with the OpenAI API. Args: audio_uri (str), model (str, optional), language (str, optional)."
     )
     async def transcribe_openai(
-            file_path: str,
+            audio_uri: str,
             model: str = "whisper-1",
             language: Optional[str] = None
     ):
         if not settings.OPENAI_API_KEY:
             return create_error_response("OPENAI_API_KEY is not configured on the server.")
-        if not file_path or not os.path.exists(file_path):
-            return create_error_response(f"File not found: {file_path}")
+        if not audio_uri:
+            return create_error_response("URI not provided")
 
-        lang = language if language else settings.TRANSCRIPTION_LANGUAGE
+        temp_file_path = None
         try:
+            temp_file_path = await download_to_temp_async(audio_uri)
+            if not os.path.exists(temp_file_path):
+                return create_error_response(f"File not accessible after download: {temp_file_path}")
+
+            lang = language if language else settings.TRANSCRIPTION_LANGUAGE
             response_text = await asyncio.to_thread(
                 openai_speech_transcription,
-                audio_file_path=file_path,
+                audio_file_path=temp_file_path,
                 model=model,
                 language=lang
             )
@@ -168,25 +184,33 @@ def create_app() -> Starlette:
             return create_error_response(str(error))
         except Exception as error:
             return create_error_response(f"An unexpected error occurred: {error}")
+        finally:
+            if temp_file_path:
+                cleanup_temp_file(temp_file_path)
 
     @scribe_mcp_server.tool(
         name="transcribe_hf",
-        description="Transcribes a file with a Hugging Face provider. Args: file_path (str), model (str, optional), hf_provider (str, optional)."
+        description="Transcribes audio from a URI with a Hugging Face provider. Args: audio_uri (str), model (str, optional), hf_provider (str, optional)."
     )
     async def transcribe_hf(
-            file_path: str,
+            audio_uri: str,
             model: str = "openai/whisper-large-v3",
             hf_provider: str = "hf-inference"
     ):
         if not settings.HF_TOKEN:
             return create_error_response("HF_TOKEN is not configured on the server.")
-        if not file_path or not os.path.exists(file_path):
-            return create_error_response(f"File not found: {file_path}")
+        if not audio_uri:
+            return create_error_response("URI not provided")
 
+        temp_file_path = None
         try:
+            temp_file_path = await download_to_temp_async(audio_uri)
+            if not os.path.exists(temp_file_path):
+                return create_error_response(f"File not accessible after download: {temp_file_path}")
+
             response_text = await asyncio.to_thread(
                 hf_speech_transcription,
-                audio_file_path=file_path,
+                audio_file_path=temp_file_path,
                 model=model,
                 provider=hf_provider
             )
@@ -196,11 +220,15 @@ def create_app() -> Starlette:
             return create_error_response(str(error))
         except Exception as error:
             return create_error_response(f"An unexpected error occurred: {error}")
+        finally:
+            if temp_file_path:
+                cleanup_temp_file(temp_file_path)
 
     @scribe_mcp_server.tool(name="health", description="Simple health check tool.")
     async def health():
         return {"content": [TextContent(type="text", text="ok")]}
-    
+
     return wrapped_app
+
 
 app = create_app()

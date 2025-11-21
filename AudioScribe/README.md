@@ -3,7 +3,24 @@
 AudioScribe is a versatile, dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models. The transcription model is chosen **per-request**, allowing for maximum flexibility.
 
 ---
-### API Documentation
+
+## Table of Contents
+
+*   [API Documentation](#api-documentation)
+*   [Prerequisites](#prerequisites)
+*   [Configuration (Environment Variables)](#configuration-environment-variables)
+*   [Running the Service](#running-the-service)
+    *   [Standard Python App](#running-as-a-standard-python-app-without-docker)
+    *   [Docker](#running-with-docker-recommended)
+*   [Making API Requests](#making-api-requests)
+*   [MCP Server Mode](#mcp-server-mode)
+    *   [Using Audio URIs](#using-audio-uris-in-mcp)
+*   [Dependencies](#dependencies)
+*   [Troubleshooting](#troubleshooting)
+
+---
+
+## API Documentation
 
 The REST API is self-documenting via Swagger and Redoc. While the server is running, you can access:
 
@@ -140,6 +157,11 @@ docker run -d `
 
 ## Making API Requests
 
+### REST Client
+For testing and examples, you can use the included `mcp_requests.http` file.
+*   [mcp_requests.http](mcp_requests.http): Contains ready-to-use HTTP requests for the REST Client extension in VS Code. It covers both standard API calls and MCP protocol interactions.
+
+### API Requests
 You specify the model and other parameters in the body of your `POST` request.
 
 ### Local Transcription
@@ -214,29 +236,30 @@ curl -X POST "http://localhost:7017/api/v1/transcribe/hf" `
 
 ## MCP Server Mode
 
-The MCP server runs on the same port (`7017`) and uses the same unified container.
+The MCP server runs on a separate port (default `7016`) to avoid conflicts with the main API when running locally.
+When using Docker, it can be mapped to any port.
 
 **Exposed MCP Tools:**
 *   `health()`
-*   `transcribe_local(file_path: str, model: str, language: str, with_timestamps: bool)`
-*   `transcribe_openai(file_path: str, model: str, language: str)`
-*   `transcribe_hf(file_path: str, model: str, hf_provider: str)`
+*   `transcribe_local(audio_uri: str, model: str, language: str, with_timestamps: bool)`
+*   `transcribe_openai(audio_uri: str, model: str, language: str)`
+*   `transcribe_hf(audio_uri: str, model: str, hf_provider: str)`
 
 ### How to run (both transports enabled):
 
 ```shell
-uvicorn mcp_server:app --host 0.0.0.0 --port 7017
+uvicorn mcp_server:app --host 0.0.0.0 --port 7016
 ```
 
 Streamable HTTP (bidirectional over HTTP):
-  - Endpoint: POST http://localhost:7017/mcp
+  - Endpoint: POST http://localhost:7016/mcp
   - Headers:  Content-Type: application/json
               Accept: application/json, text/event-stream
 
 SSE transport (server-sent events + POST messages):
-  - Stream:   GET  http://localhost:7017/sse-root/sse
+  - Stream:   GET  http://localhost:7016/sse-root/sse
               Accept: text/event-stream
-  - Messages: POST http://localhost:7017/sse-root/messages/
+  - Messages: POST http://localhost:7016/sse-root/messages/
               Headers: Content-Type: application/json
               Note: The messages path includes a required `session_id` query param
                     provided by the server in the first SSE event named "endpoint".
@@ -250,10 +273,41 @@ To use these tools, configure your AI-powered editor or client to connect to the
 {
   "mcpServers": {
     "audio-scribe": {
-      "url": "http://localhost:7017"
+      "url": "http://localhost:7016"
     }
   }
 }
+
+### Using Audio URIs in MCP
+
+The MCP tools accept an `audio_uri` argument, which supports both local files and HTTP(S) URLs.
+
+#### 1. Local Files (`file://`)
+To use a file on the server's local filesystem, use the `file://` scheme.
+*   **Windows**: `file:///C:/Users/User/Desktop/audio.wav`
+*   **Linux/macOS**: `file:///home/user/audio.wav`
+*   **Docker**: `file:///audio/audio.wav` (ensure the file is mounted into the container)
+
+#### 2. HTTP/HTTPS URLs (`http://`, `https://`)
+You can also provide a URL to an audio file hosted on a web server. The MCP server will download it to a temporary file for processing.
+
+**Example: Serving files locally with `http-server`**
+
+If you have audio files on your local machine and want to expose them to the MCP server (especially if running in Docker or a different environment), you can use a simple HTTP server.
+
+1.  **Install `http-server`** (requires Node.js):
+    ```shell
+    npm install -g http-server
+    ```
+
+2.  **Run the server** in the directory containing your audio files (e.g., parent of `audio` folder):
+    ```shell
+    http-server -p 9999
+    ```
+
+3.  **Access the file**:
+    If your file is at `./audio/test.wav` relative to where you ran the command, the URI will be:
+    `http://localhost:9999/audio/test.wav` (or use your machine's LAN IP if accessing from a Docker container).
 ```
 
 ---

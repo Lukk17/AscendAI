@@ -2,8 +2,8 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 
-from src.io.file_service import _safe_suffix_from_filename, cleanup_temp_file, save_upload_to_temp_async, \
-    _create_temp_file
+from src.io.file_service import safe_suffix_from_filename, cleanup_temp_file, save_upload_to_temp_async, \
+    create_temp_file
 
 
 # noinspection PyProtectedMember
@@ -16,7 +16,7 @@ from src.io.file_service import _safe_suffix_from_filename, cleanup_temp_file, s
     (12345, ""),  # Test invalid type to cover the except block
 ])
 def test_safe_suffix_from_filename(filename, expected_suffix):
-    assert _safe_suffix_from_filename(filename) == expected_suffix
+    assert safe_suffix_from_filename(filename) == expected_suffix
 
 
 @patch('os.path.exists')
@@ -76,7 +76,7 @@ def test_create_temp_file_creates_real_file():
     temp_path = None
     try:
         # noinspection PyProtectedMember
-        temp_path = _create_temp_file(suffix=".tmp")
+        temp_path = create_temp_file(suffix=".tmp")
         assert os.path.exists(temp_path)
     finally:
         if temp_path and os.path.exists(temp_path):

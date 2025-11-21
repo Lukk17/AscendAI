@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 
-def _create_temp_file(suffix: str = "") -> str:
+def create_temp_file(suffix: str = "") -> str:
     """
     Create a temporary file synchronously and return its path.
     """
@@ -14,7 +14,7 @@ def _create_temp_file(suffix: str = "") -> str:
         return tmp.name
 
 
-def _safe_suffix_from_filename(filename: str) -> str:
+def safe_suffix_from_filename(filename: str) -> str:
     """
     Build a safe suffix for a temporary file based on the original filename's suffix.
     Returns an empty string if the filename has no extension.
@@ -32,9 +32,9 @@ async def save_upload_to_temp_async(upload: UploadFile) -> str:
     """
     Asynchronously save an UploadFile to a temporary file and return the file path.
     """
-    suffix = _safe_suffix_from_filename(upload.filename or "")
+    suffix = safe_suffix_from_filename(upload.filename or "")
 
-    temp_path = _create_temp_file(suffix)
+    temp_path = create_temp_file(suffix)
 
     await upload.seek(0)
     async with aiofiles.open(temp_path, 'wb') as out_file:

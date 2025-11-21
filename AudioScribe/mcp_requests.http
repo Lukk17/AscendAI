@@ -1,21 +1,21 @@
 # For Windows:
-#@audio_file_path = C:/Users/Lukk/Desktop/audio.wav
+#@audio_uri = file:///C:/Users/Lukk/Desktop/audio.wav
 
 # For Linux / macOS:
-# @audio_file_path = ~/Desktop/audio.wav
+# @audio_uri = file:///home/user/Desktop/audio.wav
 
 # For Docker:
- @audio_file_path = /audio/audio.wav
+ @audio_uri = file:///audio/audio.wav
 
 @mcp_protocol_version = 2024-11-05
 
 # Streamable HTTP mcp_session_id is returned in 'mcp-session-id' response header after below 'initialize' request
 # Update below ID after each initialize request
-@mcp_session_id = CHANGE_ME
+@mcp_session_id = 1215a108766d4f08bf75fc55a0354785
 
 # Paste the messages path you received in the very first SSE event here.
 # Update below ID after each initialize request
-@sse_messages_path = /sse-root/messages/?session_id=07a7b6d07b294ee19746d874fc758bef
+@sse_messages_path = /sse-root/messages/?session_id=CHANGE_ME
 
 ###
 
@@ -76,7 +76,7 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
   "params": {
     "name": "transcribe_local",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "Systran/faster-whisper-large-v3",
       "language": "en",
       "with_timestamps": false
@@ -102,7 +102,7 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
   "params": {
     "name": "transcribe_local",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "Systran/faster-whisper-large-v3",
       "language": "en",
       "with_timestamps": true
@@ -126,7 +126,7 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
   "params": {
     "name": "transcribe_openai",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "whisper-1",
       "language": "en"
     }
@@ -149,7 +149,7 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
   "params": {
     "name": "transcribe_hf",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "openai/whisper-large-v3",
       "hf_provider": "hf-inference"
     }
@@ -238,7 +238,7 @@ Content-Type: application/json
   "params": {
     "name": "transcribe_local",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "Systran/faster-whisper-large-v3",
       "language": "en",
       "with_timestamps": false
@@ -258,7 +258,7 @@ Content-Type: application/json
   "params": {
     "name": "transcribe_local",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "Systran/faster-whisper-large-v3",
       "language": "en",
       "with_timestamps": true
@@ -278,7 +278,7 @@ Content-Type: application/json
   "params": {
     "name": "transcribe_openai",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "whisper-1",
       "language": "en"
     }
@@ -297,7 +297,7 @@ Content-Type: application/json
   "params": {
     "name": "transcribe_hf",
     "arguments": {
-      "file_path": "{{audio_file_path}}",
+      "audio_uri": "{{audio_uri}}",
       "model": "openai/whisper-large-v3",
       "hf_provider": "hf-inference"
     }

@@ -1,6 +1,8 @@
 import asyncio
-import json
 import os
+os.environ["OPENAI_API_KEY"] = "dummy"  # Set dummy key before importing modules that init OpenAI client
+import json
+
 import tempfile
 from typing import AsyncIterator
 
@@ -11,6 +13,9 @@ from asgi_lifespan import LifespanManager
 
 from mcp_server import create_app
 import mcp_server as mcp_server_module
+from unittest.mock import AsyncMock
+from src.config.settings import settings
+
 
 
 pytestmark = pytest.mark.asyncio
@@ -161,6 +166,12 @@ async def test_streamable_http_initialize_returns_utf8_and_session_id(asgi_clien
 
 async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
     monkeypatch.setattr(mcp_server_module, "local_speech_transcription", _fake_local_transcription)
+    
+    # Mock download_to_temp_async to return the temp_audio_file path directly
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -172,11 +183,12 @@ async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch
         "params": {
             "name": "transcribe_local",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
                 "model": "Systran/faster-whisper-large-v3",
                 "language": "pl",
                 "with_timestamps": False,
             },
+
         },
     }
 
@@ -267,7 +279,13 @@ async def test_streamable_http_transcribe_openai_with_monkeypatch(monkeypatch, t
         return "OPENAI OK"
 
     monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _fake_openai_transcription)
+    monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _fake_openai_transcription)
     monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
+    
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -279,10 +297,11 @@ async def test_streamable_http_transcribe_openai_with_monkeypatch(monkeypatch, t
         "params": {
             "name": "transcribe_openai",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
                 "model": "whisper-1",
                 "language": "pl",
             },
+
         },
     }
 
@@ -308,7 +327,13 @@ async def test_streamable_http_transcribe_hf_with_monkeypatch(monkeypatch, temp_
         return "HF OK"
 
     monkeypatch.setattr(mcp_server_module, "hf_speech_transcription", _fake_hf_transcription)
+    monkeypatch.setattr(mcp_server_module, "hf_speech_transcription", _fake_hf_transcription)
     monkeypatch.setattr(mcp_server_module.settings, "HF_TOKEN", "test")
+
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -320,10 +345,11 @@ async def test_streamable_http_transcribe_hf_with_monkeypatch(monkeypatch, temp_
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
                 "model": "openai/whisper-large-v3",
                 "hf_provider": "hf-inference",
             },
+
         },
     }
 
@@ -351,6 +377,11 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch
 
     monkeypatch.setattr(mcp_server_module, "local_speech_transcription", _fake_segments)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -361,11 +392,12 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch
         "params": {
             "name": "transcribe_local",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
                 "model": "Systran/faster-whisper-large-v3",
                 "language": "pl",
                 "with_timestamps": True,
             },
+
         },
     }
 
@@ -406,7 +438,7 @@ async def test_streamable_http_transcribe_local_file_not_found(asgi_client: Asyn
         "params": {
             "name": "transcribe_local",
             "arguments": {
-                "file_path": "X:/no/such/file.wav",
+                "audio_uri": "file:///X:/no/such/file.wav",
                 "with_timestamps": True,
             },
         },
@@ -427,6 +459,11 @@ async def test_streamable_http_transcribe_local_generator_value_error(monkeypatc
 
     monkeypatch.setattr(mcp_server_module, "local_speech_transcription", _err_gen)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -437,7 +474,9 @@ async def test_streamable_http_transcribe_local_generator_value_error(monkeypatc
         "params": {
             "name": "transcribe_local",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "Systran/faster-whisper-large-v3",
+                "language": "pl",
                 "with_timestamps": False,
             },
         },
@@ -457,6 +496,11 @@ async def test_streamable_http_transcribe_local_generator_generic_error(monkeypa
 
     monkeypatch.setattr(mcp_server_module, "local_speech_transcription", _err_gen2)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -467,7 +511,9 @@ async def test_streamable_http_transcribe_local_generator_generic_error(monkeypa
         "params": {
             "name": "transcribe_local",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "Systran/faster-whisper-large-v3",
+                "language": "pl",
                 "with_timestamps": False,
             },
         },
@@ -480,7 +526,11 @@ async def test_streamable_http_transcribe_local_generator_generic_error(monkeypa
 
 async def test_streamable_http_transcribe_openai_missing_api_key(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
     # Unset key
-    monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
+
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -492,7 +542,7 @@ async def test_streamable_http_transcribe_openai_missing_api_key(monkeypatch, te
         "params": {
             "name": "transcribe_openai",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
             },
         },
     }
@@ -515,7 +565,7 @@ async def test_streamable_http_transcribe_openai_file_not_found(monkeypatch, asg
         "params": {
             "name": "transcribe_openai",
             "arguments": {
-                "file_path": "X:/nope.wav",
+                "audio_uri": "file:///X:/nope.wav",
             },
         },
     }
@@ -532,6 +582,11 @@ async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch,
     monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
     monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _raise_value_error)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -542,7 +597,9 @@ async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch,
         "params": {
             "name": "transcribe_openai",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "whisper-1",
+                "language": "pl",
             },
         },
     }
@@ -559,6 +616,11 @@ async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, te
     monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
     monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _raise_io_error)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -569,7 +631,9 @@ async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, te
         "params": {
             "name": "transcribe_openai",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "whisper-1",
+                "language": "pl",
             },
         },
     }
@@ -586,6 +650,11 @@ async def test_streamable_http_transcribe_openai_raises_generic_exception(monkey
     monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
     monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _raise_generic)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -596,7 +665,9 @@ async def test_streamable_http_transcribe_openai_raises_generic_exception(monkey
         "params": {
             "name": "transcribe_openai",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "whisper-1",
+                "language": "pl",
             },
         },
     }
@@ -619,7 +690,7 @@ async def test_streamable_http_transcribe_hf_missing_token(monkeypatch, temp_aud
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
             },
         },
     }
@@ -642,7 +713,7 @@ async def test_streamable_http_transcribe_hf_file_not_found(monkeypatch, asgi_cl
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "file_path": "X:/nope.wav",
+                "audio_uri": "file:///X:/nope.wav",
             },
         },
     }
@@ -659,6 +730,11 @@ async def test_streamable_http_transcribe_hf_raises_value_error(monkeypatch, tem
     monkeypatch.setattr(mcp_server_module.settings, "HF_TOKEN", "test")
     monkeypatch.setattr(mcp_server_module, "hf_speech_transcription", _raise_value_error_hf)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -669,7 +745,9 @@ async def test_streamable_http_transcribe_hf_raises_value_error(monkeypatch, tem
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "openai/whisper-large-v3",
+                "hf_provider": "hf-inference",
             },
         },
     }
@@ -686,6 +764,11 @@ async def test_streamable_http_transcribe_hf_raises_io_error(monkeypatch, temp_a
     monkeypatch.setattr(mcp_server_module.settings, "HF_TOKEN", "test")
     monkeypatch.setattr(mcp_server_module, "hf_speech_transcription", _raise_io_error_hf)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -696,7 +779,9 @@ async def test_streamable_http_transcribe_hf_raises_io_error(monkeypatch, temp_a
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "openai/whisper-large-v3",
+                "hf_provider": "hf-inference",
             },
         },
     }
@@ -713,6 +798,11 @@ async def test_streamable_http_transcribe_hf_raises_generic_exception(monkeypatc
     monkeypatch.setattr(mcp_server_module.settings, "HF_TOKEN", "test")
     monkeypatch.setattr(mcp_server_module, "hf_speech_transcription", _raise_generic_hf)
 
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+
+
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -723,7 +813,9 @@ async def test_streamable_http_transcribe_hf_raises_generic_exception(monkeypatc
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "file_path": temp_audio_file,
+                "audio_uri": f"file://{temp_audio_file}",
+                "model": "openai/whisper-large-v3",
+                "hf_provider": "hf-inference",
             },
         },
     }
