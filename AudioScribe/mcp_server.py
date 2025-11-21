@@ -109,7 +109,12 @@ def create_app() -> Starlette:
 
     @scribe_mcp_server.tool(
         name="transcribe_local",
-        description="Transcribes audio from a URI with a local model. Args: audio_uri (str), model (str, optional), language (str, optional), with_timestamps (bool, optional)."
+        description="Transcribes audio from a URI using a local faster-whisper model. "
+                    "Parameters: "
+                    "- audio_uri: The URI of the audio file (e.g., 'file:///path/to/file.wav' or 'http://...'). "
+                    "- model: The model path (default: 'Systran/faster-whisper-large-v3'). "
+                    "- language: ISO 639-1 language code (e.g., 'en', 'pl', 'fr'). Do NOT use full language names like 'Polish'. "
+                    "- with_timestamps: Whether to return timestamps (default: True)."
     )
     async def transcribe_local(
             audio_uri: str,  # Changed: Now audio_uri instead of file_path

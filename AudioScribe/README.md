@@ -92,10 +92,6 @@ Ensure you have set the **environment variables** mentioned above.
     ```shell
     ./.venv/bin/activate
     ```
-    Install PyTorch separately from its specific index
-    ```shell
-    pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121"
-    ```
     Install all other application requirements
     ```shell
     pip install -r pytorch-requirements.txt -r requirements.txt
@@ -269,14 +265,29 @@ SSE transport (server-sent events + POST messages):
 To use these tools, configure your AI-powered editor or client to connect to the running server's URL.
 
 **For Claude Desktop / Generic Clients:**
+Streamable HTTP transport:
 ```json
 {
   "mcpServers": {
     "audio-scribe": {
-      "url": "http://localhost:7016"
+      "type": "streamable",
+      "url": "http://localhost:7016/mcp"
     }
   }
 }
+```
+
+SSE transport:
+```json
+{
+  "mcpServers": {
+    "audio-scribe": {
+      "type": "sse",
+      "url": "http://localhost:7016/sse-root/sse"
+    }
+  }
+}
+```
 
 ### Using Audio URIs in MCP
 
@@ -306,9 +317,44 @@ If you have audio files on your local machine and want to expose them to the MCP
     ```
 
 3.  **Access the file**:
-    If your file is at `./audio/test.wav` relative to where you ran the command, the URI will be:
-    `http://localhost:9999/audio/test.wav` (or use your machine's LAN IP if accessing from a Docker container).
-```
+    If your file is at `./audio/audio.wav` relative to where you ran the command, the URI will be:
+    `http://localhost:9999/audio/audio.wav` (or use your machine's LAN IP if accessing from a Docker container).
+
+### Example Prompts
+
+Once connected to an LLM (like via AnythingLLM), you can use natural language to trigger the tools.
+
+**Local Transcription:**
+> "Transcribe the audio file at `http://localhost:9999/audio/audio.wav` using the local model."
+
+**OpenAI Transcription:**
+> "Please use OpenAI to transcribe this file: `file:///C:/Users/Me/Desktop/audio.wav`."
+
+**Hugging Face Transcription:**
+> "Transcribe `https://example.com/audio.wav` using the Hugging Face provider."
+
+
+### Tool Parameters
+
+When using the tools (either via MCP or direct API), you can specify the following parameters. Note the defaults may differ between the standard Python app and the MCP server.
+
+#### `transcribe_local`
+*   `audio_uri` (MCP) / `file_path` (App): Path or URI to the audio file.
+*   `model`: Path to the faster-whisper model. Default: `Systran/faster-whisper-large-v3`.
+*   `language`: ISO 639-1 code (e.g., `en`, `pl`). Default: `en`.
+*   `with_timestamps`: Boolean.
+    *   **MCP Default**: `True` (returns segments with start/end times).
+    *   **Standard App Default**: `False` (returns full text only).
+
+#### `transcribe_openai`
+*   `audio_uri`: Path or URI to the audio file.
+*   `model`: OpenAI model name. Default: `whisper-1`.
+*   `language`: ISO 639-1 code.
+
+#### `transcribe_hf`
+*   `audio_uri`: Path or URI to the audio file.
+*   `model`: Hugging Face model ID. Default: `openai/whisper-large-v3`.
+*   `hf_provider`: Provider type. Default: `hf-inference`.
 
 ---
 
