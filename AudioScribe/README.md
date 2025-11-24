@@ -34,12 +34,27 @@ The REST API is self-documenting via Swagger and Redoc. While the server is runn
 *   **Python 3.11**
 *   **Nvidia CUDA**
     * https://developer.nvidia.com/cuda-12-6-0-download-archive
-    * https://developer.nvidia.com/cudnn-downloads
+    * https://developer.nvidia.com/cudnn-downloads  
+    Linux:
+    ```shell
+    wget https://developer.download.nvidia.com/compute/cudnn/9.16.0/local_installers/cudnn-local-repo-ubuntu2404-9.16.0_1.0-1_amd64.deb
+    sudo dpkg -i cudnn-local-repo-ubuntu2404-9.16.0_1.0-1_amd64.deb
+    sudo cp /var/cudnn-local-repo-ubuntu2404-9.16.0/cudnn-*-keyring.gpg /usr/share/keyrings/
+    sudo apt-get update
+    sudo apt-get -y install cudnn9-cuda-12 #correct version for cuda 12
+    ```
+
 *   **PyTorch**
     * https://pytorch.org/get-started/locally/ 
 *   **ffmpeg**: Required for audio processing.
-    *   Linux: `sudo apt install ffmpeg`
-    *   Windows: `choco install ffmpeg`
+    *   Linux:
+    ```shell
+    sudo apt install ffmpeg
+    ```
+    *   Windows:
+    ```PowerShell
+    choco install ffmpeg
+    ```
 
 Python default packages repository:
 https://pypi.org/
@@ -60,12 +75,22 @@ as they include secrets and user-specific paths.
 
 **Example `HF_HOME` and Model Parameter:**
 
+Windows:  
 If you set your `HF_HOME` environment variable to `D:\Development\AI\hf-cache`,  
 the `transformers` library will automatically use this folder.  
+
+Linux:  
+In `~/.profile` add  
+```shell
+export OPENAI_API_KEY="sk-"
+export HF_TOKEN="hf_"
+export HF_HOME="/mnt/01D8E3D9B5224500/Development/AI/hf-cache"
+```
+
 When you make an API request, you still use the public model *identifier* in the `model` field.  
 The library handles the mapping.
 
-*   **Environment Variable:** `HF_HOME=D:\Development\AI\hf-cache`
+*   **Environment Variable:** `HF_HOME=D:\Development\AI\hf-cache` or `/mnt/01D8E3D9B5224500/Development/AI/hf-cache`
 *   **API `model` parameter:** `openai/whisper-large-v3`
 
 ---
@@ -90,7 +115,7 @@ Ensure you have set the **environment variables** mentioned above.
     ```
     Unix
     ```shell
-    ./.venv/bin/activate
+    source .venv/bin/activate
     ```
     Install all other application requirements
     ```shell
