@@ -1,6 +1,7 @@
+from unittest.mock import patch, MagicMock
+
 import pytest
 from openai import APIError
-from unittest.mock import patch, MagicMock
 
 from src.transcription.openai_api_speach_to_text import openai_transcript
 

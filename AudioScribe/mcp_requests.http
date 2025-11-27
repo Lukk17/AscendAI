@@ -1,23 +1,19 @@
-# For Windows:
-#@audio_uri = file:///C:/Users/Lukk/Desktop/audio.wav
-
-# For Linux / macOS:
-# @audio_uri = file:///home/user/Desktop/audio.wav
+@audio_uri = http://localhost:9999/audio.wav
 
 # For Docker:
- @audio_uri = file:///audio/audio.wav
+#@audio_uri = http://host.docker.internal:9999/15minRecording.flac
+
 
 @mcp_protocol_version = 2024-11-05
 
 # Streamable HTTP mcp_session_id is returned in 'mcp-session-id' response header after below 'initialize' request
 # Update below ID after each initialize request
-@mcp_session_id = 1215a108766d4f08bf75fc55a0354785
+@mcp_session_id = CHANGE_ME
 
 # Paste the messages path you received in the very first SSE event here.
 # Update below ID after each initialize request
 @sse_messages_path = /sse-root/messages/?session_id=CHANGE_ME
 
-###
 
 ###
 # @name initialize
@@ -41,8 +37,6 @@ Accept: application/json, text/event-stream
     "clientInfo": { "name": "http-client", "version": "0.1.0" }
   }
 }
-
-###
 
 ###
 # @name list_tools
@@ -83,7 +77,6 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
     }
   }
 }
-
 
 
 ###

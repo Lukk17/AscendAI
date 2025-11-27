@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import patch, MagicMock
+
+import pytest
 
 from src.transcription.local_speech_to_text import local_speech_transcription_stream, _transcribe_and_communicate
 

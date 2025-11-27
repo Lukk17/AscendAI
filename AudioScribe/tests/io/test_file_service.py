@@ -1,6 +1,7 @@
 import os
-import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
+
+import pytest
 
 from src.io.file_service import safe_suffix_from_filename, cleanup_temp_file, save_upload_to_temp_async, \
     create_temp_file

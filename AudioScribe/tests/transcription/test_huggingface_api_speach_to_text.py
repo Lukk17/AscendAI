@@ -1,6 +1,7 @@
+from unittest.mock import patch, MagicMock
+
 import pytest
 from huggingface_hub.utils import HfHubHTTPError
-from unittest.mock import patch, MagicMock
 
 from src.transcription.huggingface_api_speach_to_text import hf_transcript
 

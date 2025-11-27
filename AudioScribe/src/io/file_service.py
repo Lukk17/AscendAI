@@ -1,9 +1,10 @@
-import aiofiles
 import os
 import tempfile
-from fastapi import UploadFile
 from pathlib import Path
 from typing import Optional
+
+import aiofiles
+from fastapi import UploadFile
 
 
 def create_temp_file(suffix: str = "") -> str:

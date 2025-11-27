@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="mcp_requests | transcribe_local_with_timestamps" type="HttpClient.HttpRequestRunConfigurationType" factoryName="HTTP Request" folderName="streamable" nameIsGenerated="true" path="$PROJECT_DIR$/AudioScribe/mcp_requests.http" executionIdentifier="transcribe_local_with_timestamps" index="4" runType="Run single request">
+  <configuration default="false" name="mcp_requests | transcribe_local_with_timestamps" type="HttpClient.HttpRequestRunConfigurationType" factoryName="HTTP Request" folderName="streamable" nameIsGenerated="true" environment="&lt;No Environment&gt;" path="$PROJECT_DIR$/mcp_requests.http" executionIdentifier="transcribe_local_with_timestamps" index="4" runType="Run single request">
     <method v="2" />
   </configuration>
 </component>

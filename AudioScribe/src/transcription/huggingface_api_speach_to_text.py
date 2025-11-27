@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+
 from huggingface_hub import InferenceClient
 from huggingface_hub.inference._generated.types import AutomaticSpeechRecognitionOutput
 from huggingface_hub.utils import HfHubHTTPError
@@ -58,6 +59,7 @@ def hf_transcript(audio_file_path: str, model: str, provider: str):
             chunk = audio[start_ms:end_ms]
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
+                chunk = chunk.set_frame_rate(16000)
                 chunk.export(tmp_audio.name, format="wav")
                 temp_files.append(tmp_audio.name)
                 logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")

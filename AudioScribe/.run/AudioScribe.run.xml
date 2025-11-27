@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="AudioScribe" type="Python.FastAPI" folderName="AudioScribe">
+  <configuration default="false" name="AudioScribe" type="Python.FastAPI">
     <option name="additionalOptions" value="--port 7017" />
-    <option name="file" value="$PROJECT_DIR$/AudioScribe/main.py" />
+    <option name="file" value="D:\Development\projekty-IT\AscendAI\AudioScribe\main.py" />
     <module name="AudioScribe" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />

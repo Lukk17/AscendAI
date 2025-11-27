@@ -110,6 +110,7 @@ def create_app() -> Starlette:
     @scribe_mcp_server.tool(
         name="transcribe_local",
         description="Transcribes audio from a URI using a local faster-whisper model. "
+                    "Supports mp3, wav, aac, flac, ogg, m4a, wma. Converted to 16kHz WAV internally. "
                     "Parameters: "
                     "- audio_uri: The URI of the audio file (e.g., 'file:///path/to/file.wav' or 'http://...'). "
                     "- model: The model path (default: 'Systran/faster-whisper-large-v3'). "
@@ -158,7 +159,7 @@ def create_app() -> Starlette:
 
     @scribe_mcp_server.tool(
         name="transcribe_openai",
-        description="Transcribes audio from a URI with the OpenAI API. Args: audio_uri (str), model (str, optional), language (str, optional)."
+        description="Transcribes audio from a URI with the OpenAI API. Supports mp3, mp4, mpeg, mpga, m4a, wav, and webm. Args: audio_uri (str), model (str, optional), language (str, optional)."
     )
     async def transcribe_openai(
             audio_uri: str,
@@ -195,7 +196,9 @@ def create_app() -> Starlette:
 
     @scribe_mcp_server.tool(
         name="transcribe_hf",
-        description="Transcribes audio from a URI with a Hugging Face provider. Args: audio_uri (str), model (str, optional), hf_provider (str, optional)."
+        description="Transcribes audio from a URI with a Hugging Face provider. "
+                    "Supports mp3, wav, aac, flac, ogg, m4a, wma. Converted to 16kHz WAV internally. "
+                    "Args: audio_uri (str), model (str, optional), hf_provider (str, optional)."
     )
     async def transcribe_hf(
             audio_uri: str,

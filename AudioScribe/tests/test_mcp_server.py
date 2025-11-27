@@ -1,5 +1,6 @@
 import asyncio
 import os
+
 os.environ["OPENAI_API_KEY"] = "dummy"  # Set dummy key before importing modules that init OpenAI client
 import json
 
@@ -13,10 +14,7 @@ from asgi_lifespan import LifespanManager
 
 from mcp_server import create_app
 import mcp_server as mcp_server_module
-from unittest.mock import AsyncMock
 from src.config.settings import settings
-
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -24,11 +22,13 @@ PROTOCOL_VERSION = "2024-11-05"
 STREAMABLE_ACCEPT = "application/json, text/event-stream"
 JSON_CONTENT_TYPE = "application/json"
 
+
 def base_headers() -> dict[str, str]:
     return {
         "Accept": STREAMABLE_ACCEPT,
         "Content-Type": JSON_CONTENT_TYPE,
     }
+
 
 def session_headers(session_id: str) -> dict[str, str]:
     return {
@@ -164,14 +164,15 @@ async def test_streamable_http_initialize_returns_utf8_and_session_id(asgi_clien
     assert isinstance(session_id, str) and len(session_id) > 0
 
 
-async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch(monkeypatch, temp_audio_file,
+                                                                                 asgi_client: AsyncClient):
     monkeypatch.setattr(mcp_server_module, "local_speech_transcription", _fake_local_transcription)
-    
+
     # Mock download_to_temp_async to return the temp_audio_file path directly
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -251,7 +252,7 @@ async def test_sse_post_messages_unknown_session_id(asgi_client: AsyncClient):
         # Accept 400 as an alternative but require an explanatory message
         assert resp.status_code == 400, resp.text
         # Depending on path, body may be a plain string.
-        assert ("Could not find session" in (resp.text or "") ) or ("Invalid Content-Type" in (resp.text or ""))
+        assert ("Could not find session" in (resp.text or "")) or ("Invalid Content-Type" in (resp.text or ""))
 
 
 async def test_streamable_http_health_tool(asgi_client: AsyncClient):
@@ -274,18 +275,19 @@ async def test_streamable_http_health_tool(asgi_client: AsyncClient):
     assert "ok" in str(content.get("text", "")).lower()
 
 
-async def test_streamable_http_transcribe_openai_with_monkeypatch(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_openai_with_monkeypatch(monkeypatch, temp_audio_file,
+                                                                  asgi_client: AsyncClient):
     def _fake_openai_transcription(*, audio_file_path: str, model: str, language: str):
         return "OPENAI OK"
 
     monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _fake_openai_transcription)
     monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _fake_openai_transcription)
     monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
-    
+
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -332,8 +334,8 @@ async def test_streamable_http_transcribe_hf_with_monkeypatch(monkeypatch, temp_
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -370,7 +372,8 @@ async def test_streamable_http_transcribe_hf_with_monkeypatch(monkeypatch, temp_
         assert "HF OK" in text_val
 
 
-async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch, temp_audio_file,
+                                                                     asgi_client: AsyncClient):
     async def _fake_segments(*, audio_file_path: str, model_path: str, language: str):
         yield {"text": "one", "start": 0.0, "end": 0.5}
         yield {"text": "two", "start": 0.5, "end": 1.0}
@@ -379,8 +382,8 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -450,7 +453,8 @@ async def test_streamable_http_transcribe_local_file_not_found(asgi_client: Asyn
     assert "File not found" in text
 
 
-async def test_streamable_http_transcribe_local_generator_value_error(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_local_generator_value_error(monkeypatch, temp_audio_file,
+                                                                      asgi_client: AsyncClient):
     async def _err_gen(*, audio_file_path: str, model_path: str, language: str):
         # Must be an async generator function (contain a yield) so async-for is valid
         raise ValueError("bad local input")
@@ -461,8 +465,8 @@ async def test_streamable_http_transcribe_local_generator_value_error(monkeypatc
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -487,7 +491,8 @@ async def test_streamable_http_transcribe_local_generator_value_error(monkeypatc
     assert "bad local input" in text
 
 
-async def test_streamable_http_transcribe_local_generator_generic_error(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_local_generator_generic_error(monkeypatch, temp_audio_file,
+                                                                        asgi_client: AsyncClient):
     async def _err_gen2(*, audio_file_path: str, model_path: str, language: str):
         # Must be an async generator function (contain a yield) so async-for is valid
         raise RuntimeError("boom")
@@ -498,8 +503,8 @@ async def test_streamable_http_transcribe_local_generator_generic_error(monkeypa
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -524,12 +529,14 @@ async def test_streamable_http_transcribe_local_generator_generic_error(monkeypa
     assert "An unexpected error occurred:" in text
 
 
-async def test_streamable_http_transcribe_openai_missing_api_key(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_openai_missing_api_key(monkeypatch, temp_audio_file,
+                                                                 asgi_client: AsyncClient):
     # Unset key
     monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
+
     monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
@@ -575,7 +582,8 @@ async def test_streamable_http_transcribe_openai_file_not_found(monkeypatch, asg
     assert "File not found" in text
 
 
-async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch, temp_audio_file,
+                                                                    asgi_client: AsyncClient):
     def _raise_value_error(*, audio_file_path: str, model: str, language: str):
         raise ValueError("openai bad")
 
@@ -584,8 +592,8 @@ async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch,
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -609,7 +617,8 @@ async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch,
     assert "openai bad" in text
 
 
-async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, temp_audio_file,
+                                                                 asgi_client: AsyncClient):
     def _raise_io_error(*, audio_file_path: str, model: str, language: str):
         raise IOError("disk full")
 
@@ -618,8 +627,8 @@ async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, te
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -643,7 +652,8 @@ async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, te
     assert "disk full" in text
 
 
-async def test_streamable_http_transcribe_openai_raises_generic_exception(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_openai_raises_generic_exception(monkeypatch, temp_audio_file,
+                                                                          asgi_client: AsyncClient):
     def _raise_generic(*, audio_file_path: str, model: str, language: str):
         raise RuntimeError("explode")
 
@@ -652,8 +662,8 @@ async def test_streamable_http_transcribe_openai_raises_generic_exception(monkey
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -732,8 +742,8 @@ async def test_streamable_http_transcribe_hf_raises_value_error(monkeypatch, tem
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -766,8 +776,8 @@ async def test_streamable_http_transcribe_hf_raises_io_error(monkeypatch, temp_a
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
@@ -791,7 +801,8 @@ async def test_streamable_http_transcribe_hf_raises_io_error(monkeypatch, temp_a
     assert "network down" in text
 
 
-async def test_streamable_http_transcribe_hf_raises_generic_exception(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_hf_raises_generic_exception(monkeypatch, temp_audio_file,
+                                                                      asgi_client: AsyncClient):
     def _raise_generic_hf(*, audio_file_path: str, model: str, provider: str):
         raise RuntimeError("kaboom")
 
@@ -800,8 +811,8 @@ async def test_streamable_http_transcribe_hf_raises_generic_exception(monkeypatc
 
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
-    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)

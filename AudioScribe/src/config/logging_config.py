@@ -1,6 +1,7 @@
-import colorlog
 import logging
 import re
+
+import colorlog
 
 
 class CenteredLevelFormatter(colorlog.ColoredFormatter):
