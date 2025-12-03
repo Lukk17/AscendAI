@@ -1,0 +1,110 @@
+@openmemory_host = http://localhost:8765
+@user_id = user1
+@client_id = orchestrator
+
+# ------------------------------------------------------------------------------------------
+# OPENMEMORY MCP MANUAL TESTING
+# ------------------------------------------------------------------------------------------
+# This file allows you to manually test the OpenMemory MCP server using IntelliJ IDEA's HTTP Client.
+#
+# INSTRUCTIONS:
+# 1. Run the "sse_connect" request first. Keep the "Services" tool window open to see the stream.
+# 2. The first event will be "endpoint". It will contain a URL like:
+#    /mcp/messages/?session_id=...
+# 3. Copy the FULL PATH (including query params) from that event and paste it into the
+#    @sse_messages_path variable below.
+# 4. Run the other requests (initialize, list_tools, add_memory, search_memory) sequentially.
+# ------------------------------------------------------------------------------------------
+
+# PASTE YOUR SESSION PATH HERE AFTER RUNNING sse_connect
+@sse_messages_path = /mcp/messages/?session_id=da5e0ad2149b4e0b9e7f44df57487138
+
+###
+# @name sse_connect
+# 1. Start the SSE connection.
+# Expected: You should see an "endpoint" event immediately.
+# If the connection stays open without crashing after 15s, the ping issue is fixed.
+GET {{openmemory_host}}/mcp/{{client_id}}/sse/{{user_id}}
+Accept: text/event-stream
+
+###
+# @name sse_initialize
+# 2. Initialize the session.
+POST {{openmemory_host}}{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": { "name": "intellij-client", "version": "1.0.0" }
+  }
+}
+
+###
+# @name sse_notifications_initialized
+# 3. Send initialized notification.
+POST {{openmemory_host}}{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "method": "notifications/initialized"
+}
+
+###
+# @name sse_list_tools
+# 4. List available tools.
+# Expected: Should return "add_memory", "search_memory", etc.
+POST {{openmemory_host}}{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+# @name sse_add_memory
+# 5. Test adding a memory.
+# Tool: add_memories
+
+POST {{openmemory_host}}{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "add_memories",
+    "arguments": {
+      "text": "My name is Lukk and I am testing the AscendAI project."
+    }
+  }
+}
+
+###
+# @name sse_search_memory
+# 6. Test searching for memory.
+# Tool: search_memory
+# Arguments: query (string)
+POST {{openmemory_host}}{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "search_memory",
+    "arguments": {
+      "query": "What is my name and what project am I working on?"
+    }
+  }
+}

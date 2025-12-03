@@ -1,5 +1,5 @@
 server:
-  port: 9999
+  port: 9917
 
 spring:
   application:
@@ -17,14 +17,22 @@ spring:
         toolcallback:
           enabled: true
 
-        stdio:
-          servers-configuration: classpath:mcp-servers-config.json
-
+        sse:
+          connections:
+            openmemory:
+              url: http://localhost:8000
+              sse-endpoint: /mcp/ascendai/sse/user1
+    #        streamable-http:
+    #          connections:
+    #            openmemory:
+    #              url: http://localhost:8000/mcp/messages
     #        sse:
-#          connections:
-#            # This is the bean name.
-#            ascend-mcp:
-#              url: http://localhost:9998/sse
+    #          connections:
+    #            # This is the bean name.
+    #            ascend-mcp:
+    #              url: http://localhost:9998/sse
+    #        stdio:
+    #          servers-configuration: classpath:mcp-servers-config.json
 
     openai:
       api-key: "not-needed" # Not required for local LM Studio
@@ -37,14 +45,13 @@ spring:
 
 logging:
   level:
-    org.springframework.ai: TRACE
-    org.springframework.ai.mcp: TRACE
-    org.springframework.ai.tool: TRACE
-    org.springframework.ai.mcp.client.autoconfigure: TRACE
-    org.springframework.core.io: TRACE
-    io.modelcontextprotocol.client: TRACE
-    io.modelcontextprotocol.spec: TRACE
+    org.springframework.ai: DEBUG
+    org.springframework.ai.mcp: DEBUG
+    org.springframework.ai.tool: DEBUG
+    org.springframework.ai.mcp.client.autoconfigure: DEBUG
+    org.springframework.core.io: DEBUG
+    io.modelcontextprotocol.client: DEBUG
+    io.modelcontextprotocol.spec: DEBUG
 
     org.springframework.web.client: DEBUG
     org.apache.http: DEBUG
-

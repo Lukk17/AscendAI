@@ -10,6 +10,7 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +22,8 @@ public class AiConnectionService {
         // 1. Call the client to get the full ChatResponse object
         ChatResponse chatResponse = chatClient.prompt()
                 .user(userPrompt)
+                .advisors(a -> a.param("user_id", "user1"))
+                .toolContext(Map.of("user_id", "user1"))
                 .call()
                 .chatResponse();
 
@@ -29,17 +32,25 @@ public class AiConnectionService {
         String content = chatResponse.getResult().getOutput().getText();
 
         /*
-         * This stream operation will not capture the names of the tools used because it inspects the FINAL ChatResponse from the AI model.
+         * This stream operation will not capture the names of the tools used because it
+         * inspects the FINAL ChatResponse from the AI model.
          *
-         * The high-level `.call().chatResponse()` API automatically handles the entire multi-step tool-calling process:
+         * The high-level `.call().chatResponse()` API automatically handles the entire
+         * multi-step tool-calling process:
          * 1. The client sends the user prompt.
-         * 2. The AI model responds with a request to call a tool (e.g., `getCurrentWeather`).
-         * 3. The `ChatClient` intercepts this, executes the tool, and sends the tool's output back to the model.
-         * 4. The AI model processes the tool's output and generates a final, human-readable text response.
+         * 2. The AI model responds with a request to call a tool (e.g.,
+         * `getCurrentWeather`).
+         * 3. The `ChatClient` intercepts this, executes the tool, and sends the tool's
+         * output back to the model.
+         * 4. The AI model processes the tool's output and generates a final,
+         * human-readable text response.
          *
-         * The `chatResponse` object available here is the result of step 4. At this point, the tool has already been called and its
-         * results have been used. The final `AssistantMessage` contains the natural language answer for the user, not the intermediate
-         * tool call requests. As a result, the `getToolCalls()` list on this message will be empty.
+         * The `chatResponse` object available here is the result of step 4. At this
+         * point, the tool has already been called and its
+         * results have been used. The final `AssistantMessage` contains the natural
+         * language answer for the user, not the intermediate
+         * tool call requests. As a result, the `getToolCalls()` list on this message
+         * will be empty.
          */
         List<String> toolsUsed = chatResponse.getResults().stream()
                 .map(Generation::getOutput)

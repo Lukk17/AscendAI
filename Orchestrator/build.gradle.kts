@@ -27,9 +27,11 @@ extra["springAiVersion"] = "1.0.1"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
 
     implementation("org.springframework.ai:spring-ai-starter-model-openai")
-    implementation("org.springframework.ai:spring-ai-starter-mcp-client")
+    implementation("org.springframework.ai:spring-ai-starter-mcp-client-webflux")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 
     compileOnly("org.projectlombok:lombok")
 

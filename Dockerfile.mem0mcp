@@ -1,0 +1,17 @@
+FROM mem0/openmemory-mcp:latest
+
+# Install curl for healthchecks and configuration
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Apply the patch to remove 'json_object' constraint for LM Studio compatibility
+# We use sed to replace the hardcoded response_format with None
+RUN sed -i 's/response_format={"type": "json_object"}/response_format=None/g' /usr/local/lib/python3.12/site-packages/mem0/memory/main.py
+
+# Apply patch to app/routers/config.py to allow extra fields in EmbedderConfig (like embedding_dims)
+# We COPY and run a dedicated script for this patch
+COPY patch_config.py .
+RUN python3 patch_config.py
+
+# Patch app/utils/categorization.py to fix 'with_response_format' error and hardcoded model
+# We COPY the local fixed file instead of using echo to avoid indentation errors
+COPY categorization.py /usr/src/openmemory/app/utils/categorization.py
