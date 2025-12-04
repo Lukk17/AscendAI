@@ -2,11 +2,11 @@ name: ascend-ai
 
 x-common-env: &common-env
   LLM_MODEL: meta-llama-3.1-8b-instruct
-  EMBEDDER_MODEL: nomic-ai/nomic-embed-text-v1.5-GGUF
 
 services:
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.16
+    container_name: qdrant
     restart: unless-stopped
     ports:
       - "6333:6333"
@@ -28,14 +28,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.mem0mcp
-    container_name: ascend-ai-openmemory-1
+    container_name: openmemory
+    image: openmemory-ascend-ai:latest
     restart: unless-stopped
     ports:
       - "8765:8765"
     environment:
       <<: *common-env
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
       OPENAI_API_KEY: lm-studio
       OPENAI_BASE_URL: http://host.docker.internal:1234/v1
       LOG_LEVEL: DEBUG
@@ -60,6 +59,13 @@ services:
       - ./configure_mem0.sh:/configure_mem0.sh
     environment:
       <<: *common-env
+      LLM_MAX_TOKENS: 1500
+      EMBEDDER_MODEL: nomic-ai/nomic-embed-text-v1.5-GGUF
+      EMBEDDING_DIMS: 768
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_COLLECTION: openmemory
+      QDRANT_DISTANCE: Cosine
     entrypoint: ["/bin/sh", "/configure_mem0.sh"]
     depends_on:
       openmemory:
