@@ -17,7 +17,7 @@
 # ------------------------------------------------------------------------------------------
 
 # PASTE YOUR SESSION PATH HERE AFTER RUNNING sse_connect
-@sse_messages_path = /mcp/messages/?session_id=1eb7e268c4e140fbadb4756a11e641b1
+@sse_messages_path = /mcp/messages/?session_id=CHANGE_ME
 
 ###
 # @name sse_connect
