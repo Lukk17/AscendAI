@@ -1,9 +1,9 @@
+import os
 import re
 from typing import List
 import logging
 from openai import OpenAI
 
-# Initialize OpenAI client (uses env vars OPENAI_API_KEY, OPENAI_BASE_URL)
 openai_client = OpenAI()
 
 MEMORY_CATEGORIZATION_PROMPT = """You are a memory categorization assistant. 
@@ -18,9 +18,12 @@ def get_categories_for_memory(memory: str) -> List[str]:
             {"role": "user", "content": memory}
         ]
 
+        # Get model from environment variable, fallback to known working model
+        model_name = os.getenv("LLM_MODEL", "meta-llama-3.1-8b-instruct")
+
         # Use standard create call, compatible with all OpenAI clients
         completion = openai_client.chat.completions.create(
-            model="meta-llama-3.1-8b-instruct", # Use the user-defined model or a safe default
+            model=model_name,
             messages=messages,
             temperature=0
         )

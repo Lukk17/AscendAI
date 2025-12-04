@@ -13,11 +13,11 @@
 #    /mcp/messages/?session_id=...
 # 3. Copy the FULL PATH (including query params) from that event and paste it into the
 #    @sse_messages_path variable below.
-# 4. Run the other requests (initialize, list_tools, add_memory, search_memory) sequentially.
+# 4. Run the other requests (initialize(both), list_tools, add_memory, search_memory) sequentially.
 # ------------------------------------------------------------------------------------------
 
 # PASTE YOUR SESSION PATH HERE AFTER RUNNING sse_connect
-@sse_messages_path = /mcp/messages/?session_id=da5e0ad2149b4e0b9e7f44df57487138
+@sse_messages_path = /mcp/messages/?session_id=1eb7e268c4e140fbadb4756a11e641b1
 
 ###
 # @name sse_connect

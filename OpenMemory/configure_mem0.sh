@@ -4,7 +4,7 @@ set -e
 echo "⏳ Waiting for OpenMemory API to be ready at http://openmemory:8765..."
 i=0
 while [ $i -lt 60 ]; do
-  # Try health endpoint first, then config endpoint (like run.sh)
+  # Try health endpoint first, then config endpoint
   if curl -s -f http://openmemory:8765/openapi.json > /dev/null 2>&1; then
     echo "✅ OpenMemory API is ready!"
     break
@@ -23,31 +23,31 @@ echo "🧩 Configuring OpenMemory (Bulk Update)..."
 curl -fsS -X PUT "http://openmemory:8765/api/v1/config/" \
   -H 'Content-Type: application/json' \
   -d '{
-    "mem0": {
-      "vector_store": {
-        "provider": "qdrant",
-        "config": {
-          "host": "qdrant",
-          "port": 6333,
-          "collection_name": "openmemory",
-          "embedding_model_dims": 768
-        }
-      },
-      "embedder": {
-        "provider": "openai",
-        "config": {
-          "model": "nomic-ai/nomic-embed-text-v1.5-GGUF"
-        }
-      },
-      "llm": {
-        "provider": "openai",
-        "config": {
-          "model": "meta-llama-3.1-8b-instruct",
-          "temperature": 0.1,
-          "max_tokens": 1500
-        }
+  "mem0": {
+    "vector_store": {
+      "provider": "qdrant",
+      "config": {
+        "host": "qdrant",
+        "port": 6333,
+        "collection_name": "openmemory",
+        "embedding_model_dims": 768
+      }
+    },
+    "embedder": {
+      "provider": "openai",
+      "config": {
+        "model": "${EMBEDDER_MODEL:-nomic-ai/nomic-embed-text-v1.5-GGUF}"
+      }
+    },
+    "llm": {
+      "provider": "openai",
+      "config": {
+        "model": "${LLM_MODEL:-meta-llama-3.1-8b-instruct}",
+        "temperature": 0.1,
+        "max_tokens": 1500
       }
     }
+  }
   }'
 
 echo
