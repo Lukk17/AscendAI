@@ -20,19 +20,15 @@ spring:
         sse:
           connections:
             openmemory:
-              url: http://localhost:8000
+              url: http://localhost:8765
               sse-endpoint: /mcp/ascendai/sse/user1
     #        streamable-http:
     #          connections:
     #            openmemory:
     #              url: http://localhost:8000/mcp/messages
-    #        sse:
-    #          connections:
-    #            # This is the bean name.
-    #            ascend-mcp:
-    #              url: http://localhost:9998/sse
-    #        stdio:
-    #          servers-configuration: classpath:mcp-servers-config.json
+
+        stdio:
+          servers-configuration: classpath:mcp-servers-config.json
 
     openai:
       api-key: "not-needed" # Not required for local LM Studio
