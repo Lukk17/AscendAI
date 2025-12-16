@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: MCP
+    name: ascend-ai-mcp
 #  for STDIO no web server needed
   main:
     web-application-type: none

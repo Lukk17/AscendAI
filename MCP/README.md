@@ -1,7 +1,4 @@
-# AI MCP Server
-
-Based on:
-https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/mcp-annotations-server
+# AscendAI MCP Server
 
 ---
 

@@ -1,1 +1,1 @@
-rootProject.name = "Orchestrator"
+rootProject.name = "ascend-ai-orchestrator"

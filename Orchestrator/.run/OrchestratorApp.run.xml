@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="OrchestratorApp" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
     <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
-    <module name="Orchestrator.main" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.lukk.ai.orchestrator.OrchestratorApp" />
+    <module name="ascend-ai-orchestrator.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.lukk.ascend.ai.orchestrator.OrchestratorApp" />
     <extension name="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />
       <option name="IS_SUBST" value="false" />

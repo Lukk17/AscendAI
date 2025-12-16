@@ -1,1 +1,1 @@
-rootProject.name = "MCP"
+rootProject.name = "ascend-ai-mcp"

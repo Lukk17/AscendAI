@@ -6,7 +6,7 @@ spring:
     jdbc:
       initialize-schema: always
   application:
-    name: Orchestrator
+    name: ascend-ai-orchestrator
   datasource:
     url: jdbc:postgresql://localhost:5432/ascend_ai
     username: postgres
