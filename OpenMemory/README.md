@@ -76,17 +76,17 @@ To push your custom working version to your Docker Hub repository, follow these 
     It is recommended to tag with both a specific version (Semantic Versioning) and `latest`.
     Replace `your-username` with your Docker Hub username.
     ```powershell
-    # Tag as v1.0.0
-    docker tag openmemory-ascend-ai:latest your-username/openmemory-ascend-ai:v1.0.0
+    # Tag as v0.0.1
+    docker tag openmemory-ascend-ai:latest lukk17/openmemory-ascend-ai:v0.0.1
     
     # Tag as latest
-    docker tag openmemory-ascend-ai:latest your-username/openmemory-ascend-ai:latest
+    docker tag openmemory-ascend-ai:latest lukk17/openmemory-ascend-ai:latest
     ```
 
 3.  **Push the Images**:
     ```powershell
-    docker push your-username/openmemory-ascend-ai:v1.0.0
-    docker push your-username/openmemory-ascend-ai:latest
+    docker push lukk17/openmemory-ascend-ai:v0.0.1
+    docker push lukk17/openmemory-ascend-ai:latest
     ```
 
 4.  **Using the Pushed Image**:
@@ -94,7 +94,7 @@ To push your custom working version to your Docker Hub repository, follow these 
     ```yaml
     services:
       openmemory:
-        image: your-username/openmemory-ascend-ai:v1.0.0 # Pin to a specific version for stability
+        image: lukk17/openmemory-ascend-ai:v0.0.1 # Pin to a specific version for stability
         # build: ... (comment out build section)
     ```
 

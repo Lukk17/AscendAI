@@ -142,9 +142,20 @@ docker build -t audio-scribe:latest .
 
 # Or, build the image for the MCP server
 docker build -f Dockerfile.mcp -t audio-scribe-mcp:latest .
+
+**2. Tag and Publish (Optional):**
+
+If you want to push this image to Docker Hub (e.g., to use it in another environment or specific `docker-compose.yaml`):
+
+```shell
+docker tag audio-scribe:latest lukk17/audio-scribe:v0.0.1
 ```
 
-**2. Run the container:**
+```shell
+docker push lukk17/audio-scribe:v0.0.1
+```
+
+**3. Run the container:**
 
 **For Linux/macOS:**
 ```shell

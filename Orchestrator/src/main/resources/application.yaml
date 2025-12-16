@@ -2,25 +2,16 @@ server:
   port: 9917
 
 spring:
+  integration:
+    jdbc:
+      initialize-schema: always
   application:
     name: Orchestrator
   datasource:
     url: jdbc:postgresql://localhost:5432/ascend_ai
-    username: user
-    password: password
+    username: postgres
+    password: local
     driver-class-name: org.postgresql.Driver
-
-s3:
-  bucket: knowledge-base
-  endpoint: http://localhost:9070
-  access-key: admin
-  secret-key: password
-
-app:
-  ingestion:
-    chunk-size: 500
-  unstructured:
-    base-url: http://localhost:9080
   ai:
     mcp:
       client:
@@ -56,15 +47,28 @@ app:
           max-tokens: -1
         base-url: "http://127.0.0.1:1234"
 
+app:
+  ingestion:
+    chunk-size: 500
+  unstructured:
+    base-url: http://localhost:9080
+
+s3:
+  bucket: knowledge-base
+  endpoint: http://localhost:9070
+  access-key: admin
+  secret-key: password
+
 logging:
   level:
-    org.springframework.ai: DEBUG
-    org.springframework.ai.mcp: DEBUG
-    org.springframework.ai.tool: DEBUG
-    org.springframework.ai.mcp.client.autoconfigure: DEBUG
-    org.springframework.core.io: DEBUG
-    io.modelcontextprotocol.client: DEBUG
-    io.modelcontextprotocol.spec: DEBUG
+    com.lukk.ai.orchestrator: DEBUG
+    org.springframework.ai: INFO
+    org.springframework.ai.mcp: INFO
+    org.springframework.ai.tool: INFO
+    org.springframework.ai.mcp.client.autoconfigure: INFO
+    org.springframework.core.io: INFO
+    io.modelcontextprotocol.client: INFO
+    io.modelcontextprotocol.spec: INFO
 
-    org.springframework.web.client: DEBUG
-    org.apache.http: DEBUG
+    org.springframework.web.client: INFO
+    org.apache.http: INFO

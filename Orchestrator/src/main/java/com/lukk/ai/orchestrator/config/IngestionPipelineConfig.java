@@ -1,13 +1,17 @@
 package com.lukk.ai.orchestrator.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.commonmark.node.AbstractVisitor;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.text.TextContentRenderer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,26 +20,23 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.integration.annotation.InboundChannelAdapter;
 import org.springframework.integration.annotation.Poller;
-import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.aws.inbound.S3InboundFileSynchronizingMessageSource;
 import org.springframework.integration.aws.support.S3SessionFactory;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.config.EnableIntegration;
+import org.springframework.integration.core.GenericHandler;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.file.FileReadingMessageSource;
-import org.springframework.integration.file.filters.AcceptOnceFileListFilter;
 import org.springframework.integration.file.filters.ChainFileListFilter;
 import org.springframework.integration.file.filters.FileSystemPersistentAcceptOnceFileListFilter;
 import org.springframework.integration.jdbc.metadata.JdbcMetadataStore;
 import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHandler;
 import org.springframework.util.StreamUtils;
+import org.springframework.web.reactive.function.client.WebClient;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import javax.sql.DataSource;
 import java.io.File;
@@ -43,15 +44,13 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 @Configuration
 @EnableIntegration
+@Slf4j
 public class IngestionPipelineConfig {
-
-    private static final Logger logger = LoggerFactory.getLogger(IngestionPipelineConfig.class);
 
     @Value("${app.ingestion.chunk-size:500}")
     private int chunkSize;
@@ -83,6 +82,24 @@ public class IngestionPipelineConfig {
     }
 
     @Bean
+    public org.springframework.boot.CommandLineRunner initBucket(S3Client s3Client) {
+        return args -> {
+            try {
+                s3Client.headBucket(
+                        software.amazon.awssdk.services.s3.model.HeadBucketRequest.builder().bucket(s3Bucket).build());
+                log.info("Bucket '{}' already exists.", s3Bucket);
+            } catch (software.amazon.awssdk.services.s3.model.NoSuchBucketException e) {
+                log.info("Bucket '{}' not found. Creating...", s3Bucket);
+                s3Client.createBucket(software.amazon.awssdk.services.s3.model.CreateBucketRequest.builder()
+                        .bucket(s3Bucket).build());
+                log.info("Bucket '{}' created successfully.", s3Bucket);
+            } catch (Exception e) {
+                log.error("Failed to check/create bucket '{}'", s3Bucket, e);
+            }
+        };
+    }
+
+    @Bean
     public ConcurrentMetadataStore metadataStore(DataSource dataSource) {
         return new JdbcMetadataStore(dataSource);
     }
@@ -90,7 +107,7 @@ public class IngestionPipelineConfig {
     @Bean
     @InboundChannelAdapter(value = "s3Channel", poller = @Poller(fixedDelay = "5000", errorChannel = "errorChannel"))
     public S3InboundFileSynchronizingMessageSource s3MessageSource(S3Client s3Client,
-            ConcurrentMetadataStore metadataStore) {
+                                                                   ConcurrentMetadataStore metadataStore) {
         S3SessionFactory s3SessionFactory = new S3SessionFactory(s3Client);
 
         var synchronizer = new org.springframework.integration.aws.inbound.S3InboundFileSynchronizer(s3SessionFactory);
@@ -138,12 +155,16 @@ public class IngestionPipelineConfig {
     public IntegrationFlow markdownFlow(VectorStore vectorStore) {
         return IntegrationFlow.from("markdownChannel")
                 .transform(File.class, this::processMarkdown)
+                .handle((GenericHandler<List<Document>>) (payload, headers) -> {
+                    removeOldDocuments(payload, vectorStore);
+                    return payload;
+                })
                 .transform(this::splitDocuments)
                 .split()
                 .handle(message -> {
                     Document doc = (Document) message.getPayload();
                     vectorStore.add(List.of(doc));
-                    logger.info("Indexed markdown document: {}", doc.getId());
+                    log.info("Indexed markdown document: {}", doc.getId());
                 })
                 .get();
     }
@@ -152,12 +173,16 @@ public class IngestionPipelineConfig {
     public IntegrationFlow unstructuredFlow(VectorStore vectorStore) {
         return IntegrationFlow.from("unstructuredChannel")
                 .transform(File.class, this::processUnstructured)
+                .handle((GenericHandler<List<Document>>) (payload, headers) -> {
+                    removeOldDocuments(payload, vectorStore);
+                    return payload;
+                })
                 .transform(this::splitDocuments)
                 .split()
                 .handle(message -> {
                     Document doc = (Document) message.getPayload();
                     vectorStore.add(List.of(doc));
-                    logger.info("Indexed structured document: {}", doc.getId());
+                    log.info("Indexed structured document: {}", doc.getId());
                 })
                 .get();
     }
@@ -165,44 +190,78 @@ public class IngestionPipelineConfig {
     @Bean
     public MessageChannel errorChannel() {
         DirectChannel channel = new DirectChannel();
-        channel.subscribe(message -> logger.error("Error in ingestion pipeline: {}", message.getPayload()));
+        channel.subscribe(message -> log.error("Error in ingestion pipeline: {}", message.getPayload()));
         return channel;
     }
 
-    // --- Helpers ---
+    private void removeOldDocuments(List<Document> newDocuments, VectorStore vectorStore) {
+        if (newDocuments.isEmpty()) {
+            return;
+        }
+        String source = (String) newDocuments.get(0).getMetadata().get("source");
+        if (source != null) {
+            log.info("Removing existing documents for source: {}", source);
+            Filter.Expression filterExpression = new FilterExpressionBuilder()
+                    .eq("source", source)
+                    .build();
+
+            vectorStore.delete(filterExpression);
+            log.info("Deleted old documents for source: {}", source);
+        }
+    }
 
     private List<Document> processMarkdown(File file) {
+        log.info("Processing file: {}, Last Modified: {}", file.getName(), new java.util.Date(file.lastModified()));
         try (FileInputStream fis = new FileInputStream(file)) {
             String content = StreamUtils.copyToString(fis, StandardCharsets.UTF_8);
 
-            // Simple parsing strategy: Use CommonMark to parse and extract text with
-            // headers as metadata
             Parser parser = Parser.builder().build();
             Node document = parser.parse(content);
+
+            // This is a simple visitor to find the first H1 as a title.
+            // For production, a file can be split per each header, not just one per file as title.
+            final String[] title = {file.getName()}; // Default to filename
+            document.accept(new AbstractVisitor() {
+                @Override
+                public void visit(org.commonmark.node.Heading heading) {
+                    if (heading.getLevel() == 1 && title[0].equals(file.getName())) {
+                        TextContentRenderer renderer = TextContentRenderer.builder().build();
+                        title[0] = renderer.render(heading);
+                    }
+                    super.visit(heading);
+                }
+            });
+
             TextContentRenderer renderer = TextContentRenderer.builder().build();
             String text = renderer.render(document);
 
-            // In a real implementation, you'd iterate nodes to attach header metadata.
-            // For now, we return one document with the content.
-            return List.of(new Document(text, Map.of("source", file.getName(), "type", "markdown")));
+            Map<String, Object> metadata = new java.util.HashMap<>();
+            metadata.put("source", file.getName());
+            metadata.put("type", "markdown");
+            metadata.put("title", title[0]);
+            metadata.put("last_modified", new java.util.Date(file.lastModified()).toString());
+
+            return List.of(new Document(text, metadata));
         } catch (IOException e) {
             throw new RuntimeException("Failed to read markdown file", e);
+        } finally {
+            if (file.exists()) {
+                boolean deleted = file.delete();
+                log.info("Local file '{}' deleted: {}", file.getName(), deleted);
+            }
         }
     }
 
     private List<Document> processUnstructured(File file) {
+        log.info("Processing file: {}, Last Modified: {}", file.getName(), new java.util.Date(file.lastModified()));
         WebClient webClient = WebClient.create(unstructuredApiUrl);
 
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("files", new FileSystemResource(file));
         builder.part("strategy", "hi_res");
 
-        // Call Unstructured API
         try {
-            // Note: This is a simplified call. Real response parsing depends on
-            // Unstructured API JSON format.
-            // We assume it returns a list of elements.
-            String response = webClient.post()
+            String responseJson = webClient.post()
                     .uri("/general/v0/general")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .bodyValue(builder.build())
@@ -210,15 +269,40 @@ public class IngestionPipelineConfig {
                     .bodyToMono(String.class)
                     .block();
 
-            // Placeholder: Wrap response in a document.
-            // Ideally we parse JSON, extract "text" fields and tables.
-            return List.of(new Document(response, Map.of("source", file.getName(), "type", "unstructured")));
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(responseJson);
+
+            StringBuilder fullText = new StringBuilder();
+            if (rootNode.isArray()) {
+                for (JsonNode node : rootNode) {
+                    if (node.has("text")) {
+                        fullText.append(node.get("text").asText()).append("\n\n");
+                    }
+                }
+            } else {
+                if (rootNode.has("text")) {
+                    fullText.append(rootNode.get("text").asText());
+                }
+            }
+
+            Map<String, Object> metadata = new java.util.HashMap<>();
+            metadata.put("source", file.getName());
+            metadata.put("type", "unstructured");
+            metadata.put("last_modified", new java.util.Date(file.lastModified()).toString());
+
+            return List.of(new Document(fullText.toString(), metadata));
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to call Unstructured API", e);
+            throw new RuntimeException("Failed to call Unstructured API or parse response", e);
+        } finally {
+            if (file.exists()) {
+                boolean deleted = file.delete();
+                log.info("Local file '{}' deleted: {}", file.getName(), deleted);
+            }
         }
     }
 
+    @SuppressWarnings("unchecked")
     private List<Document> splitDocuments(Object payload) {
         List<Document> docs = (List<Document>) payload;
         TokenTextSplitter splitter = new TokenTextSplitter(chunkSize, 30, 5, 10000, true);
