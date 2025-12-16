@@ -4,6 +4,33 @@ x-common-env: &common-env
   LLM_MODEL: meta-llama-3.1-8b-instruct
 
 services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    ports:
+      - "9070:9000"
+      - "9071:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    volumes:
+      - ./data/minio:/data
+    command: server /data --console-address ":9001"
+    networks:
+      default:
+        aliases:
+          - minio
+
+  unstructured-api:
+    image: downloads.unstructured.io/unstructured-io/unstructured-api:0.0.90
+    ports:
+      - "9080:8000"
+    networks:
+      default:
+        aliases:
+          - unstructured-api
+
   qdrant:
     image: qdrant/qdrant:v1.16
     container_name: qdrant
@@ -26,7 +53,7 @@ services:
 
   openmemory:
     build:
-      context: .
+      context: ./OpenMemory
       dockerfile: Dockerfile.mem0mcp
     container_name: openmemory
     image: openmemory-ascend-ai:latest
@@ -56,7 +83,7 @@ services:
     image: curlimages/curl:latest
     restart: "no"
     volumes:
-      - ./configure_mem0.sh:/configure_mem0.sh
+      - ./OpenMemory/configure_mem0.sh:/configure_mem0.sh
     environment:
       <<: *common-env
       LLM_MAX_TOKENS: 1500

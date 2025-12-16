@@ -32,6 +32,14 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-starter-model-openai")
     implementation("org.springframework.ai:spring-ai-starter-mcp-client-webflux")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    implementation("org.springframework.boot:spring-boot-starter-integration")
+    implementation("org.springframework.integration:spring-integration-file")
+    implementation("org.springframework.integration:spring-integration-aws:3.0.0")
+    implementation("org.springframework.integration:spring-integration-jdbc")
+    implementation("org.postgresql:postgresql")
+    implementation("org.springframework.ai:spring-ai-starter-vector-store-qdrant")
+    implementation("org.commonmark:commonmark:0.21.0")
+    implementation("software.amazon.awssdk:s3:2.29.10")
 
     compileOnly("org.projectlombok:lombok")
 

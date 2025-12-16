@@ -4,6 +4,23 @@ server:
 spring:
   application:
     name: Orchestrator
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ascend_ai
+    username: user
+    password: password
+    driver-class-name: org.postgresql.Driver
+
+s3:
+  bucket: knowledge-base
+  endpoint: http://localhost:9070
+  access-key: admin
+  secret-key: password
+
+app:
+  ingestion:
+    chunk-size: 500
+  unstructured:
+    base-url: http://localhost:9080
   ai:
     mcp:
       client:
@@ -22,10 +39,10 @@ spring:
             openmemory:
               url: http://localhost:8765
               sse-endpoint: /mcp/ascendai/sse/user1
-    #        streamable-http:
-    #          connections:
-    #            openmemory:
-    #              url: http://localhost:8000/mcp/messages
+        #        streamable-http:
+        #          connections:
+        #            openmemory:
+        #              url: http://localhost:8000/mcp/messages
 
         stdio:
           servers-configuration: classpath:mcp-servers-config.json
