@@ -100,6 +100,76 @@ services:
       openmemory:
         condition: service_healthy
 
+  weather-mcp:
+    build:
+      context: ./WeatherMCP
+      dockerfile: Dockerfile
+    # image: lukk17/weather-mcp:latest
+    container_name: weather-mcp
+    restart: unless-stopped
+    ports:
+      - "9998:9998"
+    networks:
+      default:
+        aliases:
+          - weather-mcp
+
+  audio-scribe:
+    build:
+      context: ./AudioScribe
+      dockerfile: Dockerfile
+    # image: lukk17/audio-scribe:latest
+    container_name: audio-scribe
+    restart: unless-stopped
+    ports:
+      - "7017:7017"
+    environment:
+      - HF_HOME=/hf-cache
+      - HF_TOKEN=${HF_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - D:/Development/AI/hf-cache:/hf-cache
+      - C:\Users\Lukk\Desktop:/audio
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      default:
+        aliases:
+          - audio-scribe
+
+  audio-scribe-mcp:
+    build:
+      context: ./AudioScribe
+      dockerfile: Dockerfile.mcp
+    # image: lukk17/audio-scribe-mcp:latest
+    container_name: audio-scribe-mcp
+    restart: unless-stopped
+    ports:
+      - "7016:7016"
+    environment:
+      - HF_HOME=/hf-cache
+      - HF_TOKEN=${HF_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - D:/Development/AI/hf-cache:/hf-cache
+      - C:\Users\Lukk\Desktop:/audio
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      default:
+        aliases:
+          - audio-scribe-mcp
+
 volumes:
   qdrant_data:
   mem0_data:

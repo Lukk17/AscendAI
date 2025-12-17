@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="mcp_requests | call_weather_tool" type="HttpClient.HttpRequestRunConfigurationType" factoryName="HTTP Request" folderName="WeatherMCP-streamable" nameIsGenerated="true" path="$PROJECT_DIR$/WeatherMCP/mcp_requests.http" executionIdentifier="call_weather_tool" index="3" runType="Run single request">
+    <method v="2" />
+  </configuration>
+</component>

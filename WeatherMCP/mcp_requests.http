@@ -1,0 +1,68 @@
+@mcp_server_url = http://localhost:9998
+@mcp_endpoint = /mcp
+
+@mcp_protocol_version = 2024-11-05
+# Update below ID after the connection/init
+@mcp_session_id = d33e1f24-13ff-42d1-8dba-2e7fe8d9e938
+
+
+###
+# @name initialize
+# 2. Initialize a Streamable HTTP MCP session.
+# Ensure you put the Session ID in the params or URL if required by your specific client logic,
+# but for Spring AI, usually connection is Step 1.
+# This POST goes to the Message Endpoint.
+POST {{mcp_server_url}}{{mcp_endpoint}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "{{mcp_protocol_version}}",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "1.0" }
+  }
+}
+
+###
+# @name list_tools
+# 2. List available tools.
+# Requires 'mcp-session-id' from initialization.
+POST {{mcp_server_url}}{{mcp_endpoint}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+# @name call_weather_tool
+# 3. Call the weather tool.
+POST {{mcp_server_url}}{{mcp_endpoint}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "getCurrentWeather",
+    "arguments": {
+      "city": "Warsaw",
+      "unit": "celsius",
+      "language": "en"
+    }
+  }
+}

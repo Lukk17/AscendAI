@@ -30,13 +30,13 @@ spring:
             openmemory:
               url: http://localhost:8765
               sse-endpoint: /mcp/ascendai/sse/user1
-        #        streamable-http:
-        #          connections:
-        #            openmemory:
-        #              url: http://localhost:8000/mcp/messages
+        streamable-http:
+          connections:
+            weather-server:
+              url: http://localhost:9998
 
-        stdio:
-          servers-configuration: classpath:mcp-servers-config.json
+#        stdio:
+#          servers-configuration: classpath:mcp-servers-config.json
 
     openai:
       api-key: "not-needed" # Not required for local LM Studio

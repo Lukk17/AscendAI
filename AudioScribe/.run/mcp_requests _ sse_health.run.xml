@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="mcp_requests | sse_health" type="HttpClient.HttpRequestRunConfigurationType" factoryName="HTTP Request" folderName="sse" nameIsGenerated="true" environment="&lt;No Environment&gt;" path="$PROJECT_DIR$/mcp_requests.http" executionIdentifier="sse_health" index="15" runType="Run single request">
+  <configuration default="false" name="mcp_requests | sse_health" type="HttpClient.HttpRequestRunConfigurationType" factoryName="HTTP Request" folderName="AudioScribe-sse" nameIsGenerated="true" environment="&lt;No Environment&gt;" path="$PROJECT_DIR$/mcp_requests.http" runType="Run single request">
     <method v="2" />
   </configuration>
 </component>

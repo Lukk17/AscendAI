@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="mcp_requests | transcribe_openai" type="HttpClient.HttpRequestRunConfigurationType" factoryName="HTTP Request" folderName="streamable" nameIsGenerated="true" environment="&lt;No Environment&gt;" path="$PROJECT_DIR$/mcp_requests.http" executionIdentifier="transcribe_openai" index="5" runType="Run single request">
+  <configuration default="false" name="mcp_requests | transcribe_openai" type="HttpClient.HttpRequestRunConfigurationType" factoryName="HTTP Request" folderName="AudioScribe-streamable" nameIsGenerated="true" environment="&lt;No Environment&gt;" path="$PROJECT_DIR$/mcp_requests.http" runType="Run single request">
     <method v="2" />
   </configuration>
 </component>

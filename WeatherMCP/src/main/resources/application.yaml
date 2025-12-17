@@ -1,0 +1,37 @@
+server:
+  port: 9998
+
+spring:
+  application:
+    name: ascend-ai-mcp
+  threads:
+    virtual:
+      enabled: true
+
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: ascend-ai-weather-mcp
+        version: 0.0.1
+
+        # Communication type. SYNC for request/response, ASYNC for streaming.
+        type: ASYNC
+        protocol: STREAMABLE
+
+        # The specific URL path for the Server-Sent Events (SSE) communication stream. Default is:
+        sse-message-endpoint: /mcp
+
+        capabilities:
+          # Enables discovery of @Tool annotated methods.
+          tool: true
+          # Enables RAG capabilities.
+          resource: false
+          # Server can act as a simple prompt proxy.
+          prompt: false
+          # Server can act as a simple completion proxy - used only in old versions of models like GPT-3.
+          completion: false
+
+logging:
+  level:
+    org.springframework.ai.mcp: DEBUG

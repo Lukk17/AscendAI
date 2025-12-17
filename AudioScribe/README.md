@@ -136,12 +136,16 @@ Ensure you have set the **environment variables** mentioned above.
 This is the recommended method for a stable deployment.
 
 **1. Build the Docker image:**
-```shell
-# Build the main image for the REST API
-docker build -t audio-scribe:latest .
 
-# Or, build the image for the MCP server
+Build the main image for the REST API
+```shell
+docker build -t audio-scribe:latest .
+```
+
+Build the image for the MCP server
+```shell
 docker build -f Dockerfile.mcp -t audio-scribe-mcp:latest .
+```
 
 **2. Tag and Publish (Optional):**
 
@@ -295,6 +299,34 @@ SSE transport (server-sent events + POST messages):
               Headers: Content-Type: application/json
               Note: The messages path includes a required `session_id` query param
                     provided by the server in the first SSE event named "endpoint".
+
+### Docker Run (MCP)
+
+**For Linux/macOS:**
+```shell
+docker run -d \
+  --name audio-scribe-mcp \
+  --gpus all \
+  -p 7016:7016 \
+  -e OPENAI_API_KEY="sk-..." \
+  -e HF_TOKEN="hf_..." \
+  -e HF_HOME=/hf-cache \
+  -v ~/hf-cache:/hf-cache \
+  audio-scribe-mcp:latest
+```
+
+**For Windows (PowerShell):**
+```PowerShell
+docker run -d `
+  --name audio-scribe-mcp `
+  --gpus all `
+  -p 7016:7016 `
+  -e OPENAI_API_KEY="sk-..." `
+  -e HF_TOKEN="hf_..." `
+  -e HF_HOME=/hf-cache `
+  -v "D:/path/to/your/hf-cache:/hf-cache" `
+  audio-scribe-mcp:latest
+```
 
 ### Example MCP Client Configurations
 

@@ -1,0 +1,14 @@
+HELP.md
+.gradle
+build/
+!build/libs/*.jar
+out/
+bin/
+.idea
+.vscode
+.git
+.gitignore
+*.iml
+
+mcp_requests.http
+README.md
