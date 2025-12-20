@@ -172,3 +172,64 @@ If you need to completely reset the MinIO state or delete a bucket that is stuck
     ```bash
     mc rb --force local/knowledge-base
     ```
+
+### 2. Qdrant: Managing Vector Data
+
+The Orchestrator uses a Qdrant collection named `ascendai` (configured in `application.yaml`).
+
+**Delete Entire Collection (Reset Memory):**
+To completely wipe all vector data:
+```bash
+curl -X DELETE "http://localhost:6333/collections/ascendai"
+```
+
+**Granular Deletion (Remove Specific File):**
+To remove only the vectors associated with a specific file (e.g., `kierunki.md`):
+```bash
+curl -X POST "http://localhost:6333/collections/ascendai/points/delete" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "filter": {
+         "must": [
+           { "key": "metadata.source", "match": { "value": "kierunki.md" } }
+         ]
+       }
+     }'
+```
+
+**List All Collections:**
+To view all existing collections:
+```bash
+curl http://localhost:6333/collections
+```
+
+**Visualizing Data (Qdrant Dashboard):**
+The Qdrant image includes a **Built-in Dashboard**.
+*   **URL**: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
+*   You can browse collections, view stored vectors, and verify data ingestion visually without needing extra containers.
+
+### 3. Resetting Ingestion History (PostgreSQL)
+
+To force the system to re-process files, you must remove their entries from the metadata store.
+
+**Database Details:**
+*   **Database**: `ascend_ai`
+*   **Schema**: `public`
+*   **Table**: `int_metadata_store`
+
+**Option A: Clear History for a Single File (Granular)**
+If you want to re-ingest a specific file (e.g., `test.md`):
+```sql
+DELETE FROM public.int_metadata_store 
+WHERE metadata_key LIKE '%test.md' 
+   OR metadata_key LIKE '%test.md'; 
+```
+*(Note: Keys often include prefixes like `s3-metadata` or `local-fs-metadata`)*
+
+**Option B: Clear ALL History (Full Reset)**
+To force the system to re-process **everything**:
+```sql
+TRUNCATE TABLE public.int_metadata_store;
+```
+
+**After running either command, restart the Orchestrator.**

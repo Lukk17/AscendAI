@@ -35,34 +35,75 @@ spring:
             weather-server:
               url: http://localhost:9998
 
-#        stdio:
-#          servers-configuration: classpath:mcp-servers-config.json
+    #        stdio:
+    #          servers-configuration: classpath:mcp-servers-config.json
 
     openai:
       api-key: "not-needed" # Not required for local LM Studio
+      base-url: "http://127.0.0.1:1234"
       chat:
         options:
-          model: "meta-llama-3.1-8b-instruct" # The exact model ID to be used
+          model: qwen/qwen3-vl-4b
+          # model: "meta-llama-3.1-8b-instruct"
           temperature: 0.7
           max-tokens: -1
-        base-url: "http://127.0.0.1:1234"
+      embedding:
+        options:
+          model: "text-embedding-nomic-embed-text-v1.5"
+    vectorstore:
+      qdrant:
+        collection-name: ascendai
 
 app:
   ingestion:
-    chunk-size: 500
-  unstructured:
-    base-url: http://localhost:9080
+    token-splitter:
+      chunk-size: 1000
+      min-chunk-size-chars: 350
+      min-chunk-length-to-embed: 5
+      max-num-chunks: 10000
+      keep-separator: true
+    folders:
+      obsidian: "obsidian/"
+      documents: "documents/"
 
-s3:
-  bucket: knowledge-base
-  endpoint: http://localhost:9070
-  access-key: admin
-  secret-key: password
+    # system-prompt: |
+    #   English Version (Reference):
+    #   You are a helpful and friendly assistant.
+    #   You have access to a long-term memory and a knowledge base (RAG) of user documents.
+    #   RULES:
+    #   1. When answering questions about the user or their notes, ALWAYS consider the provided CONTEXT (from Qdrant/RAG) and use the 'search_memory' tool.
+    #   2. You may retry searching (with different keywords) up to 3 times. Do not enter an infinite loop.
+    #   3. If you cannot find the information after 3 tries or checking context, explicitly state that you don't have that information.
+    #   4. Do not hallucinate facts about user notes.
+
+    system-prompt: |
+      Jesteś pomocnym i przyjaznym asystentem AI.
+      Masz dostęp do pamięci długoterminowej oraz bazy wiedzy (RAG) z dokumentami użytkownika.
+      ZASADY:
+      1. Kiedy odpowiadasz na pytania dotyczące użytkownika lub jego notatek, ZAWSZE bierz pod uwagę dostarczony KONTEKST (z Qdrant/RAG) oraz używaj narzędzia 'search_memory' (OpenMemory).
+      2. Jeśli szukasz informacji, możesz ponowić próbę wyszukiwania (używając innych słów kluczowych) maksymalnie 3 razy. Nie wpadaj w nieskończoną pętlę.
+      3. Jeśli po 3 próbach lub sprawdzeniu kontekstu nadal nie masz informacji, powiedz użytkownikowi wprost, że nie wiesz / nie masz tych danych w notatkach.
+      4. Nie zmyślaj faktów na temat notatek użytkownika.
+
+    poller:
+      max-messages-per-poll: 20
+      fixed-delay-millis: 1000
+  user:
+    default-id: user1
+  unstructured:
+    base-url: http://localhost:8000
+    api-path: "/general/v0/general"
+
+  s3:
+    bucket: knowledge-base
+    endpoint: http://localhost:9070
+    access-key: admin
+    secret-key: password
 
 logging:
   level:
     com.lukk.ai.orchestrator: DEBUG
-    org.springframework.ai: INFO
+    org.springframework.ai: DEBUG
     org.springframework.ai.mcp: INFO
     org.springframework.ai.tool: INFO
     org.springframework.ai.mcp.client.autoconfigure: INFO

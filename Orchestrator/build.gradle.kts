@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "3.5.4"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.springdoc.openapi-gradle-plugin") version "1.9.0"
 }
 
 group = "com.lukk"
@@ -21,6 +22,8 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://repo.spring.io/milestone") }
+    maven { url = uri("https://repo.spring.io/snapshot") }
 }
 
 extra["springAiVersion"] = "1.1.2"
@@ -39,8 +42,11 @@ dependencies {
     implementation("org.springframework.integration:spring-integration-jdbc")
     implementation("org.postgresql:postgresql")
     implementation("org.springframework.ai:spring-ai-starter-vector-store-qdrant")
+    implementation("org.springframework.ai:spring-ai-advisors-vector-store")
+    implementation("io.qdrant:client:1.11.0")
     implementation("org.commonmark:commonmark:0.21.0")
     implementation("software.amazon.awssdk:s3:2.29.10")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
 
     compileOnly("org.projectlombok:lombok")
 

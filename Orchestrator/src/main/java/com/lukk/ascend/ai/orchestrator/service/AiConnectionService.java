@@ -2,11 +2,15 @@ package com.lukk.ascend.ai.orchestrator.service;
 
 import com.lukk.ascend.ai.orchestrator.dto.AiResponse;
 import com.lukk.ascend.ai.orchestrator.dto.CustomMetadata;
+import com.lukk.ascend.ai.orchestrator.exception.AiGenerationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,50 +21,50 @@ import java.util.Map;
 public class AiConnectionService {
 
     private final ChatClient chatClient;
+    private final VectorStore vectorStore;
 
-    public AiResponse prompt(String userPrompt) {
-        // 1. Call the client to get the full ChatResponse object
+    /**
+     * Sends a prompt to the AI model and retrieves the response.
+     * <p>
+     * This method orchestrates the full chat interaction, including tool execution.
+     * The AI model may call registered tools (functions) to gather information
+     * before providing the final answer.
+     * </p>
+     *
+     * @param userPrompt The user's input message.
+     * @param userId     The ID of the user triggering the prompt, for context.
+     * @return An {@link AiResponse} containing the generated text and metadata
+     * (including tools used).
+     * @throws AiGenerationException if the chat client returns a null response.
+     */
+    public AiResponse prompt(String userPrompt, String userId) {
         ChatResponse chatResponse = chatClient.prompt()
                 .user(userPrompt)
-                .advisors(a -> a.param("user_id", "user1"))
-                .toolContext(Map.of("user_id", "user1"))
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder().query(userPrompt).topK(5).build())
+                        .build())
+                .advisors(a -> a.param("user_id", userId))
+                .toolContext(Map.of("user_id", userId))
                 .call()
                 .chatResponse();
 
-        // 2. Extract the content and the metadata
-        assert chatResponse != null;
-        String content = chatResponse.getResult().getOutput().getText();
+        if (chatResponse == null) {
+            throw new AiGenerationException("Received null response from ChatClient");
+        }
 
-        /*
-         * This stream operation will not capture the names of the tools used because it
-         * inspects the FINAL ChatResponse from the AI model.
-         *
-         * The high-level `.call().chatResponse()` API automatically handles the entire
-         * multi-step tool-calling process:
-         * 1. The client sends the user prompt.
-         * 2. The AI model responds with a request to call a tool (e.g.,
-         * `getCurrentWeather`).
-         * 3. The `ChatClient` intercepts this, executes the tool, and sends the tool's
-         * output back to the model.
-         * 4. The AI model processes the tool's output and generates a final,
-         * human-readable text response.
-         *
-         * The `chatResponse` object available here is the result of step 4. At this
-         * point, the tool has already been called and its
-         * results have been used. The final `AssistantMessage` contains the natural
-         * language answer for the user, not the intermediate
-         * tool call requests. As a result, the `getToolCalls()` list on this message
-         * will be empty.
-         */
-        List<String> toolsUsed = chatResponse.getResults().stream()
+        String content = chatResponse.getResult().getOutput().getText();
+        List<String> toolsUsed = extractExecutedToolNames(chatResponse);
+
+        CustomMetadata metadata = new CustomMetadata(chatResponse.getMetadata(), toolsUsed);
+
+        return new AiResponse(content, metadata);
+    }
+
+    private List<String> extractExecutedToolNames(ChatResponse chatResponse) {
+        return chatResponse.getResults().stream()
                 .map(Generation::getOutput)
                 .flatMap(output -> output.getToolCalls().stream())
                 .map(AssistantMessage.ToolCall::name)
                 .toList();
-
-        CustomMetadata metadata = new CustomMetadata(chatResponse.getMetadata(), toolsUsed);
-
-        // 3. Return your custom DTO
-        return new AiResponse(content, metadata);
     }
 }
