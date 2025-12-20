@@ -1,1 +1,1 @@
-rootProject.name = "ascend-ai-weather-mcp"
+rootProject.name = "weather-mcp"

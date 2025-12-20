@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: ascend-ai-mcp
+    name: ascend-ai-weather-mcp
   threads:
     virtual:
       enabled: true

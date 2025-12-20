@@ -70,9 +70,9 @@ public class IngestionController {
      */
     private String determineFolder(String filename) {
         if (filename != null && filename.endsWith(".md")) {
-            return obsidianFolder;
+            return obsidianFolder + "/";
         } else {
-            return documentsFolder;
+            return documentsFolder + "/";
         }
     }
 }

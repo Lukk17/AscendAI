@@ -1,7 +1,8 @@
 package com.lukk.ascend.ai.orchestrator.config;
 
+import com.lukk.ascend.ai.orchestrator.exception.IngestionException;
 import com.lukk.ascend.ai.orchestrator.service.DocumentService;
-import com.lukk.ascend.ai.orchestrator.service.IngestionService;
+import com.lukk.ascend.ai.orchestrator.service.ingestion.IngestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -13,7 +14,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.InboundChannelAdapter;
 import org.springframework.integration.annotation.Poller;
 import org.springframework.integration.aws.inbound.S3StreamingMessageSource;
+import org.springframework.integration.aws.support.S3RemoteFileTemplate;
 import org.springframework.integration.aws.support.S3SessionFactory;
+import org.springframework.integration.aws.support.filters.S3PersistentAcceptOnceFileListFilter;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.channel.ExecutorChannel;
 import org.springframework.integration.core.GenericHandler;
@@ -50,9 +53,17 @@ public class IngestionPipelineConfig {
     private final IngestionService ingestionService;
     private final DocumentService documentService;
     private final Executor taskExecutor;
+    private final S3Client s3Client;
+    private final ConcurrentMetadataStore metadataStore;
 
     @Value("${app.s3.bucket}")
     private String s3Bucket;
+
+    @Value("${app.ingestion.folders.obsidian:obsidian/}")
+    private String obsidianFolder;
+
+    @Value("${app.ingestion.folders.documents:documents/}")
+    private String documentsFolder;
 
     /**
      * Initializes the S3 bucket if it does not exist.
@@ -76,15 +87,6 @@ public class IngestionPipelineConfig {
         };
     }
 
-    @Value("${app.ingestion.folders.obsidian:obsidian/}")
-    private String obsidianFolder;
-
-    @Value("${app.ingestion.folders.documents:documents/}")
-    private String documentsFolder;
-
-    private final S3Client s3Client;
-    private final ConcurrentMetadataStore metadataStore;
-
     /**
      * Configures the S3 Message Source for streaming files.
      * <p>
@@ -101,8 +103,9 @@ public class IngestionPipelineConfig {
     public MessageSource<InputStream> s3MessageSource() {
         S3SessionFactory s3SessionFactory = new S3SessionFactory(s3Client);
         S3StreamingMessageSource messageSource = new S3StreamingMessageSource(
-                new org.springframework.integration.aws.support.S3RemoteFileTemplate(s3SessionFactory),
-                Comparator.comparing(S3Object::lastModified));
+                new S3RemoteFileTemplate(s3SessionFactory),
+                Comparator.comparing(S3Object::lastModified)
+        );
 
         messageSource.setRemoteDirectory(s3Bucket);
         messageSource.setFilter(createPersistentS3Filter(metadataStore));
@@ -115,7 +118,7 @@ public class IngestionPipelineConfig {
      */
     private CompositeFileListFilter<S3Object> createPersistentS3Filter(ConcurrentMetadataStore metadataStore) {
         CompositeFileListFilter<S3Object> filter = new CompositeFileListFilter<>();
-        filter.addFilter(new org.springframework.integration.aws.support.filters.S3PersistentAcceptOnceFileListFilter(
+        filter.addFilter(new S3PersistentAcceptOnceFileListFilter(
                 metadataStore, "s3-streaming-metadata"));
         return filter;
     }
@@ -129,7 +132,6 @@ public class IngestionPipelineConfig {
         return new ExecutorChannel(taskExecutor);
     }
 
-    // Channels for specific file types
     @Bean
     public MessageChannel markdownChannel() {
         return new DirectChannel();
@@ -179,9 +181,9 @@ public class IngestionPipelineConfig {
         String path = filename.toLowerCase();
         log.info("Routing file: {}", path);
 
-        if (path.endsWith(".md") || path.contains("obsidian")) {
+        if (path.endsWith(".md") || path.contains(obsidianFolder)) {
             return "markdownChannel";
-        } else if (path.contains("documents")) {
+        } else if (path.contains(documentsFolder)) {
             return "unstructuredChannel";
         }
 
@@ -215,7 +217,7 @@ public class IngestionPipelineConfig {
             String filename = (String) message.getHeaders().get(FileHeaders.REMOTE_FILE);
             return ingestionService.processMarkdown(stream, filename != null ? filename : "unknown.md");
         } catch (Exception e) {
-            throw new RuntimeException("Error processing markdown stream", e);
+            throw new IngestionException("Error processing markdown stream", e);
         }
     }
 
@@ -245,7 +247,7 @@ public class IngestionPipelineConfig {
             String filename = (String) message.getHeaders().get(FileHeaders.REMOTE_FILE);
             return ingestionService.processUnstructured(stream, filename != null ? filename : "unknown");
         } catch (Exception e) {
-            throw new RuntimeException("Error processing unstructured stream", e);
+            throw new IngestionException("Error processing unstructured stream", e);
         }
     }
 }

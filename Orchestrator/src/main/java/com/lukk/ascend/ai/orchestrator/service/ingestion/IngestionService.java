@@ -1,4 +1,4 @@
-package com.lukk.ascend.ai.orchestrator.service;
+package com.lukk.ascend.ai.orchestrator.service.ingestion;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;

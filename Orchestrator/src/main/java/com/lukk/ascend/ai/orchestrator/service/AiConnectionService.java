@@ -20,6 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AiConnectionService {
 
+    public static final String USER_ID_KEY = "user_id";
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
 
@@ -43,8 +44,8 @@ public class AiConnectionService {
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().query(userPrompt).topK(5).build())
                         .build())
-                .advisors(a -> a.param("user_id", userId))
-                .toolContext(Map.of("user_id", userId))
+                .advisors(a -> a.param(USER_ID_KEY, userId))
+                .toolContext(Map.of(USER_ID_KEY, userId))
                 .call()
                 .chatResponse();
 

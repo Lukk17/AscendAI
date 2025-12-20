@@ -1,10 +1,12 @@
-package com.lukk.ascend.ai.orchestrator.service;
+package com.lukk.ascend.ai.orchestrator.service.ingestion;
 
+import lombok.EqualsAndHashCode;
 import org.springframework.core.io.InputStreamResource;
 
 import java.io.IOException;
 import java.io.InputStream;
 
+@EqualsAndHashCode(callSuper = true)
 public class MultipartInputStreamResource extends InputStreamResource {
     private final String filename;
 

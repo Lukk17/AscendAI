@@ -6,12 +6,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.integration.jdbc.metadata.JdbcMetadataStore;
 import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.web.client.RestClient;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 
 import java.net.http.HttpClient;
 import java.util.concurrent.Executor;
@@ -78,8 +82,8 @@ public class AppConfig {
     private String s3SecretKey;
 
     @Bean
-    public software.amazon.awssdk.services.s3.S3Client s3Client() {
-        return software.amazon.awssdk.services.s3.S3Client.builder()
+    public S3Client s3Client() {
+        return S3Client.builder()
                 .endpointOverride(java.net.URI.create(s3Endpoint))
                 // MinIO requires a region, usually ignores it but needs one
                 .region(software.amazon.awssdk.regions.Region.US_EAST_1)
@@ -87,7 +91,7 @@ public class AppConfig {
                         .create(
                                 software.amazon.awssdk.auth.credentials.AwsBasicCredentials
                                         .create(s3AccessKey, s3SecretKey)))
-                .serviceConfiguration(software.amazon.awssdk.services.s3.S3Configuration.builder()
+                .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)
                         .build())
                 .build();
@@ -105,11 +109,11 @@ public class AppConfig {
     @Bean
     public ConcurrentMetadataStore metadataStore(
             javax.sql.DataSource dataSource) {
-        return new org.springframework.integration.jdbc.metadata.JdbcMetadataStore(dataSource);
+        return new JdbcMetadataStore(dataSource);
     }
 
     @Bean
-    public org.springframework.boot.CommandLineRunner initVectorStore(QdrantClient qdrantClient) {
+    public CommandLineRunner initVectorStore(QdrantClient qdrantClient) {
         return args -> {
             String collectionName = "ascendai";
             try {
@@ -127,11 +131,7 @@ public class AppConfig {
                                                         collectionName,
                                                         Collections.VectorParams
                                                                 .newBuilder()
-                                                                .setSize(768) // Nomic
-                                                                // Embed
-                                                                // Text
-                                                                // v1.5
-                                                                // dimensions
+                                                                .setSize(768)
                                                                 .setDistance(Collections.Distance.Cosine)
                                                                 .build())
                                                 .get();
