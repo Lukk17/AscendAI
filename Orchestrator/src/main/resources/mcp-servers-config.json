@@ -1,12 +1,16 @@
 {
   "mcpServers": {
-    "weather-server": {
-      "command": "java",
-      "args": [
-        "-jar",
-        "D:/Development/projekty-IT/AscendAI/MCP/build/libs/MCP-0.0.1.jar"
-      ],
-      "env": {}
+    "openmemory": {
+      "type": "sse",
+      "url": "http://localhost:8765/sse"
+    },
+    "audioscribe": {
+      "type": "http",
+      "url": "http://localhost:7016/mcp"
+    },
+    "weather": {
+      "type": "http",
+      "url": "http://localhost:9998/mcp"
     }
   }
 }

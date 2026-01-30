@@ -10,7 +10,9 @@ import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.text.TextContentRenderer;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -45,7 +47,9 @@ public class IngestionService {
     private static final String KEY_TEXT = "text";
     private static final String PARAM_FILES = "files";
 
-    private final RestClient.Builder restClientBuilder;
+    @Qualifier("ingestionRestClient")
+    private final RestClient restClient;
+
     private final ObjectMapper objectMapper;
 
     @Value("${app.unstructured.base-url}")
@@ -101,19 +105,28 @@ public class IngestionService {
     public List<Document> processUnstructured(InputStream inputStream, String filename) {
         log.info("Processing Unstructured stream for file: {}", filename);
 
-        RestClient restClient = restClientBuilder.build();
+        try {
+            byte[] content = StreamUtils.copyToByteArray(inputStream);
 
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add(PARAM_FILES, new MultipartInputStreamResource(inputStream, filename));
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add(PARAM_FILES, new ByteArrayResource(content) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            });
 
-        String response = restClient.post()
-                .uri(unstructuredBaseUrl + unstructuredApiPath)
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body)
-                .retrieve()
-                .body(String.class);
+            String response = restClient.post()
+                    .uri(unstructuredBaseUrl + unstructuredApiPath)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(String.class);
 
-        return parseUnstructuredResponse(response, filename);
+            return parseUnstructuredResponse(response, filename);
+        } catch (IOException e) {
+            throw new IngestionException("Failed to read input stream for file: " + filename, e);
+        }
     }
 
     private String readContentCheckingCharset(InputStream inputStream) throws IOException {

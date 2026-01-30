@@ -1,0 +1,17 @@
+app:
+  vectorstore:
+    collection-name: ascendai-cloud
+    size: 1536
+
+spring:
+  ai:
+    openai:
+      base-url: https://api.openai.com
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-5.1
+          max-completion-tokens: ${OPENAI_MAX_COMPLETION_TOKENS:1500}
+      embedding:
+        options:
+          model: text-embedding-3-small

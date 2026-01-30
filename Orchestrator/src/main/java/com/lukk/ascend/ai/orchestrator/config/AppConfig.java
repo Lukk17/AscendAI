@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfig
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.integration.jdbc.metadata.JdbcMetadataStore;
 import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.web.client.RestClient;
@@ -30,8 +31,29 @@ public class AppConfig {
         return Executors.newVirtualThreadPerTaskExecutor();
     }
 
-    @Value("${app.ingestion.system-prompt}")
+    @Value("${app.system-prompt}")
     private String systemPrompt;
+
+    @Value("${app.vectorstore.collection-name}")
+    private String vectorStoreCollectionName;
+
+    @Value("${app.vectorstore.size}")
+    private int vectorStoreSize;
+
+    @Value("${app.ingestion.connect-timeout}")
+    private int connectTimeout;
+
+    @Value("${app.ingestion.read-timeout}")
+    private int readTimeout;
+
+    @Value("${app.s3.endpoint}")
+    private String s3Endpoint;
+
+    @Value("${app.s3.access-key}")
+    private String s3AccessKey;
+
+    @Value("${app.s3.secret-key}")
+    private String s3SecretKey;
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder, SyncMcpToolCallbackProvider toolCallbackProvider) {
@@ -72,14 +94,20 @@ public class AppConfig {
                 .requestFactory(new JdkClientHttpRequestFactory(httpClient));
     }
 
-    @Value("${app.s3.endpoint}")
-    private String s3Endpoint;
+    @Bean
+    public RestClient restClient(RestClient.Builder builder) {
+        return builder.build();
+    }
 
-    @Value("${app.s3.access-key}")
-    private String s3AccessKey;
-
-    @Value("${app.s3.secret-key}")
-    private String s3SecretKey;
+    @Bean("ingestionRestClient")
+    public RestClient ingestionRestClient() {
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeout);
+        factory.setReadTimeout(readTimeout);
+        return RestClient.builder()
+                .requestFactory(factory)
+                .build();
+    }
 
     @Bean
     public S3Client s3Client() {
@@ -115,7 +143,7 @@ public class AppConfig {
     @Bean
     public CommandLineRunner initVectorStore(QdrantClient qdrantClient) {
         return args -> {
-            String collectionName = "ascendai";
+            String collectionName = vectorStoreCollectionName;
             try {
                 qdrantClient.listCollectionsAsync().get().stream()
                         .filter(c -> c.equals(collectionName))
@@ -131,7 +159,7 @@ public class AppConfig {
                                                         collectionName,
                                                         Collections.VectorParams
                                                                 .newBuilder()
-                                                                .setSize(768)
+                                                                .setSize(vectorStoreSize)
                                                                 .setDistance(Collections.Distance.Cosine)
                                                                 .build())
                                                 .get();

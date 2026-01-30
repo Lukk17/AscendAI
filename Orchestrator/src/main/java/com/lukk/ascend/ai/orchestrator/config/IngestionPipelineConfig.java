@@ -27,6 +27,7 @@ import org.springframework.integration.file.filters.CompositeFileListFilter;
 import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
@@ -35,16 +36,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Executor;
 
-/**
- * Configuration for the File Ingestion Pipeline.
- * <p>
- * This class sets up the Spring Integration flows that monitor S3 for new
- * files,
- * stream their content, and route them to the appropriate processing logic
- * based
- * on file type.
- * </p>
- */
 @Configuration
 @RequiredArgsConstructor
 @Slf4j
@@ -65,12 +56,6 @@ public class IngestionPipelineConfig {
     @Value("${app.ingestion.folders.documents:documents/}")
     private String documentsFolder;
 
-    /**
-     * Initializes the S3 bucket if it does not exist.
-     *
-     * @param s3Client The S3 client.
-     * @return A CommandLineRunner that executes on startup.
-     */
     @Bean
     public CommandLineRunner initBucket(S3Client s3Client) {
         return args -> {
@@ -104,8 +89,7 @@ public class IngestionPipelineConfig {
         S3SessionFactory s3SessionFactory = new S3SessionFactory(s3Client);
         S3StreamingMessageSource messageSource = new S3StreamingMessageSource(
                 new S3RemoteFileTemplate(s3SessionFactory),
-                Comparator.comparing(S3Object::lastModified)
-        );
+                Comparator.comparing(S3Object::lastModified));
 
         messageSource.setRemoteDirectory(s3Bucket);
         messageSource.setFilter(createPersistentS3Filter(metadataStore));
@@ -113,9 +97,6 @@ public class IngestionPipelineConfig {
         return messageSource;
     }
 
-    /**
-     * Creates a persistent file filter backed by the database.
-     */
     private CompositeFileListFilter<S3Object> createPersistentS3Filter(ConcurrentMetadataStore metadataStore) {
         CompositeFileListFilter<S3Object> filter = new CompositeFileListFilter<>();
         filter.addFilter(new S3PersistentAcceptOnceFileListFilter(
@@ -123,10 +104,6 @@ public class IngestionPipelineConfig {
         return filter;
     }
 
-    /**
-     * Channel for S3 messages.
-     * Uses Virtual Threads (via taskExecutor) for high-concurrency processing.
-     */
     @Bean
     public MessageChannel s3Channel() {
         return new ExecutorChannel(taskExecutor);
@@ -149,10 +126,6 @@ public class IngestionPipelineConfig {
         return channel;
     }
 
-    /**
-     * Main Ingestion Integration Flow.
-     * Routes incoming S3 messages to specific channels based on file extension.
-     */
     @Bean
     public IntegrationFlow ingestionFlow() {
         return IntegrationFlow.from(s3Channel())
@@ -160,16 +133,9 @@ public class IngestionPipelineConfig {
                 .get();
     }
 
-    /**
-     * Routing logic for ingested files.
-     *
-     * @param message The Spring Integration message containing the file stream.
-     * @return The name of the destination channel.
-     */
     private String routeFile(Message<?> message) {
         String filename = (String) message.getHeaders().get(FileHeaders.REMOTE_FILE);
         if (filename == null) {
-            // Fallback for some adapter versions
             filename = (String) message.getHeaders().get("file_remoteFile");
         }
 
@@ -191,9 +157,6 @@ public class IngestionPipelineConfig {
         return "nullChannel";
     }
 
-    /**
-     * Flow for processing Markdown files.
-     */
     @Bean
     public IntegrationFlow markdownFlow(VectorStore vectorStore) {
         return IntegrationFlow.from(markdownChannel())
@@ -221,9 +184,6 @@ public class IngestionPipelineConfig {
         }
     }
 
-    /**
-     * Flow for processing Unstructured files (PDF, etc.).
-     */
     @Bean
     public IntegrationFlow unstructuredFlow(VectorStore vectorStore) {
         return IntegrationFlow.from(unstructuredChannel())

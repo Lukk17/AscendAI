@@ -11,14 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * Service responsible for managing AI Documents.
- * <p>
- * This handles document post-processing, such as splitting large texts into
- * manageable chunks (TokenTextSplitter) and maintaining the Vector Store state
- * (e.g., removing old versions of documents before re-indexing).
- * </p>
- */
 @Service
 @Slf4j
 public class DocumentService {
@@ -53,16 +45,6 @@ public class DocumentService {
         }
     }
 
-    /**
-     * Splits a list of documents into smaller token-based chunks.
-     * <p>
-     * Uses {@link TokenTextSplitter} to ensure chunks fit within the embedding
-     * model's context window.
-     * </p>
-     *
-     * @param documents The list of large documents.
-     * @return A list of smaller, split documents.
-     */
     public List<Document> splitDocuments(List<Document> documents) {
         log.info("Splitting {} documents into chunks using chunk size: {}", documents.size(),
                 tokenSplitterChunkSize);

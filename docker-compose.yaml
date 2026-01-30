@@ -89,7 +89,7 @@ services:
     environment:
       <<: *common-env
       LLM_MAX_TOKENS: 1500
-      EMBEDDER_MODEL: nomic-ai/nomic-embed-text-v1.5-GGUF
+      EMBEDDER_MODEL: nomic-ai/text-embedding-nomic-embed-text-v2-moe
       EMBEDDING_DIMS: 768
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
@@ -169,6 +169,17 @@ services:
       default:
         aliases:
           - audio-scribe-mcp
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - redis
 
 volumes:
   qdrant_data:

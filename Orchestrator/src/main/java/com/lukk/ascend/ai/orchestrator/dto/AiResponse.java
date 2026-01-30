@@ -1,5 +1,7 @@
 package com.lukk.ascend.ai.orchestrator.dto;
 
-public record AiResponse(String content, CustomMetadata metadata) {
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+
+public record AiResponse(String content, ChatResponseMetadata metadata) {
 }
 
