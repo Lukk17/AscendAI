@@ -9,6 +9,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.InboundChannelAdapter;
@@ -39,6 +40,7 @@ import java.util.concurrent.Executor;
 @Configuration
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(prefix = "app.ingestion.auto", name = "enabled", havingValue = "true")
 public class IngestionPipelineConfig {
 
     private final IngestionService ingestionService;
@@ -55,22 +57,6 @@ public class IngestionPipelineConfig {
 
     @Value("${app.ingestion.folders.documents:documents/}")
     private String documentsFolder;
-
-    @Bean
-    public CommandLineRunner initBucket(S3Client s3Client) {
-        return args -> {
-            try {
-                s3Client.headBucket(b -> b.bucket(s3Bucket));
-                log.info("Bucket '{}' already exists.", s3Bucket);
-            } catch (software.amazon.awssdk.services.s3.model.NoSuchBucketException e) {
-                log.info("Bucket '{}' not found. Creating...", s3Bucket);
-                s3Client.createBucket(b -> b.bucket(s3Bucket));
-                log.info("Bucket '{}' created successfully.", s3Bucket);
-            } catch (Exception e) {
-                log.error("Failed to check/create bucket '{}'", s3Bucket, e);
-            }
-        };
-    }
 
     /**
      * Configures the S3 Message Source for streaming files.

@@ -1,0 +1,72 @@
+@mcp_protocol_version = 2024-11-05
+@mcp_session_id = CHANGE_ME
+
+###
+# @name initialize
+# Initialize a Streamable HTTP MCP session.
+POST http://localhost:7021/mcp
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "0.1.0" }
+  }
+}
+
+###
+# @name list_tools
+POST http://localhost:7021/mcp
+Content-Type: application/json
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+# @name web_search
+POST http://localhost:7021/mcp
+Content-Type: application/json
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "web_search",
+    "arguments": {
+      "query": "AscendAI project",
+      "limit": 3
+    }
+  }
+}
+
+###
+# @name web_read
+POST http://localhost:7021/mcp
+Content-Type: application/json
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "web_read",
+    "arguments": {
+      "url": "https://example.com"
+    }
+  }
+}

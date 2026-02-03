@@ -59,6 +59,7 @@ public class StartupLogConfig implements ApplicationListener<ApplicationReadyEve
         String appName = env.getProperty("spring.application.name", "AscendAI Orchestrator");
         String mainPromptUrl = String.format("%s://localhost:%s%s/prompt", protocol, serverPort, contextPath);
         String aiBaseUrl = env.getProperty("spring.ai.openai.base-url", "unknown");
+        String aiChatModel = env.getProperty("spring.ai.openai.chat.options.model", "unknown");
 
         String[] profiles = env.getActiveProfiles();
         String activeProfiles = (profiles.length == 0) ? "default" : String.join(", ", profiles);
@@ -80,9 +81,10 @@ public class StartupLogConfig implements ApplicationListener<ApplicationReadyEve
                 "\tAccess URLs:\n" +
                 "\tLocal:      \t{}://localhost:{}{}\n" +
                 "\tExternal:   \t{}://{}:{}{}\n" +
+                "\tAI:         \t{}\n" +
                 "\n" +
                 "\tProfile(s): \t{}\n" +
-                "\tAI provider:\t{}\n" +
+                "\tAI model:   \t{}\n" +
                 "\n" +
                 "\tActionable Status:\n" +
                 "\t- Postgres:    \t{}\n" +
@@ -96,8 +98,9 @@ public class StartupLogConfig implements ApplicationListener<ApplicationReadyEve
                 appName,
                 protocol, serverPort, contextPath,
                 protocol, hostAddress, serverPort, contextPath,
-                activeProfiles,
                 aiBaseUrl,
+                activeProfiles,
+                aiChatModel,
                 dbStatus,
                 redisStatus,
                 s3Status,

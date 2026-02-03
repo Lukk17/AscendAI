@@ -3,7 +3,7 @@ package com.lukk.ascend.ai.orchestrator.controller;
 import com.lukk.ascend.ai.orchestrator.config.api.ApiCommonErrorResponses;
 import com.lukk.ascend.ai.orchestrator.config.api.ApiCommonSuccessResponses;
 import com.lukk.ascend.ai.orchestrator.dto.AiResponse;
-import com.lukk.ascend.ai.orchestrator.service.AiConnectionService;
+import com.lukk.ascend.ai.orchestrator.service.ChatOrchestratorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +22,10 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequiredArgsConstructor
 @Tag(name = "Prompt", description = "Prompt controller.")
-@RequestMapping(produces = "application/json")
+@RequestMapping(value = "/api/v1/ai", produces = "application/json")
 public class PromptController {
 
-    private final AiConnectionService aiConnectionService;
+    private final ChatOrchestratorService chatOrchestratorService;
 
     @Value("${app.user.default-id:user1}")
     private String defaultUserId;
@@ -34,17 +34,19 @@ public class PromptController {
     @ApiCommonSuccessResponses
     @ApiCommonErrorResponses
     @PostMapping(value = "/prompt", consumes = "multipart/form-data")
-    public ResponseEntity<AiResponse> getAiResponse(
+    public ResponseEntity<AiResponse> prompt(
             @RequestParam("prompt") String prompt,
-            @RequestPart(value = "image", required = false) MultipartFile image,
-            @RequestPart(value = "doc", required = false) MultipartFile document,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "document", required = false) MultipartFile document,
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
+
         String userId = userIdHeader != null && !userIdHeader.isBlank() ? userIdHeader : defaultUserId;
+
         log.info("Received Prompt | ClientID: {} | HasImage: {} | HasDoc: {} | Prompt: {}",
                 userId,
                 image != null && !image.isEmpty(),
                 document != null && !document.isEmpty(),
                 prompt);
-        return ResponseEntity.ok(aiConnectionService.prompt(prompt, image, document, userId));
+        return ResponseEntity.ok(chatOrchestratorService.prompt(prompt, image, document, userId));
     }
 }

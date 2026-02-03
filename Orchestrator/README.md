@@ -4,7 +4,7 @@
 
 This project is the central hub of the AI system, acting as an orchestrator.  
 It's a Spring Boot application that provides a REST API to connect user prompts with a Large Language Model (LLM).  
-Crucially, it extends the LLM's capabilities by dynamically discovering and integrating external tools via the Model Context Protocol (MCP) and providing a RAG (Retrieval-Augmented Generation) pipeline for document ingestion.
+It extends the LLM's capabilities by integrating external tools via the Model Context Protocol (MCP), a retrieval-gated RAG pipeline (Qdrant), and a dedicated semantic memory service (`ascend-memory`).
 
 ---
 
@@ -19,13 +19,16 @@ flowchart TD
     subgraph Core ["Core Orchestration"]
         Orchestrator -- "1. Context Retrieval" --> Redis["Redis (Active Memory)"]
         Orchestrator -- "2. History Lookup" --> Postgres["PostgreSQL (Long-term)"]
-        Orchestrator -- "3. Vector Search" --> Qdrant["Qdrant (RAG)"]
+        Orchestrator -- "3. Soft-RAG (Thresholded)" --> Qdrant["Qdrant (RAG)"]
+        Orchestrator -- "4. Semantic Memory (REST)" --> AscendMemory["ascend-memory"]
     end
     
     subgraph MCP ["Model Context Protocol (MCP)"]
-        Orchestrator -- "Tool Discovery" --> MCPRouter["MCP Router"]
-        MCPRouter -- "Core Memory Ops" --> OpenMemory["OpenMemory Server"]
-        MCPRouter -- "External Tools" --> ExtTools["External Tools (Weather, Web, etc.)"]
+        Orchestrator -- "Tool Discovery & Calls" --> ExtTools["External Tools"]
+        ExtTools --> Weather["Weather MCP"]
+        ExtTools --> Audio["AudioScribe MCP"]
+        ExtTools --> WebTools["Web Tools MCP"]
+        WebTools --> Searxng["SearXNG"]
     end
 
     subgraph Ingestion ["Ingestion Pipeline"]
@@ -46,29 +49,31 @@ flowchart TD
 2.  **PostgreSQL**:
     *   **Purpose**: Persistent, reliable storage.
     *   **Usage**: Archival of all Chat History and structured User Metadata (preferences, profile data).
-3.  **OpenMemory (MCP)**:
-    *   **Purpose**: Core memory management via MCP.
-    *   **Usage**: Exposed as a tool, allowing the AI to explicitly "save" or "recall" facts that don't fit into the standard vector search (e.g., "I am allergic to peanuts").
-4.  **Qdrant**:
+3.  **Qdrant**:
     *   **Purpose**: Vector Database for RAG.
     *   **Usage**: Stores semantic embeddings of ingested documents (Markdown, PDF, etc.) for similarity search.
+4.  **ascend-memory**:
+    *   **Purpose**: Semantic memory service (separate from chat history).
+    *   **Usage**: Orchestrator retrieves user-scoped memories over REST and injects them as optional context.
 
 ---
 
 ## Operational Workflow
 
 ### 1. Memory vs. Tools
-The Orchestrator uses a "Smart Prioritization" logic within the System Prompt to decide how to handle requests:
-*   **Real-time Usage**: If the user asks for dynamic data (e.g., "Stock Price", "Weather"), the AI uses External MCP Tools immediately. It strictly avoids searching memory for this data to prevent hallucinations.
-*   **Memory Persistence**: If the user states a fact (e.g., "My name is Luke"), the AI uses the `OpenMemory` tool to save this information.
-*   **Context Retrieval**: For general questions, the AI defaults to searching its Context (Redis/Postgres) and RAG (Qdrant) before generating an answer.
+The Orchestrator uses a retrieval-gated approach:
+*   **Soft-RAG (Thresholded)**: It always queries Qdrant, but injects RAG context only if the top similarity score is above a configured threshold. This prevents context-only refusals and avoids suppressing tool usage.
+*   **Tools (MCP)**: Tools remain available for dynamic/external information (weather, web search, transcription).
+*   **Semantic Memory (REST)**: User-scoped memories are retrieved from `ascend-memory` and injected as optional context.
+
+#### Optional upgrade: Model Router (1 extra LLM call)
+For a larger tool set and ambiguous prompts, you can add a model-router step that returns JSON like `{route: RAG|TOOL|BOTH}` and drives retrieval/tooling explicitly.
 
 ### 2. Document & Image Ingestion
 *   **Direct Ingestion**: Users can upload images or documents directly in the `/prompt` request (`multipart/form-data`). These are processed on-the-fly (`On-Demand Ingestion`) and added to the temporary context window for the current reply.
 *   **Background Ingestion (S3)**:
     *   The system monitors a **MinIO S3 Bucket (`knowledge-base`)**.
-    *   **Startup**: On boot, the system automatically scans the bucket. New files are detected, downloaded, processed (Markdown locally, PDFs via Unstructured API), and embedded into Qdrant.
-    *   **Continuous**: The poller checks for new files every few seconds, ensuring the Knowledge Base is always up-to-date.
+    *   **Manual**: Ingestion is disabled by default to avoid startup latency and unexpected cloud embedding costs. Trigger ingestion explicitly via the REST endpoint.
 
 ---
 
@@ -97,6 +102,9 @@ Before running the application, ensure you have the following services up and ru
     *   **Unstructured API**: For parsing complex document types (PDFs, PPTX, etc.).
     *   **PostgreSQL**: Metadata store for the ingestion pipeline (schema `ascend_ai`).
     *   **Redis**: Caching and active memory store.
+    *   **SearXNG**: Self-hosted meta-search engine (Web Tools dependency).
+    *   **web-tools-mcp**: MCP server providing `web_search` and `read_url` tools.
+    *   **ascend-memory**: Semantic memory service used by Orchestrator over REST.
 
 2.  **LLM Provider**:
     *   **LM Studio** (or similar) running locally on port `1234` (default).
@@ -106,7 +114,7 @@ Before running the application, ensure you have the following services up and ru
 
 ## RAG Pipeline & Document Ingestion
 
-The orchestrator includes an automated ingestion pipeline that monitors an S3 bucket for new files.
+The orchestrator includes an ingestion pipeline for processing S3 bucket files on demand.
 
 ### 1. S3 Storage (MinIO)
 *   **Bucket Name**: `knowledge-base` (Created automatically on startup if missing).
@@ -125,15 +133,16 @@ The pipeline routes files based on the folder specifically in the S3 bucket:
 | `documents/` | **Unstructured Flow** | `.pdf`, `.docx`, `.pptx`, `.html`, `.txt`, etc. | Sends files to the **Unstructured API** container. Capable of performing OCR and extracting text from complex layouts. |
 
 ### 3. How it Works
-1.  **Polling**: The application polls the `knowledge-base` bucket every 5 seconds.
-2.  **Synchronization**: New files are downloaded to a local `downloads/` directory.
-3.  **Routing**:
+1.  **Trigger**: Call `POST /api/ingestion/run` to scan the `knowledge-base` bucket.
+2.  **Routing**:
     *   Files containing `obsidian` in their path go to the Markdown processor.
     *   Files containing `documents` in their path go to the Unstructured processor.
-4.  **Processing**:
+3.  **Processing**:
     *   **Markdown**: Parsed into text, split into chunks.
     *   **Unstructured**: Sent to the Unstructured API, which returns extracted text, then split into chunks.
-5.  **Embedding & Storage**: Text chunks are converted to vectors and stored in **Qdrant**.
+4.  **Embedding & Storage**: Text chunks are converted to vectors and stored in **Qdrant**.
+
+Auto ingestion is available but disabled by default. Enable it with `app.ingestion.auto.enabled=true`.
 
 ---
 
@@ -144,7 +153,7 @@ From the project root:
 ```bash
 docker-compose up -d
 ```
-Ensure MinIO, Qdrant, Redis, Postgres, and Unstructured API are running.
+Ensure MinIO, Qdrant, Redis, Postgres, Unstructured API, SearXNG, `ascend-memory`, and `web-tools-mcp` are running.
 
 ### 2. Run the Orchestrator
 ```bash
@@ -162,11 +171,13 @@ It will also display:
 3.  **Test Markdown**:
     *   Create a folder `obsidian`.
     *   Upload a sample `.md` file inside it.
+    *   Trigger ingestion: `POST http://localhost:9917/api/ingestion/run`
     *   Check application logs. You should see: `Indexed markdown document: <id>`
 4.  **Test Unstructured**:
     *   Create a folder `documents`.
     *   Upload a `.pdf` or `.docx`.
-    *   Check application logs. You should see: `Indexed structured document: <id>`
+    *   Trigger ingestion: `POST http://localhost:9917/api/ingestion/run`
+    *   Check application logs. You should see: `Indexed unstructured document: <id>`
 
 ### 4. Testing Scenarios (CURL)
 
@@ -295,11 +306,20 @@ SELECT * FROM user_instructions WHERE user_id = 'user1';
 ### Key Application Properties (`application.yaml`)
 
 *   **Server Port**: `9917`
+*   **Vector Store (Qdrant)**:
+    *   `app.vectorstore.collection-name`: local collection name (default: `ascendai`)
+    *   `app.vectorstore.size`: must match embedding dimension (default: `768` for `text-embedding-nomic-embed-text-v2-moe`)
+    *   `application-cloud.yaml`: overrides to `ascendai-cloud` + `1536` (OpenAI `text-embedding-3-small`) to avoid dimension mismatches
 *   **S3 Configuration**:
     *   `s3.endpoint`: `http://localhost:9070`
     *   `s3.bucket`: `knowledge-base`
 *   **Data Source**: Postgres connection for metadata store.
 *   **Unstructured API**: Base URL for the document parsing service.
+*   **RAG**:
+    *   `app.rag.enabled`: enables retrieval-gated soft-RAG
+    *   `app.rag.similarity-threshold`: controls when retrieved context is injected
+*   **Ingestion**:
+    *   `app.ingestion.auto.enabled`: disabled by default to avoid startup latency/costs (use manual ingestion endpoint)
 
 ### MCP Client
-*   `spring.ai.mcp.client`: Configured to manage local MCP servers (e.g., `sqlite`, `filesystem`) via `mcp-servers-config.json`.
+*   `spring.ai.mcp.client`: Configured via `application.yaml` connections (Weather, AudioScribe, Web Tools).

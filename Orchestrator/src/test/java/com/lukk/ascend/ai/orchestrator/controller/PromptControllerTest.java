@@ -1,9 +1,7 @@
 package com.lukk.ascend.ai.orchestrator.controller;
 
 import com.lukk.ascend.ai.orchestrator.dto.AiResponse;
-import com.lukk.ascend.ai.orchestrator.dto.PromptRequest;
-import com.lukk.ascend.ai.orchestrator.service.AiConnectionService;
-import com.lukk.ascend.ai.orchestrator.test.TestDummyBuilder;
+import com.lukk.ascend.ai.orchestrator.service.ChatOrchestratorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,10 +9,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MultipartFile;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -22,37 +20,46 @@ import static org.mockito.Mockito.when;
 class PromptControllerTest {
 
     @Mock
-    private AiConnectionService aiConnectionService;
+    private ChatOrchestratorService chatOrchestratorService;
+
+    @Mock
+    private MultipartFile image;
+
+    @Mock
+    private MultipartFile document;
 
     @InjectMocks
     private PromptController promptController;
 
     @Test
-    void getAiResponse_ShouldReturnOk_WhenServiceSucceeds() {
+    void prompt_shouldReturnAiResponse() {
         // given
-        PromptRequest request = TestDummyBuilder.createPromptRequest();
-        AiResponse mockResponse = TestDummyBuilder.createAiResponse();
-        ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
+        String prompt = "test prompt";
+        String responseText = "AI Response";
+        AiResponse aiResponse = new AiResponse(responseText, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(aiConnectionService.prompt(anyString(), anyString())).thenReturn(mockResponse);
+        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString())).thenReturn(aiResponse);
 
         // when
-        ResponseEntity<AiResponse> response = promptController.getAiResponse(request);
+        ResponseEntity<AiResponse> response = promptController.prompt(prompt, null, null, "user1");
 
         // then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(mockResponse, response.getBody());
+        assertNotNull(response.getBody());
+        assertEquals(responseText, response.getBody().content());
     }
 
     @Test
-    void getAiResponse_ShouldPropagateException_WhenServiceFails() {
+    void prompt_shouldThrowException_whenServiceFails() {
         // given
-        PromptRequest request = TestDummyBuilder.createPromptRequest();
-        ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
+        String prompt = "test prompt";
+        org.springframework.test.util.ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(aiConnectionService.prompt(anyString(), anyString())).thenThrow(new RuntimeException("Service Error"));
+        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString()))
+                .thenThrow(new RuntimeException("Service Error"));
 
         // when & then
-        assertThrows(RuntimeException.class, () -> promptController.getAiResponse(request));
+        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, "user1"));
     }
 }

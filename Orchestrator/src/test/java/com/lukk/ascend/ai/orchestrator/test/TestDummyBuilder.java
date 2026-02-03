@@ -2,10 +2,8 @@ package com.lukk.ascend.ai.orchestrator.test;
 
 import com.lukk.ascend.ai.orchestrator.dto.AiResponse;
 import com.lukk.ascend.ai.orchestrator.dto.CustomMetadata;
-import com.lukk.ascend.ai.orchestrator.dto.PromptRequest;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
-import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.document.Document;
@@ -23,21 +21,12 @@ public class TestDummyBuilder {
     public static final String TEST_RESPONSE_CONTENT = "Test Response Content";
     public static final String TEST_TOOL_NAME = "test_tool";
 
-    public static PromptRequest createPromptRequest() {
-        return new PromptRequest(TEST_PROMPT);
-    }
-
     public static AiResponse createAiResponse() {
         return new AiResponse(TEST_RESPONSE_CONTENT, createCustomMetadata());
     }
 
     public static CustomMetadata createCustomMetadata() {
         ChatResponseMetadata metadata = mock(ChatResponseMetadata.class);
-        Usage usage = mock(Usage.class);
-        // Usage mocking removed to avoid API version mismatch issues.
-        // when(metadata.getUsage()).thenReturn(usage); // Optional: keep usage mock if
-        // needed, but empty.
-
         return new CustomMetadata(metadata, List.of(TEST_TOOL_NAME));
     }
 
@@ -49,7 +38,6 @@ public class TestDummyBuilder {
                 "{}");
 
         when(chatResponse.getResult()).thenReturn(generation);
-        when(chatResponse.getResults()).thenReturn(List.of(generation));
         when(chatResponse.getMetadata()).thenReturn(mock(ChatResponseMetadata.class));
 
         when(generation.getOutput()).thenReturn(message);

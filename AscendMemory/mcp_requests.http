@@ -1,0 +1,118 @@
+@mcp_protocol_version = 2025-11-25
+@mcp_session_id = a3d1e679aa0d4317b50221bcebd21306
+
+###
+# @name initialize
+# Initialize a Streamable HTTP MCP session.
+POST http://localhost:7020/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "{{mcp_protocol_version}}",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "0.1.0" }
+  }
+}
+
+###
+# @name list_tools
+POST http://localhost:7020/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+# @name insert_memory
+POST http://localhost:7020/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "memory_insert",
+    "arguments": {
+      "user_id": "testUser1",
+      "text": "This is a test memory: red dolphin"
+    }
+  }
+}
+
+###
+# @name search_memory
+POST http://localhost:7020/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "memory_search",
+    "arguments": {
+      "user_id": "testUser1",
+      "query": "What is test memory?",
+      "limit": 3
+    }
+  }
+}
+
+###
+# @name delete_memory
+POST http://localhost:7020/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "memory_delete",
+    "arguments": {
+      "memory_id": "cfdc1178-5496-48b4-a9ab-299d426508cf"
+    }
+  }
+}
+
+###
+# @name wipe_memory
+POST http://localhost:7020/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "tools/call",
+  "params": {
+    "name": "memory_wipe",
+    "arguments": {
+      "user_id": "testUser1"
+    }
+  }
+}

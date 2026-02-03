@@ -28,9 +28,6 @@ import static org.mockito.Mockito.when;
 class IngestionServiceTest {
 
     @Mock
-    private RestClient.Builder restClientBuilder;
-
-    @Mock
     private RestClient restClient;
 
     @Mock
@@ -128,7 +125,6 @@ class IngestionServiceTest {
     }
 
     private void mockRestClientSetup() {
-        when(restClientBuilder.build()).thenReturn(restClient);
         when(restClient.post()).thenReturn(requestBodyUriSpec);
         when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
         when(requestBodySpec.contentType(any())).thenReturn(requestBodySpec);

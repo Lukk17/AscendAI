@@ -53,52 +53,71 @@ services:
       timeout: 5s
       retries: 5
 
-  openmemory:
+  ascend-memory:
     build:
-      context: ./OpenMemory
-      dockerfile: Dockerfile.mem0mcp
-    container_name: openmemory
-    image: openmemory-ascend-ai:latest
+      context: ./AscendMemory
+      dockerfile: Dockerfile
+    container_name: ascend-memory
     restart: unless-stopped
     ports:
-      - "8765:8765"
+      - "7020:7020"
     environment:
-      <<: *common-env
-      OPENAI_API_KEY: lm-studio
-      OPENAI_BASE_URL: http://host.docker.internal:1234/v1
-      LOG_LEVEL: DEBUG
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - mem0_data:/root/.mem0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=http://host.docker.internal:1234/v1
+      # - OPENAI_BASE_URL=https://api.openai.com/v1
+      - API_PORT=7020
+      - API_HOST=0.0.0.0
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - MEM0_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v2-moe
+#      - MEM0_EMBEDDING_MODEL=text-embedding-3-small
+      - MEM0_COLLECTION_NAME=ascend_memory
+      # - MEM0_COLLECTION_NAME=ascend_memory_cloud
+      - MEM0_EMBEDDING_DIMS=768
+      # - MEM0_EMBEDDING_DIMS=1536
+      - MEM0_INFER_MEMORY=false
+      # - MEM0_INFER_MEMORY=true
+      - LOG_LEVEL=INFO
     depends_on:
       qdrant:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8765/openapi.json"]
-      interval: 60s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      default:
+        aliases:
+          - ascend-memory
 
-  mem0-configurator:
-    image: curlimages/curl:latest
-    restart: "no"
-    volumes:
-      - ./OpenMemory/configure_mem0.sh:/configure_mem0.sh
+  ascend-web-search:
+    build:
+      context: ./AscendWebSearch
+      dockerfile: Dockerfile
+    container_name: ascend-web-search
+    restart: unless-stopped
+    ports:
+      - "7021:7021"
     environment:
-      <<: *common-env
-      LLM_MAX_TOKENS: 1500
-      EMBEDDER_MODEL: nomic-ai/text-embedding-nomic-embed-text-v2-moe
-      EMBEDDING_DIMS: 768
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
-      QDRANT_COLLECTION: openmemory
-      QDRANT_DISTANCE: Cosine
-    entrypoint: ["/bin/sh", "/configure_mem0.sh"]
+      - SEARXNG_BASE_URL=http://searxng:8080
+      - API_PORT=7021
+      - API_HOST=0.0.0.0
+      - LOG_LEVEL=INFO
     depends_on:
-      openmemory:
-        condition: service_healthy
+      - searxng
+    networks:
+      default:
+        aliases:
+          - ascend-web-search
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "9020:8080"
+    networks:
+      default:
+        aliases:
+          - searxng
 
   weather-mcp:
     build:
@@ -181,7 +200,54 @@ services:
         aliases:
           - redis
 
+  # openmemory:
+  #   build:
+  #     context: ./OpenMemory
+  #     dockerfile: Dockerfile.mem0mcp
+  #   container_name: openmemory
+  #   image: openmemory-ascend-ai:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8765:8765"
+  #   environment:
+  #     <<: *common-env
+  #     OPENAI_API_KEY: lm-studio
+  #     OPENAI_BASE_URL: http://host.docker.internal:1234/v1
+  #     LOG_LEVEL: DEBUG
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   volumes:
+  #     - mem0_data:/root/.mem0
+  #   depends_on:
+  #     qdrant:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8765/openapi.json"]
+  #     interval: 60s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+
+  # mem0-configurator:
+  #   image: curlimages/curl:latest
+  #   restart: "no"
+  #   volumes:
+  #     - ./OpenMemory/configure_mem0.sh:/configure_mem0.sh
+  #   environment:
+  #     <<: *common-env
+  #     LLM_MAX_TOKENS: 1500
+  #     EMBEDDER_MODEL: nomic-ai/text-embedding-nomic-embed-text-v2-moe
+  #     EMBEDDING_DIMS: 768
+  #     QDRANT_HOST: qdrant
+  #     QDRANT_PORT: 6333
+  #     QDRANT_COLLECTION: openmemory
+  #     QDRANT_DISTANCE: Cosine
+  #   entrypoint: ["/bin/sh", "/configure_mem0.sh"]
+  #   depends_on:
+  #     openmemory:
+  #       condition: service_healthy
+
 volumes:
   qdrant_data:
-  mem0_data:
+  # mem0_data: # for local openmemory
   minio_data:

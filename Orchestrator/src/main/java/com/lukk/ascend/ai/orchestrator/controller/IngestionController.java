@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.orchestrator.controller;
 
 import com.lukk.ascend.ai.orchestrator.config.api.ApiCommonErrorResponses;
 import com.lukk.ascend.ai.orchestrator.config.api.ApiCommonSuccessResponses;
+import com.lukk.ascend.ai.orchestrator.service.ManualIngestionService;
 import com.lukk.ascend.ai.orchestrator.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  * Controller for handling file ingestion requests.
@@ -39,6 +41,7 @@ public class IngestionController {
     private String documentsFolder;
 
     private final StorageService storageService;
+    private final ManualIngestionService manualIngestionService;
 
     @Operation(summary = "AscendAI upload endpoint", description = "Documents and images upload endpoint.")
     @ApiCommonSuccessResponses
@@ -60,6 +63,15 @@ public class IngestionController {
             log.error("Error uploading file", e);
             return ResponseEntity.internalServerError().body("Failed to upload file: " + e.getMessage());
         }
+    }
+
+    @Operation(summary = "Run ingestion", description = "Manually scans the S3 bucket and ingests new/updated files.")
+    @ApiCommonSuccessResponses
+    @ApiCommonErrorResponses
+    @PostMapping(value = "/run")
+    public ResponseEntity<ManualIngestionService.ManualIngestionResult> runIngestion(
+            @RequestParam(value = "prefix", required = false) String prefix) {
+        return ResponseEntity.ok(manualIngestionService.run(Optional.ofNullable(prefix)));
     }
 
     /**
