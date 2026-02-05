@@ -2,17 +2,21 @@
 name = "ascend-web-search"
 version = "0.1.0"
 description = "AscendAI Web Search & Extraction Service"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.100.0",
-    "uvicorn>=0.20.0",
-    "fastmcp>=0.1.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "httpx>=0.24.0",
-    "trafilatura>=1.6.0",
-    "playwright>=1.40.0",
-    "beautifulsoup4>=4.12.0"
+    "fastapi==0.128.0",
+    "uvicorn==0.40.0",
+    "fastmcp==2.14.5",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "httpx>=0.28.1",
+    "trafilatura>=2.0.0",
+    "playwright==1.58.0",
+    "beautifulsoup4==4.14.3",
+    "textstat>=0.7.12",
+    "crawlee[playwright]>=1.3.1",
+    "playwright-stealth==2.0.1",
+    "adblockparser>=0.7.0"
 ]
 
 [project.optional-dependencies]

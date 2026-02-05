@@ -53,6 +53,28 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - redis
+
+  searxng:
+    image: searxng/searxng:2026.2.3-f7a608703
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "9020:8080"
+    networks:
+      default:
+        aliases:
+          - searxng
+
   ascend-memory:
     build:
       context: ./AscendMemory
@@ -101,23 +123,23 @@ services:
       - API_PORT=7021
       - API_HOST=0.0.0.0
       - LOG_LEVEL=INFO
+      - SEARXNG_LIMITER=false
+      - SEARXNG_USER_AGENT=AscendWebSearch/1.0
+      - SEARXNG_X_REAL_IP=0.0.0.0
+      - SEARXNG_X_FORWARDED_FOR=0.0.0.0
+      - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
+      - VALIDATION_MIN_WORDS=200
     depends_on:
       - searxng
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       default:
         aliases:
           - ascend-web-search
-
-  searxng:
-    image: searxng/searxng:latest
-    container_name: searxng
-    restart: unless-stopped
-    ports:
-      - "9020:8080"
-    networks:
-      default:
-        aliases:
-          - searxng
 
   weather-mcp:
     build:
@@ -188,17 +210,6 @@ services:
       default:
         aliases:
           - audio-scribe-mcp
-
-  redis:
-    image: redis:7.4-alpine
-    container_name: redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    networks:
-      default:
-        aliases:
-          - redis
 
   # openmemory:
   #   build:

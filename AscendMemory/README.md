@@ -14,6 +14,7 @@ AscendMemory is a robust, persistent memory service for the AscendAI ecosystem. 
     *   [Docker](#running-with-docker-recommended)
 *   [Making API Requests](#making-api-requests)
 *   [MCP Server Mode](#mcp-server-mode)
+*   [Troubleshooting](#troubleshooting)
 *   [Dependencies](#dependencies)
 
 ---
@@ -54,41 +55,80 @@ The service is configured via environment variables. You can set them in your sh
 
 ### Running as a standard Python App (without Docker)
 
-1.  **Install Dependencies:**
-    
+1.  **Create virtual environment**
+
+    Linux/MacOS:
     ```shell
-    # Create virtual environment
+    python3 -m venv .venv
+    ```
+
+    Windows:
+    ```powershell
     python -m venv .venv
-    
-    # Activate
-    # Windows:
-    .\.venv\Scripts\activate
-    # Linux/Mac:
+    ```
+
+2.  **Activate virtual environment**
+
+    Linux/MacOS:
+    ```shell
     source .venv/bin/activate
-    
-    # Install dependencies
+    ```
+
+    Windows:
+    ```powershell
+    .\.venv\Scripts\activate
+    ```
+
+3.  **Install dependencies**
+
+    ```shell
     pip install .
     ```
 
-2.  **Run the Server:**
-    
+4.  **Run the Server**
+
+    For local usage (e.g., with LM Studio), ensure the following are set:
+    *   `OPENAI_API_KEY`: (Required)
+    *   `OPENAI_BASE_URL`: (e.g., `http://localhost:1234/v1`)
+    *   `MEM0_LLM_MODEL`: (e.g., `llama-3.2-1b-instruct`)
+
+    **Note:** For local development, you can alternatively modify the default values directly in `src/core/config.py`.
+
+    *Exporting variables (optional if set in system/config.py):*
+
+    Linux/MacOS:
     ```shell
-    # Ensure OPENAI_API_KEY and MEM0_LLM_MODEL are set
     export OPENAI_API_KEY="sk-..."
-    
+    export OPENAI_BASE_URL="http://localhost:1234/v1"
+    export MEM0_LLM_MODEL="llama-3.2-1b-instruct"
+    ```
+
+    ```shell
+    python src/main.py
+    ```
+
+    Windows:
+    ```powershell
+    $env:OPENAI_API_KEY="sk-..."
+    $env:OPENAI_BASE_URL="http://localhost:1234/v1"
+    $env:MEM0_LLM_MODEL="llama-3.2-1b-instruct"
+    ```
+
+    ```powershell
     python src/main.py
     ```
 
 ### Running with Docker (Recommended)
 
-1.  **Build the Image:**
-    
+1.  **Build the Image**
+
     ```shell
     docker build -t ascend-memory:latest .
     ```
 
-2.  **Run the Container:**
-    
+2.  **Run the Container**
+
+    Linux/MacOS:
     ```shell
     docker run -d \
       --name ascend-memory \
@@ -96,6 +136,42 @@ The service is configured via environment variables. You can set them in your sh
       -e OPENAI_API_KEY="sk-..." \
       -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" \
       ascend-memory:latest
+    ```
+
+    Windows:
+    ```powershell
+    docker run -d `
+      --name ascend-memory `
+      -p 7020:7020 `
+      -e OPENAI_API_KEY="sk-..." `
+      -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" `
+      ascend-memory:latest
+    ```
+
+3.  **Tagging and Pushing to Registry**
+
+    Tag with a specific version (e.g., 1.0.0):
+
+    ```shell
+    docker tag ascend-memory:latest myregistry/ascend-memory:1.0.0
+    ```
+
+    Tag with latest:
+
+    ```shell
+    docker tag ascend-memory:latest myregistry/ascend-memory:latest
+    ```
+
+    Push specific version:
+
+    ```shell
+    docker push myregistry/ascend-memory:1.0.0
+    ```
+
+    Push latest:
+
+    ```shell
+    docker push myregistry/ascend-memory:latest
     ```
 
 ---

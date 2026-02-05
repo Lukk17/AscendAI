@@ -6,6 +6,7 @@
 # Initialize a Streamable HTTP MCP session.
 POST http://localhost:7021/mcp
 Content-Type: application/json
+Accept: application/json, text/event-stream
 
 {
   "jsonrpc": "2.0",
@@ -22,6 +23,7 @@ Content-Type: application/json
 # @name list_tools
 POST http://localhost:7021/mcp
 Content-Type: application/json
+Accept: application/json, text/event-stream
 MCP-Session-Id: {{mcp_session_id}}
 MCP-Protocol-Version: {{mcp_protocol_version}}
 
@@ -36,6 +38,7 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
 # @name web_search
 POST http://localhost:7021/mcp
 Content-Type: application/json
+Accept: application/json, text/event-stream
 MCP-Session-Id: {{mcp_session_id}}
 MCP-Protocol-Version: {{mcp_protocol_version}}
 
@@ -56,6 +59,7 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
 # @name web_read
 POST http://localhost:7021/mcp
 Content-Type: application/json
+Accept: application/json, text/event-stream
 MCP-Session-Id: {{mcp_session_id}}
 MCP-Protocol-Version: {{mcp_protocol_version}}
 
@@ -70,3 +74,6 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
     }
   }
 }
+
+### Helper: Health Check
+GET http://localhost:7021/health

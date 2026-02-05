@@ -3,13 +3,9 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from src.core.memory_client import AscendMemoryClient
+from service.memory_client import AscendMemoryClient, get_memory_client
 
 rest_router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
-
-
-def get_memory_client():
-    return AscendMemoryClient()
 
 
 class UpsertRequest(BaseModel):
