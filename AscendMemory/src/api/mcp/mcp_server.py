@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from fastmcp import FastMCP
 
-from service.memory_client import AscendMemoryClient, get_memory_client
+from src.service.memory_client import AscendMemoryClient, get_memory_client
 
 mcp = FastMCP("AscendMemory")
 

@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from service.memory_client import AscendMemoryClient, get_memory_client
+from src.service.memory_client import AscendMemoryClient, get_memory_client
 
 rest_router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
 

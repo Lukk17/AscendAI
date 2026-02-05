@@ -17,11 +17,22 @@ from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
 
 # Configure logging
+LOG_FORMAT = "[%(asctime)s] %(levelname)s: %(message)s"
+DATE_FORMAT = "%H:%M:%S"
+
 logging.basicConfig(
     level=settings.LOG_LEVEL,
-    format="[%(asctime)s] %(levelname)s: %(message)s",
-    datefmt="%H:%M:%S"
+    format=LOG_FORMAT,
+    datefmt=DATE_FORMAT
 )
+
+# Unify Uvicorn loggers to specific format
+for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
+    log = logging.getLogger(logger_name)
+    log.setLevel(settings.LOG_LEVEL)
+    for handler in log.handlers:
+        handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
+
 logger = logging.getLogger("uvicorn")
 
 
