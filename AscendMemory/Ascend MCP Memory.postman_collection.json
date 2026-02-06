@@ -1,0 +1,360 @@
+{
+  "info": {
+    "_postman_id": "a8e1bc1b-7ee2-4cd4-8afd-1369cd0414a6",
+    "name": "Ascend MCP Memory",
+    "description": "Automated test suite for AscendMemory MCP Server.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "6370134"
+  },
+  "item": [
+    {
+      "name": "Initialize",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Automatically extract header and save to collection variable",
+              "pm.collectionVariables.set(\"mcp_session_id\", pm.response.headers.get(\"MCP-Session-Id\"));",
+              "",
+              "pm.test(\"Session ID is set\", function () {",
+              "    pm.expect(pm.collectionVariables.get(\"mcp_session_id\")).to.not.be.undefined;",
+              "    pm.expect(pm.collectionVariables.get(\"mcp_session_id\")).to.not.be.empty;",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"{{mcp_protocol_version}}\",\n    \"capabilities\": {},\n    \"clientInfo\": { \"name\": \"postman-client\", \"version\": \"0.1.0\" }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{protocol}}://{{baseUrl}}:7020/mcp",
+          "protocol": "{{protocol}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "7020",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Tools",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+        },
+        "url": {
+          "raw": "{{protocol}}://{{baseUrl}}:7020/mcp",
+          "protocol": "{{protocol}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "7020",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Insert Memory",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var rawText = pm.response.text();\r",
+              "// Split by \"data: \" to handle Server-Sent Events\r",
+              "var chunks = rawText.split(\"data: \");\r",
+              "\r",
+              "var memoryId = null;\r",
+              "\r",
+              "for (var i = 0; i < chunks.length; i++) {\r",
+              "    var chunk = chunks[i].trim();\r",
+              "    if (chunk.length === 0) continue;\r",
+              "    \r",
+              "    try {\r",
+              "        var jsonData = JSON.parse(chunk);\r",
+              "        \r",
+              "        if (jsonData.result && jsonData.result.structuredContent) {\r",
+              "            // \"result\" -> \"structuredContent\" -> \"result\"\r",
+              "            var memoryIds = jsonData.result.structuredContent.result;\r",
+              "\r",
+              "            if (memoryIds && memoryIds.length > 0) {\r",
+              "                memoryId = memoryIds[0].id; // Extract inner ID\r",
+              "                \r",
+              "                // Save to Collection Variable\r",
+              "                pm.collectionVariables.set(\"memoryId\", memoryId);\r",
+              "                console.log(\"Extracted Memory ID: \" + memoryId);\r",
+              "                break; // Found it, stop parsing\r",
+              "            }\r",
+              "        }\r",
+              "    } catch (e) {\r",
+              "        // Ignore non-JSON chunks (like \"event: message\")\r",
+              "    }\r",
+              "}\r",
+              "\r",
+              "if (!memoryId) {\r",
+              "    console.log(\"No memory ID found in stream response\");\r",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"memory_insert\",\n    \"arguments\": {\n      \"user_id\": \"{{userId}}\",\n      \"text\": \"This is a test memory: red dolphin\"\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{protocol}}://{{baseUrl}}:7020/mcp",
+          "protocol": "{{protocol}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "7020",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Memory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"memory_search\",\n    \"arguments\": {\n      \"user_id\": \"{{userId}}\",\n      \"query\": \"What is test memory?\",\n      \"limit\": 3\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{protocol}}://{{baseUrl}}:7020/mcp",
+          "protocol": "{{protocol}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "7020",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Memory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"memory_delete\",\n    \"arguments\": {\n      \"memory_id\": \"{{memoryId}}\"\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{protocol}}://{{baseUrl}}:7020/mcp",
+          "protocol": "{{protocol}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "7020",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Wipe Memory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 6,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"memory_wipe\",\n    \"arguments\": {\n      \"user_id\": \"{{userId}}\"\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{protocol}}://{{baseUrl}}:7020/mcp",
+          "protocol": "{{protocol}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "7020",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          "pm.test(\"Status code is 200\", function () {\r",
+          "    pm.response.to.have.status(200);\r",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "mcp_protocol_version",
+      "value": "2025-11-25"
+    },
+    {
+      "key": "mcp_session_id",
+      "value": ""
+    },
+    {
+      "key": "memoryId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "baseUrl",
+      "value": "localhost"
+    },
+    {
+      "key": "protocol",
+      "value": "http"
+    }
+  ]
+}

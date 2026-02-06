@@ -4,8 +4,8 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 
-from src.config.config import settings
 from src.adapters.file_service import save_upload_to_temp_async, cleanup_temp_file
+from src.config.config import settings
 from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
 
 rest_router = APIRouter()

@@ -1,6 +1,4 @@
-import asyncio
 import os
-from contextlib import asynccontextmanager
 
 os.environ["OPENAI_API_KEY"] = "dummy"  # Set dummy key before importing modules that init OpenAI client
 import json
@@ -13,9 +11,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from asgi_lifespan import LifespanManager
 
-# UPDATED: Import app from src.main
-from src.main import app
-# UPDATED: Import mcp_server_module from src.api.mcp.mcp_server
+from src.main import create_app
 import src.api.mcp.mcp_server as mcp_server_module
 from src.config.config import settings
 
@@ -153,6 +149,7 @@ async def asgi_client():
     Creates a test client using the App Factory pattern.
     This ensures each test gets a fresh, isolated app instance, solving state conflicts.
     """
+    app = create_app()
     async with LifespanManager(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://testserver", timeout=30.0) as ac:
@@ -222,37 +219,6 @@ async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch
             assert "to look like" in text_val
     else:
         assert "to look like" in text_val
-
-
-async def test_sse_messages_route_exists_and_requires_session_id(asgi_client: AsyncClient):
-    resp = await asgi_client.post("/sse-root/messages/")
-    assert resp.status_code == 400
-
-
-async def test_sse_post_messages_invalid_session_id_malformed(asgi_client: AsyncClient):
-    # Malformed session_id should return 400
-    resp = await asgi_client.post("/sse-root/messages/?session_id=not-a-hex")
-    assert resp.status_code == 400
-
-
-async def test_sse_post_messages_unknown_session_id(asgi_client: AsyncClient):
-    # Valid hex but unknown session should return 400 or 404 depending on a transport version.
-    # Current MCP SseServerTransport returns 404 with the body "Could not find session" when session is unknown.
-    # Some environments may normalize to 400. We accept both but assert the message text when 404 is not used.
-    unknown_hex = "0" * 32
-    # Provide minimal required header so transport security doesn't reject early
-    resp = await asgi_client.post(
-        f"/sse-root/messages/?session_id={unknown_hex}",
-        headers={"Content-Type": "application/json"},
-    )
-    if resp.status_code == 404:
-        # Preferred behavior as per library code
-        assert True
-    else:
-        # Accept 400 as an alternative but require an explanatory message
-        assert resp.status_code == 400, resp.text
-        # Depending on path, body may be a plain string.
-        assert ("Could not find session" in (resp.text or "")) or ("Invalid Content-Type" in (resp.text or ""))
 
 
 async def test_streamable_http_health_tool(asgi_client: AsyncClient):
@@ -734,7 +700,7 @@ async def test_streamable_http_transcribe_hf_file_not_found(monkeypatch, asgi_cl
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "audio_uri": "file:///X:/nope.wav", # URI matches what we expect
+                "audio_uri": "file:///X:/nope.wav",  # URI matches what we expect
             },
         },
     }
@@ -873,8 +839,8 @@ async def test_transcribe_local_validation_error_missing_uri(asgi_client: AsyncC
     # FastMCP/Pydantic will likely raise an internal validation error returned in the result or as an JSON-RPC error
     # We check if the result indicates failure or error
     if "error" in payload:
-         # JSON-RPC error
-         assert "Invalid params" in payload["error"]["message"] or "Validation" in payload["error"]["message"]
+        # JSON-RPC error
+        assert "Invalid params" in payload["error"]["message"] or "Validation" in payload["error"]["message"]
     else:
         # Tool execution error
         text = _first_text_block(payload)

@@ -21,8 +21,6 @@ def _generate_response_stripping_unsupported_json_object_format(self, messages, 
 
 OpenAILLM.generate_response = _generate_response_stripping_unsupported_json_object_format
 
-
-
 # Singleton instance
 _client_instance: Optional['AscendMemoryClient'] = None
 

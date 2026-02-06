@@ -1,0 +1,406 @@
+{
+  "info": {
+    "_postman_id": "02fd1612-ada7-4d58-b720-d5e05d65379a",
+    "name": "AudioScribe MCP",
+    "description": "Automated test suite for AudioScribe MCP Server.\n\nWhen running in docker change audio source to \"audio_uri_docker\"",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "6370134"
+  },
+  "item": [
+    {
+      "name": "Initialize",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Automatically extract header and save to collection variable",
+              "pm.collectionVariables.set(\"mcp_session_id\", pm.response.headers.get(\"MCP-Session-Id\"));",
+              "",
+              "pm.test(\"Session ID is set\", function () {",
+              "    pm.expect(pm.collectionVariables.get(\"mcp_session_id\")).to.not.be.undefined;",
+              "    pm.expect(pm.collectionVariables.get(\"mcp_session_id\")).to.not.be.empty;",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"{{mcp_protocol_version}}\",\n    \"capabilities\": {},\n    \"clientInfo\": { \"name\": \"postman-client\", \"version\": \"0.1.0\" }\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7017/mcp",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "7017",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 6,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"health\",\n    \"arguments\": {}\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7017/mcp",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "7017",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Tools",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7017/mcp",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "7017",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Transcribe Local",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_local\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"Systran/faster-whisper-large-v3\",\n      \"language\": \"en\",\n      \"with_timestamps\": false\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7017/mcp",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "7017",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Transcribe OpenAI",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_openai\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"whisper-1\",\n      \"language\": \"en\"\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7017/mcp",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "7017",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Transcribe HF",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_hf\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"openai/whisper-large-v3\",\n      \"hf_provider\": \"hf-inference\"\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7017/mcp",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "7017",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Transcribe Local Timestamped",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json, text/event-stream"
+          },
+          {
+            "key": "MCP-Session-Id",
+            "value": "{{mcp_session_id}}"
+          },
+          {
+            "key": "MCP-Protocol-Version",
+            "value": "{{mcp_protocol_version}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 7,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_local\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"Systran/faster-whisper-large-v3\",\n      \"language\": \"en\",\n      \"with_timestamps\": true\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7017/mcp",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "7017",
+          "path": [
+            "mcp"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          "pm.test(\"Status code is 200\", function () {\r",
+          "    pm.response.to.have.status(200);\r",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "audio_uri",
+      "value": "http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac"
+    },
+    {
+      "key": "mcp_protocol_version",
+      "value": "2025-11-25"
+    },
+    {
+      "key": "mcp_session_id",
+      "value": ""
+    },
+    {
+      "key": "baseUrl",
+      "value": "localhost"
+    },
+    {
+      "key": "protocol",
+      "value": "http"
+    },
+    {
+      "key": "audio_uri_docker",
+      "value": ""
+    }
+  ]
+}

@@ -73,7 +73,7 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
 3.  **Install dependencies**
 
     ```shell
-    pip install .
+    pip install -e .[dev]
     ```
 
 4.  **Install Playwright Browsers**

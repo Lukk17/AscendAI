@@ -1,0 +1,64 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Docker Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+    <deployment type="dockerfile">
+      <settings>
+        <option name="imageTag" value="ascend-web-search:latest" />
+        <option name="containerName" value="ascend-web-search" />
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="SEARXNG_BASE_URL" />
+              <option name="value" value="http://searxng:8080" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="API_PORT" />
+              <option name="value" value="7021" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="API_HOST" />
+              <option name="value" value="0.0.0.0" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LOG_LEVEL" />
+              <option name="value" value="INFO" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="SEARXNG_LIMITER" />
+              <option name="value" value="false" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="SEARXNG_USER_AGENT" />
+              <option name="value" value="AscendWebSearch/1.0" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="SEARXNG_X_REAL_IP" />
+              <option name="value" value="0.0.0.0" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="SEARXNG_X_FORWARDED_FOR" />
+              <option name="value" value="0.0.0.0" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="BLOCKLIST_URL" />
+              <option name="value" value="https://secure.fanboy.co.nz/fanboy-annoyance.txt" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="VALIDATION_MIN_WORDS" />
+              <option name="value" value="200" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="portBindings">
+          <list>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="7021" />
+              <option name="hostPort" value="7021" />
+            </DockerPortBindingImpl>
+          </list>
+        </option>
+        <option name="sourceFilePath" value="Dockerfile" />
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

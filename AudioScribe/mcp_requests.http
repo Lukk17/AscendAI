@@ -8,19 +8,12 @@
 # For Docker:
 #@audio_uri = http://host.docker.internal:9999/audio.wav
 
-@mcp_protocol_version = 2025-06-18
-# Streamable HTTP mcp_session_id is returned in 'mcp-session-id' response header after below 'initialize' request
-# Update below ID after each initialize request
-@mcp_session_id = d93e1087d7df45c6b079c40f5d838c58
+@mcp_protocol_version = 2025-11-25
 
 ###
 # @name initialize
 # Initialize a Streamable HTTP MCP session.
-# IMPORTANT:
-# - After you send this, copy the "mcp-session-id" response header value
-#   into the mcp_session_id variable below.
-# - Keep the protocolVersion consistent across requests; copy it to
-#   mcp_protocol_version.
+# Session is automatically saved in "mcp_session_id" after initialization request.
 POST http://localhost:7017/mcp
 Content-Type: application/json
 Accept: application/json, text/event-stream
@@ -35,6 +28,11 @@ Accept: application/json, text/event-stream
     "clientInfo": { "name": "http-client", "version": "0.1.0" }
   }
 }
+
+> {%
+    client.global.set("mcp_session_id", response.headers.valueOf("MCP-Session-Id"));
+    client.log("Session ID set to: " + client.global.get("mcp_session_id"));
+%}
 
 ###
 # @name list_tools

@@ -3,12 +3,12 @@ import json
 import os
 from typing import Optional
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from mcp.types import TextContent
 
-from src.config.config import settings
 from src.adapters.download_service import download_to_temp_async
 from src.adapters.file_service import cleanup_temp_file
+from src.config.config import settings
 from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
 
 URI_NOT_PROVIDED = "URI not provided"

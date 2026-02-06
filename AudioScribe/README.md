@@ -117,13 +117,13 @@ Ensure you have set the **environment variables** mentioned above.
     ```shell
     source .venv/bin/activate
     ```
-    Install all other application requirements
-    ```shell
-    pip install -r pytorch-requirements.txt -r requirements.txt
+    Install all application requirements (one-liner):
+    ```powershell
+    pip install -r pytorch-requirements.txt; pip install -e .[dev]
     ```
-    without cache:
+    For development (includes tests):
     ```shell
-    pip install --no-cache-dir -r pytorch-requirements.txt -r requirements.txt
+    pip install -e .[dev]
     ```
 
 2.  **Run the Uvicorn Server:**
@@ -281,14 +281,6 @@ Streamable HTTP (bidirectional over HTTP):
   - Headers:  Content-Type: application/json
               Accept: application/json, text/event-stream
 
-SSE transport (server-sent events + POST messages):
-  - Stream:   GET  http://localhost:7017/sse-root/sse
-              Accept: text/event-stream
-  - Messages: POST http://localhost:7017/sse-root/messages/
-              Headers: Content-Type: application/json
-              Note: The messages path includes a required `session_id` query param
-                    provided by the server in the first SSE event named "endpoint".
-
 ### Example MCP Client Configurations
 
 To use these tools, configure your AI-powered editor or client to connect to the running server's URL.
@@ -301,18 +293,6 @@ Streamable HTTP transport:
     "audio-scribe": {
       "type": "streamable",
       "url": "http://localhost:7017/mcp"
-    }
-  }
-}
-```
-
-SSE transport:
-```json
-{
-  "mcpServers": {
-    "audio-scribe": {
-      "type": "sse",
-      "url": "http://localhost:7017/sse-root/sse"
     }
   }
 }
@@ -418,16 +398,13 @@ When using the tools (either via MCP or direct API), you can specify the followi
 
 ## Dependencies
 
-To update dependency versions in `requirements.txt` excluding ones which should be manually updated,  
-due to torch compatibility  
-Windows:
-```PowerShell
-pip freeze | Select-String -NotMatch -Pattern '^(torch|numpy|sympy|networkx|mpmath|filelock|fsspec|jinja2|typing_extensions)$' > requirements.txt
-```
-Unix:
-```shell
-pip freeze | grep -v -E '^(torch|numpy|sympy|networkx|mpmath|filelock|fsspec|jinja2|typing_extensions)$' > requirements.txt
-```
+The project uses a hybrid dependency management approach to ensure stability and proper GPU support:
+
+*   `pytorch-requirements.txt`: Limits **PyTorch** and related libraries to specific versions compatible with CUDA 12.6. This file MUST be installed first.
+*   `pyproject.toml`: Contains all other application dependencies with frozen versions.
+
+To update standard dependencies (non-PyTorch), modify `pyproject.toml`.
+
 
 ---
 ## Troubleshooting
@@ -488,6 +465,7 @@ pip uninstall -y -r temp_requirements.txt
 ```
 Then reinstall:
 ```shell
-pip install --no-cache-dir -r pytorch-requirements.txt -r requirements.txt
+pip install --no-cache-dir -r pytorch-requirements.txt
+pip install --no-cache-dir .
 ```
 Now you can remove `temp_requirements.txt` file.

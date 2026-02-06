@@ -23,13 +23,11 @@ RUN groupadd -r "$APP_USER" && useradd -r -g "$APP_USER" "$APP_USER"
 WORKDIR /app
 
 # Copy requirements files first to leverage Docker layer caching
-COPY requirements.txt .
 COPY pytorch-requirements.txt .
-
-# Install Python dependencies
+COPY pyproject.toml .
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir -r pytorch-requirements.txt && \
-    python3 -m pip install --no-cache-dir -r requirements.txt
+    python3 -m pip install --no-cache-dir .
 
 # Copy the rest of the application code and set ownership
 COPY --chown="$APP_USER":"$APP_USER" . .

@@ -1,6 +1,6 @@
 import os
-from unittest.mock import MagicMock, patch, AsyncMock
 from typing import Any
+from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
 

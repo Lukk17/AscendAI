@@ -83,15 +83,15 @@ def openai_transcript(audio_file_path: str, model: str, language: str):
                 # Force wav format export
                 chunk.export(tmp_audio.name, format="wav")
                 tmp_path = tmp_audio.name
-            
+
             temp_files.append(tmp_path)
-            
+
             # Fail-safe check
             chunk_size = os.path.getsize(tmp_path)
             if chunk_size > settings.OPENAI_API_LIMIT_BYTES:
-                 logger.error(f"Chunk {chunk_num} size {chunk_size} exceeds limit {settings.OPENAI_API_LIMIT_BYTES}!")
-                 # This should effectively never happen with our math, but safety first.
-                 raise ValueError(f"Generated chunk {chunk_num} exceeded OpenAI size limit.")
+                logger.error(f"Chunk {chunk_num} size {chunk_size} exceeds limit {settings.OPENAI_API_LIMIT_BYTES}!")
+                # This should effectively never happen with our math, but safety first.
+                raise ValueError(f"Generated chunk {chunk_num} exceeded OpenAI size limit.")
 
             logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
             chunk_transcription = _transcribe_single_chunk(tmp_path, model, language)

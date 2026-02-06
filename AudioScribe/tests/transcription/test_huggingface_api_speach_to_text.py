@@ -40,7 +40,10 @@ def test_hf_transcript_pydub_load_error(mock_from_file):
 def test_hf_transcript_api_error(mock_inference_client, mock_audio_segment, mock_open):
     mock_audio_segment.from_file.return_value.__len__.return_value = 10 * 1000
     mock_client_instance = MagicMock()
-    mock_client_instance.automatic_speech_recognition.side_effect = HfHubHTTPError("Model not found")
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    mock_client_instance.automatic_speech_recognition.side_effect = HfHubHTTPError("Model not found",
+                                                                                   response=mock_response)
     mock_inference_client.return_value = mock_client_instance
 
     with pytest.raises(ValueError, match="Hugging Face API failed to process an audio chunk"):

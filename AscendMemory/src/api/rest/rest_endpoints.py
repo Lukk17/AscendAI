@@ -1,18 +1,12 @@
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.service.memory_client import AscendMemoryClient, get_memory_client
 
 rest_router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
 
-
-class UpsertRequest(BaseModel):
-    user_id: str
-    messages: Optional[List[Dict[str, str]]] = None
-    text: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
 
 
 class SearchResponseItem(BaseModel):
@@ -36,9 +30,16 @@ def search_memory(
     return client.search(query=query, user_id=user_id, limit=limit)
 
 
-@rest_router.post("/upsert")
-def upsert_memory(
-        request: UpsertRequest,
+class InsertRequest(BaseModel):
+    user_id: str = Field(..., description="Unique identifier for the user")
+    text: Optional[str] = Field(None, description="The memory content to insert")
+    messages: Optional[List[Dict[str, str]]] = Field(None, description="Chat messages to infer memory from")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+
+@rest_router.post("/insert")
+async def insert_memory(
+        request: InsertRequest,
         client: AscendMemoryClient = Depends(get_memory_client)
 ):
     """

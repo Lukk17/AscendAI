@@ -1,12 +1,15 @@
-from unittest.mock import patch, MagicMock
 from typing import Tuple, Generator, Any
+from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from src.main import app
+from src.main import create_app
+
+app = create_app()
 
 client = TestClient(app)
+
 
 @pytest.fixture
 def mock_file() -> Tuple[str, bytes, str]:
@@ -14,7 +17,8 @@ def mock_file() -> Tuple[str, bytes, str]:
 
 
 @patch('src.api.rest.rest_endpoints.local_speech_transcription')
-def test_transcribe_local_endpoint_with_timestamps(mock_local_transcription: MagicMock, mock_file: Tuple[str, bytes, str]) -> None:
+def test_transcribe_local_endpoint_with_timestamps(mock_local_transcription: MagicMock,
+                                                   mock_file: Tuple[str, bytes, str]) -> None:
     # // given
     async def fake_generator(*args: Any, **kwargs: Any) -> Generator[dict, None, None]:
         yield {'text': 'hello', 'start': 0, 'end': 1}
@@ -35,7 +39,8 @@ def test_transcribe_local_endpoint_with_timestamps(mock_local_transcription: Mag
 
 
 @patch('src.api.rest.rest_endpoints.local_speech_transcription')
-def test_transcribe_local_endpoint_without_timestamps(mock_local_transcription: MagicMock, mock_file: Tuple[str, bytes, str]) -> None:
+def test_transcribe_local_endpoint_without_timestamps(mock_local_transcription: MagicMock,
+                                                      mock_file: Tuple[str, bytes, str]) -> None:
     # // given
     async def fake_generator(*args: Any, **kwargs: Any) -> Generator[dict, None, None]:
         yield {'text': 'hello', 'start': 0, 'end': 0.5}
@@ -57,7 +62,8 @@ def test_transcribe_local_endpoint_without_timestamps(mock_local_transcription: 
 
 
 @patch('src.api.rest.rest_endpoints.local_speech_transcription')
-def test_transcribe_local_endpoint_generic_error(mock_local_transcription: MagicMock, mock_file: Tuple[str, bytes, str]) -> None:
+def test_transcribe_local_endpoint_generic_error(mock_local_transcription: MagicMock,
+                                                 mock_file: Tuple[str, bytes, str]) -> None:
     # // given
     async def fake_error_generator(*args: Any, **kwargs: Any) -> Generator[None, None, None]:
         raise RuntimeError("Generic unexpected error")
@@ -74,7 +80,8 @@ def test_transcribe_local_endpoint_generic_error(mock_local_transcription: Magic
 
 
 @patch('src.api.rest.rest_endpoints.openai_speech_transcription', side_effect=ValueError("Model not found"))
-def test_transcribe_openai_endpoint_value_error(mock_openai_transcription: MagicMock, mock_file: Tuple[str, bytes, str]) -> None:
+def test_transcribe_openai_endpoint_value_error(mock_openai_transcription: MagicMock,
+                                                mock_file: Tuple[str, bytes, str]) -> None:
     # // given
     # Mocking side_effect above
 
@@ -126,7 +133,8 @@ def test_transcribe_openai_io_error(mock_openai_transcription: MagicMock, mock_f
 
 
 @patch('src.api.rest.rest_endpoints.openai_speech_transcription', side_effect=Exception("Critical Failure"))
-def test_transcribe_openai_generic_error(mock_openai_transcription: MagicMock, mock_file: Tuple[str, bytes, str]) -> None:
+def test_transcribe_openai_generic_error(mock_openai_transcription: MagicMock,
+                                         mock_file: Tuple[str, bytes, str]) -> None:
     # // given
     # Mocking side effect above
 

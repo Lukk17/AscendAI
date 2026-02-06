@@ -1,7 +1,8 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager, AsyncExitStack
+
 import uvicorn
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response, status, Request
 
 from src.api.mcp.mcp_server import mcp
@@ -15,10 +16,12 @@ logger = logging.getLogger("uvicorn")
 
 is_ready = False
 
+
 async def warmup_client():
     """Background task to initialize the heavy memory client."""
     global is_ready
-    logger.info("Starting background warmup of AscendMemoryClient... Please wait for 'Background warmup complete' before sending requests.")
+    logger.info(
+        "Starting background warmup of AscendMemoryClient... Please wait for 'Background warmup complete' before sending requests.")
     try:
         # Force initialization
         client = get_memory_client()
@@ -30,37 +33,46 @@ async def warmup_client():
     except Exception as e:
         logger.error(f"Background warmup failed: {e}")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    setup_logging()
-    asyncio.create_task(warmup_client())
-    yield
+
+def create_app() -> FastAPI:
+    mcp_asgi_app = mcp.http_app()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        setup_logging()
+        asyncio.create_task(warmup_client())
+        
+        # Initialize MCP server lifespan
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(app))
+            yield
+
+    app = FastAPI(title="AscendMemory", lifespan=lifespan)
+    app.include_router(rest_router)
+
+    @app.middleware("http")
+    async def log_request_receipt(request: Request, call_next):
+        path = request.url.path
+        if path != "/health":
+            logger.info(f"Received Request: {request.method} {path}")
+        response = await call_next(request)
+        return response
+
+    @app.get("/health")
+    def health_check(response: Response):
+        if not is_ready:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            return {"status": "starting", "detail": "Memory client initializing"}
+        return {"status": "ok"}
+
+    # Mount must be last to avoid capturing specific routes
+    app.mount("/", mcp_asgi_app)
+    
+    return app
 
 
-mcp_asgi_app = mcp.http_app()
-
-app = FastAPI(title="AscendMemory", lifespan=lifespan)
-
-app.include_router(rest_router)
-
-@app.middleware("http")
-async def log_request_receipt(request: Request, call_next):
-    path = request.url.path
-    if path != "/health":
-        logger.info(f"Received Request: {request.method} {path}")
-    response = await call_next(request)
-    return response
-
-@app.get("/health")
-def health_check(response: Response):
-    if not is_ready:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "starting", "detail": "Memory client initializing"}
-    return {"status": "ok"}
-
-# Mount must be last to avoid capturing specific routes
-app.mount("/", mcp_asgi_app)
-
+# Global instance for uvicorn
+app = create_app()
 
 if __name__ == "__main__":
     uvicorn.run(

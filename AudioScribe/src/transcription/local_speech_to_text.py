@@ -9,8 +9,8 @@ import torch
 from faster_whisper import WhisperModel
 from pydub import AudioSegment
 
-from src.config.logging_config import setup_logging
 from src.config.config import settings
+from src.config.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 

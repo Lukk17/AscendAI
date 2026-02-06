@@ -82,7 +82,7 @@ The service is configured via environment variables. You can set them in your sh
 3.  **Install dependencies**
 
     ```shell
-    pip install .
+    pip install -e .[dev]
     ```
 
 4.  **Run the Server**
@@ -178,14 +178,14 @@ The service is configured via environment variables. You can set them in your sh
 
 ## Making API Requests
 
-### 1. Upsert Memory (Add/Update)
+### 1. Insert Memory (Add)
+Inserts a new memory or infers one from messages.
 
-Add a new memory for a user.
+**Endpoint:** `POST /api/v1/memory/insert`
 
-**Endpoint:** `POST /api/v1/memory/upsert`
-
+**Example:**
 ```bash
-curl -X POST "http://localhost:7020/api/v1/memory/upsert" \
+curl -X POST "http://localhost:7020/api/v1/memory/insert" \
      -H "Content-Type: application/json" \
      -d '{
            "user_id": "testUser1",
