@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy source code
+COPY src/ src/
+
 # Install python dependencies
 COPY pyproject.toml .
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -18,9 +21,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN playwright install-deps && \
     playwright install chromium
 
-# Copy source code
-COPY src/ src/
-
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 
@@ -28,4 +28,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 7021
 
 # Run the application
-CMD ["python", "src/main.py"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "7021"]

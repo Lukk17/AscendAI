@@ -125,6 +125,7 @@ Ensure you have set the **environment variables** mentioned above.
     ```shell
     pip install -e .[dev]
     ```
+    *The `-e` flag stands for "editable". It allows you to modify the source code and see changes immediately without reinstalling the package.*
 
 2.  **Run the Uvicorn Server:**
     ```shell
@@ -302,6 +303,9 @@ Streamable HTTP transport:
 
 The MCP tools accept an `audio_uri` argument, which supports both local files and HTTP(S) URLs.
 
+> [!NOTE]
+> **Docker Users (Postman)**: When testing with the provided Postman collection against a Docker container, use the `{{audio_uri_docker}}` variable (which resolves to `http://host.docker.internal:...`) instead of `{{audio_uri}}` in the request body. Using `localhost` from within the container will fail.
+
 #### 1. Local Files (`file://`)
 To use a file on the server's local filesystem, use the `file://` scheme.
 *   **Windows**: `file:///C:/Users/User/Desktop/audio.wav`
@@ -452,20 +456,24 @@ You may need to restart your terminal or IDE for the change to take effect.
 ---
 
 ### Reinstalling python dependencies
-Terminal in your activated virtual environment.  
+Terminal in your activated virtual environment.
 
-This creates a temporary list of everything that's currently installed.
+This creates a list of everything that's currently installed, uninstalls it, and then deletes the list file.
+
 ```shell
-pip freeze > temp_requirements.txt
+pip freeze > uninstall.txt
 ```
-Now, use that list to uninstall everything.  
-The -y flag automatically confirms all the uninstallations so you don't have to do it one by one.
+
 ```shell
-pip uninstall -y -r temp_requirements.txt
+pip uninstall -y -r uninstall.txt
 ```
+
+```shell
+del uninstall.txt
+```
+
 Then reinstall:
 ```shell
 pip install --no-cache-dir -r pytorch-requirements.txt
 pip install --no-cache-dir .
 ```
-Now you can remove `temp_requirements.txt` file.

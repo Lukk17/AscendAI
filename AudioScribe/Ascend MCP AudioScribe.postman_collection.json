@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "02fd1612-ada7-4d58-b720-d5e05d65379a",
-    "name": "AudioScribe MCP",
+    "name": "Ascend MCP AudioScribe",
     "description": "Automated test suite for AudioScribe MCP Server.\n\nWhen running in docker change audio source to \"audio_uri_docker\"",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "6370134"
@@ -45,63 +45,10 @@
           "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"{{mcp_protocol_version}}\",\n    \"capabilities\": {},\n    \"clientInfo\": { \"name\": \"postman-client\", \"version\": \"0.1.0\" }\n  }\n}"
         },
         "url": {
-          "raw": "http://localhost:7017/mcp",
-          "protocol": "http",
+          "raw": "{{protocol}}://{{baseUrl}}:7017/mcp",
+          "protocol": "{{protocol}}",
           "host": [
-            "localhost"
-          ],
-          "port": "7017",
-          "path": [
-            "mcp"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Health",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              ""
-            ],
-            "type": "text/javascript",
-            "packages": {},
-            "requests": {}
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "Accept",
-            "value": "application/json, text/event-stream"
-          },
-          {
-            "key": "MCP-Session-Id",
-            "value": "{{mcp_session_id}}"
-          },
-          {
-            "key": "MCP-Protocol-Version",
-            "value": "{{mcp_protocol_version}}"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 6,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"health\",\n    \"arguments\": {}\n  }\n}"
-        },
-        "url": {
-          "raw": "http://localhost:7017/mcp",
-          "protocol": "http",
-          "host": [
-            "localhost"
+            "{{baseUrl}}"
           ],
           "port": "7017",
           "path": [
@@ -151,10 +98,10 @@
           "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
         },
         "url": {
-          "raw": "http://localhost:7017/mcp",
-          "protocol": "http",
+          "raw": "{{protocol}}://{{baseUrl}}:7017/mcp",
+          "protocol": "{{protocol}}",
           "host": [
-            "localhost"
+            "{{baseUrl}}"
           ],
           "port": "7017",
           "path": [
@@ -201,13 +148,13 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_local\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"Systran/faster-whisper-large-v3\",\n      \"language\": \"en\",\n      \"with_timestamps\": false\n    }\n  }\n}"
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_local\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri_docker}}\",\n      \"model\": \"Systran/faster-whisper-large-v3\",\n      \"language\": \"en\",\n      \"with_timestamps\": false\n    }\n  }\n}"
         },
         "url": {
-          "raw": "http://localhost:7017/mcp",
-          "protocol": "http",
+          "raw": "{{protocol}}://{{baseUrl}}:7017/mcp",
+          "protocol": "{{protocol}}",
           "host": [
-            "localhost"
+            "{{baseUrl}}"
           ],
           "port": "7017",
           "path": [
@@ -254,13 +201,13 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_openai\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"whisper-1\",\n      \"language\": \"en\"\n    }\n  }\n}"
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_openai\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri_docker}}\",\n      \"model\": \"whisper-1\",\n      \"language\": \"en\"\n    }\n  }\n}"
         },
         "url": {
-          "raw": "http://localhost:7017/mcp",
-          "protocol": "http",
+          "raw": "{{protocol}}://{{baseUrl}}:7017/mcp",
+          "protocol": "{{protocol}}",
           "host": [
-            "localhost"
+            "{{baseUrl}}"
           ],
           "port": "7017",
           "path": [
@@ -294,13 +241,13 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_hf\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"openai/whisper-large-v3\",\n      \"hf_provider\": \"hf-inference\"\n    }\n  }\n}"
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_hf\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri_docker}}\",\n      \"model\": \"openai/whisper-large-v3\",\n      \"hf_provider\": \"hf-inference\"\n    }\n  }\n}"
         },
         "url": {
-          "raw": "http://localhost:7017/mcp",
-          "protocol": "http",
+          "raw": "{{protocol}}://{{baseUrl}}:7017/mcp",
+          "protocol": "{{protocol}}",
           "host": [
-            "localhost"
+            "{{baseUrl}}"
           ],
           "port": "7017",
           "path": [
@@ -334,13 +281,13 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 7,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_local\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri}}\",\n      \"model\": \"Systran/faster-whisper-large-v3\",\n      \"language\": \"en\",\n      \"with_timestamps\": true\n    }\n  }\n}"
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 7,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"transcribe_local\",\n    \"arguments\": {\n      \"audio_uri\": \"{{audio_uri_docker}}\",\n      \"model\": \"Systran/faster-whisper-large-v3\",\n      \"language\": \"en\",\n      \"with_timestamps\": true\n    }\n  }\n}"
         },
         "url": {
-          "raw": "http://localhost:7017/mcp",
-          "protocol": "http",
+          "raw": "{{protocol}}://{{baseUrl}}:7017/mcp",
+          "protocol": "{{protocol}}",
           "host": [
-            "localhost"
+            "{{baseUrl}}"
           ],
           "port": "7017",
           "path": [
@@ -372,6 +319,49 @@
         "exec": [
           "pm.test(\"Status code is 200\", function () {\r",
           "    pm.response.to.have.status(200);\r",
+          "});\r",
+          "\r",
+          "pm.test(\"MCP Response is Successful\", function () {\r",
+          "    var body = pm.response.text();\r",
+          "    var jsonData = null;\r",
+          "\r",
+          "    // Handle Server-Sent Events (SSE) format if present\r",
+          "    if (body.trim().startsWith(\"event:\")) {\r",
+          "        // Extract the JSON from the \"data:\" line\r",
+          "        var lines = body.split('\\n');\r",
+          "        for (var i = 0; i < lines.length; i++) {\r",
+          "            if (lines[i].startsWith(\"data: \")) {\r",
+          "                try {\r",
+          "                    jsonData = JSON.parse(lines[i].substring(6));\r",
+          "                } catch (e) {\r",
+          "                    pm.expect.fail(\"Failed to parse SSE JSON data: \" + e.message);\r",
+          "                }\r",
+          "                break; \r",
+          "            }\r",
+          "        }\r",
+          "    } else {\r",
+          "        // Standard JSON response\r",
+          "        try {\r",
+          "            jsonData = pm.response.json();\r",
+          "        } catch (e) {\r",
+          "            pm.expect.fail(\"Failed to parse JSON response: \" + e.message);\r",
+          "        }\r",
+          "    }\r",
+          "\r",
+          "    if (!jsonData) {\r",
+          "        pm.expect.fail(\"No valid JSON data found in response\");\r",
+          "        return;\r",
+          "    }\r",
+          "    \r",
+          "    // Check for JSON-RPC and MCP errors...\r",
+          "    if (jsonData.error) pm.expect.fail(\"JSON-RPC Error: \" + jsonData.error.message);\r",
+          "    if (jsonData.result && jsonData.result.isError) {\r",
+          "         var reason = \"Tool execution failed\";\r",
+          "         if (jsonData.result.content && jsonData.result.content.length > 0) {\r",
+          "             reason += \": \" + jsonData.result.content[0].text;\r",
+          "         }\r",
+          "         pm.expect.fail(reason);\r",
+          "    }\r",
           "});"
         ]
       }

@@ -75,6 +75,7 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
     ```shell
     pip install -e .[dev]
     ```
+    *The `-e` flag stands for "editable". It allows you to modify the source code and see changes immediately without reinstalling the package.*
 
 4.  **Install Playwright Browsers**
 
@@ -116,7 +117,27 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
     docker build -t ascend-web-search:latest .
     ```
 
-2.  **Run the Container**
+2.  **Tag and Publish (Optional):**
+
+    If you want to push this image to Docker Hub (e.g., to use it in another environment or specific `docker-compose.yaml`):
+
+    ```shell
+    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:v0.0.1
+    ```
+
+    ```shell
+    docker push lukk17/ascend-web-search:v0.0.1
+    ```
+    
+    ```shell
+    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:latest
+    ```
+
+    ```shell
+    docker push lukk17/ascend-web-search:latest
+    ```
+
+3.  **Run the Container**
 
     Linux/MacOS:
     ```shell
@@ -278,3 +299,29 @@ The `web_read` tool uses a smart fallback strategy to ensure high success rates 
 
 1.  **Fast Path**: Attempts to fetch the URL using standard HTTP GET and extract content with `trafilatura`. This is fast and resource-efficient.
 2.  **Render Path**: If the fast path fails (e.g., 403 Forbidden, 429 Too Many Requests, or empty content due to JavaScript), it switches to **Playwright**. It launches a headless Chromium browser, renders the page (executing JS), and then extracts the content.
+
+---
+
+## Troubleshooting
+
+### Reinstalling python dependencies
+Terminal in your activated virtual environment.
+
+This creates a list of everything that's currently installed, uninstalls it, and then deletes the list file.
+
+```shell
+pip freeze > uninstall.txt
+```
+
+```shell
+pip uninstall -y -r uninstall.txt
+```
+
+```shell
+del uninstall.txt
+```
+
+Then reinstall:
+```shell
+pip install -e .[dev]
+```

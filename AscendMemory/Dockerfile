@@ -9,12 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
+# Copy source code
+COPY src/ src/
+
+# Install python dependencies
 COPY pyproject.toml .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
-
-# Copy source code
-COPY src/ src/
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
@@ -23,4 +24,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 7020
 
 # Run the application
-CMD ["python", "src/main.py"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "7020"]

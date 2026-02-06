@@ -7,7 +7,7 @@ dependencies = [
     "fastapi==0.128.0",
     "uvicorn==0.40.0",
     "fastmcp==2.14.5",
-   "pydantic==2.11.10" ,
+    "pydantic==2.11.10",
     "pydantic-settings==2.12.0",
     "httpx==0.28.1",
     "trafilatura>=2.0.0",
@@ -17,7 +17,12 @@ dependencies = [
     "crawlee[playwright]>=1.3.1",
     "playwright-stealth==2.0.1",
     "adblockparser>=0.7.0",
-    "colorlog==6.10.1"
+    "colorlog==6.10.1",
+    "parsel==1.11.0",
+    "jaro-winkler==2.0.3",
+    "lxml==6.0.2",
+    "cssselect==1.4.0",
+    "scikit-learn>=1.8.0"
 ]
 
 [project.optional-dependencies]

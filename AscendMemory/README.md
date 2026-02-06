@@ -84,6 +84,7 @@ The service is configured via environment variables. You can set them in your sh
     ```shell
     pip install -e .[dev]
     ```
+    *The `-e` flag stands for "editable". It allows you to modify the source code and see changes immediately without reinstalling the package.*
 
 4.  **Run the Server**
 
@@ -150,28 +151,28 @@ The service is configured via environment variables. You can set them in your sh
 
 3.  **Tagging and Pushing to Registry**
 
-    Tag with a specific version (e.g., 1.0.0):
+    Tag with a specific version (e.g., v0.0.1):
 
     ```shell
-    docker tag ascend-memory:latest myregistry/ascend-memory:1.0.0
+    docker tag ascend-ai-ascend-memory:latest lukk17/ascend-memory:v0.0.1
     ```
 
     Tag with latest:
 
     ```shell
-    docker tag ascend-memory:latest myregistry/ascend-memory:latest
+    docker tag ascend-ai-ascend-memory:latest lukk17/ascend-memory:latest
     ```
 
     Push specific version:
 
     ```shell
-    docker push myregistry/ascend-memory:1.0.0
+    docker push lukk17/ascend-memory:v0.0.1
     ```
 
     Push latest:
 
     ```shell
-    docker push myregistry/ascend-memory:latest
+    docker push lukk17/ascend-memory:latest
     ```
 
 ---
@@ -274,3 +275,25 @@ Dependency management is handled via `pyproject.toml`.
 To add a new dependency:
 1.  Add it to `pyproject.toml`.
 2.  Reinstall: `pip install .`
+
+### Reinstalling python dependencies
+Terminal in your activated virtual environment.
+
+This creates a list of everything that's currently installed, uninstalls it, and then deletes the list file.
+
+```shell
+pip freeze > uninstall.txt
+```
+
+```shell
+pip uninstall -y -r uninstall.txt
+```
+
+```shell
+del uninstall.txt
+```
+
+Then reinstall:
+```shell
+pip install -e .[dev]
+```

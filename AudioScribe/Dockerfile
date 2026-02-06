@@ -9,12 +9,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install Python, pip, and other system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     ffmpeg \
     libsndfile1 \
     python3.11 \
-    python3-pip && \
+    python3.11-distutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install pip for Python 3.11
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
 # Create a non-root user and group for security
 RUN groupadd -r "$APP_USER" && useradd -r -g "$APP_USER" "$APP_USER"
@@ -24,10 +28,11 @@ WORKDIR /app
 
 # Copy requirements files first to leverage Docker layer caching
 COPY pytorch-requirements.txt .
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \
+    python3.11 -m pip install --no-cache-dir -r pytorch-requirements.txt
+
 COPY pyproject.toml .
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r pytorch-requirements.txt && \
-    python3 -m pip install --no-cache-dir .
+RUN python3.11 -m pip install --no-cache-dir .
 
 # Copy the rest of the application code and set ownership
 COPY --chown="$APP_USER":"$APP_USER" . .
@@ -39,4 +44,4 @@ USER $APP_USER
 EXPOSE 7017
 
 # The command to run the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "7017"]
+CMD ["python3.11", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "7017"]
