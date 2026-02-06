@@ -1,7 +1,7 @@
 import logging
-import sys
 
 logger = logging.getLogger(__name__)
+
 
 class Compat(dict):
     """
@@ -13,6 +13,7 @@ class Compat(dict):
     This shim intercepts key lookups (filenames) and returns them as-is, preventing 'crawlee' from crashing
     when it tries to look up file paths. It uses a heuristic to differentiate between 'headers' and 'fingerprints'.
     """
+
     def __init__(self, category: str):
         self.category = category
         super().__init__()
@@ -21,10 +22,11 @@ class Compat(dict):
         # Heuristic: headers/input usually go to headers dir
         if self.category == 'headers':
             return "header" in str(key) or "input" in str(key)
-        return False # fingerprints will be caught by the else block in crawlee
+        return False  # fingerprints will be caught by the else block in crawlee
 
     def __getitem__(self, key):
         return key
+
 
 def apply_compatibility_patches():
     """

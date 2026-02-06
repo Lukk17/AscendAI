@@ -6,7 +6,7 @@ import httpx
 from openai import OpenAI, APIError
 from pydub import AudioSegment
 
-from src.config.settings import settings
+from src.config.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +58,13 @@ def openai_transcript(audio_file_path: str, model: str, language: str):
         logger.exception("Pydub failed to load the audio file for chunking.")
         raise IOError("Failed to load audio file for chunking. It may be corrupt or an unsupported format.") from e
 
-    ratio = file_size / len(audio)
-    chunk_length_ms = int(settings.TARGET_CHUNK_SIZE_BYTES / ratio)
+    # Deterministic Normalization: 16kHz, Mono, 16-bit PCM
+    # 16000 samples/s * 2 bytes/sample * 1 channel = 32,000 bytes/sec
+    audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+    bytes_per_second = 32000
+
+    # Calculate chunk duration in milliseconds
+    chunk_length_ms = int((settings.TARGET_CHUNK_SIZE_BYTES / bytes_per_second) * 1000)
 
     full_transcription = []
     temp_files = []
@@ -75,13 +80,23 @@ def openai_transcript(audio_file_path: str, model: str, language: str):
             chunk = audio[start_ms:end_ms]
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
+                # Force wav format export
                 chunk.export(tmp_audio.name, format="wav")
-                temp_files.append(tmp_audio.name)
-                logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
+                tmp_path = tmp_audio.name
+            
+            temp_files.append(tmp_path)
+            
+            # Fail-safe check
+            chunk_size = os.path.getsize(tmp_path)
+            if chunk_size > settings.OPENAI_API_LIMIT_BYTES:
+                 logger.error(f"Chunk {chunk_num} size {chunk_size} exceeds limit {settings.OPENAI_API_LIMIT_BYTES}!")
+                 # This should effectively never happen with our math, but safety first.
+                 raise ValueError(f"Generated chunk {chunk_num} exceeded OpenAI size limit.")
 
-                chunk_transcription = _transcribe_single_chunk(tmp_audio.name, model, language)
-                full_transcription.append(chunk_transcription)
-                logger.info(f"Chunk {chunk_num}/{num_chunks} complete.")
+            logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
+            chunk_transcription = _transcribe_single_chunk(tmp_path, model, language)
+            full_transcription.append(chunk_transcription)
+            logger.info(f"Chunk {chunk_num}/{num_chunks} complete.")
 
         return " ".join(full_transcription)
 

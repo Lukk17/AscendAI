@@ -10,8 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 class BlocklistLoader:
-    def __init__(self, assets_dir: str = "src/assets"):
-        self.assets_dir = Path(assets_dir)
+    def __init__(self, assets_dir: str = None):
+        if assets_dir:
+            self.assets_dir = Path(assets_dir)
+        else:
+            self.assets_dir = Path(__file__).parent.parent / "assets"
+
         self.blocklist_path = self.assets_dir / "fanboy-annoyance.txt"
         self._ensure_assets_dir()
 

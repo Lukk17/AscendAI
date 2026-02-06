@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
 
-from src.io.file_service import safe_suffix_from_filename, cleanup_temp_file, save_upload_to_temp_async, \
+from src.adapters.file_service import safe_suffix_from_filename, cleanup_temp_file, save_upload_to_temp_async, \
     create_temp_file
 
 
@@ -52,7 +52,7 @@ def test_cleanup_temp_file_handles_os_error(mock_exists, mock_remove):
 
 
 @pytest.mark.asyncio
-@patch('src.io.file_service.create_temp_file', return_value="/fake/temp/file.wav")
+@patch('src.adapters.file_service.create_temp_file', return_value="/fake/temp/file.wav")
 @patch('aiofiles.open')
 async def test_save_upload_to_temp_async(mock_aio_open, mock_create_temp):
     async_file_mock = AsyncMock()

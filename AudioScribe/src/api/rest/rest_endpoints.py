@@ -1,25 +1,14 @@
 import asyncio
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any, Optional
 
-from src.config.logging_config import setup_logging
-from src.config.settings import settings
-from src.io.file_service import save_upload_to_temp_async, cleanup_temp_file
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi.responses import JSONResponse
+
+from src.config.config import settings
+from src.adapters.file_service import save_upload_to_temp_async, cleanup_temp_file
 from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
 
-setup_logging()
-
-app = FastAPI(
-    title="AudioScribe",
-    description="A dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models.",
-    version="0.8.0",
-)
-
-
-@app.get("/")
-async def root():
-    return {"message": "Welcome to the AudioScribe API"}
+rest_router = APIRouter()
 
 
 def _build_timestamp_response(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -32,7 +21,7 @@ def _build_text_only_response(segments: List[Dict[str, Any]]) -> str:
     return " ".join([s['text'] for s in segments])
 
 
-@app.post("/api/v1/transcribe/local", summary="Transcription with a local model")
+@rest_router.post("/api/v1/transcribe/local", summary="Transcription with a local model")
 async def transcribe_local_endpoint(
         file: UploadFile = File(...),
         model: str = Form("Systran/faster-whisper-large-v3"),
@@ -74,7 +63,7 @@ async def transcribe_local_endpoint(
             cleanup_temp_file(temp_file_path)
 
 
-@app.post("/api/v1/transcribe/openai", summary="Transcription with OpenAI API")
+@rest_router.post("/api/v1/transcribe/openai", summary="Transcription with OpenAI API")
 async def transcribe_openai_endpoint(
         file: UploadFile = File(...),
         model: str = Form("whisper-1"),
@@ -110,7 +99,7 @@ async def transcribe_openai_endpoint(
         await file.close()
 
 
-@app.post("/api/v1/transcribe/hf", summary="Transcription with Hugging Face provider")
+@rest_router.post("/api/v1/transcribe/hf", summary="Transcription with Hugging Face provider")
 async def transcribe_hf_endpoint(
         file: UploadFile = File(...),
         model: str = Form("openai/whisper-large-v3"),

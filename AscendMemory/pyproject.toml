@@ -12,7 +12,8 @@ dependencies = [
     "pydantic-settings>=2.5.0",
     "httpx>=0.27.0",
     "python-multipart>=0.0.9", # for file uploads if needed, or form data
-    "qdrant-client==1.16.2"
+    "qdrant-client==1.16.2",
+    "colorlog==6.10.1"
 ]
 
 [project.optional-dependencies]

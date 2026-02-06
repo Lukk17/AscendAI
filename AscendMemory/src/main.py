@@ -7,28 +7,12 @@ from fastapi import FastAPI, Response, status, Request
 from src.api.mcp.mcp_server import mcp
 from src.api.rest.rest_endpoints import rest_router
 from src.config.config import settings
+from src.config.logging_config import setup_logging, get_uvicorn_log_config
 from src.service.memory_client import get_memory_client
 
-# Configure logging
-LOG_FORMAT = "[%(asctime)s] %(levelname)s: %(message)s"
-DATE_FORMAT = "%H:%M:%S"
-
-logging.basicConfig(
-    level=settings.LOG_LEVEL,
-    format=LOG_FORMAT,
-    datefmt=DATE_FORMAT
-)
-
-# Unify Uvicorn loggers to specific format
-for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
-    log = logging.getLogger(logger_name)
-    log.setLevel(settings.LOG_LEVEL)
-    for handler in log.handlers:
-        handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
-
+setup_logging()
 logger = logging.getLogger("uvicorn")
 
-# Flag to track readiness
 is_ready = False
 
 async def warmup_client():
@@ -48,7 +32,7 @@ async def warmup_client():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start warmup in background
+    setup_logging()
     asyncio.create_task(warmup_client())
     yield
 
@@ -82,5 +66,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "src.main:app",
         host=settings.API_HOST,
-        port=settings.API_PORT
+        port=settings.API_PORT,
+        log_config=get_uvicorn_log_config()
     )

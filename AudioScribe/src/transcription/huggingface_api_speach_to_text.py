@@ -7,7 +7,7 @@ from huggingface_hub.inference._generated.types import AutomaticSpeechRecognitio
 from huggingface_hub.utils import HfHubHTTPError
 from pydub import AudioSegment
 
-from src.config.settings import settings
+from src.config.config import settings
 
 logger = logging.getLogger(__name__)
 

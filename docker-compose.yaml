@@ -5,7 +5,7 @@ x-common-env: &common-env
 
 services:
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: minio
     restart: unless-stopped
     ports:
@@ -182,34 +182,13 @@ services:
       default:
         aliases:
           - audio-scribe
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7017/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
-  audio-scribe-mcp:
-    build:
-      context: ./AudioScribe
-      dockerfile: Dockerfile.mcp
-    # image: lukk17/audio-scribe-mcp:latest
-    container_name: audio-scribe-mcp
-    restart: unless-stopped
-    ports:
-      - "7016:7016"
-    environment:
-      - HF_HOME=/hf-cache
-      - HF_TOKEN=${HF_TOKEN}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    volumes:
-      - D:/Development/AI/hf-cache:/hf-cache
-      - C:\Users\Lukk\Desktop:/audio
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    networks:
-      default:
-        aliases:
-          - audio-scribe-mcp
+
 
   # openmemory:
   #   build:

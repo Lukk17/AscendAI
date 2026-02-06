@@ -31,7 +31,7 @@ def setup_logging():
     }
 
     log_format = (
-        '%(log_color)s[AudioScribe] %(asctime)s - %(levelname)s - %(module)-18s%(reset)s >> '
+        '%(log_color)s[AscendMemory] %(asctime)s - %(levelname)s - %(module)-18s%(reset)s >> '
         '%(log_color)s%(message)s'
     )
 
@@ -65,7 +65,7 @@ def get_uvicorn_log_config() -> dict:
     }
 
     log_format = (
-        '%(log_color)s[AudioScribe] %(asctime)s - %(levelname)s - %(message)s'
+        '%(log_color)s[AscendMemory] %(asctime)s - %(levelname)s - %(message)s'
     )
 
     return {

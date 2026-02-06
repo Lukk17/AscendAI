@@ -137,14 +137,8 @@ This is the recommended method for a stable deployment.
 
 **1. Build the Docker image:**
 
-Build the main image for the REST API
 ```shell
 docker build -t audio-scribe:latest .
-```
-
-Build the image for the MCP server
-```shell
-docker build -f Dockerfile.mcp -t audio-scribe-mcp:latest .
 ```
 
 **2. Tag and Publish (Optional):**
@@ -272,8 +266,7 @@ curl -X POST "http://localhost:7017/api/v1/transcribe/hf" `
 
 ## MCP Server Mode
 
-The MCP server runs on a separate port (default `7016`) to avoid conflicts with the main API when running locally.
-When using Docker, it can be mapped to any port.
+The MCP server is integrated into the main application.
 
 **Exposed MCP Tools:**
 *   `health()`
@@ -281,52 +274,20 @@ When using Docker, it can be mapped to any port.
 *   `transcribe_openai(audio_uri: str, model: str, language: str)`
 *   `transcribe_hf(audio_uri: str, model: str, hf_provider: str)`
 
-### How to run (both transports enabled):
-
-```shell
-uvicorn mcp_server:app --host 0.0.0.0 --port 7016
-```
+### How to use:
 
 Streamable HTTP (bidirectional over HTTP):
-  - Endpoint: POST http://localhost:7016/mcp
+  - Endpoint: POST http://localhost:7017/mcp
   - Headers:  Content-Type: application/json
               Accept: application/json, text/event-stream
 
 SSE transport (server-sent events + POST messages):
-  - Stream:   GET  http://localhost:7016/sse-root/sse
+  - Stream:   GET  http://localhost:7017/sse-root/sse
               Accept: text/event-stream
-  - Messages: POST http://localhost:7016/sse-root/messages/
+  - Messages: POST http://localhost:7017/sse-root/messages/
               Headers: Content-Type: application/json
               Note: The messages path includes a required `session_id` query param
                     provided by the server in the first SSE event named "endpoint".
-
-### Docker Run (MCP)
-
-**For Linux/macOS:**
-```shell
-docker run -d \
-  --name audio-scribe-mcp \
-  --gpus all \
-  -p 7016:7016 \
-  -e OPENAI_API_KEY="sk-..." \
-  -e HF_TOKEN="hf_..." \
-  -e HF_HOME=/hf-cache \
-  -v ~/hf-cache:/hf-cache \
-  audio-scribe-mcp:latest
-```
-
-**For Windows (PowerShell):**
-```PowerShell
-docker run -d `
-  --name audio-scribe-mcp `
-  --gpus all `
-  -p 7016:7016 `
-  -e OPENAI_API_KEY="sk-..." `
-  -e HF_TOKEN="hf_..." `
-  -e HF_HOME=/hf-cache `
-  -v "D:/path/to/your/hf-cache:/hf-cache" `
-  audio-scribe-mcp:latest
-```
 
 ### Example MCP Client Configurations
 
@@ -339,7 +300,7 @@ Streamable HTTP transport:
   "mcpServers": {
     "audio-scribe": {
       "type": "streamable",
-      "url": "http://localhost:7016/mcp"
+      "url": "http://localhost:7017/mcp"
     }
   }
 }
@@ -351,7 +312,7 @@ SSE transport:
   "mcpServers": {
     "audio-scribe": {
       "type": "sse",
-      "url": "http://localhost:7016/sse-root/sse"
+      "url": "http://localhost:7017/sse-root/sse"
     }
   }
 }
@@ -387,6 +348,35 @@ If you have audio files on your local machine and want to expose them to the MCP
 3.  **Access the file**:
     If your file is at `./audio/audio.wav` relative to where you ran the command, the URI will be:
     `http://localhost:9999/audio/audio.wav` (or use your machine's LAN IP if accessing from a Docker container).
+
+#### 3. MinIO (S3-compatible Storage)
+
+If you are running the project with `docker-compose`, you have a MinIO instance available. To make a bucket public so `AudioScribe` can download files without authentication variables, follow these steps:
+
+1.  **Exec into the MinIO container**:
+    ```shell
+    docker exec -it minio /bin/sh
+    ```
+
+2.  **Configure the `mc` (MinIO Client) alias**:
+    (Default credentials are usually `admin`/`password` based on your docker-compose)
+    ```shell
+    mc alias set myminio http://localhost:9000 admin password
+    ```
+
+3.  **Set the bucket as public**:
+    ```shell
+    mc anonymous set public myminio/public-audio
+    ```
+
+4.  **Upload Audio**:
+    You can now upload files via the Console (`http://localhost:9071`) or CLI.
+
+5.  **Use the URI**:
+    *   **Inside Docker Network**: `http://minio:9000/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
+    *   **From Localhost**: `http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
+    
+    *(Note: Adjust the `prefix` parameter if your file is in a subdirectory, e.g., `prefix=test%2Faudio.wav`)*
 
 ### Example Prompts
 

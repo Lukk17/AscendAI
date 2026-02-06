@@ -1,4 +1,4 @@
-@mcp_protocol_version = 2024-11-05
+@mcp_protocol_version = 2025-11-25
 @mcp_session_id = CHANGE_ME
 
 ###
@@ -13,7 +13,7 @@ Accept: application/json, text/event-stream
   "id": 1,
   "method": "initialize",
   "params": {
-    "protocolVersion": "2024-11-05",
+    "protocolVersion": "{{mcp_protocol_version}}",
     "capabilities": {},
     "clientInfo": { "name": "http-client", "version": "0.1.0" }
   }

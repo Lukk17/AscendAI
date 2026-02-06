@@ -1,0 +1,159 @@
+# Served via MinIO
+@audio_uri = http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac
+# If running in Docker (Container to Container communication)
+# @audio_uri = http://minio:9000/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac
+
+# Served via local server
+# @audio_uri = http://localhost:9999/audio.wav
+# For Docker:
+#@audio_uri = http://host.docker.internal:9999/audio.wav
+
+@mcp_protocol_version = 2025-11-25
+# Paste the messages path you received in the very first SSE event here.
+# Update below ID after each initialize request
+@sse_messages_path = /sse-root/messages/?session_id=CHANGE_ME
+
+###
+# SSE TRANSPORT EXAMPLES
+# ------------------------------------------------------------------------------------------
+# The server is also exposing an SSE transport mounted under "/sse-root".
+# SSE is a long-lived GET connection for server-to-client events, and a POST endpoint
+# for client-to-server messages.
+#
+# Flow:
+# 1) Start the SSE stream (GET). The first event will contain the message POST path like:
+#      /sse-root/messages/?session_id=<session_id_hex>
+# 2) Copy that path into the variable below and use it for JSON-RPC POSTs.
+# ------------------------------------------------------------------------------------------
+
+###
+# @name sse_connect
+# Start an SSE stream. Your HTTP client must support text/event-stream to keep the
+# connection open and display events. If it doesn't, use curl:
+#   curl -N -H "Accept: text/event-stream" http://localhost:7017/sse-root/sse
+GET http://localhost:7017/sse-root/sse
+Accept: text/event-stream
+
+###
+# @name sse_initialize
+# Initialize the MCP session over SSE by POSTing to the messages path.
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 100,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "{{mcp_protocol_version}}",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "0.1.0" }
+  }
+}
+
+###
+# @name sse_list_tools
+# List available tools over SSE by POSTing to the messages path.
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 110,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+# @name sse_transcribe_local
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 101,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_local",
+    "arguments": {
+      "audio_uri": "{{audio_uri}}",
+      "model": "Systran/faster-whisper-large-v3",
+      "language": "en",
+      "with_timestamps": false
+    }
+  }
+}
+
+###
+# @name sse_transcribe_local_with_timestamps
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 101,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_local",
+    "arguments": {
+      "audio_uri": "{{audio_uri}}",
+      "model": "Systran/faster-whisper-large-v3",
+      "language": "en",
+      "with_timestamps": true
+    }
+  }
+}
+
+###
+# @name sse_transcribe_openai
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 102,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_openai",
+    "arguments": {
+      "audio_uri": "{{audio_uri}}",
+      "model": "whisper-1",
+      "language": "en"
+    }
+  }
+}
+
+###
+# @name sse_transcribe_hf
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 103,
+  "method": "tools/call",
+  "params": {
+    "name": "transcribe_hf",
+    "arguments": {
+      "audio_uri": "{{audio_uri}}",
+      "model": "openai/whisper-large-v3",
+      "hf_provider": "hf-inference"
+    }
+  }
+}
+
+###
+# @name sse_health
+# Simple health check via tools/call over SSE.
+POST http://localhost:7017{{sse_messages_path}}
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 111,
+  "method": "tools/call",
+  "params": {
+    "name": "health",
+    "arguments": {}
+  }
+}

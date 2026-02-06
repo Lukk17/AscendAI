@@ -1,8 +1,9 @@
 from typing import List, Dict, Any
 
 from fastmcp import FastMCP
-from src.search.search_client import SearxngClient
+
 from src.reader.web_reader import WebReader
+from src.search.search_client import SearxngClient
 
 # Initialize FastMCP
 mcp = FastMCP("AscendWebSearch")
