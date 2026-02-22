@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
             logger.critical(f"Startup Warning: Failed to initialize Blocklist: {e}")
             # Fail hard as requested
             raise RuntimeError("Failed to initialize Blocklist") from e
-        
+
         # Initialize MCP server lifespan
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(app))
@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
 
     # Mount must be last to avoid capturing specific routes
     app.mount("/", mcp_asgi_app)
-    
+
     return app
 
 

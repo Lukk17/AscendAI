@@ -20,12 +20,22 @@ def search(query: str, limit: int = 5):
 
 
 @rest_router.get("/read")
-async def read_url(url: str):
+async def read_url(url: str, include_links: bool = False, link_filter: str | None = None):
     """
     Extract content from a URL.
+    Args:
+        url: The URL to scrape.
+        include_links: When True, returns annotated content with inline [N] link markers
+                       and a numbered link map {1: url, 2: url, ...}.
+        link_filter: Optional URL substring — when set, only links whose href contains
+                     this string are included in the link map (e.g. '/job-offer/').
     """
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
+
+    if include_links:
+        result = await web_reader.read_with_links(url, link_filter)
+        return {"url": url, **result}
 
     content = await web_reader.read(url)
     return {"url": url, "content": content}

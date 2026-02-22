@@ -11,12 +11,15 @@ class CrawleeStrategy(BaseStrategy):
         self.url_validator = url_validator
 
     async def extract(self, url: str) -> str:
-        result_container = {"content": ""}
+        html = await self.get_html(url)
+        extracted = trafilatura.extract(html)
+        return extracted if extracted else ""
 
-        crawler = AdaptivePlaywrightCrawler(
+    async def get_html(self, url: str) -> str:
+        result_container: dict[str, str] = {"html": ""}
+
+        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
             max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
-            headless=True,
-            browser_type='chromium',
         )
 
         @crawler.router.default_handler
@@ -28,17 +31,12 @@ class CrawleeStrategy(BaseStrategy):
             await context.page.route("**/*", self.url_validator.route_handler)
 
         await crawler.run([url])
-        return result_container["content"]
+        return result_container["html"]
 
-    async def _handle_crawlee_request(self, context, result_container) -> None:
+    async def _handle_crawlee_request(self, context, result_container: dict[str, str]) -> None:
         if isinstance(context, PlaywrightCrawlingContext):
-            await self._handle_playwright_context(context, result_container)
+            result_container["html"] = await context.page.content()
         elif hasattr(context, 'soup'):
-            result_container["content"] = trafilatura.extract(str(context.soup)) or ""
+            result_container["html"] = str(context.soup)
         elif hasattr(context, 'response'):
-            result_container["content"] = trafilatura.extract(context.response.text) or ""
-
-    async def _handle_playwright_context(self, context: PlaywrightCrawlingContext, result_container) -> None:
-        page = context.page
-        content = await page.content()
-        result_container["content"] = trafilatura.extract(content) or ""
+            result_container["html"] = context.response.text

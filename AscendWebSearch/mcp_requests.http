@@ -75,5 +75,27 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
   }
 }
 
+###
+# @name web_read_with_links
+POST http://localhost:7021/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "web_read",
+    "arguments": {
+      "url": "https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes",
+      "include_links": true,
+      "link_filter": "/job-offer/"
+    }
+  }
+}
+
 ### Helper: Health Check
 GET http://localhost:7021/health

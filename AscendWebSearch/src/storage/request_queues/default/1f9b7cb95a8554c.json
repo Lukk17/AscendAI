@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.coingecko.com/en/categories",
+  "url": "https://www.coingecko.com/en/categories",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": null,
+  "handled_at": "2026-02-22 10:04:27.451975+00:00"
+}

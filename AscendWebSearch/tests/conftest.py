@@ -5,11 +5,21 @@ from unittest.mock import MagicMock
 mock_fastmcp = MagicMock()
 mock_instance = MagicMock()
 
+from contextlib import asynccontextmanager
+
 
 # Mock sse_app to return a valid-ish ASGI app (callable)
 async def mock_asgi_app(scope, receive, send):
     pass
 
+
+class MockRouter:
+    @asynccontextmanager
+    async def lifespan_context(self, app):
+        yield
+
+
+mock_asgi_app.router = MockRouter()
 
 mock_instance.sse_app.return_value = mock_asgi_app
 mock_instance.streamable_http_app.return_value = mock_asgi_app

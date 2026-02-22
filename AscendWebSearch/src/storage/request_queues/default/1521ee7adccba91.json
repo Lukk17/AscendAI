@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.linkedin.com/jobs/search?keywords=java+developer&location=united+states",
+  "url": "https://www.linkedin.com/jobs/search/?keywords=Java%20Developer&location=United%20States",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": null,
+  "handled_at": "2026-02-21 22:16:27.804518+00:00"
+}

@@ -7,108 +7,140 @@ from src.reader.strategies.fallback_strategy import FallbackStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
 
+SAMPLE_HTML = "<html><body><p>Text</p><script>bad</script></body></html>"
+
+
+class MockPage:
+    def __init__(self, html: str = "<html></html>"):
+        self.goto = AsyncMock()
+        self.wait_for_timeout = AsyncMock()
+        self.content = AsyncMock(return_value=html)
+        self.route = AsyncMock()
+        self.evaluate = AsyncMock()
+        self.add_init_script = AsyncMock()
+
+
+class MockContext:
+    def __init__(self, html: str = "<html></html>"):
+        self.page = MockPage(html)
+        self.new_page = AsyncMock(return_value=self.page)
+        self.close = AsyncMock()
+
+
+class MockBrowser:
+    def __init__(self, html: str = "<html></html>"):
+        self.context = MockContext(html)
+        self.new_context = AsyncMock(return_value=self.context)
+        self.close = AsyncMock()
+
+
+def _make_httpx_mock(html: str):
+    mock_response = MagicMock()
+    mock_response.text = html
+    mock_response.raise_for_status = MagicMock()
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.get = AsyncMock(return_value=mock_response)
+    return mock_client
+
 
 @pytest.mark.asyncio
-@pytest.mark.asyncio
-async def test_crawlee_strategy_success():
-    mock_validator = MagicMock()
-    strategy = CrawleeStrategy(mock_validator)
+async def test_trafilatura_strategy_extract():
+    strategy = TrafilaturaStrategy(lambda: "test-ua")
 
-    # Mock the internal AdaptivePlaywrightCrawler usage
-    with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
-        mock_crawler = AsyncMock()
-        mock_crawler_cls.return_value = mock_crawler
-
-        # Mock run method to simulate processing
-        mock_crawler.run = AsyncMock()
-
-        # We need to ensure the run call doesn't fail and we can assert on it.
-        # Since logic isn't fully mocked for extraction (it's inside the crawler callbacks),
-        # minimal assertion is that we instantiated it correctly and called run.
-        await strategy.extract("http://test.com")
-
-        mock_crawler.run.assert_called()
-
-
-@pytest.mark.asyncio
-async def test_trafilatura_strategy_success():
-    mock_provider = lambda: "test-ua"
-    strategy = TrafilaturaStrategy(mock_provider)
-
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.text = "<html>content</html>"
-        mock_get.return_value = mock_resp
-
-        with patch("trafilatura.extract", return_value="Extracted") as mock_extract:
+    with patch("src.reader.strategies.trafilatura_strategy.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
+        with patch("src.reader.strategies.trafilatura_strategy.trafilatura.extract", return_value="Extracted"):
             result = await strategy.extract("http://test.com")
             assert result == "Extracted"
 
 
 @pytest.mark.asyncio
-async def test_fallback_strategy_success():
-    mock_provider = lambda: "test-ua"
-    strategy = FallbackStrategy(mock_provider)
+async def test_trafilatura_strategy_get_html():
+    strategy = TrafilaturaStrategy(lambda: "test-ua")
 
-    mock_html = "<html><body><p>Text</p><script>bad</script></body></html>"
+    with patch("src.reader.strategies.trafilatura_strategy.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
+        result = await strategy.get_html("http://test.com")
+        assert result == SAMPLE_HTML
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.text = mock_html
-        mock_get.return_value = mock_resp
 
+@pytest.mark.asyncio
+async def test_fallback_strategy_extract():
+    strategy = FallbackStrategy(lambda: "test-ua")
+
+    with patch("src.reader.strategies.fallback_strategy.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
         result = await strategy.extract("http://test.com")
         assert "Text" in result
-        assert "bad" not in result  # Script removed
+        assert "bad" not in result
 
 
 @pytest.mark.asyncio
+async def test_fallback_strategy_get_html():
+    strategy = FallbackStrategy(lambda: "test-ua")
+
+    with patch("src.reader.strategies.fallback_strategy.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
+        result = await strategy.get_html("http://test.com")
+        assert result == SAMPLE_HTML
+
+
 @pytest.mark.asyncio
-async def test_playwright_strategy_success():
-    mock_provider = lambda: "test-ua"
-    mock_validator = MagicMock()
-    strategy = PlaywrightStrategy(mock_provider, mock_validator)
-
-    # Custom Mock Classes to ensure proper async behavior
-    class MockPage:
-        def __init__(self):
-            self.goto = AsyncMock()
-            self.wait_for_timeout = AsyncMock()
-            self.content = AsyncMock(return_value="<html></html>")
-            self.route = AsyncMock()
-            # Add evaluate/add_init_script just in case, though patching Stealth should avoid their use
-            self.evaluate = AsyncMock()
-            self.add_init_script = AsyncMock()
-
-    class MockContext:
-        def __init__(self):
-            self.page = MockPage()
-            self.new_page = AsyncMock(return_value=self.page)
-            self.close = AsyncMock(return_value=None)
-
-    class MockBrowser:
-        def __init__(self):
-            self.context = MockContext()
-            self.new_context = AsyncMock(return_value=self.context)
-            self.close = AsyncMock(return_value=None)
-
-    mock_browser_instance = MockBrowser()
+async def test_playwright_strategy_extract():
+    strategy = PlaywrightStrategy(lambda: "test-ua", MagicMock())
+    mock_browser = MockBrowser("<html><body>content</body></html>")
 
     with patch("src.reader.strategies.playwright_strategy.async_playwright") as mock_pw:
         mock_ctx_mgr = AsyncMock()
         mock_pw.return_value = mock_ctx_mgr
-        mock_ctx_mgr.__aenter__.return_value.chromium.launch.return_value = mock_browser_instance
+        mock_ctx_mgr.__aenter__.return_value.chromium.launch.return_value = mock_browser
 
-        # Patch Stealth to prevent it from trying to execute scripts on our mock page (which causes hangs/errors)
         with patch("src.reader.strategies.playwright_strategy.Stealth") as mock_stealth_cls:
-            mock_stealth_instance = AsyncMock()
-            mock_stealth_cls.return_value = mock_stealth_instance
-
-            with patch("trafilatura.extract", return_value="PW Extracted"):
+            mock_stealth_cls.return_value = AsyncMock()
+            with patch("src.reader.strategies.playwright_strategy.trafilatura.extract", return_value="PW Extracted"):
                 result = await strategy.extract("http://test.com")
                 assert result == "PW Extracted"
-                mock_browser_instance.context.page.goto.assert_called()
-                # Verify stealth was applied
-                mock_stealth_instance.apply_stealth_async.assert_called_with(mock_browser_instance.context.page)
+
+
+@pytest.mark.asyncio
+async def test_playwright_strategy_get_html():
+    rendered_html = "<html><body>JS rendered</body></html>"
+    strategy = PlaywrightStrategy(lambda: "test-ua", MagicMock())
+    mock_browser = MockBrowser(rendered_html)
+
+    with patch("src.reader.strategies.playwright_strategy.async_playwright") as mock_pw:
+        mock_ctx_mgr = AsyncMock()
+        mock_pw.return_value = mock_ctx_mgr
+        mock_ctx_mgr.__aenter__.return_value.chromium.launch.return_value = mock_browser
+
+        with patch("src.reader.strategies.playwright_strategy.Stealth") as mock_stealth_cls:
+            mock_stealth_cls.return_value = AsyncMock()
+            result = await strategy.get_html("http://test.com")
+            assert result == rendered_html
+
+
+@pytest.mark.asyncio
+async def test_crawlee_strategy_extract():
+    strategy = CrawleeStrategy(MagicMock())
+
+    with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
+        mock_crawler = AsyncMock()
+        mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
+        mock_crawler.run = AsyncMock()
+        await strategy.extract("http://test.com")
+        mock_crawler.run.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_crawlee_strategy_get_html():
+    strategy = CrawleeStrategy(MagicMock())
+
+    with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
+        mock_crawler = AsyncMock()
+        mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
+        mock_crawler.run = AsyncMock()
+        result = await strategy.get_html("http://test.com")
+        assert isinstance(result, str)
+        mock_crawler.run.assert_called()

@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 
 from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
+from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.fallback_strategy import FallbackStrategy
@@ -66,6 +67,17 @@ class WebReader:
 
         return self._create_failure_response(url)
 
+    async def read_with_links(self, url: str, link_filter: str | None = None) -> Dict[str, Any]:
+        logger.info(f"Reading URL with links: {url}")
+
+        for name, strategy in self.strategies.items():
+            html = await self._execute_html_strategy(name, strategy, url)
+            if html:
+                content, links = annotate_links(html, url, link_filter)
+                return {"content": content, "links": links, "status": "success"}
+
+        return self._create_failure_response(url)
+
     async def _execute_strategy(self, name: str, strategy: BaseStrategy, url: str) -> Optional[Dict[str, Any]]:
         try:
             content = await strategy.extract(url)
@@ -78,6 +90,16 @@ class WebReader:
         except Exception as e:
             logger.warning(f"Strategy {name} failed for {url}: {e}")
             return None
+
+    async def _execute_html_strategy(self, name: str, strategy: BaseStrategy, url: str) -> str:
+        try:
+            html = await strategy.get_html(url)
+            if html:
+                return html
+            logger.info(f"Strategy {name} returned empty HTML.")
+        except Exception as e:
+            logger.warning(f"Strategy {name} get_html failed for {url}: {e}")
+        return ""
 
     def _create_failure_response(self, url: str) -> Dict[str, Any]:
         return {"content": "", "status": "error", "error": f"All extraction methods failed for {url}"}

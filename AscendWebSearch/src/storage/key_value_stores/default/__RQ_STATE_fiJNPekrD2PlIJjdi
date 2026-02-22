@@ -1,0 +1,12 @@
+{
+  "sequence_counter": 1,
+  "forefront_sequence_counter": 0,
+  "forefront_requests": {},
+  "regular_requests": {
+    "https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes": 0
+  },
+  "in_progress_requests": [],
+  "handled_requests": [
+    "https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes"
+  ]
+}

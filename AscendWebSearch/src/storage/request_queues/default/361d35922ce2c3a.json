@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes",
+  "url": "https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": null,
+  "handled_at": "2026-02-21 19:27:57.905572+00:00"
+}

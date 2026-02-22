@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.linkedin.com/jobs/search?keywords=java+developer+salary&location=poland",
+  "url": "https://www.linkedin.com/jobs/search/?keywords=Java%20Developer%20salary&location=Poland",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": null,
+  "handled_at": "2026-02-21 21:33:23.021000+00:00"
+}

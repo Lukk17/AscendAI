@@ -43,10 +43,13 @@ class Settings(BaseSettings):
 
     MAX_REQUESTS_PER_CRAWL: int = Field(default=5, description="Max requests for adaptive crawler")
     DYNAMIC_CONTENT_WAIT: int = Field(default=2000, description="Wait time in ms for dynamic content to load")
+    SCROLL_ITERATIONS: int = Field(default=5,
+                                   description="Number of scroll steps to trigger infinite-scroll content loading")
+    SCROLL_STEP_PX: int = Field(default=1500, description="Pixels to scroll per step when loading dynamic content")
 
     # Validation Thresholds
     MIN_FLESCH_SCORE: float = Field(default=20.0, description="Minimum Flesch reading ease score")
-    MIN_TTR: float = Field(default=0.2, description="Minimum Type-Token Ratio for repetition check")
+    MIN_TTR: float = Field(default=0.1, description="Minimum Type-Token Ratio for repetition check")
     ERROR_KEYWORDS: list[str] = Field(
         default=["Access Denied", "403 Forbidden", "Captcha", "Security Check", "Enable JavaScript"],
         description="Keywords indicating extraction failure"

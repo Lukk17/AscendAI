@@ -15,6 +15,11 @@ class PlaywrightStrategy(BaseStrategy):
         self.url_validator = url_validator
 
     async def extract(self, url: str) -> str:
+        html = await self.get_html(url)
+        extracted = trafilatura.extract(html)
+        return extracted if extracted else ""
+
+    async def get_html(self, url: str) -> str:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await self._create_stealth_context(browser)
@@ -23,14 +28,10 @@ class PlaywrightStrategy(BaseStrategy):
             await self._apply_protections(page)
 
             try:
-                # Convert seconds to milliseconds for Playwright
                 timeout_ms = settings.EXTRACT_TIMEOUT * 1000
-                await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+                await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
                 await page.wait_for_timeout(settings.DYNAMIC_CONTENT_WAIT)
-
-                content = await page.content()
-                extracted = trafilatura.extract(content)
-                return extracted if extracted else ""
+                return await page.content()
             finally:
                 await context.close()
                 await browser.close()
