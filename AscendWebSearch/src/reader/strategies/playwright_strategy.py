@@ -21,7 +21,7 @@ class PlaywrightStrategy(BaseStrategy):
 
     async def get_html(self, url: str) -> str:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(headless=False)
             context = await self._create_stealth_context(browser)
             page = await context.new_page()
 

@@ -20,6 +20,7 @@ class CrawleeStrategy(BaseStrategy):
 
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
             max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
+            browser_pool_options={"headless": False}
         )
 
         @crawler.router.default_handler

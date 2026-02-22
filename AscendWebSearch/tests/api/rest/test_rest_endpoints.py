@@ -37,7 +37,7 @@ async def test_search_get_empty(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_read_get_success(client: AsyncClient):
     # given
-    mock_content = "Extracted unit"
+    mock_content = {"content": "Extracted unit", "status": "success", "method": "test"}
 
     # when
     with patch("src.api.rest.rest_endpoints.web_reader.read", new_callable=AsyncMock) as mock_read:

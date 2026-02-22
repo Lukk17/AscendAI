@@ -36,5 +36,5 @@ async def test_read_endpoint(client: AsyncClient):
         resp = await client.get("/api/v1/web/read", params={"url": "http://test.com"})
 
         assert resp.status_code == 200
-        # User changed response structure to {"url": ..., "content": ...}
-        assert resp.json()["content"] == mock_res
+        assert resp.json()["content"] == mock_res["content"]
+        assert resp.json()["url"] == "http://test.com"

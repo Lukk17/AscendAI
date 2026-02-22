@@ -29,6 +29,7 @@ async def web_read(
 ) -> Union[Dict[str, Any], str]:
     """
     Read (scrape) the content of a web page.
+    IMPORTANT: If the status returned is `captcha_required`, display the `vnc_url` to the user and ask them to open it in their browser to manually solve the Captcha.
     Args:
         url: The URL to read.
         include_links: When True, returns annotated content with inline [N] link markers

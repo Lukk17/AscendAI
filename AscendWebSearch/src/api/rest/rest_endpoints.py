@@ -19,7 +19,22 @@ def search(query: str, limit: int = 5):
     return results
 
 
-@rest_router.get("/read")
+@rest_router.get("/read", responses={
+    200: {
+        "description": "Successful extraction or Captcha required",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "success": {"value": {"url": "https://example.com", "content": "Text...", "status": "success",
+                                          "method": "1-fallback_beautifulsoup"}},
+                    "captcha": {"value": {"url": "https://example.com", "status": "captcha_required",
+                                          "vnc_url": "http://localhost:7900",
+                                          "message": "Manual Captcha resolution required. Please visit: http://localhost:7900"}}
+                }
+            }
+        }
+    }
+})
 async def read_url(url: str, include_links: bool = False, link_filter: str | None = None):
     """
     Extract content from a URL.
@@ -35,7 +50,7 @@ async def read_url(url: str, include_links: bool = False, link_filter: str | Non
 
     if include_links:
         result = await web_reader.read_with_links(url, link_filter)
-        return {"url": url, **result}
+    else:
+        result = await web_reader.read(url)
 
-    content = await web_reader.read(url)
-    return {"url": url, "content": content}
+    return {"url": url, **result}

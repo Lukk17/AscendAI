@@ -49,7 +49,7 @@ def _make_httpx_mock(html: str):
 async def test_trafilatura_strategy_extract():
     strategy = TrafilaturaStrategy(lambda: "test-ua")
 
-    with patch("src.reader.strategies.trafilatura_strategy.httpx.AsyncClient") as mock_cls:
+    with patch("src.reader.strategies.trafilatura_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
         with patch("src.reader.strategies.trafilatura_strategy.trafilatura.extract", return_value="Extracted"):
             result = await strategy.extract("http://test.com")
@@ -60,7 +60,7 @@ async def test_trafilatura_strategy_extract():
 async def test_trafilatura_strategy_get_html():
     strategy = TrafilaturaStrategy(lambda: "test-ua")
 
-    with patch("src.reader.strategies.trafilatura_strategy.httpx.AsyncClient") as mock_cls:
+    with patch("src.reader.strategies.trafilatura_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
         result = await strategy.get_html("http://test.com")
         assert result == SAMPLE_HTML
@@ -70,7 +70,7 @@ async def test_trafilatura_strategy_get_html():
 async def test_fallback_strategy_extract():
     strategy = FallbackStrategy(lambda: "test-ua")
 
-    with patch("src.reader.strategies.fallback_strategy.httpx.AsyncClient") as mock_cls:
+    with patch("src.reader.strategies.fallback_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
         result = await strategy.extract("http://test.com")
         assert "Text" in result
@@ -81,7 +81,7 @@ async def test_fallback_strategy_extract():
 async def test_fallback_strategy_get_html():
     strategy = FallbackStrategy(lambda: "test-ua")
 
-    with patch("src.reader.strategies.fallback_strategy.httpx.AsyncClient") as mock_cls:
+    with patch("src.reader.strategies.fallback_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
         result = await strategy.get_html("http://test.com")
         assert result == SAMPLE_HTML

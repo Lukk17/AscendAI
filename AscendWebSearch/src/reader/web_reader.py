@@ -4,12 +4,15 @@ import random
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+from src.api.exceptions import CaptchaRequiredException
 from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
 from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.fallback_strategy import FallbackStrategy
+from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
+from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
 from src.validator.content_validator import ContentValidator
@@ -34,10 +37,12 @@ class WebReader:
         self.url_validator = URLValidator(rules)
 
         self.strategies: Dict[str, BaseStrategy] = {
-            "1-trafilatura": TrafilaturaStrategy(self._get_random_user_agent),
-            "2-playwright_stealth": PlaywrightStrategy(self._get_random_user_agent, self.url_validator),
-            "3-crawlee_adaptive": CrawleeStrategy(self.url_validator),
-            "4-fallback_beautifulsoup": FallbackStrategy(self._get_random_user_agent)
+            "1-fallback_beautifulsoup": FallbackStrategy(self._get_random_user_agent),
+            "2-trafilatura": TrafilaturaStrategy(self._get_random_user_agent),
+            "3-flaresolverr": FlareSolverrStrategy(),
+            "4-playwright_stealth": PlaywrightStrategy(self._get_random_user_agent, self.url_validator),
+            "5-crawlee_adaptive": CrawleeStrategy(self.url_validator),
+            "6-novnc": NoVNCStrategy()
         }
 
     def _load_user_agents(self) -> List[str]:
@@ -60,21 +65,27 @@ class WebReader:
     async def read(self, url: str) -> Dict[str, Any]:
         logger.info(f"Reading URL: {url}")
 
-        for name, strategy in self.strategies.items():
-            result = await self._execute_strategy(name, strategy, url)
-            if result:
-                return result
+        try:
+            for name, strategy in self.strategies.items():
+                result = await self._execute_strategy(name, strategy, url)
+                if result:
+                    return result
+        except CaptchaRequiredException as e:
+            return {"status": "captcha_required", "vnc_url": e.vnc_url, "message": e.message}
 
         return self._create_failure_response(url)
 
     async def read_with_links(self, url: str, link_filter: str | None = None) -> Dict[str, Any]:
         logger.info(f"Reading URL with links: {url}")
 
-        for name, strategy in self.strategies.items():
-            html = await self._execute_html_strategy(name, strategy, url)
-            if html:
-                content, links = annotate_links(html, url, link_filter)
-                return {"content": content, "links": links, "status": "success"}
+        try:
+            for name, strategy in self.strategies.items():
+                html = await self._execute_html_strategy(name, strategy, url)
+                if html:
+                    content, links = annotate_links(html, url, link_filter)
+                    return {"content": content, "links": links, "status": "success"}
+        except CaptchaRequiredException as e:
+            return {"status": "captcha_required", "vnc_url": e.vnc_url, "message": e.message}
 
         return self._create_failure_response(url)
 
@@ -86,7 +97,8 @@ class WebReader:
 
             logger.info(f"Strategy {name} validation failed.")
             return None
-
+        except CaptchaRequiredException:
+            raise
         except Exception as e:
             logger.warning(f"Strategy {name} failed for {url}: {e}")
             return None
@@ -97,6 +109,8 @@ class WebReader:
             if html:
                 return html
             logger.info(f"Strategy {name} returned empty HTML.")
+        except CaptchaRequiredException:
+            raise
         except Exception as e:
             logger.warning(f"Strategy {name} get_html failed for {url}: {e}")
         return ""

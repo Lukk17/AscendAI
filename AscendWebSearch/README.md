@@ -295,10 +295,12 @@ curl -X POST http://localhost:7021/mcp `
 
 ## How it Works (Extraction Strategy)
 
-The `web_read` tool uses a smart fallback strategy to ensure high success rates while maintaining speed:
+The `web_read` tool uses a multi-tiered smart cascade strategy to bypass Web Application Firewalls (WAFs) like Cloudflare, ensuring maximum success rates:
 
-1.  **Fast Path**: Attempts to fetch the URL using standard HTTP GET and extract content with `trafilatura`. This is fast and resource-efficient.
-2.  **Render Path**: If the fast path fails (e.g., 403 Forbidden, 429 Too Many Requests, or empty content due to JavaScript), it switches to **Playwright**. It launches a headless Chromium browser, renders the page (executing JS), and then extracts the content.
+1.  **Fast Path (`curl_cffi`)**: Attempts to fetch the URL using HTTP GET via `curl_cffi` (mimicking a Chrome 120 TLS fingerprint) and extracts content with `trafilatura` or `BeautifulSoup`. This is fast, resource-efficient, and bypasses basic blocks.
+2.  **Automated WAF Solver (`FlareSolverr`)**: If Cloudflare blocks the fast path, the request is sent to a dedicated FlareSolverr container that automatically resolves JavaScript challenges and caches the clearance cookies for future requests.
+3.  **Render Path (`Playwright` & `Crawlee`)**: For complex dynamic sites that require rendering (but aren't actively blocking), it uses `undetected-playwright` running with `headless=False` to mimic human behavior and render the DOM.
+4.  **Human Fallback (`NoVNC`)**: If all automated methods fail to bypass an advanced Captcha, it triggers a remote Playwright session to the target site and returns a `captcha_required` status with a VNC URL. The orchestrator can present this URL to the user, allowing them to solve the captcha visually in their own browser before the system automatically resumes extraction.
 
 ---
 

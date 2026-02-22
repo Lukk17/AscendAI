@@ -9,7 +9,7 @@ from src.reader.web_reader import WebReader
 async def test_web_reader_success_first_strategy():
     mock_content = "Extracted Content"
 
-    with patch("src.reader.web_reader.TrafilaturaStrategy.extract", new_callable=AsyncMock) as mock_extract:
+    with patch("src.reader.web_reader.FallbackStrategy.extract", new_callable=AsyncMock) as mock_extract:
         mock_extract.return_value = mock_content
 
         with patch("src.reader.web_reader.ContentValidator.validate", return_value=True):
@@ -18,7 +18,7 @@ async def test_web_reader_success_first_strategy():
 
             assert result["status"] == "success"
             assert result["content"] == mock_content
-            assert "1-trafilatura" in result["method"]
+            assert "1-fallback" in result["method"]
 
 
 @pytest.mark.asyncio
@@ -36,7 +36,7 @@ async def test_web_reader_all_strategies_fail():
 async def test_web_reader_read_with_links_uses_strategy_chain():
     raw_html = "<html><body><a href='https://example.com/job1'>Job One</a></body></html>"
 
-    with patch("src.reader.web_reader.TrafilaturaStrategy.get_html", new_callable=AsyncMock) as mock_get_html:
+    with patch("src.reader.web_reader.FallbackStrategy.get_html", new_callable=AsyncMock) as mock_get_html:
         mock_get_html.return_value = raw_html
 
         reader = WebReader()
@@ -58,7 +58,7 @@ async def test_web_reader_read_with_links_and_filter():
     </body></html>
     """
 
-    with patch("src.reader.web_reader.TrafilaturaStrategy.get_html", new_callable=AsyncMock) as mock_get_html:
+    with patch("src.reader.web_reader.FallbackStrategy.get_html", new_callable=AsyncMock) as mock_get_html:
         mock_get_html.return_value = raw_html
 
         reader = WebReader()
@@ -72,10 +72,10 @@ async def test_web_reader_read_with_links_and_filter():
 async def test_web_reader_read_with_links_escalates_on_empty_html():
     raw_html = "<html><body><a href='https://example.com/job1'>Job</a></body></html>"
 
-    with patch("src.reader.web_reader.TrafilaturaStrategy.get_html", new_callable=AsyncMock) as mock_first:
+    with patch("src.reader.web_reader.FallbackStrategy.get_html", new_callable=AsyncMock) as mock_first:
         mock_first.return_value = ""
 
-        with patch("src.reader.web_reader.PlaywrightStrategy.get_html", new_callable=AsyncMock) as mock_second:
+        with patch("src.reader.web_reader.TrafilaturaStrategy.get_html", new_callable=AsyncMock) as mock_second:
             mock_second.return_value = raw_html
 
             reader = WebReader()

@@ -97,5 +97,25 @@ MCP-Protocol-Version: {{mcp_protocol_version}}
   }
 }
 
+###
+# @name web_read_captcha_example
+POST http://localhost:7021/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "tools/call",
+  "params": {
+    "name": "web_read",
+    "arguments": {
+      "url": "https://nowsecure.nl"
+    }
+  }
+}
+
 ### Helper: Health Check
 GET http://localhost:7021/health

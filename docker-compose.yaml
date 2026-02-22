@@ -110,6 +110,35 @@ services:
         aliases:
           - ascend-memory
 
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.4.6
+    container_name: flaresolverr
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=UTC
+    networks:
+      default:
+        aliases:
+          - flaresolverr
+
+  selenium-browser:
+    image: selenium/standalone-chromium:4.15.0-20231123
+    container_name: selenium-browser
+    restart: unless-stopped
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    shm_size: 2g
+    networks:
+      default:
+        aliases:
+          - selenium-browser
+
   ascend-web-search:
     build:
       context: ./AscendWebSearch
@@ -129,8 +158,14 @@ services:
       - SEARXNG_X_FORWARDED_FOR=0.0.0.0
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
       - VALIDATION_MIN_WORDS=200
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      - SELENIUM_BROWSER_CDP_URL=http://selenium-browser:4444
+      - SELENIUM_BROWSER_VNC_URL=http://localhost:7900
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - searxng
+      - flaresolverr
+      - selenium-browser
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
       interval: 30s
