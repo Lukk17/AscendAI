@@ -3,16 +3,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
-from src.reader.strategies.fallback_strategy import FallbackStrategy
+from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
 
 SAMPLE_HTML = "<html><body><p>Text</p><script>bad</script></body></html>"
 
 
+class MockResponse:
+    def __init__(self):
+        self.status = 200
+
+
 class MockPage:
     def __init__(self, html: str = "<html></html>"):
-        self.goto = AsyncMock()
+        self.url = "http://test.com"
+        self.goto = AsyncMock(return_value=MockResponse())
         self.wait_for_timeout = AsyncMock()
         self.content = AsyncMock(return_value=html)
         self.route = AsyncMock()
@@ -67,10 +73,10 @@ async def test_trafilatura_strategy_get_html():
 
 
 @pytest.mark.asyncio
-async def test_fallback_strategy_extract():
-    strategy = FallbackStrategy(lambda: "test-ua")
+async def test_beautifulsoup_strategy_extract():
+    strategy = BeautifulSoupStrategy(lambda: "test-ua")
 
-    with patch("src.reader.strategies.fallback_strategy.requests.AsyncSession") as mock_cls:
+    with patch("src.reader.strategies.beautifulsoup_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
         result = await strategy.extract("http://test.com")
         assert "Text" in result
@@ -78,10 +84,10 @@ async def test_fallback_strategy_extract():
 
 
 @pytest.mark.asyncio
-async def test_fallback_strategy_get_html():
-    strategy = FallbackStrategy(lambda: "test-ua")
+async def test_beautifulsoup_strategy_get_html():
+    strategy = BeautifulSoupStrategy(lambda: "test-ua")
 
-    with patch("src.reader.strategies.fallback_strategy.requests.AsyncSession") as mock_cls:
+    with patch("src.reader.strategies.beautifulsoup_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
         result = await strategy.get_html("http://test.com")
         assert result == SAMPLE_HTML

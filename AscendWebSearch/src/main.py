@@ -12,7 +12,7 @@ from fastapi import FastAPI
 
 from src.api.exception_handlers import httpx_exception_handler, global_exception_handler
 from src.api.mcp.mcp_server import mcp
-from src.api.rest.rest_endpoints import rest_router
+from src.api.rest.rest_endpoints import rest_router, rest_router_v2
 from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
 from src.config.logging_config import setup_logging, get_uvicorn_log_config
@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, global_exception_handler)
 
     app.include_router(rest_router)
+    app.include_router(rest_router_v2)
 
     @app.get("/health")
     def health_check():

@@ -58,10 +58,12 @@ class Settings(BaseSettings):
 
     # Cloudflare Bypass / External Services
     FLARESOLVERR_URL: str = Field(default="http://localhost:8191/v1", description="URL for FlareSolverr instance")
-    SELENIUM_BROWSER_CDP_URL: str = Field(default="http://localhost:4444", description="CDP URL for remote browser")
+    SELENIUM_BROWSER_CDP_URL: str = Field(default="ws://localhost:4444/playwright", description="CDP URL for remote browser")
     SELENIUM_BROWSER_VNC_URL: str = Field(default="http://localhost:7900",
                                           description="VNC URL for manual captcha solve")
+    PUBLIC_VNC_URL: str = Field(default="http://localhost:7900", description="Public Internet-facing VNC URL (can be Ngrok api string)")
     REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL for cookie storage")
+
 
 
 settings = Settings()

@@ -41,11 +41,11 @@ async def test_flaresolverr_strategy_success():
         with patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession") as mock_session_cls:
             mock_session_cls.return_value = mock_session
             with patch("src.reader.strategies.flaresolverr_strategy.cookie_manager") as mock_cookie_mgr:
-                mock_cookie_mgr.save_clearance_data = AsyncMock()
+                mock_cookie_mgr.save_session_data = AsyncMock()
 
                 # Mock trafilatura as well
                 with patch("src.reader.strategies.flaresolverr_strategy.trafilatura.extract", return_value="Cleared"):
                     result = await strategy.extract("http://test.com")
 
                     assert result == "Cleared"
-                    mock_cookie_mgr.save_clearance_data.assert_called_once()
+                    mock_cookie_mgr.save_session_data.assert_called_once()

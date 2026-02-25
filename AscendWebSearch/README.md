@@ -30,6 +30,7 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
 *   **Python 3.12**
 *   **SearXNG Instance** (Running on port 8080 or accessible via URL)
 *   **Playwright Browsers** (If running locally)
+*   **Ngrok Auth Token** (For remote CAPTCHA solving. Get free from dashboard.ngrok.com and set as a system environment variable `NGROK_AUTHTOKEN`)
 
 ---
 
@@ -39,6 +40,7 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
 *   `API_PORT`: **(Optional)** Port to run the server on. Default: `7021`.
 *   `API_HOST`: **(Optional)** Host to bind to. Default: `0.0.0.0`.
 *   `LOG_LEVEL`: **(Optional)** Logging level. Default: `INFO`.
+*   `NGROK_AUTHTOKEN`: **(Required for remote VNC)** Token required by the Ngrok docker container. Set this directly in your Windows/Linux environment variables. Docker Compose will automatically detect and pass it to the container.
 
 ---
 
@@ -300,7 +302,54 @@ The `web_read` tool uses a multi-tiered smart cascade strategy to bypass Web App
 1.  **Fast Path (`curl_cffi`)**: Attempts to fetch the URL using HTTP GET via `curl_cffi` (mimicking a Chrome 120 TLS fingerprint) and extracts content with `trafilatura` or `BeautifulSoup`. This is fast, resource-efficient, and bypasses basic blocks.
 2.  **Automated WAF Solver (`FlareSolverr`)**: If Cloudflare blocks the fast path, the request is sent to a dedicated FlareSolverr container that automatically resolves JavaScript challenges and caches the clearance cookies for future requests.
 3.  **Render Path (`Playwright` & `Crawlee`)**: For complex dynamic sites that require rendering (but aren't actively blocking), it uses `undetected-playwright` running with `headless=False` to mimic human behavior and render the DOM.
-4.  **Human Fallback (`NoVNC`)**: If all automated methods fail to bypass an advanced Captcha, it triggers a remote Playwright session to the target site and returns a `captcha_required` status with a VNC URL. The orchestrator can present this URL to the user, allowing them to solve the captcha visually in their own browser before the system automatically resumes extraction.
+4.  **Human Fallback & Login Auth (`NoVNC`)**: If all automated methods fail to bypass an advanced Captcha, or the requested page requires a manual Account Login, the `ChallengeDetector` triggers a remote Playwright session to the target site. This returns a `human_intervention_required` status with a VNC URL and an `intervention_type` (e.g. `login` or `captcha`). The Ascend orchestrator can present this URL to the user, allowing them to log in or solve the captcha visually in their own browser before the system automatically captures the authenticated session and resumes extraction.
+
+### Remote Human Intervention (Ngrok Flow)
+
+To allow you to solve CAPTCHAs or Logins from anywhere (e.g., your smartphone) without needing an SSH tunnel to your server, AscendWebSearch implements an automated Ngrok integration within the Docker Compose network.
+
+1. **The Dynamic URL Problem:** When the `ngrok` container launches, it assigns a random public domain (e.g. `https://xyz.ngrok.app`). Since this changes every restart, the URL cannot be statically hardcoded.
+2. **The API Solution:** During initialization, AscendWebSearch sets `PUBLIC_VNC_URL=http://ngrok:4040/api/tunnels`. When a CAPTCHA triggers, the Python code calls this local diagnostic API on the Ngrok container. It extracts the *active* public URL dynamically.
+3. **The Result:** The system appends `?autoconnect=true` to the extracted URL and returns it to your Orchestrator chat payload. You tap the link, bypass the VNC login screen, solve the CAPTCHA, and the background task continues.
+
+```mermaid
+sequenceDiagram
+    participant User (Phone)
+    participant Orchestrator
+    participant API (AscendWebSearch)
+    participant Ngrok
+    participant Selenium (NoVNC)
+    participant Target Website
+
+    User (Phone)->>Orchestrator: Scrape requested (e.g. Indeed.com)
+    Orchestrator->>API: GET /api/v1/web/read
+    API->>Target Website: Fetch HTML
+    Target Website-->>API: 403 Forbidden (Cloudflare CAPTCHA)
+    
+    Note over API: Detects challenge
+    
+    API->>Ngrok: GET http://ngrok:4040/api/tunnels
+    Ngrok-->>API: Returns active public URL (e.g., https://xyz.ngrok.app)
+    
+    API-->>Orchestrator: {status: human_intervention_required, vnc_url: https://xyz.ngrok.app/vnc.html?autoconnect=true}
+    Orchestrator-->>User (Phone): Passes link to User in Chat
+    
+    Note over User (Phone),Selenium (NoVNC): User taps link on phone
+    
+    User (Phone)->>Selenium (NoVNC): Connects instantly (No password, autoconnect bypass)
+    User (Phone)->>Target Website: Taps CAPTCHA checkbox on screen via VNC
+    Target Website-->>Selenium (NoVNC): Grants cf_clearance cookie
+    Selenium (NoVNC)-->>API: Background task captures session
+    
+    Note over API: Saves session to Redis
+    
+    API->>Orchestrator: Extraction resumed successfully
+```
+
+### Session Persistence (Redis)
+All authenticated sessions, clearance tokens, and captchas solved by the `NoVNC` fallback or `FlareSolverr` are permanently stored within the shared `redis` Docker cache container. This architectural decision ensures that:
+*   **Persistent Auth:** Authenticated sessions outlive `ascend-web-search` API container restarts and deployments.
+*   **Distributed Scaling:** Prevents "split-brain" caching in multi-worker environments. Any of the `N` FastAPI workers can instantly access the shared tokens, fully preventing the system from repeatedly prompting users for manual logins.
 
 ---
 

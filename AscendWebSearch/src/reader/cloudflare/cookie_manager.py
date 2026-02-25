@@ -42,7 +42,7 @@ class CookieManager:
         domain = parsed.netloc if parsed.netloc else parsed.path.split('/')[0]
         return domain.lower()
 
-    async def get_clearance_data(self, url: str) -> Optional[Dict[str, Any]]:
+    async def get_session_data(self, url: str) -> Optional[Dict[str, Any]]:
         """
         Returns a dict containing 'cookies' (dict) and 'user_agent' (str) if available.
         """
@@ -50,18 +50,18 @@ class CookieManager:
 
         if self.redis_client:
             try:
-                data = await self.redis_client.get(f"cf_clearance:{domain}")
+                data = await self.redis_client.get(f"session_cookies:{domain}")
                 if data:
                     return json.loads(data)
             except Exception as e:
-                self._handle_error("Failed to get clearance data from Redis", e)
+                self._handle_error("Failed to get session data from Redis", e)
 
         return self._memory_store.get(domain)
 
-    async def save_clearance_data(self, url: str, cookies: Dict[str, str], user_agent: str,
+    async def save_session_data(self, url: str, cookies: Dict[str, str], user_agent: str,
                                   ttl_seconds: int = 7200) -> None:
         """
-        Saves clearance cookies and the exact User-Agent used to acquire them.
+        Saves session cookies and the exact User-Agent used to acquire them.
         """
         domain = self._get_domain(url)
         payload = {
@@ -72,17 +72,17 @@ class CookieManager:
         if self.redis_client:
             try:
                 await self.redis_client.setex(
-                    f"cf_clearance:{domain}",
+                    f"session_cookies:{domain}",
                     ttl_seconds,
                     json.dumps(payload)
                 )
-                logger.info(f"Saved clearance data to Redis for {domain}")
+                logger.info(f"Saved session data to Redis for {domain}")
                 return
             except Exception as e:
-                self._handle_error("Failed to save clearance data to Redis", e)
+                self._handle_error("Failed to save session data to Redis", e)
 
         self._memory_store[domain] = payload
-        logger.info(f"Saved clearance data to memory for {domain}")
+        logger.info(f"Saved session data to memory for {domain}")
 
 
 cookie_manager = CookieManager()

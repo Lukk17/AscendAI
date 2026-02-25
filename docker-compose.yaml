@@ -126,23 +126,43 @@ services:
         aliases:
           - flaresolverr
 
-  selenium-browser:
-    image: selenium/standalone-chromium:4.15.0-20231123
-    container_name: selenium-browser
+  # selenium-browser:
+  #   image: selenium/standalone-chromium:144.0
+  #   container_name: selenium-browser
+  #   restart: unless-stopped
+  #   ports:
+  #     - "4444:4444"
+  #     - "7900:7900"
+  #   environment:
+  #     - SE_VNC_NO_PASSWORD=1
+  #     - SE_SCREEN_WIDTH=1920
+  #     - SE_SCREEN_HEIGHT=1080
+  #     - SE_NODE_GRID_URL=http://selenium-browser:4444
+  #   shm_size: 2g
+  #   networks:
+  #     default:
+  #       aliases:
+  #         - selenium-browser
+
+  ngrok-ascend-web-search:
+    image: ngrok/ngrok:3
+    container_name: ngrok-ascend-web-search
     restart: unless-stopped
-    ports:
-      - "4444:4444"
-      - "7900:7900"
-    shm_size: 2g
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: "http ascend-web-search:7900"
+    depends_on:
+      - ascend-web-search
     networks:
       default:
         aliases:
-          - selenium-browser
+          - ngrok-ascend-web-search
 
   ascend-web-search:
     build:
       context: ./AscendWebSearch
       dockerfile: Dockerfile
+    # image: lukk17/ascend-web-search:latest
     container_name: ascend-web-search
     restart: unless-stopped
     ports:
@@ -159,13 +179,14 @@ services:
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
       - VALIDATION_MIN_WORDS=200
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
-      - SELENIUM_BROWSER_CDP_URL=http://selenium-browser:4444
-      - SELENIUM_BROWSER_VNC_URL=http://localhost:7900
+      - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
       - REDIS_URL=redis://redis:6379/0
+    cap_add:
+      - SYS_ADMIN
+    shm_size: "2gb"
     depends_on:
       - searxng
       - flaresolverr
-      - selenium-browser
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
       interval: 30s

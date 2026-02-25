@@ -58,6 +58,23 @@ The application will automatically:
 
 ---
 
+## 🌐 HTTP Orchestrator API
+
+### 1. Extract Web Payload (`v2`)
+The `/api/v2/web/read` endpoint accepts a `POST` request with an explicit JSON payload. This is required because complex target URLs containing parameters (e.g., `?login=true&auth=1`) get natively stripped by standard HTTP `GET` query parsing. 
+
+```bash
+curl -X POST http://localhost:7021/api/v2/web/read \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://secure.indeed.com/auth?continue=http://www.indeed.com/jobs...&from=page-two-signin",
+    "include_links": true,
+    "heavy_mode": true
+  }'
+```
+
+---
+
 ## ⚙️ Configuration & Ports
 
 | Service | Port | Default Credentials | Description |

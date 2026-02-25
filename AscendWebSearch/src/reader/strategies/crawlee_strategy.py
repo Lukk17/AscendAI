@@ -1,9 +1,17 @@
-import trafilatura
+from typing import Any
 from crawlee.crawlers import AdaptivePlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.browsers import PlaywrightBrowserPlugin
 
 from src.config.config import settings
+from src.api.exceptions import ChallengeDetectedException
+from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.validator.url_validator import URLValidator
+
+import logging
+import trafilatura
+
+logger = logging.getLogger(__name__)
 
 
 class CrawleeStrategy(BaseStrategy):
@@ -20,7 +28,16 @@ class CrawleeStrategy(BaseStrategy):
 
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
             max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
-            browser_pool_options={"headless": False}
+            playwright_crawler_specific_kwargs={
+                "headless": False,
+                "browser_launch_options": {"chromium_sandbox": False},
+                "browser_context_options": {
+                    "locale": "en-US",
+                    "timezone_id": "America/New_York",
+                    "geolocation": {"latitude": 37.7749, "longitude": -122.4194},
+                    "permissions": ["geolocation"]
+                }
+            }
         )
 
         @crawler.router.default_handler
@@ -32,9 +49,19 @@ class CrawleeStrategy(BaseStrategy):
             await context.page.route("**/*", self.url_validator.route_handler)
 
         await crawler.run([url])
-        return result_container["html"]
+        html = result_container.get("html", "")
+        
+        if ChallengeDetector.is_login_required(url, html):
+            logger.warning(f"CrawleeStrategy: Login wall detected on {url}")
+            raise ChallengeDetectedException(intervention_type="login")
+            
+        if ChallengeDetector.is_blocked(200, html):
+            logger.warning(f"CrawleeStrategy: WAF/Cloudflare block detected on {url}")
+            raise ChallengeDetectedException(intervention_type="captcha")
+            
+        return html
 
-    async def _handle_crawlee_request(self, context, result_container: dict[str, str]) -> None:
+    async def _handle_crawlee_request(self, context: Any, result_container: dict[str, str]) -> None:
         if isinstance(context, PlaywrightCrawlingContext):
             result_container["html"] = await context.page.content()
         elif hasattr(context, 'soup'):

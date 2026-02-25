@@ -26,17 +26,19 @@ async def web_read(
         url: str,
         include_links: bool = False,
         link_filter: str | None = None,
+        heavy_mode: bool = False,
 ) -> Union[Dict[str, Any], str]:
     """
     Read (scrape) the content of a web page.
-    IMPORTANT: If the status returned is `captcha_required`, display the `vnc_url` to the user and ask them to open it in their browser to manually solve the Captcha.
+    IMPORTANT: If the status returned is `human_intervention_required`, display the `vnc_url` to the user and ask them to open it in their browser to manually solve the Captcha or log into the required account.
     Args:
         url: The URL to read.
         include_links: When True, returns annotated content with inline [N] link markers
                        and a numbered link map {1: url, 2: url, ...}.
         link_filter: Optional URL substring — when set, only links whose href contains
                      this string are included in the link map (e.g. '/job-offer/').
+        heavy_mode: If True, skips lightweight strategies and jumps straight to advanced browser strategies.
     """
     if include_links:
-        return await web_reader.read_with_links(url, link_filter)
-    return await web_reader.read(url)
+        return await web_reader.read_with_links(url, link_filter, heavy_mode=heavy_mode)
+    return await web_reader.read(url, heavy_mode=heavy_mode)

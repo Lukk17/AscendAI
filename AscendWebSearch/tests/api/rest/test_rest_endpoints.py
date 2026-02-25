@@ -57,3 +57,18 @@ async def test_read_get_missing_url(client: AsyncClient):
 
     # then
     assert resp.status_code == 422  # FastAPI validation error for required param
+
+
+@pytest.mark.asyncio
+async def test_read_get_heavy_mode(client: AsyncClient):
+    # given
+    mock_content = {"content": "Extracted unit heavy", "status": "success", "method": "test"}
+
+    # when
+    with patch("src.api.rest.rest_endpoints.web_reader.read", new_callable=AsyncMock) as mock_read:
+        mock_read.return_value = mock_content
+        resp = await client.get("/api/v1/web/read", params={"url": "http://unit.com", "heavy_mode": "true"})
+
+        # then
+        assert resp.status_code == 200
+        mock_read.assert_called_once_with("http://unit.com", heavy_mode=True)

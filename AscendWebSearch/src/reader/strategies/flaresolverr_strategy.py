@@ -4,6 +4,8 @@ import trafilatura
 from curl_cffi import requests
 
 from src.config.config import settings
+from src.api.exceptions import ChallengeDetectedException
+from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.strategies.base_strategy import BaseStrategy
 
@@ -51,7 +53,15 @@ class FlareSolverrStrategy(BaseStrategy):
                     cookie_dict = {c.get("name"): c.get("value") for c in cookies_list if "name" in c and "value" in c}
 
                     if "cf_clearance" in cookie_dict:
-                        await cookie_manager.save_clearance_data(url, cookie_dict, user_agent)
+                        await cookie_manager.save_session_data(url, cookie_dict, user_agent)
+
+                    if ChallengeDetector.is_login_required(url, html):
+                        logger.warning(f"FlareSolverrStrategy: Login wall detected on {url}")
+                        raise ChallengeDetectedException(intervention_type="login")
+
+                    if ChallengeDetector.is_blocked(200, html):
+                        logger.warning(f"FlareSolverrStrategy: WAF/Cloudflare block detected on {url}")
+                        return ""
 
                     return html
                 else:

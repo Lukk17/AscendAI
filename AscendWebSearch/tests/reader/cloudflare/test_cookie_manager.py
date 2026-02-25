@@ -15,15 +15,15 @@ def clean_cookie_manager():
 
 
 @pytest.mark.asyncio
-async def test_cookie_manager_memory_fallback(clean_cookie_manager):
+async def test_cookie_manager_memory_beautifulsoup(clean_cookie_manager):
     clean_cookie_manager.redis_client = None
 
     url = "https://example.com/path"
     cookies = {"cf_clearance": "abc1234"}
     user_agent = "Mozilla/5.0"
 
-    await clean_cookie_manager.save_clearance_data(url, cookies, user_agent)
-    data = await clean_cookie_manager.get_clearance_data("https://example.com/other")
+    await clean_cookie_manager.save_session_data(url, cookies, user_agent)
+    data = await clean_cookie_manager.get_session_data("https://example.com/other")
 
     assert data is not None
     assert data["cookies"]["cf_clearance"] == "abc1234"
@@ -39,13 +39,13 @@ async def test_cookie_manager_redis_success(clean_cookie_manager):
     mock_redis = AsyncMock()
     clean_cookie_manager.redis_client = mock_redis
 
-    await clean_cookie_manager.save_clearance_data(url, cookies, user_agent)
+    await clean_cookie_manager.save_session_data(url, cookies, user_agent)
     mock_redis.setex.assert_called_once()
 
     # Mock retrieval
     mock_redis.get.return_value = '{"cookies": {"cf_clearance": "abc1234"}, "user_agent": "Mozilla/5.0"}'
 
-    data = await clean_cookie_manager.get_clearance_data(url)
+    data = await clean_cookie_manager.get_session_data(url)
     assert data is not None
     assert data["cookies"]["cf_clearance"] == "abc1234"
     assert data["user_agent"] == "Mozilla/5.0"

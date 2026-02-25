@@ -4,7 +4,8 @@ import trafilatura
 from curl_cffi import requests
 
 from src.config.config import settings
-from src.reader.cloudflare.cloudflare_detector import CloudflareDetector
+from src.api.exceptions import ChallengeDetectedException
+from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.strategies.base_strategy import BaseStrategy
 
@@ -24,7 +25,7 @@ class TrafilaturaStrategy(BaseStrategy):
         return extracted if extracted else ""
 
     async def get_html(self, url: str) -> str:
-        clearance_data = await cookie_manager.get_clearance_data(url)
+        clearance_data = await cookie_manager.get_session_data(url)
 
         headers = {}
         cookies = {}
@@ -45,9 +46,13 @@ class TrafilaturaStrategy(BaseStrategy):
                     allow_redirects=True
                 )
 
-                if CloudflareDetector.is_blocked(response.status_code, response.text):
+                if ChallengeDetector.is_login_required(response.url, response.text):
+                    logger.warning(f"TrafilaturaStrategy: Login wall detected on {url}")
+                    raise ChallengeDetectedException(intervention_type="login")
+
+                if ChallengeDetector.is_blocked(response.status_code, response.text):
                     logger.warning(f"TrafilaturaStrategy: WAF/Cloudflare block detected on {url}")
-                    return ""
+                    raise ChallengeDetectedException(intervention_type="captcha")
 
                 response.raise_for_status()
                 return response.text
