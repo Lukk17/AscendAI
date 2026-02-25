@@ -59,7 +59,7 @@ class CookieManager:
         return self._memory_store.get(domain)
 
     async def save_session_data(self, url: str, cookies: Dict[str, str], user_agent: str,
-                                  ttl_seconds: int = 7200) -> None:
+                                ttl_seconds: int = 7200) -> None:
         """
         Saves session cookies and the exact User-Agent used to acquire them.
         """

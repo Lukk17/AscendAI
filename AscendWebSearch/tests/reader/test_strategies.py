@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
+from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
 
@@ -24,6 +24,7 @@ class MockPage:
         self.route = AsyncMock()
         self.evaluate = AsyncMock()
         self.add_init_script = AsyncMock()
+        self.wait_for_load_state = AsyncMock()
 
 
 class MockContext:
@@ -57,9 +58,11 @@ async def test_trafilatura_strategy_extract():
 
     with patch("src.reader.strategies.trafilatura_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
-        with patch("src.reader.strategies.trafilatura_strategy.trafilatura.extract", return_value="Extracted"):
-            result = await strategy.extract("http://test.com")
-            assert result == "Extracted"
+        with patch("src.reader.strategies.trafilatura_strategy.cookie_manager.get_session_data", new_callable=AsyncMock,
+                   return_value=None):
+            with patch("src.reader.strategies.trafilatura_strategy.trafilatura.extract", return_value="Extracted"):
+                result = await strategy.extract("http://test.com")
+                assert result == "Extracted"
 
 
 @pytest.mark.asyncio
@@ -68,8 +71,10 @@ async def test_trafilatura_strategy_get_html():
 
     with patch("src.reader.strategies.trafilatura_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
-        result = await strategy.get_html("http://test.com")
-        assert result == SAMPLE_HTML
+        with patch("src.reader.strategies.trafilatura_strategy.cookie_manager.get_session_data", new_callable=AsyncMock,
+                   return_value=None):
+            result = await strategy.get_html("http://test.com")
+            assert result == SAMPLE_HTML
 
 
 @pytest.mark.asyncio
@@ -78,9 +83,11 @@ async def test_beautifulsoup_strategy_extract():
 
     with patch("src.reader.strategies.beautifulsoup_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
-        result = await strategy.extract("http://test.com")
-        assert "Text" in result
-        assert "bad" not in result
+        with patch("src.reader.strategies.beautifulsoup_strategy.cookie_manager.get_session_data",
+                   new_callable=AsyncMock, return_value=None):
+            result = await strategy.extract("http://test.com")
+            assert "Text" in result
+            assert "bad" not in result
 
 
 @pytest.mark.asyncio
@@ -89,8 +96,10 @@ async def test_beautifulsoup_strategy_get_html():
 
     with patch("src.reader.strategies.beautifulsoup_strategy.requests.AsyncSession") as mock_cls:
         mock_cls.return_value = _make_httpx_mock(SAMPLE_HTML)
-        result = await strategy.get_html("http://test.com")
-        assert result == SAMPLE_HTML
+        with patch("src.reader.strategies.beautifulsoup_strategy.cookie_manager.get_session_data",
+                   new_callable=AsyncMock, return_value=None):
+            result = await strategy.get_html("http://test.com")
+            assert result == SAMPLE_HTML
 
 
 @pytest.mark.asyncio

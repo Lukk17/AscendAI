@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     novnc \
     websockify \
+    fluxbox \
+    dbus-x11 \
     supervisor \
     python3-venv \
     && rm -rf /var/lib/apt/lists/*
@@ -34,6 +36,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV DISPLAY=:99
+ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 
 # Expose ports (API and NoVNC)
 EXPOSE 7021 7900

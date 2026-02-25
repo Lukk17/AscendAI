@@ -1,15 +1,14 @@
+import logging
 from typing import Any
-from crawlee.crawlers import AdaptivePlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.browsers import PlaywrightBrowserPlugin
 
-from src.config.config import settings
+import trafilatura
+from crawlee.crawlers import AdaptivePlaywrightCrawler, PlaywrightCrawlingContext
+
 from src.api.exceptions import ChallengeDetectedException
+from src.config.config import settings
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.validator.url_validator import URLValidator
-
-import logging
-import trafilatura
 
 logger = logging.getLogger(__name__)
 
@@ -50,15 +49,15 @@ class CrawleeStrategy(BaseStrategy):
 
         await crawler.run([url])
         html = result_container.get("html", "")
-        
+
         if ChallengeDetector.is_login_required(url, html):
             logger.warning(f"CrawleeStrategy: Login wall detected on {url}")
             raise ChallengeDetectedException(intervention_type="login")
-            
+
         if ChallengeDetector.is_blocked(200, html):
             logger.warning(f"CrawleeStrategy: WAF/Cloudflare block detected on {url}")
             raise ChallengeDetectedException(intervention_type="captcha")
-            
+
         return html
 
     async def _handle_crawlee_request(self, context: Any, result_container: dict[str, str]) -> None:

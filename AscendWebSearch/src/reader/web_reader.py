@@ -7,11 +7,11 @@ from typing import List, Dict, Any, Optional
 from src.api.exceptions import HumanInterventionRequiredException, ChallengeDetectedException
 from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
-from src.reader.link_annotator import annotate_links
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
-from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
+from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
@@ -65,13 +65,12 @@ class WebReader:
 
     async def read(self, url: str, heavy_mode: bool = False) -> Dict[str, Any]:
         logger.info(f"Reading URL: {url} (heavy_mode: {heavy_mode})")
-        
-        if ChallengeDetector.is_login_redirect_url(url):
-            logger.warning(f"WebReader: Pre-emptive URL redirect login detected on {url}. Aborting extraction.")
-            return {"status": "human_intervention_required", "intervention_type": "login", "vnc_url": "http://localhost:7900", "message": "Manual Login authentication required. Please visit: http://localhost:7900"}
 
         strategies_to_run = self.strategies
-        if heavy_mode:
+        if ChallengeDetector.is_login_redirect_url(url):
+            logger.warning(f"WebReader: Pre-emptive URL redirect login detected on {url}. Forcing NoVNC strategy.")
+            strategies_to_run = {"6-novnc": self.strategies["6-novnc"]}
+        elif heavy_mode:
             strategies_to_run = {
                 "4-playwright_stealth": self.strategies["4-playwright_stealth"],
                 "5-crawlee_adaptive": self.strategies["5-crawlee_adaptive"],
@@ -84,19 +83,20 @@ class WebReader:
                 if result:
                     return result
         except HumanInterventionRequiredException as e:
-            return {"status": "human_intervention_required", "intervention_type": e.intervention_type, "vnc_url": e.vnc_url, "message": e.message}
+            return {"status": "human_intervention_required", "intervention_type": e.intervention_type,
+                    "vnc_url": e.vnc_url, "message": e.message}
 
         return self._create_failure_response(url)
 
-    async def read_with_links(self, url: str, link_filter: str | None = None, heavy_mode: bool = False) -> Dict[str, Any]:
+    async def read_with_links(self, url: str, link_filter: str | None = None, heavy_mode: bool = False) -> Dict[
+        str, Any]:
         logger.info(f"Reading URL with links: {url} (heavy_mode: {heavy_mode})")
 
-        if ChallengeDetector.is_login_redirect_url(url):
-            logger.warning(f"WebReader: Pre-emptive URL redirect login detected on {url}. Aborting extraction.")
-            return {"status": "human_intervention_required", "intervention_type": "login", "vnc_url": "http://localhost:7900", "message": "Manual Login authentication required. Please visit: http://localhost:7900"}
-
         strategies_to_run = self.strategies
-        if heavy_mode:
+        if ChallengeDetector.is_login_redirect_url(url):
+            logger.warning(f"WebReader: Pre-emptive URL redirect login detected on {url}. Forcing NoVNC strategy.")
+            strategies_to_run = {"6-novnc": self.strategies["6-novnc"]}
+        elif heavy_mode:
             strategies_to_run = {
                 "4-playwright_stealth": self.strategies["4-playwright_stealth"],
                 "5-crawlee_adaptive": self.strategies["5-crawlee_adaptive"],
@@ -110,7 +110,8 @@ class WebReader:
                     content, links = annotate_links(html, url, link_filter)
                     return {"content": content, "links": links, "status": "success", "mode": name}
         except HumanInterventionRequiredException as e:
-            return {"status": "human_intervention_required", "intervention_type": e.intervention_type, "vnc_url": e.vnc_url, "message": e.message}
+            return {"status": "human_intervention_required", "intervention_type": e.intervention_type,
+                    "vnc_url": e.vnc_url, "message": e.message}
 
         return self._create_failure_response(url)
 

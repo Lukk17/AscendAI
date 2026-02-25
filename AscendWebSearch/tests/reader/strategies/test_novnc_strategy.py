@@ -28,7 +28,8 @@ async def test_novnc_strategy_get_html_raises_exception():
         mock_settings.PUBLIC_VNC_URL = "http://vnc"
 
         with patch("src.reader.strategies.novnc_strategy.asyncio.create_task") as mock_task:
-            with patch("src.reader.strategies.novnc_strategy.ChallengeDetector.is_login_required", return_value=True) as mock_detector:
+            with patch("src.reader.strategies.novnc_strategy.ChallengeDetector.is_login_required",
+                       return_value=True) as mock_detector:
                 with pytest.raises(HumanInterventionRequiredException) as excinfo:
                     await strategy.get_html("http://test.com/login")
 

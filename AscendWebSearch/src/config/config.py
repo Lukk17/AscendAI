@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     DEFAULT_TIMEOUT: float = Field(default=30.0, description="Default HTTP request timeout in seconds")
     SEARCH_TIMEOUT: float = Field(default=10.0, description="Timeout for search requests")
     EXTRACT_TIMEOUT: float = Field(default=30.0, description="Timeout for web extraction")
+    NOVNC_TIMEOUT_SECONDS: int = Field(default=600,
+                                       description="Timeout in seconds for NoVNC manual intervention (default 10 mins)")
 
     MAX_REQUESTS_PER_CRAWL: int = Field(default=5, description="Max requests for adaptive crawler")
     DYNAMIC_CONTENT_WAIT: int = Field(default=2000, description="Wait time in ms for dynamic content to load")
@@ -58,12 +60,13 @@ class Settings(BaseSettings):
 
     # Cloudflare Bypass / External Services
     FLARESOLVERR_URL: str = Field(default="http://localhost:8191/v1", description="URL for FlareSolverr instance")
-    SELENIUM_BROWSER_CDP_URL: str = Field(default="ws://localhost:4444/playwright", description="CDP URL for remote browser")
+    SELENIUM_BROWSER_CDP_URL: str = Field(default="ws://localhost:4444/playwright",
+                                          description="CDP URL for remote browser")
     SELENIUM_BROWSER_VNC_URL: str = Field(default="http://localhost:7900",
                                           description="VNC URL for manual captcha solve")
-    PUBLIC_VNC_URL: str = Field(default="http://localhost:7900", description="Public Internet-facing VNC URL (can be Ngrok api string)")
+    PUBLIC_VNC_URL: str = Field(default="http://localhost:7900",
+                                description="Public Internet-facing VNC URL (can be Ngrok api string)")
     REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL for cookie storage")
-
 
 
 settings = Settings()

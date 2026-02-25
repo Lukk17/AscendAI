@@ -3,8 +3,8 @@ import logging
 import trafilatura
 from curl_cffi import requests
 
-from src.config.config import settings
 from src.api.exceptions import ChallengeDetectedException
+from src.config.config import settings
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.strategies.base_strategy import BaseStrategy

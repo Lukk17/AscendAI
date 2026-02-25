@@ -28,13 +28,13 @@ async def test_search_endpoint(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_read_endpoint(client: AsyncClient):
-    mock_res = {"status": "success", "content": "Read Content"}
+    mock_res = {"status": "success", "content": "Read Content", "mode": "1-beautifulsoup"}
 
     with patch.object(web_reader, "read", new_callable=AsyncMock) as mock_read:
         mock_read.return_value = mock_res
-        # User changed to GET /api/v1/web/read
-        resp = await client.get("/api/v1/web/read", params={"url": "http://test.com"})
+        # User changed to POST /api/v2/web/read
+        resp = await client.post("/api/v2/web/read", json={"url": "http://test.com"})
 
         assert resp.status_code == 200
         assert resp.json()["content"] == mock_res["content"]
-        assert resp.json()["url"] == "http://test.com"
+        assert resp.json()["url"] == "http://test.com/"

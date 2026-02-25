@@ -8,7 +8,8 @@ from src.reader.web_reader import WebReader
 
 @pytest.mark.asyncio
 async def test_web_reader_circuit_breaker_abort():
-    with patch("src.reader.web_reader.BeautifulSoupStrategy.extract", side_effect=ChallengeDetectedException(intervention_type="login")):
+    with patch("src.reader.web_reader.BeautifulSoupStrategy.extract",
+               side_effect=ChallengeDetectedException(intervention_type="login")):
         with patch("src.reader.web_reader.NoVNCStrategy.extract", new_callable=AsyncMock) as mock_novnc:
             mock_novnc.return_value = "NoVNC Circuit Breaker Content"
             with patch("src.reader.web_reader.ContentValidator.validate", return_value=True):
@@ -117,8 +118,9 @@ async def test_web_reader_read_with_links_all_strategies_fail():
 async def test_web_reader_read_heavy_mode():
     reader = WebReader()
     mock_content = "Playwright Content Heavy"
-    
-    with patch("src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract", new_callable=AsyncMock) as mock_pw_extract:
+
+    with patch("src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
+               new_callable=AsyncMock) as mock_pw_extract:
         mock_pw_extract.return_value = mock_content
         with patch("src.reader.web_reader.ContentValidator.validate", return_value=True):
             result = await reader.read("http://test.com", heavy_mode=True)
@@ -132,8 +134,9 @@ async def test_web_reader_read_heavy_mode():
 async def test_web_reader_read_with_links_heavy_mode():
     reader = WebReader()
     raw_html = "<html><body><a href='https://test.com/heavy'>Heavy Link</a></body></html>"
-    
-    with patch("src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html", new_callable=AsyncMock) as mock_pw_get_html:
+
+    with patch("src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+               new_callable=AsyncMock) as mock_pw_get_html:
         mock_pw_get_html.return_value = raw_html
         result = await reader.read_with_links("http://test.com", heavy_mode=True)
 
