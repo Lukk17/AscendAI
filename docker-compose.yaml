@@ -22,16 +22,50 @@ services:
         aliases:
           - minio
 
-  unstructured-api:
-    image: downloads.unstructured.io/unstructured-io/unstructured-api:0.0.90
-    container_name: unstructured-api  
+  docling-serve:
+    image: quay.io/docling-project/docling-serve:v1.14.0
+    container_name: docling-serve
     restart: unless-stopped
     ports:
-      - "9080:8000"
+      - "5001:5001"
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=1
+      - DOCLING_SERVE_OCR_ENGINE=easyocr
     networks:
       default:
         aliases:
-          - unstructured-api
+          - docling-serve
+
+  # unstructured-api:
+  #   image: downloads.unstructured.io/unstructured-io/unstructured-api:0.0.90
+  #   container_name: unstructured-api
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9080:8000"
+  #   networks:
+  #     default:
+  #       aliases:
+  #         - unstructured-api
+
+  ascend-paddle-ocr:
+    build:
+      context: ./PaddleOCR
+      dockerfile: Dockerfile
+    container_name: ascend-paddle-ocr
+    restart: unless-stopped
+    ports:
+      - "7022:7022"
+    environment:
+      - API_PORT=7022
+      - API_HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+      - DEFAULT_LANGUAGE=en
+      - MAX_FILE_SIZE_MB=50
+      - OCR_REQUEST_TIMEOUT=120
+    networks:
+      default:
+        aliases:
+          - ascend-paddle-ocr
 
   qdrant:
     image: qdrant/qdrant:v1.16

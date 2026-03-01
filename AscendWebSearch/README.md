@@ -124,11 +124,11 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
     If you want to push this image to Docker Hub (e.g., to use it in another environment or specific `docker-compose.yaml`):
 
     ```shell
-    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:v0.0.1
+    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:v0.0.2
     ```
 
     ```shell
-    docker push lukk17/ascend-web-search:v0.0.1
+    docker push lukk17/ascend-web-search:v0.0.2
     ```
     
     ```shell

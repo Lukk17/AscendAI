@@ -1,21 +1,25 @@
 # AscendAI
 
-This repository contains a multi-module project demonstrating a complete RAG (Retrieval-Augmented Generation) system using Spring AI's Model Context Protocol (MCP). It extends the capabilities of a Large Language Model (LLM) with external tools and a memory-rich context window.
-
-The system is composed of an Orchestrator (Spring Boot), an MCP Tool Server, and a suite of Dockerized support services for vector storage, object storage, and document processing.
+This repository contains a multi-module AI orchestration platform built with Spring AI and the Model Context Protocol (MCP). It routes user prompts to multiple AI providers (LM Studio, OpenAI, Gemini, Anthropic, MiniMax) with per-request selection, extends LLM capabilities with external tools, and provides a RAG pipeline with semantic memory.
 
 ---
 
 ## 🏗️ System Architecture
 
-*   **Orchestrator**: The main Spring Boot application that handles user requests, manages the RAG pipeline, and communicates with the LLM.
-*   **MCP Server**: Provides external tools to the LLM via the Model Context Protocol.
-*   **OpenMemory**: A personalized memory service powered by Qdrant.
+📐 **[Full Architecture Documentation](docs/architecture/arc42/01-introduction-and-goals.md)** — arc42, ADRs, and C4 Mermaid diagrams.
+
+*   **Orchestrator**: Spring Boot application — REST API, multi-provider AI, RAG pipeline, MCP tool integration.
+*   **AudioScribe**: MCP server for audio transcription (FastMCP/Python).
+*   **WeatherMCP**: MCP server for weather data (Spring Boot/Java).
+*   **AscendWebSearch**: MCP server for web search via SearXNG (FastMCP/Python).
+*   **AscendMemory**: Semantic memory service with REST API (FastAPI/Python).
 *   **Support Services** (Dockerized):
-    *   **MinIO**: S3-compatible object storage for document ingestion (`knowledge-base` bucket).
-    *   **Unstructured API**: Processes complex document formats (PDF, DOCX) into text.
-    *   **Qdrant**: Vector database for storing document embeddings and memory.
-*   **PostgreSQL**: Stores metadata for the ingestion pipeline (running locally or via Docker).
+    *   **MinIO**: S3-compatible object storage for document ingestion.
+    *   **Qdrant**: Vector database for RAG embeddings and semantic memory.
+    *   **Redis**: Chat history cache.
+    *   **SearXNG**: Privacy-respecting meta search engine.
+    *   **FlareSolverr**: Cloudflare bypass proxy for web scraping.
+*   **PostgreSQL**: Persistent metadata and chat history (local or Docker).
 
 ---
 
@@ -79,11 +83,17 @@ curl -X POST http://localhost:7021/api/v2/web/read \
 
 | Service | Port | Default Credentials | Description |
 | :--- | :--- | :--- | :--- |
-| **Orchestrator** | `9917` | - | Main Application API |
+| **Orchestrator** | `9917` | - | Main API Gateway |
+| **AudioScribe** | `7017` | - | MCP — Audio Transcription |
+| **WeatherMCP** | `9998` | - | MCP — Weather Data |
+| **AscendWebSearch** | `7021` | - | MCP — Web Search |
+| **AscendMemory** | `7020` | - | REST — Semantic Memory |
 | **MinIO API** | `9070` | `admin` / `password` | S3 API Endpoint |
 | **MinIO Console** | `9071` | `admin` / `password` | Web UI for File Management |
-| **Unstructured API** | `9080` | - | Text Extraction Service |
-| **Qdrant** | `6333` | - | Vector Database |
+| **Qdrant** | `6333` / `6334` | - | Vector Database (HTTP/gRPC) |
+| **Redis** | `6379` | - | Cache |
+| **SearXNG** | `8088` | - | Meta Search Engine |
+| **FlareSolverr** | `8191` | - | Cloudflare Bypass |
 | **PostgreSQL** | `5432` | `postgres` / `local` | Metadata Storage |
 
 ### 3. Publish (Push)
@@ -100,33 +110,6 @@ docker push lukk17/ascend-ai:latest
 
 ---
 
-## 🏗️ Managing Custom Service Images (Advanced)
-
-The project also builds a custom image for the `openmemory` service (defined in `OpenMemory/Dockerfile.mem0mcp`). If you want to version and publish this image to your own Docker Hub:
-
-### 1. Build the OpenMemory Image
-```bash
-docker build -t openmemory-ascend-ai:latest -f OpenMemory/Dockerfile.mem0mcp OpenMemory
-```
-
-### 2. Tag and Push
-```bash
-# Tag with your username and a version
-docker tag openmemory-ascend-ai:latest lukk17/openmemory-ascend-ai:v0.0.1
-
-# Push
-docker push lukk17/openmemory-ascend-ai:v0.0.1
-```
-
-
-### 3. Update docker-compose.yaml
-To use your published image instead of building locally, update `docker-compose.yaml`:
-
-```yaml
-  openmemory:
-    image: lukk17/openmemory-ascend-ai:v0.0.1
-    # build: ...  <-- Comment out or remove the build section
-```
 
 ---
 
