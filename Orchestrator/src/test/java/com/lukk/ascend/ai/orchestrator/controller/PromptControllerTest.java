@@ -39,10 +39,11 @@ class PromptControllerTest {
         AiResponse aiResponse = new AiResponse(responseText, null);
         org.springframework.test.util.ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString())).thenReturn(aiResponse);
+        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString(), any(), any()))
+                .thenReturn(aiResponse);
 
         // when
-        ResponseEntity<AiResponse> response = promptController.prompt(prompt, null, null, "user1");
+        ResponseEntity<AiResponse> response = promptController.prompt(prompt, null, null, null, null, "user1");
 
         // then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -56,10 +57,10 @@ class PromptControllerTest {
         String prompt = "test prompt";
         org.springframework.test.util.ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString()))
+        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString(), any(), any()))
                 .thenThrow(new RuntimeException("Service Error"));
 
         // when & then
-        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, "user1"));
+        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, "user1"));
     }
 }

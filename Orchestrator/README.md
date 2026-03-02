@@ -23,12 +23,21 @@ flowchart TD
         Orchestrator -- "4. Semantic Memory (REST)" --> AscendMemory["ascend-memory"]
     end
     
+    subgraph Providers ["AI Providers (per-request selection)"]
+        Orchestrator -- "ChatModelResolver" --> ProviderRouter{"provider param"}
+        ProviderRouter --> LMStudio["LM Studio (default)"]
+        ProviderRouter --> OpenAI["OpenAI"]
+        ProviderRouter --> Gemini["Gemini"]
+        ProviderRouter --> Anthropic["Anthropic"]
+        ProviderRouter --> MiniMax["MiniMax"]
+    end
+
     subgraph MCP ["Model Context Protocol (MCP)"]
         Orchestrator -- "Tool Discovery & Calls" --> ExtTools["External Tools"]
         ExtTools --> Weather["Weather MCP"]
         ExtTools --> Audio["AudioScribe MCP"]
-        ExtTools --> WebTools["Web Tools MCP"]
-        WebTools --> Searxng["SearXNG"]
+        ExtTools --> WebSearch["AscendWebSearch MCP"]
+        WebSearch --> Searxng["SearXNG"]
     end
 
     subgraph Ingestion ["Ingestion Pipeline"]
@@ -38,9 +47,9 @@ flowchart TD
         MarkdownParser -- "Chunks & Embeds" --> Qdrant
         UnstructuredAPI -- "Chunks & Embeds" --> Qdrant
     end
-    
-    Orchestrator -- "Final Prompt" --> LLM["LLM (LM Studio)"]
 ```
+
+📐 **[Full Architecture Documentation](../docs/architecture/arc42/01-introduction-and-goals.md)** — arc42, ADRs, and C4 Mermaid diagrams.
 
 ### Core Components
 1.  **Redis**:
@@ -77,17 +86,23 @@ For a larger tool set and ambiguous prompts, you can add a model-router step tha
 
 ---
 
-## Model Selection & Justification
+## Multi-Provider AI & Model Selection
 
-### LLM: `meta-llama-3.1-8b-instruct`
-*   **Why**: We prioritize reliability and instruction following over raw creative power for the Orchestrator.
-*   **Issue with Qwen**: While powerful, Qwen models occasionally output non-standard tokens or struggle with the strict tool-calling format required by our MCP implementation, leading to parsing errors.
-*   **Llama 3.1**: Provides a balanced trade-off—excellent tool use coherence, robust instruction following, and decent reasoning capabilities for an 8B model.
+The Orchestrator supports multiple AI providers with **per-request selection** via `provider` and `model` query parameters:
+
+| Provider | Type | Default Model | API Key Env Var |
+|---|---|---|---|
+| `lmstudio` (default) | OpenAI-compatible | `meta-llama-3.1-8b-instruct` | Not needed |
+| `openai` | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
+| `gemini` | OpenAI-compatible | `gemini-2.5-flash` | `GEMINI_API_KEY` |
+| `anthropic` | Anthropic native | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
+| `minimax` | OpenAI-compatible | `MiniMax-M2.5` | `MINIMAX_API_KEY` |
+
+Providers are configured in `application.yaml` under `app.ai.providers`. Each can be enabled/disabled independently. Models default to environment variables with fallback values.
 
 ### Embeddings: `text-embedding-nomic-embed-text-v2-moe`
-*   **Why**:
-    *   **Matryoshka Representation**: Allows flexible embedding sizes.
-    *   **Multilingual Support**: Crucial for our use case (Polish/English mixing). The `v2` version specifically handles non-English contexts significantly better than `v1.5` or standard BERT models.
+*   **Matryoshka Representation**: Allows flexible embedding sizes.
+*   **Multilingual Support**: Handles Polish/English mixing. The `v2` version handles non-English contexts better than `v1.5`.
 
 ---
 
@@ -229,10 +244,33 @@ curl -X POST "http://localhost:9917/prompt" \
 
 **Windows (PowerShell)**:
 ```powershell
-curl -X POST "http://localhost:9917/prompt" `
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
      -H "X-User-Id: user1" `
      -H "Content-Type: multipart/form-data" `
      -F "prompt=What is the weather in Warsaw?"
+```
+
+#### 4. Multi-Provider: Using Gemini
+
+**Windows (PowerShell)**:
+```powershell
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
+     -H "X-User-Id: user1" `
+     -H "Content-Type: multipart/form-data" `
+     -F "prompt=Explain quantum computing" `
+     -F "provider=gemini" `
+     -F "model=gemini-2.5-pro"
+```
+
+#### 5. Multi-Provider: Using Anthropic
+
+**Windows (PowerShell)**:
+```powershell
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
+     -H "X-User-Id: user1" `
+     -H "Content-Type: multipart/form-data" `
+     -F "prompt=Write a haiku about coding" `
+     -F "provider=anthropic"
 ```
 
 #### 4. Memory Context

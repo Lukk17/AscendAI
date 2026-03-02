@@ -33,6 +33,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webflux")
 
     implementation("org.springframework.ai:spring-ai-starter-model-openai")
+    implementation("org.springframework.ai:spring-ai-starter-model-anthropic")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.ai:spring-ai-starter-mcp-client-webflux")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
@@ -49,6 +50,7 @@ dependencies {
     implementation("org.commonmark:commonmark:0.21.0")
     implementation("software.amazon.awssdk:s3:2.29.10")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
+    implementation("org.apache.pdfbox:pdfbox:3.0.4")
 
     compileOnly("org.projectlombok:lombok")
 

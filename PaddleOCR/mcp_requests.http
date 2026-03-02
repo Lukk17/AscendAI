@@ -1,0 +1,124 @@
+@mcp_protocol_version = 2025-11-25
+@mcp_session_id = CHANGE_ME
+
+###
+# @name initialize
+# Initialize a Streamable HTTP MCP session.
+POST http://localhost:7022/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "{{mcp_protocol_version}}",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "0.1.0" }
+  }
+}
+
+###
+# @name list_tools
+POST http://localhost:7022/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+# @name ocr_process_json
+POST http://localhost:7022/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "ocr_process",
+    "arguments": {
+      "file_path": "/path/to/image.png",
+      "lang": "en",
+      "output_format": "json"
+    }
+  }
+}
+
+###
+# @name ocr_process_markdown
+POST http://localhost:7022/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+MCP-Session-Id: {{mcp_session_id}}
+MCP-Protocol-Version: {{mcp_protocol_version}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "ocr_process",
+    "arguments": {
+      "file_path": "/path/to/image.png",
+      "lang": "pl",
+      "output_format": "markdown"
+    }
+  }
+}
+
+###
+# @name rest_ocr_json
+POST http://localhost:7022/v1/ocr
+Accept: application/json
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="files"; filename="test.png"
+Content-Type: image/png
+
+< ./test.png
+--boundary
+Content-Disposition: form-data; name="lang"
+
+en
+--boundary
+Content-Disposition: form-data; name="output_format"
+
+json
+--boundary--
+
+###
+# @name rest_ocr_markdown
+POST http://localhost:7022/v1/ocr
+Accept: application/json
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="files"; filename="test.png"
+Content-Type: image/png
+
+< ./test.png
+--boundary
+Content-Disposition: form-data; name="lang"
+
+pl
+--boundary
+Content-Disposition: form-data; name="output_format"
+
+markdown
+--boundary--
+
+### Helper: Health Check
+GET http://localhost:7022/health

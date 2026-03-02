@@ -29,6 +29,17 @@ app:
     base-url: "http://localhost:9080"
     api-path: "/general/v0/general"
 
+  docling:
+    base-url: "http://localhost:7021"
+    api-path: "/v1/convert"
+
+  paddleocr:
+    base-url: "http://localhost:7022"
+    api-path: "/v1/ocr"
+
+  document-router:
+    pdf-min-text-threshold-per-page: 50
+
   s3:
     bucket: knowledge-base
     endpoint: http://localhost:9070
@@ -45,9 +56,57 @@ app:
       base-url: "http://localhost:7020"
       search-limit: 10
 
+  ai:
+    default-provider: lmstudio
+    providers:
+      lmstudio:
+        enabled: true
+        type: openai
+        base-url: "http://127.0.0.1:1234"
+        api-key: "not-needed"
+        model: ${LMSTUDIO_MODEL:meta-llama-3.1-8b-instruct}
+        temperature: 0.7
+      openai:
+        enabled: false
+        type: openai
+        base-url: "https://api.openai.com"
+        api-key: ${OPENAI_API_KEY:not-set}
+        model: ${OPENAI_MODEL:gpt-4o}
+        temperature: 0.7
+      gemini:
+        enabled: false
+        type: openai
+        base-url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+        api-key: ${GEMINI_API_KEY:not-set}
+        model: ${GEMINI_MODEL:gemini-2.5-flash}
+        temperature: 0.7
+      anthropic:
+        enabled: false
+        type: anthropic
+        api-key: ${ANTHROPIC_API_KEY:not-set}
+        model: ${ANTHROPIC_MODEL:claude-sonnet-4-5}
+        temperature: 0.7
+      minimax:
+        enabled: false
+        type: openai
+        base-url: "https://api.minimax.io/v1"
+        api-key: ${MINIMAX_API_KEY:not-set}
+        model: ${MINIMAX_MODEL:MiniMax-M2.5}
+        temperature: 0.7
+
   vectorstore:
-    collection-name: ascendai
-    size: 768
+    default-collection: ascendai-768
+    collections:
+      - name: ascendai-768
+        size: 768
+      - name: ascendai-1536
+        size: 1536
+    provider-collection-mapping:
+      lmstudio: ascendai-768
+      gemini: ascendai-768
+      openai: ascendai-1536
+      anthropic: ascendai-1536
+      minimax: ascendai-1536
   rag:
     enabled: true
     top-k: 5
@@ -84,6 +143,8 @@ spring:
       port: 6379
 
   ai:
+    model:
+      chat: none
     mcp:
       client:
         enabled: true
@@ -93,35 +154,24 @@ spring:
         type: SYNC
         toolcallback:
           enabled: true
-        #        sse:
-        #          connections:
-        #            openmemory:
-        #              url: http://localhost:8765
-        #              # Static, to make this dynamic custom DynamicMcpClientFactory implementation required in Java
-        #              sse-endpoint: /mcp/ascendai/sse/${app.user.default-id}
         streamable-http:
           connections:
             audioscribe:
-              url: http://localhost:7016
+              url: http://localhost:7017
             weather:
               url: http://localhost:9998
             ascend-web-search:
               url: http://localhost:7021
 
     openai:
-      api-key: "not-needed" # Not required for local LM Studio
+      api-key: "not-needed"
       base-url: "http://127.0.0.1:1234"
-      chat:
-        options:
-          #          model: qwen/qwen3-vl-4b
-          model: "meta-llama-3.1-8b-instruct"
-          temperature: 0.7
       embedding:
         options:
           model: "text-embedding-nomic-embed-text-v2-moe"
     vectorstore:
       qdrant:
-        collection-name: ${app.vectorstore.collection-name}
+        collection-name: ${app.vectorstore.default-collection}
 
 logging:
   level:

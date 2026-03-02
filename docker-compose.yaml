@@ -36,16 +36,16 @@ services:
         aliases:
           - docling-serve
 
-  # unstructured-api:
-  #   image: downloads.unstructured.io/unstructured-io/unstructured-api:0.0.90
-  #   container_name: unstructured-api
-  #   restart: unless-stopped
-  #   ports:
-  #     - "9080:8000"
-  #   networks:
-  #     default:
-  #       aliases:
-  #         - unstructured-api
+  unstructured-api:
+    image: downloads.unstructured.io/unstructured-io/unstructured-api:0.0.90
+    container_name: unstructured-api
+    restart: unless-stopped
+    ports:
+      - "9080:8000"
+    networks:
+      default:
+        aliases:
+          - unstructured-api
 
   ascend-paddle-ocr:
     build:

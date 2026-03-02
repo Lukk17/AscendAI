@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.orchestrator.service;
 
+import com.lukk.ascend.ai.orchestrator.config.properties.VectorStoreProperties;
 import com.lukk.ascend.ai.orchestrator.exception.IngestionException;
 import com.lukk.ascend.ai.orchestrator.service.ingestion.IngestionService;
 import lombok.RequiredArgsConstructor;
@@ -11,14 +12,12 @@ import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
-import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.services.s3.model.*;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -30,7 +29,8 @@ public class ManualIngestionService {
     private final ConcurrentMetadataStore metadataStore;
     private final IngestionService ingestionService;
     private final DocumentService documentService;
-    private final VectorStore vectorStore;
+    private final VectorStoreResolver vectorStoreResolver;
+    private final VectorStoreProperties vectorStoreProperties;
 
     @Value("${app.s3.bucket}")
     private String bucket;
@@ -90,12 +90,7 @@ public class ManualIngestionService {
             return;
         }
 
-        try {
-            ingestObject(key, result);
-        } catch (Exception e) {
-            result.failed++;
-            log.error("Manual ingestion failed for key: {}", key, e);
-        }
+        ingestObject(key, result);
     }
 
     private void ingestObject(String key, ManualIngestionResult result) {
@@ -104,7 +99,8 @@ public class ManualIngestionService {
                 .key(key)
                 .build())) {
 
-            List<Document> documents = key.toLowerCase().endsWith(".md") || key.toLowerCase().contains(obsidianFolder)
+            boolean isMarkdown = key.toLowerCase().endsWith(".md") || key.toLowerCase().contains(obsidianFolder);
+            List<Document> documents = isMarkdown
                     ? ingestionService.processMarkdown(stream, key)
                     : ingestionService.processUnstructured(stream, key);
 
@@ -113,16 +109,36 @@ public class ManualIngestionService {
                 return;
             }
 
-            documentService.removeOldDocuments(documents, vectorStore);
-
             List<Document> chunks = documentService.splitDocuments(documents);
-            for (Document chunk : chunks) {
-                vectorStore.add(List.of(chunk));
-                result.indexed++;
-            }
-        } catch (Exception e) {
-            throw new IngestionException("Manual ingestion failed for key: " + key, e);
+            ingestIntoAllCollections(chunks, key);
+            result.indexed += chunks.size();
+        } catch (IngestionException e) {
+            result.failed++;
+            log.error("[ManualIngestionService] Ingestion failed for key: {}", key, e);
+        } catch (IOException e) {
+            result.failed++;
+            throw new IngestionException("Failed to read S3 object: " + key, e);
         }
+    }
+
+    private void ingestIntoAllCollections(List<Document> chunks, String key) {
+        vectorStoreProperties.getCollections().forEach(config -> {
+            VectorStore store = vectorStoreResolver.resolve(resolveProviderForCollection(config.getName()));
+            log.info("[ManualIngestionService] Ingesting {} chunks into collection '{}' for key: {}",
+                    chunks.size(), config.getName(), key);
+            documentService.removeOldDocuments(chunks, store);
+            for (Document chunk : chunks) {
+                store.add(List.of(chunk));
+            }
+        });
+    }
+
+    private String resolveProviderForCollection(String collectionName) {
+        return vectorStoreProperties.getProviderCollectionMapping().entrySet().stream()
+                .filter(entry -> entry.getValue().equals(collectionName))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean shouldIngestKey(String key) {

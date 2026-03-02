@@ -32,7 +32,7 @@ public class StartupLogConfig implements ApplicationListener<ApplicationReadyEve
     private final ObjectProvider<ToolCallbackProvider> toolCallbackProvider;
 
     public StartupLogConfig(Environment env, DataSource dataSource, StringRedisTemplate redisTemplate,
-            S3Client s3Client, ObjectProvider<ToolCallbackProvider> toolCallbackProvider) {
+                            S3Client s3Client, ObjectProvider<ToolCallbackProvider> toolCallbackProvider) {
         this.env = env;
         this.dataSource = dataSource;
         this.redisTemplate = redisTemplate;
@@ -70,31 +70,31 @@ public class StartupLogConfig implements ApplicationListener<ApplicationReadyEve
         String mcpStatus = checkMcpTools();
 
         log.info("\n" +
-                "    _    ___  ___ ___ _  _ ___      _  ___ \n" +
-                "   /_\\  / __|/ __/ __| \\| |   \\    /_\\|_ _|\n" +
-                "  / _ \\ \\__ \\ (__| _|| .` | |) |  / _ \\| | \n" +
-                " /_/ \\_\\|___/\\___|___|_|\\_|___/  /_/ \\_\\___|\n" +
-                "\n" +
-                "----------------------------------------------------------\n" +
-                "\tApplication '{}' is running!\n" +
-                "\n" +
-                "\tAccess URLs:\n" +
-                "\tLocal:      \t{}://localhost:{}{}\n" +
-                "\tExternal:   \t{}://{}:{}{}\n" +
-                "\tAI:         \t{}\n" +
-                "\n" +
-                "\tProfile(s): \t{}\n" +
-                "\tAI model:   \t{}\n" +
-                "\n" +
-                "\tActionable Status:\n" +
-                "\t- Postgres:    \t{}\n" +
-                "\t- Redis:       \t{}\n" +
-                "\t- S3 Ingested: \t{}\n" +
-                "\t- MCP Tools:   \t{}\n" +
-                "\n" +
-                "\tMAIN PROMPT ENDPOINT:\n" +
-                "\tPOST        \t{}\n" +
-                "----------------------------------------------------------",
+                        "    _    ___  ___ ___ _  _ ___      _  ___ \n" +
+                        "   /_\\  / __|/ __/ __| \\| |   \\    /_\\|_ _|\n" +
+                        "  / _ \\ \\__ \\ (__| _|| .` | |) |  / _ \\| | \n" +
+                        " /_/ \\_\\|___/\\___|___|_|\\_|___/  /_/ \\_\\___|\n" +
+                        "\n" +
+                        "----------------------------------------------------------\n" +
+                        "\tApplication '{}' is running!\n" +
+                        "\n" +
+                        "\tAccess URLs:\n" +
+                        "\tLocal:      \t{}://localhost:{}{}\n" +
+                        "\tExternal:   \t{}://{}:{}{}\n" +
+                        "\tAI:         \t{}\n" +
+                        "\n" +
+                        "\tProfile(s): \t{}\n" +
+                        "\tAI model:   \t{}\n" +
+                        "\n" +
+                        "\tActionable Status:\n" +
+                        "\t- Postgres:    \t{}\n" +
+                        "\t- Redis:       \t{}\n" +
+                        "\t- S3 Ingested: \t{}\n" +
+                        "\t- MCP Tools:   \t{}\n" +
+                        "\n" +
+                        "\tMAIN PROMPT ENDPOINT:\n" +
+                        "\tPOST        \t{}\n" +
+                        "----------------------------------------------------------",
                 appName,
                 protocol, serverPort, contextPath,
                 protocol, hostAddress, serverPort, contextPath,

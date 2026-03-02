@@ -1,13 +1,13 @@
 package com.lukk.ascend.ai.orchestrator.config;
 
+import com.lukk.ascend.ai.orchestrator.config.properties.VectorStoreProperties;
 import io.qdrant.client.QdrantClient;
 import io.qdrant.client.grpc.Collections;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfigurer;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -19,10 +19,13 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 
 import java.net.http.HttpClient;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 @Configuration
+@EnableConfigurationProperties(VectorStoreProperties.class)
 @Slf4j
 public class AppConfig {
 
@@ -33,12 +36,6 @@ public class AppConfig {
 
     @Value("${app.system-prompt}")
     private String systemPrompt;
-
-    @Value("${app.vectorstore.collection-name}")
-    private String vectorStoreCollectionName;
-
-    @Value("${app.vectorstore.size}")
-    private int vectorStoreSize;
 
     @Value("${app.ingestion.connect-timeout}")
     private int connectTimeout;
@@ -54,22 +51,6 @@ public class AppConfig {
 
     @Value("${app.s3.secret-key}")
     private String s3SecretKey;
-
-    @Bean
-    public ChatClient chatClient(ChatClient.Builder builder, SyncMcpToolCallbackProvider toolCallbackProvider) {
-        var tools = toolCallbackProvider.getToolCallbacks();
-        log.debug("Found {} tools from MCP provider.", tools.length);
-
-        for (var tool : tools) {
-            log.debug("Tool found: {}", tool.getToolDefinition().name());
-        }
-
-        return builder
-                .defaultSystem(systemPrompt)
-                .defaultToolCallbacks(tools)
-                .build();
-
-    }
 
     /**
      * Configures the RestClient.Builder.
@@ -141,38 +122,46 @@ public class AppConfig {
     }
 
     @Bean
-    public CommandLineRunner initVectorStore(QdrantClient qdrantClient) {
+    public CommandLineRunner initVectorStore(QdrantClient qdrantClient,
+                                             VectorStoreProperties vectorStoreProperties) {
         return args -> {
-            String collectionName = vectorStoreCollectionName;
             try {
-                qdrantClient.listCollectionsAsync().get().stream()
-                        .filter(c -> c.equals(collectionName))
-                        .findFirst()
-                        .ifPresentOrElse(
-                                c -> log.info("Collection '{}' already exists.",
-                                        collectionName),
-                                () -> {
-                                    log.info("Collection '{}' not found. Creating...",
-                                            collectionName);
-                                    try {
-                                        qdrantClient.createCollectionAsync(
-                                                        collectionName,
-                                                        Collections.VectorParams
-                                                                .newBuilder()
-                                                                .setSize(vectorStoreSize)
-                                                                .setDistance(Collections.Distance.Cosine)
-                                                                .build())
-                                                .get();
-                                        log.info("Collection '{}' created successfully.",
-                                                collectionName);
-                                    } catch (Exception e) {
-                                        log.error("Failed to create collection '{}'",
-                                                collectionName, e);
-                                    }
-                                });
-            } catch (Exception e) {
-                log.error("Failed to check collection '{}'", collectionName, e);
+                List<String> existingCollections = qdrantClient.listCollectionsAsync().get();
+                vectorStoreProperties.getCollections()
+                        .forEach(config -> createCollectionIfAbsent(qdrantClient,
+                                existingCollections, config));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Failed to fetch existing collections", e);
+            } catch (ExecutionException e) {
+                log.error("Failed to fetch existing collections", e);
             }
         };
+    }
+
+    private void createCollectionIfAbsent(QdrantClient qdrantClient, List<String> existingCollections,
+                                          VectorStoreProperties.CollectionConfig config) {
+        if (existingCollections.contains(config.getName())) {
+            log.info("[AppConfig] Collection '{}' already exists.", config.getName());
+            return;
+        }
+
+        log.info("[AppConfig] Collection '{}' not found. Creating with size {}...", config.getName(),
+                config.getSize());
+        try {
+            qdrantClient.createCollectionAsync(
+                            config.getName(),
+                            Collections.VectorParams.newBuilder()
+                                    .setSize(config.getSize())
+                                    .setDistance(Collections.Distance.Cosine)
+                                    .build())
+                    .get();
+            log.info("[AppConfig] Collection '{}' created successfully.", config.getName());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("[AppConfig] Interrupted while creating collection '{}'", config.getName(), e);
+        } catch (ExecutionException e) {
+            log.error("[AppConfig] Failed to create collection '{}'", config.getName(), e);
+        }
     }
 }

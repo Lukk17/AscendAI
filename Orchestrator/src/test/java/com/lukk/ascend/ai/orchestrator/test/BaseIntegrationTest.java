@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.orchestrator.test;
 
-import org.springframework.ai.chat.client.ChatClient;
+import com.lukk.ascend.ai.orchestrator.service.ChatModelResolver;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,7 +24,10 @@ public abstract class BaseIntegrationTest {
     protected CommandLineRunner initVectorStore;
 
     @MockitoBean
-    protected ChatClient chatClient;
+    protected ChatModelResolver chatModelResolver;
+
+    @MockitoBean
+    protected SyncMcpToolCallbackProvider toolCallbackProvider;
 
     @MockitoBean
     protected S3Client s3Client;

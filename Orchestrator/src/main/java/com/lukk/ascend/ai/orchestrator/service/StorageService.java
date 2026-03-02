@@ -25,9 +25,9 @@ public class StorageService {
         log.info("Uploading file to S3. Bucket: '{}', Key: '{}'", s3Bucket, key);
         try {
             s3Client.putObject(PutObjectRequest.builder()
-                    .bucket(s3Bucket)
-                    .key(key)
-                    .build(),
+                            .bucket(s3Bucket)
+                            .key(key)
+                            .build(),
                     RequestBody.fromInputStream(inputStream, size));
             log.info("Successfully uploaded file: '{}'", key);
         } catch (Exception e) {
