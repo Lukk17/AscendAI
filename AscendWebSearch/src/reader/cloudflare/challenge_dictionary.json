@@ -1,0 +1,24 @@
+{
+  "waf_script_signatures": [
+    "arkoselabs.com",
+    "recaptcha/api.js",
+    "hcaptcha.com/1/api.js",
+    "datadome.co/tags.js",
+    "perimeterx.net"
+  ],
+  "waf_strict_phrases": [
+    "Prove your humanity",
+    "Pardon Our Interruption",
+    "Please verify you are a human",
+    "Checking if the site connection is secure",
+    "Just a moment...",
+    "Attention Required!"
+  ],
+  "login_title_patterns": [
+    "sign in",
+    "log in",
+    "login",
+    "sign into",
+    "create account"
+  ]
+}

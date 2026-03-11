@@ -1,0 +1,64 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Docker Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+    <deployment type="dockerfile">
+      <settings>
+        <option name="imageTag" value="ascend-memory:latest" />
+        <option name="containerName" value="ascend-memory" />
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="OPENAI_BASE_URL" />
+              <option name="value" value="http://host.docker.internal:1234/v1" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="API_PORT" />
+              <option name="value" value="7020" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="API_HOST" />
+              <option name="value" value="0.0.0.0" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="QDRANT_HOST" />
+              <option name="value" value="qdrant" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="QDRANT_PORT" />
+              <option name="value" value="6333" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MEM0_EMBEDDING_MODEL" />
+              <option name="value" value="text-embedding-nomic-embed-text-v2-moe" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MEM0_COLLECTION_NAME" />
+              <option name="value" value="ascend_memory" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MEM0_EMBEDDING_DIMS" />
+              <option name="value" value="768" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MEM0_INFER_MEMORY" />
+              <option name="value" value="false" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LOG_LEVEL" />
+              <option name="value" value="INFO" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="portBindings">
+          <list>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="7020" />
+              <option name="hostPort" value="7020" />
+            </DockerPortBindingImpl>
+          </list>
+        </option>
+        <option name="sourceFilePath" value="Dockerfile" />
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>
