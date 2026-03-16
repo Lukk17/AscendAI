@@ -14,9 +14,15 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
 @Service
 @RequiredArgsConstructor
@@ -74,6 +80,7 @@ public class ChatModelResolver {
         OpenAiApi openAiApi = OpenAiApi.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
+                .restClientBuilder(RestClient.builder().requestFactory(buildRequestFactory(config.getTimeoutSeconds())))
                 .build();
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
@@ -89,17 +96,31 @@ public class ChatModelResolver {
 
     private AnthropicChatModel buildAnthropicChatModel(ProviderConfig config) {
         AnthropicApi anthropicApi = AnthropicApi.builder()
+                .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
+                .restClientBuilder(RestClient.builder().requestFactory(buildRequestFactory(config.getTimeoutSeconds())))
                 .build();
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .model(config.getModel())
                 .temperature(config.getTemperature())
+                .maxTokens(config.getMaxTokens() != null ? config.getMaxTokens() : 4096)
                 .build();
 
         return AnthropicChatModel.builder()
                 .anthropicApi(anthropicApi)
                 .defaultOptions(options)
                 .build();
+    }
+
+    @SuppressWarnings("null")
+    private ClientHttpRequestFactory buildRequestFactory(Long timeoutSeconds) {
+        Duration timeout = Duration.ofSeconds(timeoutSeconds != null ? timeoutSeconds : 60);
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(timeout);
+        return requestFactory;
     }
 }

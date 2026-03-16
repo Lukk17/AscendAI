@@ -6,6 +6,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 
 @Configuration
 @Slf4j
@@ -20,7 +21,7 @@ public class BucketInitConfig {
             try {
                 s3Client.headBucket(b -> b.bucket(s3Bucket));
                 log.info("Bucket '{}' already exists.", s3Bucket);
-            } catch (software.amazon.awssdk.services.s3.model.NoSuchBucketException e) {
+            } catch (NoSuchBucketException e) {
                 log.info("Bucket '{}' not found. Creating...", s3Bucket);
                 s3Client.createBucket(b -> b.bucket(s3Bucket));
                 log.info("Bucket '{}' created successfully.", s3Bucket);

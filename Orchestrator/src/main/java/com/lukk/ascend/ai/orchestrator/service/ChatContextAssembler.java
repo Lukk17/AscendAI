@@ -37,20 +37,27 @@ public class ChatContextAssembler {
         if (!semanticMemoryBlock.isBlank()) {
             sb.append("\n\n").append(semanticMemoryBlock);
         }
+        
+        log.info("Assembled SystemMessage for user: '{}'. State -> BaseSystemPrompt: YES, UserInstructions: {}, SemanticMemory: {} ({} items)", 
+                userId, (instructions != null && !instructions.isBlank()) ? "YES" : "NO", !semanticMemoryBlock.isBlank() ? "YES" : "NO", semanticMemory != null ? semanticMemory.size() : 0);
+                
         return sb.toString();
     }
 
-    public String buildUserMessage(String originalPrompt, MultipartFile document, String provider) {
+    public String buildUserMessage(String originalPrompt, MultipartFile document, String embeddingProvider) {
         String userPrompt = originalPrompt;
 
         if (document != null && !document.isEmpty()) {
             userPrompt += documentIngestionService.processDocument(document);
         }
 
-        String ragContext = ragRetrievalService.retrieveContext(userPrompt, provider);
+        String ragContext = ragRetrievalService.retrieveContext(userPrompt, embeddingProvider);
         if (!ragContext.isBlank()) {
             userPrompt += "\n\n" + ragContext;
         }
+
+        log.info("Assembled UserMessage. State -> DocumentAttached: {}, RAG Context Injected: {}", 
+                (document != null && !document.isEmpty()) ? "YES" : "NO", !ragContext.isBlank() ? "YES" : "NO");
 
         return userPrompt;
     }

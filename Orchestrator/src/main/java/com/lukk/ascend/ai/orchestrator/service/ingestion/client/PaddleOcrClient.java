@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -53,7 +54,7 @@ public class PaddleOcrClient {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add(PARAM_FILES, new NamedByteArrayResource(fileBytes, filename));
         Optional.ofNullable(lang)
-                .filter(l -> !l.isBlank())
+                .filter(StringUtils::hasText)
                 .ifPresent(l -> body.add(PARAM_LANG, l));
 
         try {

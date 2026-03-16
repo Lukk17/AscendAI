@@ -18,11 +18,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -85,8 +87,11 @@ public class ChatExecutor {
         if (image != null && !image.isEmpty()) {
             try {
                 Resource imageResource = new InputStreamResource(image.getInputStream());
-                promptBuilder.user(u -> u.text(userPrompt).media(MimeTypeUtils.IMAGE_PNG, imageResource));
-                log.info("Attached image resource to prompt");
+                MimeType mimeType = Optional.ofNullable(image.getContentType())
+                        .map(MimeType::valueOf)
+                        .orElse(MimeTypeUtils.IMAGE_PNG);
+                promptBuilder.user(u -> u.text(userPrompt).media(mimeType, imageResource));
+                log.info("Attached image resource to prompt with MimeType: {}", mimeType);
             } catch (Exception e) {
                 throw new AiGenerationException("Failed to process image upload", e);
             }

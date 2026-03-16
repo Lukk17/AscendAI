@@ -1,6 +1,6 @@
 package com.lukk.ascend.ai.orchestrator.service;
 
-import com.lukk.ascend.ai.orchestrator.config.properties.VectorStoreProperties;
+import com.lukk.ascend.ai.orchestrator.config.properties.EmbeddingProviderProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -15,26 +15,27 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class VectorStoreResolver {
 
-    private final Map<String, QdrantVectorStore> vectorStoreMap;
-    private final VectorStoreProperties vectorStoreProperties;
+    private final Map<String, QdrantVectorStore> embeddingProviderStoreMap;
+    private final EmbeddingProviderProperties embeddingProviderProperties;
 
-    public VectorStore resolve(String provider) {
-        String collectionName = resolveCollectionName(provider);
-        log.info("[VectorStoreResolver] Provider: {} -> Collection: {}", provider, collectionName);
+    public VectorStore resolve(String embeddingProvider) {
+        String resolvedProvider = resolveProviderName(embeddingProvider);
+        log.info("[VectorStoreResolver] Resolving VectorStore for embedding provider: {}", resolvedProvider);
 
-        return Optional.ofNullable(vectorStoreMap.get(collectionName))
-                .orElseGet(() -> {
-                    log.warn("[VectorStoreResolver] Collection '{}' not found in map, falling back to default",
-                            collectionName);
-                    return vectorStoreMap.get(vectorStoreProperties.getDefaultCollection());
-                });
+        QdrantVectorStore vectorStore = embeddingProviderStoreMap.get(resolvedProvider);
+        if (vectorStore == null) {
+            log.error("[VectorStoreResolver] Embedding provider '{}' not found. Available: {}",
+                    resolvedProvider, embeddingProviderStoreMap.keySet());
+            throw new IllegalStateException(
+                    "VectorStore for embedding provider '%s' not found".formatted(resolvedProvider));
+        }
+        return vectorStore;
     }
 
-    private String resolveCollectionName(String provider) {
-        return Optional.ofNullable(provider)
+    public String resolveProviderName(String embeddingProvider) {
+        return Optional.ofNullable(embeddingProvider)
                 .filter(p -> !p.isBlank())
-                .map(p -> vectorStoreProperties.getProviderCollectionMapping().getOrDefault(p.toLowerCase(),
-                        vectorStoreProperties.getDefaultCollection()))
-                .orElse(vectorStoreProperties.getDefaultCollection());
+                .map(String::toLowerCase)
+                .orElse(embeddingProviderProperties.getDefaultProvider());
     }
 }

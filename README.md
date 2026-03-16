@@ -2,24 +2,29 @@
 
 This repository contains a multi-module AI orchestration platform built with Spring AI and the Model Context Protocol (MCP). It routes user prompts to multiple AI providers (LM Studio, OpenAI, Gemini, Anthropic, MiniMax) with per-request selection, extends LLM capabilities with external tools, and provides a RAG pipeline with semantic memory.
 
+**Supported Gemini Models:**
+- `gemini-flash-latest` (Default)
+- `gemini-pro-latest`
+- `gemini-flash-lite-latest`
+
 ---
 
 ## 🏗️ System Architecture
 
 📐 **[Full Architecture Documentation](docs/architecture/arc42/01-introduction-and-goals.md)** — arc42, ADRs, and C4 Mermaid diagrams.
 
-*   **Orchestrator**: Spring Boot application — REST API, multi-provider AI, RAG pipeline, MCP tool integration.
-*   **AudioScribe**: MCP server for audio transcription (FastMCP/Python).
-*   **WeatherMCP**: MCP server for weather data (Spring Boot/Java).
-*   **AscendWebSearch**: MCP server for web search via SearXNG (FastMCP/Python).
-*   **AscendMemory**: Semantic memory service with REST API (FastAPI/Python).
-*   **Support Services** (Dockerized):
-    *   **MinIO**: S3-compatible object storage for document ingestion.
-    *   **Qdrant**: Vector database for RAG embeddings and semantic memory.
-    *   **Redis**: Chat history cache.
-    *   **SearXNG**: Privacy-respecting meta search engine.
-    *   **FlareSolverr**: Cloudflare bypass proxy for web scraping.
-*   **PostgreSQL**: Persistent metadata and chat history (local or Docker).
+- **Orchestrator**: Spring Boot application — REST API, multi-provider AI, RAG pipeline, MCP tool integration.
+- **AudioScribe**: MCP server for audio transcription (FastMCP/Python).
+- **WeatherMCP**: MCP server for weather data (Spring Boot/Java).
+- **AscendWebSearch**: MCP server for web search via SearXNG (FastMCP/Python).
+- **AscendMemory**: Semantic memory service with REST API (FastAPI/Python).
+- **Support Services** (Dockerized):
+  - **MinIO**: S3-compatible object storage for document ingestion.
+  - **Qdrant**: Vector database for RAG embeddings and semantic memory.
+  - **Redis**: Chat history cache.
+  - **SearXNG**: Privacy-respecting meta search engine.
+  - **FlareSolverr**: Cloudflare bypass proxy for web scraping.
+- **PostgreSQL**: Persistent metadata and chat history (local or Docker).
 
 ---
 
@@ -27,9 +32,9 @@ This repository contains a multi-module AI orchestration platform built with Spr
 
 ### Prerequisites
 
-*   **Docker Desktop** (running)
-*   **Java 21**
-*   **PostgreSQL** (Active instance on port 5432)
+- **Docker Desktop** (running)
+- **Java 21**
+- **PostgreSQL** (Active instance on port 5432)
 
 ### 1. Start Infrastructure
 
@@ -42,9 +47,10 @@ docker-compose up -d
 ### 2. Configure Database
 
 Ensure your local PostgreSQL has a database named `ascend_ai`. The application is configured to connect with the following default credentials (update `Orchestrator/src/main/resources/application.yaml` if yours differ):
-*   **User**: `postgres`
-*   **Password**: `local`
-*   **Database**: `ascend_ai`
+
+- **User**: `postgres`
+- **Password**: `local`
+- **Database**: `ascend_ai`
 
 ### 3. Run the Orchestrator
 
@@ -56,16 +62,18 @@ cd Orchestrator
 ```
 
 The application will automatically:
-*   Connect to MinIO.
-*   Create the `knowledge-base` bucket if it doesn't exist.
-*   Initialize the necessary database tables (`INT_METADATA_STORE`, etc.).
+
+- Connect to MinIO.
+- Create the `knowledge-base` bucket if it doesn't exist.
+- Initialize the necessary database tables (`INT_METADATA_STORE`, etc.).
 
 ---
 
 ## 🌐 HTTP Orchestrator API
 
 ### 1. Extract Web Payload (`v2`)
-The `/api/v2/web/read` endpoint accepts a `POST` request with an explicit JSON payload. This is required because complex target URLs containing parameters (e.g., `?login=true&auth=1`) get natively stripped by standard HTTP `GET` query parsing. 
+
+The `/api/v2/web/read` endpoint accepts a `POST` request with an explicit JSON payload. This is required because complex target URLs containing parameters (e.g., `?login=true&auth=1`) get natively stripped by standard HTTP `GET` query parsing.
 
 ```bash
 curl -X POST http://localhost:7021/api/v2/web/read \
@@ -81,28 +89,31 @@ curl -X POST http://localhost:7021/api/v2/web/read \
 
 ## ⚙️ Configuration & Ports
 
-| Service | Port | Default Credentials | Description |
-| :--- | :--- | :--- | :--- |
-| **Orchestrator** | `9917` | - | Main API Gateway |
-| **AudioScribe** | `7017` | - | MCP — Audio Transcription |
-| **WeatherMCP** | `9998` | - | MCP — Weather Data |
-| **AscendWebSearch** | `7021` | - | MCP — Web Search |
-| **AscendMemory** | `7020` | - | REST — Semantic Memory |
-| **MinIO API** | `9070` | `admin` / `password` | S3 API Endpoint |
-| **MinIO Console** | `9071` | `admin` / `password` | Web UI for File Management |
-| **Qdrant** | `6333` / `6334` | - | Vector Database (HTTP/gRPC) |
-| **Redis** | `6379` | - | Cache |
-| **SearXNG** | `8088` | - | Meta Search Engine |
-| **FlareSolverr** | `8191` | - | Cloudflare Bypass |
-| **PostgreSQL** | `5432` | `postgres` / `local` | Metadata Storage |
+| Service             | Port            | Default Credentials  | Description                 |
+| :------------------ | :-------------- | :------------------- | :-------------------------- |
+| **Orchestrator**    | `9917`          | -                    | Main API Gateway            |
+| **AudioScribe**     | `7017`          | -                    | MCP — Audio Transcription   |
+| **WeatherMCP**      | `9998`          | -                    | MCP — Weather Data          |
+| **AscendWebSearch** | `7021`          | -                    | MCP — Web Search            |
+| **AscendMemory**    | `7020`          | -                    | REST — Semantic Memory      |
+| **MinIO API**       | `9070`          | `admin` / `password` | S3 API Endpoint             |
+| **MinIO Console**   | `9071`          | `admin` / `password` | Web UI for File Management  |
+| **Qdrant**          | `6333` / `6334` | -                    | Vector Database (HTTP/gRPC) |
+| **Redis**           | `6379`          | -                    | Cache                       |
+| **SearXNG**         | `8088`          | -                    | Meta Search Engine          |
+| **FlareSolverr**    | `8191`          | -                    | Cloudflare Bypass           |
+| **PostgreSQL**      | `5432`          | `postgres` / `local` | Metadata Storage            |
 
 ### 3. Publish (Push)
+
 Log in to Docker Hub if you haven't already:
+
 ```bash
 docker login
 ```
 
 Push the tagged images:
+
 ```bash
 docker push lukk17/ascend-ai:v1.0.0
 docker push lukk17/ascend-ai:latest
@@ -110,14 +121,14 @@ docker push lukk17/ascend-ai:latest
 
 ---
 
-
 ---
 
 ## � Data and Persistence
 
 Docker uses a **named volume** (`minio_data`) to persist your MinIO data (buckets and files). This ensures that even if you remove the container, your data remains safe.
-*   **Location**: Managed by Docker (usually in `/var/lib/docker/volumes/...`).
-*   **Management**: Use `docker volume ls` and `docker volume inspect minio_data` to view details.
+
+- **Location**: Managed by Docker (usually in `/var/lib/docker/volumes/...`).
+- **Management**: Use `docker volume ls` and `docker volume inspect minio_data` to view details.
 
 ---
 
@@ -126,24 +137,27 @@ Docker uses a **named volume** (`minio_data`) to persist your MinIO data (bucket
 To add documents (Markdown, PDF, DOCX) to your RAG pipeline, you need to upload them to the `knowledge-base` bucket in MinIO.
 
 ### Option 1: MinIO Console (Web UI)
+
 1.  Open [http://localhost:9071](http://localhost:9071).
 2.  Login with default credentials: `admin` / `password`.
 3.  Click on **Buckets** in the left menu.
 4.  Select `knowledge-base`.
-    *   *If it doesn't exist, the Orchestrator will create it on startup, or you can create it manually.*
+    - _If it doesn't exist, the Orchestrator will create it on startup, or you can create it manually._
 5.  Click **Object Browser** -> **Upload**.
 6.  Select your file(s) or folder(s).
-    *   **Markdown**: Files with `.md` (best if from Obsidian).
-    *   **Documents**: PDFs, DOCX, etc. (processed via Unstructured API).
+    - **Markdown**: Files with `.md` (best if from Obsidian).
+    - **Documents**: PDFs, DOCX, etc. (processed via Unstructured API).
 
 ### Option 2: CLI (curl) via Orchestrator
+
 You can directly upload files using the Orchestrator's API, which will automatically route them to the correct folder (`obsidian/` or `documents/`):
 
 ```bash
 # Example: Uploading a Markdown file
 curl -X POST -F "file=@width_test.md" http://localhost:9917/api/ingestion/upload
 ```
-*Note: Make sure the file exists in your current directory.*
+
+_Note: Make sure the file exists in your current directory._
 
 ---
 
@@ -175,16 +189,23 @@ If you need to completely reset the MinIO state or delete a bucket that is stuck
 
 ### 2. Qdrant: Managing Vector Data
 
-The Orchestrator uses a Qdrant collection named `ascendai` (configured in `application.yaml`).
+The system uses Qdrant for two distinct features:
+
+1. **RAG (Orchestrator)**: Uses `ascendai-768` (for Gemini/LM Studio) or `ascendai-1536` (for OpenAI) depending on the active embedding dimensions.
+2. **Semantic Memory (AscendMemory / Mem0)**: Uses the `ascend_memory` collection (768 dimensions by default, using `text-embedding-nomic-embed-text-v2-moe`).
 
 **Delete Entire Collection (Reset Memory):**
-To completely wipe all vector data:
+To completely wipe all vector data for a given collection:
+
 ```bash
-curl -X DELETE "http://localhost:6333/collections/ascendai"
+curl -X DELETE "http://localhost:6333/collections/ascendai-768"
+curl -X DELETE "http://localhost:6333/collections/ascendai-1536"
+curl -X DELETE "http://localhost:6333/collections/ascend_memory"
 ```
 
 **Granular Deletion (Remove Specific File):**
 To remove only the vectors associated with a specific file (e.g., `kierunki.md`):
+
 ```bash
 curl -X POST "http://localhost:6333/collections/ascendai/points/delete" \
      -H "Content-Type: application/json" \
@@ -199,37 +220,71 @@ curl -X POST "http://localhost:6333/collections/ascendai/points/delete" \
 
 **List All Collections:**
 To view all existing collections:
+
 ```bash
 curl http://localhost:6333/collections
 ```
 
 **Visualizing Data (Qdrant Dashboard):**
 The Qdrant image includes a **Built-in Dashboard**.
-*   **URL**: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
-*   You can browse collections, view stored vectors, and verify data ingestion visually without needing extra containers.
+
+- **URL**: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
+- You can browse collections, view stored vectors, and verify data ingestion visually without needing extra containers.
 
 ### 3. Resetting Ingestion History (PostgreSQL)
 
 To force the system to re-process files, you must remove their entries from the metadata store.
 
 **Database Details:**
-*   **Database**: `ascend_ai`
-*   **Schema**: `public`
-*   **Table**: `int_metadata_store`
+
+- **Database**: `ascend_ai`
+- **Schema**: `public`
+- **Table**: `int_metadata_store`
 
 **Option A: Clear History for a Single File (Granular)**
 If you want to re-ingest a specific file (e.g., `test.md`):
+
 ```sql
-DELETE FROM public.int_metadata_store 
-WHERE metadata_key LIKE '%test.md' 
-   OR metadata_key LIKE '%test.md'; 
+DELETE FROM public.int_metadata_store
+WHERE metadata_key LIKE '%test.md'
+   OR metadata_key LIKE '%test.md';
 ```
-*(Note: Keys often include prefixes like `s3-metadata` or `local-fs-metadata`)*
+
+_(Note: Keys often include prefixes like `s3-metadata` or `local-fs-metadata`)_
 
 **Option B: Clear ALL History (Full Reset)**
 To force the system to re-process **everything**:
+
 ```sql
 TRUNCATE TABLE public.int_metadata_store;
 ```
 
 **After running either command, restart the Orchestrator.**
+
+### 4. Resetting Chat History (Redis & PostgreSQL)
+
+The Orchestrator maintains your chat context in two places:
+
+1.  **Short-Term History (Redis)**: This is the active context window sent to the LLM during conversational interactions.
+2.  **Long-Term History (PostgreSQL)**: The system archives all interactions to the database for persistent auditing and user analytics.
+
+**Clear Active Context (Redis):**
+To completely wipe the active memory for all sessions, flush the Redis cached keys:
+
+1. Exec into the Redis container:
+   ```bash
+   docker exec -it redis-stack redis-cli
+   ```
+2. Flush all keys:
+   ```bash
+   FLUSHALL
+   ```
+
+**Clear Archived History (PostgreSQL):**
+If you want to completely erase the persistent database records of previous chats from the system:
+
+1. Connect to the PostgreSQL database (`ascend_ai`).
+2. Run the following command:
+   ```sql
+   DELETE FROM chat_history;
+   ```

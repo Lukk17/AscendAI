@@ -1,6 +1,5 @@
 package com.lukk.ascend.ai.orchestrator.service;
 
-import com.lukk.ascend.ai.orchestrator.config.properties.VectorStoreProperties;
 import com.lukk.ascend.ai.orchestrator.exception.IngestionException;
 import com.lukk.ascend.ai.orchestrator.service.ingestion.IngestionService;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +11,15 @@ import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.S3Object;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -30,7 +32,6 @@ public class ManualIngestionService {
     private final IngestionService ingestionService;
     private final DocumentService documentService;
     private final VectorStoreResolver vectorStoreResolver;
-    private final VectorStoreProperties vectorStoreProperties;
 
     @Value("${app.s3.bucket}")
     private String bucket;
@@ -41,7 +42,7 @@ public class ManualIngestionService {
     @Value("${app.ingestion.folders.documents:documents/}")
     private String documentsFolder;
 
-    public ManualIngestionResult run(Optional<String> prefix) {
+    public ManualIngestionResult run(Optional<String> prefix, String embeddingProvider) {
         String continuationToken = null;
         ManualIngestionResult result = new ManualIngestionResult();
 
@@ -50,7 +51,7 @@ public class ManualIngestionService {
             continuationToken = response.nextContinuationToken();
 
             for (S3Object object : response.contents()) {
-                processObject(object, result);
+                processObject(object, result, embeddingProvider);
             }
         } while (continuationToken != null && !continuationToken.isBlank());
 
@@ -71,7 +72,7 @@ public class ManualIngestionService {
         return s3Client.listObjectsV2(builder.build());
     }
 
-    private void processObject(S3Object object, ManualIngestionResult result) {
+    private void processObject(S3Object object, ManualIngestionResult result, String embeddingProvider) {
         String key = object.key();
         if (key == null || key.isBlank()) {
             return;
@@ -90,10 +91,10 @@ public class ManualIngestionService {
             return;
         }
 
-        ingestObject(key, result);
+        ingestObject(key, result, embeddingProvider);
     }
 
-    private void ingestObject(String key, ManualIngestionResult result) {
+    private void ingestObject(String key, ManualIngestionResult result, String embeddingProvider) {
         try (ResponseInputStream<GetObjectResponse> stream = s3Client.getObject(GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
@@ -110,7 +111,7 @@ public class ManualIngestionService {
             }
 
             List<Document> chunks = documentService.splitDocuments(documents);
-            ingestIntoAllCollections(chunks, key);
+            ingestIntoActiveCollection(chunks, key, embeddingProvider);
             result.indexed += chunks.size();
         } catch (IngestionException e) {
             result.failed++;
@@ -121,24 +122,14 @@ public class ManualIngestionService {
         }
     }
 
-    private void ingestIntoAllCollections(List<Document> chunks, String key) {
-        vectorStoreProperties.getCollections().forEach(config -> {
-            VectorStore store = vectorStoreResolver.resolve(resolveProviderForCollection(config.getName()));
-            log.info("[ManualIngestionService] Ingesting {} chunks into collection '{}' for key: {}",
-                    chunks.size(), config.getName(), key);
-            documentService.removeOldDocuments(chunks, store);
-            for (Document chunk : chunks) {
-                store.add(List.of(chunk));
-            }
-        });
-    }
-
-    private String resolveProviderForCollection(String collectionName) {
-        return vectorStoreProperties.getProviderCollectionMapping().entrySet().stream()
-                .filter(entry -> entry.getValue().equals(collectionName))
-                .map(Map.Entry::getKey)
-                .findFirst()
-                .orElse(null);
+    private void ingestIntoActiveCollection(List<Document> chunks, String key, String embeddingProvider) {
+        VectorStore store = vectorStoreResolver.resolve(embeddingProvider);
+        log.info("[ManualIngestionService] Ingesting {} chunks for key: {} using embeddingProvider: {}",
+                chunks.size(), key, embeddingProvider);
+        documentService.removeOldDocuments(chunks, store);
+        for (Document chunk : chunks) {
+            store.add(List.of(chunk));
+        }
     }
 
     private boolean shouldIngestKey(String key) {

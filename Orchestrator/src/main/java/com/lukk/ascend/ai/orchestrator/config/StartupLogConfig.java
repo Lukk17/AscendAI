@@ -1,7 +1,7 @@
 package com.lukk.ascend.ai.orchestrator.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.ObjectProvider;
@@ -22,9 +22,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Component
+@Slf4j
 public class StartupLogConfig implements ApplicationListener<ApplicationReadyEvent> {
 
-    private static final Logger log = LoggerFactory.getLogger(StartupLogConfig.class);
     private final Environment env;
     private final DataSource dataSource;
     private final StringRedisTemplate redisTemplate;

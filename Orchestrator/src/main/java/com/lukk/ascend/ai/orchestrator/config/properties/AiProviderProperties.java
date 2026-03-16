@@ -18,11 +18,15 @@ public class AiProviderProperties {
     @Getter
     @Setter
     public static class ProviderConfig {
-        private boolean enabled;
+        private boolean isEnabled;
         private String type;
         private String baseUrl;
         private String apiKey;
         private String model;
+        private String memoryExtractionModel;
+        private String defaultEmbedding;
         private double temperature;
+        private Integer maxTokens;
+        private Long timeoutSeconds;
     }
 }

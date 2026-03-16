@@ -5,6 +5,7 @@ import com.lukk.ascend.ai.orchestrator.config.api.ApiCommonSuccessResponses;
 import com.lukk.ascend.ai.orchestrator.service.ManualIngestionService;
 import com.lukk.ascend.ai.orchestrator.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +48,9 @@ public class IngestionController {
     @ApiCommonSuccessResponses
     @ApiCommonErrorResponses
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> uploadDocument(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<String> uploadDocument(
+            @Parameter(description = "File to upload. Markdown files (.md) go to obsidian/ folder, others to documents/ folder.", required = true)
+            @RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("File is empty");
         }
@@ -65,13 +68,19 @@ public class IngestionController {
         }
     }
 
-    @Operation(summary = "Run ingestion", description = "Manually scans the S3 bucket and ingests new/updated files.")
+    @Operation(summary = "Run ingestion", description = "Manually scans the S3 bucket and ingests new/updated files into the vector store for the specified embedding provider.")
     @ApiCommonSuccessResponses
     @ApiCommonErrorResponses
     @PostMapping(value = "/run")
     public ResponseEntity<ManualIngestionService.ManualIngestionResult> runIngestion(
-            @RequestParam(value = "prefix", required = false) String prefix) {
-        return ResponseEntity.ok(manualIngestionService.run(Optional.ofNullable(prefix)));
+            @Parameter(description = "Optional S3 key prefix to limit scan scope. If omitted, scans the entire bucket.", example = "obsidian/")
+            @RequestParam(value = "prefix", required = false) String prefix,
+
+            @Parameter(description = "Embedding provider to use for ingestion. Determines which collection (768 or 1536) documents are embedded into. "
+                    + "Available: lmstudio (768-dim), gemini (768-dim), openai (1536-dim). Defaults to EMBEDDING_PROVIDER env var.",
+                    example = "lmstudio")
+            @RequestParam(value = "embeddingProvider", required = false) String embeddingProvider) {
+        return ResponseEntity.ok(manualIngestionService.run(Optional.ofNullable(prefix), embeddingProvider));
     }
 
     /**

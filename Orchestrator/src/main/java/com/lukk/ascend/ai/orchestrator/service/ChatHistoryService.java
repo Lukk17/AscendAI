@@ -9,7 +9,6 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -19,12 +18,12 @@ public class ChatHistoryService {
 
     public List<Message> loadHistory(String userId) {
         List<Message> history = persistentChatMemory.get(userId, 100);
-        log.info("Loaded chat history for user: {}, size: {}", userId, history.size());
+        log.info("Loaded chat history for user: '{}'. Retrieved {} messages from persistence (Redis/Postgres).", userId, history.size());
         return history;
     }
 
     public void saveHistory(String userId, String userPrompt, String responseContent) {
-        log.info("Saving chat history for User: {}", userId);
+        log.info("Saving new interaction to chat history for user: '{}' (1 UserMessage, 1 AssistantMessage).", userId);
         Message userMsg = new UserMessage(userPrompt);
         Message assistantMsg = new AssistantMessage(responseContent);
         persistentChatMemory.add(userId, List.of(userMsg, assistantMsg));

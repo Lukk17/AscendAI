@@ -90,19 +90,109 @@ For a larger tool set and ambiguous prompts, you can add a model-router step tha
 
 The Orchestrator supports multiple AI providers with **per-request selection** via `provider` and `model` query parameters:
 
-| Provider | Type | Default Model | API Key Env Var |
+| Provider | Type | Default Model | API Key Env Var | Enabled Env Var |
+|---|---|---|---|---|
+| `lmstudio` (default) | OpenAI-compatible | `meta-llama-3.1-8b-instruct` | Not needed | `LMSTUDIO_ENABLED` (default: `true`) |
+| `openai` | OpenAI | `gpt-4o` | `OPENAI_API_KEY` | `OPENAI_ENABLED` (default: `true`) |
+| `gemini` | OpenAI-compatible | `gemini-2.5-flash` | `GEMINI_API_KEY` | `GEMINI_ENABLED` (default: `true`) |
+| `anthropic` | Anthropic native | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` | `ANTHROPIC_ENABLED` (default: `true`) |
+| `minimax` | OpenAI-compatible | `MiniMax-M2.5` | `MINIMAX_API_KEY` | `MINIMAX_ENABLED` (default: `true`) |
+
+Providers are configured in `application.yaml` under `app.ai.providers`. Each can be enabled/disabled via environment variables. Models default to environment variables with fallback values.
+
+### Popular Models per Provider
+
+#### OpenAI
+| Model | Description |
+|---|---|
+| `gpt-5.4` | Latest flagship — unified Codex+GPT, 1M+ context, advanced reasoning |
+| `gpt-5.1` | Conversational focus, available in Instant/Thinking/Pro variants |
+| `gpt-5-mini` | Lightweight and cost-effective |
+| `gpt-4o` | Multimodal (text/audio/image), fast response times |
+| `gpt-4o-mini` | Smaller, cheaper variant of GPT-4o |
+
+#### Anthropic
+| Model | Description |
+|---|---|
+| `claude-opus-4-6` | Most capable — excels at complex tasks and agentic workflows, 1M context |
+| `claude-sonnet-4-6` | Best Sonnet — Opus-level coding performance at Sonnet pricing, 1M context |
+| `claude-sonnet-4-5` | Previous generation balanced model |
+| `claude-haiku-4-5` | Fastest and most cost-effective |
+| `claude-haiku-3-5` | Budget-friendly for simple tasks |
+
+#### Gemini
+| Model | Description |
+|---|---|
+| `gemini-3.1-pro` | Latest — advanced reasoning, long-context, multimodal |
+| `gemini-3.1-flash` | Frontier performance at lower cost |
+| `gemini-3.1-flash-lite` | Fastest and most cost-efficient Gemini 3 model |
+| `gemini-2.5-pro` | Deep reasoning and coding, free tier available |
+| `gemini-2.5-flash` | Best price-performance for high-volume tasks |
+
+#### MiniMax
+| Model | Description |
+|---|---|
+| `MiniMax-M2.5` | Flagship — complex tasks, strong coding, tool-call collaboration |
+| `MiniMax-M2.5-highspeed` | Faster variant of M2.5 |
+| `MiniMax-M2.1` | Multilingual programming and code refactoring |
+| `MiniMax-M2` | Balanced performance/cost for agentic workflows |
+| `MiniMax-M1` | Open-source 456B MoE model, 1M context |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `LMSTUDIO_ENABLED` | No | Enable LM Studio provider (default: `true`) |
+| `OPENAI_ENABLED` | No | Enable OpenAI provider (default: `true`) |
+| `OPENAI_API_KEY` | If OpenAI enabled | OpenAI API key from [platform.openai.com](https://platform.openai.com/) |
+| `GEMINI_ENABLED` | No | Enable Gemini provider (default: `true`) |
+| `GEMINI_API_KEY` | If Gemini enabled | Gemini API key from [aistudio.google.com](https://aistudio.google.com/) |
+| `ANTHROPIC_ENABLED` | No | Enable Anthropic provider (default: `true`) |
+| `ANTHROPIC_API_KEY` | If Anthropic enabled | Anthropic API key from [platform.claude.com](https://platform.claude.com/settings/keys) |
+| `MINIMAX_ENABLED` | No | Enable MiniMax provider (default: `true`) |
+| `MINIMAX_API_KEY` | If MiniMax enabled | MiniMax API key |
+| `OPENAI_MODEL` | No | Override default OpenAI model (default: `gpt-4o`) |
+| `GEMINI_MODEL` | No | Override default Gemini model (default: `gemini-2.5-flash`) |
+| `ANTHROPIC_MODEL` | No | Override default Anthropic model (default: `claude-sonnet-4-5`) |
+| `MINIMAX_MODEL` | No | Override default MiniMax model (default: `MiniMax-M2.5`) |
+| `LMSTUDIO_MODEL` | No | Override default LM Studio model (default: `meta-llama-3.1-8b-instruct`) |
+| `EMBEDDING_PROVIDER` | No | Embedding provider: `lmstudio` (default), `openai`, or `gemini` |
+
+### Embedding Provider Configuration
+
+The embedding provider controls which service generates vector embeddings for RAG and which Qdrant collection is used. It can be set **per-request** via the `embeddingProvider` parameter, defaulting to the `EMBEDDING_PROVIDER` env var (default: `lmstudio`).
+
+| Embedding Provider | Model | Dimensions | Requires |
 |---|---|---|---|
-| `lmstudio` (default) | OpenAI-compatible | `meta-llama-3.1-8b-instruct` | Not needed |
-| `openai` | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
-| `gemini` | OpenAI-compatible | `gemini-2.5-flash` | `GEMINI_API_KEY` |
-| `anthropic` | Anthropic native | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
-| `minimax` | OpenAI-compatible | `MiniMax-M2.5` | `MINIMAX_API_KEY` |
+| `lmstudio` (default) | `text-embedding-nomic-embed-text-v2-moe` | 768 | LM Studio running locally |
+| `openai` | `text-embedding-3-small` | 1536 | `OPENAI_API_KEY` |
+| `gemini` | `gemini-embedding-001` | 768 | `GEMINI_API_KEY` |
 
-Providers are configured in `application.yaml` under `app.ai.providers`. Each can be enabled/disabled independently. Models default to environment variables with fallback values.
+#### Per-Request Usage
 
-### Embeddings: `text-embedding-nomic-embed-text-v2-moe`
-*   **Matryoshka Representation**: Allows flexible embedding sizes.
-*   **Multilingual Support**: Handles Polish/English mixing. The `v2` version handles non-English contexts better than `v1.5`.
+```
+POST /api/v1/ai/prompt
+  prompt=...
+  provider=anthropic           # chat provider
+  embeddingProvider=lmstudio   # embedding provider (optional)
+
+POST /api/ingestion/run
+  embeddingProvider=openai     # ingest into 1536-dim collection
+```
+
+#### Compatibility Matrix
+
+Incompatible combinations return **400 Bad Request**.
+
+| Embedding → | `lmstudio` (768) | `gemini` (768) | `openai` (1536) |
+|---|---|---|---|
+| Chat: `lmstudio` | ✅ | ✅ | ❌ |
+| Chat: `gemini` | ✅ | ✅ | ✅ |
+| Chat: `anthropic` | ✅ | ✅ | ✅ |
+| Chat: `minimax` | ✅ | ✅ | ✅ |
+| Chat: `openai` | ❌ | ❌ | ✅ |
+
+> **Note**: Switching between dimension groups (768↔1536) requires re-ingestion of documents into the target collection.
 
 ---
 
@@ -344,10 +434,8 @@ SELECT * FROM user_instructions WHERE user_id = 'user1';
 ### Key Application Properties (`application.yaml`)
 
 *   **Server Port**: `9917`
-*   **Vector Store (Qdrant)**:
-    *   `app.vectorstore.collection-name`: local collection name (default: `ascendai`)
-    *   `app.vectorstore.size`: must match embedding dimension (default: `768` for `text-embedding-nomic-embed-text-v2-moe`)
-    *   `application-cloud.yaml`: overrides to `ascendai-cloud` + `1536` (OpenAI `text-embedding-3-small`) to avoid dimension mismatches
+*   **Embedding Provider**: `app.embedding.provider` — active embedding backend (`lmstudio`, `openai`, `gemini`)
+*   **Vector Store (Qdrant)**: Collections `ascendai-768` and `ascendai-1536` are auto-created. The active collection is derived from the embedding provider's dimensions.
 *   **S3 Configuration**:
     *   `s3.endpoint`: `http://localhost:9070`
     *   `s3.bucket`: `knowledge-base`

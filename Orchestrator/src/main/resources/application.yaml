@@ -48,7 +48,7 @@ app:
 
   memory:
     chat-history:
-      max-size: 50
+      max-size: 5
       ttl: 86400s
     user-profile:
       ttl: 86400s
@@ -57,56 +57,89 @@ app:
       search-limit: 10
 
   ai:
-    default-provider: lmstudio
+    default-provider: ${MODEL_PROVIDER:lmstudio}
     providers:
       lmstudio:
-        enabled: true
+        enabled: ${LMSTUDIO_ENABLED:true}
         type: openai
         base-url: "http://127.0.0.1:1234"
         api-key: "not-needed"
         model: ${LMSTUDIO_MODEL:meta-llama-3.1-8b-instruct}
+        memory-extraction-model: ${LMSTUDIO_MODEL:meta-llama-3.1-8b-instruct}
         temperature: 0.7
+        timeout-seconds: 120
+        default-embedding: lmstudio
       openai:
-        enabled: false
+        enabled: ${OPENAI_ENABLED:true}
         type: openai
         base-url: "https://api.openai.com"
         api-key: ${OPENAI_API_KEY:not-set}
         model: ${OPENAI_MODEL:gpt-4o}
+        memory-extraction-model: ${OPENAI_EXTRACTION_MODEL:gpt-4o-mini}
         temperature: 0.7
+        timeout-seconds: 120
+        default-embedding: openai
       gemini:
-        enabled: false
+        enabled: ${GEMINI_ENABLED:true}
         type: openai
         base-url: "https://generativelanguage.googleapis.com/v1beta/openai/"
         api-key: ${GEMINI_API_KEY:not-set}
-        model: ${GEMINI_MODEL:gemini-2.5-flash}
+        model: ${GEMINI_MODEL:gemini-flash-latest}
+        memory-extraction-model: ${GEMINI_EXTRACTION_MODEL:gemini-flash-lite-latest}
         temperature: 0.7
+        timeout-seconds: 120
+        default-embedding: gemini
       anthropic:
-        enabled: false
+        enabled: ${ANTHROPIC_ENABLED:true}
         type: anthropic
+        base-url: "https://api.anthropic.com"
         api-key: ${ANTHROPIC_API_KEY:not-set}
         model: ${ANTHROPIC_MODEL:claude-sonnet-4-5}
+        memory-extraction-model: ${ANTHROPIC_EXTRACTION_MODEL:claude-3-5-haiku-20241022}
         temperature: 0.7
+        max-tokens: 16384
+        timeout-seconds: 120
+        default-embedding: openai
       minimax:
-        enabled: false
+        enabled: ${MINIMAX_ENABLED:true}
         type: openai
         base-url: "https://api.minimax.io/v1"
         api-key: ${MINIMAX_API_KEY:not-set}
         model: ${MINIMAX_MODEL:MiniMax-M2.5}
+        memory-extraction-model: ${MINIMAX_EXTRACTION_MODEL:MiniMax-M2.5}
         temperature: 0.7
+        timeout-seconds: 120
+        default-embedding: openai
+
+  embedding:
+    provider: ${EMBEDDING_PROVIDER:lmstudio}
+    providers:
+      lmstudio:
+        type: openai
+        base-url: "http://127.0.0.1:1234"
+        api-key: "not-needed"
+        model: text-embedding-nomic-embed-text-v2-moe
+        dimensions: 768
+      openai:
+        type: openai
+        base-url: "https://api.openai.com"
+        api-key: ${OPENAI_API_KEY:not-set}
+        model: text-embedding-3-small
+        dimensions: 1536
+      gemini:
+        type: openai
+        base-url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+        api-key: ${GEMINI_API_KEY:not-set}
+        model: gemini-embedding-001
+        dimensions: 768
 
   vectorstore:
-    default-collection: ascendai-768
     collections:
       - name: ascendai-768
         size: 768
       - name: ascendai-1536
         size: 1536
-    provider-collection-mapping:
-      lmstudio: ascendai-768
-      gemini: ascendai-768
-      openai: ascendai-1536
-      anthropic: ascendai-1536
-      minimax: ascendai-1536
+
   rag:
     enabled: true
     top-k: 5
@@ -166,18 +199,18 @@ spring:
     openai:
       api-key: "not-needed"
       base-url: "http://127.0.0.1:1234"
-      embedding:
-        options:
-          model: "text-embedding-nomic-embed-text-v2-moe"
     vectorstore:
       qdrant:
-        collection-name: ${app.vectorstore.default-collection}
+        collection-name: ascendai-768
 
 logging:
   level:
+    root: INFO
     com.lukk.ai.orchestrator: DEBUG
     org.springframework: INFO
     org.springframework.ai: DEBUG
-
     org.springframework.web.client: INFO
     org.apache.http: INFO
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%-5level) %clr(%.5t){magenta} %clr(%logger{36}){cyan} %clr([SupplierConnect]){blue} : %msg%n"

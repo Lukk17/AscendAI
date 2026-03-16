@@ -9,9 +9,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -37,13 +40,13 @@ class PromptControllerTest {
         String prompt = "test prompt";
         String responseText = "AI Response";
         AiResponse aiResponse = new AiResponse(responseText, null);
-        org.springframework.test.util.ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
+        ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString(), any(), any()))
+        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString(), any(), any(), any()))
                 .thenReturn(aiResponse);
 
         // when
-        ResponseEntity<AiResponse> response = promptController.prompt(prompt, null, null, null, null, "user1");
+        ResponseEntity<AiResponse> response = promptController.prompt(prompt, null, null, null, null, null, "user1");
 
         // then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -55,12 +58,12 @@ class PromptControllerTest {
     void prompt_shouldThrowException_whenServiceFails() {
         // given
         String prompt = "test prompt";
-        org.springframework.test.util.ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
+        ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString(), any(), any()))
+        when(chatOrchestratorService.prompt(anyString(), any(), any(), anyString(), any(), any(), any()))
                 .thenThrow(new RuntimeException("Service Error"));
 
-        // when & then
-        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, "user1"));
+        // then
+        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, null, "user1"));
     }
 }

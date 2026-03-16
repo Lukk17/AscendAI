@@ -18,14 +18,15 @@ public class RagRetrievalService {
     private final VectorStoreResolver vectorStoreResolver;
     private final RagProperties ragProperties;
 
-    public String retrieveContext(String query, String provider) {
+    public String retrieveContext(String query, String embeddingProvider) {
         if (!ragProperties.isEnabled()) {
             return "";
         }
 
-        VectorStore vectorStore = vectorStoreResolver.resolve(provider);
-        log.info("[RagRetrievalService] Retrieving context for provider: {} with topK: {}", provider,
-                ragProperties.getTopK());
+        VectorStore vectorStore = vectorStoreResolver.resolve(embeddingProvider);
+        String collectionName = vectorStoreResolver.resolveProviderName(embeddingProvider);
+        log.info("Executing RAG retrieval against Qdrant collection: '{}' (embeddingProvider={}, topK={})",
+                collectionName, embeddingProvider, ragProperties.getTopK());
 
         SearchRequest searchRequest = SearchRequest.builder()
                 .query(query)
@@ -33,9 +34,8 @@ public class RagRetrievalService {
                 .similarityThreshold(SearchRequest.SIMILARITY_THRESHOLD_ACCEPT_ALL)
                 .build();
 
-        List<Document> documents = vectorStore.similaritySearch(searchRequest);
-        if (documents == null || documents.isEmpty()) {
-            log.debug("[RagRetrievalService] No documents returned. topK={}", ragProperties.getTopK());
+        List<Document> documents = performSimilaritySearch(vectorStore, searchRequest);
+        if (documents.isEmpty()) {
             return "";
         }
 
@@ -51,6 +51,17 @@ public class RagRetrievalService {
         }
 
         return buildContextBlock(documents);
+    }
+
+    private List<Document> performSimilaritySearch(VectorStore vectorStore, SearchRequest searchRequest) {
+        try {
+            List<Document> documents = vectorStore.similaritySearch(searchRequest);
+            return documents != null ? documents : List.of();
+        } catch (Exception e) {
+            log.warn("[RagRetrievalService] Similarity search failed (embedding service may be unavailable): {}",
+                    e.getMessage());
+            return List.of();
+        }
     }
 
     private String buildContextBlock(List<Document> documents) {

@@ -17,6 +17,10 @@ import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.web.client.RestClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import java.net.URI;
 
 import java.net.http.HttpClient;
 import java.util.List;
@@ -93,12 +97,12 @@ public class AppConfig {
     @Bean
     public S3Client s3Client() {
         return S3Client.builder()
-                .endpointOverride(java.net.URI.create(s3Endpoint))
+                .endpointOverride(URI.create(s3Endpoint))
                 // MinIO requires a region, usually ignores it but needs one
-                .region(software.amazon.awssdk.regions.Region.US_EAST_1)
-                .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+                .region(Region.US_EAST_1)
+                .credentialsProvider(StaticCredentialsProvider
                         .create(
-                                software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+                                AwsBasicCredentials
                                         .create(s3AccessKey, s3SecretKey)))
                 .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)
