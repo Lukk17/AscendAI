@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.orchestrator.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.orchestrator.config.properties.AiProviderProperties.ProviderConfig;
 import com.lukk.ascend.ai.orchestrator.service.ChatModelResolver;
+import com.lukk.ascend.ai.orchestrator.service.ChatResponseContentResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -47,6 +48,9 @@ class SemanticMemoryExtractorTest {
     private ObjectMapper objectMapper;
 
     @Mock
+    private ChatResponseContentResolver chatResponseContentResolver;
+
+    @Mock
     private ChatModel chatModel;
 
     @InjectMocks
@@ -61,6 +65,7 @@ class SemanticMemoryExtractorTest {
         String jsonResponse = "[\"User has a dog named Rex\"]";
         ChatResponse mockResponse = createMockChatResponse(jsonResponse);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(jsonResponse);
 
         List<String> parsedFacts = List.of("User has a dog named Rex");
         when(objectMapper.readValue(eq(jsonResponse), any(TypeReference.class))).thenReturn(parsedFacts);
@@ -69,7 +74,6 @@ class SemanticMemoryExtractorTest {
         extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
 
         // then
-        // Since Virtual Thread executes asynchronously, use timeout verification
         verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex");
     }
 
@@ -82,6 +86,7 @@ class SemanticMemoryExtractorTest {
         String jsonResponse = "[]";
         ChatResponse mockResponse = createMockChatResponse(jsonResponse);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(jsonResponse);
 
         List<String> parsedFacts = List.of();
         when(objectMapper.readValue(eq(jsonResponse), any(TypeReference.class))).thenReturn(parsedFacts);
@@ -118,6 +123,7 @@ class SemanticMemoryExtractorTest {
         String invalidJson = "Invalid output";
         ChatResponse mockResponse = createMockChatResponse(invalidJson);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(invalidJson);
 
         when(objectMapper.readValue(eq(invalidJson), any(TypeReference.class)))
                 .thenThrow(new JsonProcessingException("Malformatted JSON") {});
@@ -130,6 +136,28 @@ class SemanticMemoryExtractorTest {
         verify(memoryClient, after(500).never()).insertMemory(any(), any());
     }
 
+    @Test
+    void extract_WhenThinkingModelReturnsMultipleGenerations_ThenExtractsFactsFromActualContent() throws JsonProcessingException {
+        // given
+        setupProviderConfig("MiniMax-M2.7");
+        when(chatModelResolver.resolve(DEFAULT_PROVIDER)).thenReturn(chatModel);
+
+        String thinkingText = "Let me analyze the user input for semantic facts...";
+        String jsonResponse = "[\"User has a dog named Rex\"]";
+        ChatResponse mockResponse = createMockThinkingChatResponse(thinkingText, jsonResponse);
+        when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(jsonResponse);
+
+        List<String> parsedFacts = List.of("User has a dog named Rex");
+        when(objectMapper.readValue(eq(jsonResponse), any(TypeReference.class))).thenReturn(parsedFacts);
+
+        // when
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+
+        // then
+        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex");
+    }
+
     private void setupProviderConfig(String extractionModel) {
         ProviderConfig config = new ProviderConfig();
         config.setMemoryExtractionModel(extractionModel);
@@ -140,5 +168,11 @@ class SemanticMemoryExtractorTest {
         AssistantMessage assistantMessage = new AssistantMessage(content);
         Generation generation = new Generation(assistantMessage);
         return new ChatResponse(List.of(generation));
+    }
+
+    private ChatResponse createMockThinkingChatResponse(String thinkingContent, String actualContent) {
+        Generation thinkingGeneration = new Generation(new AssistantMessage(thinkingContent));
+        Generation actualGeneration = new Generation(new AssistantMessage(actualContent));
+        return new ChatResponse(List.of(thinkingGeneration, actualGeneration));
     }
 }

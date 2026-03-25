@@ -8,3 +8,4 @@ All significant architecture decisions are documented as Architecture Decision R
 | [ADR-002](../decisions/ADR-002-openai-compatible-gemini-minimax.md) | OpenAI-compatible endpoints for Gemini and MiniMax | Accepted |
 | [ADR-003](../decisions/ADR-003-semantic-memory-rest-over-mcp.md) | Direct REST for AscendMemory instead of MCP | Accepted |
 | [ADR-004](../decisions/ADR-004-mcp-for-tool-integration.md) | Spring AI MCP client for tool discovery and invocation | Accepted |
+| [ADR-005](../decisions/ADR-005-thinking-model-response-resolution.md) | `ChatResponseContentResolver` for thinking model multi-block responses | Accepted |

@@ -46,6 +46,9 @@ class ChatExecutorTest {
     private SyncMcpToolCallbackProvider toolCallbackProvider;
 
     @Mock
+    private ChatResponseContentResolver chatResponseContentResolver;
+
+    @Mock
     private ChatModel chatModel;
 
     @InjectMocks
@@ -64,6 +67,7 @@ class ChatExecutorTest {
 
         ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE, null);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
 
         // when
         AiResponse result = chatExecutor.execute(DEFAULT_USER_ID, SYSTEM_TEXT, USER_TEXT, List.of(), null, PROVIDER, MODEL);
@@ -83,6 +87,7 @@ class ChatExecutorTest {
         AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall("1", "toolName", "toolName", "{}");
         ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE, List.of(toolCall));
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
 
         // when
         AiResponse result = chatExecutor.execute(DEFAULT_USER_ID, SYSTEM_TEXT, USER_TEXT, List.of(), null, PROVIDER, MODEL);
@@ -101,9 +106,28 @@ class ChatExecutorTest {
         MockMultipartFile image = new MockMultipartFile("file", "cat.png", "image/png", "img_data".getBytes());
         ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE, null);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
 
         // when
         AiResponse result = chatExecutor.execute(DEFAULT_USER_ID, SYSTEM_TEXT, USER_TEXT, List.of(), image, PROVIDER, MODEL);
+
+        // then
+        assertThat(result.content()).isEqualTo(EXPECTED_RESPONSE);
+    }
+
+    @Test
+    void execute_WhenThinkingModel_ThenReturnsActualContent() {
+        // given
+        String thinkingText = "Let me analyze this step by step...";
+        when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
+        when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);
+
+        ChatResponse mockResponse = createMockChatResponse(thinkingText, null);
+        when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
+
+        // when
+        AiResponse result = chatExecutor.execute(DEFAULT_USER_ID, SYSTEM_TEXT, USER_TEXT, List.of(), null, PROVIDER, MODEL);
 
         // then
         assertThat(result.content()).isEqualTo(EXPECTED_RESPONSE);

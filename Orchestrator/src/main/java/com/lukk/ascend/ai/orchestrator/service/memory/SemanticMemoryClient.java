@@ -43,7 +43,7 @@ public class SemanticMemoryClient {
     private List<SemanticMemoryItem> performSearchCall(String userId, String query, int limit) {
         List<SemanticMemoryItem> result = restClientBuilder.build()
                 .get()
-                .uri(properties.getBaseUrl() + "/api/memory/search?userId={userId}&query={query}&limit={limit}", userId, query, limit)
+                .uri(properties.getBaseUrl() + "/api/v1/memory/search?userId={userId}&query={query}&limit={limit}", userId, query, limit)
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {});
                 

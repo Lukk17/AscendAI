@@ -36,6 +36,7 @@ public class ChatExecutor {
 
     private final ChatModelResolver chatModelResolver;
     private final SyncMcpToolCallbackProvider toolCallbackProvider;
+    private final ChatResponseContentResolver chatResponseContentResolver;
 
     @Value("${app.system-prompt}")
     private String systemPrompt;
@@ -63,7 +64,7 @@ public class ChatExecutor {
             throw new AiGenerationException("Received null response from ChatClient");
         }
 
-        String content = chatResponse.getResult().getOutput().getText();
+        String content = chatResponseContentResolver.resolveContent(chatResponse);
         List<String> toolsUsed = extractToolsUsed(chatResponse);
 
         return new AiResponse(content, new CustomMetadata(chatResponse.getMetadata(), toolsUsed));

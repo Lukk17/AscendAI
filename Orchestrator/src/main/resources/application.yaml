@@ -216,4 +216,4 @@ logging:
     org.apache.http: INFO
 
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%-5level) %clr(%.5t){magenta} %clr(%logger{36}){cyan} %clr([SupplierConnect]){blue} : %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%-5level) %clr(%.5t){magenta} %clr(%logger{36}){cyan} %clr([AscendAI]){blue} : %msg%n"

@@ -5,10 +5,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.orchestrator.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.orchestrator.service.ChatModelResolver;
+import com.lukk.ascend.ai.orchestrator.service.ChatResponseContentResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -34,6 +36,7 @@ public class SemanticMemoryExtractor {
     private final AiProviderProperties aiProviderProperties;
     private final SemanticMemoryClient memoryClient;
     private final ObjectMapper objectMapper;
+    private final ChatResponseContentResolver chatResponseContentResolver;
 
     public void extract(String userId, String userText, String provider) {
         Thread.startVirtualThread(() -> processExtraction(userId, userText, provider));
@@ -61,10 +64,12 @@ public class SemanticMemoryExtractor {
 
         ChatClient chatClient = clientBuilder.build();
 
-        String responseContent = chatClient.prompt()
+        ChatResponse chatResponse = chatClient.prompt()
                 .user(userText)
                 .call()
-                .content();
+                .chatResponse();
+
+        String responseContent = chatResponseContentResolver.resolveContent(chatResponse);
 
         List<String> facts = extractFactsFromJson(responseContent);
         facts.forEach(fact -> memoryClient.insertMemory(userId, fact));

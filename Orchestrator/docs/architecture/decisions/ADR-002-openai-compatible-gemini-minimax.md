@@ -1,4 +1,4 @@
-# ADR-002: OpenAI-Compatible Endpoints for Gemini and MiniMax
+# ADR-002: Provider API Compatibility Strategy
 
 ## Status
 
@@ -6,20 +6,31 @@ Accepted
 
 ## Context
 
-Both Google Gemini (via AI Studio) and MiniMax expose OpenAI-compatible API endpoints. We need to decide whether to use their native SDKs/starters or leverage the existing `OpenAiChatModel` from Spring AI.
+AI providers expose different API formats. We need to decide which SDK/protocol type to use for each provider within the `ChatModelResolver` framework.
 
 Alternatives considered:
 1. **Native SDK per provider** — separate Spring AI starters or custom REST clients
 2. **OpenAI-compatible endpoints** — reuse `OpenAiChatModel` with different base URLs
+3. **Anthropic-compatible endpoints** — reuse `AnthropicChatModel` with different base URLs
 
 ## Decision
 
-Use OpenAI-compatible endpoints for Gemini (`https://generativelanguage.googleapis.com/v1beta/openai/`) and MiniMax (`https://api.minimax.io/v1`). Both are configured as `type: openai` in `app.ai.providers`, so the `ChatModelResolver` builds them identically to OpenAI using `OpenAiChatModel` with a custom base URL.
+Each provider is configured with a `type` that determines which Spring AI model implementation is used:
+
+| Provider | `type` | Base URL | Rationale |
+|---|---|---|---|
+| `lmstudio` | `anthropic` | `http://127.0.0.1:1234` | LM Studio supports the Anthropic Messages API format |
+| `openai` | `openai` | `https://api.openai.com` | Native OpenAI API |
+| `gemini` | `openai` | `https://generativelanguage.googleapis.com/v1beta/openai/` | Google provides an OpenAI-compatible endpoint; no Anthropic-compatible option available |
+| `anthropic` | `anthropic` | `https://api.anthropic.com` | Native Anthropic API |
+| `minimax` | `anthropic` | `https://api.minimax.io/anthropic` | MiniMax provides an Anthropic-compatible endpoint |
+
+The `ChatModelResolver` builds either `OpenAiChatModel` or `AnthropicChatModel` based on the `type` field, with provider-specific base URLs and API keys.
 
 ## Consequences
 
-- **Positive**: No additional dependencies — both providers reuse the existing `spring-ai-starter-model-openai`
-- **Positive**: Uniform configuration: all OpenAI-compatible providers share the same `ProviderConfig` schema
-- **Positive**: Gemini API key from [AI Studio](https://aistudio.google.com/) works directly — no Vertex AI setup needed
-- **Negative**: If providers diverge from OpenAI API compatibility, may need custom handling
-- **Negative**: Provider-specific features (e.g., Gemini grounding) are not accessible through the OpenAI-compatible layer
+- **Positive**: Only two dependencies needed — `spring-ai-starter-model-openai` and `spring-ai-starter-model-anthropic`
+- **Positive**: Uniform configuration: all providers share the same `ProviderConfig` schema regardless of type
+- **Positive**: Anthropic-type providers gain native support for thinking models (extended thinking / chain-of-thought)
+- **Negative**: Providers using `type: anthropic` may return multi-block thinking responses; handled by `ChatResponseContentResolver` (see [ADR-005](ADR-005-thinking-model-response-resolution.md))
+- **Negative**: Provider-specific features (e.g., Gemini grounding) are not accessible through compatibility layers
