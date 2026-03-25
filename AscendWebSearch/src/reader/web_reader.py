@@ -82,9 +82,8 @@ class WebReader:
                 result = await self._execute_strategy(name, strategy, url)
                 if result:
                     return result
-        except HumanInterventionRequiredException as e:
-            return {"status": "human_intervention_required", "intervention_type": e.intervention_type,
-                    "vnc_url": e.vnc_url, "message": e.message}
+        except HumanInterventionRequiredException:
+            raise
 
         return self._create_failure_response(url)
 
@@ -108,10 +107,11 @@ class WebReader:
                 html = await self._execute_html_strategy(name, strategy, url)
                 if html:
                     content, links = annotate_links(html, url, link_filter)
-                    return {"content": content, "links": links, "status": "success", "mode": name}
-        except HumanInterventionRequiredException as e:
-            return {"status": "human_intervention_required", "intervention_type": e.intervention_type,
-                    "vnc_url": e.vnc_url, "message": e.message}
+                    if self.validator.validate(content):
+                        return {"content": content, "links": links, "status": "success", "mode": name}
+                    logger.info(f"Strategy {name} validation failed after annotation.")
+        except HumanInterventionRequiredException:
+            raise
 
         return self._create_failure_response(url)
 

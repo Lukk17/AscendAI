@@ -44,34 +44,15 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
 
             start_time = asyncio.get_event_loop().time()
             while asyncio.get_event_loop().time() - start_time < settings.NOVNC_TIMEOUT_SECONDS:
-                current_url = page.url
-                cookies = await context.cookies()
-
-                success = False
-
-                if intervention_type == "login":
-                    try:
-                        content = await page.content()
-                        if not ChallengeDetector.is_login_redirect_url(
-                                current_url) and not ChallengeDetector.is_login_required(current_url,
-                                                                                         content) and "about:blank" not in current_url:
-                            success = True
-                    except Exception as e:
-                        logger.warning(f"NoVNC Strategy: Failed to evaluate page content during polling: {e}")
-                else:
-                    for c in cookies:
-                        if c["name"] == "cf_clearance":
-                            success = True
-                            break
-
-                if success:
-                    logger.info("NoVNC Strategy: Successfully acquired session via human resolution!")
+                try:
+                    cookies = await context.cookies()
                     cookie_dict = {c["name"]: c["value"] for c in cookies}
                     user_agent = await page.evaluate("navigator.userAgent")
                     await cookie_manager.save_session_data(url, cookie_dict, user_agent)
-                    break
+                except Exception as e:
+                    logger.debug(f"NoVNC Strategy: Transient error syncing session cookies: {e}")
 
-                await asyncio.sleep(2.0)
+                await asyncio.sleep(5.0)
 
             if not page.is_closed():
                 await page.close()

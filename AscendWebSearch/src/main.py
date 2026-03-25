@@ -10,7 +10,9 @@ import httpx
 import uvicorn
 from fastapi import FastAPI
 
-from src.api.exception_handlers import httpx_exception_handler, global_exception_handler
+from src.api.exception_handlers import httpx_exception_handler, global_exception_handler, \
+    human_intervention_exception_handler
+from src.api.exceptions import HumanInterventionRequiredException
 from src.api.mcp.mcp_server import mcp
 from src.api.rest.rest_endpoints import rest_router, rest_router_v2
 from src.config.blocklist_loader import BlocklistLoader
@@ -43,6 +45,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="AscendWebSearch", lifespan=lifespan)
 
     app.add_exception_handler(httpx.HTTPError, httpx_exception_handler)
+    app.add_exception_handler(HumanInterventionRequiredException, human_intervention_exception_handler)
     app.add_exception_handler(Exception, global_exception_handler)
 
     app.include_router(rest_router)

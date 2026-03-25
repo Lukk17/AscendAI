@@ -51,7 +51,7 @@ async def test_web_reader_all_strategies_fail():
 
 @pytest.mark.asyncio
 async def test_web_reader_read_with_links_uses_strategy_chain():
-    raw_html = "<html><body><a href='https://example.com/job1'>Job One</a></body></html>"
+    raw_html = "<html><body>This is filler text to pass the ten word minimum validation limit <a href='https://example.com/job1'>Job One</a></body></html>"
 
     with patch("src.reader.web_reader.BeautifulSoupStrategy.get_html", new_callable=AsyncMock) as mock_get_html:
         mock_get_html.return_value = raw_html
@@ -70,6 +70,7 @@ async def test_web_reader_read_with_links_uses_strategy_chain():
 async def test_web_reader_read_with_links_and_filter():
     raw_html = """
     <html><body>
+        This is filler text to pass the ten word minimum validation limit.
         <a href='https://example.com/job-offer/senior'>Senior</a>
         <a href='https://example.com/about'>About</a>
     </body></html>
@@ -87,7 +88,7 @@ async def test_web_reader_read_with_links_and_filter():
 
 @pytest.mark.asyncio
 async def test_web_reader_read_with_links_escalates_on_empty_html():
-    raw_html = "<html><body><a href='https://example.com/job1'>Job</a></body></html>"
+    raw_html = "<html><body>This is filler text to pass the ten word minimum validation limit <a href='https://example.com/job1'>Job</a></body></html>"
 
     with patch("src.reader.web_reader.BeautifulSoupStrategy.get_html", new_callable=AsyncMock) as mock_first:
         mock_first.return_value = ""
@@ -133,7 +134,7 @@ async def test_web_reader_read_heavy_mode():
 @pytest.mark.asyncio
 async def test_web_reader_read_with_links_heavy_mode():
     reader = WebReader()
-    raw_html = "<html><body><a href='https://test.com/heavy'>Heavy Link</a></body></html>"
+    raw_html = "<html><body>This is filler text to pass the ten word minimum validation limit <a href='https://test.com/heavy'>Heavy Link</a></body></html>"
 
     with patch("src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
                new_callable=AsyncMock) as mock_pw_get_html:

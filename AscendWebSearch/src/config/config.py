@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # Blocklist & Validation
     BLOCKLIST_URL: str = Field(default="https://secure.fanboy.co.nz/fanboy-annoyance.txt",
                                description="URL for adblock list")
-    VALIDATION_MIN_WORDS: int = Field(default=200, description="Minimum word count for valid content")
+    VALIDATION_MIN_WORDS: int = Field(default=10, description="Minimum word count for valid content")
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")

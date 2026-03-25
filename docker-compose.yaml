@@ -211,7 +211,7 @@ services:
       - SEARXNG_X_REAL_IP=0.0.0.0
       - SEARXNG_X_FORWARDED_FOR=0.0.0.0
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
-      - VALIDATION_MIN_WORDS=200
+      - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
       - REDIS_URL=redis://redis:6379/0

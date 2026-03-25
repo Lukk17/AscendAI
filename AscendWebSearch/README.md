@@ -7,6 +7,7 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
 ## Table of Contents
 
 *   [API Documentation](#api-documentation)
+*   [Versioning & Changelog](#versioning--changelog)
 *   [Prerequisites](#prerequisites)
 *   [Configuration (Environment Variables)](#configuration-environment-variables)
 *   [Running the Service](#running-the-service)
@@ -22,6 +23,17 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
 
 *   **Swagger UI**: [http://localhost:7021/docs](http://localhost:7021/docs)
 *   **Redoc**: [http://localhost:7021/redoc](http://localhost:7021/redoc)
+
+---
+
+## Versioning & Changelog
+
+The strict version of the `AscendWebSearch` microservice is managed via the `version` field centrally inside `pyproject.toml`. 
+
+**When to update:**
+You should actively bump the `version` in `pyproject.toml` and manually record the structural changes in `CHANGELOG.md` whenever:
+1. You deploy a new release to Docker Hub.
+2. You introduce new scraping strategies or network-breaking dependencies (e.g., adding FlareSolverr or NoVNC bridges).
 
 ---
 
@@ -124,11 +136,11 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
     If you want to push this image to Docker Hub (e.g., to use it in another environment or specific `docker-compose.yaml`):
 
     ```shell
-    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:v0.0.2
+    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:v0.1.0
     ```
 
     ```shell
-    docker push lukk17/ascend-web-search:v0.0.2
+    docker push lukk17/ascend-web-search:v0.1.0
     ```
     
     ```shell
