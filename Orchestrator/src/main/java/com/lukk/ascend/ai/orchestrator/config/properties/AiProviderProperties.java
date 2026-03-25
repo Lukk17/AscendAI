@@ -19,6 +19,7 @@ public class AiProviderProperties {
     @Setter
     public static class ProviderConfig {
         private boolean isEnabled;
+        private boolean requiresHttp1;
         private String type;
         private String baseUrl;
         private String apiKey;

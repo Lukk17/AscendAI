@@ -31,6 +31,8 @@ public class ChatModelResolver {
 
     private static final String TYPE_OPENAI = "openai";
     private static final String TYPE_ANTHROPIC = "anthropic";
+    private static final long DEFAULT_CONNECT_TIMEOUT_SECONDS = 10L;
+    private static final long DEFAULT_READ_TIMEOUT_SECONDS = 60L;
 
     private final AiProviderProperties aiProviderProperties;
     private final Map<String, ChatModel> chatModels = new LinkedHashMap<>();
@@ -69,18 +71,18 @@ public class ChatModelResolver {
 
     private ChatModel buildChatModel(String name, ProviderConfig config) {
         return switch (config.getType()) {
-            case TYPE_OPENAI -> buildOpenAiChatModel(config);
-            case TYPE_ANTHROPIC -> buildAnthropicChatModel(config);
+            case TYPE_OPENAI -> buildOpenAiChatModel(name, config);
+            case TYPE_ANTHROPIC -> buildAnthropicChatModel(name, config);
             default -> throw new IllegalArgumentException(
                     "Unsupported AI provider type '%s' for provider '%s'".formatted(config.getType(), name));
         };
     }
 
-    private OpenAiChatModel buildOpenAiChatModel(ProviderConfig config) {
+    private OpenAiChatModel buildOpenAiChatModel(String name, ProviderConfig config) {
         OpenAiApi openAiApi = OpenAiApi.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
-                .restClientBuilder(RestClient.builder().requestFactory(buildRequestFactory(config.getTimeoutSeconds())))
+                .restClientBuilder(RestClient.builder().requestFactory(buildRequestFactory(config.getTimeoutSeconds(), config.isRequiresHttp1())))
                 .build();
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
@@ -94,11 +96,11 @@ public class ChatModelResolver {
                 .build();
     }
 
-    private AnthropicChatModel buildAnthropicChatModel(ProviderConfig config) {
+    private AnthropicChatModel buildAnthropicChatModel(String name, ProviderConfig config) {
         AnthropicApi anthropicApi = AnthropicApi.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
-                .restClientBuilder(RestClient.builder().requestFactory(buildRequestFactory(config.getTimeoutSeconds())))
+                .restClientBuilder(RestClient.builder().requestFactory(buildRequestFactory(config.getTimeoutSeconds(), config.isRequiresHttp1())))
                 .build();
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
@@ -114,11 +116,19 @@ public class ChatModelResolver {
     }
 
     @SuppressWarnings("null")
-    private ClientHttpRequestFactory buildRequestFactory(Long timeoutSeconds) {
-        Duration timeout = Duration.ofSeconds(timeoutSeconds != null ? timeoutSeconds : 60);
-        HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
+    private ClientHttpRequestFactory buildRequestFactory(Long timeoutSeconds, boolean isHttp1Required) {
+        Duration timeout = Duration.ofSeconds(
+                Optional.ofNullable(timeoutSeconds).orElse(DEFAULT_READ_TIMEOUT_SECONDS)
+        );
+        
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS));
+        
+        Optional.of(isHttp1Required)
+                .filter(Boolean::booleanValue)
+                .ifPresent(ignored -> builder.version(HttpClient.Version.HTTP_1_1));
+        
+        HttpClient httpClient = builder.build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(timeout);
         return requestFactory;

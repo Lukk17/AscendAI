@@ -20,7 +20,7 @@ flowchart TD
         Orchestrator -- "1. Context Retrieval" --> Redis["Redis (Active Memory)"]
         Orchestrator -- "2. History Lookup" --> Postgres["PostgreSQL (Long-term)"]
         Orchestrator -- "3. Soft-RAG (Thresholded)" --> Qdrant["Qdrant (RAG)"]
-        Orchestrator -- "4. Semantic Memory (REST)" --> AscendMemory["ascend-memory"]
+        Orchestrator -- "4. Memory Search & Insert" --> AscendMemory["ascend-memory"]
     end
     
     subgraph Providers ["AI Providers (per-request selection)"]
@@ -63,7 +63,7 @@ flowchart TD
     *   **Usage**: Stores semantic embeddings of ingested documents (Markdown, PDF, etc.) for similarity search.
 4.  **ascend-memory**:
     *   **Purpose**: Semantic memory service (separate from chat history).
-    *   **Usage**: Orchestrator retrieves user-scoped memories over REST and injects them as optional context.
+    *   **Usage**: The Orchestrator retrieves user-scoped facts over REST to inject as optional context before generating a response. Afterward, a background Virtual Thread asynchronously extracts new facts from the conversation using a low-cost LLM and `POST`s them back to this service for long-term semantic storage.
 
 ---
 
@@ -73,7 +73,9 @@ flowchart TD
 The Orchestrator uses a retrieval-gated approach:
 *   **Soft-RAG (Thresholded)**: It always queries Qdrant, but injects RAG context only if the top similarity score is above a configured threshold. This prevents context-only refusals and avoids suppressing tool usage.
 *   **Tools (MCP)**: Tools remain available for dynamic/external information (weather, web search, transcription).
-*   **Semantic Memory (REST)**: User-scoped memories are retrieved from `ascend-memory` and injected as optional context.
+*   **Semantic Memory (REST)**: 
+    *   *Retrieval*: User-scoped memories are retrieved from `ascend-memory` and injected as optional context.
+    *   *Storage*: After generating a response, the Orchestrator triggers an asynchronous Virtual Thread. This thread uses a low-cost LLM configuration to deterministically extract facts from the conversation and POSTs them to `ascend-memory`, ensuring the extraction process adds exactly zero latency to the user's request.
 
 #### Optional upgrade: Model Router (1 extra LLM call)
 For a larger tool set and ambiguous prompts, you can add a model-router step that returns JSON like `{route: RAG|TOOL|BOTH}` and drives retrieval/tooling explicitly.

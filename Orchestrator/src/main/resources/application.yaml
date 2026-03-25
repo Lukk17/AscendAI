@@ -61,12 +61,14 @@ app:
     providers:
       lmstudio:
         enabled: ${LMSTUDIO_ENABLED:true}
-        type: openai
+        requires-http1: true
+        type: anthropic
         base-url: "http://127.0.0.1:1234"
         api-key: "not-needed"
         model: ${LMSTUDIO_MODEL:meta-llama-3.1-8b-instruct}
         memory-extraction-model: ${LMSTUDIO_MODEL:meta-llama-3.1-8b-instruct}
         temperature: 0.7
+        max-tokens: 16384
         timeout-seconds: 120
         default-embedding: lmstudio
       openai:
@@ -102,12 +104,13 @@ app:
         default-embedding: openai
       minimax:
         enabled: ${MINIMAX_ENABLED:true}
-        type: openai
-        base-url: "https://api.minimax.io/v1"
+        type: anthropic
+        base-url: "https://api.minimax.io/anthropic"
         api-key: ${MINIMAX_API_KEY:not-set}
-        model: ${MINIMAX_MODEL:MiniMax-M2.5}
-        memory-extraction-model: ${MINIMAX_EXTRACTION_MODEL:MiniMax-M2.5}
+        model: ${MINIMAX_MODEL:MiniMax-M2.7}
+        memory-extraction-model: ${MINIMAX_EXTRACTION_MODEL:MiniMax-M2.7}
         temperature: 0.7
+        max-tokens: 16384
         timeout-seconds: 120
         default-embedding: openai
 

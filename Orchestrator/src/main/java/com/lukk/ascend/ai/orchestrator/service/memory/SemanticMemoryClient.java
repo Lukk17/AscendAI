@@ -45,7 +45,6 @@ public class SemanticMemoryClient {
                 .get()
                 .uri(properties.getBaseUrl() + "/api/memory/search?userId={userId}&query={query}&limit={limit}", userId, query, limit)
                 .retrieve()
-                .onStatus(status -> status.value() == 404, this::handleNotFoundError)
                 .body(new ParameterizedTypeReference<>() {});
                 
         List<SemanticMemoryItem> finalResult = Optional.ofNullable(result).orElseGet(List::of);
@@ -53,12 +52,13 @@ public class SemanticMemoryClient {
         return finalResult;
     }
 
-    private void handleNotFoundError(HttpRequest request, ClientHttpResponse response) throws IOException {
-    }
-
     private List<SemanticMemoryItem> handleSearchError(String userId, Exception e) {
         if (e instanceof RestClientResponseException restException) {
-            log.warn("Semantic memory search failed for user '{}'. Status: {}", userId, restException.getStatusCode());
+            if (restException.getStatusCode().value() == 404) {
+                log.debug("No semantic memory found for user '{}' (404 Not Found)", userId);
+            } else {
+                log.warn("Semantic memory search failed for user '{}'. Status: {}", userId, restException.getStatusCode());
+            }
         } else {
             log.warn("Semantic memory search failed for user '{}'. Reason: {}", userId, e.getMessage());
         }
