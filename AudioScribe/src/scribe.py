@@ -7,16 +7,22 @@ from src.transcription.openai_api_speach_to_text import openai_transcript
 logger = logging.getLogger(__name__)
 
 
-def openai_speech_transcription(audio_file_path: str, model: str, language: str):
-    response = openai_transcript(audio_file_path, model, language)
-    logger.info(f"[OpenAI] {response}\n")
+def openai_speech_transcription(audio_file_path: str, model: str, language: str, with_timestamps: bool = False):
+    response = openai_transcript(audio_file_path, model, language, with_timestamps)
+    if with_timestamps:
+        logger.info(f"[OpenAI] {len(response)} segments transcribed\n")
+    else:
+        logger.info(f"[OpenAI] {response}\n")
     return response
 
 
-def hf_speech_transcription(audio_file_path: str, model: str, provider: str):
+def hf_speech_transcription(audio_file_path: str, model: str, provider: str, with_timestamps: bool = False):
     logger.info("[HF] Starting transcription...")
-    response_text = hf_transcript(audio_file_path, model, provider)
-    logger.info(f"[HF] {response_text}\n")
+    response_text = hf_transcript(audio_file_path, model, provider, with_timestamps)
+    if with_timestamps:
+        logger.info(f"[HF] {len(response_text)} segments transcribed\n")
+    else:
+        logger.info(f"[HF] {response_text}\n")
     return response_text
 
 

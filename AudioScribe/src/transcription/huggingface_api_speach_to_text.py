@@ -25,7 +25,7 @@ def _transcribe_single_chunk(client: InferenceClient, audio_chunk_path: str, mod
         raise ValueError("Hugging Face API failed to process an audio chunk.") from e
 
 
-def hf_transcript(audio_file_path: str, model: str, provider: str):
+def hf_transcript(audio_file_path: str, model: str, provider: str, with_timestamps: bool = False):
     """
     Transcribes an audio file using a Hugging Face provider.
     Handles long files by splitting them into small chunks to avoid timeouts on the free tier.
@@ -46,7 +46,8 @@ def hf_transcript(audio_file_path: str, model: str, provider: str):
 
     chunk_length_ms = settings.HF_CHUNK_LENGTH_SECONDS * 1000
 
-    full_transcription = []
+    full_transcription_text = []
+    full_transcription_segments = []
     temp_files = []
 
     try:
@@ -64,14 +65,25 @@ def hf_transcript(audio_file_path: str, model: str, provider: str):
                 temp_files.append(tmp_audio.name)
                 logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
 
-                chunk_transcription = _transcribe_single_chunk(client, tmp_audio.name, model)
-                full_transcription.append(chunk_transcription)
+                chunk_transcription_text = _transcribe_single_chunk(client, tmp_audio.name, model)
+                
+                if with_timestamps:
+                    segment = {
+                        "text": chunk_transcription_text,
+                        "start": start_ms / 1000.0,
+                        "end": (start_ms + len(chunk)) / 1000.0
+                    }
+                    full_transcription_segments.append(segment)
+                else:
+                    full_transcription_text.append(chunk_transcription_text)
+                    
                 logger.info(f"Chunk {chunk_num}/{num_chunks} complete.")
 
-        return " ".join(full_transcription)
+        if with_timestamps:
+            return full_transcription_segments
+        return " ".join(full_transcription_text)
 
     except (ValueError, IOError):
-        # Re-raise exceptions we expect and handle
         raise
     except Exception as e:
         logger.error(f"An unexpected error occurred during the HF chunking process: {e}")

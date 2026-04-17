@@ -7,6 +7,11 @@ from fastapi.responses import JSONResponse
 from src.adapters.file_service import save_upload_to_temp_async, cleanup_temp_file
 from src.config.config import settings
 from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
+from src.transcription.audacity_parser import extract_tracks_from_aup
+from src.transcription.conversation_merger import transcribe_and_merge_tracks
+import tempfile
+import shutil
+import os
 
 rest_router = APIRouter()
 
@@ -131,4 +136,58 @@ async def transcribe_hf_endpoint(
     finally:
         if temp_file_path:
             cleanup_temp_file(temp_file_path)
+        await file.close()
+
+
+@rest_router.post("/api/v1/transcribe/audacity", summary="Transcription of Audacity project (.zip)")
+async def transcribe_audacity_endpoint(
+        file: UploadFile = File(...),
+        provider: str = Form("local"),
+        model: str = Form("Systran/faster-whisper-large-v3"),
+        language: Optional[str] = Form(None),
+        hf_provider: str = Form("hf-inference")
+):
+    """
+    Transcribes a zipped Audacity project (.aup + _data folder) and merges the audio chronologically.
+    - **provider**: 'local', 'openai', or 'huggingface'
+    """
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="File must be a .zip containing an Audacity project.")
+
+    lang = language if language else settings.TRANSCRIPTION_LANGUAGE
+    temp_zip_path = None
+    extraction_dir = tempfile.mkdtemp(prefix="audacity_")
+    
+    try:
+        temp_zip_path = await save_upload_to_temp_async(file)
+        
+        tracks = await asyncio.to_thread(extract_tracks_from_aup, temp_zip_path, extraction_dir)
+        
+        if not tracks:
+            raise HTTPException(status_code=400, detail="No usable audio tracks found in the uploaded Audacity project.")
+
+        transcription_text = await transcribe_and_merge_tracks(
+            tracks=tracks,
+            provider=provider,
+            model=model,
+            language=lang,
+            hf_provider=hf_provider
+        )
+
+        return JSONResponse(content={
+            "source": provider,
+            "model": model,
+            "language": lang,
+            "transcription": transcription_text
+        })
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+    finally:
+        if temp_zip_path:
+            cleanup_temp_file(temp_zip_path)
+        if os.path.exists(extraction_dir):
+            shutil.rmtree(extraction_dir, ignore_errors=True)
         await file.close()

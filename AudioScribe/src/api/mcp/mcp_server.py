@@ -10,6 +10,10 @@ from src.adapters.download_service import download_to_temp_async
 from src.adapters.file_service import cleanup_temp_file
 from src.config.config import settings
 from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
+from src.transcription.audacity_parser import extract_tracks_from_aup
+from src.transcription.conversation_merger import transcribe_and_merge_tracks
+import tempfile
+import shutil
 
 URI_NOT_PROVIDED = "URI not provided"
 
@@ -146,6 +150,54 @@ async def transcribe_hf(
     finally:
         if temp_file_path:
             cleanup_temp_file(temp_file_path)
+
+
+@mcp.tool(
+    name="transcribe_audacity",
+    description="Transcribes a multi-track Audacity project from a URI (.zip containing .aup and _data folder). "
+                "Args: audio_uri (str), provider (str, 'local'|'openai'|'huggingface'), model (str), language (str)."
+)
+async def transcribe_audacity(
+        audio_uri: str,
+        provider: str = "local",
+        model: str = "Systran/faster-whisper-large-v3",
+        language: Optional[str] = None
+):
+    if not audio_uri:
+        return create_error_response(URI_NOT_PROVIDED)
+
+    temp_zip_path = None
+    extraction_dir = tempfile.mkdtemp(prefix="mcp_audacity_")
+    try:
+        temp_zip_path = await download_to_temp_async(audio_uri)
+        if not os.path.exists(temp_zip_path):
+            return create_error_response(f"File not accessible after download: {temp_zip_path}")
+            
+        lang = language if language else settings.TRANSCRIPTION_LANGUAGE
+        tracks = await asyncio.to_thread(extract_tracks_from_aup, temp_zip_path, extraction_dir)
+        
+        if not tracks:
+             return create_error_response("No usable audio tracks found in the uploaded Audacity project.")
+
+        transcription_text = await transcribe_and_merge_tracks(
+            tracks=tracks,
+            provider=provider,
+            model=model,
+            language=lang
+        )
+        
+        payload = {"source": provider, "model": model, "language": lang, "transcription": transcription_text}
+        return {"content": [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]}
+        
+    except (ValueError, IOError) as error:
+        return create_error_response(str(error))
+    except Exception as error:
+        return create_error_response(f"An unexpected error occurred: {error}")
+    finally:
+        if temp_zip_path:
+            cleanup_temp_file(temp_zip_path)
+        if os.path.exists(extraction_dir):
+            shutil.rmtree(extraction_dir, ignore_errors=True)
 
 
 @mcp.tool(name="health", description="Simple health check tool.")

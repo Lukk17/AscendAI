@@ -16,15 +16,20 @@ client = OpenAI(
 )
 
 
-def _transcribe_single_chunk(audio_chunk_path: str, model: str, language: str) -> str:
+def _transcribe_single_chunk(audio_chunk_path: str, model: str, language: str, with_timestamps: bool) -> list[dict] | str:
     """Helper function to transcribe a single audio chunk."""
     try:
         with open(audio_chunk_path, "rb") as audio_file:
-            response = client.audio.transcriptions.create(
-                model=model,
-                file=audio_file,
-                language=language
-            )
+            kwargs = {"model": model, "file": audio_file}
+            if language:
+                kwargs["language"] = language
+            if with_timestamps:
+                kwargs["response_format"] = "verbose_json"
+                kwargs["timestamp_granularities"] = ["segment"]
+            response = client.audio.transcriptions.create(**kwargs)
+            
+        if with_timestamps:
+            return [{"text": s.text, "start": s.start, "end": s.end} for s in response.segments]
         return response.text
     except APIError as e:
         logger.error(f"OpenAI API error during chunk transcription for model '{model}': {e}")
@@ -32,7 +37,7 @@ def _transcribe_single_chunk(audio_chunk_path: str, model: str, language: str) -
             "OpenAI API failed to process an audio chunk. It may be an invalid model or the API may be unavailable.") from e
 
 
-def openai_transcript(audio_file_path: str, model: str, language: str):
+def openai_transcript(audio_file_path: str, model: str, language: str, with_timestamps: bool = False):
     """
     Transcribes an audio file using the OpenAI Whisper API.
     Handles large files by automatically splitting them into chunks.
@@ -43,12 +48,13 @@ def openai_transcript(audio_file_path: str, model: str, language: str):
         f"[OpenAI] Transcription Parameters: "
         f"Language='{language}', "
         f"APILimitBytes={settings.OPENAI_API_LIMIT_BYTES}, "
-        f"TargetChunkBytes={settings.TARGET_CHUNK_SIZE_BYTES}"
+        f"TargetChunkBytes={settings.TARGET_CHUNK_SIZE_BYTES}, "
+        f"WithTimestamps={with_timestamps}"
     )
 
     if file_size < settings.OPENAI_API_LIMIT_BYTES:
         logger.info("File is smaller than the API limit. Transcribing directly.")
-        return _transcribe_single_chunk(audio_file_path, model, language)
+        return _transcribe_single_chunk(audio_file_path, model, language, with_timestamps)
 
     logger.info(f"File size ({file_size / 1024 / 1024:.2f} MB) exceeds limit. Splitting into chunks.")
 
@@ -58,15 +64,13 @@ def openai_transcript(audio_file_path: str, model: str, language: str):
         logger.exception("Pydub failed to load the audio file for chunking.")
         raise IOError("Failed to load audio file for chunking. It may be corrupt or an unsupported format.") from e
 
-    # Deterministic Normalization: 16kHz, Mono, 16-bit PCM
-    # 16000 samples/s * 2 bytes/sample * 1 channel = 32,000 bytes/sec
     audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
     bytes_per_second = 32000
 
-    # Calculate chunk duration in milliseconds
     chunk_length_ms = int((settings.TARGET_CHUNK_SIZE_BYTES / bytes_per_second) * 1000)
 
-    full_transcription = []
+    full_transcription_text = []
+    full_transcription_segments = []
     temp_files = []
 
     try:
@@ -80,25 +84,32 @@ def openai_transcript(audio_file_path: str, model: str, language: str):
             chunk = audio[start_ms:end_ms]
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
-                # Force wav format export
                 chunk.export(tmp_audio.name, format="wav")
                 tmp_path = tmp_audio.name
 
             temp_files.append(tmp_path)
 
-            # Fail-safe check
             chunk_size = os.path.getsize(tmp_path)
             if chunk_size > settings.OPENAI_API_LIMIT_BYTES:
                 logger.error(f"Chunk {chunk_num} size {chunk_size} exceeds limit {settings.OPENAI_API_LIMIT_BYTES}!")
-                # This should effectively never happen with our math, but safety first.
                 raise ValueError(f"Generated chunk {chunk_num} exceeded OpenAI size limit.")
 
             logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
-            chunk_transcription = _transcribe_single_chunk(tmp_path, model, language)
-            full_transcription.append(chunk_transcription)
+            chunk_transcription = _transcribe_single_chunk(tmp_path, model, language, with_timestamps)
+            
+            if with_timestamps:
+                for segment in chunk_transcription:
+                    segment['start'] += start_ms / 1000.0
+                    segment['end'] += start_ms / 1000.0
+                    full_transcription_segments.append(segment)
+            else:
+                full_transcription_text.append(chunk_transcription)
+                
             logger.info(f"Chunk {chunk_num}/{num_chunks} complete.")
 
-        return " ".join(full_transcription)
+        if with_timestamps:
+            return full_transcription_segments
+        return " ".join(full_transcription_text)
 
     finally:
         for f_path in temp_files:
