@@ -288,3 +288,65 @@ If you want to completely erase the persistent database records of previous chat
    ```sql
    DELETE FROM chat_history;
    ```
+
+---
+
+### Agent standards import
+
+To import the central AI standards into this project without overwriting existing files, we use Git Selective Checkout. 
+
+This approach extracts only the required AI folders and template files directly into the project root.
+
+To protect the central repository, we configure the remote as a read-only source in your local workspace by setting the push URL to an invalid address. 
+
+This ensures you can pull updates from the central repository, but Git will block any accidental pushes of your project-specific changes back to the global standards.
+
+### Step 1: Initial Setup
+
+Enable symlink support in Git:
+Globally
+```shell
+git config --global core.symlinks true
+```
+Locally for this repository only
+```shell
+git config core.symlinks true
+```
+
+Run these commands in the root of this project to add the remote, disable pushing, and extract the specific payload files into your workspace.
+
+```bash
+git remote add agent-standards https://github.com/Lukk17/agent-standards
+```
+
+```bash
+git remote set-url --push agent-standards no_push
+```
+
+```bash
+git fetch agent-standards
+```
+
+```bash
+git checkout agent-standards/master -- .agents .claude kilo.jsonc.example opencode.json.example AGENTS.md
+```
+
+```bash
+git commit -m "Import central agent-standards (.agents and .claude)"
+```
+
+### Step 2: Pulling Future Updates
+
+When the central standards repository is updated, pull the latest files into this project by running the following commands.
+
+```bash
+git fetch agent-standards
+```
+
+```bash
+git checkout agent-standards/master -- .agents .claude
+```
+
+```bash
+git commit -m "Update AI standards from central repository"
+```
