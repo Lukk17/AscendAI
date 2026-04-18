@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     DEFAULT_MODEL_HF: str = "openai/whisper-large-v3"
     HF_CHUNK_LENGTH_SECONDS: int = 20
 
+    # --- System Tools ---
+    FFMPEG_PATH: str = "ffmpeg"
+
+    # --- Download File Management ---
+    DOWNLOAD_FILE_TTL_SECONDS: int = 300
+
 
 # Create a single, importable instance of the settings
 settings = Settings()

@@ -1,6 +1,8 @@
 import logging
 import os
 import tempfile
+import time
+from typing import Callable, Optional
 
 from huggingface_hub import InferenceClient
 from huggingface_hub.inference._generated.types import AutomaticSpeechRecognitionOutput
@@ -25,7 +27,8 @@ def _transcribe_single_chunk(client: InferenceClient, audio_chunk_path: str, mod
         raise ValueError("Hugging Face API failed to process an audio chunk.") from e
 
 
-def hf_transcript(audio_file_path: str, model: str, provider: str, with_timestamps: bool = False):
+def hf_transcript(audio_file_path: str, model: str, provider: str, with_timestamps: bool = False,
+                   progress_callback: Optional[Callable[[dict], None]] = None):
     """
     Transcribes an audio file using a Hugging Face provider.
     Handles long files by splitting them into small chunks to avoid timeouts on the free tier.
@@ -63,10 +66,17 @@ def hf_transcript(audio_file_path: str, model: str, provider: str, with_timestam
                 chunk = chunk.set_frame_rate(16000)
                 chunk.export(tmp_audio.name, format="wav")
                 temp_files.append(tmp_audio.name)
-                logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
 
+                chunk_size_mb = os.path.getsize(tmp_audio.name) / 1024 / 1024
+                logger.info(f"Transcribing chunk {chunk_num}/{num_chunks} ({chunk_size_mb:.2f} MB)...")
+                if progress_callback:
+                    progress_callback({"type": "progress", "message": f"Transcribing chunk {chunk_num}/{num_chunks}",
+                                       "data": {"chunk": chunk_num, "total": num_chunks, "size_mb": round(chunk_size_mb, 2)}})
+
+                chunk_start = time.monotonic()
                 chunk_transcription_text = _transcribe_single_chunk(client, tmp_audio.name, model)
-                
+                chunk_elapsed = time.monotonic() - chunk_start
+
                 if with_timestamps:
                     segment = {
                         "text": chunk_transcription_text,
@@ -76,8 +86,11 @@ def hf_transcript(audio_file_path: str, model: str, provider: str, with_timestam
                     full_transcription_segments.append(segment)
                 else:
                     full_transcription_text.append(chunk_transcription_text)
-                    
-                logger.info(f"Chunk {chunk_num}/{num_chunks} complete.")
+
+                logger.info(f"Chunk {chunk_num}/{num_chunks} complete in {chunk_elapsed:.2f}s.")
+                if progress_callback:
+                    progress_callback({"type": "progress", "message": f"Chunk {chunk_num}/{num_chunks} complete in {chunk_elapsed:.2f}s",
+                                       "data": {"chunk": chunk_num, "total": num_chunks, "elapsed_s": round(chunk_elapsed, 2)}})
 
         if with_timestamps:
             return full_transcription_segments

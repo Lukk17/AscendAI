@@ -13,7 +13,7 @@ from src.scribe import (
 def test_openai_speech_transcription_calls_correct_function(mock_openai_transcript):
     result = openai_speech_transcription("fake_path.wav", "whisper-1", "en")
 
-    mock_openai_transcript.assert_called_once_with("fake_path.wav", "whisper-1", "en")
+    mock_openai_transcript.assert_called_once_with("fake_path.wav", "whisper-1", "en", False, progress_callback=None)
     assert result == "OpenAI text"
 
 
@@ -21,7 +21,7 @@ def test_openai_speech_transcription_calls_correct_function(mock_openai_transcri
 def test_hf_speech_transcription_calls_correct_function(mock_hf_transcript):
     result = hf_speech_transcription("fake_path.wav", "some/model", "hf-inference")
 
-    mock_hf_transcript.assert_called_once_with("fake_path.wav", "some/model", "hf-inference")
+    mock_hf_transcript.assert_called_once_with("fake_path.wav", "some/model", "hf-inference", False, progress_callback=None)
     assert result == "HF text"
 
 

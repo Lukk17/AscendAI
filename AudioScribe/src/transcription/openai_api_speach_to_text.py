@@ -1,6 +1,8 @@
 import logging
 import os
 import tempfile
+import time
+from typing import Callable, Optional
 
 import httpx
 from openai import OpenAI, APIError
@@ -37,7 +39,8 @@ def _transcribe_single_chunk(audio_chunk_path: str, model: str, language: str, w
             "OpenAI API failed to process an audio chunk. It may be an invalid model or the API may be unavailable.") from e
 
 
-def openai_transcript(audio_file_path: str, model: str, language: str, with_timestamps: bool = False):
+def openai_transcript(audio_file_path: str, model: str, language: str, with_timestamps: bool = False,
+                      progress_callback: Optional[Callable[[dict], None]] = None):
     """
     Transcribes an audio file using the OpenAI Whisper API.
     Handles large files by automatically splitting them into chunks.
@@ -53,8 +56,12 @@ def openai_transcript(audio_file_path: str, model: str, language: str, with_time
     )
 
     if file_size < settings.OPENAI_API_LIMIT_BYTES:
-        logger.info("File is smaller than the API limit. Transcribing directly.")
-        return _transcribe_single_chunk(audio_file_path, model, language, with_timestamps)
+        logger.info(f"File size ({file_size / 1024 / 1024:.2f} MB) is within limit. Transcribing directly.")
+        chunk_start = time.monotonic()
+        result = _transcribe_single_chunk(audio_file_path, model, language, with_timestamps)
+        elapsed = time.monotonic() - chunk_start
+        logger.info(f"Transcription complete in {elapsed:.2f}s.")
+        return result
 
     logger.info(f"File size ({file_size / 1024 / 1024:.2f} MB) exceeds limit. Splitting into chunks.")
 
@@ -94,9 +101,16 @@ def openai_transcript(audio_file_path: str, model: str, language: str, with_time
                 logger.error(f"Chunk {chunk_num} size {chunk_size} exceeds limit {settings.OPENAI_API_LIMIT_BYTES}!")
                 raise ValueError(f"Generated chunk {chunk_num} exceeded OpenAI size limit.")
 
-            logger.info(f"Transcribing chunk {chunk_num}/{num_chunks}...")
+            chunk_size_mb = chunk_size / 1024 / 1024
+            logger.info(f"Transcribing chunk {chunk_num}/{num_chunks} ({chunk_size_mb:.2f} MB)...")
+            if progress_callback:
+                progress_callback({"type": "progress", "message": f"Transcribing chunk {chunk_num}/{num_chunks}",
+                                   "data": {"chunk": chunk_num, "total": num_chunks, "size_mb": round(chunk_size_mb, 2)}})
+
+            chunk_start = time.monotonic()
             chunk_transcription = _transcribe_single_chunk(tmp_path, model, language, with_timestamps)
-            
+            chunk_elapsed = time.monotonic() - chunk_start
+
             if with_timestamps:
                 for segment in chunk_transcription:
                     segment['start'] += start_ms / 1000.0
@@ -104,8 +118,11 @@ def openai_transcript(audio_file_path: str, model: str, language: str, with_time
                     full_transcription_segments.append(segment)
             else:
                 full_transcription_text.append(chunk_transcription)
-                
-            logger.info(f"Chunk {chunk_num}/{num_chunks} complete.")
+
+            logger.info(f"Chunk {chunk_num}/{num_chunks} complete in {chunk_elapsed:.2f}s.")
+            if progress_callback:
+                progress_callback({"type": "progress", "message": f"Chunk {chunk_num}/{num_chunks} complete in {chunk_elapsed:.2f}s",
+                                   "data": {"chunk": chunk_num, "total": num_chunks, "elapsed_s": round(chunk_elapsed, 2)}})
 
         if with_timestamps:
             return full_transcription_segments
