@@ -74,6 +74,20 @@ Always invoke relevant project skills before starting implementation work. Skill
 - `/git-workflow` for branching and commit conventions
 - `/database-migrations` for schema changes
 
+## Implementation Plan
+
+Before starting any non-trivial implementation work (bug fixes, features, refactors), create or completely overwrite `implementation_plan.md` in the project root. This file serves as the single source of truth for the current active plan.
+
+**Required structure:**
+1. **Context** section at the top — what problem is being solved and why
+2. **Progress** section — a TODO checklist of all tasks. Update this in real-time:
+   - Mark each task as done (`[x]`) immediately after completing it, before starting the next task
+   - This section must always reflect the current state of work
+3. **Plan** section — detailed implementation steps with file paths, code changes, and rationale
+4. **Verification** section — how to test the changes end-to-end
+
+Each new plan completely overwrites the previous `implementation_plan.md`. There is only ever one active plan.
+
 ## IDE Compatibility
 
 Always output file edits using strict SEARCH/REPLACE blocks.

@@ -120,12 +120,12 @@ class SemanticMemoryExtractorTest {
         setupProviderConfig("meta-llama-3.1-8b-instruct");
         when(chatModelResolver.resolve(DEFAULT_PROVIDER)).thenReturn(chatModel);
 
-        String invalidJson = "Invalid output";
+        String invalidJson = "Invalid output with no JSON at all";
         ChatResponse mockResponse = createMockChatResponse(invalidJson);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
         when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(invalidJson);
 
-        when(objectMapper.readValue(eq(invalidJson), any(TypeReference.class)))
+        when(objectMapper.readValue(any(String.class), any(TypeReference.class)))
                 .thenThrow(new JsonProcessingException("Malformatted JSON") {});
 
         // when
@@ -134,6 +134,34 @@ class SemanticMemoryExtractorTest {
         // then
         verify(chatModelResolver, timeout(2000)).resolve(DEFAULT_PROVIDER);
         verify(memoryClient, after(500).never()).insertMemory(any(), any());
+    }
+
+    @Test
+    void extract_WhenThinkingModelReturnsReasoningWithEmbeddedJson_ThenExtractsFactsFromEmbeddedArray() throws JsonProcessingException {
+        // given — simulates the MiniMax-M2.7 bug: resolver returns thinking text with JSON embedded
+        setupProviderConfig("MiniMax-M2.7");
+        when(chatModelResolver.resolve(DEFAULT_PROVIDER)).thenReturn(chatModel);
+
+        String thinkingWithEmbeddedJson = """
+                The user says "My dog is named Rex." We need to identify semantic facts.
+                Thus final answer: ["User has a dog named Rex"]""";
+        String embeddedArray = "[\"User has a dog named Rex\"]";
+
+        ChatResponse mockResponse = createMockChatResponse(thinkingWithEmbeddedJson);
+        when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(thinkingWithEmbeddedJson);
+
+        // First call with full text fails, second call with extracted array succeeds
+        when(objectMapper.readValue(eq(thinkingWithEmbeddedJson), any(TypeReference.class)))
+                .thenThrow(new JsonProcessingException("Not valid JSON") {});
+        when(objectMapper.readValue(eq(embeddedArray), any(TypeReference.class)))
+                .thenReturn(List.of("User has a dog named Rex"));
+
+        // when
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+
+        // then
+        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex");
     }
 
     @Test

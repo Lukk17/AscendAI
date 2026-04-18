@@ -25,9 +25,11 @@ public class SemanticMemoryExtractor {
 
     private static final String EXTRACTOR_INSTRUCTION = """
             Identify exclusively standalone semantic facts (identity, strict preference, name, contact) from the attached user prompt.
-            Disregard general knowledge or questions. Return exclusively a JSON Array of strings.
-            If there are no facts to save, return [].
-            
+            Disregard general knowledge or questions.
+
+            RESPOND WITH ONLY a JSON Array of strings. No explanation, no reasoning, no markdown.
+            If there are no facts to save, respond with exactly: []
+
             Example output:
             ["User loves playing electric guitar", "User's favorite color is red"]
             """;
@@ -106,8 +108,22 @@ public class SemanticMemoryExtractor {
         try {
             return objectMapper.readValue(cleanedJson, new TypeReference<List<String>>() {});
         } catch (JsonProcessingException e) {
-            log.warn("Could not parse memory extraction response as JSON Array. Content: {}", cleanedJson);
-            return List.of();
+            return extractEmbeddedJsonArray(cleanedJson);
         }
+    }
+
+    private List<String> extractEmbeddedJsonArray(String text) {
+        int lastOpen = text.lastIndexOf('[');
+        int lastClose = text.lastIndexOf(']');
+        if (lastOpen >= 0 && lastClose > lastOpen) {
+            String candidate = text.substring(lastOpen, lastClose + 1);
+            try {
+                return objectMapper.readValue(candidate, new TypeReference<List<String>>() {});
+            } catch (JsonProcessingException ex) {
+                // Fall through to warn
+            }
+        }
+        log.warn("Could not parse memory extraction response as JSON Array. Content: {}", text);
+        return List.of();
     }
 }
