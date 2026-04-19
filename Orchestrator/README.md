@@ -63,8 +63,8 @@ flowchart TD
     *   **Usage**: Stores semantic embeddings of ingested documents (Markdown, PDF, etc.) for similarity search.
 4.  **ascend-memory**:
     *   **Purpose**: Semantic memory service (separate from chat history).
-    *   **Prerequisite**: Requires **LM Studio** to be running locally on port `1234` to provide embeddings for Qdrant storage. Without it, memory insertion and retrieval will fail.
-    *   **Usage**: The Orchestrator retrieves user-scoped facts over REST to inject as optional context before generating a response. Afterward, a background Virtual Thread asynchronously extracts new facts from the conversation using a low-cost LLM and `POST`s them back to this service for long-term semantic storage.
+    *   **Usage**: The Orchestrator retrieves user-scoped facts over REST to inject as optional context before generating a response. Afterward, a background Virtual Thread asynchronously extracts new facts from the conversation and `POST`s them back to this service for long-term semantic storage.
+    *   **Provider routing**: The Orchestrator forwards the active `embeddingProvider` to ascend-memory. Each provider maps to a dedicated Qdrant collection (`ascend_memory_768` for lmstudio/gemini, `ascend_memory_1536` for openai), ensuring dimension-safe storage.
 
 5.  **Thinking Model Response Resolution**:
     *   **Problem**: Providers using `type: anthropic` (LM Studio, Anthropic, MiniMax) may return multi-block responses where the first block contains internal chain-of-thought reasoning and the last block contains the actual answer. Standard `getResult()` returns the first block (thinking text), not the answer.
@@ -82,7 +82,7 @@ The Orchestrator uses a retrieval-gated approach:
 *   **Semantic Memory (REST)**: 
     *   *Retrieval*: User-scoped memories are retrieved from `ascend-memory` and injected as optional context.
     *   *Storage*: After generating a response, the Orchestrator triggers an asynchronous Virtual Thread. This thread uses a low-cost LLM configuration to deterministically extract facts from the conversation and POSTs them to `ascend-memory`, ensuring the extraction process adds exactly zero latency to the user's request.
-    *   ⚠️ **Important Dependency**: `ascend-memory` requires **LM Studio** running locally on port 1234 (serving `text-embedding-nomic-embed-text-v2-moe`) to generate vector embeddings for its Qdrant backend. If LM Studio is not running, memory operations will return 500 Interal Server Errors.
+    *   **Embedding provider**: `ascend-memory` uses the same `embeddingProvider` as the Orchestrator request. The default (`lmstudio`) requires LM Studio running locally on port `1234`. Switching to `openai` or `gemini` eliminates this local dependency.
 
 #### Optional upgrade: Model Router (1 extra LLM call)
 For a larger tool set and ambiguous prompts, you can add a model-router step that returns JSON like `{route: RAG|TOOL|BOTH}` and drives retrieval/tooling explicitly.

@@ -57,13 +57,13 @@ class ChatOrchestratorServiceTest {
         // given
         MultipartFile image = mock(MultipartFile.class);
         MultipartFile doc = mock(MultipartFile.class);
-        
-        when(contextAssembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_PROMPT)).thenReturn("System...");
+
+        when(contextAssembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_PROMPT, ACTIVE_EMBEDDING)).thenReturn("System...");
         when(contextAssembler.buildUserMessage(DEFAULT_PROMPT, doc, ACTIVE_EMBEDDING)).thenReturn("ProcessedPrompt");
-        
+
         List<Message> mockHistory = List.of(new UserMessage("Old Msg"));
         when(historyService.loadHistory(DEFAULT_USER_ID)).thenReturn(mockHistory);
-        
+
         AiResponse mockResponse = new AiResponse("Expected answer", new CustomMetadata(null, List.of()));
         when(chatExecutor.execute(DEFAULT_USER_ID, "System...", "ProcessedPrompt", mockHistory, image, DEFAULT_PROVIDER, DEFAULT_MODEL))
                 .thenReturn(mockResponse);
@@ -74,25 +74,25 @@ class ChatOrchestratorServiceTest {
         // then
         assertThat(result).isNotNull();
         assertThat(result.content()).isEqualTo("Expected answer");
-        
+
         verify(embeddingProviderValidator).validate(DEFAULT_PROVIDER, ACTIVE_EMBEDDING);
         verify(historyService).saveHistory(DEFAULT_USER_ID, "ProcessedPrompt", "Expected answer");
-        verify(semanticMemoryExtractor).extract(DEFAULT_USER_ID, DEFAULT_PROMPT, DEFAULT_PROVIDER);
+        verify(semanticMemoryExtractor).extract(DEFAULT_USER_ID, DEFAULT_PROMPT, DEFAULT_PROVIDER, DEFAULT_MODEL, ACTIVE_EMBEDDING);
     }
-    
+
     @Test
     void prompt_WhenEmbeddingProviderNotProvided_ThenResolvesFromPropertiesAndExecutes() {
         // given
         ProviderConfig config = new ProviderConfig();
         config.setDefaultEmbedding(ACTIVE_EMBEDDING);
         when(aiProviderProperties.getProviders()).thenReturn(Map.of(DEFAULT_PROVIDER, config));
-        
-        when(contextAssembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_PROMPT)).thenReturn("System...");
+
+        when(contextAssembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_PROMPT, ACTIVE_EMBEDDING)).thenReturn("System...");
         when(contextAssembler.buildUserMessage(DEFAULT_PROMPT, null, ACTIVE_EMBEDDING)).thenReturn("ProcessedPrompt");
-        
+
         List<Message> mockHistory = List.of();
         when(historyService.loadHistory(DEFAULT_USER_ID)).thenReturn(mockHistory);
-        
+
         AiResponse mockResponse = new AiResponse("Answer", new CustomMetadata(null, List.of()));
         when(chatExecutor.execute(DEFAULT_USER_ID, "System...", "ProcessedPrompt", mockHistory, null, DEFAULT_PROVIDER, DEFAULT_MODEL))
                 .thenReturn(mockResponse);
@@ -103,5 +103,6 @@ class ChatOrchestratorServiceTest {
         // then
         assertThat(result.content()).isEqualTo("Answer");
         verify(embeddingProviderValidator).validate(DEFAULT_PROVIDER, ACTIVE_EMBEDDING);
+        verify(semanticMemoryExtractor).extract(DEFAULT_USER_ID, DEFAULT_PROMPT, DEFAULT_PROVIDER, DEFAULT_MODEL, ACTIVE_EMBEDDING);
     }
 }

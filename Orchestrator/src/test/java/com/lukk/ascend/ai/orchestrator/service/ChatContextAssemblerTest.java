@@ -56,12 +56,13 @@ class ChatContextAssemblerTest {
         // given
         when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn("Be concise.");
         when(semanticMemoryProperties.getSearchLimit()).thenReturn(10);
-        
+
         SemanticMemoryItem item = createMemoryItem("User uses Java");
-        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10)).thenReturn(List.of(item));
+        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(List.of(item));
 
         // when
-        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT);
+        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
         assertThat(result)
@@ -75,10 +76,11 @@ class ChatContextAssemblerTest {
         // given
         when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn(null);
         when(semanticMemoryProperties.getSearchLimit()).thenReturn(10);
-        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10)).thenReturn(List.of());
+        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(List.of());
 
         // when
-        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT);
+        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
         assertThat(result)
@@ -92,11 +94,11 @@ class ChatContextAssemblerTest {
         // given
         when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn("Be concise.");
         when(semanticMemoryProperties.getSearchLimit()).thenReturn(10);
-        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10))
+        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10, DEFAULT_EMBEDDING_PROVIDER))
                 .thenThrow(new RuntimeException("Connection failed"));
 
         // when
-        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT);
+        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
         assertThat(result)
@@ -123,7 +125,7 @@ class ChatContextAssemblerTest {
         MultipartFile document = mock(MultipartFile.class);
         when(document.isEmpty()).thenReturn(false);
         when(documentIngestionService.processDocument(document)).thenReturn("\n[Doc Content]");
-        
+
         String intermediatePrompt = DEFAULT_USER_PROMPT + "\n[Doc Content]";
         when(ragRetrievalService.retrieveContext(intermediatePrompt, DEFAULT_EMBEDDING_PROVIDER)).thenReturn("[RAG Content]");
 
@@ -136,7 +138,7 @@ class ChatContextAssemblerTest {
                 .contains("[Doc Content]")
                 .contains("[RAG Content]");
     }
-    
+
     @Test
     void buildUserMessage_WhenEmptyDocAndNoRag_ThenIgnoresDocument() {
         // given

@@ -35,7 +35,7 @@ public class ChatOrchestratorService {
 
         embeddingProviderValidator.validate(provider, activeEmbeddingProvider);
 
-        String systemText = contextAssembler.buildSystemMessage(userId, prompt);
+        String systemText = contextAssembler.buildSystemMessage(userId, prompt, activeEmbeddingProvider);
         String userText = contextAssembler.buildUserMessage(prompt, document, activeEmbeddingProvider);
 
         List<Message> history = historyService.loadHistory(userId);
@@ -43,8 +43,8 @@ public class ChatOrchestratorService {
         AiResponse response = chatExecutor.execute(userId, systemText, userText, history, image, provider, model);
 
         historyService.saveHistory(userId, userText, response.content());
-        
-        semanticMemoryExtractor.extract(userId, prompt, provider);
+
+        semanticMemoryExtractor.extract(userId, prompt, provider, model, activeEmbeddingProvider);
 
         return response;
     }

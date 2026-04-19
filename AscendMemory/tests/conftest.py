@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, patch
 
 # Mock mem0ai dependencies
 mock_mem0 = MagicMock()
@@ -18,12 +18,27 @@ mock_mcp_instance = MagicMock()
 mock_mcp_instance.tool.return_value = lambda f: f
 
 
-# Mock http_app to return a dummy ASGI app
-async def mock_asgi_app(scope, receive, send):
-    pass
+# Mock http_app to return a Starlette-like app with router.lifespan_context
+from contextlib import asynccontextmanager
 
 
-mock_mcp_instance.http_app.return_value = mock_asgi_app
+@asynccontextmanager
+async def _mock_lifespan_context(app):
+    yield
+
+
+_mock_router = MagicMock()
+_mock_router.lifespan_context = _mock_lifespan_context
+
+
+class _MockMcpAsgiApp:
+    router = _mock_router
+
+    async def __call__(self, scope, receive, send):
+        pass
+
+
+mock_mcp_instance.http_app.return_value = _MockMcpAsgiApp()
 
 mock_fastmcp_module.FastMCP.return_value = mock_mcp_instance
 sys.modules["fastmcp"] = mock_fastmcp_module
@@ -34,7 +49,7 @@ from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 
 from src.main import app
-from src.service.memory_client import AscendMemoryClient, get_memory_client
+from src.service.memory_client import AscendMemoryClient
 
 
 @pytest.fixture
@@ -47,18 +62,14 @@ def mock_memory_service():
 
 
 @pytest.fixture
-def override_dependencies(mock_memory_service):
+def override_dependencies():
     """
-    Overrides the get_memory_client dependency in FastAPI.
-    Returns a mock AscendMemoryClient that wraps the global mock_memory_instance.
+    Patches get_memory_client in rest_endpoints so all endpoint calls return a mock client.
+    Returns the mock AscendMemoryClient for assertion.
     """
     mock_client = MagicMock(spec=AscendMemoryClient)
-    # Link the mock client's internal memory to our global mock
-    mock_client.memory = mock_memory_service
-
-    app.dependency_overrides[get_memory_client] = lambda: mock_client
-    yield mock_client
-    app.dependency_overrides = {}
+    with patch("src.api.rest.rest_endpoints.get_memory_client", return_value=mock_client):
+        yield mock_client
 
 
 @pytest_asyncio.fixture(scope="function")

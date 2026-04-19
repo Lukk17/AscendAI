@@ -37,7 +37,7 @@ public class DoclingClient {
     public DoclingClient(
             @Qualifier("ingestionRestClient") RestClient restClient,
             ObjectMapper objectMapper,
-            @Value("${app.docling.base-url:http://localhost:7021}") String doclingBaseUrl,
+            @Value("${app.docling.base-url:http://localhost:5001}") String doclingBaseUrl,
             @Value("${app.docling.api-path:/v1/convert}") String doclingApiPath) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;

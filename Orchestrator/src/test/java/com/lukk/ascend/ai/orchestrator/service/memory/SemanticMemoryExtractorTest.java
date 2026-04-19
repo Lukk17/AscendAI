@@ -34,6 +34,7 @@ class SemanticMemoryExtractorTest {
     private static final String DEFAULT_USER_ID = "user1";
     private static final String DEFAULT_USER_TEXT = "My dog is named Rex";
     private static final String DEFAULT_PROVIDER = "lmstudio";
+    private static final String DEFAULT_EMBEDDING_PROVIDER = "lmstudio";
 
     @Mock
     private ChatModelResolver chatModelResolver;
@@ -71,10 +72,10 @@ class SemanticMemoryExtractorTest {
         when(objectMapper.readValue(eq(jsonResponse), any(TypeReference.class))).thenReturn(parsedFacts);
 
         // when
-        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
-        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex");
+        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex", DEFAULT_EMBEDDING_PROVIDER);
     }
 
     @Test
@@ -92,11 +93,11 @@ class SemanticMemoryExtractorTest {
         when(objectMapper.readValue(eq(jsonResponse), any(TypeReference.class))).thenReturn(parsedFacts);
 
         // when
-        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
         verify(chatModelResolver, timeout(2000)).resolve(DEFAULT_PROVIDER);
-        verify(memoryClient, after(500).never()).insertMemory(any(), any());
+        verify(memoryClient, after(500).never()).insertMemory(any(), any(), any());
     }
 
     @Test
@@ -107,13 +108,13 @@ class SemanticMemoryExtractorTest {
         when(chatModel.call(any(Prompt.class))).thenThrow(new RuntimeException("AI Provider Down"));
 
         // when
-        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
         verify(chatModelResolver, timeout(2000)).resolve(DEFAULT_PROVIDER);
-        verify(memoryClient, after(500).never()).insertMemory(any(), any());
+        verify(memoryClient, after(500).never()).insertMemory(any(), any(), any());
     }
-    
+
     @Test
     void extract_WhenJsonProcessingException_ThenHandlesGracefully() throws JsonProcessingException {
         // given
@@ -129,11 +130,11 @@ class SemanticMemoryExtractorTest {
                 .thenThrow(new JsonProcessingException("Malformatted JSON") {});
 
         // when
-        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
         verify(chatModelResolver, timeout(2000)).resolve(DEFAULT_PROVIDER);
-        verify(memoryClient, after(500).never()).insertMemory(any(), any());
+        verify(memoryClient, after(500).never()).insertMemory(any(), any(), any());
     }
 
     @Test
@@ -158,10 +159,10 @@ class SemanticMemoryExtractorTest {
                 .thenReturn(List.of("User has a dog named Rex"));
 
         // when
-        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
-        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex");
+        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex", DEFAULT_EMBEDDING_PROVIDER);
     }
 
     @Test
@@ -180,10 +181,10 @@ class SemanticMemoryExtractorTest {
         when(objectMapper.readValue(eq(jsonResponse), any(TypeReference.class))).thenReturn(parsedFacts);
 
         // when
-        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER);
+        extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
-        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex");
+        verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex", DEFAULT_EMBEDDING_PROVIDER);
     }
 
     private void setupProviderConfig(String extractionModel) {

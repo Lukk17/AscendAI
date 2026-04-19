@@ -40,21 +40,21 @@ public class SemanticMemoryExtractor {
     private final ObjectMapper objectMapper;
     private final ChatResponseContentResolver chatResponseContentResolver;
 
-    public void extract(String userId, String userText, String provider) {
-        Thread.startVirtualThread(() -> processExtraction(userId, userText, provider));
+    public void extract(String userId, String userText, String provider, String model, String embeddingProvider) {
+        Thread.startVirtualThread(() -> processExtraction(userId, userText, provider, model, embeddingProvider));
     }
 
-    private void processExtraction(String userId, String userText, String provider) {
+    private void processExtraction(String userId, String userText, String provider, String model, String embeddingProvider) {
         log.debug("Initiating asynchronous semantic memory extraction for user '{}' via provider '{}'", userId, provider);
         try {
-            executeExtractionFlow(userId, userText, provider);
+            executeExtractionFlow(userId, userText, provider, model, embeddingProvider);
         } catch (Exception e) {
             handleExtractionError(userId, e);
         }
     }
 
-    private void executeExtractionFlow(String userId, String userText, String provider) {
-        String extractionModel = resolveMemoryExtractionModel(provider);
+    private void executeExtractionFlow(String userId, String userText, String provider, String model, String embeddingProvider) {
+        String extractionModel = resolveExtractionModel(provider, model);
         ChatModel chatModel = chatModelResolver.resolve(provider);
 
         ChatClient.Builder clientBuilder = ChatClient.builder(chatModel)
@@ -62,7 +62,7 @@ public class SemanticMemoryExtractor {
 
         Optional.ofNullable(extractionModel)
                 .filter(StringUtils::hasText)
-                .ifPresent(model -> clientBuilder.defaultOptions(ChatOptions.builder().model(model).build()));
+                .ifPresent(m -> clientBuilder.defaultOptions(ChatOptions.builder().model(m).build()));
 
         ChatClient chatClient = clientBuilder.build();
 
@@ -74,14 +74,21 @@ public class SemanticMemoryExtractor {
         String responseContent = chatResponseContentResolver.resolveContent(chatResponse);
 
         List<String> facts = extractFactsFromJson(responseContent);
-        facts.forEach(fact -> memoryClient.insertMemory(userId, fact));
+        facts.forEach(fact -> memoryClient.insertMemory(userId, fact, embeddingProvider));
     }
 
     private void handleExtractionError(String userId, Exception e) {
         log.warn("Failed to extract or insert semantic memory asynchronously for user '{}'. Reason: {}", userId, e.getMessage());
     }
 
-    private String resolveMemoryExtractionModel(String provider) {
+    /**
+     * Resolves which model to use for extraction.
+     * Priority: user's requested model > provider's configured memoryExtractionModel > null (provider default).
+     */
+    private String resolveExtractionModel(String provider, String requestedModel) {
+        if (StringUtils.hasText(requestedModel)) {
+            return requestedModel;
+        }
         return Optional.ofNullable(aiProviderProperties.getProviders().get(provider))
                 .map(AiProviderProperties.ProviderConfig::getMemoryExtractionModel)
                 .orElse(null);

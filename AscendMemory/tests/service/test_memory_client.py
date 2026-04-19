@@ -6,21 +6,37 @@ import src.service.memory_client as client_module
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
-    """Reset the singleton instance before and after each test."""
-    client_module._client_instance = None
+    """Reset the per-provider singleton dict before and after each test."""
+    client_module._client_instances = {}
     yield
-    client_module._client_instance = None
+    client_module._client_instances = {}
 
 
-def test_get_memory_client_singleton():
-    # given
-    # when
-    client1 = get_memory_client()
-    client2 = get_memory_client()
+def test_get_memory_client_singleton_same_provider():
+    # given / when
+    client1 = get_memory_client("lmstudio")
+    client2 = get_memory_client("lmstudio")
 
-    # then
+    # then — same provider returns same instance
     assert client1 is client2
     assert isinstance(client1, AscendMemoryClient)
+
+
+def test_get_memory_client_different_providers_different_instances():
+    # given / when
+    client_lm = get_memory_client("lmstudio")
+    client_oai = get_memory_client("openai")
+
+    # then — different providers return different instances
+    assert client_lm is not client_oai
+
+
+def test_get_memory_client_no_provider_uses_default():
+    # when
+    client = get_memory_client()
+
+    # then
+    assert isinstance(client, AscendMemoryClient)
 
 
 def test_add_memory_success(mock_memory_service):
@@ -36,7 +52,6 @@ def test_add_memory_success(mock_memory_service):
     # then
     assert result == [{"id": "mem_1"}]
     mock_memory_service.add.assert_called_once()
-    # Check call kwargs
     call_kwargs = mock_memory_service.add.call_args.kwargs
     assert call_kwargs["user_id"] == user_id
     assert call_kwargs["messages"] == [{"role": "user", "content": text}]
@@ -79,7 +94,6 @@ def test_delete_memory_success(mock_memory_service):
 def test_wipe_user_success(mock_memory_service):
     # given
     client = get_memory_client()
-    # Mock listing memories
     mock_memory_service.get_all.return_value = {
         "results": [{"id": "id_1"}, {"id": "id_2"}]
     }
@@ -89,7 +103,6 @@ def test_wipe_user_success(mock_memory_service):
 
     # then
     mock_memory_service.get_all.assert_called_once_with(user_id="u1")
-    # Verify calls to delete for each ID
     assert mock_memory_service.delete.call_count == 2
     mock_memory_service.delete.assert_any_call(memory_id="id_1")
     mock_memory_service.delete.assert_any_call(memory_id="id_2")
@@ -114,7 +127,7 @@ def test_search_memory_error(mock_memory_service):
     results = client.search(user_id="u1", query="test")
 
     # then
-    assert results == []  # Should match the safe default
+    assert results == []
 
 
 def test_delete_memory_error(mock_memory_service):
@@ -143,8 +156,7 @@ def test_wipe_user_error_deleting_one(mock_memory_service):
     mock_memory_service.get_all.return_value = {"results": [{"id": "1"}]}
     mock_memory_service.delete.side_effect = Exception("Del 1 Error")
 
-    # when
-    # Should catch exception inside loop and log it, not raise
+    # when — exception inside loop is caught and logged, not re-raised
     client.wipe_user(user_id="u1")
 
     # then

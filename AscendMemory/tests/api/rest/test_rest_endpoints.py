@@ -1,24 +1,35 @@
 import pytest
 from httpx import AsyncClient
-from unittest.mock import MagicMock
 
 
 @pytest.mark.asyncio
-async def test_upsert_memory_success(client: AsyncClient, override_dependencies):
+async def test_insert_memory_success(client: AsyncClient, override_dependencies):
     # given
     mock_service = override_dependencies
     mock_service.add.return_value = [{"id": "mem_1"}]
-    payload = {
-        "user_id": "u1",
-        "text": "test memory"
-    }
+    payload = {"user_id": "u1", "text": "test memory"}
 
     # when
-    response = await client.post("/api/v1/memory/upsert", json=payload)
+    response = await client.post("/api/v1/memory/insert", json=payload)
 
     # then
     assert response.status_code == 200
     assert response.json() == [{"id": "mem_1"}]
+    mock_service.add.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_insert_memory_with_provider(client: AsyncClient, override_dependencies):
+    # given
+    mock_service = override_dependencies
+    mock_service.add.return_value = [{"id": "mem_2"}]
+    payload = {"user_id": "u1", "text": "test memory", "provider": "openai"}
+
+    # when
+    response = await client.post("/api/v1/memory/insert", json=payload)
+
+    # then
+    assert response.status_code == 200
     mock_service.add.assert_called_once()
 
 
@@ -34,6 +45,21 @@ async def test_search_memory_success(client: AsyncClient, override_dependencies)
     # then
     assert response.status_code == 200
     assert response.json() == [{"id": "mem_1", "score": 0.8}]
+    mock_service.search.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_search_memory_with_provider(client: AsyncClient, override_dependencies):
+    # given
+    mock_service = override_dependencies
+    mock_service.search.return_value = []
+
+    # when
+    response = await client.get("/api/v1/memory/search",
+                                params={"user_id": "u1", "query": "test", "provider": "openai"})
+
+    # then
+    assert response.status_code == 200
     mock_service.search.assert_called_once()
 
 

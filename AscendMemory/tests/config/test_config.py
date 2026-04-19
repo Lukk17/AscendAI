@@ -11,7 +11,8 @@ def test_settings_defaults():
     assert settings.API_PORT == 7020
     assert settings.API_HOST == "0.0.0.0"
     assert settings.QDRANT_HOST == "localhost"
-    assert settings.MEM0_EMBEDDING_DIMS == 768
+    assert settings.MEM0_DEFAULT_PROVIDER == "lmstudio"
+    assert settings.MEM0_LLM_MODEL == "meta-llama-3.1-8b-instruct"
 
 
 def test_settings_env_override():
@@ -19,7 +20,7 @@ def test_settings_env_override():
     env_vars = {
         "API_PORT": "9090",
         "QDRANT_HOST": "qdrant-prod",
-        "MEM0_COLLECTION_NAME": "test_collection"
+        "MEM0_DEFAULT_PROVIDER": "openai"
     }
 
     with patch.dict(os.environ, env_vars):
@@ -29,4 +30,4 @@ def test_settings_env_override():
         # then
         assert settings.API_PORT == 9090
         assert settings.QDRANT_HOST == "qdrant-prod"
-        assert settings.MEM0_COLLECTION_NAME == "test_collection"
+        assert settings.MEM0_DEFAULT_PROVIDER == "openai"

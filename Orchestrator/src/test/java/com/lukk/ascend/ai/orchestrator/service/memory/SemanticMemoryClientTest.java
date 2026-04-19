@@ -14,7 +14,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Instant;
-
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +33,7 @@ class SemanticMemoryClientTest {
     private static final String QUERY = "Find memory";
     private static final int LIMIT = 5;
     private static final String FACT = "User uses Python";
+    private static final String EMBEDDING_PROVIDER = "lmstudio";
 
     @Mock(answer = Answers.RETURNS_DEEP_STUBS)
     private RestClient.Builder restClientBuilder;
@@ -50,7 +50,7 @@ class SemanticMemoryClientTest {
         when(properties.isEnabled()).thenReturn(false);
 
         // when
-        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT);
+        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT, EMBEDDING_PROVIDER);
 
         // then
         assertThat(result).isEmpty();
@@ -65,15 +65,15 @@ class SemanticMemoryClientTest {
         when(properties.getBaseUrl()).thenReturn("http://memory");
 
         List<SemanticMemoryItem> expectedItems = List.of(new SemanticMemoryItem("1", "user1", "Memory", 0.9d, Instant.now(), Map.of()));
-        
+
         when(restClientBuilder.build().get()
-                .uri(anyString(), eq(DEFAULT_USER_ID), eq(QUERY), eq(LIMIT))
+                .uri(anyString(), eq(DEFAULT_USER_ID), eq(QUERY), eq(LIMIT), eq(EMBEDDING_PROVIDER))
                 .retrieve()
                 .body(any(ParameterizedTypeReference.class)))
                 .thenReturn(expectedItems);
 
         // when
-        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT);
+        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT, EMBEDDING_PROVIDER);
 
         // then
         assertThat(result).isEqualTo(expectedItems);
@@ -89,18 +89,18 @@ class SemanticMemoryClientTest {
         RestClientResponseException exception = new HttpClientErrorException(HttpStatus.NOT_FOUND);
 
         when(restClientBuilder.build().get()
-                .uri(anyString(), anyString(), anyString(), any(Integer.class))
+                .uri(anyString(), anyString(), anyString(), any(Integer.class), anyString())
                 .retrieve()
                 .body(any(ParameterizedTypeReference.class)))
                 .thenThrow(exception);
 
         // when
-        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT);
+        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT, EMBEDDING_PROVIDER);
 
         // then
         assertThat(result).isEmpty();
     }
-    
+
     @Test
     @SuppressWarnings("unchecked")
     void search_WhenGeneralException_ThenGracefullyReturnsEmptyList() {
@@ -109,13 +109,13 @@ class SemanticMemoryClientTest {
         when(properties.getBaseUrl()).thenReturn("http://memory");
 
         when(restClientBuilder.build().get()
-                .uri(anyString(), anyString(), anyString(), any(Integer.class))
+                .uri(anyString(), anyString(), anyString(), any(Integer.class), anyString())
                 .retrieve()
                 .body(any(ParameterizedTypeReference.class)))
                 .thenThrow(new RuntimeException("Connection Refused"));
 
         // when
-        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT);
+        List<SemanticMemoryItem> result = semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT, EMBEDDING_PROVIDER);
 
         // then
         assertThat(result).isEmpty();
@@ -127,7 +127,7 @@ class SemanticMemoryClientTest {
         when(properties.isEnabled()).thenReturn(false);
 
         // when
-        semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT);
+        semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
 
         // then
         verifyNoInteractions(restClientBuilder);
@@ -138,21 +138,21 @@ class SemanticMemoryClientTest {
         // given
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
-        
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
-        
+
         RestClient restClient = mock(RestClient.class);
         when(restClientBuilder.build()).thenReturn(restClient);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
         when(responseSpecMock.onStatus(any(), any())).thenReturn(responseSpecMock);
 
-        // when / then
-        semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT);
+        // when / then — no exception
+        semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
     }
 }

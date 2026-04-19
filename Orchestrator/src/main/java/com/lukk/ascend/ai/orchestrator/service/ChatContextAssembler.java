@@ -26,10 +26,10 @@ public class ChatContextAssembler {
     @Value("${app.system-prompt}")
     private String baseSystemPrompt;
 
-    public String buildSystemMessage(String userId, String userPrompt) {
+    public String buildSystemMessage(String userId, String userPrompt, String embeddingProvider) {
         String instructions = userInstructionService.getInstructions(userId);
 
-        List<SemanticMemoryItem> semanticMemory = fetchSemanticMemory(userId, userPrompt);
+        List<SemanticMemoryItem> semanticMemory = fetchSemanticMemory(userId, userPrompt, embeddingProvider);
         String semanticMemoryBlock = buildSemanticMemoryBlock(semanticMemory);
 
         StringBuilder sb = new StringBuilder(baseSystemPrompt);
@@ -37,10 +37,10 @@ public class ChatContextAssembler {
         if (!semanticMemoryBlock.isBlank()) {
             sb.append("\n\n").append(semanticMemoryBlock);
         }
-        
-        log.info("Assembled SystemMessage for user: '{}'. State -> BaseSystemPrompt: YES, UserInstructions: {}, SemanticMemory: {} ({} items)", 
+
+        log.info("Assembled SystemMessage for user: '{}'. State -> BaseSystemPrompt: YES, UserInstructions: {}, SemanticMemory: {} ({} items)",
                 userId, (instructions != null && !instructions.isBlank()) ? "YES" : "NO", !semanticMemoryBlock.isBlank() ? "YES" : "NO", semanticMemory != null ? semanticMemory.size() : 0);
-                
+
         return sb.toString();
     }
 
@@ -62,9 +62,9 @@ public class ChatContextAssembler {
         return userPrompt;
     }
 
-    private List<SemanticMemoryItem> fetchSemanticMemory(String userId, String userPrompt) {
+    private List<SemanticMemoryItem> fetchSemanticMemory(String userId, String userPrompt, String embeddingProvider) {
         try {
-            return semanticMemoryClient.search(userId, userPrompt, semanticMemoryProperties.getSearchLimit());
+            return semanticMemoryClient.search(userId, userPrompt, semanticMemoryProperties.getSearchLimit(), embeddingProvider);
         } catch (Exception e) {
             log.warn("Semantic memory retrieval failed for userId={}: {}", userId, e.getMessage());
             return List.of();

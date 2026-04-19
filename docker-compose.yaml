@@ -133,6 +133,8 @@ services:
       # - MEM0_EMBEDDING_DIMS=1536
       - MEM0_INFER_MEMORY=false
       # - MEM0_INFER_MEMORY=true
+      - MEM0_DEFAULT_PROVIDER=lmstudio
+      # - MEM0_DEFAULT_PROVIDER=openai
       - LOG_LEVEL=INFO
     depends_on:
       qdrant:

@@ -1,12 +1,12 @@
 from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from src.service.memory_client import AscendMemoryClient, get_memory_client
+from src.config.config import settings
+from src.service.memory_client import get_memory_client
 
 rest_router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
-
 
 
 class SearchResponseItem(BaseModel):
@@ -22,11 +22,13 @@ def search_memory(
         user_id: str,
         query: str,
         limit: int = 5,
-        client: AscendMemoryClient = Depends(get_memory_client)
+        provider: Optional[str] = None,
 ):
     """
     Search for memories relevant to the query.
+    provider: embedding provider to use (default: MEM0_DEFAULT_PROVIDER).
     """
+    client = get_memory_client(provider or settings.MEM0_DEFAULT_PROVIDER)
     return client.search(query=query, user_id=user_id, limit=limit)
 
 
@@ -35,16 +37,18 @@ class InsertRequest(BaseModel):
     text: Optional[str] = Field(None, description="The memory content to insert")
     messages: Optional[List[Dict[str, str]]] = Field(None, description="Chat messages to infer memory from")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+    provider: Optional[str] = Field(None, description="Embedding provider to use (default: MEM0_DEFAULT_PROVIDER)")
 
 
 @rest_router.post("/insert")
 async def insert_memory(
         request: InsertRequest,
-        client: AscendMemoryClient = Depends(get_memory_client)
 ):
     """
     Add a new memory.
+    provider: embedding provider to use (default: MEM0_DEFAULT_PROVIDER).
     """
+    client = get_memory_client(request.provider or settings.MEM0_DEFAULT_PROVIDER)
     try:
         return client.add(
             user_id=request.user_id,
@@ -61,11 +65,13 @@ async def insert_memory(
 @rest_router.post("/wipe")
 def wipe_memory(
         user_id: str,
-        client: AscendMemoryClient = Depends(get_memory_client)
+        provider: Optional[str] = None,
 ):
     """
     Wipe all memories for a user.
+    provider: embedding provider to use (default: MEM0_DEFAULT_PROVIDER).
     """
+    client = get_memory_client(provider or settings.MEM0_DEFAULT_PROVIDER)
     client.wipe_user(user_id=user_id)
     return {"status": "success", "message": f"All memories wiped for user {user_id}"}
 
@@ -73,13 +79,15 @@ def wipe_memory(
 @rest_router.delete("")
 def delete_memory(
         memory_id: str,
-        client: AscendMemoryClient = Depends(get_memory_client)
+        provider: Optional[str] = None,
 ):
     """
     Delete a specific memory by ID.
+    provider: embedding provider to use (default: MEM0_DEFAULT_PROVIDER).
     """
     if not memory_id:
         raise HTTPException(status_code=400, detail="memory_id is required")
 
+    client = get_memory_client(provider or settings.MEM0_DEFAULT_PROVIDER)
     client.delete(memory_id=memory_id)
     return {"status": "success", "message": f"Memory {memory_id} deleted"}

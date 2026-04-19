@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 from mem0 import Memory
 from mem0.llms.openai import OpenAILLM
 
-from src.config.config import settings
+from src.config.config import settings, PROVIDER_CONFIGS
 
 logger = logging.getLogger(__name__)
 
@@ -21,32 +21,54 @@ def _generate_response_stripping_unsupported_json_object_format(self, messages, 
 
 OpenAILLM.generate_response = _generate_response_stripping_unsupported_json_object_format
 
-# Singleton instance
-_client_instance: Optional['AscendMemoryClient'] = None
+# Per-provider singleton instances keyed by provider name
+_client_instances: Dict[str, 'AscendMemoryClient'] = {}
 
 
-def get_memory_client() -> 'AscendMemoryClient':
+def resolve_provider(provider: Optional[str]) -> str:
+    """Resolve provider name, falling back to configured default."""
+    if provider and provider.strip():
+        return provider.strip().lower()
+    return settings.MEM0_DEFAULT_PROVIDER
+
+
+def get_memory_client(provider: Optional[str] = None) -> 'AscendMemoryClient':
     """
-    Returns the singleton instance of AscendMemoryClient.
-    Lazy initializes if not already created.
+    Returns the AscendMemoryClient for the given provider.
+    Lazy-initializes per-provider singleton instances.
     """
-    global _client_instance
-    if _client_instance is None:
-        logger.info("Initializing Singleton AscendMemoryClient...")
-        _client_instance = AscendMemoryClient()
-    return _client_instance
+    resolved = resolve_provider(provider)
+    if resolved not in _client_instances:
+        logger.info(f"Initializing AscendMemoryClient for provider '{resolved}'...")
+        _client_instances[resolved] = AscendMemoryClient(resolved)
+    return _client_instances[resolved]
+
+
+def get_default_memory_client() -> 'AscendMemoryClient':
+    """FastAPI Depends-compatible factory for the default provider (used for warmup and DI)."""
+    return get_memory_client()
 
 
 class AscendMemoryClient:
-    def __init__(self):
+    def __init__(self, provider: str):
+        provider_config = PROVIDER_CONFIGS.get(provider)
+        if provider_config is None:
+            logger.warning(
+                f"Unknown provider '{provider}', falling back to default '{settings.MEM0_DEFAULT_PROVIDER}'")
+            provider_config = PROVIDER_CONFIGS[settings.MEM0_DEFAULT_PROVIDER]
+
+        collection_name = provider_config["collection_name"]
+        embedding_model = provider_config["embedding_model"]
+        embedding_dims = provider_config["embedding_dims"]
+
         config = {
             "vector_store": {
                 "provider": "qdrant",
                 "config": {
                     "host": settings.QDRANT_HOST,
                     "port": settings.QDRANT_PORT,
-                    "collection_name": settings.MEM0_COLLECTION_NAME,
-                    "embedding_model_dims": settings.MEM0_EMBEDDING_DIMS
+                    "collection_name": collection_name,
+                    "embedding_model_dims": embedding_dims
                 }
             },
             "llm": {
@@ -60,33 +82,31 @@ class AscendMemoryClient:
             "embedder": {
                 "provider": "openai",
                 "config": {
-                    "model": settings.MEM0_EMBEDDING_MODEL,
+                    "model": embedding_model,
                     "api_key": settings.OPENAI_API_KEY,
                     "openai_base_url": settings.OPENAI_BASE_URL
                 }
             }
         }
         self.memory = Memory.from_config(config)
+        self.provider = provider
         logger.info(
-            f"Initialized Mem0 Memory Client with config: Qdrant Host={settings.QDRANT_HOST}, Embedder={settings.MEM0_EMBEDDING_MODEL}")
+            f"[AscendMemory] Initialized client | provider={provider} | collection={collection_name} | "
+            f"embedder={embedding_model} | dims={embedding_dims}")
 
     def search(self, query: str, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """
-        Search for memories.
-        Returns a list of dicts. Each dict has 'memory', 'score', etc.
-        """
+        """Search for memories. Returns a list of dicts with 'memory', 'score', etc."""
         try:
             results = self.memory.search(query=query, user_id=user_id, limit=limit)
             return results.get("results", []) if results else []
         except Exception as e:
-            logger.error(f"Error searching memory for user {user_id}: {e}")
+            logger.error(f"Error searching memory for user {user_id} (provider={self.provider}): {e}")
             return []
 
     def add(self, user_id: str, messages: Optional[List[Dict[str, str]]] = None, text: Optional[str] = None,
             metadata: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
-        Add memory. 
-        Accepts either messages (list of {role, content}) or raw text.
+        Add memory. Accepts either messages (list of {role, content}) or raw text.
         Returns the result from mem0, which includes the memory ID.
         """
         try:
@@ -102,31 +122,27 @@ class AscendMemoryClient:
 
             return result.get("results", [])
         except Exception as e:
-            logger.error(f"Error adding memory for user {user_id}: {e}")
+            logger.error(f"Error adding memory for user {user_id} (provider={self.provider}): {e}")
             raise
 
     def delete(self, memory_id: str) -> None:
-        """
-        Delete a single memory by ID.
-        """
+        """Delete a single memory by ID."""
         try:
             self.memory.delete(memory_id=memory_id)
         except Exception as e:
-            logger.error(f"Error deleting memory {memory_id}: {e}")
+            logger.error(f"Error deleting memory {memory_id} (provider={self.provider}): {e}")
             raise
 
     def wipe_user(self, user_id: str) -> None:
         """
         Delete all memories for a user.
+        Uses individual deletes as a workaround for mem0 bug where delete_all resets the entire collection.
         """
         try:
-            # MEM0 BUG WORKAROUND:
-            # Do NOT use self.memory.delete_all(user_id=user_id) because it resets the ENTIRE collection.
-            # Instead, list all memories for the user and delete them one by one.
             all_memories = self.memory.get_all(user_id=user_id)
             memories_list = all_memories.get("results", [])
 
-            logger.info(f"Wiping {len(memories_list)} memories for user {user_id}")
+            logger.info(f"Wiping {len(memories_list)} memories for user {user_id} (provider={self.provider})")
 
             for mem in memories_list:
                 try:
@@ -135,5 +151,5 @@ class AscendMemoryClient:
                     logger.error(f"Failed to delete memory {mem['id']}: {del_e}")
 
         except Exception as e:
-            logger.error(f"Error wiping memory for user {user_id}: {e}")
+            logger.error(f"Error wiping memory for user {user_id} (provider={self.provider}): {e}")
             raise

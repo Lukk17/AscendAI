@@ -2,10 +2,7 @@
 
 This repository contains a multi-module AI orchestration platform built with Spring AI and the Model Context Protocol (MCP). It routes user prompts to multiple AI providers (LM Studio, OpenAI, Gemini, Anthropic, MiniMax) with per-request selection, extends LLM capabilities with external tools, and provides a RAG pipeline with semantic memory.
 
-**Supported Gemini Models:**
-- `gemini-flash-latest` (Default)
-- `gemini-pro-latest`
-- `gemini-flash-lite-latest`
+**Supported AI Providers:** LM Studio (local), OpenAI, Gemini, Anthropic, MiniMax — with per-request model selection.
 
 ---
 
@@ -38,7 +35,7 @@ This repository contains a multi-module AI orchestration platform built with Spr
 
 ### 1. Start Infrastructure
 
-Run the following command at the project root to start MinIO, Qdrant, Unstructured API, and OpenMemory:
+Run the following command at the project root to start infrastructure services (MinIO, Qdrant, Redis, SearXNG, AscendMemory, etc.):
 
 ```bash
 docker-compose up -d
@@ -95,12 +92,16 @@ curl -X POST http://localhost:7021/api/v2/web/read \
 | **AudioScribe**     | `7017`          | -                    | MCP — Audio Transcription   |
 | **WeatherMCP**      | `9998`          | -                    | MCP — Weather Data          |
 | **AscendWebSearch** | `7021`          | -                    | MCP — Web Search            |
-| **AscendMemory**    | `7020`          | -                    | REST — Semantic Memory      |
+| **AscendMemory**    | `7020`          | -                    | REST/MCP — Semantic Memory  |
+| **AudioForge**      | `7018`          | -                    | Audio Processing            |
+| **PaddleOCR**       | `7022`          | -                    | MCP — OCR Service           |
+| **Docling Serve**   | `5001`          | -                    | Document Conversion         |
+| **Unstructured API**| `9080`          | -                    | Document Parsing for RAG    |
 | **MinIO API**       | `9070`          | `admin` / `password` | S3 API Endpoint             |
 | **MinIO Console**   | `9071`          | `admin` / `password` | Web UI for File Management  |
 | **Qdrant**          | `6333` / `6334` | -                    | Vector Database (HTTP/gRPC) |
 | **Redis**           | `6379`          | -                    | Cache                       |
-| **SearXNG**         | `8088`          | -                    | Meta Search Engine          |
+| **SearXNG**         | `9020`          | -                    | Meta Search Engine          |
 | **FlareSolverr**    | `8191`          | -                    | Cloudflare Bypass           |
 | **PostgreSQL**      | `5432`          | `postgres` / `local` | Metadata Storage            |
 
@@ -192,7 +193,7 @@ If you need to completely reset the MinIO state or delete a bucket that is stuck
 The system uses Qdrant for two distinct features:
 
 1. **RAG (Orchestrator)**: Uses `ascendai-768` (for Gemini/LM Studio) or `ascendai-1536` (for OpenAI) depending on the active embedding dimensions.
-2. **Semantic Memory (AscendMemory / Mem0)**: Uses the `ascend_memory` collection (768 dimensions by default, using `text-embedding-nomic-embed-text-v2-moe`).
+2. **Semantic Memory (AscendMemory / Mem0)**: Uses `ascend_memory_768` (for lmstudio/gemini, 768 dims) or `ascend_memory_1536` (for openai, 1536 dims) depending on the embedding provider.
 
 **Delete Entire Collection (Reset Memory):**
 To completely wipe all vector data for a given collection:
@@ -200,7 +201,8 @@ To completely wipe all vector data for a given collection:
 ```bash
 curl -X DELETE "http://localhost:6333/collections/ascendai-768"
 curl -X DELETE "http://localhost:6333/collections/ascendai-1536"
-curl -X DELETE "http://localhost:6333/collections/ascend_memory"
+curl -X DELETE "http://localhost:6333/collections/ascend_memory_768"
+curl -X DELETE "http://localhost:6333/collections/ascend_memory_1536"
 ```
 
 **Granular Deletion (Remove Specific File):**

@@ -2,7 +2,7 @@ app:
   unstructured:
     base-url: "http://ascend-unstructured:9080"
   docling:
-    base-url: "http://ascend-docling:7021"
+    base-url: "http://docling-serve:5001"
   paddleocr:
     base-url: "http://ascend-paddle-ocr:7022"
   s3:

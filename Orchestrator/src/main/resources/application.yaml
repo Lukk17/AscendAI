@@ -30,7 +30,7 @@ app:
     api-path: "/general/v0/general"
 
   docling:
-    base-url: "http://localhost:7021"
+    base-url: "http://localhost:5001"
     api-path: "/v1/convert"
 
   paddleocr:

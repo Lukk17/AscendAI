@@ -39,15 +39,28 @@ The REST API is self-documenting. While the server is running, you can access:
 
 The service is configured via environment variables. You can set them in your shell or use a `.env` file (if supported by your runner, though this project uses `pydantic-settings` which reads `.env` by default if present).
 
-*   `OPENAI_API_KEY`: **(Required)** Your OpenAI API key. Used by `mem0` for embeddings.
-*   `OPENAI_BASE_URL`: **(Required)** Base URL for the LLM provider (e.g., `http://host.docker.internal:1234/v1` for local LM Studio).
-*   `MEM0_LLM_MODEL`: **(Required for Local)** Exact model ID loaded in LM Studio (e.g., `llama-3.2-1b-instruct`). Defaults to `gpt-4o` if not set.
+*   `OPENAI_API_KEY`: **(Required)** API key for the embedding model endpoint.
+*   `OPENAI_BASE_URL`: **(Required)** Base URL for the LLM/embedding provider (e.g., `http://host.docker.internal:1234/v1` for local LM Studio, or `https://api.openai.com/v1`).
+*   `MEM0_LLM_MODEL`: **(Optional)** Exact model ID for fact extraction LLM (e.g., `meta-llama-3.1-8b-instruct`). Default: `meta-llama-3.1-8b-instruct`.
+*   `MEM0_DEFAULT_PROVIDER`: **(Optional)** Default embedding provider when none is specified in requests. Options: `lmstudio`, `openai`, `gemini`. Default: `lmstudio`.
+*   `MEM0_INFER_MEMORY`: **(Optional)** Whether mem0 infers memories from interactions (vs storing them verbatim). Default: `false`.
 *   `API_PORT`: **(Optional)** Port to run the server on. Default: `7020`.
 *   `API_HOST`: **(Optional)** Host to bind to. Default: `0.0.0.0`.
 *   `LOG_LEVEL`: **(Optional)** Logging level. Default: `INFO`.
 *   `QDRANT_HOST`: Hostname of the Qdrant vector database (use `localhost` for local dev, `qdrant` for docker).
 *   `QDRANT_PORT`: Port for Qdrant (default: 6333).
-*   `MEM0_EMBEDDING_MODEL`: Embedding model to use (default config uses `text-embedding-nomic-embed-text-v2-moe`).
+
+### Embedding Provider → Qdrant Collection Mapping
+
+The service routes each request to the correct Qdrant collection based on the `provider` parameter:
+
+| Provider | Embedding Model | Dimensions | Qdrant Collection |
+|---|---|---|---|
+| `lmstudio` (default) | `text-embedding-nomic-embed-text-v2-moe` | 768 | `ascend_memory_768` |
+| `openai` | `text-embedding-3-small` | 1536 | `ascend_memory_1536` |
+| `gemini` | `gemini-embedding-001` | 768 | `ascend_memory_768` |
+
+Providers sharing the same dimensions (`lmstudio` and `gemini`) share the same Qdrant collection.
 
 ---
 
@@ -191,9 +204,12 @@ curl -X POST "http://localhost:7020/api/v1/memory/insert" \
      -d '{
            "user_id": "testUser1",
            "text": "The user prefers dark mode in all applications.",
+           "provider": "lmstudio",
            "metadata": {"category": "preferences"}
          }'
 ```
+
+The `provider` field is optional — omitting it uses the `MEM0_DEFAULT_PROVIDER` setting.
 
 ### 2. Search Memory
 
@@ -202,8 +218,10 @@ Retrieve relevant memories based on a semantic query.
 **Endpoint:** `GET /api/v1/memory/search`
 
 ```bash
-curl "http://localhost:7020/api/v1/memory/search?user_id=testUser1&query=dark%20mode"
+curl "http://localhost:7020/api/v1/memory/search?user_id=testUser1&query=dark%20mode&provider=lmstudio"
 ```
+
+The `provider` query param is optional.
 
 ### 3. Delete Memory
 
@@ -251,10 +269,10 @@ If you are manually invoking the MCP endpoints (e.g., using `mcp_requests.http` 
 
 ### Available Tools
 
-*   `memory_insert(user_id, text, metadata)`: Add a memory.
-*   `memory_search(user_id, query, limit)`: Search memories.
-*   `memory_delete(memory_id)`: Delete a specific memory.
-*   `memory_wipe(user_id)`: Wipe all user memories.
+*   `memory_insert(user_id, text, provider?, metadata?)`: Add a memory. `provider` selects the embedding provider/collection (default: `MEM0_DEFAULT_PROVIDER`).
+*   `memory_search(user_id, query, limit?, provider?)`: Search memories.
+*   `memory_delete(memory_id, provider?)`: Delete a specific memory.
+*   `memory_wipe(user_id, provider?)`: Wipe all user memories.
 
 **Testing MCP:**
 A complete collection of example requests is available in the file:
