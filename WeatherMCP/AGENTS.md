@@ -9,7 +9,7 @@ WeatherMCP is a standalone MCP server built with Spring AI that provides weather
 - **Language**: Java 21
 - **Framework**: Spring Boot 3.5.4
 - **Build Tool**: Gradle (`build.gradle.kts`)
-- **Key Library**: Spring AI 1.1.2 (`spring-ai-starter-mcp-server-webmvc`)
+- **Key Library**: Spring AI 1.1.4 (`spring-ai-starter-mcp-server-webmvc`)
 - **Docker Base**: `eclipse-temurin:21-jre-alpine`
 
 ## Build & Run Commands

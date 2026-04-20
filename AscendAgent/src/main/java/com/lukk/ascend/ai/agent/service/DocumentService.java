@@ -53,7 +53,8 @@ public class DocumentService {
                 minChunkSizeChars,
                 minChunkLengthToEmbed,
                 maxNumChunks,
-                keepSeparator);
+                keepSeparator,
+                List.of('.', '!', '?', ';', '\n'));
         List<Document> splitDocs = splitter.apply(documents);
         log.info("Split into {} chunks.", splitDocs.size());
         return splitDocs;

@@ -9,7 +9,7 @@ The AscendAgent is the central Spring Boot API gateway for the AscendAI platform
 - **Language**: Java 21
 - **Framework**: Spring Boot 3.5.4
 - **Build Tool**: Gradle (`build.gradle.kts`)
-- **Key Libraries**: Spring AI 1.1.2, Qdrant client 1.11.0, CommonMark 0.21.0, PDFBox 3.0.4, Liquibase
+- **Key Libraries**: Spring AI 1.1.4, Qdrant client 1.13.0, CommonMark 0.28.0, PDFBox 3.0.7, Liquibase
 
 ## Build & Run Commands
 

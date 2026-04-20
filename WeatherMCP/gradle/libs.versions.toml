@@ -1,0 +1,26 @@
+[versions]
+spring-boot = "3.5.4"
+spring-ai = "1.1.4"
+spring-dependency-management = "1.1.7"
+
+[libraries]
+# Spring Boot starters (versions managed by Spring Boot BOM)
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-devtools = { module = "org.springframework.boot:spring-boot-devtools" }
+
+# Spring AI MCP server (version managed by Spring AI BOM)
+spring-ai-starter-mcp-server-webmvc = { module = "org.springframework.ai:spring-ai-starter-mcp-server-webmvc" }
+
+# Spring AI BOM
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
+
+# Lombok (version managed by Spring Boot BOM)
+lombok = { module = "org.projectlombok:lombok" }
+
+# Test
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

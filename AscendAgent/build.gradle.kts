@@ -1,8 +1,8 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.5.4"
-    id("io.spring.dependency-management") version "1.1.7"
-    id("org.springdoc.openapi-gradle-plugin") version "1.9.0"
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
+    alias(libs.plugins.springdoc.openapi)
 }
 
 group = "com.lukk"
@@ -23,51 +23,62 @@ configurations {
 repositories {
     mavenCentral()
     maven { url = uri("https://repo.spring.io/milestone") }
-    maven { url = uri("https://repo.spring.io/snapshot") }
-}
-
-extra["springAiVersion"] = "1.1.2"
-
-dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-webflux")
-
-    implementation("org.springframework.ai:spring-ai-starter-model-openai")
-    implementation("org.springframework.ai:spring-ai-starter-model-anthropic")
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
-    implementation("org.springframework.ai:spring-ai-starter-mcp-client-webflux")
-    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
-    implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
-    implementation("org.liquibase:liquibase-core")
-    implementation("org.springframework.boot:spring-boot-starter-integration")
-    implementation("org.springframework.integration:spring-integration-file")
-    implementation("org.springframework.integration:spring-integration-aws:3.0.0")
-    implementation("org.springframework.integration:spring-integration-jdbc")
-    implementation("org.postgresql:postgresql")
-    implementation("org.springframework.ai:spring-ai-starter-vector-store-qdrant")
-    implementation("org.springframework.ai:spring-ai-advisors-vector-store")
-    implementation("io.qdrant:client:1.11.0")
-    implementation("org.commonmark:commonmark:0.21.0")
-    implementation("software.amazon.awssdk:s3:2.29.10")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
-    implementation("org.apache.pdfbox:pdfbox:3.0.4")
-
-    compileOnly("org.projectlombok:lombok")
-
-    developmentOnly("org.springframework.boot:spring-boot-devtools")
-
-    annotationProcessor("org.projectlombok:lombok")
-
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testRuntimeOnly("com.h2database:h2")
 }
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.ai:spring-ai-bom:${property("springAiVersion")}")
+        mavenBom(libs.spring.ai.bom.get().toString())
+        mavenBom(libs.aws.sdk.bom.get().toString())
     }
+}
+
+dependencies {
+    // Spring Boot
+    implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.webflux)
+    implementation(libs.spring.boot.starter.data.redis)
+    implementation(libs.spring.boot.starter.oauth2.client)
+    implementation(libs.spring.boot.starter.data.jdbc)
+    implementation(libs.spring.boot.starter.integration)
+
+    // Spring AI (versions from Spring AI BOM)
+    implementation(libs.spring.ai.starter.model.openai)
+    implementation(libs.spring.ai.starter.model.anthropic)
+    implementation(libs.spring.ai.starter.mcp.client.webflux)
+    implementation(libs.spring.ai.starter.vector.store.qdrant)
+    implementation(libs.spring.ai.advisors.vector.store)
+
+    // Spring Integration
+    implementation(libs.spring.integration.file)
+    implementation(libs.spring.integration.jdbc)
+    implementation(libs.spring.integration.aws)
+
+    // Database
+    implementation(libs.postgresql)
+    implementation(libs.liquibase.core)
+
+    // AWS SDK (version from AWS BOM)
+    implementation(libs.aws.sdk.s3)
+
+    // Standalone libraries
+    implementation(libs.qdrant.client)
+    implementation(libs.commonmark)
+    implementation(libs.pdfbox)
+
+    // Springdoc OpenAPI
+    implementation(libs.springdoc.openapi.starter.webmvc.ui)
+
+    // Lombok
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+
+    // Dev tools
+    developmentOnly(libs.spring.boot.devtools)
+
+    // Test
+    testImplementation(libs.spring.boot.starter.test)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.h2)
 }
 
 tasks.withType<Test> {

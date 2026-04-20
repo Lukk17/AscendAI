@@ -1,0 +1,66 @@
+[versions]
+spring-boot = "3.5.4"
+spring-ai = "1.1.4"
+spring-dependency-management = "1.1.7"
+spring-integration-aws = "3.0.0"
+springdoc = "2.8.14"
+aws-sdk = "2.42.34"
+# qdrant-client intentionally NOT overridden — Spring AI BOM manages it at 1.13.0.
+# Overriding to 1.17.0 breaks QdrantVectorStore (gRPC proto classes removed in 1.14+).
+commonmark = "0.28.0"
+pdfbox = "3.0.7"
+
+[libraries]
+# Spring Boot starters (versions managed by Spring Boot BOM)
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-webflux = { module = "org.springframework.boot:spring-boot-starter-webflux" }
+spring-boot-starter-data-redis = { module = "org.springframework.boot:spring-boot-starter-data-redis" }
+spring-boot-starter-oauth2-client = { module = "org.springframework.boot:spring-boot-starter-oauth2-client" }
+spring-boot-starter-data-jdbc = { module = "org.springframework.boot:spring-boot-starter-data-jdbc" }
+spring-boot-starter-integration = { module = "org.springframework.boot:spring-boot-starter-integration" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-devtools = { module = "org.springframework.boot:spring-boot-devtools" }
+
+# Spring Integration (core modules managed by Boot BOM)
+spring-integration-file = { module = "org.springframework.integration:spring-integration-file" }
+spring-integration-jdbc = { module = "org.springframework.integration:spring-integration-jdbc" }
+spring-integration-aws = { module = "org.springframework.integration:spring-integration-aws", version.ref = "spring-integration-aws" }
+
+# Spring AI (versions managed by Spring AI BOM)
+spring-ai-starter-model-openai = { module = "org.springframework.ai:spring-ai-starter-model-openai" }
+spring-ai-starter-model-anthropic = { module = "org.springframework.ai:spring-ai-starter-model-anthropic" }
+spring-ai-starter-mcp-client-webflux = { module = "org.springframework.ai:spring-ai-starter-mcp-client-webflux" }
+spring-ai-starter-vector-store-qdrant = { module = "org.springframework.ai:spring-ai-starter-vector-store-qdrant" }
+spring-ai-advisors-vector-store = { module = "org.springframework.ai:spring-ai-advisors-vector-store" }
+
+# BOMs
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
+aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
+
+# AWS SDK (version managed by AWS BOM)
+aws-sdk-s3 = { module = "software.amazon.awssdk:s3" }
+
+# Springdoc OpenAPI (no BOM published — version managed here)
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+
+# Database (versions managed by Spring Boot BOM)
+postgresql = { module = "org.postgresql:postgresql" }
+liquibase-core = { module = "org.liquibase:liquibase-core" }
+h2 = { module = "com.h2database:h2" }
+
+# Standalone libraries (manual versioning)
+# qdrant-client: version managed by Spring AI BOM (1.13.0) — do not override
+qdrant-client = { module = "io.qdrant:client" }
+commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
+
+# Lombok (version managed by Spring Boot BOM)
+lombok = { module = "org.projectlombok:lombok" }
+
+# Test
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+springdoc-openapi = { id = "org.springdoc.openapi-gradle-plugin", version = "1.9.0" }
