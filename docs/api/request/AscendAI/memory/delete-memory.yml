@@ -1,0 +1,55 @@
+info:
+  name: delete-memory
+  type: http
+  seq: 3
+
+http:
+  method: DELETE
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory?memory_id={{memoryId}}"
+  params:
+    - name: memory_id
+      value: "{{memoryId}}"
+      type: query
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: success
+    request:
+      url: http://localhost:7020/api/v1/memory?memory_id=3801b968-3735-4fee-995a-cd2b44c341df
+      method: DELETE
+      params:
+        - name: memory_id
+          value: 3801b968-3735-4fee-995a-cd2b44c341df
+          type: query
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: date
+          value: Tue, 03 Feb 2026 21:18:37 GMT
+        - name: server
+          value: uvicorn
+        - name: content-length
+          value: "84"
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+              "status": "success",
+              "message": "Memory 3801b968-3735-4fee-995a-cd2b44c341df deleted"
+          }

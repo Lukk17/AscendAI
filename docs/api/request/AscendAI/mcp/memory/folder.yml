@@ -1,0 +1,18 @@
+info:
+  name: memory
+  type: folder
+  seq: 2
+
+request:
+  variables:
+    - name: mcp_session_id
+      value: ""
+    - name: memoryId
+      value: ""
+    - name: userId
+      value: ""
+  auth: inherit
+
+docs:
+  content: Automated test suite for AscendMemory MCP Server.
+  type: text/markdown

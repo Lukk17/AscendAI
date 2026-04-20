@@ -1,0 +1,26 @@
+app:
+  unstructured:
+    base-url: "http://ascend-unstructured:9080"
+  docling:
+    base-url: "http://docling-serve:5001"
+  paddleocr:
+    base-url: "http://ascend-paddle-ocr:7022"
+  s3:
+    # MinIO must be running externally (port 9070)
+    endpoint: "http://host.docker.internal:9070"
+  memory:
+    semantic:
+      base-url: "http://ascend-memory:7020"
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/ascend_ai
+  data:
+    redis:
+      # Redis must be running externally (port 6379)
+      host: host.docker.internal
+  ai:
+    vectorstore:
+      qdrant:
+        # Qdrant must be running externally (port 6333)
+        host: host.docker.internal

@@ -1,0 +1,57 @@
+info:
+  name: get-text-from-pdf-book
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: http://localhost:9080/general/v0/general
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: files
+        type: file
+        value:
+          - /C:/Users/Lukk/Desktop/test.pdf
+      - name: strategy
+        type: text
+        value: hi_res
+      - name: strategy
+        type: text
+        value: auto
+        disabled: true
+      - name: pdf_infer_table_structure
+        type: text
+        value: "true"
+      - name: skip_infer_table_types
+        type: text
+        value: "[]"
+      - name: include_page_breaks
+        type: text
+        value: "true"
+      - name: languages
+        type: text
+        value: pol
+      - name: chunking_strategy
+        type: text
+        value: by_title
+      - name: combine_under_n_chars
+        type: text
+        value: "500"
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

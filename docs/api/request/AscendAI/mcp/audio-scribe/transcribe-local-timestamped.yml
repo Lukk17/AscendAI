@@ -1,0 +1,49 @@
+info:
+  name: transcribe-local-timestamped
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7017/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: MCP-Session-Id
+      value: "{{mcp_session_id}}"
+    - name: MCP-Protocol-Version
+      value: "{{mcp_protocol_version}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "tools/call",
+        "params": {
+          "name": "transcribe_local",
+          "arguments": {
+            "audio_uri": "{{audio_uri_docker}}",
+            "model": "Systran/faster-whisper-large-v3",
+            "language": "en",
+            "with_timestamps": true
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,77 @@
+info:
+  name: "[DEPRECATED] web read"
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/web/read?include_links=true&url=https://secure.indeed.com/auth?co=US%26hl=en_US%26continue=http%3A%2F%2Fwww.indeed.com%2Fjobs%3Fq%3DAI%26l%3Dusa%26radius%3D25%26fromage%3D7%26from%3DsearchOnDesktopSerp%26start%3D10%26pp%3DgQAPAAABnF_iawAAAAACVo1v-QAmAQEBBgEy-8xJ-avH4XAbwgE1_cF76uRmPgm4rskeQbHv-aSSuWQAAA%26branding=page-two-signin%26jsContinue=https%3A%2F%2Fonboarding.indeed.com%2Fonboarding%3Fco%3DUS%26hl%3Den_US%26from%3Dpage-two-signin%26continue%3Dhttp%253A%252F%252Fwww.indeed.com%252Fjobs%253Fq%253DAI%2526l%253Dusa%2526radius%253D25%2526fromage%253D7%2526from%253DsearchOnDesktopSerp%2526start%253D10%2526pp%253DgQAPAAABnF_iawAAAAACVo1v-QAmAQEBBgEy-8xJ-avH4XAbwgE1_cF76uRmPgm4rskeQbHv-aSSuWQAAA%26from=page-two-signin&heavy_mode=true"
+  params:
+    - name: include_links
+      value: "true"
+      type: query
+    - name: url
+      value: https://wp.pl
+      type: query
+      disabled: true
+    - name: url
+      value: https://edition.cnn.com/
+      type: query
+      disabled: true
+    - name: url
+      value: https://docs.openclaw.ai/platforms/android
+      type: query
+      disabled: true
+    - name: url
+      value: https://revdev.tech
+      type: query
+      disabled: true
+    - name: url
+      value: https://www.reddit.com/
+      type: query
+      disabled: true
+    - name: url
+      value: https://justjoin.it/job-offers/remote/java?employment-type=b2b%26experience-level=senior%26with-salary=yes
+      type: query
+      disabled: true
+    - name: url
+      value: https://www.linkedin.com/jobs/search/?currentJobId=4372540262&f_AL=true&f_E=4&keywords=Java%20Developer&location=United%20States&origin=JOB_SEARCH_PAGE_JOB_FILTER
+      type: query
+      description: linkedIn joboffer
+      disabled: true
+    - name: url
+      value: https://www.indeed.com/rc/clk?jk=529ae7d921f68858%26bb=G-LrH1IIZV0Yq4PIxeyXt_78Z2g6jD6W5z5UWv7zzilkg381jnH9EiBx2h2T42f_jZPJzOSXUcP2zq_dWtChnuKIW6mZYkKiMKRUiOKinL6e3ZDq2nGQp7Oh_0fRkWZl%26xkcb=SoCf67M3mE2LGSwEMh0KbzkdCdPP%26fccid=fa188178345ae8f8%26vjs=3
+      type: query
+      description: indeed job offer
+      disabled: true
+    - name: url
+      value: nowsecure.nl
+      type: query
+      description: test captcha
+      disabled: true
+    - name: url
+      value: https://secure.indeed.com/auth?co=US%26hl=en_US%26continue=http%3A%2F%2Fwww.indeed.com%2Fjobs%3Fq%3DAI%26l%3Dusa%26radius%3D25%26fromage%3D7%26from%3DsearchOnDesktopSerp%26start%3D10%26pp%3DgQAPAAABnF_iawAAAAACVo1v-QAmAQEBBgEy-8xJ-avH4XAbwgE1_cF76uRmPgm4rskeQbHv-aSSuWQAAA%26branding=page-two-signin%26jsContinue=https%3A%2F%2Fonboarding.indeed.com%2Fonboarding%3Fco%3DUS%26hl%3Den_US%26from%3Dpage-two-signin%26continue%3Dhttp%253A%252F%252Fwww.indeed.com%252Fjobs%253Fq%253DAI%2526l%253Dusa%2526radius%253D25%2526fromage%253D7%2526from%253DsearchOnDesktopSerp%2526start%253D10%2526pp%253DgQAPAAABnF_iawAAAAACVo1v-QAmAQEBBgEy-8xJ-avH4XAbwgE1_cF76uRmPgm4rskeQbHv-aSSuWQAAA%26from=page-two-signin
+      type: query
+      description: indeed auth login
+    - name: url
+      value: https://www.indeed.com/jobs?q=AI%26l=usa%26radius=25%26fromage=7%26from=searchOnDesktopSerp%26start=20%26pp=gQAeAAABnF_iawAAAAACVo1v-QA6AQEBCD6A99N9SysLaVNWOP602J2TfGu4WMTYl2QVe1DlKNumaEW23YqEO6pnPpwcCdrqVNqmBRvXggAA
+      type: query
+      disabled: true
+    - name: heavy_mode
+      value: "true"
+      type: query
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

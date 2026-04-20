@@ -1,0 +1,259 @@
+info:
+  name: image-description-prompt
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+  body:
+    type: multipart-form
+    data:
+      - name: prompt
+        type: text
+        value: Describe what you see in this image in detail
+      - name: "image "
+        type: file
+        value:
+          - /C:/Users/Lukk/Desktop/Ascend-test-files/songo-profil.jpg
+      - name: embeddingProvider
+        type: text
+        value: openai
+      - name: provider
+        type: text
+        value: anthropic
+        description: "Optional, default is lmstudio, values: openai"
+      - name: model
+        type: text
+        value: claude-sonnet-4-6
+        description: "Optional, default different for each provider, values: gpt-4o, claude-sonnet-4-5"
+      - name: provider
+        type: text
+        value: openai
+        disabled: true
+      - name: model
+        type: text
+        value: gpt-5.1
+        description: "default gpt-4o, values: gpt-5.4 ; gpt-5.1 ; gpt-5-mini ; gpt-4o-mini"
+        disabled: true
+      - name: provider
+        type: text
+        value: gemini
+        disabled: true
+      - name: model
+        type: text
+        value: gemini-2.5-flash
+        description: "default: gemini-2.5-flash values: gemini-pro-latest ;  gemini-2.5-pro ; gemini-2.5-flash"
+        disabled: true
+      - name: provider
+        type: text
+        value: lmstudio
+        description: default provider
+        disabled: true
+      - name: model
+        type: text
+        value: qwen/qwen3-vl-4b
+        description: default meta-llama-3.1-8b-instruct
+        disabled: true
+      - name: embeddingProvider
+        type: text
+        value: lmstudio
+        disabled: true
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: legacy-example
+    request:
+      url: http://localhost:9999/prompt
+      method: POST
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: "{\r
+
+          \    \"prompt\": \"what is the weather like in warsaw?\"\r
+
+          }"
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+        - name: Transfer-Encoding
+          value: chunked
+        - name: Date
+          value: Mon, 08 Sep 2025 17:26:16 GMT
+        - name: Keep-Alive
+          value: timeout=60
+        - name: Connection
+          value: keep-alive
+      body:
+        type: json
+        data: |-
+          {
+              "content": "The current weather in Warsaw is a solar apocalypse with a temperature of 117 degrees.",
+              "metadata": {
+                  "id": "",
+                  "model": "",
+                  "rateLimit": {
+                      "requestsRemaining": 0,
+                      "requestsLimit": 0,
+                      "requestsReset": "PT0S",
+                      "tokensReset": "PT0S",
+                      "tokensRemaining": 0,
+                      "tokensLimit": 0
+                  },
+                  "usage": {
+                      "completionTokens": 0,
+                      "nativeUsage": {},
+                      "promptTokens": 0,
+                      "totalTokens": 0
+                  },
+                  "promptMetadata": [],
+                  "empty": true,
+                  "toolsUsed": []
+              }
+          }
+  - name: OpenAI
+    request:
+      url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+      method: POST
+      body:
+        type: multipart-form
+        data:
+          - name: prompt
+            type: text
+            value: Describe what you see in this image in detail
+          - name: provider
+            type: text
+            value: anthropic
+            description: "Optional, default is lmstudio, values: openai"
+            disabled: true
+          - name: model
+            type: text
+            value: claude-sonnet-4-6
+            description: "Optional, default different for each provider, values: gpt-4o, claude-sonnet-4-5"
+            disabled: true
+          - name: "image "
+            type: file
+            value:
+              - /C:/Users/Lukk/Pictures/songo-profil.jpg
+          - name: document
+            type: file
+            value: []
+            disabled: true
+          - name: embeddingProvider
+            type: text
+            value: openai
+          - name: "image "
+            type: file
+            value: []
+            disabled: true
+          - name: document
+            type: file
+            value: []
+            disabled: true
+          - name: provider
+            type: text
+            value: openai
+            disabled: true
+          - name: model
+            type: text
+            value: gpt-5.1
+            description: "default gpt-4o, values: gpt-5.4 ; gpt-5.1 ; gpt-5-mini ; gpt-4o-mini"
+            disabled: true
+          - name: provider
+            type: text
+            value: gemini
+          - name: model
+            type: text
+            value: gemini-3.1-pro
+            description: "default: gemini-2.5-flash values: gemini-3.1-pro ;  gemini-2.5-pro ; gemini-2.5-flash"
+          - name: provider
+            type: text
+            value: minimax
+            disabled: true
+          - name: model
+            type: text
+            value: MiniMax-M2.5
+            description: "default: MiniMax-M2.5 values: MiniMax-M2.5-highspeed ; MiniMax-M2.1 ; MiniMax-M2 ; MiniMax-M1"
+            disabled: true
+          - name: provider
+            type: text
+            value: "lmstudio "
+            description: default provider
+            disabled: true
+          - name: model
+            type: text
+            value: meta-llama-3.1-8b-instruct
+            description: default meta-llama-3.1-8b-instruct
+            disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: X-Content-Type-Options
+          value: nosniff
+        - name: X-XSS-Protection
+          value: "0"
+        - name: Cache-Control
+          value: no-cache, no-store, max-age=0, must-revalidate
+        - name: Pragma
+          value: no-cache
+        - name: Expires
+          value: "0"
+        - name: X-Frame-Options
+          value: DENY
+        - name: Content-Type
+          value: application/json
+        - name: Transfer-Encoding
+          value: chunked
+        - name: Date
+          value: Thu, 12 Mar 2026 10:49:32 GMT
+        - name: Keep-Alive
+          value: timeout=60
+        - name: Connection
+          value: keep-alive
+      body:
+        type: json
+        data: |-
+          {
+              "content": "The image is an illustration of an anime-style warrior in a powerful, dynamic pose, surrounded by glowing energy.\n\nKey details:\n\n- **Character appearance**\n  - He has tall, sharply spiked hair that points upward in many thick, flame-like strands. The hair is bright golden yellow, with lighter highlights that make it look luminous.\n  - His eyebrows are also golden, matching the hair, and his eyes are a striking teal/greenish-blue color with a very intense, focused stare.\n  - His facial expression is serious and determined, with furrowed brows and a tight jaw, suggesting he’s ready for battle or already in one.\n  - His skin is light, and his muscles are very pronounced, especially in his arms and shoulders, giving him a very strong, athletic build.\n\n- **Clothing**\n  - He wears a sleeveless orange gi (martial-arts style outfit) with a deep blue undershirt visible at the collar and shoulders.\n  - The gi has dark shading and highlights that emphasize the folds and give it a dramatic, almost metallic look in the lighting.\n  - He has a dark blue belt or sash around his waist (partially visible).\n  - His forearms and fists are bare, showing muscular definition and veins, emphasizing power and tension.\n\n- **Pose and perspective**\n  - The character is shown from a slightly low, front angle, making him look larger and more imposing.\n  - One arm is drawn back near his side, bent at the elbow, while the other arm is extended forward in a punching or striking pose, with a clenched fist aimed toward the viewer.\n  - The forward fist is large and close to the camera, using foreshortening to create a strong sense of depth and impact.\n  - His torso is slightly twisted, adding motion and dynamism to the stance.\n\n- **Energy and effects**\n  - The character is surrounded by a bright, glowing aura of yellow and golden light, radiating outward like flames or electricity.\n  - Wisps and waves of energy swirl around his body, especially around his shoulders, back, and extended arm.\n  - The aura has a smoky, misty texture in places, with brighter, almost white-hot areas near his body and darker golden tones farther out.\n  - There are subtle light streaks and glow effects that make the aura look intense and supernatural.\n\n- **Background and lighting**\n  - The background is mostly dark—deep blacks and very dark browns—making the bright yellows and golds stand out dramatically.\n  - The main light source seems to be the character’s own aura, casting strong highlights on his hair, shoulders, and fists.\n  - The contrast between the dark background and the luminous aura gives the image a high-energy, dramatic, almost explosive feel.\n\nOverall, the image portrays a powerful anime warrior in a transformed, energy-charged state, captured mid-action with vivid colors, strong lighting contrasts, and a sense of immense power and determination.",
+              "metadata": {
+                  "id": "",
+                  "model": "",
+                  "rateLimit": {
+                      "requestsRemaining": 0,
+                      "requestsReset": "PT0S",
+                      "tokensLimit": 0,
+                      "requestsLimit": 0,
+                      "tokensReset": "PT0S",
+                      "tokensRemaining": 0
+                  },
+                  "usage": {
+                      "promptTokens": 0,
+                      "nativeUsage": {},
+                      "completionTokens": 0,
+                      "totalTokens": 0
+                  },
+                  "promptMetadata": [],
+                  "empty": true,
+                  "toolsUsed": []
+              }
+          }

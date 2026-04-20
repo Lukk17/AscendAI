@@ -1,0 +1,10 @@
+info:
+  name: mcp
+  type: folder
+  seq: 5
+
+request:
+  variables:
+    - name: mcp_protocol_version
+      value: 2025-11-25
+  auth: inherit

@@ -1,26 +1,8 @@
 name: ascend-ai
 
-x-common-env: &common-env
-  LLM_MODEL: meta-llama-3.1-8b-instruct
-
 services:
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: minio
-    restart: unless-stopped
-    ports:
-      - "9070:9000"
-      - "9071:9001"
-    environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    networks:
-      default:
-        aliases:
-          - minio
+
+  # ─── Document processing services ───
 
   docling-serve:
     image: quay.io/docling-project/docling-serve:v1.14.0
@@ -67,36 +49,7 @@ services:
         aliases:
           - ascend-paddle-ocr
 
-  qdrant:
-    image: qdrant/qdrant:v1.16
-    container_name: qdrant
-    restart: unless-stopped
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    networks:
-      default:
-        aliases:
-          - mem0_store
-          - qdrant
-    volumes:
-      - qdrant_data:/qdrant/storage
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/6333'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7.4-alpine
-    container_name: redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    networks:
-      default:
-        aliases:
-          - redis
+  # ─── Search infrastructure ───
 
   searxng:
     image: searxng/searxng:2026.2.3-f7a608703
@@ -108,43 +61,6 @@ services:
       default:
         aliases:
           - searxng
-
-  ascend-memory:
-    build:
-      context: ./AscendMemory
-      dockerfile: Dockerfile
-    container_name: ascend-memory
-    restart: unless-stopped
-    ports:
-      - "7020:7020"
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_BASE_URL=http://host.docker.internal:1234/v1
-      # - OPENAI_BASE_URL=https://api.openai.com/v1
-      - API_PORT=7020
-      - API_HOST=0.0.0.0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - MEM0_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v2-moe
-#      - MEM0_EMBEDDING_MODEL=text-embedding-3-small
-      - MEM0_COLLECTION_NAME=ascend_memory
-      # - MEM0_COLLECTION_NAME=ascend_memory_cloud
-      - MEM0_EMBEDDING_DIMS=768
-      # - MEM0_EMBEDDING_DIMS=1536
-      - MEM0_INFER_MEMORY=false
-      # - MEM0_INFER_MEMORY=true
-      - MEM0_DEFAULT_PROVIDER=lmstudio
-      # - MEM0_DEFAULT_PROVIDER=openai
-      - LOG_LEVEL=INFO
-    depends_on:
-      qdrant:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      default:
-        aliases:
-          - ascend-memory
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.4.6
@@ -162,23 +78,42 @@ services:
         aliases:
           - flaresolverr
 
-  # selenium-browser:
-  #   image: selenium/standalone-chromium:144.0
-  #   container_name: selenium-browser
-  #   restart: unless-stopped
-  #   ports:
-  #     - "4444:4444"
-  #     - "7900:7900"
-  #   environment:
-  #     - SE_VNC_NO_PASSWORD=1
-  #     - SE_SCREEN_WIDTH=1920
-  #     - SE_SCREEN_HEIGHT=1080
-  #     - SE_NODE_GRID_URL=http://selenium-browser:4444
-  #   shm_size: 2g
-  #   networks:
-  #     default:
-  #       aliases:
-  #         - selenium-browser
+  # ─── Application services ───
+
+  ascend-memory:
+    build:
+      context: ./AscendMemory
+      dockerfile: Dockerfile
+    container_name: ascend-memory
+    restart: unless-stopped
+    ports:
+      - "7020:7020"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=http://host.docker.internal:1234/v1
+      # - OPENAI_BASE_URL=https://api.openai.com/v1
+      - API_PORT=7020
+      - API_HOST=0.0.0.0
+      # Qdrant must be running externally (port 6333)
+      - QDRANT_HOST=host.docker.internal
+      - QDRANT_PORT=6333
+      - MEM0_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v2-moe
+#      - MEM0_EMBEDDING_MODEL=text-embedding-3-small
+      - MEM0_COLLECTION_NAME=ascend_memory
+      # - MEM0_COLLECTION_NAME=ascend_memory_cloud
+      - MEM0_EMBEDDING_DIMS=768
+      # - MEM0_EMBEDDING_DIMS=1536
+      - MEM0_INFER_MEMORY=false
+      # - MEM0_INFER_MEMORY=true
+      - MEM0_DEFAULT_PROVIDER=lmstudio
+      # - MEM0_DEFAULT_PROVIDER=openai
+      - LOG_LEVEL=INFO
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      default:
+        aliases:
+          - ascend-memory
 
   ngrok-ascend-web-search:
     image: ngrok/ngrok:3
@@ -216,7 +151,8 @@ services:
       - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
-      - REDIS_URL=redis://redis:6379/0
+      # Redis must be running externally (port 6379)
+      - REDIS_URL=redis://host.docker.internal:6379/0
       - NOVNC_TIMEOUT_SECONDS=600
     cap_add:
       - SYS_ADMIN
@@ -280,57 +216,3 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-
-
-
-  # openmemory:
-  #   build:
-  #     context: ./OpenMemory
-  #     dockerfile: Dockerfile.mem0mcp
-  #   container_name: openmemory
-  #   image: openmemory-ascend-ai:latest
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8765:8765"
-  #   environment:
-  #     <<: *common-env
-  #     OPENAI_API_KEY: lm-studio
-  #     OPENAI_BASE_URL: http://host.docker.internal:1234/v1
-  #     LOG_LEVEL: DEBUG
-  #   extra_hosts:
-  #     - "host.docker.internal:host-gateway"
-  #   volumes:
-  #     - mem0_data:/root/.mem0
-  #   depends_on:
-  #     qdrant:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8765/openapi.json"]
-  #     interval: 60s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 10s
-
-  # mem0-configurator:
-  #   image: curlimages/curl:latest
-  #   restart: "no"
-  #   volumes:
-  #     - ./OpenMemory/configure_mem0.sh:/configure_mem0.sh
-  #   environment:
-  #     <<: *common-env
-  #     LLM_MAX_TOKENS: 1500
-  #     EMBEDDER_MODEL: nomic-ai/text-embedding-nomic-embed-text-v2-moe
-  #     EMBEDDING_DIMS: 768
-  #     QDRANT_HOST: qdrant
-  #     QDRANT_PORT: 6333
-  #     QDRANT_COLLECTION: openmemory
-  #     QDRANT_DISTANCE: Cosine
-  #   entrypoint: ["/bin/sh", "/configure_mem0.sh"]
-  #   depends_on:
-  #     openmemory:
-  #       condition: service_healthy
-
-volumes:
-  qdrant_data:
-  # mem0_data: # for local openmemory
-  minio_data:

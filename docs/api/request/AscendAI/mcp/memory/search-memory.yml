@@ -1,0 +1,48 @@
+info:
+  name: search-memory
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: MCP-Session-Id
+      value: "{{mcp_session_id}}"
+    - name: MCP-Protocol-Version
+      value: "{{mcp_protocol_version}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "tools/call",
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "user_id": "{{userId}}",
+            "query": "What is test memory?",
+            "limit": 3
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

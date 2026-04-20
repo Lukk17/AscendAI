@@ -10,55 +10,63 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 
 | Module | Tech Stack | Port | Role |
 |---|---|---|---|
-| [Orchestrator](Orchestrator/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
+| [AscendAgent](AscendAgent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
 | [AudioScribe](AudioScribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
 | [AscendWebSearch](AscendWebSearch/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
 | [AscendMemory](AscendMemory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
 | [WeatherMCP](WeatherMCP/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9998 | MCP server for weather data |
-| [AudioForge](AudioForge/AGENTS.md) | Python 3.13, FastAPI | 7018 | Audio processing service (convert, silence removal) |
 | [PaddleOCR](PaddleOCR/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7022 | OCR service using PaddleOCR |
-| [OpenMemory](OpenMemory/AGENTS.md) | Docker wrapper | - | Deprecated wrapper for mem0 OpenMemory MCP (replaced by AscendMemory) |
 
-## Infrastructure (docker-compose.yaml)
+## External Prerequisites
 
-All services are deployed via `docker-compose.yaml` in the project root. Key infrastructure:
+These services must be running before starting docker-compose. In production they map to managed cloud services (e.g., AWS ElastiCache, Qdrant Cloud, S3).
+
+| Service | Port(s) | Purpose |
+|---|---|---|
+| PostgreSQL | 5432 | Persistent metadata, chat history, ingestion state |
+| Redis | 6379 | Chat history cache and session persistence |
+| Qdrant | 6333 / 6334 | Vector database for RAG embeddings and semantic memory |
+| MinIO | 9070 / 9071 | S3-compatible object storage for RAG document ingestion |
+
+## Docker Compose Services (docker-compose.yaml)
+
+Application and support services deployed via `docker-compose.yaml`:
 
 | Service | Port | Purpose |
 |---|---|---|
-| MinIO | 9070 / 9071 | S3-compatible object storage for RAG document ingestion |
-| Qdrant | 6333 / 6334 | Vector database for RAG embeddings and semantic memory |
-| Redis | 6379 | Chat history cache and session persistence |
 | SearXNG | 9020 | Privacy-respecting meta search engine |
 | FlareSolverr | 8191 | Cloudflare bypass proxy for web scraping |
 | Docling Serve | 5001 | Document conversion service |
 | Unstructured API | 9080 | Document parsing for RAG pipeline |
-| PostgreSQL | 5432 | Persistent metadata, chat history, ingestion state |
 
 ## How to Build and Run
 
 ```bash
-# 1. Start infrastructure
+# 1. Ensure external prerequisites are running (PostgreSQL :5432, Redis :6379, Qdrant :6333, MinIO :9070)
+
+# 2. Start application and support services
 docker-compose up -d
 
-# 2. Ensure PostgreSQL has database 'ascend_ai' (user: postgres, password: local)
+# 3. Ensure PostgreSQL has database 'ascend_ai' (user: postgres, password: local)
 
-# 3. Run the Orchestrator
-cd Orchestrator && ./gradlew bootRun
+# 4. Run the AscendAgent
+cd AscendAgent && ./gradlew bootRun
 
-# 4. Python services run via uvicorn or docker-compose
+# 5. Python services run via uvicorn or docker-compose
 ```
 
 ## Cross-Module Conventions
 
-- **Java modules** (Orchestrator, WeatherMCP): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.2.
-- **Python modules** (AudioScribe, AscendWebSearch, AscendMemory, AudioForge, PaddleOCR): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
+- **Java modules** (AscendAgent, WeatherMCP): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.2.
+- **Python modules** (AudioScribe, AscendWebSearch, AscendMemory, PaddleOCR): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
 - All services expose a `/health` endpoint for Docker healthchecks.
 - All services are containerized with Dockerfiles and wired through `docker-compose.yaml`.
-- MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the Orchestrator.
+- MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the AscendAgent.
 
 ## Architecture Documentation
 
-Full arc42 architecture docs, ADRs, and C4 diagrams are in `Orchestrator/docs/architecture/`.
+- **Monorepo-level**: System overview, service interactions, deployment, ADRs — in `docs/architecture/`
+- **AscendAgent internals**: Component diagrams, internal arc42, module-specific ADRs — in `AscendAgent/docs/architecture/`
 
 ## Proactive Skill Usage
 
@@ -74,6 +82,8 @@ Always invoke relevant project skills before starting implementation work. Skill
 - `/git-workflow` for branching and commit conventions
 - `/database-migrations` for schema changes
 
+Every implementation plan must include a **Relevant Skills** section listing all skills that should be loaded before implementing. This ensures the agent always knows which domain-specific standards apply to the work at hand.
+
 ## Implementation Plan
 
 Before starting any non-trivial implementation work (bug fixes, features, refactors), create or completely overwrite `implementation_plan.md` in the project root. This file serves as the single source of truth for the current active plan.
@@ -84,9 +94,12 @@ Before starting any non-trivial implementation work (bug fixes, features, refact
    - Mark each task as done (`[x]`) immediately after completing it, before starting the next task
    - This section must always reflect the current state of work
 3. **Plan** section — detailed implementation steps with file paths, code changes, and rationale
-4. **Verification** section — how to test the changes end-to-end
+4. **Relevant Skills** section — list all skills that must be loaded before implementation begins
+5. **Verification** section — how to test the changes end-to-end
 
 Each new plan completely overwrites the previous `implementation_plan.md`. There is only ever one active plan.
+
+**Approval gate:** After writing `implementation_plan.md`, **always wait for user approval** before starting implementation. The user will review the plan in the markdown file and may add comments or request changes. Do NOT begin modifying source code, configs, or any project files until the user explicitly approves the plan. This is the most important rule in the workflow.
 
 ## IDE Compatibility
 

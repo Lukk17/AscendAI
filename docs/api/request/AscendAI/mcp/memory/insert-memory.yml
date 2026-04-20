@@ -1,0 +1,110 @@
+info:
+  name: insert-memory
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: MCP-Session-Id
+      value: "{{mcp_session_id}}"
+    - name: MCP-Protocol-Version
+      value: "{{mcp_protocol_version}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+          "name": "memory_insert",
+          "arguments": {
+            "user_id": "{{userId}}",
+            "text": "This is a test memory: red dolphin"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: "var rawText = JSON.stringify(res.getBody());\r
+
+        // Split by \"data: \" to handle Server-Sent Events\r
+
+        var chunks = rawText.split(\"data: \");\r
+
+        \r
+
+        var memoryId = null;\r
+
+        \r
+
+        for (var i = 0; i < chunks.length; i++) {\r
+
+        \    var chunk = chunks[i].trim();\r
+
+        \    if (chunk.length === 0) continue;\r
+
+        \    \r
+
+        \    try {\r
+
+        \        var jsonData = JSON.parse(chunk);\r
+
+        \        \r
+
+        \        if (jsonData.result && jsonData.result.structuredContent) {\r
+
+        \            // \"result\" -> \"structuredContent\" -> \"result\"\r
+
+        \            var memoryIds = jsonData.result.structuredContent.result;\r
+
+        \r
+
+        \            if (memoryIds && memoryIds.length > 0) {\r
+
+        \                memoryId = memoryIds[0].id; // Extract inner ID\r
+
+        \                \r
+
+        \                // Save to Collection Variable\r
+
+        //                 pm.collectionVariables.set(\"memoryId\", memoryId);\r
+
+        \                console.log(\"Extracted Memory ID: \" + memoryId);\r
+
+        \                break; // Found it, stop parsing\r
+
+        \            }\r
+
+        \        }\r
+
+        \    } catch (e) {\r
+
+        \        // Ignore non-JSON chunks (like \"event: message\")\r
+
+        \    }\r
+
+        }\r
+
+        \r
+
+        if (!memoryId) {\r
+
+        \    console.log(\"No memory ID found in stream response\");\r
+
+        }"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

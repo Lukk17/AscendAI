@@ -1,0 +1,21 @@
+info:
+  name: audio-scribe
+  type: folder
+  seq: 1
+
+request:
+  variables:
+    - name: audio_uri
+      value: http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac
+    - name: audio_uri_docker
+      value: ""
+    - name: mcp_session_id
+      value: ""
+  auth: inherit
+
+docs:
+  content: |-
+    Automated test suite for AudioScribe MCP Server.
+
+    When running in docker change audio source to "audio_uri_docker"
+  type: text/markdown

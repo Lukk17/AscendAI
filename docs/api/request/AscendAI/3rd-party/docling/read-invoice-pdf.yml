@@ -1,0 +1,45 @@
+info:
+  name: read-invoice-pdf
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:5001/v1/convert/file
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: files
+        type: file
+        value:
+          - /C:/Users/Lukk/Desktop/test.pdf
+        contentType: application/pdf
+      - name: do_ocr
+        type: text
+        value: "true"
+      - name: table_mode
+        type: text
+        value: accurate
+      - name: to_formats
+        type: text
+        value: json
+      - name: lang
+        type: text
+        value: pol
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

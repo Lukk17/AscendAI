@@ -1,0 +1,17 @@
+opencollection: 1.0.0
+
+info:
+  name: AscendAI
+
+request:
+  variables:
+    - name: memoryId
+      value: ""
+    - name: userId
+      value: ""
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

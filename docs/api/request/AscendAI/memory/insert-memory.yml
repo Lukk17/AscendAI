@@ -1,0 +1,102 @@
+info:
+  name: insert-memory
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/insert"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+                 "user_id": "{{userId}}",
+                 "text": "The user prefers dark mode in all applications.",
+                 "metadata": {"category": "preferences"}
+               }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: "var jsonData = res.getBody();\r
+
+        \r
+
+        if (jsonData && jsonData.length > 0) {\r
+
+        \    var memoryId = jsonData[0].id;\r
+
+        //     pm.collectionVariables.set(\"memoryId\", memoryId);\r
+
+        \r
+
+        \    // This TEST NAME will appear in the Runner Report\r
+
+        \    test(\"Extracted Memory ID: \" + memoryId, function () {\r
+
+        \        expect(memoryId).to.not.be.empty;\r
+
+        \    });\r
+
+        \r
+
+        } else {\r
+
+        \    test(\"FAILED: No memory ID found\", function () {\r
+
+        \        expect(false).to.be.true;\r
+
+        \    });\r
+
+        }"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: success
+    request:
+      url: http://localhost:7020/api/v1/memory/upsert
+      method: POST
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+                     "user_id": "testUser1",
+                     "text": "The user prefers dark mode in all applications.",
+                     "metadata": {"category": "preferences"}
+                   }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: date
+          value: Tue, 03 Feb 2026 21:13:48 GMT
+        - name: server
+          value: uvicorn
+        - name: content-length
+          value: "150"
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+              {
+                  "id": "5c96b256-395e-466f-870d-5f493a8f044a",
+                  "memory": "The user prefers dark mode in all applications.",
+                  "event": "ADD",
+                  "actor_id": null,
+                  "role": "user"
+              }
+          ]

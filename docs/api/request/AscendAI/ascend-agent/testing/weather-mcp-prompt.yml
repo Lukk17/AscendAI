@@ -1,0 +1,96 @@
+info:
+  name: weather-mcp-prompt
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+  body:
+    type: multipart-form
+    data:
+      - name: prompt
+        type: text
+        value: What is current weather in Warsaw ?
+      - name: embeddingProvider
+        type: text
+        value: openai
+        description: "Optional, default to env variable value, values: lmstudio, openai, gemini"
+      - name: provider
+        type: text
+        value: minimax
+      - name: model
+        type: text
+        value: MiniMax-M2.7
+        description: "default: MiniMax-M2.5 values: MiniMax-M2.5-highspeed ; MiniMax-M2.1 ; MiniMax-M2 ; MiniMax-M1"
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: legacy-example
+    request:
+      url: http://localhost:9999/prompt
+      method: POST
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: "{\r
+
+          \    \"prompt\": \"what is the weather like in warsaw?\"\r
+
+          }"
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+        - name: Transfer-Encoding
+          value: chunked
+        - name: Date
+          value: Mon, 08 Sep 2025 17:26:16 GMT
+        - name: Keep-Alive
+          value: timeout=60
+        - name: Connection
+          value: keep-alive
+      body:
+        type: json
+        data: |-
+          {
+              "content": "The current weather in Warsaw is a solar apocalypse with a temperature of 117 degrees.",
+              "metadata": {
+                  "id": "",
+                  "model": "",
+                  "rateLimit": {
+                      "requestsRemaining": 0,
+                      "requestsLimit": 0,
+                      "requestsReset": "PT0S",
+                      "tokensReset": "PT0S",
+                      "tokensRemaining": 0,
+                      "tokensLimit": 0
+                  },
+                  "usage": {
+                      "completionTokens": 0,
+                      "nativeUsage": {},
+                      "promptTokens": 0,
+                      "totalTokens": 0
+                  },
+                  "promptMetadata": [],
+                  "empty": true,
+                  "toolsUsed": []
+              }
+          }

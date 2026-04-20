@@ -1,0 +1,460 @@
+# AscendAI AscendAgent
+
+---
+
+This project is the central hub of the AI system, acting as the central AI agent.  
+It's a Spring Boot application that provides a REST API to connect user prompts with a Large Language Model (LLM).  
+It extends the LLM's capabilities by integrating external tools via the Model Context Protocol (MCP), a retrieval-gated RAG pipeline (Qdrant), and a dedicated semantic memory service (`ascend-memory`).
+
+---
+
+## Architecture Overview
+
+The agent manages the flow of information between the user, the LLM, persistent storage, and external tools.
+
+```mermaid
+flowchart TD
+    User["User"] -- "HTTP POST /prompt" --> AscendAgent["AscendAgent"]
+    
+    subgraph Core ["Core Orchestration"]
+        AscendAgent -- "1. Context Retrieval" --> Redis["Redis (Active Memory)"]
+        AscendAgent -- "2. History Lookup" --> Postgres["PostgreSQL (Long-term)"]
+        AscendAgent -- "3. Soft-RAG (Thresholded)" --> Qdrant["Qdrant (RAG)"]
+        AscendAgent -- "4. Memory Search & Insert" --> AscendMemory["ascend-memory"]
+    end
+    
+    subgraph Providers ["AI Providers (per-request selection)"]
+        AscendAgent -- "ChatModelResolver" --> ProviderRouter{"provider param"}
+        ProviderRouter --> LMStudio["LM Studio (default)"]
+        ProviderRouter --> OpenAI["OpenAI"]
+        ProviderRouter --> Gemini["Gemini"]
+        ProviderRouter --> Anthropic["Anthropic"]
+        ProviderRouter --> MiniMax["MiniMax"]
+    end
+
+    subgraph MCP ["Model Context Protocol (MCP)"]
+        AscendAgent -- "Tool Discovery & Calls" --> ExtTools["External Tools"]
+        ExtTools --> Weather["Weather MCP"]
+        ExtTools --> Audio["AudioScribe MCP"]
+        ExtTools --> WebSearch["AscendWebSearch MCP"]
+        WebSearch --> Searxng["SearXNG"]
+    end
+
+    subgraph Ingestion ["Ingestion Pipeline"]
+        MinIO["MinIO (S3)"] -- "Syncs Files" --> AscendAgent
+        AscendAgent -- "Route: /obsidian" --> MarkdownParser["CommonMark Parser"]
+        AscendAgent -- "Route: /documents" --> UnstructuredAPI["Unstructured API"]
+        MarkdownParser -- "Chunks & Embeds" --> Qdrant
+        UnstructuredAPI -- "Chunks & Embeds" --> Qdrant
+    end
+```
+
+📐 **[Full Architecture Documentation](../docs/architecture/arc42/01-introduction-and-goals.md)** — arc42, ADRs, and C4 Mermaid diagrams.
+
+### Core Components
+1.  **Redis**:
+    *   **Purpose**: High-performance caching and "Active Memory".
+    *   **Usage**: Stores short-term conversation context, user instructions, and cached embedding results to reduce latency.
+2.  **PostgreSQL**:
+    *   **Purpose**: Persistent, reliable storage.
+    *   **Usage**: Archival of all Chat History and structured User Metadata (preferences, profile data).
+3.  **Qdrant**:
+    *   **Purpose**: Vector Database for RAG.
+    *   **Usage**: Stores semantic embeddings of ingested documents (Markdown, PDF, etc.) for similarity search.
+4.  **ascend-memory**:
+    *   **Purpose**: Semantic memory service (separate from chat history).
+    *   **Usage**: The AscendAgent retrieves user-scoped facts over REST to inject as optional context before generating a response. Afterward, a background Virtual Thread asynchronously extracts new facts from the conversation and `POST`s them back to this service for long-term semantic storage.
+    *   **Provider routing**: The AscendAgent forwards the active `embeddingProvider` to ascend-memory. Each provider maps to a dedicated Qdrant collection (`ascend_memory_768` for lmstudio/gemini, `ascend_memory_1536` for openai), ensuring dimension-safe storage.
+
+5.  **Thinking Model Response Resolution**:
+    *   **Problem**: Providers using `type: anthropic` (LM Studio, Anthropic, MiniMax) may return multi-block responses where the first block contains internal chain-of-thought reasoning and the last block contains the actual answer. Standard `getResult()` returns the first block (thinking text), not the answer.
+    *   **Solution**: `ChatResponseContentResolver` resolves the last non-blank `Generation` text from any `ChatResponse`. This works transparently for both single-generation (OpenAI-type) and multi-generation (Anthropic-type thinking model) responses.
+    *   **Impact**: Affects both the user-facing chat response (`ChatExecutor`) and the asynchronous semantic memory extraction (`SemanticMemoryExtractor`).
+
+---
+
+## Operational Workflow
+
+### 1. Memory vs. Tools
+The AscendAgent uses a retrieval-gated approach:
+*   **Soft-RAG (Thresholded)**: It always queries Qdrant, but injects RAG context only if the top similarity score is above a configured threshold. This prevents context-only refusals and avoids suppressing tool usage.
+*   **Tools (MCP)**: Tools remain available for dynamic/external information (weather, web search, transcription).
+*   **Semantic Memory (REST)**: 
+    *   *Retrieval*: User-scoped memories are retrieved from `ascend-memory` and injected as optional context.
+    *   *Storage*: After generating a response, the AscendAgent triggers an asynchronous Virtual Thread. This thread uses a low-cost LLM configuration to deterministically extract facts from the conversation and POSTs them to `ascend-memory`, ensuring the extraction process adds exactly zero latency to the user's request.
+    *   **Embedding provider**: `ascend-memory` uses the same `embeddingProvider` as the AscendAgent request. The default (`lmstudio`) requires LM Studio running locally on port `1234`. Switching to `openai` or `gemini` eliminates this local dependency.
+
+#### Optional upgrade: Model Router (1 extra LLM call)
+For a larger tool set and ambiguous prompts, you can add a model-router step that returns JSON like `{route: RAG|TOOL|BOTH}` and drives retrieval/tooling explicitly.
+
+### 2. Document & Image Ingestion
+*   **Direct Ingestion**: Users can upload images or documents directly in the `/prompt` request (`multipart/form-data`). These are processed on-the-fly (`On-Demand Ingestion`) and added to the temporary context window for the current reply.
+*   **Background Ingestion (S3)**:
+    *   The system monitors a **MinIO S3 Bucket (`knowledge-base`)**.
+    *   **Manual**: Ingestion is disabled by default to avoid startup latency and unexpected cloud embedding costs. Trigger ingestion explicitly via the REST endpoint.
+
+---
+
+## Multi-Provider AI & Model Selection
+
+The AscendAgent supports multiple AI providers with **per-request selection** via `provider` and `model` query parameters:
+
+| Provider | Type | Default Model | API Key Env Var | Enabled Env Var |
+|---|---|---|---|---|
+| `lmstudio` (default) | OpenAI-compatible | `meta-llama-3.1-8b-instruct` | Not needed | `LMSTUDIO_ENABLED` (default: `true`) |
+| `openai` | OpenAI | `gpt-4o` | `OPENAI_API_KEY` | `OPENAI_ENABLED` (default: `true`) |
+| `gemini` | OpenAI-compatible | `gemini-2.5-flash` | `GEMINI_API_KEY` | `GEMINI_ENABLED` (default: `true`) |
+| `anthropic` | Anthropic native | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` | `ANTHROPIC_ENABLED` (default: `true`) |
+| `minimax` | OpenAI-compatible | `MiniMax-M2.5` | `MINIMAX_API_KEY` | `MINIMAX_ENABLED` (default: `true`) |
+
+Providers are configured in `application.yaml` under `app.ai.providers`. Each can be enabled/disabled via environment variables. Models default to environment variables with fallback values.
+
+### Popular Models per Provider
+
+#### OpenAI
+| Model | Description |
+|---|---|
+| `gpt-5.4` | Latest flagship — unified Codex+GPT, 1M+ context, advanced reasoning |
+| `gpt-5.1` | Conversational focus, available in Instant/Thinking/Pro variants |
+| `gpt-5-mini` | Lightweight and cost-effective |
+| `gpt-4o` | Multimodal (text/audio/image), fast response times |
+| `gpt-4o-mini` | Smaller, cheaper variant of GPT-4o |
+
+#### Anthropic
+| Model | Description |
+|---|---|
+| `claude-opus-4-6` | Most capable — excels at complex tasks and agentic workflows, 1M context |
+| `claude-sonnet-4-6` | Best Sonnet — Opus-level coding performance at Sonnet pricing, 1M context |
+| `claude-sonnet-4-5` | Previous generation balanced model |
+| `claude-haiku-4-5` | Fastest and most cost-effective |
+| `claude-haiku-3-5` | Budget-friendly for simple tasks |
+
+#### Gemini
+| Model | Description |
+|---|---|
+| `gemini-3.1-pro` | Latest — advanced reasoning, long-context, multimodal |
+| `gemini-3.1-flash` | Frontier performance at lower cost |
+| `gemini-3.1-flash-lite` | Fastest and most cost-efficient Gemini 3 model |
+| `gemini-2.5-pro` | Deep reasoning and coding, free tier available |
+| `gemini-2.5-flash` | Best price-performance for high-volume tasks |
+
+#### MiniMax
+| Model | Description |
+|---|---|
+| `MiniMax-M2.5` | Flagship — complex tasks, strong coding, tool-call collaboration |
+| `MiniMax-M2.5-highspeed` | Faster variant of M2.5 |
+| `MiniMax-M2.1` | Multilingual programming and code refactoring |
+| `MiniMax-M2` | Balanced performance/cost for agentic workflows |
+| `MiniMax-M1` | Open-source 456B MoE model, 1M context |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `LMSTUDIO_ENABLED` | No | Enable LM Studio provider (default: `true`) |
+| `OPENAI_ENABLED` | No | Enable OpenAI provider (default: `true`) |
+| `OPENAI_API_KEY` | If OpenAI enabled | OpenAI API key from [platform.openai.com](https://platform.openai.com/) |
+| `GEMINI_ENABLED` | No | Enable Gemini provider (default: `true`) |
+| `GEMINI_API_KEY` | If Gemini enabled | Gemini API key from [aistudio.google.com](https://aistudio.google.com/) |
+| `ANTHROPIC_ENABLED` | No | Enable Anthropic provider (default: `true`) |
+| `ANTHROPIC_API_KEY` | If Anthropic enabled | Anthropic API key from [platform.claude.com](https://platform.claude.com/settings/keys) |
+| `MINIMAX_ENABLED` | No | Enable MiniMax provider (default: `true`) |
+| `MINIMAX_API_KEY` | If MiniMax enabled | MiniMax API key |
+| `OPENAI_MODEL` | No | Override default OpenAI model (default: `gpt-4o`) |
+| `GEMINI_MODEL` | No | Override default Gemini model (default: `gemini-2.5-flash`) |
+| `ANTHROPIC_MODEL` | No | Override default Anthropic model (default: `claude-sonnet-4-5`) |
+| `MINIMAX_MODEL` | No | Override default MiniMax model (default: `MiniMax-M2.5`) |
+| `LMSTUDIO_MODEL` | No | Override default LM Studio model (default: `meta-llama-3.1-8b-instruct`) |
+| `EMBEDDING_PROVIDER` | No | Embedding provider: `lmstudio` (default), `openai`, or `gemini` |
+
+### Embedding Provider Configuration
+
+The embedding provider controls which service generates vector embeddings for RAG and which Qdrant collection is used. It can be set **per-request** via the `embeddingProvider` parameter, defaulting to the `EMBEDDING_PROVIDER` env var (default: `lmstudio`).
+
+| Embedding Provider | Model | Dimensions | Requires |
+|---|---|---|---|
+| `lmstudio` (default) | `text-embedding-nomic-embed-text-v2-moe` | 768 | LM Studio running locally |
+| `openai` | `text-embedding-3-small` | 1536 | `OPENAI_API_KEY` |
+| `gemini` | `gemini-embedding-001` | 768 | `GEMINI_API_KEY` |
+
+#### Per-Request Usage
+
+```
+POST /api/v1/ai/prompt
+  prompt=...
+  provider=anthropic           # chat provider
+  embeddingProvider=lmstudio   # embedding provider (optional)
+
+POST /api/ingestion/run
+  embeddingProvider=openai     # ingest into 1536-dim collection
+```
+
+#### Compatibility Matrix
+
+Incompatible combinations return **400 Bad Request**.
+
+| Embedding → | `lmstudio` (768) | `gemini` (768) | `openai` (1536) |
+|---|---|---|---|
+| Chat: `lmstudio` | ✅ | ✅ | ❌ |
+| Chat: `gemini` | ✅ | ✅ | ✅ |
+| Chat: `anthropic` | ✅ | ✅ | ✅ |
+| Chat: `minimax` | ✅ | ✅ | ✅ |
+| Chat: `openai` | ❌ | ❌ | ✅ |
+
+> **Note**: Switching between dimension groups (768↔1536) requires re-ingestion of documents into the target collection.
+
+---
+
+## Prerequisites
+
+Before running the application, ensure you have the following services up and running.
+
+1.  **Docker Environment**:
+    *   The project uses `docker-compose.yaml` in the root directory to spin up required services.
+    *   **MinIO**: S3-compatible storage for file ingestion (Ports: 9070 API, 9071 Console).
+    *   **Qdrant**: Vector database for storing embeddings.
+    *   **Unstructured API**: For parsing complex document types (PDFs, PPTX, etc.).
+    *   **PostgreSQL**: Metadata store for the ingestion pipeline (schema `ascend_ai`).
+    *   **Redis**: Caching and active memory store.
+    *   **SearXNG**: Self-hosted meta-search engine (Web Tools dependency).
+    *   **web-tools-mcp**: MCP server providing `web_search` and `read_url` tools.
+    *   **ascend-memory**: Semantic memory service used by AscendAgent over REST.
+
+2.  **LLM Provider**:
+    *   **LM Studio** (or similar) running locally on port `1234` (default).
+    *   Ensure an embedding model is also loaded or accessible if using a separate embedding service (default config uses OpenAI format, potentially pointing to local or remote).
+
+---
+
+## RAG Pipeline & Document Ingestion
+
+The agent includes an ingestion pipeline for processing S3 bucket files on demand.
+
+### 1. S3 Storage (MinIO)
+*   **Bucket Name**: `knowledge-base` (Created automatically on startup if missing).
+*   **Access**:
+    *   **Console**: http://localhost:9071
+    *   **User**: `admin`
+    *   **Password**: `password`
+*   **Uploads**: You can upload files directly via the MinIO Console or using the AWS CLI/MinIO Client (`mc`).
+
+### 2. File Routing & Supported Types
+The pipeline routes files based on the folder specifically in the S3 bucket:
+
+| Folder Path in S3 | Processor | Supported Formats | Description |
+| :--- | :--- | :--- | :--- |
+| `obsidian/` | **Markdown Flow** | `.md` | Uses a local CommonMark parser. Optimized for Obsidian vaults and markdown notes. Extracts headers as metadata. |
+| `documents/` | **Unstructured Flow** | `.pdf`, `.docx`, `.pptx`, `.html`, `.txt`, etc. | Sends files to the **Unstructured API** container. Capable of performing OCR and extracting text from complex layouts. |
+
+### 3. How it Works
+1.  **Trigger**: Call `POST /api/ingestion/run` to scan the `knowledge-base` bucket.
+2.  **Routing**:
+    *   Files containing `obsidian` in their path go to the Markdown processor.
+    *   Files containing `documents` in their path go to the Unstructured processor.
+3.  **Processing**:
+    *   **Markdown**: Parsed into text, split into chunks.
+    *   **Unstructured**: Sent to the Unstructured API, which returns extracted text, then split into chunks.
+4.  **Embedding & Storage**: Text chunks are converted to vectors and stored in **Qdrant**.
+
+Auto ingestion is available but disabled by default. Enable it with `app.ingestion.auto.enabled=true`.
+
+---
+
+## How to Run and Test
+
+### 1. Start Support Services
+From the project root:
+```bash
+docker-compose up -d
+```
+Ensure MinIO, Qdrant, Redis, Postgres, Unstructured API, SearXNG, `ascend-memory`, and `web-tools-mcp` are running.
+
+### 2. Run the AscendAgent
+```bash
+./gradlew bootRun
+```
+Access the fancy startup log to see the running port (default `9917`) and active profiles.
+It will also display:
+*   Postgres & Redis Connection Status.
+*   Count of available files in S3 (`knowledge-base`) ready for ingestion.
+*   List of active MCP Tools.
+
+### 3. Test Ingestion (RAG)
+1.  Open MinIO Console: http://localhost:9071
+2.  Navigate to the `knowledge-base` bucket.
+3.  **Test Markdown**:
+    *   Create a folder `obsidian`.
+    *   Upload a sample `.md` file inside it.
+    *   Trigger ingestion: `POST http://localhost:9917/api/ingestion/run`
+    *   Check application logs. You should see: `Indexed markdown document: <id>`
+4.  **Test Unstructured**:
+    *   Create a folder `documents`.
+    *   Upload a `.pdf` or `.docx`.
+    *   Trigger ingestion: `POST http://localhost:9917/api/ingestion/run`
+    *   Check application logs. You should see: `Indexed unstructured document: <id>`
+
+### 4. Testing Scenarios (CURL)
+
+**Prerequisites**:
+- Server running on `localhost:9917`.
+- `X-User-Id` header is required for context.
+
+#### 1. RAG: Summarizing a Document
+
+**Windows (PowerShell)**:
+```powershell
+curl -X POST "http://localhost:9917/prompt" `
+     -H "X-User-Id: user1" `
+     -H "Content-Type: multipart/form-data" `
+     -F "prompt=Summarize the key points." `
+     -F "doc=@notes.md"
+```
+
+**Linux/Mac (Bash)**:
+```bash
+curl -X POST "http://localhost:9917/prompt" \
+     -H "X-User-Id: user1" \
+     -H "Content-Type: multipart/form-data" \
+     -F "prompt=Summarize the key points." \
+     -F "doc=@notes.md"
+```
+
+#### 2. Vision: Describing a Picture
+
+**Windows (PowerShell)**:
+```powershell
+curl -X POST "http://localhost:9917/prompt" `
+     -H "X-User-Id: user1" `
+     -H "Content-Type: multipart/form-data" `
+     -F "prompt=Describe this image." `
+     -F "image=@screenshot.png"
+```
+
+**Linux/Mac (Bash)**:
+```bash
+curl -X POST "http://localhost:9917/prompt" \
+     -H "X-User-Id: user1" \
+     -H "Content-Type: multipart/form-data" \
+     -F "prompt=Describe this image." \
+     -F "image=@screenshot.png"
+```
+
+#### 3. MCP Tool Usage (Weather)
+
+**Windows (PowerShell)**:
+```powershell
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
+     -H "X-User-Id: user1" `
+     -H "Content-Type: multipart/form-data" `
+     -F "prompt=What is the weather in Warsaw?"
+```
+
+#### 4. Multi-Provider: Using Gemini
+
+**Windows (PowerShell)**:
+```powershell
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
+     -H "X-User-Id: user1" `
+     -H "Content-Type: multipart/form-data" `
+     -F "prompt=Explain quantum computing" `
+     -F "provider=gemini" `
+     -F "model=gemini-2.5-pro"
+```
+
+#### 5. Multi-Provider: Using Anthropic
+
+**Windows (PowerShell)**:
+```powershell
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
+     -H "X-User-Id: user1" `
+     -H "Content-Type: multipart/form-data" `
+     -F "prompt=Write a haiku about coding" `
+     -F "provider=anthropic"
+```
+
+#### 4. Memory Context
+
+**Set Context (Bash)**:
+```bash
+curl -X POST "http://localhost:9917/prompt" \
+     -H "X-User-Id: user1" \
+     -H "Content-Type: multipart/form-data" \
+     -F "prompt=My name is Luke."
+```
+
+**Retrieve Context (Bash)**:
+```bash
+curl -X POST "http://localhost:9917/prompt" \
+     -H "X-User-Id: user1" \
+     -H "Content-Type: multipart/form-data" \
+     -F "prompt=What is my name?"
+```
+
+### 5. Verify Persistence & Memory
+
+#### 1. Redis (Chat History & Instructions)
+
+**Connect to Redis**:
+```bash
+docker exec -it redis redis-cli
+```
+
+**Check Keys**:
+All keys:
+```bash
+KEYS *
+```
+Specific keys:
+```bash
+KEYS "user:user1:*"
+```
+
+**View History**:
+```bash
+LRANGE user:user1:history 0 -1
+```
+
+**View Instructions**:
+```bash
+GET user:user1:instructions
+```
+
+#### 2. PostgreSQL (Long-term Storage)
+
+**Connect to Database**:
+```bash
+docker exec -it postgres psql -U postgres -d ascend_ai
+```
+
+**Check History**:
+```sql
+SELECT * FROM chat_history WHERE user_id = 'user1' ORDER BY created_at DESC LIMIT 5;
+```
+
+**Check Instructions**:
+```sql
+SELECT * FROM user_instructions WHERE user_id = 'user1';
+```
+
+---
+
+## Configuration
+
+### Key Application Properties (`application.yaml`)
+
+*   **Server Port**: `9917`
+*   **Embedding Provider**: `app.embedding.provider` — active embedding backend (`lmstudio`, `openai`, `gemini`)
+*   **Vector Store (Qdrant)**: Collections `ascendai-768` and `ascendai-1536` are auto-created. The active collection is derived from the embedding provider's dimensions.
+*   **S3 Configuration**:
+    *   `s3.endpoint`: `http://localhost:9070`
+    *   `s3.bucket`: `knowledge-base`
+*   **Data Source**: Postgres connection for metadata store.
+*   **Unstructured API**: Base URL for the document parsing service.
+*   **RAG**:
+    *   `app.rag.enabled`: enables retrieval-gated soft-RAG
+    *   `app.rag.similarity-threshold`: controls when retrieved context is injected
+*   **Ingestion**:
+    *   `app.ingestion.auto.enabled`: disabled by default to avoid startup latency/costs (use manual ingestion endpoint)
+
+### MCP Client
+*   `spring.ai.mcp.client`: Configured via `application.yaml` connections (Weather, AudioScribe, Web Tools).

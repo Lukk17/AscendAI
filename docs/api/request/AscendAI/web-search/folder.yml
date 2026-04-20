@@ -1,0 +1,22 @@
+info:
+  name: web-search
+  type: folder
+  seq: 3
+
+request:
+  variables:
+    - name: scrap_url_loginIndeed
+      value: ""
+    - name: scrap_url_indeed
+      value: ""
+    - name: scrap_url_nowsecure
+      value: ""
+    - name: scrap_url_linkedin
+      value: ""
+    - name: scrap_url_reddit
+      value: ""
+    - name: scrap_url_wp
+      value: ""
+    - name: scrap_url_justjoinit
+      value: ""
+  auth: inherit

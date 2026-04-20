@@ -1,0 +1,51 @@
+info:
+  name: "[low quality] read image"
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: http://localhost:5001/v1/convert/file
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: files
+        type: file
+        value:
+          - /C:/Users/Lukk/Desktop/Screenshot 2026-02-28 035630.png
+        contentType: image/png
+      - name: do_ocr
+        type: text
+        value: "true"
+      - name: force_ocr
+        type: text
+        value: "true"
+      - name: table_mode
+        type: text
+        value: accurate
+      - name: from_formats
+        type: text
+        value: image
+      - name: images_scale
+        type: text
+        value: "4.0"
+      - name: pipeline
+        type: text
+        value: standard
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

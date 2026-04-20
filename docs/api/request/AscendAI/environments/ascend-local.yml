@@ -1,0 +1,6 @@
+name: ascend-local
+variables:
+  - name: baseUrl
+    value: localhost
+  - name: protocol
+    value: http

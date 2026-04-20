@@ -1,0 +1,55 @@
+info:
+  name: wipe-memory
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/wipe?user_id={{userId}}"
+  params:
+    - name: user_id
+      value: "{{userId}}"
+      type: query
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: success
+    request:
+      url: http://localhost:7020/api/v1/memory/wipe?user_id=testUser1
+      method: POST
+      params:
+        - name: user_id
+          value: testUser1
+          type: query
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: date
+          value: Tue, 03 Feb 2026 21:20:35 GMT
+        - name: server
+          value: uvicorn
+        - name: content-length
+          value: "70"
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+              "status": "success",
+              "message": "All memories wiped for user testUser1"
+          }

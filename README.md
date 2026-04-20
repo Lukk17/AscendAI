@@ -8,20 +8,23 @@ This repository contains a multi-module AI orchestration platform built with Spr
 
 ## 🏗️ System Architecture
 
-📐 **[Full Architecture Documentation](docs/architecture/arc42/01-introduction-and-goals.md)** — arc42, ADRs, and C4 Mermaid diagrams.
+📐 **[Monorepo Architecture](docs/architecture/README.md)** — system overview, service interactions, deployment topology, ADRs.
 
-- **Orchestrator**: Spring Boot application — REST API, multi-provider AI, RAG pipeline, MCP tool integration.
+📐 **[AscendAgent Internals](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md)** — detailed arc42, component diagrams, module-specific ADRs.
+
+- **AscendAgent**: Spring Boot application — REST API, multi-provider AI, RAG pipeline, MCP tool integration.
 - **AudioScribe**: MCP server for audio transcription (FastMCP/Python).
 - **WeatherMCP**: MCP server for weather data (Spring Boot/Java).
 - **AscendWebSearch**: MCP server for web search via SearXNG (FastMCP/Python).
 - **AscendMemory**: Semantic memory service with REST API (FastAPI/Python).
-- **Support Services** (Dockerized):
-  - **MinIO**: S3-compatible object storage for document ingestion.
-  - **Qdrant**: Vector database for RAG embeddings and semantic memory.
+- **External Prerequisites** (must be running before docker-compose):
+  - **PostgreSQL**: Persistent metadata and chat history.
   - **Redis**: Chat history cache.
+  - **Qdrant**: Vector database for RAG embeddings and semantic memory.
+  - **MinIO**: S3-compatible object storage for document ingestion.
+- **Support Services** (Dockerized):
   - **SearXNG**: Privacy-respecting meta search engine.
   - **FlareSolverr**: Cloudflare bypass proxy for web scraping.
-- **PostgreSQL**: Persistent metadata and chat history (local or Docker).
 
 ---
 
@@ -32,10 +35,13 @@ This repository contains a multi-module AI orchestration platform built with Spr
 - **Docker Desktop** (running)
 - **Java 21**
 - **PostgreSQL** (Active instance on port 5432)
+- **Redis** (Active instance on port 6379)
+- **Qdrant** (Active instance on ports 6333/6334)
+- **MinIO** (Active instance on ports 9070/9071, credentials: `admin` / `password`)
 
-### 1. Start Infrastructure
+### 1. Start Application Services
 
-Run the following command at the project root to start infrastructure services (MinIO, Qdrant, Redis, SearXNG, AscendMemory, etc.):
+Ensure all external prerequisites above are running, then start application and support services (SearXNG, AscendMemory, AudioScribe, etc.):
 
 ```bash
 docker-compose up -d
@@ -43,18 +49,18 @@ docker-compose up -d
 
 ### 2. Configure Database
 
-Ensure your local PostgreSQL has a database named `ascend_ai`. The application is configured to connect with the following default credentials (update `Orchestrator/src/main/resources/application.yaml` if yours differ):
+Ensure your local PostgreSQL has a database named `ascend_ai`. The application is configured to connect with the following default credentials (update `AscendAgent/src/main/resources/application.yaml` if yours differ):
 
 - **User**: `postgres`
 - **Password**: `local`
 - **Database**: `ascend_ai`
 
-### 3. Run the Orchestrator
+### 3. Run the AscendAgent
 
-Navigate to the `Orchestrator` directory and run the application:
+Navigate to the `AscendAgent` directory and run the application:
 
 ```bash
-cd Orchestrator
+cd AscendAgent
 ./gradlew bootRun
 ```
 
@@ -66,7 +72,7 @@ The application will automatically:
 
 ---
 
-## 🌐 HTTP Orchestrator API
+## 🌐 HTTP AscendAgent API
 
 ### 1. Extract Web Payload (`v2`)
 
@@ -88,12 +94,11 @@ curl -X POST http://localhost:7021/api/v2/web/read \
 
 | Service             | Port            | Default Credentials  | Description                 |
 | :------------------ | :-------------- | :------------------- | :-------------------------- |
-| **Orchestrator**    | `9917`          | -                    | Main API Gateway            |
+| **AscendAgent**    | `9917`          | -                    | Main API Gateway            |
 | **AudioScribe**     | `7017`          | -                    | MCP — Audio Transcription   |
 | **WeatherMCP**      | `9998`          | -                    | MCP — Weather Data          |
 | **AscendWebSearch** | `7021`          | -                    | MCP — Web Search            |
 | **AscendMemory**    | `7020`          | -                    | REST/MCP — Semantic Memory  |
-| **AudioForge**      | `7018`          | -                    | Audio Processing            |
 | **PaddleOCR**       | `7022`          | -                    | MCP — OCR Service           |
 | **Docling Serve**   | `5001`          | -                    | Document Conversion         |
 | **Unstructured API**| `9080`          | -                    | Document Parsing for RAG    |
@@ -126,10 +131,7 @@ docker push lukk17/ascend-ai:latest
 
 ## � Data and Persistence
 
-Docker uses a **named volume** (`minio_data`) to persist your MinIO data (buckets and files). This ensures that even if you remove the container, your data remains safe.
-
-- **Location**: Managed by Docker (usually in `/var/lib/docker/volumes/...`).
-- **Management**: Use `docker volume ls` and `docker volume inspect minio_data` to view details.
+MinIO runs as an external prerequisite. Data persistence depends on your MinIO installation (local or cloud-managed S3).
 
 ---
 
@@ -143,15 +145,15 @@ To add documents (Markdown, PDF, DOCX) to your RAG pipeline, you need to upload 
 2.  Login with default credentials: `admin` / `password`.
 3.  Click on **Buckets** in the left menu.
 4.  Select `knowledge-base`.
-    - _If it doesn't exist, the Orchestrator will create it on startup, or you can create it manually._
+    - _If it doesn't exist, the AscendAgent will create it on startup, or you can create it manually._
 5.  Click **Object Browser** -> **Upload**.
 6.  Select your file(s) or folder(s).
     - **Markdown**: Files with `.md` (best if from Obsidian).
     - **Documents**: PDFs, DOCX, etc. (processed via Unstructured API).
 
-### Option 2: CLI (curl) via Orchestrator
+### Option 2: CLI (curl) via AscendAgent
 
-You can directly upload files using the Orchestrator's API, which will automatically route them to the correct folder (`obsidian/` or `documents/`):
+You can directly upload files using the AscendAgent's API, which will automatically route them to the correct folder (`obsidian/` or `documents/`):
 
 ```bash
 # Example: Uploading a Markdown file
@@ -192,7 +194,7 @@ If you need to completely reset the MinIO state or delete a bucket that is stuck
 
 The system uses Qdrant for two distinct features:
 
-1. **RAG (Orchestrator)**: Uses `ascendai-768` (for Gemini/LM Studio) or `ascendai-1536` (for OpenAI) depending on the active embedding dimensions.
+1. **RAG (AscendAgent)**: Uses `ascendai-768` (for Gemini/LM Studio) or `ascendai-1536` (for OpenAI) depending on the active embedding dimensions.
 2. **Semantic Memory (AscendMemory / Mem0)**: Uses `ascend_memory_768` (for lmstudio/gemini, 768 dims) or `ascend_memory_1536` (for openai, 1536 dims) depending on the embedding provider.
 
 **Delete Entire Collection (Reset Memory):**
@@ -261,11 +263,11 @@ To force the system to re-process **everything**:
 TRUNCATE TABLE public.int_metadata_store;
 ```
 
-**After running either command, restart the Orchestrator.**
+**After running either command, restart the AscendAgent.**
 
 ### 4. Resetting Chat History (Redis & PostgreSQL)
 
-The Orchestrator maintains your chat context in two places:
+The AscendAgent maintains your chat context in two places:
 
 1.  **Short-Term History (Redis)**: This is the active context window sent to the LLM during conversational interactions.
 2.  **Long-Term History (PostgreSQL)**: The system archives all interactions to the database for persistent auditing and user analytics.
@@ -273,9 +275,9 @@ The Orchestrator maintains your chat context in two places:
 **Clear Active Context (Redis):**
 To completely wipe the active memory for all sessions, flush the Redis cached keys:
 
-1. Exec into the Redis container:
+1. Connect to Redis (running externally):
    ```bash
-   docker exec -it redis-stack redis-cli
+   redis-cli
    ```
 2. Flush all keys:
    ```bash

@@ -1,0 +1,74 @@
+info:
+  name: get-text-from-png-invoice
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:9080/general/v0/general
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: files
+        type: file
+        value:
+          - /C:/Users/Lukk/Desktop/Screenshot 2026-02-28 035630.png
+      - name: strategy
+        type: text
+        value: hi_res
+        disabled: true
+      - name: strategy
+        type: text
+        value: auto
+        disabled: true
+      - name: pdf_infer_table_structure
+        type: text
+        value: "true"
+      - name: skip_infer_table_types
+        type: text
+        value: "[]"
+      - name: include_page_breaks
+        type: text
+        value: "true"
+      - name: languages
+        type: text
+        value: pol
+      - name: chunking_strategy
+        type: text
+        value: by_title
+      - name: combine_under_n_chars
+        type: text
+        value: "500"
+        disabled: true
+      - name: strategy
+        type: text
+        value: ocr_only
+      - name: hi_res_model_name
+        type: text
+        value: detectron2_lp
+      - name: combine_under_n_chars
+        type: text
+        value: "1000"
+      - name: max_characters
+        type: text
+        value: "4000"
+      - name: extract_image_block_types
+        type: text
+        value: "[Table]"
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

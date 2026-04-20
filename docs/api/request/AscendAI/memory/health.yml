@@ -1,0 +1,91 @@
+info:
+  name: health
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7020/health"
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: success
+    request:
+      url: http://localhost:7020/api/v1/memory/search?user_id=testUser1&query=dark%20mode
+      method: GET
+      params:
+        - name: user_id
+          value: testUser1
+          type: query
+        - name: query
+          value: dark%20mode
+          type: query
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: date
+          value: Tue, 03 Feb 2026 21:16:43 GMT
+        - name: server
+          value: uvicorn
+        - name: content-length
+          value: "919"
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+              {
+                  "id": "5c96b256-395e-466f-870d-5f493a8f044a",
+                  "memory": "The user prefers dark mode in all applications.",
+                  "hash": "1c6fc7869ee25eba3ea7daca38809231",
+                  "metadata": {
+                      "category": "preferences"
+                  },
+                  "score": 0.62800556,
+                  "created_at": "2026-02-03T13:14:56.355100-08:00",
+                  "updated_at": null,
+                  "user_id": "testUser1",
+                  "role": "user"
+              },
+              {
+                  "id": "3801b968-3735-4fee-995a-cd2b44c341df",
+                  "memory": "The user prefers dark mode in all applications.",
+                  "hash": "1c6fc7869ee25eba3ea7daca38809231",
+                  "metadata": {
+                      "category": "preferences"
+                  },
+                  "score": 0.62800556,
+                  "created_at": "2026-02-03T13:16:30.189010-08:00",
+                  "updated_at": null,
+                  "user_id": "testUser1",
+                  "role": "user"
+              },
+              {
+                  "id": "ee357f25-78f0-4b29-8ec6-83af7b28a219",
+                  "memory": "The user prefers dark mode in all applications.",
+                  "hash": "1c6fc7869ee25eba3ea7daca38809231",
+                  "metadata": {
+                      "category": "preferences"
+                  },
+                  "score": 0.62800556,
+                  "created_at": "2026-02-03T13:13:30.991875-08:00",
+                  "updated_at": null,
+                  "user_id": "testUser1",
+                  "role": "user"
+              }
+          ]

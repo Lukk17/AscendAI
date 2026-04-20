@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-WeatherMCP is a standalone MCP server built with Spring AI that provides weather data to the Orchestrator via the Model Context Protocol. It uses SSE (Server-Sent Events) for communication.
+WeatherMCP is a standalone MCP server built with Spring AI that provides weather data to the AscendAgent via the Model Context Protocol. It uses SSE (Server-Sent Events) for communication.
 
 ## Tech Stack
 
