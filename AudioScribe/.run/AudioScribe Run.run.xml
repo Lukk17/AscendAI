@@ -21,7 +21,7 @@
           </list>
         </option>
         <option name="commandLineOptions" value="--gpus all --env HF_TOKEN --env OPENAI_API_KEY" />
-        <option name="sourceFilePath" value="Dockerfile" />
+        <option name="sourceFilePath" value="AudioScribe/Dockerfile" />
         <option name="volumeBindings">
           <list>
             <DockerVolumeBindingImpl>

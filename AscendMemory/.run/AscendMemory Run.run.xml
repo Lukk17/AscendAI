@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Docker Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+  <configuration default="false" name="AscendMemory Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
     <deployment type="dockerfile">
       <settings>
         <option name="imageTag" value="ascend-memory:latest" />
@@ -56,7 +56,7 @@
             </DockerPortBindingImpl>
           </list>
         </option>
-        <option name="sourceFilePath" value="Dockerfile" />
+        <option name="sourceFilePath" value="AscendMemory/Dockerfile" />
       </settings>
     </deployment>
     <method v="2" />

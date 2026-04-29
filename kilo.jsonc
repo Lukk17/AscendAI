@@ -1,6 +1,0 @@
-{
-  "instructions": [
-    ".agents/skills/*/SKILL.md",
-    ".agents/commands/*.md"
-  ]
-}

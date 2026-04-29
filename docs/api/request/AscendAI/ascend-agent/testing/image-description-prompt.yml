@@ -6,6 +6,9 @@ info:
 http:
   method: POST
   url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+  headers:
+    - name: X-User-Id
+      value: frosty
   body:
     type: multipart-form
     data:
@@ -15,18 +18,20 @@ http:
       - name: "image "
         type: file
         value:
-          - /C:/Users/Lukk/Desktop/Ascend-test-files/songo-profil.jpg
+          - C:\Users\Lukk\Desktop\Ascend-test-files\songo-profil.jpg
+        contentType: file
       - name: embeddingProvider
         type: text
         value: openai
+        disabled: true
       - name: provider
         type: text
         value: anthropic
-        description: "Optional, default is lmstudio, values: openai"
+        disabled: true
       - name: model
         type: text
         value: claude-sonnet-4-6
-        description: "Optional, default different for each provider, values: gpt-4o, claude-sonnet-4-5"
+        disabled: true
       - name: provider
         type: text
         value: openai
@@ -34,7 +39,6 @@ http:
       - name: model
         type: text
         value: gpt-5.1
-        description: "default gpt-4o, values: gpt-5.4 ; gpt-5.1 ; gpt-5-mini ; gpt-4o-mini"
         disabled: true
       - name: provider
         type: text
@@ -43,30 +47,16 @@ http:
       - name: model
         type: text
         value: gemini-2.5-flash
-        description: "default: gemini-2.5-flash values: gemini-pro-latest ;  gemini-2.5-pro ; gemini-2.5-flash"
-        disabled: true
-      - name: provider
-        type: text
-        value: lmstudio
-        description: default provider
-        disabled: true
-      - name: model
-        type: text
-        value: qwen/qwen3-vl-4b
-        description: default meta-llama-3.1-8b-instruct
         disabled: true
       - name: embeddingProvider
         type: text
         value: lmstudio
-        disabled: true
-
-runtime:
-  tests:
-    - type: after-response
-      code: |-
-        test("Status code is 200", function () {
-            expect(res.getStatus()).to.equal(200);
-        });
+      - name: provider
+        type: text
+        value: lmstudio
+      - name: model
+        type: text
+        value: qwen/qwen3-vl-4b
 
 settings:
   encodeUrl: true
