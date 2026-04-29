@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Orchestrator [bootRun]" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="AscendAgent [clean build]" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
-      <option name="externalProjectPath" value="$PROJECT_DIR$/Orchestrator" />
+      <option name="externalProjectPath" value="$PROJECT_DIR$/AscendAgent" />
       <option name="externalSystemIdString" value="GRADLE" />
       <option name="scriptParameters" value="" />
       <option name="taskDescriptions">
@@ -10,7 +10,8 @@
       </option>
       <option name="taskNames">
         <list>
-          <option value="bootRun" />
+          <option value="clean" />
+          <option value="build" />
         </list>
       </option>
       <option name="vmOptions" />

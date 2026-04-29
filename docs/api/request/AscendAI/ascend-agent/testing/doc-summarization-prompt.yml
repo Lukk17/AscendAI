@@ -6,55 +6,45 @@ info:
 http:
   method: POST
   url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+  headers:
+    - name: X-User-Id
+      value: frosty
   body:
     type: multipart-form
     data:
+      - name: document
+        type: file
+        value:
+          - C:\Users\Lukk\Desktop\Ascend-test-files\test.pdf
+        contentType: file
       - name: prompt
         type: text
         value: Summarize the key points in this document
       - name: provider
         type: text
         value: openai
-        description: Optional, default is lmstudio
         disabled: true
       - name: model
         type: text
         value: gpt-4o
-        description: Optional, default different for each provider
         disabled: true
-      - name: document
-        type: file
-        value:
-          - /C:/Users/Lukk/Desktop/Ascend-test-files/test.pdf
       - name: embeddingProvider
         type: text
         value: openai
-        description: "Optional, default to env variable value, values: lmstudio, openai, gemini"
       - name: provider
         type: text
         value: minimax
       - name: model
         type: text
         value: MiniMax-M2.7
-        description: "default: MiniMax-M2.5 values: MiniMax-M2.5-highspeed ; MiniMax-M2.1 ; MiniMax-M2 ; MiniMax-M1"
       - name: provider
         type: text
         value: anthropic
-        description: "Optional, default is lmstudio, values: openai"
         disabled: true
       - name: model
         type: text
         value: claude-sonnet-4-6
-        description: "default claude-sonnet-4-5, values: claude-sonnet-4-6 ; claude-opus-4-6 ; claude-haiku-4-5 ; claude-haiku-3-5"
         disabled: true
-
-runtime:
-  tests:
-    - type: after-response
-      code: |-
-        test("Status code is 200", function () {
-            expect(res.getStatus()).to.equal(200);
-        });
 
 settings:
   encodeUrl: true
