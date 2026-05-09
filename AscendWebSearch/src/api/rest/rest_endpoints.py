@@ -1,13 +1,16 @@
 from typing import List, Dict, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
 
 from src.reader.web_reader import WebReader
 from src.search.search_client import SearxngClient
+from src.validator.url_validator import is_safe_external_url
 
 rest_router = APIRouter(prefix="/api/v1/web", tags=["web_v1"])
 rest_router_v2 = APIRouter(prefix="/api/v2/web", tags=["web_v2"])
+
+MAX_QUERY_LENGTH = 500
 
 search_client = SearxngClient()
 web_reader = WebReader()
@@ -21,12 +24,18 @@ class ReadRequest(BaseModel):
 
 
 @rest_router.get("/search", response_model=List[Dict[str, Any]])
-def search(query: str, limit: int = 5):
+async def search(query: str, limit: int = 5):
     """
     Search the web.
     """
-    results = search_client.search(query=query, limit=limit)
-    return results
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="query must not be empty")
+    if len(query) > MAX_QUERY_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"query exceeds maximum length of {MAX_QUERY_LENGTH} characters"
+        )
+    return await search_client.search(query=query, limit=limit)
 
 
 @rest_router_v2.post("/read", responses={
@@ -57,6 +66,11 @@ async def read_url_v2(request: ReadRequest):
     This is the recommended endpoint as it natively protects complex URL parameters (like & or ?continue=) from being hijacked by the HTTP Router.
     """
     url_str = str(request.url)
+    if not is_safe_external_url(url_str):
+        raise HTTPException(
+            status_code=400,
+            detail="URL resolves to a private, loopback, link-local, or otherwise non-routable address"
+        )
     if request.include_links:
         result = await web_reader.read_with_links(url_str, request.link_filter, heavy_mode=request.heavy_mode)
     else:

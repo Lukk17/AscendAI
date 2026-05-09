@@ -13,8 +13,12 @@ from src.reader.strategies.base_strategy import BaseStrategy
 logger = logging.getLogger(__name__)
 
 
+_active_monitor_tasks: set[asyncio.Task] = set()
+
+
 async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> None:
     logger.info(f"Background task started to monitor session for {url} ({intervention_type})")
+    browser = None
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -49,17 +53,29 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                     cookie_dict = {c["name"]: c["value"] for c in cookies}
                     user_agent = await page.evaluate("navigator.userAgent")
                     await cookie_manager.save_session_data(url, cookie_dict, user_agent)
+
+                    # Early exit once the user has navigated away from the login/challenge page.
+                    # Without this, we keep overwriting Redis every 5 s for the full timeout window
+                    # even though the human finished the challenge in the first 30 s.
+                    current_url = page.url or ""
+                    if not ChallengeDetector.is_login_redirect_url(current_url) and current_url != url:
+                        logger.info(
+                            f"NoVNC Strategy: challenge appears resolved (now at {current_url}), "
+                            f"stopping monitor early"
+                        )
+                        break
                 except Exception as e:
                     logger.debug(f"NoVNC Strategy: Transient error syncing session cookies: {e}")
 
                 await asyncio.sleep(5.0)
-
-            if not page.is_closed():
-                await page.close()
-            await browser.close()
-
     except Exception as e:
         logger.error(f"Background noVNC monitoring task failed: {e}")
+    finally:
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception as e:
+                logger.debug(f"NoVNC Strategy: browser close failed during cleanup: {e}")
 
 
 class NoVNCStrategy(BaseStrategy):
@@ -73,7 +89,11 @@ class NoVNCStrategy(BaseStrategy):
             url) else "captcha"
         final_vnc_url = await self._resolve_public_vnc_url()
 
-        asyncio.create_task(_monitor_for_cookies(url, intervention_type))
+        # Hold a strong reference so the event loop's weak set doesn't GC the task mid-flight,
+        # which silently kills the cookie sync and leaves users stuck re-logging.
+        task = asyncio.create_task(_monitor_for_cookies(url, intervention_type))
+        _active_monitor_tasks.add(task)
+        task.add_done_callback(_active_monitor_tasks.discard)
 
         raise HumanInterventionRequiredException(vnc_url=final_vnc_url, intervention_type=intervention_type)
 

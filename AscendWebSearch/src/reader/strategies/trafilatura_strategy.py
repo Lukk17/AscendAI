@@ -57,6 +57,8 @@ class TrafilaturaStrategy(BaseStrategy):
                 response.raise_for_status()
                 return response.text
 
+        except ChallengeDetectedException:
+            raise
         except Exception as e:
             logger.warning(f"TrafilaturaStrategy failed to fetch URL {url}: {e}")
             return ""

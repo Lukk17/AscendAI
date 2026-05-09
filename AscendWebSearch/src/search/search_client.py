@@ -12,9 +12,11 @@ logger = logging.getLogger(__name__)
 class SearxngClient:
     def __init__(self, base_url: str = settings.SEARXNG_BASE_URL):
         self.base_url = base_url.rstrip("/")
-        self.client = httpx.Client(timeout=settings.SEARCH_TIMEOUT)
+        # AsyncClient because every caller is on the FastAPI event loop. The previous sync
+        # httpx.Client blocked the loop for the duration of the SearXNG request.
+        self.client = httpx.AsyncClient(timeout=settings.SEARCH_TIMEOUT)
 
-    def search(self, query: str, limit: int = 5, categories: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def search(self, query: str, limit: int = 5, categories: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Search using SearXNG.
         Returns a list of results.
@@ -36,7 +38,7 @@ class SearxngClient:
             "X-Forwarded-For": settings.SEARXNG_X_FORWARDED_FOR
         }
 
-        response = self.client.get(url, params=params, headers=headers)
+        response = await self.client.get(url, params=params, headers=headers)
         response.raise_for_status()
 
         return self._parse_html_results(response.text, limit)
