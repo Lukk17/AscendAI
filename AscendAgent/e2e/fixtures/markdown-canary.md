@@ -1,0 +1,1 @@
+The Ascend canary phrase is PURPLE-MOOSE-42.
