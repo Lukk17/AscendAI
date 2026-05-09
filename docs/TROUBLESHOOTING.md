@@ -4,123 +4,177 @@ Operational recipes for resetting state, clearing caches, and recovering from co
 
 ---
 
-## Data and Persistence
+## Data and persistence
 
-MinIO runs as an external prerequisite. Data persistence depends on your MinIO installation (local or cloud-managed S3).
+MinIO, Qdrant, PostgreSQL, and Redis all run as external prerequisites. Data persistence depends on how you've deployed them (native, docker run, managed cloud).
 
 ---
 
 ## 1. MinIO: "Bucket already exists" or "Access Denied"
 
-If you need to completely reset MinIO state or delete a bucket that is stuck, you **cannot** use the Web UI in recent versions. Use the command line inside the Docker container.
+If MinIO state is stuck, the Web UI in recent versions can't force-delete a bucket. Use the `mc` CLI inside the running container.
 
-**Force delete a bucket via Docker:**
+Find the container name (usually `minio`):
 
-1. Open a terminal.
-2. Verify the running container name (usually `minio`):
-   ```bash
-   docker ps
-   ```
-3. Exec into the MinIO container:
-   ```bash
-   docker exec -it minio /bin/sh
-   ```
-4. Configure the `mc` client (aliases `local` to your server):
-   ```bash
-   mc alias set local http://localhost:9000 admin password
-   ```
-5. Force delete the bucket:
-   ```bash
-   mc rb --force local/knowledge-base
-   ```
+```bash
+docker ps
+```
+
+```powershell
+docker ps
+```
+
+Open a shell inside it:
+
+```bash
+docker exec -it minio /bin/sh
+```
+
+```powershell
+docker exec -it minio /bin/sh
+```
+
+Configure `mc` against your local MinIO, then force-delete the bucket. From inside the container:
+
+```bash
+mc alias set local http://localhost:9000 admin password
+```
+
+```bash
+mc rb --force local/knowledge-base
+```
 
 ---
 
-## 2. Qdrant: Managing Vector Data
+## 2. Qdrant: managing vector data
 
-The system uses Qdrant for two distinct features:
+Qdrant holds two distinct collection groups:
 
-1. **RAG (AscendAgent)**: Uses `ascendai-768` (Gemini/LM Studio) or `ascendai-1536` (OpenAI) depending on active embedding dimensions.
-2. **Semantic Memory (AscendMemory / Mem0)**: Uses `ascend_memory_768` (lmstudio/gemini, 768 dims) or `ascend_memory_1536` (openai, 1536 dims).
+- **RAG (AscendAgent)** — `ascendai-768` (lmstudio / gemini) or `ascendai-1536` (openai), depending on the active embedding provider.
+- **Semantic memory (AscendMemory / mem0)** — `ascend_memory_768` (lmstudio / gemini, 768 dims) or `ascend_memory_1536` (openai, 1536 dims).
 
-**Delete entire collection (reset memory):**
+Switching providers between dimension groups means the new collection starts empty. Re-run ingestion (`POST /api/v1/ingestion/run?embeddingProvider=...`) to populate it.
+
+### Delete a whole collection
+
+Bash:
 
 ```bash
 curl -X DELETE "http://localhost:6333/collections/ascendai-768"
+```
+
+```bash
 curl -X DELETE "http://localhost:6333/collections/ascendai-1536"
+```
+
+```bash
 curl -X DELETE "http://localhost:6333/collections/ascend_memory_768"
+```
+
+```bash
 curl -X DELETE "http://localhost:6333/collections/ascend_memory_1536"
 ```
 
-**Granular deletion (remove specific file):**
+PowerShell:
 
-```bash
-curl -X POST "http://localhost:6333/collections/ascendai/points/delete" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "filter": {
-         "must": [
-           { "key": "metadata.source", "match": { "value": "kierunki.md" } }
-         ]
-       }
-     }'
+```powershell
+curl.exe -X DELETE "http://localhost:6333/collections/ascendai-768"
 ```
 
-**List all collections:**
+```powershell
+curl.exe -X DELETE "http://localhost:6333/collections/ascendai-1536"
+```
+
+```powershell
+curl.exe -X DELETE "http://localhost:6333/collections/ascend_memory_768"
+```
+
+```powershell
+curl.exe -X DELETE "http://localhost:6333/collections/ascend_memory_1536"
+```
+
+### Granular deletion (one source file)
+
+Bash:
+
+```bash
+curl -X POST "http://localhost:6333/collections/ascendai-768/points/delete" -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"metadata.source","match":{"value":"notes.md"}}]}}'
+```
+
+PowerShell:
+
+```powershell
+curl.exe -X POST "http://localhost:6333/collections/ascendai-768/points/delete" -H "Content-Type: application/json" -d '{\"filter\":{\"must\":[{\"key\":\"metadata.source\",\"match\":{\"value\":\"notes.md\"}}]}}'
+```
+
+### List all collections
+
+Bash:
 
 ```bash
 curl http://localhost:6333/collections
 ```
 
-**Visualize data (Qdrant Dashboard):**
+PowerShell:
 
-- URL: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
-- Browse collections, view stored vectors, verify ingestion visually.
+```powershell
+curl.exe http://localhost:6333/collections
+```
+
+### Visualize data (Qdrant Dashboard)
+
+Open [http://localhost:6333/dashboard](http://localhost:6333/dashboard). Browse collections, view stored vectors, verify ingestion visually.
 
 ---
 
-## 3. Resetting Ingestion History (PostgreSQL)
+## 3. Resetting ingestion history (PostgreSQL)
 
 To force re-processing of files, remove their entries from the metadata store.
 
-- **Database**: `ascend_ai`
-- **Schema**: `public`
-- **Table**: `int_metadata_store`
+- Database: `ascend_ai`
+- Schema: `public`
+- Table: `int_metadata_store`
 
-**Option A — Clear history for a single file:**
+Clear history for one file:
 
 ```sql
-DELETE FROM public.int_metadata_store
-WHERE metadata_key LIKE '%test.md';
+DELETE FROM public.int_metadata_store WHERE metadata_key LIKE '%test.md';
 ```
 
-_(Keys often include prefixes like `s3-metadata` or `local-fs-metadata`.)_
+Keys often include prefixes like `s3-metadata` or `local-fs-metadata`.
 
-**Option B — Clear ALL history (full reset):**
+Clear all history (full reset):
 
 ```sql
 TRUNCATE TABLE public.int_metadata_store;
 ```
 
-After running either command, restart the AscendAgent.
+After running either, restart AscendAgent.
 
 ---
 
-## 4. Resetting Chat History (Redis & PostgreSQL)
+## 4. Resetting chat history (Redis + PostgreSQL)
 
-The AscendAgent keeps chat context in two places:
+AscendAgent keeps chat context in two places:
 
-1. **Short-term (Redis)** — active context window sent to the LLM.
-2. **Long-term (PostgreSQL)** — archived interactions for auditing and analytics.
+- **Short-term (Redis)** — active context window sent to the LLM.
+- **Long-term (PostgreSQL)** — archived interactions for audit and analytics.
 
-**Clear active context (Redis):**
+Clear active context (Redis):
+
+Bash:
 
 ```bash
-redis-cli
-FLUSHALL
+redis-cli FLUSHALL
 ```
 
-**Clear archived history (PostgreSQL):**
+PowerShell:
+
+```powershell
+redis-cli FLUSHALL
+```
+
+Clear archived history (PostgreSQL):
 
 ```sql
 DELETE FROM chat_history;

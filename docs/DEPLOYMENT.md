@@ -6,28 +6,40 @@ Build, rebuild, and publish AscendAI services. For day-to-day Quick Start see th
 
 ## Docker Compose recipes
 
-Start application and support services:
+The stack is split across two project files:
+
+- **`docker-compose.yaml`** — project `ascend-ai`. Includes `ascend-scrapper.docker-compose.yaml` via the top-level `include:` directive, so a single `docker compose up` from the repo root brings up the full 10-container stack (merged into the `ascend-ai` project; one group in Docker Desktop).
+- **`ascend-scrapper.docker-compose.yaml`** — project `ascend-scrapper`. Web-scraping stack (`searxng`, `flaresolverr`, `ascend-web-search`, `ngrok-ascend-web-search`). Self-contained and runnable on its own; when run standalone it forms its own group in Docker Desktop.
+
+### Bring up the full stack
 
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
-Rebuild and recreate everything:
+### Bring up only the scrapper stack
+
+```bash
+docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
+```
+
+### Rebuild and recreate everything
 
 ```bash
 docker compose up -d --build --force-recreate
 ```
 
-Build and recreate a single service (e.g. `audio-scribe`):
+### Build and recreate a single service (e.g. `audio-scribe`)
 
 ```bash
 docker compose up -d --no-deps --build --force-recreate <service>
 ```
 
-- `<service>` is the name from `docker-compose.yaml` (e.g. `audio-scribe`).
+- `<service>` is the name from either compose file (e.g. `audio-scribe`, `ascend-web-search`).
 - `--no-deps` skips linked services (database, redis, etc.).
+- For services in the scrapper file you can target them with the merged invocation above (because of `include:`) or with `-f ascend-scrapper.docker-compose.yaml`.
 
-Build only (no recreation, ignore cache):
+### Build only (no recreation, ignore cache)
 
 ```bash
 docker compose build --no-cache

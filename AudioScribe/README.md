@@ -7,6 +7,7 @@ AudioScribe is a versatile, dynamic speech-to-text service supporting local, Ope
 ## Table of Contents
 
 *   [API Documentation](#api-documentation)
+*   [Agent Skill](#agent-skill)
 *   [Prerequisites](#prerequisites)
 *   [Configuration (Environment Variables)](#configuration-environment-variables)
 *   [Running the Service](#running-the-service)
@@ -26,6 +27,16 @@ The REST API is self-documenting via Swagger and Redoc. While the server is runn
 
 *   **Swagger UI**: [http://localhost:7017/docs](http://localhost:7017/docs)
 *   **Redoc**: [http://localhost:7017/redoc](http://localhost:7017/redoc)
+
+---
+
+## Agent Skill
+
+A drop-in skill is shipped at [`skills/audio-scribe/SKILL.md`](skills/audio-scribe/SKILL.md). Copy the `skills/audio-scribe/` directory into your agent's skills folder (`.claude/skills/`, `.agents/skills/`, `.kilocode/skills/`, etc.) and the agent will pick it up automatically.
+
+The skill covers the four endpoints (`/local`, `/openai`, `/hf`, `/audacity`), backend-selection guidance (when to use which), the streaming SSE flow with `download_url`, and the multi-track Audacity / Craig-Bot zip workflow. Base URL is left out (varies per environment) — the agent runtime is expected to provide it.
+
+When you change endpoint shapes here, update the SKILL.md so downstream agents stay accurate.
 
 ---
 
@@ -129,7 +140,7 @@ Ensure you have set the **environment variables** mentioned above.
 
 2.  **Run the Uvicorn Server:**
     ```shell
-    uvicorn main:app --host 0.0.0.0 --port 7017 --reload
+    uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
     ```
 
 ### Running with Docker (Recommended)

@@ -1,498 +1,332 @@
-# AscendAI
+<h1 align="center">AscendAI</h1>
 
-This repository contains a multi-module AI orchestration platform built with Spring AI and the Model Context Protocol (MCP). It routes user prompts to multiple AI providers (LM Studio, OpenAI, Gemini, Anthropic, MiniMax) with per-request selection, extends LLM capabilities with external tools, and provides a RAG pipeline with semantic memory.
+<p align="center">
+  <strong>Multi-provider AI orchestrator with MCP, RAG, and semantic memory — built on Spring AI.</strong>
+</p>
 
-**Supported AI Providers:** LM Studio (local), OpenAI, Gemini, Anthropic, MiniMax — with per-request model selection.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://openjdk.org/projects/jdk/21/"><img src="https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk&logoColor=white" alt="Java 21"></a>
+  <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F.svg?logo=springboot&logoColor=white" alt="Spring Boot 3.5"></a>
+  <a href="https://spring.io/projects/spring-ai"><img src="https://img.shields.io/badge/Spring%20AI-1.1.4-6DB33F.svg" alt="Spring AI 1.1.4"></a>
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-enabled-8A2BE2.svg" alt="MCP enabled"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?logo=python&logoColor=white" alt="Python 3.11+"></a>
+  <a href="https://docs.docker.com/compose/"><img src="https://img.shields.io/badge/Docker-Compose-2496ED.svg?logo=docker&logoColor=white" alt="Docker Compose"></a>
+  <a href="https://github.com/Lukk17/AscendAI/stargazers"><img src="https://img.shields.io/github/stars/Lukk17/AscendAI?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/Lukk17/AscendAI/commits"><img src="https://img.shields.io/github/last-commit/Lukk17/AscendAI" alt="Last commit"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white" alt="Redis">
+  <img src="https://img.shields.io/badge/Qdrant-DC244C.svg" alt="Qdrant">
+  <img src="https://img.shields.io/badge/MinIO-C72E49?logo=minio&logoColor=white" alt="MinIO">
+  <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Mem0-semantic%20memory-7B61FF.svg" alt="Mem0">
+  <img src="https://img.shields.io/badge/SearXNG-meta%20search-3050FF.svg" alt="SearXNG">
+  <img src="https://img.shields.io/badge/Liquibase-2962FF?logo=liquibase&logoColor=white" alt="Liquibase">
+</p>
+
+```mermaid
+graph TB
+    User["User"]
+
+    subgraph "AscendAI Platform"
+        Agent["AscendAgent<br/>REST API :9917<br/>Spring Boot · Java 21"]
+
+        subgraph "MCP Tool Services"
+            AudioScribe["AudioScribe<br/>:7017<br/>Audio Transcription"]
+            Weather["WeatherMCP<br/>:9998<br/>Weather Data"]
+            WebSearch["AscendWebSearch<br/>:7021<br/>Web Search"]
+            PaddleOCR["PaddleOCR<br/>:7022<br/>OCR"]
+        end
+
+        Memory["AscendMemory<br/>:7020<br/>Semantic Memory"]
+    end
+
+    subgraph "AI Providers"
+        Local["LM Studio<br/>(local, default)"]
+        Cloud["OpenAI · Anthropic<br/>Gemini · MiniMax"]
+    end
+
+    subgraph "Data Layer"
+        PG["PostgreSQL<br/>Chat · Metadata"]
+        RD["Redis<br/>Chat cache"]
+        QD["Qdrant<br/>Vector DB"]
+        S3["MinIO<br/>Documents"]
+    end
+
+    User -->|"REST"| Agent
+    Agent -->|"MCP"| AudioScribe
+    Agent -->|"MCP"| Weather
+    Agent -->|"MCP"| WebSearch
+    Agent -->|"MCP"| PaddleOCR
+    Agent -->|"REST"| Memory
+    Agent -.-> Local
+    Agent -.-> Cloud
+    Agent --> PG
+    Agent --> RD
+    Agent --> QD
+    Agent --> S3
+    Memory --> QD
+```
 
 ---
 
-## 🏗️ System Architecture
+## Table of Contents
 
-📐 **[Monorepo Architecture](docs/architecture/README.md)** — system overview, service interactions, deployment topology, ADRs.
-
-📐 **[AscendAgent Internals](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md)** — detailed arc42, component diagrams, module-specific ADRs.
-
-- **AscendAgent**: Spring Boot application — REST API, multi-provider AI, RAG pipeline, MCP tool integration.
-- **AudioScribe**: MCP server for audio transcription (FastMCP/Python).
-- **WeatherMCP**: MCP server for weather data (Spring Boot/Java).
-- **AscendWebSearch**: MCP server for web search via SearXNG (FastMCP/Python).
-- **AscendMemory**: Semantic memory service with REST API (FastAPI/Python).
-- **External Prerequisites** (must be running before docker-compose):
-  - **PostgreSQL**: Persistent metadata and chat history.
-  - **Redis**: Chat history cache.
-  - **Qdrant**: Vector database for RAG embeddings and semantic memory.
-  - **MinIO**: S3-compatible object storage for document ingestion.
-- **Support Services** (Dockerized):
-  - **SearXNG**: Privacy-respecting meta search engine.
-  - **FlareSolverr**: Cloudflare bypass proxy for web scraping.
+- [Why this exists](#why-this-exists)
+- [Features](#features)
+- [How it compares](#how-it-compares)
+- [Demo](#demo)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Supported AI Providers](#supported-ai-providers)
+- [Configuration & Ports](#configuration--ports)
+- [Documentation](#documentation)
 
 ---
 
-## 🚀 Getting Started
+## Why this exists
+
+I built AscendAI because off-the-shelf orchestrators don't let you swap providers per-request, run a privacy-respecting search backend you fully control, and persist semantic memory across sessions in a single coherent platform. AscendAI does all three: it routes each prompt to the model you choose at call time (local LM Studio, OpenAI, Anthropic, Gemini, MiniMax), wires in MCP tool servers for audio, web, weather, and OCR, and keeps long-term context in a Mem0-backed Qdrant store so conversations actually accumulate knowledge.
+
+---
+
+## Features
+
+- **Per-request provider routing** — pick LM Studio, OpenAI, Anthropic, Gemini, or MiniMax on every API call without restarts or config changes.
+- **RAG pipeline with Qdrant** — thresholded soft-retrieval over ingested documents using provider-matched embedding dimensions (768 / 1536).
+- **Semantic memory via Mem0** — long-lived, user-scoped memories searchable across sessions through the AscendMemory service.
+- **MCP tool servers** — first-class integrations for audio transcription (AudioScribe), web search (AscendWebSearch + SearXNG), weather (WeatherMCP), and OCR (PaddleOCR).
+- **Document ingestion to MinIO** — drop files (Markdown, PDF, DOCX) into a bucket and get them parsed via Docling/Unstructured and indexed automatically.
+- **Hybrid chat history** — Redis for the active context window, PostgreSQL for durable long-term archives and analytics.
+- **Privacy-respecting web** — SearXNG meta-search plus FlareSolverr for Cloudflare-protected pages, all self-hosted.
+
+---
+
+## How it compares
+
+The honest peer set is other **deployable AI orchestration backends** that bundle multi-provider routing, RAG, memory, and tools into one self-hosted service. Not chat UIs, not low-code workflow builders, not pure router proxies, not libraries. All four below are mature and well-known in this niche.
+
+|                              | **AscendAI**            | [R2R][r2r]            | [Letta][letta]         | [Onyx][onyx]          | [Quivr][quivr]         | [LangChain][langchain]  |
+| ---------------------------- | ----------------------- | --------------------- | ---------------------- | --------------------- | ---------------------- | ----------------------- |
+| Shape                        | Deployable service      | Deployable service    | Deployable service     | Deployable service    | Deployable service     | Library / framework     |
+| Stack                        | Java 21 / Spring AI     | Python                | Python                 | Python                | Python                 | Python (TS port)        |
+| API-first (no UI shipped)    | Yes                     | Yes                   | Yes (server on `:8283`)| UI bundled, API-driven| UI bundled, API exposed| N/A — you build it      |
+| Per-request provider switch  | Built-in                | Built-in              | Built-in               | Built-in              | Built-in               | Possible via chain rebuild |
+| RAG over uploaded docs       | Built-in (Qdrant + threshold) | Built-in (multimodal, hybrid, KGs) | Lighter, agent-state focused | Built-in (40+ connectors) | Built-in (pluggable stores) | Many backends, you wire it |
+| Persistent semantic memory   | Mem0 + Qdrant           | Add-on                | Native (OS-style hierarchical) | Add-on        | Built-in               | Roll-your-own           |
+| Tool integration model       | MCP-native (Spring AI MCP client) | Function tools  | Function tools        | Function tools + connectors | Function tools  | Tools + MCP via adapters |
+| Single docker compose deploy | Yes                     | Yes                   | Yes                    | Yes                   | Yes                    | Bring-your-own          |
+
+[r2r]: https://github.com/SciPhi-AI/R2R
+[letta]: https://github.com/letta-ai/letta
+[onyx]: https://github.com/onyx-dot-app/onyx
+[quivr]: https://github.com/QuivrHQ/quivr
+[langchain]: https://github.com/langchain-ai/langchain
+
+LangChain isn't strictly a peer — it's a framework, not a deployable service. It's in the table because it's the most likely thing readers reach for when they think "AI orchestration", and the honest answer is "if you're already wiring your own service in LangChain, you don't need AscendAI."
+
+### Where AscendAI is honestly distinctive
+
+- **JVM-native.** Every credible peer in this niche is Python or TypeScript. If you live in Spring Boot already, AscendAI drops in alongside the rest of your services without a polyglot deploy.
+- **MCP-first tool model.** Onyx and Letta do tool use; AscendAI is built around MCP from day one with multiple bundled MCP servers (audio, OCR, web search, weather). Add new tools by pointing the agent at another MCP server, no code changes.
+- **Breadth of integration in one stack.** RAG, semantic memory, MCP tools, multi-provider routing, hot/archive chat history — all present, no add-ons.
+
+### Where it loses
+
+- **No UI.** Onyx and Quivr ship one. AscendAI is a backend you put behind your own client.
+- **Smaller community.** All four peers above have more stars, more contributors, more battle testing.
+- **RAG depth.** R2R has a more sophisticated RAG pipeline (knowledge graphs, multimodal). AscendAI's RAG is solid but plain.
+- **Memory depth.** Letta's memory architecture is more advanced than Mem0-based memory.
+
+If you're already happy in Python with R2R or Letta, you don't need this. AscendAI exists because I wanted these capabilities in a Spring-native deployment.
+
+---
+
+## Demo
+
+Send a prompt with per-request provider and model selection. The endpoint accepts `multipart/form-data` (so you can attach an optional `image` or `document`):
+
+```bash
+curl -X POST http://localhost:9917/api/v1/ai/prompt \
+  -H "X-User-Id: luksarna" \
+  -F "prompt=Summarize my notes on Spring AI and MCP." \
+  -F "provider=anthropic" \
+  -F "model=claude-sonnet-4-6" \
+  -F "embeddingProvider=lmstudio"
+```
+
+Sample response (`AiResponse` — `content` plus an unwrapped Spring AI `ChatResponseMetadata` and the list of MCP tools invoked during the turn):
+
+```json
+{
+  "content": "Your notes describe AscendAI as a Spring AI orchestrator that routes prompts across providers and uses MCP for tool calls. Per-request model selection happens via /api/v1/ai/prompt; RAG runs over Qdrant collections (ascendai-768 / -1536); semantic memory is backed by Mem0…",
+  "id": "msg_01ABcDEf…",
+  "model": "claude-sonnet-4-6",
+  "usage": { "promptTokens": 1842, "completionTokens": 312, "totalTokens": 2154 },
+  "toolsUsed": ["ascend_memory_search", "web_search"]
+}
+```
+
+---
+
+## Architecture
+
+📐 **[Monorepo Architecture](docs/architecture/README.md)** — system overview, service interactions, deployment, ADRs.
+
+📐 **[AscendAgent Internals](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md)** — arc42 documentation, component diagrams, module ADRs.
+
+| Module              | Stack                  | Port | Role                                              |
+| ------------------- | ---------------------- | ---- | ------------------------------------------------- |
+| **AscendAgent**     | Java 21 / Spring Boot  | 9917 | API gateway, multi-provider AI, RAG, MCP client   |
+| **AudioScribe**     | Python / FastMCP       | 7017 | Audio transcription (Whisper / OpenAI / HF)       |
+| **AscendWebSearch** | Python / FastMCP       | 7021 | Web search & scraping via SearXNG                 |
+| **AscendMemory**    | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                   |
+| **WeatherMCP**      | Java / Spring Boot     | 9998 | Weather data MCP server                           |
+| **PaddleOCR**       | Python / FastMCP       | 7022 | OCR service                                       |
+
+### Request flow
+
+How a single prompt traverses the platform:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant A as AscendAgent
+    participant R as Redis<br/>(short-term)
+    participant M as AscendMemory<br/>(Mem0)
+    participant Q as Qdrant<br/>(RAG)
+    participant T as MCP Tools<br/>(Web/Audio/OCR/Weather)
+    participant L as LLM Provider<br/>(per-request)
+    participant P as PostgreSQL<br/>(long-term)
+
+    U->>A: POST /api/v1/ai/prompt
+    A->>R: Load chat window
+    A->>M: Search semantic memory
+    M->>Q: Vector search (memory collection)
+    M-->>A: Top-k memories
+    A->>Q: RAG retrieval (doc collection)
+    Q-->>A: Top-k chunks (above threshold)
+    A->>L: Prompt + memory + RAG + tool defs
+    L-->>A: Tool call request (optional)
+    A->>T: Invoke MCP tool
+    T-->>A: Tool result
+    A->>L: Tool result → final answer
+    L-->>A: Response + usage
+    A->>R: Append turn
+    A->>P: Persist transcript
+    A->>M: Extract & store new memories
+    A-->>U: AiResponse {content, metadata, toolsUsed}
+```
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
-- **Docker Desktop** (running)
-- **Java 21**
-- **PostgreSQL** (Active instance on port 5432)
-- **Redis** (Active instance on port 6379)
-- **Qdrant** (Active instance on ports 6333/6334)
-- **MinIO** (Active instance on ports 9070/9071, credentials: `admin` / `password`)
+- Docker Desktop
+- Java 21
+- PostgreSQL on `5432`, Redis on `6379`, Qdrant on `6333`/`6334`, MinIO on `9070`/`9071` (`admin` / `password`)
 
-### 1. Start Application Services
+### Run it
 
-Ensure all external prerequisites above are running, then start application and support services (SearXNG, AscendMemory, AudioScribe, etc.):
-
-```shell
-docker-compose up -d
-```
-
-To rebuild and recreate all services:
-```shell
-docker compose up -d --build --force-recreate
-```
-
-To build and recreate the selected service:
-```shell
-docker compose up -d --no-deps --build --force-recreate <service name>
-```
-where:
-`<service name>` is the name from `docker-compose.yaml` like `audio-scribe`
-`--no-deps` - do not start linked services (database, redis, etc.)
-
-Only to build (without recreation):
-```shell
-docker compose build --no-cache
-```
-where:
-`--no-cache` - rebuild images without using of layer cache
-
-### 2. Configure Database
-
-Ensure your local PostgreSQL has a database named `ascend_ai`. The application is configured to connect with the following default credentials (update `AscendAgent/src/main/resources/application.yaml` if yours differ):
-
-- **User**: `postgres`
-- **Password**: `local`
-- **Database**: `ascend_ai`
-
-### 3. Run the AscendAgent
-
-Navigate to the `AscendAgent` directory and run the application:
+**1. Bring up the stack** (full 10-container stack via `include:`):
 
 ```bash
-cd AscendAgent
-./gradlew bootRun
+docker compose up -d --build
 ```
 
-The application will automatically:
+```powershell
+docker compose up -d --build
+```
 
-- Connect to MinIO.
-- Create the `knowledge-base` bucket if it doesn't exist.
-- Initialize the necessary database tables (`INT_METADATA_STORE`, etc.).
+Optional — bring up only the web-scraping stack as its own Docker Desktop group:
+
+```bash
+docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
+```
+
+**2. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
+
+**3. Start the AscendAgent**:
+
+```bash
+cd AscendAgent && ./gradlew bootRun
+```
+
+```powershell
+cd AscendAgent ; ./gradlew bootRun
+```
+
+On first start the agent creates the MinIO `knowledge-base` bucket and initialises metadata tables. The API is then available at [http://localhost:9917](http://localhost:9917) — see the startup banner for live status of every dependency.
+
+For advanced compose flags, per-service rebuilds, and production notes see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. For document ingestion see **[docs/INGESTION.md](docs/INGESTION.md)**.
 
 ---
 
-## 🌐 HTTP AscendAgent API
+## Supported AI Providers
 
-### 1. Extract Web Payload (`v2`)
+Per-request selection across:
 
-The `/api/v2/web/read` endpoint accepts a `POST` request with an explicit JSON payload. This is required because complex target URLs containing parameters (e.g., `?login=true&auth=1`) get natively stripped by standard HTTP `GET` query parsing.
-
-```bash
-curl -X POST http://localhost:7021/api/v2/web/read \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://secure.indeed.com/auth?continue=http://www.indeed.com/jobs...&from=page-two-signin",
-    "include_links": true,
-    "heavy_mode": true
-  }'
-```
+- **OpenAI** — gpt-5.4, gpt-5.1, gpt-5-mini, gpt-4o, gpt-4o-mini
+- **Anthropic** — claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5, claude-haiku-4-5
+- **Gemini** — gemini-3.1-pro, gemini-3.1-flash, gemini-2.5-pro, gemini-2.5-flash
+- **MiniMax** — MiniMax-M2.5, MiniMax-M2.5-highspeed, MiniMax-M2.1
+- **LM Studio** — meta-llama-3.1-8b-instruct (default, local)
 
 ---
 
-## ⚙️ Configuration & Ports
+## Configuration & Ports
 
-| Service             | Port            | Default Credentials  | Description                 |
-| :------------------ | :-------------- | :------------------- | :-------------------------- |
-| **AscendAgent**    | `9917`          | -                    | Main API Gateway            |
-| **AudioScribe**     | `7017`          | -                    | MCP — Audio Transcription   |
-| **WeatherMCP**      | `9998`          | -                    | MCP — Weather Data          |
-| **AscendWebSearch** | `7021`          | -                    | MCP — Web Search            |
-| **AscendMemory**    | `7020`          | -                    | REST/MCP — Semantic Memory  |
-| **PaddleOCR**       | `7022`          | -                    | MCP — OCR Service           |
-| **Docling Serve**   | `5001`          | -                    | Document Conversion         |
-| **Unstructured API**| `9080`          | -                    | Document Parsing for RAG    |
-| **MinIO API**       | `9070`          | `admin` / `password` | S3 API Endpoint             |
-| **MinIO Console**   | `9071`          | `admin` / `password` | Web UI for File Management  |
-| **Qdrant**          | `6333` / `6334` | -                    | Vector Database (HTTP/gRPC) |
-| **Redis**           | `6379`          | -                    | Cache                       |
-| **SearXNG**         | `9020`          | -                    | Meta Search Engine          |
-| **FlareSolverr**    | `8191`          | -                    | Cloudflare Bypass           |
-| **PostgreSQL**      | `5432`          | `postgres` / `local` | Metadata Storage            |
+### AscendAI services
 
-### 3. Publish (Push)
+Each service ships both REST and MCP surfaces (except WeatherMCP, MCP-only). The "Used by AscendAgent via" column shows the actual transport AscendAgent uses today; the other surface is available for direct external use.
 
-Log in to Docker Hub if you haven't already:
+| Service             | Port    | Surfaces        | Used by AscendAgent via | Role                                                                |
+| :------------------ | :------ | :-------------- | :---------------------- | :------------------------------------------------------------------ |
+| **AscendAgent**     | `9917`  | REST            | —                       | API gateway / orchestrator. `POST /api/v1/ai/prompt` is the entry. |
+| **AscendMemory**    | `7020`  | REST + MCP      | REST                    | Semantic memory store (Mem0 + Qdrant). Search/insert per-user.     |
+| **AudioScribe**     | `7017`  | REST + MCP      | MCP (Streamable HTTP)   | Speech-to-text (faster-whisper / OpenAI / HF / Audacity merge).    |
+| **AscendWebSearch** | `7021`  | REST + MCP      | MCP (Streamable HTTP)   | Web search + content extraction (SearXNG → Cloudflare → NoVNC).    |
+| **PaddleOCR**       | `7022`  | REST + MCP      | MCP (Streamable HTTP)   | Image OCR.                                                         |
+| **WeatherMCP**      | `9998`  | MCP only (SSE)  | MCP (SSE)               | Weather data tool (reference Spring AI MCP server).                |
 
-```bash
-docker login
-```
+### Support services (in-stack, deployed via compose)
 
-Push the tagged images:
+| Service                 | Port    | Default credentials | Role                                                       |
+| :---------------------- | :------ | :------------------ | :--------------------------------------------------------- |
+| **SearXNG**             | `9020`  | –                   | Privacy-respecting meta-search; backend for AscendWebSearch.|
+| **FlareSolverr**        | `8191`  | –                   | Cloudflare bypass proxy used by AscendWebSearch.           |
+| **Docling Serve**       | `5001`  | –                   | PDF/DOCX → structured JSON (used by ingestion pipeline).   |
+| **Unstructured API**    | `9080`  | –                   | Generic document parsing fallback for ingestion.           |
 
-```bash
-docker push lukk17/ascend-ai:v1.0.0
-docker push lukk17/ascend-ai:latest
-```
+### External prerequisites (not in compose — managed/cloud in production)
+
+| Service                 | Port            | Default credentials  | Role                                                        |
+| :---------------------- | :-------------- | :------------------- | :---------------------------------------------------------- |
+| **PostgreSQL**          | `5432`          | `postgres` / `local` | Chat-history archive, ingestion metadata, user instructions.|
+| **Redis**               | `6379`          | –                    | Short-term chat-history cache, session state.               |
+| **Qdrant**              | `6333` / `6334` | –                    | Vector DB for RAG (`ascendai-768/1536`) and Mem0 memory.    |
+| **MinIO**               | `9070` / `9071` | `admin` / `password` | S3-compatible object store for ingested documents.          |
 
 ---
 
----
+## Documentation
 
-## � Data and Persistence
-
-MinIO runs as an external prerequisite. Data persistence depends on your MinIO installation (local or cloud-managed S3).
-
----
-
-## �📄 Adding Documents for RAG
-
-To add documents (Markdown, PDF, DOCX) to your RAG pipeline, you need to upload them to the `knowledge-base` bucket in MinIO.
-
-### Option 1: MinIO Console (Web UI)
-
-1.  Open [http://localhost:9071](http://localhost:9071).
-2.  Login with default credentials: `admin` / `password`.
-3.  Click on **Buckets** in the left menu.
-4.  Select `knowledge-base`.
-    - _If it doesn't exist, the AscendAgent will create it on startup, or you can create it manually._
-5.  Click **Object Browser** -> **Upload**.
-6.  Select your file(s) or folder(s).
-    - **Markdown**: Files with `.md` (best if from Obsidian).
-    - **Documents**: PDFs, DOCX, etc. (processed via Unstructured API).
-
-### Option 2: CLI (curl) via AscendAgent
-
-You can directly upload files using the AscendAgent's API, which will automatically route them to the correct folder (`obsidian/` or `documents/`):
-
-```bash
-# Example: Uploading a Markdown file
-curl -X POST -F "file=@width_test.md" http://localhost:9917/api/ingestion/upload
-```
-
-_Note: Make sure the file exists in your current directory._
+- **[Monorepo architecture](docs/architecture/README.md)** — system view, ADRs, deployment topology.
+- **[AscendAgent arc42](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md)** — internals, component diagrams.
+- **[Deployment](docs/DEPLOYMENT.md)** — Docker Compose recipes, image publishing, prod notes.
+- **[Document ingestion](docs/INGESTION.md)** — upload flows for the RAG pipeline.
+- **[End-to-end testing](AscendAgent/e2e/README.md)** — capability tests, fixtures, and the Bruno collection at `docs/api/request/AscendAI/`.
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Qdrant / MinIO / PostgreSQL / Redis reset recipes.
+- **[Agent tooling & OpenSpec](docs/AGENT_TOOLING.md)** — agent-standards import, OpenSpec workflow.
 
 ---
 
-## 🔧 Troubleshooting
+## License
 
-### 1. MinIO: "Bucket already exists" or "Access Denied" errors
-
-If you need to completely reset the MinIO state or delete a bucket that is stuck, you **cannot** use the Web UI in recent versions. You must use the command line inside the Docker container.
-
-**How to force delete a bucket via Docker:**
-
-1.  Open a terminal.
-2.  Execute the following command to verify the running container name (usually `minio`):
-    ```bash
-    docker ps
-    ```
-3.  Exec into the MinIO container (or use Docker Desktop's "Exec" terminal):
-    ```bash
-    docker exec -it minio /bin/sh
-    ```
-4.  **Configure the `mc` client** (this aliases 'local' to your server):
-    ```bash
-    mc alias set local http://localhost:9000 admin password
-    ```
-5.  **Force delete the bucket**:
-    ```bash
-    mc rb --force local/knowledge-base
-    ```
-
-### 2. Qdrant: Managing Vector Data
-
-The system uses Qdrant for two distinct features:
-
-1. **RAG (AscendAgent)**: Uses `ascendai-768` (for Gemini/LM Studio) or `ascendai-1536` (for OpenAI) depending on the active embedding dimensions.
-2. **Semantic Memory (AscendMemory / Mem0)**: Uses `ascend_memory_768` (for lmstudio/gemini, 768 dims) or `ascend_memory_1536` (for openai, 1536 dims) depending on the embedding provider.
-
-**Delete Entire Collection (Reset Memory):**
-To completely wipe all vector data for a given collection:
-
-```bash
-curl -X DELETE "http://localhost:6333/collections/ascendai-768"
-curl -X DELETE "http://localhost:6333/collections/ascendai-1536"
-curl -X DELETE "http://localhost:6333/collections/ascend_memory_768"
-curl -X DELETE "http://localhost:6333/collections/ascend_memory_1536"
-```
-
-**Granular Deletion (Remove Specific File):**
-To remove only the vectors associated with a specific file (e.g., `kierunki.md`):
-
-```bash
-curl -X POST "http://localhost:6333/collections/ascendai/points/delete" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "filter": {
-         "must": [
-           { "key": "metadata.source", "match": { "value": "kierunki.md" } }
-         ]
-       }
-     }'
-```
-
-**List All Collections:**
-To view all existing collections:
-
-```bash
-curl http://localhost:6333/collections
-```
-
-**Visualizing Data (Qdrant Dashboard):**
-The Qdrant image includes a **Built-in Dashboard**.
-
-- **URL**: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
-- You can browse collections, view stored vectors, and verify data ingestion visually without needing extra containers.
-
-### 3. Resetting Ingestion History (PostgreSQL)
-
-To force the system to re-process files, you must remove their entries from the metadata store.
-
-**Database Details:**
-
-- **Database**: `ascend_ai`
-- **Schema**: `public`
-- **Table**: `int_metadata_store`
-
-**Option A: Clear History for a Single File (Granular)**
-If you want to re-ingest a specific file (e.g., `test.md`):
-
-```sql
-DELETE FROM public.int_metadata_store
-WHERE metadata_key LIKE '%test.md'
-   OR metadata_key LIKE '%test.md';
-```
-
-_(Note: Keys often include prefixes like `s3-metadata` or `local-fs-metadata`)_
-
-**Option B: Clear ALL History (Full Reset)**
-To force the system to re-process **everything**:
-
-```sql
-TRUNCATE TABLE public.int_metadata_store;
-```
-
-**After running either command, restart the AscendAgent.**
-
-### 4. Resetting Chat History (Redis & PostgreSQL)
-
-The AscendAgent maintains your chat context in two places:
-
-1.  **Short-Term History (Redis)**: This is the active context window sent to the LLM during conversational interactions.
-2.  **Long-Term History (PostgreSQL)**: The system archives all interactions to the database for persistent auditing and user analytics.
-
-**Clear Active Context (Redis):**
-To completely wipe the active memory for all sessions, flush the Redis cached keys:
-
-1. Connect to Redis (running externally):
-   ```bash
-   redis-cli
-   ```
-2. Flush all keys:
-   ```bash
-   FLUSHALL
-   ```
-
-**Clear Archived History (PostgreSQL):**
-If you want to completely erase the persistent database records of previous chats from the system:
-
-1. Connect to the PostgreSQL database (`ascend_ai`).
-2. Run the following command:
-   ```sql
-   DELETE FROM chat_history;
-   ```
-
----
-
-### Agent standards import
-
-To import the central AI standards into this project without overwriting existing files, we use Git Selective Checkout. 
-
-This approach extracts only the required AI folders and template files directly into the project root.
-
-To protect the central repository, we configure the remote as a read-only source in your local workspace by setting the push URL to an invalid address. 
-
-This ensures you can pull updates from the central repository, but Git will block any accidental pushes of your project-specific changes back to the global standards.
-
-### Step 1: Initial Setup
-
-Enable symlink support in Git:
-Globally
-```shell
-git config --global core.symlinks true
-```
-Locally for this repository only
-```shell
-git config core.symlinks true
-```
-
-Run these commands in the root of this project to add the remote, disable pushing, and extract the specific payload files into your workspace.
-
-```bash
-git remote add agent-standards https://github.com/Lukk17/agent-standards
-```
-
-```bash
-git remote set-url --push agent-standards no_push
-```
-
-```bash
-git fetch agent-standards
-```
-
-```bash
-git checkout agent-standards/master -- .agents .claude .kilocode .opencode .codex AGENTS.md.example kilo.jsonc.example opencode.json.example
-```
-
-```bash
-git commit -m "Import central agent-standards (.agents and .claude)"
-```
-
-### Step 2: Pulling Future Updates
-
-When the central standards repository is updated, pull the latest files into this project by running the following commands.
-
-```bash
-git fetch agent-standards
-```
-
-```bash
-git checkout agent-standards/master -- .agents .claude
-```
-
-```bash
-git commit -m "Update AI standards from central repository"
-```
-
----
-
-### OpenSpec Integration
-
-[OpenSpec](https://github.com/Fission-AI/OpenSpec) is a spec-driven development framework that installs skills and commands into each agent's native directories.
-
-#### How the symlinks work with OpenSpec
-
-The `.kilocode/skills/`, `.opencode/skills/`, and `.codex/skills/` directories are all symlinked to `.agents/skills/`. When `openspec init` writes skills to any of these directories, they land in `.agents/skills/` — the canonical location already read by all agents.
-
-Commands are tool-specific (different formats per agent) and cannot be centralized. OpenSpec creates them in each tool's native commands directory, which is expected and correct.
-#### Using OpenSpec in a project that imports agent-standards
-
-After running Step 1 above, initialize OpenSpec in your project:
-
-```bash
-# Install OpenSpec globally
-npm install -g @fission-ai/openspec@latest
-
-# Initialize with all agents
-# Skills land in .agents/skills/ via existing symlinks
-# Commands are created in each tool's native commands directory
-openspec init --tools "claude,kilocode,opencode,codex"
-```
-
-What `openspec init` creates:
-
-```text
-openspec/
-  config.yaml              # OpenSpec project config
-  specs/                   # Living documentation of your system
-  changes/                 # Active feature work
-    archive/               # Completed changes
-
-# Skills (via symlinks, all land in .agents/skills/):
-.agents/skills/openspec-workflow/SKILL.md
-.agents/skills/openspec-specs/SKILL.md
-
-# Commands (tool-specific, not symlinked):
-.claude/commands/opsx/propose.md
-.kilocode/workflows/opsx-propose.md
-.opencode/commands/opsx-propose.md
-```
-
-Restart IDE and terminal after openspec initialization.
-
-#### OpenSpec tool directories reference
-
-| Tool | Skills written to | Commands written to |
-|---|---|---|
-| Claude Code | `.claude/skills/openspec-*/` -> `.agents/skills/` | `.claude/commands/opsx/*.md` |
-| Kilo Code | `.kilocode/skills/openspec-*/` -> `.agents/skills/` | `.kilocode/workflows/opsx-*.md` |
-| OpenCode | `.opencode/skills/openspec-*/` -> `.agents/skills/` | `.opencode/commands/opsx-*.md` |
-| Codex | `.codex/skills/openspec-*/` -> `.agents/skills/` | `$CODEX_HOME/prompts/opsx-*.md` |
-
-#### Command Syntax Variations
-
-Because the AI coding landscape is fragmented, OpenSpec generates files for two different architectures. Depending on your specific agent UI, your commands will appear in one of two ways:
-* Standalone Markdown Commands: Agents that read flat files will show commands with extensions in their dropdowns (e.g., /opsx-propose.md).
-* Agent Skills: Agents that parse semantic SKILL.md metadata or have native integration will use standard slash syntax (e.g., /opsx:propose).
-
-Use the syntax that appears in your agent's autocomplete menu.
-
-#### The Full OpenSpec Workflow
-
-Once initialized, invoke OpenSpec skills from your agent using the full artifact-driven lifecycle:
-
-#### 0. Run Coding Agent
-You need to start coding agent first - for example, by running in terminal:
-```shell
-claude
-```
-#### 1. Propose the change
-Use multiline prompts to include logs or detailed context.
-Inside coding agent shell run your specific command variation:
-
-```text
-/opsx:propose add dark mode support
-```
-
-```text
-/opsx-propose.md add dark mode support
-```
-The agent creates the proposal, design, and implementation tasks under `openspec/changes/`.
-
-#### 2. Apply the code
-Review the generated `tasks.md` by manually editing md files or just telling agent what is wrong with it.
-
-After plan approval agent can start implementation:
-
-```text
-/opsx:apply
-```
-
-```text
-/opsx-apply.md
-```
-The agent writes the code and checks off the boxes in your `tasks.md`.
-
-#### 3. Verify and refine
-If bugs occur or tests fail, pass the logs back to refine the implementation.
-
-```text
-/opsx:verify The toggle button is invisible on mobile. Fix it.
-```
-
-```text
-/opsx-verify.md The toggle button is invisible on mobile. Fix it.
-```
-
-#### 4. Archive the change
-Once the code is working and tested, merge the documentation.
-
-```text
-/opsx:archive
-```
-
-```text
-/opsx-archive.md
-```
-The agent merges the delta specs into `openspec/specs/` and moves the change folder to `openspec/changes/archive/`.
+Released under the [MIT License](LICENSE).

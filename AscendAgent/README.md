@@ -14,7 +14,7 @@ The agent manages the flow of information between the user, the LLM, persistent 
 
 ```mermaid
 flowchart TD
-    User["User"] -- "HTTP POST /prompt" --> AscendAgent["AscendAgent"]
+    User["User"] -- "POST /api/v1/ai/prompt" --> AscendAgent["AscendAgent"]
     
     subgraph Core ["Core Orchestration"]
         AscendAgent -- "1. Context Retrieval" --> Redis["Redis (Active Memory)"]
@@ -185,7 +185,7 @@ POST /api/v1/ai/prompt
   provider=anthropic           # chat provider
   embeddingProvider=lmstudio   # embedding provider (optional)
 
-POST /api/ingestion/run
+POST /api/v1/ingestion/run
   embeddingProvider=openai     # ingest into 1536-dim collection
 ```
 
@@ -217,7 +217,7 @@ Before running the application, ensure you have the following services up and ru
     *   **PostgreSQL**: Metadata store for the ingestion pipeline (schema `ascend_ai`).
     *   **Redis**: Caching and active memory store.
     *   **SearXNG**: Self-hosted meta-search engine (Web Tools dependency).
-    *   **web-tools-mcp**: MCP server providing `web_search` and `read_url` tools.
+    *   **ascend-web-search**: MCP server providing `web_search` and `read_url` tools.
     *   **ascend-memory**: Semantic memory service used by AscendAgent over REST.
 
 2.  **LLM Provider**:
@@ -243,11 +243,11 @@ The pipeline routes files based on the folder specifically in the S3 bucket:
 
 | Folder Path in S3 | Processor | Supported Formats | Description |
 | :--- | :--- | :--- | :--- |
-| `obsidian/` | **Markdown Flow** | `.md` | Uses a local CommonMark parser. Optimized for Obsidian vaults and markdown notes. Extracts headers as metadata. |
+| `markdown/` | **Markdown Flow** | `.md` | Uses a local CommonMark parser. Optimized for Obsidian vaults and other markdown notes. Extracts headers as metadata. |
 | `documents/` | **Unstructured Flow** | `.pdf`, `.docx`, `.pptx`, `.html`, `.txt`, etc. | Sends files to the **Unstructured API** container. Capable of performing OCR and extracting text from complex layouts. |
 
 ### 3. How it Works
-1.  **Trigger**: Call `POST /api/ingestion/run` to scan the `knowledge-base` bucket.
+1.  **Trigger**: Call `POST /api/v1/ingestion/run` to scan the `knowledge-base` bucket.
 2.  **Routing**:
     *   Files containing `obsidian` in their path go to the Markdown processor.
     *   Files containing `documents` in their path go to the Unstructured processor.
@@ -256,7 +256,7 @@ The pipeline routes files based on the folder specifically in the S3 bucket:
     *   **Unstructured**: Sent to the Unstructured API, which returns extracted text, then split into chunks.
 4.  **Embedding & Storage**: Text chunks are converted to vectors and stored in **Qdrant**.
 
-Auto ingestion is available but disabled by default. Enable it with `app.ingestion.auto.enabled=true`.
+Ingestion is two-step by default: upload writes to MinIO, then a separate `POST /api/v1/ingestion/run` scans and embeds. Auto-polling exists (`app.ingestion.auto.enabled=true`) but ships off so the agent doesn't spend embedding tokens on every restart. Full lifecycle in [`docs/INGESTION.md`](../docs/INGESTION.md).
 
 ---
 
@@ -264,10 +264,16 @@ Auto ingestion is available but disabled by default. Enable it with `app.ingesti
 
 ### 1. Start Support Services
 From the project root:
+
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
-Ensure MinIO, Qdrant, Redis, Postgres, Unstructured API, SearXNG, `ascend-memory`, and `web-tools-mcp` are running.
+
+```powershell
+docker compose up -d --build
+```
+
+External prerequisites (PostgreSQL, Redis, Qdrant, MinIO) must be running on the host first — they aren't part of compose. Compose itself brings up the application services (`ascend-memory`, `ascend-web-search`, `audio-scribe`, etc.) plus the support stack (SearXNG, FlareSolverr, Docling, Unstructured).
 
 ### 2. Run the AscendAgent
 ```bash
@@ -285,12 +291,12 @@ It will also display:
 3.  **Test Markdown**:
     *   Create a folder `obsidian`.
     *   Upload a sample `.md` file inside it.
-    *   Trigger ingestion: `POST http://localhost:9917/api/ingestion/run`
+    *   Trigger ingestion: `POST http://localhost:9917/api/v1/ingestion/run`
     *   Check application logs. You should see: `Indexed markdown document: <id>`
 4.  **Test Unstructured**:
     *   Create a folder `documents`.
     *   Upload a `.pdf` or `.docx`.
-    *   Trigger ingestion: `POST http://localhost:9917/api/ingestion/run`
+    *   Trigger ingestion: `POST http://localhost:9917/api/v1/ingestion/run`
     *   Check application logs. You should see: `Indexed unstructured document: <id>`
 
 ### 4. Testing Scenarios (CURL)
@@ -303,7 +309,7 @@ It will also display:
 
 **Windows (PowerShell)**:
 ```powershell
-curl -X POST "http://localhost:9917/prompt" `
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
      -H "X-User-Id: user1" `
      -H "Content-Type: multipart/form-data" `
      -F "prompt=Summarize the key points." `
@@ -312,7 +318,7 @@ curl -X POST "http://localhost:9917/prompt" `
 
 **Linux/Mac (Bash)**:
 ```bash
-curl -X POST "http://localhost:9917/prompt" \
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
      -H "X-User-Id: user1" \
      -H "Content-Type: multipart/form-data" \
      -F "prompt=Summarize the key points." \
@@ -323,7 +329,7 @@ curl -X POST "http://localhost:9917/prompt" \
 
 **Windows (PowerShell)**:
 ```powershell
-curl -X POST "http://localhost:9917/prompt" `
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
      -H "X-User-Id: user1" `
      -H "Content-Type: multipart/form-data" `
      -F "prompt=Describe this image." `
@@ -332,7 +338,7 @@ curl -X POST "http://localhost:9917/prompt" `
 
 **Linux/Mac (Bash)**:
 ```bash
-curl -X POST "http://localhost:9917/prompt" \
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
      -H "X-User-Id: user1" \
      -H "Content-Type: multipart/form-data" \
      -F "prompt=Describe this image." \
@@ -376,7 +382,7 @@ curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
 
 **Set Context (Bash)**:
 ```bash
-curl -X POST "http://localhost:9917/prompt" \
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
      -H "X-User-Id: user1" \
      -H "Content-Type: multipart/form-data" \
      -F "prompt=My name is Luke."
@@ -384,7 +390,7 @@ curl -X POST "http://localhost:9917/prompt" \
 
 **Retrieve Context (Bash)**:
 ```bash
-curl -X POST "http://localhost:9917/prompt" \
+curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
      -H "X-User-Id: user1" \
      -H "Content-Type: multipart/form-data" \
      -F "prompt=What is my name?"

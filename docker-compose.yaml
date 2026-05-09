@@ -1,5 +1,8 @@
 name: ascend-ai
 
+include:
+  - ascend-scrapper.docker-compose.yaml
+
 services:
 
   # ─── Document processing services ───
@@ -49,35 +52,6 @@ services:
         aliases:
           - ascend-paddle-ocr
 
-  # ─── Search infrastructure ───
-
-  searxng:
-    image: searxng/searxng:2026.2.3-f7a608703
-    container_name: searxng
-    restart: unless-stopped
-    ports:
-      - "9020:8080"
-    networks:
-      default:
-        aliases:
-          - searxng
-
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:v3.4.6
-    container_name: flaresolverr
-    restart: unless-stopped
-    ports:
-      - "8191:8191"
-    environment:
-      - LOG_LEVEL=info
-      - LOG_HTML=false
-      - CAPTCHA_SOLVER=none
-      - TZ=UTC
-    networks:
-      default:
-        aliases:
-          - flaresolverr
-
   # ─── Application services ───
 
   ascend-memory:
@@ -89,20 +63,18 @@ services:
     ports:
       - "7020:7020"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_BASE_URL=http://host.docker.internal:1234/v1
-      # - OPENAI_BASE_URL=https://api.openai.com/v1
       - API_PORT=7020
       - API_HOST=0.0.0.0
       # Qdrant must be running externally (port 6333)
       - QDRANT_HOST=host.docker.internal
       - QDRANT_PORT=6333
-      - MEM0_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v2-moe
-#      - MEM0_EMBEDDING_MODEL=text-embedding-3-small
-      - MEM0_COLLECTION_NAME=ascend_memory
-      # - MEM0_COLLECTION_NAME=ascend_memory_cloud
-      - MEM0_EMBEDDING_DIMS=768
-      # - MEM0_EMBEDDING_DIMS=1536
+      # Per-provider routing — each provider hits its own endpoint with its own key.
+      - LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
+      - LMSTUDIO_API_KEY=sk_local
+      - OPENAI_BASE_URL=https://api.openai.com/v1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - MEM0_INFER_MEMORY=false
       # - MEM0_INFER_MEMORY=true
       - MEM0_DEFAULT_PROVIDER=lmstudio
@@ -114,61 +86,6 @@ services:
       default:
         aliases:
           - ascend-memory
-
-  ngrok-ascend-web-search:
-    image: ngrok/ngrok:3
-    container_name: ngrok-ascend-web-search
-    restart: unless-stopped
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    command: "http ascend-web-search:7900"
-    depends_on:
-      - ascend-web-search
-    networks:
-      default:
-        aliases:
-          - ngrok-ascend-web-search
-
-  ascend-web-search:
-    build:
-      context: ./AscendWebSearch
-      dockerfile: Dockerfile
-    # image: lukk17/ascend-web-search:latest
-    container_name: ascend-web-search
-    restart: unless-stopped
-    ports:
-      - "7021:7021"
-    environment:
-      - SEARXNG_BASE_URL=http://searxng:8080
-      - API_PORT=7021
-      - API_HOST=0.0.0.0
-      - LOG_LEVEL=INFO
-      - SEARXNG_LIMITER=false
-      - SEARXNG_USER_AGENT=AscendWebSearch/1.0
-      - SEARXNG_X_REAL_IP=0.0.0.0
-      - SEARXNG_X_FORWARDED_FOR=0.0.0.0
-      - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
-      - VALIDATION_MIN_WORDS=10
-      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
-      - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
-      # Redis must be running externally (port 6379)
-      - REDIS_URL=redis://host.docker.internal:6379/0
-      - NOVNC_TIMEOUT_SECONDS=600
-    cap_add:
-      - SYS_ADMIN
-    shm_size: "2gb"
-    depends_on:
-      - searxng
-      - flaresolverr
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    networks:
-      default:
-        aliases:
-          - ascend-web-search
 
   weather-mcp:
     build:
