@@ -36,8 +36,8 @@ public class ManualIngestionService {
     @Value("${app.s3.bucket}")
     private String bucket;
 
-    @Value("${app.ingestion.folders.obsidian:obsidian/}")
-    private String obsidianFolder;
+    @Value("${app.ingestion.folders.markdown:markdown/}")
+    private String markdownFolder;
 
     @Value("${app.ingestion.folders.documents:documents/}")
     private String documentsFolder;
@@ -100,7 +100,7 @@ public class ManualIngestionService {
                 .key(key)
                 .build())) {
 
-            boolean isMarkdown = key.toLowerCase().endsWith(".md") || key.toLowerCase().contains(obsidianFolder);
+            boolean isMarkdown = key.toLowerCase().endsWith(".md") || key.toLowerCase().contains(markdownFolder);
             List<Document> documents = isMarkdown
                     ? ingestionService.processMarkdown(stream, key)
                     : ingestionService.processUnstructured(stream, key);
@@ -134,7 +134,7 @@ public class ManualIngestionService {
 
     private boolean shouldIngestKey(String key) {
         String path = key.toLowerCase();
-        if (path.endsWith(".md") || path.contains(obsidianFolder)) {
+        if (path.endsWith(".md") || path.contains(markdownFolder)) {
             return true;
         }
         return path.contains(documentsFolder);

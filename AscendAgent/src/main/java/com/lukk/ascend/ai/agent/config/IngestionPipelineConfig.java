@@ -50,8 +50,8 @@ public class IngestionPipelineConfig {
     @Value("${app.s3.bucket}")
     private String s3Bucket;
 
-    @Value("${app.ingestion.folders.obsidian:obsidian/}")
-    private String obsidianFolder;
+    @Value("${app.ingestion.folders.markdown:markdown/}")
+    private String markdownFolder;
 
     @Value("${app.ingestion.folders.documents:documents/}")
     private String documentsFolder;
@@ -131,7 +131,7 @@ public class IngestionPipelineConfig {
         String path = filename.toLowerCase();
         log.info("Routing file: {}", path);
 
-        if (path.endsWith(".md") || path.contains(obsidianFolder)) {
+        if (path.endsWith(".md") || path.contains(markdownFolder)) {
             return "markdownChannel";
         } else if (path.contains(documentsFolder)) {
             return "unstructuredChannel";

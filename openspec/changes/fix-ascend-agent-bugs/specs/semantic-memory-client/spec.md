@@ -66,6 +66,21 @@ When `SemanticMemoryExtractor` extracts N facts and inserts them into AscendMemo
 - **THEN** logs include `Inserted 1/2 facts for user '<userId>' (failed: 1)` at WARN
 - **AND** the user-facing prompt response is unaffected
 
+### Requirement: SemanticMemoryItem deserializes mem0 response fields
+
+`SemanticMemoryItem` SHALL map the JSON fields returned by AscendMemory's mem0-backed `/api/v1/memory/search` response onto its record components, even though they use different names. Specifically: JSON `memory` → record `text`, JSON `user_id` → record `userId`, JSON `created_at` → record `createdAt`. Without this mapping, retrieved items deserialize with `null` `text`, the assembler drops every item, and the model never sees the user's stored facts even though `Received N semantic memory items` was logged with N>=1.
+
+#### Scenario: Mem0 search payload deserializes into a non-empty SemanticMemoryItem
+
+- **WHEN** AscendMemory returns `[{"id":"abc","memory":"User's name is Luke","score":0.91,"user_id":"frosty","created_at":"2026-05-08T09:15:41Z","metadata":{}}]`
+- **THEN** `SemanticMemoryClient.search(...)` returns a list of one `SemanticMemoryItem` with `text() = "User's name is Luke"`, `userId() = "frosty"`, and a non-null `createdAt`
+
+#### Scenario: ChatContextAssembler injects retrieved facts into the SystemMessage
+
+- **WHEN** `ChatContextAssembler.buildSystemMessage(...)` is called and the search returns 2 items with non-blank `text`
+- **THEN** the assembled system message contains `User memory (may be relevant):` followed by both facts as bulleted lines
+- **AND** the log line reads `SemanticMemory: YES (2 items)` (not `NO`)
+
 ### Requirement: AscendMemory insert request body uses snake_case keys
 
 `SemanticMemoryClient` SHALL POST `/api/v1/memory/insert` with a JSON body whose keys are `user_id`, `text`, and `provider`. (This already matches today's behavior; the requirement pins it so it cannot regress.)

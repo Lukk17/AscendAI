@@ -46,12 +46,12 @@ class PromptControllerTest {
                 .thenReturn(aiResponse);
 
         // when
-        ResponseEntity<AiResponse> response = promptController.prompt(prompt, null, null, null, null, null, "user1");
+        ResponseEntity<?> response = promptController.prompt(prompt, null, null, null, null, null, "user1");
 
         // then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(responseText, response.getBody().content());
+        assertEquals(responseText, ((AiResponse) response.getBody()).content());
     }
 
     @Test

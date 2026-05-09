@@ -4,6 +4,7 @@ import com.lukk.ascend.ai.agent.config.api.ApiCommonErrorResponses;
 import com.lukk.ascend.ai.agent.config.api.ApiCommonSuccessResponses;
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.service.AscendChatService;
+import com.lukk.ascend.ai.agent.service.VisionCapabilityResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,7 +17,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @Slf4j
 @RestController
@@ -26,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class PromptController {
 
     private final AscendChatService ascendChatService;
+    private final VisionCapabilityResolver visionCapabilityResolver;
 
     @Value("${app.user.default-id:user1}")
     private String defaultUserId;
@@ -37,7 +42,7 @@ public class PromptController {
     @ApiCommonSuccessResponses
     @ApiCommonErrorResponses
     @PostMapping(value = "/prompt", consumes = "multipart/form-data")
-    public ResponseEntity<AiResponse> prompt(
+    public ResponseEntity<?> prompt(
             @Parameter(description = "User prompt text", required = true, example = "What is the weather in Warsaw?")
             @RequestParam("prompt") String prompt,
 
@@ -78,6 +83,16 @@ public class PromptController {
                 image != null && !image.isEmpty(),
                 document != null && !document.isEmpty(),
                 prompt);
+
+        if (image != null && !image.isEmpty() && !visionCapabilityResolver.supportsImages(provider, model)) {
+            com.lukk.ascend.ai.agent.dto.ApiError body = new com.lukk.ascend.ai.agent.dto.ApiError(
+                    HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
+                    "vision_unsupported",
+                    "Selected provider/model does not support image input. " +
+                            "Use a vision-capable model (e.g. claude-sonnet-4-6, gpt-4o, gemini-2.5-pro).");
+            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(body);
+        }
+
         return ResponseEntity.ok(ascendChatService.prompt(prompt, image, document, userId, provider, model, embeddingProvider));
     }
 }

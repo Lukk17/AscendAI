@@ -56,10 +56,21 @@ class AscendMemoryClient:
             logger.warning(
                 f"Unknown provider '{provider}', falling back to default '{settings.MEM0_DEFAULT_PROVIDER}'")
             provider_config = PROVIDER_CONFIGS[settings.MEM0_DEFAULT_PROVIDER]
+            provider = settings.MEM0_DEFAULT_PROVIDER
 
         collection_name = provider_config["collection_name"]
         embedding_model = provider_config["embedding_model"]
         embedding_dims = provider_config["embedding_dims"]
+
+        base_url_setting = provider_config["base_url_setting"]
+        api_key_setting = provider_config["api_key_setting"]
+        base_url = getattr(settings, base_url_setting)
+        api_key = getattr(settings, api_key_setting)
+
+        if not api_key or not api_key.strip():
+            raise ValueError(
+                f"Provider '{provider}' requires env var {api_key_setting} but it is missing or blank. "
+                f"Set it before invoking this provider.")
 
         config = {
             "vector_store": {
@@ -75,16 +86,17 @@ class AscendMemoryClient:
                 "provider": "openai",
                 "config": {
                     "model": settings.MEM0_LLM_MODEL,
-                    "api_key": settings.OPENAI_API_KEY,
-                    "openai_base_url": settings.OPENAI_BASE_URL
+                    "api_key": api_key,
+                    "openai_base_url": base_url
                 }
             },
             "embedder": {
                 "provider": "openai",
                 "config": {
                     "model": embedding_model,
-                    "api_key": settings.OPENAI_API_KEY,
-                    "openai_base_url": settings.OPENAI_BASE_URL
+                    "api_key": api_key,
+                    "openai_base_url": base_url,
+                    "embedding_dims": embedding_dims
                 }
             }
         }
@@ -92,7 +104,7 @@ class AscendMemoryClient:
         self.provider = provider
         logger.info(
             f"[AscendMemory] Initialized client | provider={provider} | collection={collection_name} | "
-            f"embedder={embedding_model} | dims={embedding_dims}")
+            f"embedder={embedding_model} | dims={embedding_dims} | base_url={base_url}")
 
     def search(self, query: str, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Search for memories. Returns a list of dicts with 'memory', 'score', etc."""

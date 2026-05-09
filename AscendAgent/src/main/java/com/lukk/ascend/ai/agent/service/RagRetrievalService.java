@@ -31,24 +31,19 @@ public class RagRetrievalService {
         SearchRequest searchRequest = SearchRequest.builder()
                 .query(query)
                 .topK(ragProperties.getTopK())
-                .similarityThreshold(SearchRequest.SIMILARITY_THRESHOLD_ACCEPT_ALL)
+                .similarityThreshold(ragProperties.getSimilarityThreshold())
                 .build();
 
         List<Document> documents = performSimilaritySearch(vectorStore, searchRequest);
         if (documents.isEmpty()) {
+            log.info("[RagRetrievalService] Retrieval: no documents above threshold={}",
+                    ragProperties.getSimilarityThreshold());
             return "";
         }
 
         Double topScore = documents.get(0).getScore();
-        double score = topScore != null ? topScore : 0.0d;
-        boolean isAboveThreshold = score >= ragProperties.getSimilarityThreshold();
-
-        log.info("[RagRetrievalService] Retrieval: docs={}, topScore={}, threshold={}, inject={}",
-                documents.size(), topScore, ragProperties.getSimilarityThreshold(), isAboveThreshold);
-
-        if (!isAboveThreshold) {
-            return "";
-        }
+        log.info("[RagRetrievalService] Retrieval: docs={}, topScore={}, threshold={}, inject=YES",
+                documents.size(), topScore, ragProperties.getSimilarityThreshold());
 
         return buildContextBlock(documents);
     }

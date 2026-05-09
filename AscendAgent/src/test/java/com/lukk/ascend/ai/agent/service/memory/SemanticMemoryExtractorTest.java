@@ -21,9 +21,18 @@ import org.springframework.ai.chat.prompt.Prompt;
 import java.util.List;
 import java.util.Map;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -185,6 +194,92 @@ class SemanticMemoryExtractorTest {
 
         // then
         verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "User has a dog named Rex", DEFAULT_EMBEDDING_PROVIDER);
+    }
+
+    @org.junit.jupiter.api.Nested
+    class ParserTests {
+
+        private final SemanticMemoryExtractor parserExtractor = new SemanticMemoryExtractor(
+                null, null, null, new ObjectMapper(), null);
+
+        @Test
+        void extractFactsFromJson_WhenThinkingResponseWithEmbeddedJson_ThenReturnsAllFacts() {
+            String thinking = "Thus we have two facts: \"User's name is Luke\" and "
+                    + "\"User is a software engineer\". The list is: "
+                    + "[\"User's name is Luke\", \"User is a software engineer\"]";
+
+            List<String> facts = parserExtractor.extractFactsFromJson(thinking);
+
+            assertThat(facts).containsExactly("User's name is Luke", "User is a software engineer");
+        }
+
+        @Test
+        void extractFactsFromJson_WhenPureJsonArray_ThenReturnsAllFacts() {
+            String pureJson = "[\"User's name is Luke\", \"User is a software engineer\"]";
+
+            List<String> facts = parserExtractor.extractFactsFromJson(pureJson);
+
+            assertThat(facts).containsExactly("User's name is Luke", "User is a software engineer");
+        }
+
+        @Test
+        void extractFactsFromJson_WhenNoJsonArrayAtAll_ThenReturnsEmptyAndDoesNotThrow() {
+            String prose = "Thus we have two facts: User's name is Luke and User is a software engineer...";
+
+            List<String> facts = parserExtractor.extractFactsFromJson(prose);
+
+            assertThat(facts).isEmpty();
+        }
+
+        @Test
+        void extractFactsFromJson_WhenMarkdownFencedJson_ThenReturnsSingleFact() {
+            String fenced = "```json\n[\"fact one\"]\n```";
+
+            List<String> facts = parserExtractor.extractFactsFromJson(fenced);
+
+            assertThat(facts).containsExactly("fact one");
+        }
+    }
+
+    @Test
+    void insertFactsWithTally_WhenSomeFail_ThenLogsWarnTallyLine() throws JsonProcessingException {
+        // given — 2 facts, 2nd insert throws
+        setupProviderConfig("meta-llama-3.1-8b-instruct");
+        when(chatModelResolver.resolve(DEFAULT_PROVIDER)).thenReturn(chatModel);
+
+        String jsonResponse = "[\"fact one\", \"fact two\"]";
+        ChatResponse mockResponse = createMockChatResponse(jsonResponse);
+        when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(jsonResponse);
+
+        when(objectMapper.readValue(eq(jsonResponse), any(TypeReference.class)))
+                .thenReturn(List.of("fact one", "fact two"));
+
+        doNothing().when(memoryClient).insertMemory(DEFAULT_USER_ID, "fact one", DEFAULT_EMBEDDING_PROVIDER);
+        doThrow(new RuntimeException("boom"))
+                .when(memoryClient).insertMemory(DEFAULT_USER_ID, "fact two", DEFAULT_EMBEDDING_PROVIDER);
+
+        // attach captor to the SemanticMemoryExtractor logger
+        Logger extractorLogger = (Logger) LoggerFactory.getLogger(SemanticMemoryExtractor.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        extractorLogger.addAppender(appender);
+
+        try {
+            // when
+            extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
+
+            // then
+            verify(memoryClient, timeout(2000)).insertMemory(DEFAULT_USER_ID, "fact two", DEFAULT_EMBEDDING_PROVIDER);
+            // give virtual thread a moment to log after the failing insert
+            verify(memoryClient, after(200).atLeastOnce()).insertMemory(DEFAULT_USER_ID, "fact one", DEFAULT_EMBEDDING_PROVIDER);
+
+            assertThat(appender.list)
+                    .anyMatch(e -> e.getLevel() == Level.WARN
+                            && e.getFormattedMessage().contains("Inserted 1/2 facts for user '" + DEFAULT_USER_ID + "' (failed: 1)"));
+        } finally {
+            extractorLogger.detachAppender(appender);
+        }
     }
 
     private void setupProviderConfig(String extractionModel) {

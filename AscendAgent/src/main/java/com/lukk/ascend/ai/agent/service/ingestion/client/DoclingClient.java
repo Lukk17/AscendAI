@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
 import com.lukk.ascend.ai.agent.util.NamedByteArrayResource;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -29,6 +30,9 @@ public class DoclingClient {
     private static final String KEY_TYPE = "type";
     private static final String PARAM_FILE = "file";
 
+    private static final String LEGACY_PATH = "/v1/convert";
+    private static final String CORRECT_PATH = "/v1/convert/file";
+
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String doclingBaseUrl;
@@ -38,11 +42,35 @@ public class DoclingClient {
             @Qualifier("ingestionRestClient") RestClient restClient,
             ObjectMapper objectMapper,
             @Value("${app.docling.base-url:http://localhost:5001}") String doclingBaseUrl,
-            @Value("${app.docling.api-path:/v1/convert}") String doclingApiPath) {
+            @Value("${app.docling.api-path:/v1/convert/file}") String doclingApiPath) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.doclingBaseUrl = doclingBaseUrl;
-        this.doclingApiPath = doclingApiPath;
+        this.doclingApiPath = normalizePath(doclingApiPath);
+    }
+
+    private static String normalizePath(String configured) {
+        if (configured == null) {
+            return CORRECT_PATH;
+        }
+        String trimmed = configured.trim();
+        if (!trimmed.startsWith("/")) {
+            trimmed = "/" + trimmed;
+        }
+        if (trimmed.length() > 1 && trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        if (LEGACY_PATH.equals(trimmed)) {
+            log.warn("[DoclingClient] Configured api-path '{}' is the legacy convert endpoint; auto-correcting to '{}'. " +
+                    "Update app.docling.api-path in application.yaml to silence this warning.", configured, CORRECT_PATH);
+            return CORRECT_PATH;
+        }
+        return trimmed;
+    }
+
+    @PostConstruct
+    void logConfiguredEndpoint() {
+        log.info("[DoclingClient] Configured upload endpoint: {}{}", doclingBaseUrl, doclingApiPath);
     }
 
     public List<Document> process(byte[] fileBytes, String filename) {

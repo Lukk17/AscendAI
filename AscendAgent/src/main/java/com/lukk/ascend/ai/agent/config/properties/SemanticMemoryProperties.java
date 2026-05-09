@@ -7,7 +7,7 @@ public class SemanticMemoryProperties {
 
     private boolean enabled = true;
 
-    private String baseUrl = "http://localhost:8770";
+    private String baseUrl = "http://localhost:7020";
 
     private int searchLimit = 5;
 
