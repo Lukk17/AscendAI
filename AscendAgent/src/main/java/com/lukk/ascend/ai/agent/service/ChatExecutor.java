@@ -18,8 +18,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.InvalidMimeTypeException;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -85,23 +87,63 @@ public class ChatExecutor {
     }
 
     private void handleImageContext(ChatClientRequestSpec promptBuilder, String userPrompt, MultipartFile image) {
-        if (image != null && !image.isEmpty()) {
-            try {
-                Resource imageResource = new InputStreamResource(image.getInputStream());
-                MimeType mimeType = Optional.ofNullable(image.getContentType())
-                        .map(MimeType::valueOf)
-                        .orElse(MimeTypeUtils.IMAGE_PNG);
-                promptBuilder.user(u -> u.text(userPrompt).media(mimeType, imageResource));
-                log.info("Attached image resource to prompt with MimeType: {}", mimeType);
-            } catch (Exception e) {
-                throw new AiGenerationException("Failed to process image upload", e);
-            }
-        } else {
+        if (image == null || image.isEmpty()) {
             promptBuilder.user(userPrompt);
+            return;
+        }
+        try {
+            Resource imageResource = new InputStreamResource(image.getInputStream());
+            MimeType mimeType = resolveImageMimeType(image);
+            promptBuilder.user(u -> u.text(userPrompt).media(mimeType, imageResource));
+            log.info("Attached image resource to prompt with MimeType: {}", mimeType);
+        } catch (Exception e) {
+            throw new AiGenerationException("Failed to process image upload", e);
         }
     }
 
-    private List<String> extractToolsUsed(ChatResponse chatResponse) {
+    /**
+     * Resolves a never-null {@link MimeType} for the uploaded image. Order:
+     * 1. Try {@code Content-Type} header — but reject obviously broken values
+     *    ({@code null}, blank, no slash, "file", "application/octet-stream").
+     * 2. Try filename extension (.jpg, .jpeg, .png, .webp, .gif).
+     * 3. Default to {@code image/png}.
+     * Logs at INFO when a fallback path is taken so a malformed client header
+     * is visible without poisoning the request.
+     */
+    MimeType resolveImageMimeType(MultipartFile image) {
+        String contentType = image.getContentType();
+        if (StringUtils.hasText(contentType) && contentType.contains("/")
+                && !"application/octet-stream".equalsIgnoreCase(contentType)) {
+            try {
+                return MimeType.valueOf(contentType);
+            } catch (InvalidMimeTypeException e) {
+                log.info("Invalid image Content-Type '{}' — falling back to filename extension", contentType);
+            }
+        } else if (StringUtils.hasText(contentType)) {
+            log.info("Suspect image Content-Type '{}' — falling back to filename extension", contentType);
+        }
+
+        String filename = image.getOriginalFilename();
+        if (StringUtils.hasText(filename)) {
+            String lower = filename.toLowerCase();
+            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+                return MimeTypeUtils.IMAGE_JPEG;
+            }
+            if (lower.endsWith(".png")) {
+                return MimeTypeUtils.IMAGE_PNG;
+            }
+            if (lower.endsWith(".webp")) {
+                return MimeType.valueOf("image/webp");
+            }
+            if (lower.endsWith(".gif")) {
+                return MimeType.valueOf("image/gif");
+            }
+        }
+        log.info("Could not infer image MIME from Content-Type or filename '{}' — defaulting to image/png", filename);
+        return MimeTypeUtils.IMAGE_PNG;
+    }
+
+    List<String> extractToolsUsed(ChatResponse chatResponse) {
         try {
             var output = chatResponse.getResult().getOutput();
             if (output.getToolCalls() == null || output.getToolCalls().isEmpty()) {

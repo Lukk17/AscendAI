@@ -1,14 +1,20 @@
 [versions]
-spring-boot = "3.5.4"
-spring-ai = "1.1.4"
+spring-boot = "3.5.14"
+spring-ai = "1.1.5"
 spring-dependency-management = "1.1.7"
-spring-integration-aws = "3.0.0"
-springdoc = "2.8.14"
+spring-integration-aws = "3.0.10"
+springdoc = "2.8.17"
 aws-sdk = "2.42.34"
 # qdrant-client intentionally NOT overridden — Spring AI BOM manages it at 1.13.0.
 # Overriding to 1.17.0 breaks QdrantVectorStore (gRPC proto classes removed in 1.14+).
 commonmark = "0.28.0"
 pdfbox = "3.0.7"
+# Tika 3.3.0 — closes CVE-2025-66516 (CVSS 10) and CVE-2025-54988 vs the previous 2.9.4 EOL pin.
+# Spring AI BOM 1.1.5 uses Tika 3.x transitively but does not publish tika-core as a managed entry,
+# so we pin it directly here.
+tika = "3.3.0"
+jacoco = "0.8.14"
+testcontainers = "2.0.5"
 
 [libraries]
 # Spring Boot starters (versions managed by Spring Boot BOM)
@@ -53,12 +59,24 @@ h2 = { module = "com.h2database:h2" }
 qdrant-client = { module = "io.qdrant:client" }
 commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
+tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
+
+# Spring Security (Boot BOM managed)
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
 
 # Lombok (version managed by Spring Boot BOM)
 lombok = { module = "org.projectlombok:lombok" }
 
 # Test
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+# Testcontainers — integration tests against real Postgres / Redis / Qdrant / MinIO
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
+testcontainers-qdrant = { module = "org.testcontainers:qdrant" }
+testcontainers-minio = { module = "org.testcontainers:minio" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
