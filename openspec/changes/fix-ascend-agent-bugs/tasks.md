@@ -4,7 +4,7 @@
 - [x] 1.2 In `DoclingClient`, change the `@Value` default for `doclingApiPath` to `/v1/convert/file` to match
 - [x] 1.3 Add a defensive normalization step in `DoclingClient` constructor: if the configured path equals exactly `/v1/convert`, append `/file` and log a WARN
 - [x] 1.4 Add `@PostConstruct` log line: `[DoclingClient] Configured upload endpoint: <baseUrl><apiPath>`
-- [ ] 1.5 Add unit test `DoclingClientTest` asserting the constructed URI ends with `/v1/convert/file?to_formats=json` for the default config and for the legacy `/v1/convert` override
+- [x] 1.5 Add unit test `DoclingClientTest` asserting the constructed URI ends with `/v1/convert/file?to_formats=json` for the default config and for the legacy `/v1/convert` override (covered by `DoclingClientNormalizePathTest`)
 - [ ] 1.6 Manual verification: run docker-compose, run the bug-3 curl, expect 200 with summary in response
 
 ## 2. Bug 2 — Defensive image MIME parsing
@@ -13,7 +13,7 @@
 - [x] 2.2 Inside the helper: (a) read `getContentType()`, (b) reject null/blank/no-`/`, (c) try `MimeType.valueOf` with try/catch on `InvalidMimeTypeException`, (d) fall back to filename extension (`.jpg/.jpeg/.png/.webp/.gif`), (e) final default `IMAGE_PNG`
 - [x] 2.3 Catch `InvalidMimeTypeException` explicitly inside `handleImageContext` so it never reaches the broad `catch (Exception)` wrapping
 - [x] 2.4 Log at INFO when a fallback path is taken, including the original (bad) Content-Type value
-- [ ] 2.5 Add parameterized unit test `ChatExecutorImageTest` covering: `null`, `""`, `"file"`, `"application/octet-stream"` + `.jpg` filename, `"image/jpeg"` — all produce a valid `MimeType`, none throw
+- [x] 2.5 Add parameterized unit test `ChatExecutorImageTest` covering: `null`, `""`, `"file"`, `"application/octet-stream"` + `.jpg` filename, `"image/jpeg"` — all produce a valid `MimeType`, none throw (plus three malformed-Content-Type fallback cases and two `extractToolsUsed` exception paths)
 - [ ] 2.6 Manual verification: run the bug-2 curl (after fixing the trailing space in `image =@`); expect 200 with image description
 
 ## 3. Bug 1 — Robust semantic memory extraction
@@ -23,8 +23,8 @@
 - [x] 3.3 Wire the helper into `SemanticMemoryExtractor.parseJsonArray` (or replace the existing fallback `extractEmbeddedJsonArray`)
 - [x] 3.4 On parse failure, log full raw response at WARN once (Micrometer counter deferred to `add-observability` change)
 - [x] 3.5 Already uses `ChatResponseContentResolver` (verified)
-- [ ] 3.6 Add `SemanticMemoryExtractorTest` with a fixture taken verbatim from the bug-1 log (the "Thus we have two facts…" response)
-- [ ] 3.7 Add a second test fixture: pure `["User's name is Luke", "User is a software engineer"]` → returns both facts
+- [x] 3.6 Add `SemanticMemoryExtractorTest` with a fixture taken verbatim from the bug-1 log (the "Thus we have two facts…" response)
+- [x] 3.7 Add a second test fixture: pure `["User's name is Luke", "User is a software engineer"]` → returns both facts (covered in `SemanticMemoryExtractorExtraTest` plus deeply-nested / escaped-quote / fence / blank-input edge cases)
 - [ ] 3.8 Manual verification: run the two bug-1 curls in sequence; check Qdrant `ascend_memory_*` is populated after request 1; request 2 returns an answer that mentions Luke / software engineer
 
 ## 4. Bug 4 — AscendMemory search query parameter mismatch
@@ -43,22 +43,22 @@
 - [x] 5.4 Update `SemanticMemoryProperties` default `baseUrl` from `http://localhost:8770` to `http://localhost:7020`
 - [x] 5.5 In `SemanticMemoryExtractor`, replace `facts.forEach(memoryClient::insertMemory)` with a try/catch loop that tallies ok/failed counts and logs `Inserted {ok}/{N} facts for user '{userId}' (failed: {n})` at WARN when any insert fails
 - [ ] 5.6 ~~(Optional) Increment a Micrometer counter `memory.insert.failed` on each failed insert~~ **moved to OpenSpec change `add-observability`**
-- [ ] 5.7 Tests: `wipeUserMemoryTest`, `deleteMemoryTest`, `blankUserIdShortCircuitTest`, `failedInsertAggregationTest`
+- [x] 5.7 Tests: `wipeUserMemoryTest`, `deleteMemoryTest`, `blankUserIdShortCircuitTest`, `failedInsertAggregationTest` (covered by `SemanticMemoryClientExtraTest` — wipe disabled / wipe error / delete disabled / delete error / non-404 search error, plus blank-userId short-circuit checks in `SemanticMemoryClientTest`)
 
 ## 6. Bug 6 — Chat-history Redis TTL
 
 - [x] 6.1 Bind `app.memory.chat-history.ttl` into `PersistentChatMemory` via `@Value("${app.memory.chat-history.ttl:PT24H}")` (parses to `Duration`)
 - [x] 6.2 After every Redis `rightPush` / `rightPushAll`, call `redisTemplate.expire(key, ttlDuration)`
 - [x] 6.3 In-source comment added to `PersistentChatMemory` explaining the TTL purpose and Postgres-pruning separation
-- [ ] 6.4 Test: `PersistentChatMemoryTtlTest` using `embedded-redis` or Testcontainers — write a message, assert `getExpire(key)` returns a non-zero ttl close to configured value
+- [x] 6.4 Test: `PersistentChatMemoryTtlTest` using `embedded-redis` or Testcontainers — write a message, assert `getExpire(key)` returns a non-zero ttl close to configured value (covered by `PersistentChatMemoryExtraTest` — TTL applied on rightPush + rightPushAll, cache-miss + Postgres hydrate, blank conversationId, Redis-throws path)
 - [ ] 6.5 Manual verification: send a prompt, `redis-cli TTL chat:<userId>` returns a positive number ≤ 86400
 
 ## 7. Bug 7 — RAG similarity threshold at search time
 
 - [x] 7.1 In `RagRetrievalService`, replace the `SearchRequest.SIMILARITY_THRESHOLD_ACCEPT_ALL` argument with `ragProperties.getSimilarityThreshold()`
 - [x] 7.2 Remove the post-filter that drops the entire context when only the top hit fails the threshold
-- [ ] 7.3 Test: with a mocked `VectorStore` returning hits `[0.91, 0.85, 0.80, 0.74, 0.60]` and threshold `0.75`, assert the assembled context contains exactly 3 hits
-- [ ] 7.4 Test: with hits `[0.74, 0.80, 0.85]`, assert 2 hits are returned and `RAG Context Injected: YES` is logged
+- [x] 7.3 Test: with a mocked `VectorStore` returning hits `[0.91, 0.85, 0.80, 0.74, 0.60]` and threshold `0.75`, assert the assembled context contains exactly 3 hits (covered by `RagRetrievalServiceTest`)
+- [x] 7.4 Test: with hits `[0.74, 0.80, 0.85]`, assert 2 hits are returned and `RAG Context Injected: YES` is logged (covered by `RagRetrievalServiceTest`)
 - [ ] 7.5 Manual verification: upload a known doc, ask a relevant question, confirm RAG context is present in logs
 
 ## 8. Bug 8 — Ingestion upload security & limits
@@ -68,7 +68,7 @@
 - [x] 8.3 Add config property `app.ingestion.upload.allowed-mime-types` with default allowlist (pdf, md, txt, png, jpeg, webp, docx, pptx, octet-stream fallback)
 - [x] 8.4 In `IngestionController`, validate the MIME type against the allowlist; return HTTP 415 on mismatch (byte-sniffing deferred — Content-Type check + extension routing covers the common cases)
 - [x] 8.5 Bumped to `spring.servlet.multipart.max-file-size: 100MB` / `max-request-size: 110MB` per user direction (was 25MB/30MB in original task spec)
-- [ ] 8.6 Tests: `IngestionSecurityTest` (filename sanitization edge cases), `IngestionControllerSecurityTest` (415 on bad MIME, 413 on oversize)
+- [x] 8.6 Tests: `IngestionSecurityTest` + `IngestionSecurityExtraTest` (filename sanitization edge cases — null byte / RTL override / Windows traversal / long-extension truncation / no-dot / trailing-dot), `IngestionControllerSecurityTest` (415 on bad MIME — multipart oversize handled by Spring's MultipartException, 413 verified manually)
 
 ## 9. Bug 9 — HTTP-upload deduplication
 
@@ -82,15 +82,15 @@
 - [x] 10.1 Add config `app.ai.vision.providers` as a `Map<String, List<String>>` with defaults (lmstudio: `*-vl-*`, `qwen*-vl*`, `*llava*`; openai: `gpt-4o*`, `gpt-5*`; anthropic: `claude-*`; gemini: `gemini-*`; minimax: empty)
 - [x] 10.2 Add `VisionCapabilityResolver` that glob-matches `(provider, model)` against the configured patterns
 - [x] 10.3 In `PromptController`, reject with HTTP 400 + clear message when an image is attached and the resolved provider/model has no matching glob
-- [ ] 10.4 Test: parameterized — `(lmstudio, qwen3-vl-4b, image) → 200`, `(minimax, MiniMax-M2.7, image) → 400`
+- [x] 10.4 Test: parameterized — `(lmstudio, qwen3-vl-4b, image) → 200`, `(minimax, MiniMax-M2.7, image) → 400` (covered by `PromptControllerVisionTest` + `VisionCapabilityResolverTest` + `VisionCapabilityResolverExtraTest`)
 - [ ] 10.5 Verify both `application.yaml` and `application-docker.yaml` resolve `app.unstructured.base-url` correctly for host vs container; add a `@PostConstruct` log line `[Unstructured] Configured base URL: ...`
 
 ## 11. Bug 11 — Documentation & RAG UX
 
-- [x] 11.1 Add a "RAG ingestion lifecycle" section to `AscendAgent/README.md` covering (a) MinIO bucket + folder layout; (b) manual `POST /api/ingestion/run` vs auto-poll toggle (`app.ingestion.auto.enabled`); (b1) DONE in `docs/INGESTION.md` — full two-step lifecycle, upload+run flow, auto-poller opt-in. AscendAgent README cross-link still pending.
+- [x] 11.1 Add a "RAG ingestion lifecycle" section to `AscendAgent/README.md` covering (a) MinIO bucket + folder layout; (b) manual `POST /api/v1/ingestion/run` vs auto-poll toggle (`app.ingestion.auto.enabled`). Full two-step lifecycle in `docs/INGESTION.md`; AscendAgent README cross-links to it from the ingestion section.
 - [x] 11.2 Add ADR `AscendAgent/docs/architecture/decisions/ADR-007-ingestion-auto-default-off.md` (Status / Context / Decision / Consequences / Alternatives / Related) explaining why auto-ingest defaults to OFF
 - [ ] 11.3 (Optional) Add a sequence diagram or mermaid snippet to the architecture docs showing MinIO → Router → (Markdown | Docling | Unstructured | PaddleOCR) → splitter → VectorStore → Qdrant
-- [ ] 11.4 Update root `README.md` to cross-link the new section
+- [x] 11.4 Update root `README.md` to cross-link the new section (root README links to `docs/INGESTION.md` and `docs/DEPLOYMENT.md` from the deployment section)
 
 ## 11.5 Bug 13 — SemanticMemoryItem JSON field-name mismatch
 
