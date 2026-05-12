@@ -15,12 +15,12 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 - [ ] Qdrant `/healthz` returns HTTP 200
 - [ ] MinIO `/minio/health/live` returns HTTP 200
 - [ ] Postgres responds to `SELECT 1` with a row
-- [ ] MinIO `mc` client present (`mc --version` returns a version)
+- [ ] MinIO `mc` client present inside the `minio` container (`docker exec minio mc --version` returns a version)
 - [ ] Fixtures `markdown-canary.md`, `banana-price-poland.pdf`, `pierogi-recipe.docx` all exist under `AscendAgent/e2e/fixtures/`
 
 ### Reset state
 
-- [ ] Registered MinIO alias (`mc alias set ascend ...`)
+- [ ] Registered MinIO alias `local` inside the container (`docker exec minio sh -c 'mc alias set local ...'`)
 - [ ] Dropped all objects in MinIO `knowledge-base` bucket
 - [ ] Truncated Postgres `int_metadata_store` table
 - [ ] Wiped Qdrant `ascendai-*` points for the three fixture sources
@@ -35,14 +35,16 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 
 ### Expected
 
-- [ ] Step 1: response body lists three uploaded keys (one markdown, two documents)
-- [ ] Step 1: `mc ls` shows `markdown-canary.md` under `markdown/` and the two other files under `documents/`
-- [ ] Step 2: response body has `indexed` ≥ 3, `failed` = 0
-- [ ] Step 2: AscendAgent log shows three `Processing ... stream for file: ...` lines and three `Split into N chunks` lines
-- [ ] Step 3a: response `content` contains the canary phrase from the fixture
-- [ ] Step 3b: response `content` contains the price quote from the fixture
-- [ ] Step 3c: response `content` mentions `30 minutes` (rest time from the recipe)
-- [ ] For each of step 3a/b/c: AscendAgent log shows `[RagRetrievalService] Retrieval: <k>/<N> candidates above threshold=<t> - scores=[...], inject=YES` with the source matching the prompt
+- [ ] Step 1: HTTP 200
+- [ ] Step 1: response body's `uploaded` field lists exactly three keys (one under `markdown/`, two under `documents/`)
+- [ ] Step 1: `docker exec minio mc ls local/knowledge-base/markdown/` lists `markdown-canary.md`
+- [ ] Step 1: `docker exec minio mc ls local/knowledge-base/documents/` lists both `banana-price-poland.pdf` and `pierogi-recipe.docx`
+- [ ] Step 2: HTTP 200
+- [ ] Step 2: response body has `indexed` ≥ 3 and `failed` = 0
+- [ ] Step 3a: response `content` contains the canary phrase from the markdown fixture (e.g. `PURPLE-MOOSE-42`)
+- [ ] Step 3b: response `content` contains a numeric price in PLN matching the PDF fixture (e.g. `6.49`)
+- [ ] Step 3c: response `content` contains `30 minutes` (rest time from the DOCX fixture)
+- [ ] None of step 3a/3b/3c returned a refusal like "I don't have that document"
 
 ### Verdict
 
@@ -50,7 +52,17 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 
 ## Result summary
 
-<!-- One short paragraph: what happened, key evidence, anything noteworthy. -->
+
+
+Input tokens:
+
+Output tokens:
+
+Start (UTC):
+
+End (UTC):
+
+Duration:
 
 ---
 

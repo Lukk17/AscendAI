@@ -10,7 +10,7 @@ Every `<N>-<feature>-test.md` file is the **immutable spec** for one test and us
 2. **Prerequisites** — concrete check commands (`curl`, `psql`, `redis-cli`, etc.) the runner executes before starting. Each command is its own code block; the prose around it states what success looks like.
 3. **Reset state** — one command per code block, executed in order, to wipe state so the test is reproducible.
 4. **Run** — one or more numbered steps. Each step is a single Bruno CLI invocation. Steps wait for HTTP 200 before continuing to the next.
-5. **Expected** — log substrings and response shape the runner verifies after each step.
+5. **Expected** — observable-behavior assertions the runner verifies after each step: HTTP status codes, response-body shape and content, persisted state in MinIO / Qdrant / Postgres, NOT log substrings. E2E specs test what the service *does*, not how it logs.
 6. **Fixtures** — paths to local files the test reads.
 
 Alongside each spec lives a `<N>-<feature>-tasks.template.md` — the **checkbox template** for a run. The runner never edits the spec or the template directly. Instead, before starting a run, it copies the template into `runs/` with a timestamped filename, ticks boxes as it progresses, fills in `Result summary` and `Verdict`, and logs anything done outside the spec under `Additional tasks I did`. See [`runs/README.md`](runs/README.md) for the full contract and naming convention.
@@ -41,7 +41,7 @@ Numbered by setup cost (lowest first). Run earliest first when stepping through;
 
 All Bruno requests in this directory pin `X-User-Id: frosty`. Reset commands target that user id.
 
-Pass criteria reference exact log substrings printed by the AscendAgent (`RAG Context Injected: YES`, `SemanticMemory: YES (N items)`, `HasImage: true`, `HasDoc: true`, `Extracted N characters from ...`). Tail the agent log while running.
+Pass criteria are observable behavior only — HTTP status, response-body content, persisted state in backing services (MinIO listings, Qdrant scrolls, Postgres rows). Logs are diagnostic, not authoritative: log lines drift across versions and aren't visible from every runner's shell. If a behavior assertion fails, then a tail of the AscendAgent log (or `docker logs ascend-memory` etc.) is the next diagnostic step — but not a pass criterion.
 
 ## Adding a new test
 

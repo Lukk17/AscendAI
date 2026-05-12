@@ -19,10 +19,9 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 ### Expected
 
 - [ ] HTTP 200
-- [ ] Response `content` contains a temperature value for the requested city
-- [ ] Response `content` contains a weather condition (cloudy / sunny / rainy / etc.)
-- [ ] AscendAgent log shows `getCurrentWeather` tool being invoked for this request id
-- [ ] Response does NOT say "I cannot access live data" or equivalent refusal
+- [ ] Response `content` contains a numeric temperature value for the requested city
+- [ ] Response `content` contains a weather condition word (cloudy / clear / sunny / rain / etc.)
+- [ ] Response `content` does NOT contain refusal phrases like "I cannot access live data" or "I don't have real-time data"
 
 ### Verdict
 
@@ -30,7 +29,17 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 
 ## Result summary
 
-<!-- One short paragraph: what happened, key evidence, anything noteworthy. -->
+
+
+Input tokens:
+
+Output tokens:
+
+Start (UTC):
+
+End (UTC):
+
+Duration:
 
 ---
 

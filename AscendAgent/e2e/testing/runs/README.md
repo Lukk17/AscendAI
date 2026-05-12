@@ -24,9 +24,13 @@ Use ISO-8601 UTC with colons replaced by hyphens so the filename is filesystem-s
 
 1. Read the spec for the test.
 2. Copy the template into `runs/` with a timestamped filename.
-3. Execute each task in order. Tick the box on success; record what went wrong on failure.
-4. After the **Run** section completes, fill in **Result summary** (one paragraph) and **Verdict** (PASS / FAIL).
-5. If any step was done outside the spec (extra diagnostics, retries, manual inspection), log it under **Additional tasks I did**.
+3. **Record `Start (UTC)`** as the very first action — the wall-clock instant *before* the prerequisite checks begin.
+4. Execute each task in order. Tick the box on success; record what went wrong on failure.
+5. After the **Verdict** line is decided, **record `End (UTC)`** — the wall-clock instant *after* the last verification step.
+6. Compute `Duration = End - Start` and record it as `HH:MM:SS`. **This is total wall-clock for the test**, not just the Bruno request duration. A Bruno call may take 5 s while the full test (prereqs + reset + run + verify) takes 2 minutes — the duration field captures the latter.
+7. Fill in **Input tokens** and **Output tokens** with your best estimate of the LLM API tokens consumed across the run. Leave blank if you can't get exact numbers — don't invent.
+8. Write the **Result summary** paragraph and the **Verdict** (PASS or FAIL).
+9. If any step was done outside the spec (extra diagnostics, retries, manual inspection), log it under **Additional tasks I did**.
 
 ## Keeping or wiping run records
 

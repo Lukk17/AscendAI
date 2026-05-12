@@ -20,13 +20,9 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 ### Expected
 
 - [ ] HTTP 200
-- [ ] Response `content` quotes specific facts from the source document
-- [ ] AscendAgent log shows `HasDoc: true` for this request id
-- [ ] AscendAgent log shows `[DocumentRouter] PDF <name> has <N> pages`
-- [ ] AscendAgent log shows one `Page i/N ... Routing to Docling` line per page
-- [ ] AscendAgent log shows `[DocumentRouter] Dispatching <N> pages of <name> in parallel`
-- [ ] AscendAgent log shows one `[DoclingClient] Extracted <chars> characters from <page>.pdf` line per page, each with a non-zero char count
-- [ ] AscendAgent log contains no HTTP 404 or 422 responses from Docling for this request
+- [ ] Response `content` is a coherent summary that quotes specific facts from the source document
+- [ ] Response `content` contains at least three of the expected proper nouns listed in the spec's Expected section
+- [ ] Response `content` is NOT a refusal like "the document context block is empty" or "I don't see a document attached"
 
 ### Verdict
 
@@ -34,7 +30,17 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ## Result summary
 
-<!-- One short paragraph: what happened, key evidence, anything noteworthy. -->
+
+
+Input tokens:
+
+Output tokens:
+
+Start (UTC):
+
+End (UTC):
+
+Duration:
 
 ---
 

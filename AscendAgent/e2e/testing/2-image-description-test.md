@@ -46,11 +46,11 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/image-description-
 
 ## Expected
 
-The Bruno output shows HTTP 200 and a response body whose `content` field describes specific subjects, colors, or text from `AscendAgent/e2e/fixtures/image.png`. A generic description ("an image of something") means the bytes did not reach the model.
+The Bruno output shows HTTP 200.
 
-The AscendAgent log shows `HasImage: true` for the matching request id.
+The response body's `content` field is a detailed description (more than a few sentences) that references concrete visual features of `AscendAgent/e2e/fixtures/image.png` — specific subjects, colors, objects, or text in the image.
 
-The AscendAgent log contains no `InvalidMimeTypeException` traces during the request.
+The response body's `content` field is NOT a refusal like "I don't see an image" or "I'm unable to view images" — those indicate the bytes did not reach the model.
 
 ## Fixtures
 

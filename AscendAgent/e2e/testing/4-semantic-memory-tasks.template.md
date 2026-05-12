@@ -29,10 +29,13 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ### Expected
 
-- [ ] After step 1: AscendAgent log shows `Inserted N/N facts for user 'frosty'` with N ≥ 1
-- [ ] After step 1: Qdrant scroll on the active `ascend_memory_*` collection filtered by `user_id=frosty` returns at least one point mentioning Luke / software engineer
-- [ ] After step 3: AscendAgent log shows `SemanticMemory: YES (N items)` with N ≥ 1
-- [ ] After step 3: Response `content` mentions `Luke` and `software engineer`
+- [ ] After step 1: HTTP 200
+- [ ] After step 1: Qdrant scroll filtered by `user_id=frosty` returns ≥ 1 point
+- [ ] After step 1: at least one Qdrant point's payload contains both `Luke` and `software engineer`
+- [ ] After step 3: HTTP 200
+- [ ] After step 3: Response `content` contains `Luke`
+- [ ] After step 3: Response `content` contains `software engineer`
+- [ ] After step 3: Response `content` is NOT a refusal like "I don't know your name"
 
 ### Verdict
 
@@ -40,7 +43,17 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-<!-- One short paragraph: what happened, key evidence, anything noteworthy. -->
+
+
+Input tokens:
+
+Output tokens:
+
+Start (UTC):
+
+End (UTC):
+
+Duration:
 
 ---
 

@@ -46,11 +46,13 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt
 
 ## Expected
 
-The Bruno output shows HTTP 200 and a response body whose `content` field contains a temperature value and a weather condition for the requested city.
+The Bruno output shows HTTP 200.
 
-The AscendAgent log (tail it during the run) shows the `getCurrentWeather` MCP tool being invoked for the request id printed in the controller log line.
+The response body's `content` field contains a numeric temperature value for the requested city.
 
-The response must NOT say "I cannot access live data" or "I don't have real-time data".
+The response body's `content` field contains a weather condition word (cloudy / clear / sunny / rain / etc.).
+
+The response body's `content` field does NOT contain refusal phrases like "I cannot access live data" or "I don't have real-time data" — those indicate the MCP tool was not invoked.
 
 ## Fixtures
 

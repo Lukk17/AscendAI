@@ -42,18 +42,18 @@ curl -fsS http://localhost:6333/healthz
 
 Expect HTTP 200.
 
-Check Redis responds.
+Check Redis responds. Run inside the `redis` container because `redis-cli` is not on the host shell in this dev environment.
 
 ```bash
-redis-cli -h localhost -p 6379 ping
+docker exec redis redis-cli ping
 ```
 
 Expect `PONG`.
 
-Check Postgres responds.
+Check Postgres responds. Run inside the `postgres` container because `psql` is not on the host shell.
 
 ```bash
-psql "postgresql://postgres:local@localhost:5432/ascend_ai" -c "SELECT 1"
+docker exec postgres psql -U postgres -d ascend_ai -c "SELECT 1"
 ```
 
 Expect a row with `1` in the output.
@@ -65,13 +65,13 @@ The Bruno requests pin `X-User-Id: frosty`. The reset commands below assume that
 Clear short-term chat for `frosty` in Redis.
 
 ```bash
-redis-cli -h localhost -p 6379 DEL chat:frosty
+docker exec redis redis-cli DEL chat:frosty
 ```
 
 Clear archived chat history for `frosty` in Postgres.
 
 ```bash
-psql "postgresql://postgres:local@localhost:5432/ascend_ai" -c "DELETE FROM chat_history WHERE user_id = 'frosty';"
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frosty';"
 ```
 
 Wipe stored semantic memory points for `frosty` in Qdrant.
@@ -91,11 +91,11 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/memory-test-save.y
 Step 2 — clear short-term chat again so the recall turn cannot leak from chat history. Run both commands and wait for them to return before continuing.
 
 ```bash
-redis-cli -h localhost -p 6379 DEL chat:frosty
+docker exec redis redis-cli DEL chat:frosty
 ```
 
 ```bash
-psql "postgresql://postgres:local@localhost:5432/ascend_ai" -c "DELETE FROM chat_history WHERE user_id = 'frosty';"
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frosty';"
 ```
 
 Step 3 — recall turn. Send the request and wait for the response before moving to the Expected section.
@@ -106,13 +106,27 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/memory-test-retrie
 
 ## Expected
 
-After step 1 the Bruno output shows HTTP 200, and the AscendAgent log contains `Inserted N/N facts for user 'frosty'` with N ≥ 1.
+After step 1 the Bruno output shows HTTP 200.
 
-After step 1 a Qdrant scroll on the active `ascend_memory_*` collection filtered by `user_id=frosty` returns at least one point whose payload mentions Luke and software engineer.
+Wait ~5 seconds after step 1 returns before running the Qdrant scroll. Mem0 writes the extracted facts to Qdrant asynchronously after the `/api/v1/memory/insert` call returns, so an immediate scroll can race the writer and miss the new points.
 
-After step 3 the Bruno output shows HTTP 200, the AscendAgent log contains `SemanticMemory: YES (N items)` with N ≥ 1, and the response `content` mentions `Luke` and `software engineer`.
+```bash
+sleep 5
+```
 
-If recall says it doesn't know the name, verify the same `embeddingProvider` was used in both turns, that Qdrant contains a point for `frosty` in the active collection, and that AscendMemory is healthy.
+After the wait, a Qdrant scroll filtered by `user_id=frosty` on the active `ascend_memory_*` collection returns at least one point whose payload mentions Luke and software engineer:
+
+```bash
+curl -sS -X POST http://localhost:6333/collections/ascend_memory_1536/points/scroll -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"user_id","match":{"value":"frosty"}}]},"limit":5,"with_payload":true,"with_vector":false}'
+```
+
+The point count returned by that scroll is ≥ 1, and at least one point's `payload.data` (or equivalent payload field) contains `Luke` AND `software engineer`.
+
+After step 3 the Bruno output shows HTTP 200.
+
+After step 3 the response body's `content` field contains both `Luke` and `software engineer`. Because chat history was wiped between save and recall, the only way the recall response can know those facts is via semantic memory.
+
+The response body's `content` field is NOT a refusal like "I don't know your name" — that indicates the semantic-memory pipeline did not deliver the stored facts.
 
 ## Fixtures
 

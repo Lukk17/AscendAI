@@ -19,9 +19,9 @@ Copy this file to `runs/<UTC-timestamp>_2-image-description-tasks.md` before sta
 ### Expected
 
 - [ ] HTTP 200
-- [ ] Response `content` describes specific subjects, colors, or text from `image.png` (not a generic "an image of something")
-- [ ] AscendAgent log shows `HasImage: true` for this request id
-- [ ] AscendAgent log contains no `InvalidMimeTypeException` traces
+- [ ] Response `content` is a detailed description (more than a few sentences)
+- [ ] Response `content` references concrete visual features of `image.png` — specific subjects, colors, objects, or text
+- [ ] Response `content` is NOT a refusal like "I don't see an image" or "I'm unable to view images"
 
 ### Verdict
 
@@ -29,7 +29,17 @@ Copy this file to `runs/<UTC-timestamp>_2-image-description-tasks.md` before sta
 
 ## Result summary
 
-<!-- One short paragraph: what happened, key evidence, anything noteworthy. -->
+
+
+Input tokens:
+
+Output tokens:
+
+Start (UTC):
+
+End (UTC):
+
+Duration:
 
 ---
 

@@ -58,21 +58,21 @@ curl -fsS http://localhost:9070/minio/health/live
 
 Expect HTTP 200.
 
-Check Postgres responds.
+Check Postgres responds. Run inside the `postgres` container because `psql` is not on the host shell in this dev environment.
 
 ```bash
-psql "postgresql://postgres:local@localhost:5432/ascend_ai" -c "SELECT 1"
+docker exec postgres psql -U postgres -d ascend_ai -c "SELECT 1"
 ```
 
 Expect a row with `1` in the output.
 
-Check the MinIO `mc` client is installed.
+Check the MinIO `mc` client is available inside the `minio` container (it ships with the image).
 
 ```bash
-mc --version
+docker exec minio mc --version
 ```
 
-Expect a version string. If not installed, install it from MinIO's documentation site.
+Expect a version string.
 
 Check the three fixtures exist.
 
@@ -84,22 +84,22 @@ Expect all three paths to print.
 
 ## Reset state
 
-Register the MinIO alias once per shell (idempotent).
+Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in `docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below runs through `sh -c` so the env vars expand *inside* the container — the host shell doesn't have them set.
 
 ```bash
-mc alias set ascend http://localhost:9070 minioadmin minioadmin
+docker exec minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"'
 ```
 
 Drop all objects from the `knowledge-base` bucket so the upload step is fresh.
 
 ```bash
-mc rm --recursive --force ascend/knowledge-base
+docker exec minio mc rm --recursive --force local/knowledge-base
 ```
 
 Truncate the Spring Integration metadata store so the run step does not classify files as already-ingested via stored ETags.
 
 ```bash
-psql "postgresql://postgres:local@localhost:5432/ascend_ai" -c "TRUNCATE TABLE int_metadata_store;"
+docker exec postgres psql -U postgres -d ascend_ai -c "TRUNCATE TABLE int_metadata_store;"
 ```
 
 Wipe RAG points for the three fixtures from Qdrant.
@@ -135,15 +135,25 @@ The three prompts saved in the request:
 
 ## Expected
 
-After step 1 the Bruno output shows HTTP 200 and the response body lists three uploaded keys under `markdown/` and `documents/`.
+After step 1 the Bruno output shows HTTP 200.
 
-After step 1 `mc ls ascend/knowledge-base/markdown/` shows `markdown-canary.md` and `mc ls ascend/knowledge-base/documents/` shows both `banana-price-poland.pdf` and `pierogi-recipe.docx`.
+After step 1 the response body's `uploaded` field lists exactly three keys: one under `markdown/` and two under `documents/`.
 
-After step 2 the Bruno output shows HTTP 200 and the response body has `indexed` ≥ 3, `failed` = 0.
+After step 1 `docker exec minio mc ls local/knowledge-base/markdown/` lists `markdown-canary.md`.
 
-After step 2 the AscendAgent log shows three `Processing ... stream for file: ...` lines and three `Split into N chunks` lines.
+After step 1 `docker exec minio mc ls local/knowledge-base/documents/` lists both `banana-price-poland.pdf` and `pierogi-recipe.docx`.
 
-After each run of step 3 the Bruno output shows HTTP 200, the response `content` cites the relevant fixture (canary phrase like `PURPLE-MOOSE-42` / a price from the PDF / `30 minutes` from the recipe), and the AscendAgent log shows `[RagRetrievalService] Retrieval: <k>/<N> candidates above threshold=<t> - scores=[...], inject=YES` with the retrieved chunk's source matching the prompt.
+After step 2 the Bruno output shows HTTP 200.
+
+After step 2 the response body has `indexed` ≥ 3 and `failed` = 0.
+
+After step 3a (markdown-canary prompt) the response body's `content` field contains the canary phrase from the markdown fixture (e.g. `PURPLE-MOOSE-42`).
+
+After step 3b (banana-price prompt) the response body's `content` field contains a numeric price in PLN that matches the PDF fixture (e.g. `6.49`).
+
+After step 3c (pierogi-recipe prompt) the response body's `content` field contains the rest time from the DOCX fixture (`30 minutes`).
+
+For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that document" — a refusal means the RAG retrieval did not inject the relevant chunk into the prompt.
 
 ## Fixtures
 
