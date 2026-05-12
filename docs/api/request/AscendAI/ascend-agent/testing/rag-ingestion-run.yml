@@ -5,21 +5,26 @@ info:
 
 http:
   method: POST
-  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ingestion/run?prefix=markdown/&embeddingProvider=lmstudio"
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ingestion/run?embeddingProvider=openai"
   headers:
     - name: X-User-Id
       value: frosty
   params:
     - name: prefix
+      value: documents/
+      type: query
+      disabled: true
+    - name: prefix
       value: markdown/
       type: query
+      disabled: true
     - name: embeddingProvider
       value: lmstudio
       type: query
+      disabled: true
     - name: embeddingProvider
       value: openai
       type: query
-      disabled: true
     - name: embeddingProvider
       value: gemini
       type: query

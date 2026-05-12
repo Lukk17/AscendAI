@@ -14,14 +14,14 @@ http:
     data:
       - name: prompt
         type: text
-        value: jakie kierunki rozwazam na wakacje ?
-      - name: image
-        type: file
-        value: []
+        value: What is the Ascend canary phrase?
         disabled: true
-      - name: document
-        type: file
-        value: []
+      - name: prompt
+        type: text
+        value: How long should I rest the pierogi dough according to Babcia Helena's recipe?
+      - name: prompt
+        type: text
+        value: What was the retail price of bananas in Poland in October 2026?
         disabled: true
       - name: embeddingProvider
         type: text
@@ -39,6 +39,22 @@ http:
       - name: model
         type: text
         value: claude-sonnet-4-6
+        disabled: true
+      - name: embeddingProvider
+        type: text
+        value: gemini
+        disabled: true
+      - name: embeddingProvider
+        type: text
+        value: lmstudio
+        disabled: true
+      - name: provider
+        type: text
+        value: gemini
+        disabled: true
+      - name: model
+        type: text
+        value: gemini-2.5-flash
         disabled: true
 
 settings:

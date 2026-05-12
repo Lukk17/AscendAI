@@ -34,17 +34,17 @@ http:
       - name: provider
         type: text
         value: openai
-        disabled: true
       - name: model
         type: text
         value: gpt-5.1
-        disabled: true
       - name: provider
         type: text
         value: gemini
+        disabled: true
       - name: model
         type: text
         value: gemini-2.5-flash
+        disabled: true
       - name: embeddingProvider
         type: text
         value: lmstudio
