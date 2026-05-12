@@ -23,8 +23,10 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class SemanticMemoryClientTest {
@@ -134,6 +136,29 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void search_WhenEnabled_ThenSendsSnakeCaseUserIdQueryParam() {
+        // given
+        when(properties.isEnabled()).thenReturn(true);
+        when(properties.getBaseUrl()).thenReturn("http://memory");
+
+        when(restClientBuilder.build().get()
+                .uri(anyString(), eq(DEFAULT_USER_ID), eq(QUERY), eq(LIMIT), eq(EMBEDDING_PROVIDER))
+                .retrieve()
+                .body(any(ParameterizedTypeReference.class)))
+                .thenReturn(List.of());
+
+        // when
+        semanticMemoryClient.search(DEFAULT_USER_ID, QUERY, LIMIT, EMBEDDING_PROVIDER);
+
+        // then
+        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+        verify(restClientBuilder.build().get()).uri(uriCaptor.capture(), eq(DEFAULT_USER_ID), eq(QUERY), eq(LIMIT), eq(EMBEDDING_PROVIDER));
+        assertThat(uriCaptor.getValue()).contains("user_id={userId}");
+        assertThat(uriCaptor.getValue()).doesNotContain("userId={userId}&");
+    }
+
+    @Test
     void insertMemory_WhenEnabled_ThenPostsSuccessfully() {
         // given
         when(properties.isEnabled()).thenReturn(true);
@@ -150,9 +175,135 @@ class SemanticMemoryClientTest {
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
-        when(responseSpecMock.onStatus(any(), any())).thenReturn(responseSpecMock);
 
         // when / then — no exception
         semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
+    }
+
+    @Test
+    void wipeUserMemory_WhenEnabled_ThenPostsToWipeEndpoint() {
+        // given
+        when(properties.isEnabled()).thenReturn(true);
+        when(properties.getBaseUrl()).thenReturn("http://memory");
+
+        RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
+        RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
+        RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
+
+        RestClient restClient = mock(RestClient.class);
+        when(restClientBuilder.build()).thenReturn(restClient);
+        when(restClient.post()).thenReturn(postMock);
+        when(postMock.uri(anyString())).thenReturn(bodySpecMock);
+        when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
+        when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
+
+        // when
+        semanticMemoryClient.wipeUserMemory(DEFAULT_USER_ID, EMBEDDING_PROVIDER);
+
+        // then
+        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+        verify(postMock).uri(uriCaptor.capture());
+        assertThat(uriCaptor.getValue()).endsWith("/api/v1/memory/wipe");
+
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpecMock).body(bodyCaptor.capture());
+        Map<String, Object> body = bodyCaptor.getValue();
+        assertThat(body).containsEntry("user_id", DEFAULT_USER_ID);
+        assertThat(body).containsEntry("provider", EMBEDDING_PROVIDER);
+    }
+
+    @Test
+    void deleteMemory_WhenEnabled_ThenIssuesDeleteWithQueryParams() {
+        // given
+        when(properties.isEnabled()).thenReturn(true);
+        when(properties.getBaseUrl()).thenReturn("http://memory");
+
+        RestClient.RequestHeadersUriSpec deleteMock = mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.RequestHeadersSpec<?> headersSpecMock = mock(RestClient.RequestHeadersSpec.class);
+        RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
+
+        RestClient restClient = mock(RestClient.class);
+        when(restClientBuilder.build()).thenReturn(restClient);
+        when(restClient.delete()).thenReturn(deleteMock);
+        when(deleteMock.uri(anyString(), eq("mem-123"), eq(EMBEDDING_PROVIDER)))
+                .thenAnswer(inv -> headersSpecMock);
+        when(headersSpecMock.retrieve()).thenReturn(responseSpecMock);
+
+        // when
+        semanticMemoryClient.deleteMemory(DEFAULT_USER_ID, "mem-123", EMBEDDING_PROVIDER);
+
+        // then
+        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+        verify(deleteMock).uri(uriCaptor.capture(), eq("mem-123"), eq(EMBEDDING_PROVIDER));
+        assertThat(uriCaptor.getValue()).contains("/api/v1/memory?memory_id={memoryId}&provider={provider}");
+    }
+
+    @Test
+    void search_WhenUserIdIsBlank_ThenReturnsEmptyListWithoutHttpCall() {
+        // when
+        List<SemanticMemoryItem> result = semanticMemoryClient.search(" ", QUERY, LIMIT, EMBEDDING_PROVIDER);
+
+        // then
+        assertThat(result).isEmpty();
+        verifyNoInteractions(restClientBuilder);
+    }
+
+    @Test
+    void insertMemory_WhenUserIdIsBlank_ThenNoOpWithoutHttpCall() {
+        // when
+        semanticMemoryClient.insertMemory("", FACT, EMBEDDING_PROVIDER);
+
+        // then
+        verifyNoInteractions(restClientBuilder);
+    }
+
+    @Test
+    void wipeUserMemory_WhenUserIdIsBlank_ThenNoOpWithoutHttpCall() {
+        // when
+        semanticMemoryClient.wipeUserMemory(null, EMBEDDING_PROVIDER);
+
+        // then
+        verifyNoInteractions(restClientBuilder);
+    }
+
+    @Test
+    void deleteMemory_WhenMemoryIdIsBlank_ThenNoOpWithoutHttpCall() {
+        // when
+        semanticMemoryClient.deleteMemory(DEFAULT_USER_ID, "", EMBEDDING_PROVIDER);
+
+        // then
+        verifyNoInteractions(restClientBuilder);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void insertMemory_WhenEnabled_ThenPostsSnakeCaseBody() {
+        // given
+        when(properties.isEnabled()).thenReturn(true);
+        when(properties.getBaseUrl()).thenReturn("http://memory");
+
+        RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
+        RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
+        RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
+
+        RestClient restClient = mock(RestClient.class);
+        when(restClientBuilder.build()).thenReturn(restClient);
+
+        when(restClient.post()).thenReturn(postMock);
+        when(postMock.uri(anyString())).thenReturn(bodySpecMock);
+        when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
+        when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
+
+        // when
+        semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
+
+        // then
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpecMock).body(bodyCaptor.capture());
+        Map<String, Object> body = bodyCaptor.getValue();
+        assertThat(body).containsEntry("user_id", DEFAULT_USER_ID);
+        assertThat(body).containsEntry("text", FACT);
+        assertThat(body).containsEntry("provider", EMBEDDING_PROVIDER);
+        assertThat(body).doesNotContainKey("userId");
     }
 }

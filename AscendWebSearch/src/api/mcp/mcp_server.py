@@ -4,21 +4,28 @@ from fastmcp import FastMCP
 
 from src.reader.web_reader import WebReader
 from src.search.search_client import SearxngClient
+from src.validator.url_validator import is_safe_external_url
 
 mcp = FastMCP("AscendWebSearch")
 search_client = SearxngClient()
 web_reader = WebReader()
 
+MAX_QUERY_LENGTH = 500
+
 
 @mcp.tool()
-def web_search(query: str, limit: int = 5) -> List[Dict[str, Any]]:
+async def web_search(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     """
     Search the web for a query using SearXNG.
     Args:
         query: The search query.
         limit: Max results (default 5).
     """
-    return search_client.search(query=query, limit=limit)
+    if not query or not query.strip():
+        raise ValueError("query must not be empty")
+    if len(query) > MAX_QUERY_LENGTH:
+        raise ValueError(f"query exceeds maximum length of {MAX_QUERY_LENGTH} characters")
+    return await search_client.search(query=query, limit=limit)
 
 
 @mcp.tool()
@@ -39,6 +46,10 @@ async def web_read(
                      this string are included in the link map (e.g. '/job-offer/').
         heavy_mode: If True, skips lightweight strategies and jumps straight to advanced browser strategies.
     """
+    if not is_safe_external_url(url):
+        raise ValueError(
+            "URL resolves to a private, loopback, link-local, or otherwise non-routable address"
+        )
     if include_links:
         return await web_reader.read_with_links(url, link_filter, heavy_mode=heavy_mode)
     return await web_reader.read(url, heavy_mode=heavy_mode)

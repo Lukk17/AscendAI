@@ -17,7 +17,8 @@ graph TB
     Reliability --> R2["Null response detection in ChatExecutor"]
 
     Testability --> T1["Unit tests with @Mock/@InjectMocks"]
-    Testability --> T2["Integration tests with mocked external deps"]
+    Testability --> T2["Integration tests with Testcontainers (Postgres/Redis/Qdrant/MinIO)"]
+    Testability --> T3["E2E capability tests via Bruno collection — behavior assertions only, no log substrings"]
 
     Security --> S1["API keys from environment variables"]
     Security --> S2["No hardcoded secrets in config"]
@@ -32,4 +33,6 @@ graph TB
 | Reliability | User requests an unknown provider | `IllegalArgumentException` with list of enabled providers returned as HTTP 400 |
 | Reliability | LLM returns null response | `AiGenerationException` thrown, caught by global handler |
 | Testability | Running tests without LLM access | All external dependencies mocked via `@MockitoBean` in `BaseIntegrationTest` |
+| Testability | Running integration tests against real backing services | `./gradlew integrationTest` boots Postgres / Redis / Qdrant / MinIO via Testcontainers; specs live in `src/test/java/.../integration/` |
+| Testability | Running capability tests against a live stack | Five numbered specs in [`AscendAgent/e2e/testing/`](../../e2e/README.md) — each runnable by Bruno CLI, asserts only observable behavior (HTTP / response body / persisted state), never log substrings |
 | Security | API key not set for a provider | Provider remains disabled (`enabled: false`), key defaults to `not-set` |

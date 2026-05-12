@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +35,14 @@ public class PersistentChatMemory implements ChatMemory {
 
     @Value("${app.memory.chat-history.max-size}")
     private int maxSize;
+
+    /**
+     * TTL applied to the Redis chat-history list after every write so dormant
+     * conversations don't pile up forever. Postgres pruning is a separate
+     * follow-up — see openspec change 'fix-ascend-agent-bugs' Bug 6.
+     */
+    @Value("${app.memory.chat-history.ttl:PT24H}")
+    private Duration ttl;
 
     public List<Message> get(String conversationId, int lastN) {
         String key = "chat:" + conversationId;
@@ -66,6 +75,7 @@ public class PersistentChatMemory implements ChatMemory {
                             .writeValueAsString(new MessageDto(msg.getMessageType().getValue(), msg.getText())));
                 }
                 redisTemplate.opsForList().rightPushAll(key, jsonMessages);
+                redisTemplate.expire(key, ttl);
             }
 
             int start = Math.max(0, hydrated.size() - lastN);
@@ -115,6 +125,7 @@ public class PersistentChatMemory implements ChatMemory {
                 persistToDb(conversationId, message);
             }
             redisTemplate.opsForList().trim(key, 0, maxSize - 1);
+            redisTemplate.expire(key, ttl);
         } catch (Exception e) {
             log.error("Failed to add messages to memory for conversation: {}", conversationId, e);
             throw new ServiceException("Failed to add to chat memory", e);

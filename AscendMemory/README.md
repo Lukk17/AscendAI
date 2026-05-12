@@ -7,6 +7,7 @@ AscendMemory is a robust, persistent memory service for the AscendAI ecosystem. 
 ## Table of Contents
 
 *   [API Documentation](#api-documentation)
+*   [Agent Skill](#agent-skill)
 *   [Prerequisites](#prerequisites)
 *   [Configuration (Environment Variables)](#configuration-environment-variables)
 *   [Running the Service](#running-the-service)
@@ -28,6 +29,16 @@ The REST API is self-documenting. While the server is running, you can access:
 
 ---
 
+## Agent Skill
+
+A drop-in skill is shipped at [`skills/ascend-memory/SKILL.md`](skills/ascend-memory/SKILL.md). Copy the `skills/ascend-memory/` directory into your agent's skills folder (`.claude/skills/`, `.agents/skills/`, `.kilocode/skills/`, etc.) and the agent will pick it up automatically.
+
+The skill teaches the agent when to search memory before answering, when to insert new memories, how to scope every call by `user_id`, and when destructive operations like `/wipe` are appropriate. Base URL is left out (varies per environment) — the agent runtime is expected to provide it.
+
+When you change endpoint shapes here, update the SKILL.md so downstream agents stay accurate.
+
+---
+
 ## Prerequisites
 
 *   **Python 3.11**
@@ -39,16 +50,24 @@ The REST API is self-documenting. While the server is running, you can access:
 
 The service is configured via environment variables. You can set them in your shell or use a `.env` file (if supported by your runner, though this project uses `pydantic-settings` which reads `.env` by default if present).
 
-*   `OPENAI_API_KEY`: **(Required)** API key for the embedding model endpoint.
-*   `OPENAI_BASE_URL`: **(Required)** Base URL for the LLM/embedding provider (e.g., `http://host.docker.internal:1234/v1` for local LM Studio, or `https://api.openai.com/v1`).
-*   `MEM0_LLM_MODEL`: **(Optional)** Exact model ID for fact extraction LLM (e.g., `meta-llama-3.1-8b-instruct`). Default: `meta-llama-3.1-8b-instruct`.
-*   `MEM0_DEFAULT_PROVIDER`: **(Optional)** Default embedding provider when none is specified in requests. Options: `lmstudio`, `openai`, `gemini`. Default: `lmstudio`.
-*   `MEM0_INFER_MEMORY`: **(Optional)** Whether mem0 infers memories from interactions (vs storing them verbatim). Default: `false`.
-*   `API_PORT`: **(Optional)** Port to run the server on. Default: `7020`.
-*   `API_HOST`: **(Optional)** Host to bind to. Default: `0.0.0.0`.
-*   `LOG_LEVEL`: **(Optional)** Logging level. Default: `INFO`.
-*   `QDRANT_HOST`: Hostname of the Qdrant vector database (use `localhost` for local dev, `qdrant` for docker).
-*   `QDRANT_PORT`: Port for Qdrant (default: 6333).
+Each embedding provider has its own base URL and API key, so a single deployment can serve `provider=lmstudio`, `provider=openai`, and `provider=gemini` simultaneously, each routed to its real endpoint.
+
+*   `LMSTUDIO_BASE_URL`: LM Studio OpenAI-compatible URL. Default: `http://localhost:1234/v1`.
+*   `LMSTUDIO_API_KEY`: Placeholder key (LM Studio doesn't validate). Default: `sk_local`.
+*   `OPENAI_BASE_URL`: Real OpenAI URL. Default: `https://api.openai.com/v1`.
+*   `OPENAI_API_KEY`: Real OpenAI key. Required when `provider=openai` is invoked.
+*   `GEMINI_BASE_URL`: Gemini OpenAI-compatible URL. Default: `https://generativelanguage.googleapis.com/v1beta/openai/`.
+*   `GEMINI_API_KEY`: Gemini key. Required when `provider=gemini` is invoked.
+*   `MEM0_LLM_MODEL`: Model ID for fact extraction. Default: `meta-llama-3.1-8b-instruct`.
+*   `MEM0_DEFAULT_PROVIDER`: Provider used when the request omits `provider`. Default: `lmstudio`.
+*   `MEM0_INFER_MEMORY`: If `true`, mem0 infers memories from chat messages instead of storing the raw text. Default: `false`.
+*   `API_PORT`: Default `7020`.
+*   `API_HOST`: Default `0.0.0.0`.
+*   `LOG_LEVEL`: Default `INFO`.
+*   `QDRANT_HOST`: `localhost` for native, `host.docker.internal` from inside Docker, or your managed Qdrant host.
+*   `QDRANT_PORT`: Default `6333`.
+
+Missing API keys only fail when the corresponding provider is actually invoked, so you can run with just the keys you need.
 
 ### Embedding Provider → Qdrant Collection Mapping
 

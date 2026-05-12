@@ -32,11 +32,10 @@ docker build -t weather-mcp:latest .
 
 This is a minimal Spring Boot MCP server with a single tool:
 
-- **`getCurrentWeather`** — Returns current weather data for a given location
-- Communication via SSE (STDIO is disabled)
-- Console logging intentionally disabled to preserve STDIO integrity
-- Explicit tool discovery via `ToolCallbackProvider`
-- Headless operation (`spring.main.web-application-type` may be set to `none` for STDIO mode)
+- **`getCurrentWeather`** — returns current weather data for a given location.
+- Communication is **SSE** (Server-Sent Events) over HTTP on port 9998. STDIO transport is disabled.
+- Console logging is intentionally suppressed in `application.yml` to keep the SSE stream clean. Write logs to a file if you need them.
+- Explicit tool discovery via a `ToolCallbackProvider` bean — deterministic registration rather than relying on annotation auto-discovery.
 
 ## Design Notes
 

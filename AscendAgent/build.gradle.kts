@@ -1,8 +1,13 @@
 plugins {
     java
+    jacoco
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.management)
     alias(libs.plugins.springdoc.openapi)
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
 }
 
 group = "com.lukk"
@@ -29,6 +34,7 @@ dependencyManagement {
     imports {
         mavenBom(libs.spring.ai.bom.get().toString())
         mavenBom(libs.aws.sdk.bom.get().toString())
+        mavenBom(libs.testcontainers.bom.get().toString())
     }
 }
 
@@ -64,6 +70,13 @@ dependencies {
     implementation(libs.qdrant.client)
     implementation(libs.commonmark)
     implementation(libs.pdfbox)
+    implementation(libs.tika.core)
+
+    // Security
+    implementation(libs.spring.boot.starter.security)
+
+    // Actuator — health endpoint
+    implementation(libs.spring.boot.starter.actuator)
 
     // Springdoc OpenAPI
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
@@ -77,10 +90,59 @@ dependencies {
 
     // Test
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.testcontainers)
+    testImplementation(libs.testcontainers.junit)
+    testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.testcontainers.qdrant)
+    testImplementation(libs.testcontainers.minio)
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.h2)
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.register<Test>("integrationTest") {
+    description = "Runs integration tests (@Tag(\"integration\")). Requires Docker to be running for Testcontainers."
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    shouldRunAfter(tasks.test)
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    // Optional override for environments where Testcontainers' auto-detection picks the wrong pipe.
+    // When unset (default), Testcontainers detects from the active Docker context.
+    //   ./gradlew integrationTest -Pdocker.host=npipe:////./pipe/docker_engine
+    (project.findProperty("docker.host") as String?)?.let {
+        environment("DOCKER_HOST", it)
+    }
+    // Pin the Docker API version so docker-java doesn't fall back to ancient 1.32
+    // when Docker Desktop's proxy garbles the _ping response. Daemon requires >=1.40.
+    environment("DOCKER_API_VERSION", "1.43")
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    executionData(fileTree(layout.buildDirectory).include("/jacoco/test.exec", "/jacoco/integrationTest.exec"))
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = "INSTRUCTION"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
 }

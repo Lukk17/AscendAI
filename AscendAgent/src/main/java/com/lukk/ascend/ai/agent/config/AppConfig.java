@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.config;
 
 import com.lukk.ascend.ai.agent.config.properties.VectorStoreProperties;
+import com.lukk.ascend.ai.agent.config.properties.VisionCapabilityProperties;
 import io.qdrant.client.QdrantClient;
 import io.qdrant.client.grpc.Collections;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 @Configuration
-@EnableConfigurationProperties(VectorStoreProperties.class)
+@EnableConfigurationProperties({VectorStoreProperties.class, VisionCapabilityProperties.class})
 @Slf4j
 public class AppConfig {
 

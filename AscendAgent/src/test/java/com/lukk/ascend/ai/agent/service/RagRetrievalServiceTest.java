@@ -71,13 +71,13 @@ class RagRetrievalServiceTest {
     }
 
     @Test
-    void retrieveContext_WhenTopScoreBelowThreshold_ThenReturnsEmptyString() {
-        // given
+    void retrieveContext_WhenAllScoresBelowThreshold_ThenReturnsEmptyString() {
+        // given — with threshold applied at search time, vector store returns nothing
+        // when no document scores above the threshold (Spring AI handles the filtering).
         setupRagProperties(true, 5, 0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-        
-        Document doc = createDocument("Some content", 0.5); // Score below 0.75
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
 
         // when
         String result = ragRetrievalService.retrieveContext(DEFAULT_QUERY, EMBED_PROVIDER);
@@ -138,6 +138,50 @@ class RagRetrievalServiceTest {
         // then
         assertThat(result).contains("This is a very long ");
         assertThat(result).doesNotContain("string that should be cut off");
+    }
+
+    @Test
+    void retrieveContext_WhenAllScoresAboveThreshold_Then3HitsBuiltInContext() {
+        // given
+        setupRagProperties(true, 5, 0.75, 4000);
+        when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
+
+        Document doc1 = createDocument("Doc one body.", 0.91);
+        Document doc2 = createDocument("Doc two body.", 0.85);
+        Document doc3 = createDocument("Doc three body.", 0.80);
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc1, doc2, doc3));
+
+        // when
+        String result = ragRetrievalService.retrieveContext(DEFAULT_QUERY, EMBED_PROVIDER);
+
+        // then
+        assertThat(result)
+                .contains("<rag_context>")
+                .contains("Doc one body.")
+                .contains("Doc two body.")
+                .contains("Doc three body.")
+                .contains("</rag_context>");
+    }
+
+    @Test
+    void retrieveContext_WhenMixedScores_Then2HitsAreReturned() {
+        // given — vector store applies the threshold itself; only docs above threshold come back
+        setupRagProperties(true, 5, 0.75, 4000);
+        when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
+
+        Document doc1 = createDocument("High scoring doc.", 0.85);
+        Document doc2 = createDocument("Moderate scoring doc.", 0.80);
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc1, doc2));
+
+        // when
+        String result = ragRetrievalService.retrieveContext(DEFAULT_QUERY, EMBED_PROVIDER);
+
+        // then
+        assertThat(result)
+                .contains("High scoring doc.")
+                .contains("Moderate scoring doc.")
+                .contains("<rag_context>")
+                .contains("</rag_context>");
     }
 
     private void setupRagProperties(boolean enabled, int topK, double threshold, int maxChars) {

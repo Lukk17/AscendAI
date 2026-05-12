@@ -20,8 +20,11 @@ The AscendAgent is the central Spring Boot API gateway for the AscendAI platform
 # Run (port 9917)
 ./gradlew bootRun
 
-# Run tests
+# Run unit tests
 ./gradlew test
+
+# Run integration tests (Testcontainers — Postgres/Redis/Qdrant/MinIO)
+./gradlew integrationTest
 
 # Run a single test class
 ./gradlew test --tests "com.lukk.ascend.ai.agent.service.SomeTest"
@@ -29,6 +32,18 @@ The AscendAgent is the central Spring Boot API gateway for the AscendAI platform
 # Docker
 docker build -t ascend-agent:latest .
 ```
+
+## End-to-end tests
+
+Capability-level e2e tests live in [`e2e/`](e2e/README.md). Five numbered specs (`1-weather-mcp` through `5-rag`) exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec asserts only observable behavior — HTTP status, response body, persisted state in MinIO / Qdrant / Postgres — never log substrings. Each spec has a sidecar `<N>-<feature>-tasks.template.md` the runner copies into `e2e/testing/runs/` per run.
+
+Quick invocation:
+
+```bash
+cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
+```
+
+See [`e2e/README.md`](e2e/README.md) for the full contract, capability matrix, and how to add a new test.
 
 ## Architecture
 

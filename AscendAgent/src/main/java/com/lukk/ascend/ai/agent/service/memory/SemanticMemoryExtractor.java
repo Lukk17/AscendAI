@@ -27,8 +27,8 @@ public class SemanticMemoryExtractor {
             Identify exclusively standalone semantic facts (identity, strict preference, name, contact) from the attached user prompt.
             Disregard general knowledge or questions.
 
-            RESPOND WITH ONLY a JSON Array of strings. No explanation, no reasoning, no markdown.
-            If there are no facts to save, respond with exactly: []
+            Output ONLY a JSON array of strings. No prose, no markdown fences, no chain-of-thought, no explanation.
+            If there are no facts to save, output exactly: []
 
             Example output:
             ["User loves playing electric guitar", "User's favorite color is red"]
@@ -74,7 +74,27 @@ public class SemanticMemoryExtractor {
         String responseContent = chatResponseContentResolver.resolveContent(chatResponse);
 
         List<String> facts = extractFactsFromJson(responseContent);
-        facts.forEach(fact -> memoryClient.insertMemory(userId, fact, embeddingProvider));
+        insertFactsWithTally(userId, facts, embeddingProvider);
+    }
+
+    private void insertFactsWithTally(String userId, List<String> facts, String embeddingProvider) {
+        if (facts.isEmpty()) {
+            return;
+        }
+        int ok = 0;
+        int failed = 0;
+        for (String fact : facts) {
+            try {
+                memoryClient.insertMemory(userId, fact, embeddingProvider);
+                ok++;
+            } catch (Exception e) {
+                failed++;
+                log.debug("Insert failed for fact '{}' (user '{}'): {}", fact, userId, e.getMessage());
+            }
+        }
+        if (failed > 0) {
+            log.warn("Inserted {}/{} facts for user '{}' (failed: {})", ok, facts.size(), userId, failed);
+        }
     }
 
     private void handleExtractionError(String userId, Exception e) {
@@ -94,7 +114,7 @@ public class SemanticMemoryExtractor {
                 .orElse(null);
     }
 
-    private List<String> extractFactsFromJson(String jsonString) {
+    List<String> extractFactsFromJson(String jsonString) {
         return Optional.ofNullable(jsonString)
                 .filter(StringUtils::hasText)
                 .map(String::trim)
@@ -119,18 +139,63 @@ public class SemanticMemoryExtractor {
         }
     }
 
+    /**
+     * Falls back to a balanced-bracket scan when the response isn't pure JSON.
+     * Thinking models (MiniMax-M2.x, etc.) prepend chain-of-thought before the array, sometimes
+     * append commentary, sometimes wrap in inline code. We scan from the end of the string for
+     * the last balanced {@code [...]} substring (string-aware, depth-counted) and try to parse it.
+     * Returns an empty list and logs WARN once if all attempts fail. Never throws.
+     */
     private List<String> extractEmbeddedJsonArray(String text) {
-        int lastOpen = text.lastIndexOf('[');
-        int lastClose = text.lastIndexOf(']');
-        if (lastOpen >= 0 && lastClose > lastOpen) {
-            String candidate = text.substring(lastOpen, lastClose + 1);
+        Optional<String> candidate = findLastBalancedJsonArray(text);
+        if (candidate.isPresent()) {
             try {
-                return objectMapper.readValue(candidate, new TypeReference<List<String>>() {});
+                return objectMapper.readValue(candidate.get(), new TypeReference<List<String>>() {});
             } catch (JsonProcessingException ex) {
-                // Fall through to warn
+                log.debug("Embedded JSON array candidate parse failed: {}", ex.getMessage());
             }
         }
         log.warn("Could not parse memory extraction response as JSON Array. Content: {}", text);
         return List.of();
+    }
+
+    private Optional<String> findLastBalancedJsonArray(String text) {
+        if (text == null || text.isBlank()) {
+            return Optional.empty();
+        }
+        for (int closeIdx = text.length() - 1; closeIdx >= 0; closeIdx--) {
+            if (text.charAt(closeIdx) != ']') {
+                continue;
+            }
+            int depth = 0;
+            boolean inString = false;
+            boolean escaped = false;
+            for (int i = closeIdx; i >= 0; i--) {
+                char c = text.charAt(i);
+                if (escaped) {
+                    escaped = false;
+                    continue;
+                }
+                if (c == '\\') {
+                    escaped = true;
+                    continue;
+                }
+                if (c == '"') {
+                    inString = !inString;
+                    continue;
+                }
+                if (inString) {
+                    continue;
+                }
+                if (c == ']') depth++;
+                else if (c == '[') {
+                    depth--;
+                    if (depth == 0) {
+                        return Optional.of(text.substring(i, closeIdx + 1));
+                    }
+                }
+            }
+        }
+        return Optional.empty();
     }
 }

@@ -40,7 +40,14 @@ class CookieManager:
     def _get_domain(self, url: str) -> str:
         parsed = urlparse(url)
         domain = parsed.netloc if parsed.netloc else parsed.path.split('/')[0]
-        return domain.lower()
+        domain = domain.lower().split(':')[0]
+        # Apex normalization so cookies stored under www.linkedin.com hit on linkedin.com (and vice versa).
+        # Without this, login cookies acquired by NoVNC on the canonical login host miss when the same
+        # crawl later resolves to a subdomain — re-triggering the login wall every request.
+        parts = domain.split('.')
+        if len(parts) > 2:
+            domain = '.'.join(parts[-2:])
+        return domain
 
     async def get_session_data(self, url: str) -> Optional[Dict[str, Any]]:
         """

@@ -4,14 +4,11 @@ import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.HttpRequest;
-import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +23,9 @@ public class SemanticMemoryClient {
     private final SemanticMemoryProperties properties;
 
     public List<SemanticMemoryItem> search(String userId, String query, int limit, String embeddingProvider) {
+        if (!hasUserId(userId, "search")) {
+            return List.of();
+        }
         return Optional.of(properties)
                 .filter(SemanticMemoryProperties::isEnabled)
                 .map(props -> executeSearch(userId, query, limit, embeddingProvider))
@@ -44,7 +44,7 @@ public class SemanticMemoryClient {
     private List<SemanticMemoryItem> performSearchCall(String userId, String query, int limit, String embeddingProvider) {
         List<SemanticMemoryItem> result = restClientBuilder.build()
                 .get()
-                .uri(properties.getBaseUrl() + "/api/v1/memory/search?userId={userId}&query={query}&limit={limit}&provider={provider}",
+                .uri(properties.getBaseUrl() + "/api/v1/memory/search?user_id={userId}&query={query}&limit={limit}&provider={provider}",
                         userId, query, limit, embeddingProvider)
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {});
@@ -68,21 +68,13 @@ public class SemanticMemoryClient {
     }
 
     public void insertMemory(String userId, String fact, String embeddingProvider) {
-        Optional.of(properties)
-                .filter(SemanticMemoryProperties::isEnabled)
-                .ifPresent(props -> executeInsert(userId, fact, embeddingProvider));
-    }
-
-    private void executeInsert(String userId, String fact, String embeddingProvider) {
-        log.info("Inserting semantic memory for user: '{}'", userId);
-        try {
-            performInsertCall(userId, fact, embeddingProvider);
-        } catch (Exception e) {
-            log.error("Exception while inserting memory for user '{}': {}", userId, e.getMessage());
+        if (!hasUserId(userId, "insertMemory")) {
+            return;
         }
-    }
-
-    private void performInsertCall(String userId, String fact, String embeddingProvider) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+        log.info("Inserting semantic memory for user: '{}'", userId);
         Map<String, String> body = new HashMap<>();
         body.put("user_id", userId);
         body.put("text", fact);
@@ -93,12 +85,71 @@ public class SemanticMemoryClient {
                 .uri(properties.getBaseUrl() + "/api/v1/memory/insert")
                 .body(body)
                 .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, this::handleInsertError)
                 .toBodilessEntity();
         log.info("Successfully inserted memory fact for user: '{}'", userId);
     }
 
-    private void handleInsertError(HttpRequest request, ClientHttpResponse response) throws IOException {
-        log.warn("Failed to insert memory: HTTP {}", response.getStatusCode());
+    /**
+     * Removes every memory for the given user via {@code POST /api/v1/memory/wipe}.
+     * Body is snake_case to match the FastAPI contract on the AscendMemory side.
+     */
+    public void wipeUserMemory(String userId, String embeddingProvider) {
+        if (!hasUserId(userId, "wipeUserMemory")) {
+            return;
+        }
+        if (!properties.isEnabled()) {
+            return;
+        }
+        log.info("Wiping semantic memory for user: '{}'", userId);
+        Map<String, String> body = new HashMap<>();
+        body.put("user_id", userId);
+        body.put("provider", embeddingProvider);
+        try {
+            restClientBuilder.build()
+                    .post()
+                    .uri(properties.getBaseUrl() + "/api/v1/memory/wipe")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully wiped semantic memory for user: '{}'", userId);
+        } catch (RestClientResponseException e) {
+            log.warn("Wipe failed for user '{}'. Status: {}", userId, e.getStatusCode());
+        }
+    }
+
+    /**
+     * Deletes a single memory by its mem0 id via {@code DELETE /api/v1/memory?memory_id=...}.
+     */
+    public void deleteMemory(String userId, String memoryId, String embeddingProvider) {
+        if (!hasUserId(userId, "deleteMemory")) {
+            return;
+        }
+        if (!StringUtils.hasText(memoryId)) {
+            log.warn("deleteMemory called with blank memoryId for user '{}'; skipping", userId);
+            return;
+        }
+        if (!properties.isEnabled()) {
+            return;
+        }
+        log.info("Deleting semantic memory id '{}' for user: '{}'", memoryId, userId);
+        try {
+            restClientBuilder.build()
+                    .delete()
+                    .uri(properties.getBaseUrl() + "/api/v1/memory?memory_id={memoryId}&provider={provider}",
+                            memoryId, embeddingProvider)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully deleted memory id '{}' for user: '{}'", memoryId, userId);
+        } catch (RestClientResponseException e) {
+            log.warn("Delete failed for memory id '{}' (user '{}'). Status: {}", memoryId, userId, e.getStatusCode());
+        }
+    }
+
+    private boolean hasUserId(String userId, String operation) {
+        if (!StringUtils.hasText(userId)) {
+            log.warn("SemanticMemoryClient.{} called with blank userId; short-circuiting", operation);
+            return false;
+        }
+        return true;
     }
 }

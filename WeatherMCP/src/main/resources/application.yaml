@@ -1,6 +1,18 @@
 server:
   port: 9998
 
+# Actuator — exposes /actuator/health for liveness checks. Only the health endpoint
+# is published; metrics/info/etc. stay closed by default.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 spring:
   application:
     name: ascend-ai-weather-mcp

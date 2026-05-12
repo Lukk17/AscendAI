@@ -61,7 +61,7 @@ class ManualIngestionServiceTest {
     @BeforeEach
     void setupGlobalFields() {
         ReflectionTestUtils.setField(manualIngestionService, "bucket", "test-bucket");
-        ReflectionTestUtils.setField(manualIngestionService, "obsidianFolder", "obsidian/");
+        ReflectionTestUtils.setField(manualIngestionService, "markdownFolder", "markdown/");
         ReflectionTestUtils.setField(manualIngestionService, "documentsFolder", "documents/");
     }
 
@@ -98,7 +98,7 @@ class ManualIngestionServiceTest {
     @Test
     void run_WhenObjectAlreadyIndexed_ThenSkipsObject() {
         // given
-        S3Object validObject = S3Object.builder().key("obsidian/file.md").eTag("v1").build();
+        S3Object validObject = S3Object.builder().key("markdown/file.md").eTag("v1").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(validObject)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         
@@ -115,7 +115,7 @@ class ManualIngestionServiceTest {
     @Test
     void run_WhenValidMarkdownObject_ThenIngestsProperly() {
         // given
-        S3Object obj = S3Object.builder().key("obsidian/test.md").lastModified(Instant.now()).build();
+        S3Object obj = S3Object.builder().key("markdown/test.md").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
@@ -124,7 +124,7 @@ class ManualIngestionServiceTest {
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         
         Document processedDoc = new Document("MD Text");
-        when(ingestionService.processMarkdown(any(), eq("obsidian/test.md"))).thenReturn(List.of(processedDoc));
+        when(ingestionService.processMarkdown(any(), eq("markdown/test.md"))).thenReturn(List.of(processedDoc));
         
         Document chunk1 = new Document("Chunk 1");
         Document chunk2 = new Document("Chunk 2");
@@ -132,7 +132,7 @@ class ManualIngestionServiceTest {
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
         // when
-        ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.of("obsidian/"), "openai");
+        ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.of("markdown/"), "openai");
 
         // then
         assertThat(result.indexed).isEqualTo(2);

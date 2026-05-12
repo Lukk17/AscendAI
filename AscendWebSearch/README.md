@@ -7,6 +7,7 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
 ## Table of Contents
 
 *   [API Documentation](#api-documentation)
+*   [Agent Skill](#agent-skill)
 *   [Versioning & Changelog](#versioning--changelog)
 *   [Prerequisites](#prerequisites)
 *   [Configuration (Environment Variables)](#configuration-environment-variables)
@@ -23,6 +24,16 @@ AscendWebSearch is a powerful web search and extraction service for the AscendAI
 
 *   **Swagger UI**: [http://localhost:7021/docs](http://localhost:7021/docs)
 *   **Redoc**: [http://localhost:7021/redoc](http://localhost:7021/redoc)
+
+---
+
+## Agent Skill
+
+A drop-in skill is shipped at [`skills/ascend-web-scrapper/SKILL.md`](skills/ascend-web-scrapper/SKILL.md). Copy the `skills/ascend-web-scrapper/` directory into your agent's skills folder (`.claude/skills/`, `.agents/skills/`, `.kilocode/skills/`, etc.) and the agent will pick it up automatically.
+
+The skill covers the two endpoints (`POST /api/v2/web/read`, `GET /api/v1/web/search`), the success / error / `human_intervention_required` response shapes, and — most importantly — the CAPTCHA / login-wall flow: surface the returned `vnc_url`, let the user solve it on any device, then re-call `/read` with the same URL so the cached session in Redis takes over. The base URL is intentionally left out of the skill (it differs per environment) — the agent runtime is expected to provide it.
+
+When you change endpoint shapes here, update the SKILL.md so downstream agents stay accurate.
 
 ---
 

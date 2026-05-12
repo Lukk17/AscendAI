@@ -17,20 +17,19 @@ graph TB
         MinIO["MinIO :9070/9071"]
     end
 
-    subgraph "Docker Compose"
-        subgraph "Application Services"
-            AudioScribe["AudioScribe :7017"]
-            WebSearch["AscendWebSearch :7021"]
-            Memory["AscendMemory :7020"]
-            PaddleOCR["PaddleOCR :7022"]
-        end
+    subgraph "Compose project: ascend-ai (docker-compose.yaml)"
+        AudioScribe["AudioScribe :7017"]
+        Memory["AscendMemory :7020"]
+        PaddleOCR["PaddleOCR :7022"]
+        Docling["Docling :5001"]
+        Unstructured["Unstructured :9080"]
+    end
 
-        subgraph "Support Services"
-            SearXNG["SearXNG :9020"]
-            Flare["FlareSolverr :8191"]
-            Docling["Docling :5001"]
-            Unstructured["Unstructured :9080"]
-        end
+    subgraph "Compose project: ascend-scrapper (ascend-scrapper.docker-compose.yaml)"
+        WebSearch["AscendWebSearch :7021"]
+        SearXNG["SearXNG :9020"]
+        Flare["FlareSolverr :8191"]
+        Ngrok["ngrok-ascend-web-search"]
     end
 
     subgraph "Cloud (Optional)"
@@ -83,7 +82,7 @@ graph TB
 
 ## Prerequisites
 
-External services must be running before `docker-compose up`:
+External services must be running before `docker compose up`. The main file (`docker-compose.yaml`, project `ascend-ai`) uses `include:` to pull in `ascend-scrapper.docker-compose.yaml` (project `ascend-scrapper`), so a single command brings up the full stack. Running the scrapper file directly (`docker compose -f ascend-scrapper.docker-compose.yaml up`) keeps it as its own Docker Desktop group.
 
 | Service | Purpose | Cloud Equivalent |
 |---|---|---|

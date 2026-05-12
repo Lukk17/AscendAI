@@ -1,109 +1,94 @@
-# AscendAI MCP Server
+# WeatherMCP
 
 ---
 
-This project is a standalone Model Context Protocol (MCP) server built with Spring Boot and Spring AI. 
-Its purpose is to expose specific functionalities, to an external MCP-compatible orchestrator.
+A standalone Model Context Protocol (MCP) server built with Spring Boot and Spring AI 1.1.4. It exposes a single tool, `getCurrentWeather`, that AscendAgent (or any MCP-compatible client) can call to fetch weather data.
 
-The server is designed for headless operation and communicates exclusively over Standard Input/Output (STDIO), 
-making it a lightweight and efficient component in a larger AI system.
+It's the reference implementation in this repo for "what a Spring AI MCP server looks like end to end" — small, single-purpose, no database.
 
 ---
 
-## Features
+## Tech stack
 
-- Tool Capability: Exposes a getCurrentWeather function as a callable tool for an LLM. 
-- STDIO Communication: Uses standard input/output for a direct, serverless communication channel with an orchestrator. 
-- Lightweight: Runs as a non-web Spring Boot application for minimal overhead. 
-- Explicit Tool Registration: Ensures reliable tool discovery through a dedicated provider configuration.
+- Java 21
+- Spring Boot 3.5.4
+- Spring AI 1.1.4 (`spring-ai-starter-mcp-server-webmvc`)
+- Gradle (`build.gradle.kts`)
 
 ---
 
-## How to Build
+## How it talks to AscendAgent
 
-Build the project using the Gradle wrapper:
+The server runs as a normal Spring Boot web app on port `9998` and serves MCP over **SSE** (Server-Sent Events). AscendAgent's MCP client subscribes at startup and discovers the `getCurrentWeather` tool automatically.
 
-On macOS/Linux:
-```
+STDIO transport is intentionally disabled. Console logging is also intentionally suppressed — if you need logs, write them to a file. This keeps the SSE stream clean and unblocks orchestrator parsing.
+
+---
+
+## Build
+
+Bash:
+
+```bash
 ./gradlew clean bootJar
 ```
 
-On Windows:
+PowerShell:
+
+```powershell
+.\gradlew.bat clean bootJar
 ```
-gradlew.bat clean bootJar
+
+The JAR lands in `build/libs/`. Project version is in `build.gradle.kts`.
+
+---
+
+## Run
+
+Bash:
+
+```bash
+./gradlew bootRun
 ```
-The build process will generate an executable JAR file in the `build/libs/` directory. 
-The file will be named MCP-0.0.1.jar based on the project's group and version.
 
----
+PowerShell:
 
-## How It Works
-This application is not meant to be run directly by a user. It's a background process started and managed by an MCP orchestrator.
+```powershell
+.\gradlew.bat bootRun
+```
 
-### 1. Communication Protocol
-The server is configured to run as a non-web application (`web-application-type: none`). 
-It uses STDIO as its transport layer. 
-This means an orchestrator starts the server's JAR file as a child process 
-and communicates with it by writing JSON-RPC 2.0 messages to its standard input and reading responses from its standard output.
+Or via Docker (in the monorepo this is wired into `docker-compose.yaml`):
 
-### 2. Tool Definition (example of WeatherToolService)
-The core functionality is defined in the `WeatherToolService`. 
-This class contains a method, `getCurrentWeather`, which is annotated with `@Tool`. 
-This annotation, provided by Spring AI, marks the method as a function that can be described to and executed by an AI model.
+Bash:
 
-### 3. Explicit Tool Discovery (ToolProvider)
-While Spring AI can auto-discover `@Tool` beans, this project ensures reliability by explicitly registering the tool with the application context. 
-The ToolProvider configuration class creates a `ToolCallbackProvider` bean, 
-which is the component responsible for listing and executing available tools. 
-This manual registration guarantees that the `WeatherToolService` is always visible to the MCP server.
-
-Of course. Here is a comprehensive README.md file for your project based on the code and configuration you provided.
-
-AscendAI MCP Weather Server
-This project is a standalone Model Context Protocol (MCP) server built with Spring Boot and Spring AI. Its purpose is to expose specific functionalities, in this case, a weather information tool, to an external MCP-compatible orchestrator.
-
-The server is designed for headless operation and communicates exclusively over Standard Input/Output (STDIO), making it a lightweight and efficient component in a larger AI system.
-
----
-
-## Features
-Tool Capability: Exposes a getCurrentWeather function as a callable tool for an LLM.
-
-STDIO Communication: Uses standard input/output for a direct, serverless communication channel with an orchestrator.
-
-Lightweight: Runs as a non-web Spring Boot application for minimal overhead.
-
-Explicit Tool Registration: Ensures reliable tool discovery through a dedicated provider configuration.
-
----
-
-
-## An Important Note on Logging 📝
-Console logging is intentionally disabled.
-
-The logging.pattern.console property in application.yml is left blank. 
-This is a critical design choice for STDIO-based communication.
-
-The STDIO stream is used exclusively for the structured JSON-RPC messages between the orchestrator and this server. 
-Any other text printed to the console, such as application logs, would corrupt this data stream, 
-break the communication protocol, and cause the orchestrator to fail.
-
----
-
-## Docker Support
-
-### Build the Docker image
-```shell
+```bash
 docker build -t weather-mcp:latest .
 ```
 
-### Run the container
-```shell
+```bash
 docker run -d -p 9998:9998 --name weather-mcp weather-mcp:latest
 ```
 
-### Tag and Publish (Optional)
-```shell
-docker tag weather-mcp:latest lukk17/weather-mcp:latest
-docker push lukk17/weather-mcp:latest
+PowerShell:
+
+```powershell
+docker build -t weather-mcp:latest .
 ```
+
+```powershell
+docker run -d -p 9998:9998 --name weather-mcp weather-mcp:latest
+```
+
+---
+
+## How AscendAgent registers the tool
+
+`WeatherToolService` exposes `getCurrentWeather` annotated with `@Tool`. A `ToolCallbackProvider` bean lists it explicitly so discovery is deterministic, not implicit. AscendAgent's MCP client then sees it in the registered tools array on startup and the LLM can call it whenever the prompt asks for live weather.
+
+---
+
+## Why this exists in the monorepo
+
+It's a demonstration MCP server, not a critical service. The interesting thing is the *integration shape*: a self-contained Spring Boot module that AscendAgent picks up over MCP without code changes on the agent side. Drop in another `@Tool` method and AscendAgent will surface it on next restart.
+
+For larger MCP servers (audio, web search, OCR), see `AudioScribe/`, `AscendWebSearch/`, `PaddleOCR/`.

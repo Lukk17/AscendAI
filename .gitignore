@@ -45,6 +45,15 @@ out/
 /nbdist/
 /.nb-gradle/
 
+# Claude Code per-user local settings
+.claude/settings.local.json
+
+# e2e manual test run records — ephemeral, one per sweep. Keep the README,
+# ignore the timestamped run files. Move a particular run into version control
+# manually if you want it as an audit artifact.
+AscendAgent/e2e/testing/runs/*
+!AscendAgent/e2e/testing/runs/README.md
+
 
 # =============================================================================
 # Language & Framework Specific

@@ -1,0 +1,89 @@
+name: ascend-scrapper
+
+services:
+
+  # ─── Search infrastructure ───
+
+  searxng:
+    image: searxng/searxng:2026.2.3-f7a608703
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "9020:8080"
+    networks:
+      default:
+        aliases:
+          - searxng
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.4.6
+    container_name: flaresolverr
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=UTC
+    networks:
+      default:
+        aliases:
+          - flaresolverr
+
+  # ─── Web search service ───
+
+  ngrok-ascend-web-search:
+    image: ngrok/ngrok:3
+    container_name: ngrok-ascend-web-search
+    restart: unless-stopped
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: "http ascend-web-search:7900"
+    depends_on:
+      - ascend-web-search
+    networks:
+      default:
+        aliases:
+          - ngrok-ascend-web-search
+
+  ascend-web-search:
+    build:
+      context: ./AscendWebSearch
+      dockerfile: Dockerfile
+    # image: lukk17/ascend-web-search:latest
+    container_name: ascend-web-search
+    restart: unless-stopped
+    ports:
+      - "7021:7021"
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080
+      - API_PORT=7021
+      - API_HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+      - SEARXNG_LIMITER=false
+      - SEARXNG_USER_AGENT=AscendWebSearch/1.0
+      - SEARXNG_X_REAL_IP=0.0.0.0
+      - SEARXNG_X_FORWARDED_FOR=0.0.0.0
+      - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
+      - VALIDATION_MIN_WORDS=10
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
+      # Redis must be running externally (port 6379)
+      - REDIS_URL=redis://host.docker.internal:6379/0
+      - NOVNC_TIMEOUT_SECONDS=600
+    cap_add:
+      - SYS_ADMIN
+    shm_size: "2gb"
+    depends_on:
+      - searxng
+      - flaresolverr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      default:
+        aliases:
+          - ascend-web-search

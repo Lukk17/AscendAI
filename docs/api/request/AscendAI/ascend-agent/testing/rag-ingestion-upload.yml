@@ -1,0 +1,32 @@
+info:
+  name: rag-ingestion-upload
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ingestion/upload"
+  headers:
+    - name: X-User-Id
+      value: frosty
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\markdown-canary.md
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\banana-price-poland.pdf
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\pierogi-recipe.docx
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
