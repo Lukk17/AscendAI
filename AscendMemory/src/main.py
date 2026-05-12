@@ -16,22 +16,42 @@ logger = logging.getLogger("uvicorn")
 
 is_ready = False
 
+# Hold a strong reference to the background warmup task so the asyncio event loop
+# (which only keeps weak references to tasks) cannot GC it before completion.
+_background_tasks: set[asyncio.Task] = set()
+
+WARMUP_RETRY_DELAY_SECONDS = 5
+WARMUP_MAX_ATTEMPTS = 60  # 60 * 5s = 5 minutes of cold-boot tolerance
+
 
 async def warmup_client():
-    """Background task to initialize the heavy memory client."""
+    """Background task to initialize the heavy memory client.
+
+    Retries with a fixed backoff so a transient cold-boot failure (e.g. Qdrant
+    not yet reachable on the docker network) does not leave /health stuck at 503
+    forever. The flag flips to True on the first successful probe and stays True.
+    """
     global is_ready
     logger.info(
         "Starting background warmup of AscendMemoryClient... Please wait for 'Background warmup complete' before sending requests.")
-    try:
-        # Force initialization
-        client = get_memory_client()
-        # Perform a dummy search to force connection to Qdrant and Embedder
-        logger.info("Performing active connection check (Dummy Search)...")
-        client.search(query="startup_warmup", user_id="system_warmup")
-        is_ready = True
-        logger.info("Background warmup complete. AscendMemoryClient is ready.")
-    except Exception as e:
-        logger.error(f"Background warmup failed: {e}")
+    for attempt in range(1, WARMUP_MAX_ATTEMPTS + 1):
+        try:
+            client = get_memory_client()
+            logger.info(f"Performing active connection check (attempt {attempt}/{WARMUP_MAX_ATTEMPTS})...")
+            client.search(query="startup_warmup", user_id="system_warmup")
+            is_ready = True
+            logger.info("Background warmup complete. AscendMemoryClient is ready.")
+            return
+        except Exception as e:
+            if attempt >= WARMUP_MAX_ATTEMPTS:
+                logger.error(
+                    f"Background warmup failed after {WARMUP_MAX_ATTEMPTS} attempts; /health will stay 503 until "
+                    f"a manual restart. Last error: {e}")
+                return
+            logger.warning(
+                f"Warmup attempt {attempt}/{WARMUP_MAX_ATTEMPTS} failed ({e}); retrying in "
+                f"{WARMUP_RETRY_DELAY_SECONDS}s")
+            await asyncio.sleep(WARMUP_RETRY_DELAY_SECONDS)
 
 
 def create_app() -> FastAPI:
@@ -40,8 +60,10 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         setup_logging()
-        asyncio.create_task(warmup_client())
-        
+        warmup_task = asyncio.create_task(warmup_client())
+        _background_tasks.add(warmup_task)
+        warmup_task.add_done_callback(_background_tasks.discard)
+
         # Initialize MCP server lifespan
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(app))
