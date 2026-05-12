@@ -16,6 +16,10 @@ services:
     environment:
       - DOCLING_SERVE_ENABLE_UI=1
       - DOCLING_SERVE_OCR_ENGINE=easyocr
+      # 4 uvicorn workers so the AscendAgent's parallel per-page dispatch
+      # (DocumentRouter.dispatchPagesInParallel) gets real CPU parallelism, not
+      # just async-IO concurrency on a single worker. Tune up for heavy PDF traffic.
+      - UVICORN_WORKERS=4
     networks:
       default:
         aliases:
