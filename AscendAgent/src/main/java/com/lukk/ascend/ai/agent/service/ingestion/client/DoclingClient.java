@@ -100,11 +100,14 @@ public class DoclingClient {
         List<Document> documents = new ArrayList<>();
         try {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
-            StringBuilder fullText = new StringBuilder();
-            extractTextRecursive(rootNode, fullText);
+            String extracted = extractDoclingContent(rootNode);
 
-            if (!fullText.isEmpty()) {
-                documents.add(new Document(fullText.toString(), Map.of(
+            if (extracted.isBlank()) {
+                log.warn("[DoclingClient] Empty extraction for {} - response payload top-level keys: {}",
+                        filename, rootNode.fieldNames());
+            } else {
+                log.info("[DoclingClient] Extracted {} characters from {}", extracted.length(), filename);
+                documents.add(new Document(extracted, Map.of(
                         KEY_SOURCE, filename,
                         KEY_TYPE, TYPE_DOCLING)));
             }
@@ -114,14 +117,36 @@ public class DoclingClient {
         return documents;
     }
 
-    private void extractTextRecursive(JsonNode node, StringBuilder sb) {
+    /**
+     * Docling Serve's /v1/convert/file with to_formats=json returns
+     *   { "status": "success", "document": { "md_content": "...", "text_content": "...",
+     *                                        "json_content": {...}, "html_content": "..." }, ... }
+     * Earlier versions of the agent walked the tree for "text" keys, which matched an older
+     * (Docling Core) response shape where each text item was {"text": "..."}. The newer
+     * Docling Serve response stores the full rendering as a single string on document.md_content
+     * (or .text_content), so the old walker silently extracted nothing.
+     */
+    private String extractDoclingContent(JsonNode rootNode) {
+        JsonNode documentNode = rootNode.path("document");
+        for (String field : new String[]{"md_content", "text_content", "html_content"}) {
+            JsonNode candidate = documentNode.path(field);
+            if (candidate.isTextual() && !candidate.asText().isBlank()) {
+                return candidate.asText();
+            }
+        }
+        StringBuilder fallback = new StringBuilder();
+        walkForTextKeys(rootNode, fallback);
+        return fallback.toString();
+    }
+
+    private void walkForTextKeys(JsonNode node, StringBuilder sb) {
         if (node.isObject()) {
             if (node.has("text") && node.get("text").isTextual()) {
                 sb.append(node.get("text").asText()).append("\n");
             }
-            node.elements().forEachRemaining(child -> extractTextRecursive(child, sb));
+            node.elements().forEachRemaining(child -> walkForTextKeys(child, sb));
         } else if (node.isArray()) {
-            node.elements().forEachRemaining(child -> extractTextRecursive(child, sb));
+            node.elements().forEachRemaining(child -> walkForTextKeys(child, sb));
         }
     }
 }

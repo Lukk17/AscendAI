@@ -6,7 +6,10 @@ app:
     auto:
       enabled: false
     token-splitter:
-      chunk-size: 1000
+      # 500 keeps individual chunks tightly on-topic so a recipe / multi-section doc
+      # splits into intro / ingredients / dough rest / cooking instead of one mixed chunk.
+      # Mixed chunks dilute the embedding and miss retrieval at typical thresholds.
+      chunk-size: 500
       min-chunk-size-chars: 350
       min-chunk-length-to-embed: 5
       max-num-chunks: 10000
@@ -128,7 +131,10 @@ app:
         enabled: ${ANTHROPIC_ENABLED:true}
         type: anthropic
         base-url: "https://api.anthropic.com"
-        api-key: ${ANTHROPIC_API_KEY:not-set}
+        # ASCEND_-prefixed env var so AscendAgent's Anthropic key does not collide
+        # with Claude Code's own auth (which claims ANTHROPIC_API_KEY on the host).
+        # Other providers (OpenAI / Gemini / MiniMax) keep their standard names.
+        api-key: ${ASCEND_ANTHROPIC_API_KEY:not-set}
         model: ${ANTHROPIC_MODEL:claude-sonnet-4-5}
         memory-extraction-model: ${ANTHROPIC_EXTRACTION_MODEL:claude-3-5-haiku-20241022}
         temperature: 0.7
@@ -179,10 +185,11 @@ app:
   rag:
     enabled: true
     top-k: 5
-    # 0.75 is too strict for short queries / short docs against OpenAI text-embedding-3-small
-    # (cosine scores typically land in 0.5-0.75 for relevant matches). 0.5 gives reliable recall
-    # without admitting unrelated chunks. Tune up if you see noisy citations.
-    similarity-threshold: 0.5
+    # 0.75 is too strict for short queries against OpenAI text-embedding-3-small;
+    # relevant matches commonly land in 0.40-0.55. 0.4 gives reliable recall in
+    # manual testing. Tune up if citations get noisy; the RagRetrievalService logs
+    # the top-K raw scores on every query so you can pick the right floor.
+    similarity-threshold: 0.4
     max-context-chars: 4000
 
   system-prompt: |
