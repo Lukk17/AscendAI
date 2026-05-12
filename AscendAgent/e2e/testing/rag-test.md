@@ -24,15 +24,15 @@ Uploaded documents (Markdown, PDF, DOCX) are ingested into MinIO and Qdrant, and
 Open Bruno → `docs/api/request/AscendAI/ascend-agent/testing/`. This test uses three requests:
 
 1. `rag-ingestion-upload.yml` — uploads all three fixtures in one multipart POST (one `file` part per fixture, already wired in the file). Verifies Bug 18.
-2. `rag-ingestion-run.yml` — scans the bucket and embeds new files. Template — multiple `prefix=` and `embeddingProvider=` rows; enable one each.
+2. `rag-ingestion-run.yml` — scans the bucket and embeds new files. The two `prefix=` rows are **disabled by default** so the request sends without a `prefix` query param — the endpoint then scans the entire bucket (both `markdown/` and `documents/`) in one call.
 3. `rag-prompt.yml` — asks a question that should hit RAG. Template — three alternative `prompt=` rows, one per fixture. Enable exactly one prompt at a time and re-send for each question.
 
 ### `rag-ingestion-run.yml` — parameters to enable
 
-- `prefix`: `documents/` (default in file; the PDF and DOCX land here)
-- `embeddingProvider`: `openai`
+- `embeddingProvider`: `openai` (default — the only enabled row)
+- Leave both `prefix=documents/` and `prefix=markdown/` disabled so the default no-prefix scan runs against the whole bucket.
 
-Then re-send with `prefix=markdown/` enabled (toggle the disabled row on, and disable `documents/`) so the markdown fixture is also embedded. The ingestion endpoint scans one prefix per call.
+If you want to scope an ingest to one folder only, toggle exactly one `prefix=` row on. The endpoint takes a single prefix per call — sending two prefix rows simultaneously is not supported.
 
 ### `rag-prompt.yml` — three sub-scenarios
 
@@ -47,10 +47,9 @@ Keep `provider` / `model` / `embeddingProvider` consistent across all three. Def
 ## Steps
 
 1. Send `rag-ingestion-upload.yml` once. Expect a 200 with three uploaded paths under `markdown/` and `documents/`.
-2. Send `rag-ingestion-run.yml` with `prefix=documents/` enabled. Expect `processed >= 2`.
-3. Re-send `rag-ingestion-run.yml` with `prefix=markdown/` enabled. Expect `processed >= 1`.
-4. Send `rag-prompt.yml` three times, one prompt enabled per send.
-5. Watch the AscendAgent log throughout.
+2. Send `rag-ingestion-run.yml` once (no `prefix` enabled — full bucket scan). Expect `processed >= 3` (one markdown + one PDF + one DOCX).
+3. Send `rag-prompt.yml` three times, one `prompt=` row enabled per send.
+4. Watch the AscendAgent log throughout.
 
 ## Expected
 
