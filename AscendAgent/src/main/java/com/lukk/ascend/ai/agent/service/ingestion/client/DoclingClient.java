@@ -28,7 +28,11 @@ public class DoclingClient {
     private static final String TYPE_DOCLING = "docling";
     private static final String KEY_SOURCE = "source";
     private static final String KEY_TYPE = "type";
-    private static final String PARAM_FILE = "file";
+    // Docling's /v1/convert/file endpoint binds the multipart field to "files" (plural) —
+    // the path segment is "file" (singular) but the form field is "files" because the
+    // endpoint supports multi-file batches. Sending "file" returns HTTP 422
+    // {"type":"missing","loc":["body","files"],"msg":"Field required"}.
+    private static final String PARAM_FILE = "files";
 
     private static final String LEGACY_PATH = "/v1/convert";
     private static final String CORRECT_PATH = "/v1/convert/file";

@@ -179,7 +179,10 @@ app:
   rag:
     enabled: true
     top-k: 5
-    similarity-threshold: 0.75
+    # 0.75 is too strict for short queries / short docs against OpenAI text-embedding-3-small
+    # (cosine scores typically land in 0.5-0.75 for relevant matches). 0.5 gives reliable recall
+    # without admitting unrelated chunks. Tune up if you see noisy citations.
+    similarity-threshold: 0.5
     max-context-chars: 4000
 
   system-prompt: |

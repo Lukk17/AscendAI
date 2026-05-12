@@ -9,7 +9,7 @@ public class RagProperties {
 
     private int topK = 5;
 
-    private double similarityThreshold = 0.75;
+    private double similarityThreshold = 0.5;
 
     private int maxContextChars = 4000;
 

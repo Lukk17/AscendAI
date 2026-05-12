@@ -89,18 +89,18 @@ class PropertiesTest {
         // defaults
         assertThat(props.isEnabled()).isTrue();
         assertThat(props.getTopK()).isEqualTo(5);
-        assertThat(props.getSimilarityThreshold()).isEqualTo(0.75d);
+        assertThat(props.getSimilarityThreshold()).isEqualTo(0.5d);
         assertThat(props.getMaxContextChars()).isEqualTo(4000);
 
         // setters
         props.setEnabled(false);
         props.setTopK(10);
-        props.setSimilarityThreshold(0.5d);
+        props.setSimilarityThreshold(0.8d);
         props.setMaxContextChars(2000);
 
         assertThat(props.isEnabled()).isFalse();
         assertThat(props.getTopK()).isEqualTo(10);
-        assertThat(props.getSimilarityThreshold()).isEqualTo(0.5d);
+        assertThat(props.getSimilarityThreshold()).isEqualTo(0.8d);
         assertThat(props.getMaxContextChars()).isEqualTo(2000);
     }
 
