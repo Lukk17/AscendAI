@@ -34,6 +34,9 @@ dependencies {
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.ai.starter.mcp.server.webmvc)
 
+    // Actuator — health endpoint for e2e prereq probes and Docker healthchecks
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+
     // MCP server starter for STDIO (alternative, disabled)
     // implementation("org.springframework.boot:spring-boot-starter")
     // implementation("org.springframework.ai:spring-ai-starter-mcp-server")

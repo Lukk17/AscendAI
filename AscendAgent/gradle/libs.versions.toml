@@ -64,6 +64,9 @@ tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 # Spring Security (Boot BOM managed)
 spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
 
+# Actuator — exposes /actuator/health for liveness probes and the e2e prereq check.
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+
 # Lombok (version managed by Spring Boot BOM)
 lombok = { module = "org.projectlombok:lombok" }
 

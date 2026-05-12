@@ -75,6 +75,9 @@ dependencies {
     // Security
     implementation(libs.spring.boot.starter.security)
 
+    // Actuator — health endpoint
+    implementation(libs.spring.boot.starter.actuator)
+
     // Springdoc OpenAPI
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
 

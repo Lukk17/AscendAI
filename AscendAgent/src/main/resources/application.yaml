@@ -1,6 +1,20 @@
 server:
   port: 9917
 
+# Actuator — exposes /actuator/health for liveness checks (used by e2e prereq probes
+# and Docker healthchecks). Only the health endpoint is published; metrics/info/etc.
+# stay closed by default.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+
 app:
   ingestion:
     auto:
