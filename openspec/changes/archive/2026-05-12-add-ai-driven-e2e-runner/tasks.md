@@ -1,3 +1,5 @@
+> **SUPERSEDED** — see `proposal.md` banner. The simpler in-spec-assertion architecture shipped in commits `c791cc5` and `2edcbee` made every task below unnecessary. Items are preserved here as audit trail of "what we considered and decided no", not as work-still-to-do.
+
 ## 1. Author the tracked judge prompt
 
 - [ ] 1.1 Create `AscendAgent/e2e/judge-prompt.md`. Sections required: (a) **Role** ("you are a strict end-to-end test judge"), (b) **Rubric** with PASS / FAIL / INCONCLUSIVE definitions matching design D6, (c) **Output schema** showing the exact JSON shape from D2, (d) **Evidence-citation rule** ("evidence_cited MUST contain a verbatim substring from the supplied response or log"), (e) **Two worked examples** (one PASS — semantic memory recall; one FAIL — RAG retrieval missing), (f) **Inconclusive triggers** (closed list: `pre_flight_unreachable`, `log_unreadable`, `judge_disagreement`, `judge_unparseable`, `evidence_truncated`)

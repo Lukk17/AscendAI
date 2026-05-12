@@ -105,24 +105,13 @@ Always invoke relevant project skills before starting implementation work. Skill
 - `/git-workflow` for branching and commit conventions
 - `/database-migrations` for schema changes
 
-Every implementation plan must include a **Relevant Skills** section listing all skills that should be loaded before implementing. This ensures the agent always knows which domain-specific standards apply to the work at hand.
+Every OpenSpec change proposal must include a **Relevant Skills** section listing all skills that should be loaded before implementing. This ensures the agent always knows which domain-specific standards apply to the work at hand.
 
-## Implementation Plan
+## Planning workflow — OpenSpec
 
-Before starting any non-trivial implementation work (bug fixes, features, refactors), create or completely overwrite `implementation_plan.md` in the project root. This file serves as the single source of truth for the current active plan.
+Non-trivial implementation work (bug fixes, features, refactors) goes through the OpenSpec change-proposal workflow under `openspec/changes/<change-name>/`. Each change has `proposal.md` (why + what), `design.md` (how), `specs/<capability>/spec.md` (requirements), and `tasks.md` (checkable implementation steps). The agent invokes `/opsx:propose` to scaffold a change, `/opsx:apply` to implement it, and `/opsx:archive` to finalize and propagate deltas into `openspec/specs/` when the change is done.
 
-**Required structure:**
-1. **Context** section at the top — what problem is being solved and why
-2. **Progress** section — a TODO checklist of all tasks. Update this in real-time:
-   - Mark each task as done (`[x]`) immediately after completing it, before starting the next task
-   - This section must always reflect the current state of work
-3. **Plan** section — detailed implementation steps with file paths, code changes, and rationale
-4. **Relevant Skills** section — list all skills that must be loaded before implementation begins
-5. **Verification** section — how to test the changes end-to-end
-
-Each new plan completely overwrites the previous `implementation_plan.md`. There is only ever one active plan.
-
-**Approval gate:** After writing `implementation_plan.md`, **always wait for user approval** before starting implementation. The user will review the plan in the markdown file and may add comments or request changes. Do NOT begin modifying source code, configs, or any project files until the user explicitly approves the plan. This is the most important rule in the workflow.
+**Approval gate:** after creating a change proposal, **always wait for explicit user approval** before starting implementation. Do NOT modify source code, configs, or any project files until the user explicitly approves the plan. This is the most important rule in the workflow.
 
 ## IDE Compatibility
 
