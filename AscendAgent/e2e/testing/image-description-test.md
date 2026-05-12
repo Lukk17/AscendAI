@@ -1,61 +1,72 @@
-### Image Description — End-to-End Test
+# Image Description — manual e2e test
 
----
+## What this verifies
 
-Verifies that an attached image is sent to a vision-capable model and the response is grounded in the actual image content (not a hallucinated description).
+An attached image is forwarded to a vision-capable model and described accurately, AND the vision-capability gate rejects providers/models that don't support images. Covers:
 
-### Pre-flight
+- **Bug 2** — defensive image MIME parsing (no `InvalidMimeTypeException` on missing/odd content-type)
+- **Bug 10** — vision-capability gate: non-vision provider/model combos return HTTP 400 with a clear `ApiError`, not a silent fallback
 
----
+## Prerequisites
 
-Bash:
+- `docker compose up -d` stack up
+- AscendAgent on port 9917
+- For the allow-path: API key for OpenAI (gpt-5.1) **or** Anthropic (claude-sonnet-4-6) **or** an LM Studio vision model loaded (e.g. `qwen/qwen3-vl-4b`)
+- For the deny-path: MiniMax credentials (text-only models)
 
-```bash
-curl http://localhost:9917/
-```
+## Bruno collection
 
-PowerShell:
+Open Bruno → `docs/api/request/AscendAI/ascend-agent/testing/` → `image-description-prompt.yml`.
 
-```powershell
-curl.exe http://localhost:9917/
-```
+The file is a template — multiple `provider=` / `model=` rows are saved against the same field names, toggled via the disabled flag. Before sending, enable exactly one provider row plus its matching model row.
 
-The fixture lives at `AscendAgent/e2e/fixtures/image.png`. Pick something with one obvious correct answer (a banana on a plain background, a known logo, a chart with a unique title). The chat provider must be vision-capable: `anthropic` (claude-sonnet-4-6, claude-opus-4-6), `openai` (gpt-4o, gpt-5.x), or `gemini` (gemini-3.1-pro, gemini-2.5-pro). LM Studio depends on the loaded model and is usually text-only.
+### Scenario A — allow-path (vision-capable)
 
-### Test — prompt with attached image
+Enable:
 
----
+- `prompt`: `Describe what you see in this image in detail`
+- `image`: file → `AscendAgent/e2e/fixtures/image.png`
+- `provider`: `openai`
+- `model`: `gpt-5.1`
+- `embeddingProvider`: `openai`
 
-**Bruno request:** `docs/api/request/AscendAI/ascend-agent/testing/image-description-prompt.yml`
+Alternatives that should also work: `anthropic` + `claude-sonnet-4-6`, or `lmstudio` + `qwen/qwen3-vl-4b` (rows present but disabled in the file — toggle them on instead).
 
-**Bruno CLI** (Bash):
+### Scenario B — deny-path (text-only model)
 
-```bash
-bru run docs/api/request/AscendAI/ascend-agent/testing/image-description-prompt.yml --env ascend-local
-```
+Same form, but enable:
 
-**Bruno CLI** (PowerShell):
+- `provider`: `minimax`
+- `model`: `MiniMax-M2.7`
 
-```powershell
-bru run docs/api/request/AscendAI/ascend-agent/testing/image-description-prompt.yml --env ascend-local
-```
+Leave everything else identical to Scenario A.
 
-**Equivalent curl** (Bash):
+## Steps
 
-```bash
-curl -X POST http://localhost:9917/api/v1/ai/prompt -H "X-User-Id: imgtest-001" -F "prompt=Describe what you see in this image in one sentence." -F "image=@AscendAgent/e2e/fixtures/image.png" -F "provider=anthropic" -F "model=claude-sonnet-4-6"
-```
+1. Send Scenario A.
+2. Inspect the response body and the AscendAgent log.
+3. Send Scenario B.
+4. Inspect the response body and the AscendAgent log.
 
-**Equivalent curl** (PowerShell):
+## Expected
 
-```powershell
-curl.exe -X POST http://localhost:9917/api/v1/ai/prompt -H "X-User-Id: imgtest-001" -F "prompt=Describe what you see in this image in one sentence." -F "image=@AscendAgent/e2e/fixtures/image.png" -F "provider=anthropic" -F "model=claude-sonnet-4-6"
-```
+**Scenario A:**
 
-### Pass criteria
+- HTTP 200; `content` describes the actual subject of `image.png` (specific objects, colors, text). A generic "an image of something" answer means the bytes didn't reach the model.
+- Agent log shows `HasImage: true` for the request and no `InvalidMimeTypeException` traces.
 
----
+**Scenario B:**
 
-- ✅ HTTP 200; the `content` field accurately describes the image (the right object, scene, or text).
-- ✅ AscendAgent log shows `HasImage: true` for this request.
-- ⚠️ Sanity check — repeat with a clearly different image. If the two prompts produce similar generic answers, the image isn't reaching the model. Look for "data URL too short" warnings or `InvalidMimeTypeException` traces in the agent log.
+- HTTP 400 with an `ApiError`-shaped body whose message states that the selected provider/model has no vision support.
+- Agent log shows the vision-gate rejection log line; no upstream provider call is made.
+
+Sanity check: re-run Scenario A with a clearly different image. If both runs produce similar generic answers, the image isn't reaching the model — look for `data URL too short` warnings.
+
+## Bugs this covers
+
+- **Bug 2** — agent must not crash on missing/odd image content-type; MIME is sniffed from bytes when the browser-supplied type is unusable.
+- **Bug 10** — vision-capability check happens before the provider call.
+
+## Fixtures
+
+- `AscendAgent/e2e/fixtures/image.png` — pick something with one obvious correct answer (a banana on a plain background, a known logo, a chart with a unique title).

@@ -1,29 +1,49 @@
-### Weather MCP — End-to-End Test
+# Weather MCP — manual e2e test
 
-Verifies the AscendAgent discovers and calls the WeatherMCP tool when the prompt asks about weather.
+## What this verifies
 
-#### Pre-flight
+The AscendAgent discovers the WeatherMCP server at startup, routes a weather prompt to its `getCurrentWeather` tool, and returns concrete weather data in the response rather than a generic "I don't have real-time data" refusal. This is a smoke test for MCP client wiring; it does not cover a specific bug fix.
 
-```bash
-curl http://localhost:9917/   # AscendAgent
-curl http://localhost:9998/   # WeatherMCP
-```
+## Prerequisites
 
-Both must respond. WeatherMCP must be reachable from AscendAgent at startup — if WeatherMCP was started after AscendAgent, restart AscendAgent so the MCP client picks it up.
+- `docker compose up -d` brought the stack up cleanly
+- AscendAgent reachable on port 9917
+- WeatherMCP reachable on port 9998
+- A chat provider that supports tool calls (Anthropic, OpenAI, Gemini, or MiniMax M2.5+)
 
-#### Test — Ask about the weather
+If WeatherMCP was started after AscendAgent, restart the agent so the MCP client picks it up.
 
-Use a chat provider that handles tool calls reliably (Anthropic / OpenAI / Gemini). LM Studio works only if the loaded model supports tool use.
+## Bruno collection
 
-```bash
-curl -X POST http://localhost:9917/api/v1/ai/prompt \
-  -H "X-User-Id: weatherttest-001" \
-  -F "prompt=What is the current weather in Warsaw?" \
-  -F "provider=anthropic" -F "model=claude-sonnet-4-6"
-```
+Open Bruno → `docs/api/request/AscendAI/ascend-agent/testing/` → `weather-mcp-prompt.yml`.
 
-**Pass:**
-- HTTP 200; response `content` mentions concrete weather data (temperature, condition) for Warsaw — not a generic "I don't have real-time data" answer.
-- AscendAgent log shows the `getCurrentWeather` MCP tool being invoked for this request.
+Most prompt-style Bruno requests in this collection are templates with several alternative rows saved against the same form-field name (e.g. multiple `provider=` rows toggled on/off via the disabled flag). Before sending, select the single row per field that matches the scenario you want to test.
 
-If the response is a "I can't access real-time weather" answer, the agent didn't call the tool — check that WeatherMCP is registered in AscendAgent's MCP client config and that the chosen chat provider/model supports tool calls.
+For this test the parameters to enable are:
+
+- `prompt`: `What is current weather in Warsaw ?`
+- `provider`: `minimax` (the default in the file — swap to `anthropic` / `openai` / `gemini` if you don't have a MiniMax key)
+- `model`: `MiniMax-M2.7` (or the matching model for the provider you pick)
+- `embeddingProvider`: `openai`
+
+Header `X-User-Id: frosty` is already pinned.
+
+## Steps
+
+1. Confirm both services respond: `GET http://localhost:9917/` and `GET http://localhost:9998/`.
+2. In Bruno, send `weather-mcp-prompt.yml`.
+3. Watch the AscendAgent log while the request runs.
+
+## Expected
+
+- HTTP 200; `content` mentions a temperature and a condition for Warsaw — not "I cannot access live data".
+- AscendAgent log shows the `getCurrentWeather` MCP tool being invoked for this request id.
+- A refusal usually means the chosen provider/model doesn't support tool calls — switch to Anthropic claude-sonnet-4-6 or OpenAI gpt-5.1.
+
+## Bugs this covers
+
+None directly. This is an MCP wiring smoke test.
+
+## Fixtures
+
+None.
