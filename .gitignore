@@ -45,6 +45,9 @@ out/
 /nbdist/
 /.nb-gradle/
 
+# Claude Code per-user local settings
+.claude/settings.local.json
+
 
 # =============================================================================
 # Language & Framework Specific
