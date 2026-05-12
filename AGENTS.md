@@ -87,6 +87,10 @@ cd AscendAgent && ./gradlew bootRun
 - **Monorepo-level**: System overview, service interactions, deployment, ADRs — in `docs/architecture/`
 - **AscendAgent internals**: Component diagrams, internal arc42, module-specific ADRs — in `AscendAgent/docs/architecture/`
 
+## End-to-End Test Suite
+
+Capability-level e2e tests for the AscendAgent live in [`AscendAgent/e2e/`](AscendAgent/e2e/README.md). Five numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in MinIO / Qdrant / Postgres — never log substrings. See [`AscendAgent/e2e/README.md`](AscendAgent/e2e/README.md) for the full contract and capability matrix.
+
 ## Proactive Skill Usage
 
 Always invoke relevant project skills before starting implementation work. Skills provide domain-specific standards and patterns that must be followed. Available skills are in `.agents/skills/` (or `.claude/skills/` for Claude Code). Examples:

@@ -285,118 +285,25 @@ It will also display:
 *   Count of available files in S3 (`knowledge-base`) ready for ingestion.
 *   List of active MCP Tools.
 
-### 3. Test Ingestion (RAG)
-1.  Open MinIO Console: http://localhost:9071
-2.  Navigate to the `knowledge-base` bucket.
-3.  **Test Markdown**:
-    *   Create a folder `obsidian`.
-    *   Upload a sample `.md` file inside it.
-    *   Trigger ingestion: `POST http://localhost:9917/api/v1/ingestion/run`
-    *   Check application logs. You should see: `Indexed markdown document: <id>`
-4.  **Test Unstructured**:
-    *   Create a folder `documents`.
-    *   Upload a `.pdf` or `.docx`.
-    *   Trigger ingestion: `POST http://localhost:9917/api/v1/ingestion/run`
-    *   Check application logs. You should see: `Indexed unstructured document: <id>`
+### 3. End-to-end tests
 
-### 4. Testing Scenarios (CURL)
+Capability tests live under [`AscendAgent/e2e/`](e2e/README.md). Five numbered specs (`1-weather-mcp` through `5-rag`) exercise the agent end-to-end via the Bruno collection at `docs/api/request/AscendAI/`. Each spec has a paired tasks template; the runner copies it into `e2e/testing/runs/<UTC-timestamp>_<N>-<feature>-tasks.md`, ticks the checkbox list as it executes, and records token usage + wall-clock time. Assertions are observable behavior only — HTTP status, response body, persisted state in MinIO / Qdrant / Postgres. See [`AscendAgent/e2e/README.md`](e2e/README.md) for the full contract, fixture inventory, and capability matrix.
 
-**Prerequisites**:
-- Server running on `localhost:9917`.
-- `X-User-Id` header is required for context.
+Quick invocation, single test:
 
-#### 1. RAG: Summarizing a Document
-
-**Windows (PowerShell)**:
-```powershell
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
-     -H "X-User-Id: user1" `
-     -H "Content-Type: multipart/form-data" `
-     -F "prompt=Summarize the key points." `
-     -F "doc=@notes.md"
-```
-
-**Linux/Mac (Bash)**:
 ```bash
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
-     -H "X-User-Id: user1" \
-     -H "Content-Type: multipart/form-data" \
-     -F "prompt=Summarize the key points." \
-     -F "doc=@notes.md"
+cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
 ```
 
-#### 2. Vision: Describing a Picture
+Whole suite:
 
-**Windows (PowerShell)**:
-```powershell
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
-     -H "X-User-Id: user1" `
-     -H "Content-Type: multipart/form-data" `
-     -F "prompt=Describe this image." `
-     -F "image=@screenshot.png"
-```
-
-**Linux/Mac (Bash)**:
 ```bash
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
-     -H "X-User-Id: user1" \
-     -H "Content-Type: multipart/form-data" \
-     -F "prompt=Describe this image." \
-     -F "image=@screenshot.png"
+cd docs/api/request/AscendAI && bru run "ascend-agent/testing" --env ascend-local
 ```
 
-#### 3. MCP Tool Usage (Weather)
+Install Bruno CLI once with `npm install -g @usebruno/cli`.
 
-**Windows (PowerShell)**:
-```powershell
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
-     -H "X-User-Id: user1" `
-     -H "Content-Type: multipart/form-data" `
-     -F "prompt=What is the weather in Warsaw?"
-```
-
-#### 4. Multi-Provider: Using Gemini
-
-**Windows (PowerShell)**:
-```powershell
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
-     -H "X-User-Id: user1" `
-     -H "Content-Type: multipart/form-data" `
-     -F "prompt=Explain quantum computing" `
-     -F "provider=gemini" `
-     -F "model=gemini-2.5-pro"
-```
-
-#### 5. Multi-Provider: Using Anthropic
-
-**Windows (PowerShell)**:
-```powershell
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" `
-     -H "X-User-Id: user1" `
-     -H "Content-Type: multipart/form-data" `
-     -F "prompt=Write a haiku about coding" `
-     -F "provider=anthropic"
-```
-
-#### 4. Memory Context
-
-**Set Context (Bash)**:
-```bash
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
-     -H "X-User-Id: user1" \
-     -H "Content-Type: multipart/form-data" \
-     -F "prompt=My name is Luke."
-```
-
-**Retrieve Context (Bash)**:
-```bash
-curl -X POST "http://localhost:9917/api/v1/ai/prompt" \
-     -H "X-User-Id: user1" \
-     -H "Content-Type: multipart/form-data" \
-     -F "prompt=What is my name?"
-```
-
-### 5. Verify Persistence & Memory
+### 4. Verify Persistence & Memory
 
 #### 1. Redis (Chat History & Instructions)
 

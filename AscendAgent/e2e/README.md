@@ -1,8 +1,8 @@
-### AscendAgent — End-to-End Tests
+### AscendAgent — end-to-end test suite
 
 ---
 
-This directory holds the manual / automated end-to-end suite for AscendAgent: capability test docs, fixture files, and a pointer to the Bruno API collection that lives at the repo root.
+The manual / AI-runnable e2e suite for AscendAgent. Each test exercises one capability end-to-end against a live stack and asserts only **observable behavior** — HTTP status codes, response-body content, persisted state in MinIO / Qdrant / Postgres. Logs are diagnostic, not pass criteria.
 
 ### What's here
 
@@ -10,18 +10,28 @@ This directory holds the manual / automated end-to-end suite for AscendAgent: ca
 
 ```
 AscendAgent/e2e/
-├── README.md         # this file
-├── fixtures/         # canary inputs (.md, .pdf, .docx, .jpg, .wav)
-└── testing/          # capability test docs (one per capability)
+├── README.md                # this file
+├── fixtures/                # canary inputs (.md, .pdf, .docx, .png, .wav)
+└── testing/                 # numbered specs + sidecar templates + run records
     ├── README.md
-    ├── semantic-memory.md
-    ├── rag.md
-    ├── pdf-read.md
-    ├── image-description.md
-    └── weather-mcp.md
+    ├── 1-weather-mcp-test.md            # spec (immutable)
+    ├── 1-weather-mcp-tasks.template.md  # run-record template (immutable)
+    ├── 2-image-description-test.md
+    ├── 2-image-description-tasks.template.md
+    ├── 3-summarization-test.md
+    ├── 3-summarization-tasks.template.md
+    ├── 4-semantic-memory-test.md
+    ├── 4-semantic-memory-tasks.template.md
+    ├── 5-rag-test.md
+    ├── 5-rag-tasks.template.md
+    └── runs/
+        ├── README.md
+        └── <UTC-timestamp>_<N>-<feature>-tasks.md   # one per executed test (gitignored)
 ```
 
-The Bruno collection isn't here. It lives at the **repo root** under `docs/api/request/AscendAI/` (collection root) so it stays a portable API client artifact, not an AscendAgent-only one. Each test doc in `testing/` references the relevant Bruno requests under `docs/api/request/AscendAI/ascend-agent/testing/`.
+Tests are number-prefixed by setup cost — `1` needs the least, `5` the most. Each spec has a paired tasks template that the runner copies into `runs/` with a sweep timestamp, ticks off checkbox-by-checkbox as it executes, and fills with results, token usage, and wall-clock time.
+
+The Bruno collection isn't here. It lives at the **repo root** under `docs/api/request/AscendAI/` (collection root) so it stays a portable API client artifact. Each spec references the matching Bruno request file under `docs/api/request/AscendAI/ascend-agent/testing/`.
 
 ### How a test runs (flow)
 
@@ -29,9 +39,10 @@ The Bruno collection isn't here. It lives at the **repo root** under `docs/api/r
 
 ```mermaid
 flowchart LR
-    Tester[Tester / CI] -->|Bruno CLI or GUI<br/>or curl| Req[(Bruno request<br/>docs/api/request/AscendAI/...)]
+    Runner[AI runner or human] -->|copy template| Record[(runs/&lt;ts&gt;_N-&lt;feature&gt;-tasks.md)]
+    Runner -->|bru run| Req[(Bruno request<br/>docs/api/request/AscendAI/...)]
     Req -->|HTTP| Agent[AscendAgent :9917]
-    Fixture[(fixtures/canary.*<br/>md / pdf / docx / jpg / wav)] -.uploaded as multipart.-> Agent
+    Fixture[(fixtures/canary.*)] -.uploaded as multipart.-> Agent
 
     subgraph Backends
         AM[AscendMemory :7020]
@@ -45,87 +56,92 @@ flowchart LR
     Agent --> S3
     Agent --> MCP
 
-    Agent -->|response JSON<br/>+ logs| Verify{Pass criteria}
-    Verify -->|grep agent log<br/>poll Qdrant<br/>match content| Result[✅ / ❌]
+    Agent -->|response JSON| Verify{Behavior assertions}
+    Verify -->|HTTP status<br/>response content<br/>Qdrant scroll<br/>MinIO ls<br/>Postgres rows| Result[✅ / ❌]
+    Result --> Record
 ```
 
-Every capability test follows the same shape:
+Every spec follows the same template:
 
-1. Pre-flight — ping the services involved.
-2. Send the request via Bruno (CLI, GUI) or the equivalent curl shown in the doc.
-3. Verify the response payload, the AscendAgent log, and (where relevant) the side effects in Qdrant or PostgreSQL.
+1. **What this verifies** — bullet list of behaviors.
+2. **Prerequisites** — concrete check commands (`curl`, `docker exec redis redis-cli ping`, etc.), each in its own code block with prose stating the success criterion.
+3. **Reset state** — one command per code block, in order, to wipe state so the run is reproducible.
+4. **Run** — one or more numbered Bruno CLI invocations; multi-step tests tell the runner to wait for HTTP 200 before continuing.
+5. **Expected** — observable behavior only: HTTP status, response content, MinIO listings, Qdrant scrolls, Postgres rows. No log substrings.
+6. **Fixtures** — paths to local files the test reads.
+
+The paired `<N>-<feature>-tasks.template.md` is the runner's checklist for one execution: prerequisites, reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**, **Time** fields) and **Additional tasks I did** (anything done outside the spec). The runner copies the template into `runs/<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in.
 
 ### Prerequisites before any test
 
 ---
 
-1. External infra is up: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, MinIO `:9070`.
-2. Compose stack is up: `docker compose up -d --build` (brings up AscendMemory, AscendWebSearch, AudioScribe, PaddleOCR, WeatherMCP, support services).
-3. AscendAgent itself is running locally: `cd AscendAgent && ./gradlew bootRun`.
+1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, MinIO `:9070`.
+2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, AscendWebSearch, AudioScribe, PaddleOCR, WeatherMCP, support services).
+3. AscendAgent running on the host: `cd AscendAgent && ./gradlew bootRun`.
 
-If the AscendAgent startup banner shows any `[FAILED]` rows under `Infrastructure`, fix that first.
+If the AscendAgent startup banner shows any `[FAILED]` rows under `Infrastructure`, fix that first. Each individual spec also has explicit prereq checks the runner executes before starting.
 
 ### Running tests
 
 ---
 
-**Bruno CLI** (preferred for repeatable runs):
-
-Bash:
+Install the Bruno CLI once:
 
 ```bash
 npm install -g @usebruno/cli
 ```
 
+Run one capability:
+
 ```bash
-bru run docs/api/request/AscendAI/ascend-agent/testing --env ascend-local
+cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
 ```
 
-PowerShell:
+Run the whole suite (uses Bruno's directory mode):
 
-```powershell
-npm install -g @usebruno/cli
+```bash
+cd docs/api/request/AscendAI && bru run "ascend-agent/testing" --env ascend-local
 ```
 
-```powershell
-bru run docs/api/request/AscendAI/ascend-agent/testing --env ascend-local
-```
-
-**Bruno GUI**: open the desktop app, point it at `docs/api/request/AscendAI/`, pick the `ascend-local` environment, click into `ascend-agent/testing/` and run requests one at a time.
-
-**Plain curl**: every capability doc under `testing/` includes a Bash and PowerShell curl equivalent of the Bruno request, so you can run a test with no extra tools.
+Or follow a spec end-to-end manually: read `<N>-<feature>-test.md`, copy its template to `runs/<UTC-timestamp>_<N>-<feature>-tasks.md`, work through the checkboxes.
 
 ### Fixtures
 
 ---
 
-`fixtures/` holds tiny sample files used by the upload-style tests. Each fixture holds different domain content (Java code review, recent commodity price, family recipe, distinctive image, short meeting clip) so a passing test proves the answer came from retrieval rather than training. Expected files:
+`fixtures/` holds small canary files used by the upload-style tests. Each fixture holds distinctive content (no overlap with model training) so a passing test proves the answer came from retrieval or the attached document rather than memorized knowledge:
 
-- `markdown-canary.md` — RAG markdown ingest. One-line canary phrase the model can't possibly know from training, used to prove real retrieval.
-- `banana-price-poland.pdf` — RAG PDF ingest + per-prompt PDF read. Contains a recent retail price.
-- `pierogi-recipe.docx` — RAG DOCX ingest. Contains a recipe with a distinctive rest time.
-- `image.png` — image description. Recognisable subject the model can identify.
-- `meeting-clip.wav` — audio transcription. Short meeting recording with one distinctive sentence.
-
-If a fixture is missing, the test doc says so and gives you the curl needed to skip it.
+| File | Used by | Distinctive content |
+|---|---|---|
+| `markdown-canary.md` | RAG (test 5) | One-line canary phrase the model can't possibly know |
+| `banana-price-poland.pdf` | RAG (test 5) | Specific recent retail price |
+| `pierogi-recipe.docx` | RAG (test 5) | Recipe with a distinctive rest time |
+| `argent-saga-chronicle.pdf` | Summarization (test 3) | Fictional saga with unique proper nouns |
+| `image.png` | Image description (test 2) | Recognizable subject the model can describe |
+| `meeting-clip.wav` | (future audio test) | Short meeting recording |
 
 ### Capability tests
 
 ---
 
-| Capability | Doc | What it proves |
-|---|---|---|
-| Semantic memory | [testing/semantic-memory.md](testing/semantic-memory.md) | A fact stated in turn 1 is recalled in turn 2 from Qdrant via AscendMemory |
-| RAG | [testing/rag.md](testing/rag.md) | Uploaded `.md`, `.pdf`, `.docx` ingest into Qdrant and surface in a later prompt |
-| PDF read | [testing/pdf-read.md](testing/pdf-read.md) | A PDF attached to a single prompt is parsed and used as context |
-| Image description | [testing/image-description.md](testing/image-description.md) | An attached image is sent to a vision-capable model and described |
-| Weather MCP | [testing/weather-mcp.md](testing/weather-mcp.md) | AscendAgent discovers and calls the WeatherMCP tool |
+Numbered by setup cost. Easiest first.
+
+| # | Spec | Template | What it proves |
+|---|---|---|---|
+| 1 | [`testing/1-weather-mcp-test.md`](testing/1-weather-mcp-test.md) | [`testing/1-weather-mcp-tasks.template.md`](testing/1-weather-mcp-tasks.template.md) | The agent discovers and invokes the WeatherMCP tool |
+| 2 | [`testing/2-image-description-test.md`](testing/2-image-description-test.md) | [`testing/2-image-description-tasks.template.md`](testing/2-image-description-tasks.template.md) | An attached image reaches a vision-capable model and is described accurately |
+| 3 | [`testing/3-summarization-test.md`](testing/3-summarization-test.md) | [`testing/3-summarization-tasks.template.md`](testing/3-summarization-tasks.template.md) | A PDF attached inline is parsed page-by-page through Docling and summarized from real content |
+| 4 | [`testing/4-semantic-memory-test.md`](testing/4-semantic-memory-test.md) | [`testing/4-semantic-memory-tasks.template.md`](testing/4-semantic-memory-tasks.template.md) | A fact stated in turn 1 is recalled in turn 2 from Qdrant via AscendMemory, after chat history is wiped |
+| 5 | [`testing/5-rag-test.md`](testing/5-rag-test.md) | [`testing/5-rag-tasks.template.md`](testing/5-rag-tasks.template.md) | Uploaded `.md`, `.pdf`, `.docx` ingest into Qdrant and surface in a later prompt with grounded citations |
 
 ### Adding a new capability test
 
 ---
 
-1. Add the request(s) under `docs/api/request/AscendAI/ascend-agent/testing/<capability>.yml`.
+1. Add the Bruno request(s) under `docs/api/request/AscendAI/ascend-agent/testing/<capability>.yml` with sensible default-enabled rows.
 2. If the test needs a fixture, drop the canary file in `fixtures/` (keep it small and uniquely identifiable).
-3. Write `AscendAgent/e2e/testing/<capability>.md` with: pre-flight, the Bruno request name, equivalent curl (Bash + PowerShell), pass criteria.
-4. Add a row to the capability table above and to `testing/README.md`.
+3. Pick the next number prefix that matches the test's setup cost.
+4. Write `testing/<N>-<capability>-test.md` using the template structure (**What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures**). Assert behavior, not logs.
+5. Write `testing/<N>-<capability>-tasks.template.md` mirroring the spec's checkboxes, with `## Result summary` containing the **Input tokens / Output tokens / Time** fields at the bottom.
+6. Add a row to the capability table above.
