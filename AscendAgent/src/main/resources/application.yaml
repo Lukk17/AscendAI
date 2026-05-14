@@ -113,6 +113,31 @@ app:
       search-limit: 10
 
   ai:
+    prompt-cache:
+      # Master kill-switch for native provider prompt caching. When false, every
+      # request goes out un-decorated and no cached_tokens are read back.
+      enabled: true
+      providers:
+        # Real Anthropic — full native cache_control support via Spring AI 1.1.4.
+        anthropic:
+          enabled: true
+        # OpenAI auto-prefix-caches when prompt >= 1024 tokens. We only read back
+        # cached_tokens — no decoration to apply.
+        openai:
+          enabled: true
+        # Gemini in this repo is wired through the OpenAI-compatible client, so it
+        # rides on OpenAI prefix caching when Google's compat surface returns
+        # cached_tokens. Native CachedContent would need the Vertex client.
+        gemini:
+          enabled: true
+        # MiniMax uses the Anthropic-compat endpoint but does NOT document
+        # cache_control support. Default off; flip on after verifying the endpoint
+        # accepts the marker without 400ing.
+        minimax:
+          enabled: false
+        # Local LM Studio has no cache API.
+        lmstudio:
+          enabled: false
     default-provider: ${MODEL_PROVIDER:lmstudio}
     vision:
       providers:

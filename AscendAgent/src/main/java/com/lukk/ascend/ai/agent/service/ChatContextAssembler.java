@@ -29,21 +29,25 @@ public class ChatContextAssembler {
     private String baseSystemPrompt;
 
     public String buildSystemMessage(String userId, String userPrompt, String embeddingProvider) {
+        return buildSystemMessages(userId, userPrompt, embeddingProvider).combined();
+    }
+
+    public AssembledSystemMessages buildSystemMessages(String userId, String userPrompt, String embeddingProvider) {
         String instructions = userInstructionService.getInstructions(userId);
 
         List<SemanticMemoryItem> semanticMemory = fetchSemanticMemory(userId, userPrompt, embeddingProvider);
         String semanticMemoryBlock = buildSemanticMemoryBlock(semanticMemory);
 
-        StringBuilder sb = new StringBuilder(baseSystemPrompt);
-        sb.append("\n\nUser Instructions:\n").append(instructions != null ? instructions : "");
+        StringBuilder dynamic = new StringBuilder();
+        dynamic.append("User Instructions:\n").append(instructions != null ? instructions : "");
         if (!semanticMemoryBlock.isBlank()) {
-            sb.append("\n\n").append(semanticMemoryBlock);
+            dynamic.append("\n\n").append(semanticMemoryBlock);
         }
 
         log.info("Assembled SystemMessage for user: '{}'. State -> BaseSystemPrompt: YES, UserInstructions: {}, SemanticMemory: {} ({} items)",
                 userId, (instructions != null && !instructions.isBlank()) ? "YES" : "NO", !semanticMemoryBlock.isBlank() ? "YES" : "NO", semanticMemory != null ? semanticMemory.size() : 0);
 
-        return sb.toString();
+        return new AssembledSystemMessages(baseSystemPrompt, dynamic.toString());
     }
 
     public BuiltUserMessage buildUserMessage(String originalPrompt, MultipartFile document, String embeddingProvider) {

@@ -165,6 +165,25 @@ class PropertiesTest {
     }
 
     @Test
+    void promptCacheProperties_DefaultsTogglesAndSetters() {
+        PromptCacheProperties props = new PromptCacheProperties();
+
+        assertThat(props.isEnabled()).isTrue();
+        assertThat(props.getProviders()).isEmpty();
+        assertThat(props.isProviderEnabled("anthropic")).isTrue();
+
+        PromptCacheProperties.ProviderCache anth = new PromptCacheProperties.ProviderCache();
+        anth.setEnabled(false);
+        props.setProviders(Map.of("anthropic", anth));
+        assertThat(props.isProviderEnabled("anthropic")).isFalse();
+        assertThat(props.isProviderEnabled("openai")).isTrue();
+
+        props.setEnabled(false);
+        assertThat(props.isProviderEnabled("openai")).isFalse();
+        assertThat(props.isProviderEnabled("anthropic")).isFalse();
+    }
+
+    @Test
     void chatHistoryProperties_DefaultsAndSetters() {
         ChatHistoryProperties props = new ChatHistoryProperties();
 

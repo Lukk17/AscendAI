@@ -2,6 +2,9 @@ package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.exception.AiGenerationException;
+import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,12 +54,17 @@ class ChatExecutorTest {
     @Mock
     private ChatModel chatModel;
 
+    @Mock
+    private PromptCacheStrategyResolver cacheStrategyResolver;
+
     @InjectMocks
     private ChatExecutor chatExecutor;
 
     @BeforeEach
     void setupGlobalFields() {
         ReflectionTestUtils.setField(chatExecutor, "systemPrompt", SYSTEM_TEXT);
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio");
+        org.mockito.Mockito.lenient().when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
     }
 
     @Test

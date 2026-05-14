@@ -3,6 +3,8 @@ package com.lukk.ascend.ai.agent.service;
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.dto.CustomMetadata;
 import com.lukk.ascend.ai.agent.exception.AiGenerationException;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -10,6 +12,7 @@ import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -24,9 +27,9 @@ import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,32 +42,43 @@ public class ChatExecutor {
     private final ChatModelResolver chatModelResolver;
     private final SyncMcpToolCallbackProvider toolCallbackProvider;
     private final ChatResponseContentResolver chatResponseContentResolver;
+    private final PromptCacheStrategyResolver cacheStrategyResolver;
 
     @Value("${app.system-prompt}")
     private String systemPrompt;
 
     public AiResponse execute(String userId, String systemText, String userText, List<Message> history,
                               MultipartFile image, String provider, String model) {
+        return execute(userId, new AssembledSystemMessages(systemText, ""), userText, history, image, provider, model);
+    }
+
+    public AiResponse execute(String userId, AssembledSystemMessages systemMessages, String userText, List<Message> history,
+                              MultipartFile image, String provider, String model) {
         log.info("Executing AI Prompt | User: {} | Provider: {} | Model: {} | Prompt Length: {}",
                 userId, provider, model, userText.length());
 
-        ChatClient chatClient = buildChatClient(provider, model);
+        PromptCacheStrategy strategy = cacheStrategyResolver.resolve(provider);
+        ChatOptions decoratedOptions = strategy.buildOptions(model);
 
-        ChatClientRequestSpec promptBuilder = chatClient.prompt()
-                .system(s -> s.text(systemText))
-                .messages(history)
-                .advisors(new SimpleLoggerAdvisor())
-                .advisors(a -> a.param(USER_ID_KEY, userId));
-
-        promptBuilder.toolContext(Map.of(USER_ID_KEY, userId));
-
-        handleImageContext(promptBuilder, userText, image);
-
-        ChatResponse chatResponse = promptBuilder.call().chatResponse();
+        ChatResponse chatResponse;
+        try {
+            chatResponse = invoke(userId, systemMessages, userText, history, image, provider, model, decoratedOptions);
+        } catch (RuntimeException e) {
+            if (!strategy.isCacheConfigError(e)) {
+                throw e;
+            }
+            log.warn("[PromptCache] provider={} cache call failed, retrying without cache: {}",
+                    strategy.providerName(), e.getMessage());
+            ChatOptions fallbackOptions = StringUtils.hasText(model)
+                    ? ChatOptions.builder().model(model).build() : null;
+            chatResponse = invoke(userId, systemMessages, userText, history, image, provider, model, fallbackOptions);
+        }
 
         if (chatResponse == null) {
             throw new AiGenerationException("Received null response from ChatClient");
         }
+
+        strategy.recordOutcome(userId, chatResponse);
 
         String content = chatResponseContentResolver.resolveContent(chatResponse);
         List<String> toolsUsed = extractToolsUsed(chatResponse);
@@ -72,14 +86,43 @@ public class ChatExecutor {
         return new AiResponse(content, new CustomMetadata(chatResponse.getMetadata(), toolsUsed));
     }
 
-    private ChatClient buildChatClient(String provider, String model) {
+    private ChatResponse invoke(String userId, AssembledSystemMessages systemMessages, String userText,
+                                List<Message> history, MultipartFile image, String provider, String model,
+                                ChatOptions options) {
+        ChatClient chatClient = buildChatClient(provider, model, options);
+
+        List<Message> allMessages = new ArrayList<>();
+        allMessages.add(new SystemMessage(systemMessages.staticPrefix()));
+        if (systemMessages.hasDynamic()) {
+            allMessages.add(new SystemMessage(systemMessages.dynamicSuffix()));
+        }
+        if (history != null && !history.isEmpty()) {
+            allMessages.addAll(history);
+        }
+
+        ChatClientRequestSpec promptBuilder = chatClient.prompt()
+                .messages(allMessages)
+                .advisors(new SimpleLoggerAdvisor())
+                .advisors(a -> a.param(USER_ID_KEY, userId));
+
+        promptBuilder.toolContext(Map.of(USER_ID_KEY, userId));
+
+        if (options != null) {
+            promptBuilder.options(options);
+        }
+
+        handleImageContext(promptBuilder, userText, image);
+
+        return promptBuilder.call().chatResponse();
+    }
+
+    private ChatClient buildChatClient(String provider, String model, ChatOptions decoratedOptions) {
         ChatModel chatModel = chatModelResolver.resolve(provider);
 
         ChatClient.Builder clientBuilder = ChatClient.builder(chatModel)
-                .defaultSystem(systemPrompt)
                 .defaultToolCallbacks(toolCallbackProvider.getToolCallbacks());
 
-        if (model != null && !model.isBlank()) {
+        if (decoratedOptions == null && StringUtils.hasText(model)) {
             clientBuilder.defaultOptions(ChatOptions.builder().model(model).build());
         }
 

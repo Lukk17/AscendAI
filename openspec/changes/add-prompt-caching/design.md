@@ -4,34 +4,48 @@ AscendAgent's hot path (`ChatExecutor.execute`) assembles a `Prompt` whose first
 
 This change introduces a per-provider caching layer that wraps the existing chat flow without changing its public contract.
 
-## Provider Matrix
+## Provider Matrix (verified against Spring AI 1.1.4 sources during implementation)
 
-| Provider | Mechanism | Knob | TTL | Reported Hit Field | Spring AI 1.1.x exposure |
-|---|---|---|---|---|---|
-| Anthropic | Explicit `cache_control: { type: "ephemeral" }` on system block | Per-block annotation | 5 min default; 1 hr with `ttl` extension | `usage.cache_read_input_tokens` / `cache_creation_input_tokens` | `AnthropicChatOptions` — verify exact field name during impl; if absent, use a `RequestResponseAdvisor` to mutate the outgoing JSON before the HTTP call |
-| OpenAI (GPT-4o, GPT-5) | Automatic prefix cache when prompt ≥ 1024 tokens | None — implicit | ~5 min sliding | `usage.prompt_tokens_details.cached_tokens` | Read-only via response metadata; verify prefix stability is our only job |
-| MiniMax | OpenAI-compatible endpoint; same automatic behavior | None | Provider-defined | Same field as OpenAI when supported | Treat identically to OpenAI |
-| Gemini | Pre-create `CachedContent` resource, reference by `cachedContent: <name>` | Resource lifecycle | Configurable, min 1 min | `usageMetadata.cachedContentTokenCount` | Spring AI 1.1.x `VertexAiGeminiChatOptions` may not expose `cachedContent`; fallback is a thin `GeminiCachedContentClient` that calls the REST API directly and a `RequestResponseAdvisor` that injects the resource name |
-| LM Studio | None (local) | — | — | — | No-op strategy; documented |
+| Provider name | Spring AI client used | Mechanism | Strategy impl | Default toggle |
+|---|---|---|---|---|
+| `anthropic` | spring-ai-anthropic | Native `AnthropicChatOptions.cacheOptions(AnthropicCacheOptions.builder().strategy(SYSTEM_ONLY).multiBlockSystemCaching(true).build())`. Reads `AnthropicApi.Usage.cacheReadInputTokens` / `cacheCreationInputTokens`. TTL default `FIVE_MINUTES` (controlled by `AnthropicCacheTtl` enum). | `AnthropicPromptCacheStrategy` | **on** |
+| `openai` | spring-ai-openai | OpenAI auto-prefix-cache (≥1024-token prefix). Read-only — log `OpenAiApi.Usage.PromptTokensDetails.cachedTokens`. | `OpenAiPromptCacheStrategy` | **on** |
+| `gemini` | spring-ai-openai (Gemini's OpenAI-compat surface — that's how this codebase wires it) | Same as openai. Native `CachedContent` would require switching to the Vertex client — **deferred**. | `OpenAiPromptCacheStrategy` (reused) | **on** |
+| `minimax` | spring-ai-anthropic (MiniMax's Anthropic-compat surface) | `cache_control` is NOT documented as supported by MiniMax's compat endpoint. Sending it would risk a 400. | `NoopPromptCacheStrategy` | **off** |
+| `lmstudio` | spring-ai-anthropic (LM Studio's Anthropic-compat surface) | No cache API. | `NoopPromptCacheStrategy` | **off** |
 
 ## Architectural Decisions
 
-### Decision 1: One strategy per provider type, dispatched on `ProviderConfig.type`
+### Decision 1: One strategy per provider NAME (deviation from original)
 
 `PromptCacheStrategy` is a small interface:
 
 ```java
 public interface PromptCacheStrategy {
-    PromptCacheDecoration decorate(PromptCacheRequest request);
-    void recordOutcome(PromptCacheOutcome outcome);
+    String providerName();
+    ChatOptions buildOptions(String model);            // returns provider-specific options w/ cache directive
+    void recordOutcome(String userId, ChatResponse response);
+    default boolean isCacheConfigError(Throwable t) { return false; }
 }
 ```
 
-`PromptCacheStrategyResolver` injects a `Map<String, PromptCacheStrategy>` keyed by provider type (`anthropic`, `openai`, `minimax`, `gemini`, `lmstudio`) and resolves per request using the same `AiProviderProperties.ProviderConfig.type` that already drives client selection. This keeps the dispatch consistent with the rest of the codebase and avoids a new enum.
+**Deviation from the original Decision 1**: dispatch is by provider NAME, not by `ProviderConfig.type`. Reason: the codebase wires Gemini through `type: openai` (Google's OpenAI-compatible surface) and MiniMax through `type: anthropic` (MiniMax's Anthropic-compat surface). Type-based dispatch would (a) try to send `cache_control` to MiniMax which doesn't document support, and (b) skip OpenAI-style cached-token logging for Gemini. Provider-name dispatch matches actual cache-support boundaries.
+
+`PromptCacheStrategyResolver` instantiates strategies in `@PostConstruct`, returns the matching one per call, and falls back to a per-provider `NoopPromptCacheStrategy` when either the master toggle or the per-provider toggle is off (or when the provider name is unknown).
 
 ### Decision 2: Strategies live in `service/cache/`
 
-The package mirrors `service/memory/` and `service/ingestion/`. They are stateless beans except for `GeminiPromptCacheStrategy`, which holds an in-memory map of `(systemPromptHash, cachedContentName, expiresAt)` to avoid recreating the `CachedContent` on every call. Eviction is lazy (check `expiresAt` on lookup; recreate on miss).
+The package mirrors `service/memory/` and `service/ingestion/`. All three strategies are stateless. `GeminiPromptCacheStrategy` (with `CachedContent` lifecycle management) is **deferred** — Gemini in this codebase rides on the OpenAI-compat client and gets the same read-only treatment as OpenAI.
+
+### Decision 2b: Static-vs-dynamic system message split via `AssembledSystemMessages`
+
+`ChatContextAssembler.buildSystemMessages(...)` returns a new record `AssembledSystemMessages(String staticPrefix, String dynamicSuffix)`. The `staticPrefix` is the `app.system-prompt` text only — globally identical, eligible for provider caching. The `dynamicSuffix` carries per-user content (instructions, semantic memory) that varies per request.
+
+`ChatExecutor` builds the prompt as `List.of(new SystemMessage(staticPrefix), new SystemMessage(dynamicSuffix), ...history)`. With `AnthropicCacheOptions.multiBlockSystemCaching(true)`, Spring AI emits each `SystemMessage` as a separate `system` array entry to the Anthropic API and applies `cache_control` to the second-to-last block — i.e., the static one. The dynamic block varies freely without invalidating the cache.
+
+For OpenAI/Gemini the two SystemMessages are joined upstream of the wire (or sent as a multi-message system payload, depending on client). Either way the byte-prefix of the assembled system text is stable across users for the static portion, so OpenAI's auto prefix cache hits.
+
+The existing `buildSystemMessage(...)` String form is kept as a thin adapter that returns `combined()` so non-cache callers don't break.
 
 ### Decision 3: Cache the system prompt and the extractor instruction; nothing else
 
@@ -60,37 +74,34 @@ The `add-observability` change adds the matching Micrometer counters (`ai.prompt
 
 OpenAI's automatic cache only fires when the prefix is byte-identical across calls. The test for `OpenAiPromptCacheStrategy` does not call OpenAI — it captures the constructed `Prompt` for two consecutive `ChatExecutor.execute` calls with the same `app.system-prompt` and asserts the first N tokens (or first system message text) are identical. This catches accidental nondeterminism (timestamps, request ids) sneaking into the prefix.
 
-## Spring AI 1.1.x API Survey (to be confirmed during implementation)
+## Spring AI 1.1.x API Survey (RESULTS — verified against 1.1.4 sources during implementation)
 
-The following must be verified against the actual Spring AI 1.1.4 sources during implementation, not assumed:
+- **`AnthropicChatOptions`**: ✅ `cacheOptions(AnthropicCacheOptions)` exposed since 1.1.0. `AnthropicCacheOptions` has `strategy` (`AnthropicCacheStrategy.{NONE, TOOLS_ONLY, SYSTEM_ONLY, SYSTEM_AND_TOOLS, CONVERSATION_HISTORY}`), per-`MessageType` `messageTypeTtl` (`AnthropicCacheTtl.{FIVE_MINUTES, ONE_HOUR}`), per-`MessageType` `messageTypeMinContentLengths`, and a `multiBlockSystemCaching` flag. `AnthropicApi.Usage` record carries `cacheReadInputTokens` + `cacheCreationInputTokens`. **No raw HTTP, no advisor needed.**
+- **`OpenAiChatOptions`**: ✅ no cache decoration knob (caching is automatic ≥1024-token prefix). `OpenAiApi.Usage.PromptTokensDetails.cachedTokens` is surfaced via `Usage.getNativeUsage()` cast. Strategy is read-only.
+- **`VertexAiGeminiChatOptions`**: not investigated — Gemini in this codebase is wired through the **OpenAI-compat** client, not Vertex. Native `CachedContent` is **deferred** to a follow-up change that would also swap the Gemini client.
+- **MiniMax**: wired via spring-ai-anthropic (MiniMax's Anthropic-compat endpoint). MiniMax does NOT publicly document `cache_control` support; sending it would risk a 400. Strategy: noop with default-off toggle. Flip on once endpoint behavior is verified.
 
-- **`AnthropicChatOptions`**: check whether `cacheControl` (or similar) is exposed. If yes, set on the outgoing options. If no, register a `RequestResponseAdvisor` that mutates the outgoing JSON to attach `cache_control` to the system block. `design.md` updates with the chosen path during impl.
-- **`OpenAiChatOptions`**: no caching knob expected (caching is automatic). Confirm `cached_tokens` is surfaced in `ChatResponse.metadata().getUsage()` or whether we need to read raw provider metadata via `chatResponse.getMetadata().get("usage.prompt_tokens_details.cached_tokens")`.
-- **`VertexAiGeminiChatOptions`**: check for `cachedContent` field. If absent, ship `GeminiCachedContentClient` (thin `RestClient`-based wrapper around the Generative Language `cachedContents` REST API) and inject the resource name via an advisor.
-- **MiniMax**: shares the OpenAI client adapter; behavior identical.
-
-If any provider's framework support is too thin to wire cleanly, fallback to the raw-HTTP path is acceptable as long as it's documented in `design.md` honestly. We do not promise framework-level support that doesn't exist.
-
-## Configuration
+## Configuration (final)
 
 ```yaml
 app:
   ai:
     prompt-cache:
-      enabled: true               # master toggle
+      enabled: true        # master toggle
       providers:
         anthropic:
-          enabled: true
+          enabled: true    # native cache_control via Spring AI 1.1.4
         openai:
-          enabled: true
+          enabled: true    # auto prefix cache; read-only
         gemini:
-          enabled: true
-          cached-content-ttl: PT10M
+          enabled: true    # rides on OpenAI-compat client; read-only
         minimax:
-          enabled: true
+          enabled: false   # Anthropic-compat endpoint; cache_control unverified
         lmstudio:
-          enabled: false          # no-op anyway
+          enabled: false   # no cache API
 ```
+
+**Deviation from original config**: removed `gemini.cached-content-ttl` (no native CachedContent in v1).
 
 ## Cost Modeling (back-of-envelope)
 

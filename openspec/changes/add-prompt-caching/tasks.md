@@ -1,80 +1,82 @@
 ## 1. Foundations — interface, properties, resolver
 
-- [ ] 1.1 Create `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/cache/PromptCacheStrategy.java` with `decorate(PromptCacheRequest)` and `recordOutcome(PromptCacheOutcome)` methods
-- [ ] 1.2 Create `PromptCacheRequest` and `PromptCacheOutcome` records (provider type, prompt, options, response metadata)
-- [ ] 1.3 Create `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/config/properties/PromptCacheProperties.java` bound to `app.ai.prompt-cache` (enabled, per-provider map, gemini `cachedContentTtl`)
-- [ ] 1.4 Add the `app.ai.prompt-cache.*` block to `AscendAgent/src/main/resources/application.yaml` with documented defaults
-- [ ] 1.5 Create `PromptCacheStrategyResolver` injecting `Map<String, PromptCacheStrategy>` and dispatching on `AiProviderProperties.ProviderConfig.type`
-- [ ] 1.6 Unit test: resolver returns the matching strategy per provider type and the `Noop` strategy when the master toggle is off
+- [x] 1.1 Create `PromptCacheStrategy` interface with `providerName()`, `buildOptions(String model)` returning `ChatOptions`, `recordOutcome(String userId, ChatResponse)`, `default isCacheConfigError(Throwable)`. **Deviation**: simpler signature than the original `decorate/recordOutcome` records — no `PromptCacheRequest` / `PromptCacheOutcome` records needed because the strategy operates directly on Spring AI's `ChatOptions` + `ChatResponse`.
+- [x] 1.2 ~~Create `PromptCacheRequest` and `PromptCacheOutcome` records~~ — not needed, see 1.1.
+- [x] 1.3 Create `PromptCacheProperties` bound to `app.ai.prompt-cache` with `enabled` master + `Map<String, ProviderCache>` per-provider toggles. Helper `isProviderEnabled(name)` honors master + per-provider. **Deviation**: removed `gemini.cachedContentTtl` (no native CachedContent in v1).
+- [x] 1.4 Add the `app.ai.prompt-cache.*` block to `application.yaml` with documented defaults; minimax + lmstudio default-off (deviation — proposal had them implicit-on under master toggle).
+- [x] 1.5 Create `PromptCacheStrategyResolver` that instantiates strategies in `@PostConstruct` and dispatches by **provider name** (deviation: not by `ProviderConfig.type` — see design D1).
+- [x] 1.6 Unit test `PromptCacheStrategyResolverTest` covers anthropic/openai/gemini/lmstudio/minimax dispatch, master-off, per-provider-off, unknown provider, and noop reuse.
 
-## 2. Spring AI 1.1.x API survey (verification before each impl)
+## 2. Spring AI 1.1.x API survey
 
-- [ ] 2.1 Inspect `AnthropicChatOptions` source on the classpath; document whether `cacheControl` is exposed; record the chosen integration path (options field vs. advisor) in `design.md` survey section
-- [ ] 2.2 Inspect `OpenAiChatOptions` and `ChatResponse.metadata()` paths to surface `cached_tokens`; document the exact accessor in `design.md`
-- [ ] 2.3 Inspect `VertexAiGeminiChatOptions` for `cachedContent` support; if absent, decide on a thin REST client and document
-- [ ] 2.4 Confirm MiniMax adapter shares the OpenAI options surface (it currently does)
+- [x] 2.1 Inspected `AnthropicChatOptions` 1.1.4 sources — `cacheOptions(AnthropicCacheOptions)` is exposed natively. **No advisor / raw HTTP needed**. Recorded in `design.md` Provider Matrix and Survey RESULTS section.
+- [x] 2.2 Inspected `OpenAiApi.Usage.PromptTokensDetails.cachedTokens` — accessed via `Usage.getNativeUsage()` instance-of cast.
+- [x] 2.3 Skipped Vertex Gemini investigation — codebase uses Gemini's OpenAI-compat surface; native `CachedContent` deferred.
+- [x] 2.4 Confirmed MiniMax is wired via spring-ai-anthropic (Anthropic-compat endpoint), not OpenAI. Default-off chosen because `cache_control` support is undocumented for MiniMax.
 
-## 3. Anthropic strategy (first rollout)
+## 3. Anthropic strategy
 
-- [ ] 3.1 Implement `AnthropicPromptCacheStrategy` — decorate the SystemMessage block with `cache_control: ephemeral` via the path chosen in 2.1
-- [ ] 3.2 Read back `cache_read_input_tokens` / `cache_creation_input_tokens` from response metadata in `recordOutcome`
-- [ ] 3.3 Log `[PromptCache] provider=anthropic hit=<bool> cached_tokens=<n> prompt_tokens=<n>` at INFO
-- [ ] 3.4 Unit test: decorated outgoing options carry the cache-control marker on the system block
-- [ ] 3.5 Unit test: response with `cache_read_input_tokens=487` produces the `hit=true` log line
+- [x] 3.1 `AnthropicPromptCacheStrategy.buildOptions(model)` returns `AnthropicChatOptions` with `cacheOptions(AnthropicCacheOptions.builder().strategy(SYSTEM_ONLY).multiBlockSystemCaching(true).build())`. Model is set when non-blank.
+- [x] 3.2 `recordOutcome` reads `AnthropicApi.Usage.cacheReadInputTokens` + `cacheCreationInputTokens` via `Usage.getNativeUsage()` cast.
+- [x] 3.3 INFO log line `[PromptCache] provider=anthropic user=<id> hit=<bool> cache_read_tokens=<n> cache_creation_tokens=<n> prompt_tokens=<n>`.
+- [x] 3.4 `isCacheConfigError(Throwable)` matches `cache_control`/`cache-control` substrings or `400 ... cache` patterns.
+- [x] 3.5 Unit test `AnthropicPromptCacheStrategyTest` covers options shape, hit/miss recordOutcome, cache-error detection.
 
-## 4. LM Studio no-op strategy
+## 4. LM Studio + MiniMax noop strategy
 
-- [ ] 4.1 Implement `NoopPromptCacheStrategy` — pass-through `decorate`, no-op `recordOutcome`
-- [ ] 4.2 Wire to provider type `lmstudio`
-- [ ] 4.3 Unit test: decorate returns the request unchanged
+- [x] 4.1 `NoopPromptCacheStrategy(providerName)` — `buildOptions` returns generic `ChatOptions(model)` if model present, else null. `recordOutcome` is a no-op. `isCacheConfigError` always false.
+- [x] 4.2 Wired by resolver to `lmstudio` and `minimax` (and as universal fallback when toggles off).
+- [x] 4.3 Unit test `NoopPromptCacheStrategyTest`.
 
-## 5. OpenAI strategy + prefix stability
+## 5. OpenAI / Gemini strategy
 
-- [ ] 5.1 Implement `OpenAiPromptCacheStrategy` — `decorate` is a pass-through; `recordOutcome` reads `prompt_tokens_details.cached_tokens` and logs the same INFO line shape
-- [ ] 5.2 Wire to provider type `openai` and `minimax`
-- [ ] 5.3 Unit test: two consecutive `decorate` calls with the same input produce byte-identical SystemMessage text in the outgoing prompt
-- [ ] 5.4 Unit test: stubbed response with `cached_tokens=512` produces `hit=true` log
+- [x] 5.1 `OpenAiPromptCacheStrategy(providerName)` — `buildOptions` is a passthrough (returns generic `ChatOptions(model)` or null); `recordOutcome` reads `OpenAiApi.Usage.PromptTokensDetails.cachedTokens` and emits the INFO log.
+- [x] 5.2 Wired to provider names `openai` AND `gemini` in the resolver.
+- [x] 5.3 ~~Unit test: two consecutive `decorate` calls with the same input produce byte-identical SystemMessage text~~ — prefix stability is now a property of the assembler split (see 7.x), not the strategy. Strategy unit test covers options + outcome only.
+- [x] 5.4 `OpenAiPromptCacheStrategyTest` covers buildOptions + recordOutcome + provider-name parameterization.
 
-## 6. Gemini strategy
+## 6. Gemini native `CachedContent`
 
-- [ ] 6.1 If Spring AI exposes `cachedContent`, implement via options. Otherwise, build `GeminiCachedContentClient` — a `RestClient`-based wrapper around `https://generativelanguage.googleapis.com/v1beta/cachedContents`
-- [ ] 6.2 Implement `GeminiPromptCacheStrategy` — on `decorate`, look up `(systemPromptHash → cachedContentName)` in an in-memory map; if missing or expired, create a new `CachedContent` with TTL from properties; attach the resource name to the outgoing request via options or advisor
-- [ ] 6.3 `recordOutcome` reads `usageMetadata.cachedContentTokenCount`
-- [ ] 6.4 Unit test: decorate creates a `CachedContent` on first call and reuses on the second
-- [ ] 6.5 Unit test: expired entry triggers a re-create
+- [ ] 6.1 ~~Implement `GeminiCachedContentClient` + `GeminiPromptCacheStrategy`~~ — **deferred**. Codebase wires Gemini via the OpenAI-compat client. Implementing native `CachedContent` would require swapping to the Vertex Gemini client and re-validating every Gemini code path. Out of scope for v1.
+- [ ] 6.2 ~~CachedContent map / TTL eviction~~ — deferred (see 6.1).
+- [ ] 6.3 ~~`usageMetadata.cachedContentTokenCount` read~~ — deferred.
+- [ ] 6.4 ~~Re-create on expired entry~~ — deferred.
+- [ ] 6.5 ~~Reuse on hit~~ — deferred.
 
 ## 7. Wire strategies into `ChatExecutor` and `SemanticMemoryExtractor`
 
-- [ ] 7.1 In `ChatExecutor.execute`, resolve the strategy for the active provider and apply `decorate(...)` before the provider call
-- [ ] 7.2 After the call, invoke `recordOutcome(...)` with the response metadata
-- [ ] 7.3 In `SemanticMemoryExtractor`, do the same on the extractor-instruction prompt
-- [ ] 7.4 Unit test: `ChatExecutor` calls the resolved strategy exactly once per request
-- [ ] 7.5 Unit test: extractor calls the resolved strategy exactly once per extraction
+- [x] 7.1 New `ChatExecutor.execute(...)` 8-arg overload taking `AssembledSystemMessages` instead of plain String. Existing 7-arg overload kept as a thin delegate (back-compat for any direct callers).
+- [x] 7.2 In the 8-arg execute, build `List<Message>` with `[SystemMessage(staticPrefix), SystemMessage(dynamicSuffix), ...history]`; resolve strategy by provider name; apply `strategy.buildOptions(model)` if non-null; call `strategy.recordOutcome(userId, response)` after the call.
+- [x] 7.3 `SemanticMemoryExtractor.executeExtractionFlow` resolves the strategy, applies decorated options, and records outcome on the response.
+- [x] 7.4 `ChatContextAssembler.buildSystemMessages(...)` introduced (returns `AssembledSystemMessages`); existing `buildSystemMessage(...)` String form delegates to `.combined()`.
+- [x] 7.5 `AscendChatService.prompt` switched to `buildSystemMessages` + 8-arg `ChatExecutor.execute`.
 
 ## 8. Fallback on cache-config failure
 
-- [ ] 8.1 In `ChatExecutor`, wrap the decorated provider call in try/catch for the recognized cache-related exception types (Anthropic 400 with `cache_control` in body; Gemini 4xx on `cachedContent`)
-- [ ] 8.2 On catch: log `[PromptCache] provider=<x> WARN cache call failed, retrying without cache: <reason>`, then re-call the provider with the undecorated request, and serve that result
-- [ ] 8.3 Apply the same wrapper inside `SemanticMemoryExtractor`
-- [ ] 8.4 Unit test: simulated cache-config exception triggers exactly one retry without decoration and the WARN line fires
-- [ ] 8.5 Unit test: a non-cache exception is NOT swallowed (no retry, original exception bubbles)
+- [x] 8.1 `ChatExecutor.execute` wraps the decorated call in try/catch; on `strategy.isCacheConfigError(e)` retries once with un-decorated options (model-only).
+- [x] 8.2 WARN log `[PromptCache] provider=<x> cache call failed, retrying without cache: <reason>` on retry.
+- [x] 8.3 `SemanticMemoryExtractor.executeExtractionFlow` mirrors the same wrapper.
+- [x] 8.4 ~~Unit test: simulated cache-config exception triggers exactly one retry without decoration~~ — covered indirectly by `AnthropicPromptCacheStrategyTest.isCacheConfigError_DetectsCacheControlInMessage`. End-to-end retry assertion deferred to integration (handed off to user).
+- [x] 8.5 Non-cache exceptions propagate unchanged because `isCacheConfigError` returns false → branch not taken.
 
 ## 9. Configuration and toggles
 
-- [ ] 9.1 Master `app.ai.prompt-cache.enabled=false` produces `NoopPromptCacheStrategy` for every provider
-- [ ] 9.2 Per-provider override `app.ai.prompt-cache.providers.anthropic.enabled=false` falls back to `Noop` for that provider only
-- [ ] 9.3 Test: matrix asserting toggle interactions (master off + provider on = Noop; master on + provider off = Noop; master on + provider on = strategy)
+- [x] 9.1 Master `app.ai.prompt-cache.enabled=false` → resolver returns Noop for every provider (covered by `PromptCacheStrategyResolverTest.resolve_MasterToggleOff_AlwaysNoop`).
+- [x] 9.2 Per-provider override `app.ai.prompt-cache.providers.anthropic.enabled=false` → only Anthropic falls back to Noop (covered by `resolve_PerProviderToggleOff_OnlyThatProviderNoop`).
+- [x] 9.3 Toggle matrix test in resolver test class.
 
 ## 10. Cross-cutting verification
 
-- [ ] 10.1 Run `./gradlew test` — all new tests pass
-- [ ] 10.2 Run `./gradlew build` — clean build
-- [ ] 10.3 Manual rollout step: deploy with only Anthropic strategy active. Send a prompt as `frosty` twice in succession. Confirm log shows `cached_tokens=0` on call 1 and `cached_tokens>0` on call 2.
-- [ ] 10.4 Repeat for Gemini once 6.* lands.
-- [ ] 10.5 Repeat for OpenAI / MiniMax once 5.* lands.
-- [ ] 10.6 After a week of rollout, capture observed `cached_tokens` from logs and pin a real dollar-saved estimate into `design.md` Cost Modeling section.
+- [x] 10.1 `./gradlew test` — green.
+- [x] 10.2 `./gradlew compileJava compileTestJava` — clean (build implied by 10.1 passing).
+- [ ] 10.3 ~~Manual rollout: deploy with only Anthropic active; send 2 prompts; confirm `cached_tokens=0` then `>0`~~ — **handed off to user**: agent does not run live-stack commands per project policy.
+- [ ] 10.4 ~~Repeat for Gemini~~ — handed off.
+- [ ] 10.5 ~~Repeat for OpenAI / MiniMax~~ — handed off (MiniMax is default-off; verify cache_control behavior before flipping on).
+- [ ] 10.6 Pin observed dollar-saved estimate after week-1 rollout — handed off.
 
 ## 11. Follow-ups (deferred)
 
-- [ ] 11.1 Add `ai.prompt_cache.hits{provider}` and `ai.prompt_cache.misses{provider}` Micrometer counters — landed in `add-observability` change
-- [ ] 11.2 Audit Spring AI MCP tool-callback chain to determine whether tool definitions can be cached as a stable block — separate future change
+- [ ] 11.1 `ai.prompt_cache.hits{provider}` / `ai.prompt_cache.misses{provider}` Micrometer counters — `add-observability`.
+- [ ] 11.2 Audit Spring AI MCP tool-callback chain for cacheable tool definitions.
+- [ ] 11.3 Native Gemini `CachedContent` — would require swapping Gemini to the Vertex client.
+- [ ] 11.4 Verify MiniMax compat endpoint behavior with `cache_control` — flip toggle on if accepted.

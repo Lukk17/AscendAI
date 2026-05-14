@@ -6,9 +6,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.service.ChatModelResolver;
 import com.lukk.ascend.ai.agent.service.ChatResponseContentResolver;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -39,6 +43,7 @@ public class SemanticMemoryExtractor {
     private final SemanticMemoryClient memoryClient;
     private final ObjectMapper objectMapper;
     private final ChatResponseContentResolver chatResponseContentResolver;
+    private final PromptCacheStrategyResolver cacheStrategyResolver;
 
     public void extract(String userId, String userText, String provider, String model, String embeddingProvider) {
         Thread.startVirtualThread(() -> processExtraction(userId, userText, provider, model, embeddingProvider));
@@ -56,25 +61,44 @@ public class SemanticMemoryExtractor {
     private void executeExtractionFlow(String userId, String userText, String provider, String model, String embeddingProvider) {
         String extractionModel = resolveExtractionModel(provider, model);
         ChatModel chatModel = chatModelResolver.resolve(provider);
+        PromptCacheStrategy strategy = cacheStrategyResolver.resolve(provider);
+        ChatOptions decoratedOptions = strategy.buildOptions(extractionModel);
 
-        ChatClient.Builder clientBuilder = ChatClient.builder(chatModel)
-                .defaultSystem(EXTRACTOR_INSTRUCTION);
+        ChatResponse chatResponse;
+        try {
+            chatResponse = invokeExtractor(chatModel, userText, extractionModel, decoratedOptions);
+        } catch (RuntimeException e) {
+            if (!strategy.isCacheConfigError(e)) {
+                throw e;
+            }
+            log.warn("[PromptCache] provider={} extractor cache call failed, retrying without cache: {}",
+                    strategy.providerName(), e.getMessage());
+            ChatOptions fallback = StringUtils.hasText(extractionModel)
+                    ? ChatOptions.builder().model(extractionModel).build() : null;
+            chatResponse = invokeExtractor(chatModel, userText, extractionModel, fallback);
+        }
 
-        Optional.ofNullable(extractionModel)
-                .filter(StringUtils::hasText)
-                .ifPresent(m -> clientBuilder.defaultOptions(ChatOptions.builder().model(m).build()));
-
-        ChatClient chatClient = clientBuilder.build();
-
-        ChatResponse chatResponse = chatClient.prompt()
-                .user(userText)
-                .call()
-                .chatResponse();
+        strategy.recordOutcome(userId, chatResponse);
 
         String responseContent = chatResponseContentResolver.resolveContent(chatResponse);
 
         List<String> facts = extractFactsFromJson(responseContent);
         insertFactsWithTally(userId, facts, embeddingProvider);
+    }
+
+    private ChatResponse invokeExtractor(ChatModel chatModel, String userText, String extractionModel, ChatOptions options) {
+        ChatClient.Builder clientBuilder = ChatClient.builder(chatModel);
+        if (options == null && StringUtils.hasText(extractionModel)) {
+            clientBuilder.defaultOptions(ChatOptions.builder().model(extractionModel).build());
+        }
+        ChatClient chatClient = clientBuilder.build();
+
+        List<Message> messages = List.of(new SystemMessage(EXTRACTOR_INSTRUCTION));
+        var spec = chatClient.prompt().messages(messages).user(userText);
+        if (options != null) {
+            spec = spec.options(options);
+        }
+        return spec.call().chatResponse();
     }
 
     private void insertFactsWithTally(String userId, List<String> facts, String embeddingProvider) {

@@ -44,12 +44,12 @@ public class AscendChatService {
 
         embeddingProviderValidator.validate(provider, activeEmbeddingProvider);
 
-        String systemText = contextAssembler.buildSystemMessage(userId, prompt, activeEmbeddingProvider);
+        AssembledSystemMessages systemMessages = contextAssembler.buildSystemMessages(userId, prompt, activeEmbeddingProvider);
         BuiltUserMessage userMessage = contextAssembler.buildUserMessage(prompt, document, activeEmbeddingProvider);
 
         List<Message> history = historyService.loadHistory(userId);
 
-        AiResponse response = chatExecutor.execute(userId, systemText, userMessage.text(), history, image, provider, model);
+        AiResponse response = chatExecutor.execute(userId, systemMessages, userMessage.text(), history, image, provider, model);
 
         historyService.saveHistory(userId, userMessage.text(), response.content());
 
