@@ -18,7 +18,7 @@ The reference Dockerfile pattern in the repo is `WeatherMCP/Dockerfile` — same
 **Non-Goals:**
 - Production deployment manifests (Kubernetes, Helm, ECS task defs). Out of scope; future ADR.
 - Pushing the image to a registry. The compose file builds locally only.
-- Refactoring `application.yaml` to read fewer env vars. Existing `${ENV:default}` interpolation already handles container/host parity.
+- Refactoring `application.yaml` to read more env vars. Container parity is delivered via the existing `application-docker.yaml` Spring profile activated by `SPRING_PROFILES_ACTIVE=docker`. The base `application.yaml` stays unchanged.
 - Containerizing PostgreSQL / Redis / Qdrant / MinIO. They remain external prerequisites per the monorepo policy in `AGENTS.md`.
 
 ## Decisions
@@ -72,7 +72,6 @@ ascend-agent:
     dockerfile: Dockerfile
   container_name: ascend-agent
   restart: unless-stopped
-  profiles: ["fullstack"]
   ports:
     - "9917:9917"
   extra_hosts:
@@ -96,49 +95,45 @@ ascend-agent:
 
 `extra_hosts: ["host.docker.internal:host-gateway"]` makes the host loopback reachable from the container on Linux too — already used by `ascend-memory` so the convention is established.
 
-### D5 — Environment variable pass-through, no hardcoding
+### D5 — Container parity via the `docker` Spring profile, secrets via env
 
-Every variable AscendAgent reads is declared by name and sourced from the shell or `.env`. None get a default in the compose file. Categories:
+Container-mode parity is delivered via the existing `application-docker.yaml` Spring profile, activated by `SPRING_PROFILES_ACTIVE=docker` (hardcoded in the compose entry — there is one correct value for in-container runtime, so it is not parameterised). The profile overrides every URL that defaults to `localhost` in `application.yaml`:
 
-- **Provider API keys** (secrets, runtime-only): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `MINIMAX_API_KEY`.
-- **Provider base URLs** (so per-provider routing works in the container): `LMSTUDIO_BASE_URL`, `OPENAI_BASE_URL`, `GEMINI_BASE_URL`, `ANTHROPIC_BASE_URL`, `MINIMAX_BASE_URL`.
-- **Embedding routing**: `EMBEDDING_PROVIDER`.
-- **Host overrides** (so the container hits the host's Postgres / Redis / Qdrant / MinIO): `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `QDRANT_HOST`, `QDRANT_PORT`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`.
-- **Service URLs** (so AscendAgent talks to other compose services by their service name when in container mode): `ASCEND_MEMORY_BASE_URL`, `DOCLING_BASE_URL`, `UNSTRUCTURED_BASE_URL`, `WEATHER_MCP_URL`, `AUDIO_SCRIBE_URL`, `ASCEND_WEB_SEARCH_URL`, `PADDLE_OCR_URL`.
-- **Feature toggles**: `APP_INGESTION_AUTO_ENABLED`, any other `app.*.enabled` knobs that exist at implementation time.
-- **Profile / runtime**: `SPRING_PROFILES_ACTIVE` (defaults via `${SPRING_PROFILES_ACTIVE:-docker}` in `.env.example` only — *not* in compose).
+- `app.unstructured.base-url` → `http://unstructured-api:8000`
+- `app.docling.base-url` → `http://docling-serve:5001`
+- `app.paddleocr.base-url` → `http://ascend-paddle-ocr:7022`
+- `app.memory.semantic.base-url` → `http://ascend-memory:7020`
+- `app.s3.endpoint` → `http://host.docker.internal:9070`
+- `spring.datasource.url` → `jdbc:postgresql://host.docker.internal:5432/ascend_ai`
+- `spring.data.redis.host` → `host.docker.internal`
+- `spring.ai.vectorstore.qdrant.host` → `host.docker.internal`
+- `spring.ai.openai.base-url` and `app.ai.providers.lmstudio.base-url` and `app.embedding.providers.lmstudio.base-url` → `http://host.docker.internal:1234`
+- `spring.ai.mcp.client.streamable-http.connections.{audioscribe,weather,ascend-web-search}.url` → the corresponding compose service URLs
 
-Each is declared in `.env.example` with an empty value or, where the value is universal and non-secret (e.g., `OPENAI_BASE_URL=https://api.openai.com/v1`), a sane public default. Secrets stay empty. `.env` is gitignored.
+Only **secrets and per-deployment knobs** flow through `environment:` in the compose entry. These match the style already established by the `ascend-memory` service (mix of hardcoded values for stable configuration and `KEY=${KEY}` for secrets):
 
-The compose entry sets each env var positionally:
+- `SPRING_PROFILES_ACTIVE=docker` (hardcoded)
+- `OPENAI_API_KEY=${OPENAI_API_KEY}`
+- `ASCEND_ANTHROPIC_API_KEY=${ASCEND_ANTHROPIC_API_KEY}` (the agent already uses the `ASCEND_`-prefixed name to avoid collisions with Claude Code's own auth on the host — see `application.yaml`)
+- `GEMINI_API_KEY=${GEMINI_API_KEY}`
+- `MINIMAX_API_KEY=${MINIMAX_API_KEY}`
 
-```yaml
-environment:
-  - OPENAI_API_KEY=${OPENAI_API_KEY}
-  - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-  - GEMINI_API_KEY=${GEMINI_API_KEY}
-  - MINIMAX_API_KEY=${MINIMAX_API_KEY}
-  - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}
-  - LMSTUDIO_BASE_URL=${LMSTUDIO_BASE_URL}
-  - OPENAI_BASE_URL=${OPENAI_BASE_URL}
-  - GEMINI_BASE_URL=${GEMINI_BASE_URL}
-  # ... etc
-```
+Other knobs that `application.yaml` already reads from env (`SECURITY_ENABLED`, `*_ENABLED`, `*_MODEL`, `EMBEDDING_PROVIDER`, etc.) stay at their YAML defaults and are not pre-wired into the compose entry. Operators who want to override them edit the compose file directly. This avoids a noisy environment block that mostly carries values nobody changes.
 
-**Alternative considered**: `env_file: [.env]`. Equivalent functionality, slightly less explicit about *which* variables a service consumes. Rejected because the explicit list doubles as documentation.
+**Alternative considered**: strict "every URL/host as `${KEY}` in compose" with matching `${VAR:default}` placeholders added to `application.yaml`. Rejected because it duplicates configuration (YAML profile + env vars), adds churn to a stable file, and diverges from the `ascend-memory` precedent in the same compose file.
 
-### D6 — Host vs container modes, `profiles:` toggle
+### D6 — Host vs container modes, both supported, container is default
 
 AscendAgent runs in two modes depending on the developer's workflow:
 
 | Mode | Command | When |
 |---|---|---|
-| host (default) | `docker compose up -d` then `cd AscendAgent && ./gradlew bootRun` | Active development with hot reload, JVM debugging, IDE attached |
-| containerized (full stack) | `docker compose --profile fullstack up --build` | End-to-end smoke tests, demos, CI, "I want everything to work without thinking" |
+| containerized (default) | `docker compose up -d --build` | Default. End-to-end smoke tests, demos, CI, "I want everything to work without thinking" |
+| host | `docker compose stop ascend-agent` then `cd AscendAgent && ./gradlew bootRun` | Active development with hot reload, JVM debugging, IDE attached |
 
-Putting `profiles: ["fullstack"]` on the `ascend-agent` service ensures the default `docker compose up` keeps today's behavior — only the existing services start, and the developer keeps using `./gradlew bootRun`. Adding `--profile fullstack` opts in to the container.
+The `ascend-agent` service has no `profiles:` gating, so `docker compose up` brings up the full stack including the gateway. Switching to host mode is a one-command stop + `./gradlew bootRun`. Port 9917 is the same either way, so REST clients don't need to change.
 
-**Alternative considered**: a separate `docker-compose.fullstack.yaml` overlay. Rejected — splits the truth across two files, and Compose v2 profiles solve the same problem in one.
+**Alternative considered**: gate `ascend-agent` behind `profiles: ["fullstack"]` so default compose preserves the legacy "compose + host gradlew" workflow. Rejected — the user explicitly chose container-by-default so that a fresh clone + `docker compose up` brings up the entire monorepo. Developers who prefer host mode pay one extra `docker compose stop ascend-agent`, which is documented in both READMEs.
 
 ### D7 — `.env` file convention and gitignore
 
@@ -213,5 +208,5 @@ This is purely additive. Existing developers who run `./gradlew bootRun` see no 
 
 ## Open Questions
 
-- Does AscendAgent currently include `spring-boot-starter-actuator`? If yes, the healthcheck works as-is. If no, the implementation task adds the dependency with the minimum exposure (`management.endpoints.web.exposure.include=health`). Resolved at implementation time.
+- Does AscendAgent currently include `spring-boot-starter-actuator`? **Resolved at implementation time: yes.** `AscendAgent/build.gradle.kts` already pulls in `spring-boot-starter-actuator` and `application.yaml` already scopes exposure to `management.endpoints.web.exposure.include: health`. The healthcheck works as-is; no build-config change needed.
 - Should the image be tagged and pushed to a registry as part of this change? Out of scope for this change; deferred to a future deployment-focused proposal.
