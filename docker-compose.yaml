@@ -80,6 +80,12 @@ services:
       - ASCEND_ANTHROPIC_API_KEY=${ASCEND_ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      # Chat-history backend toggles. Default true. Set either to false in .env
+      # to opt out of that persistence layer at runtime. The env-var names use
+      # Spring Boot's canonical form for kebab-case properties (hyphens removed):
+      # APP_MEMORY_CHATHISTORY_REDIS_ENABLED binds to app.memory.chat-history.redis.enabled.
+      - APP_MEMORY_CHATHISTORY_REDIS_ENABLED=${APP_MEMORY_CHATHISTORY_REDIS_ENABLED:-true}
+      - APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED=${APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED:-true}
     networks:
       default:
         aliases:
