@@ -8,6 +8,9 @@ app:
   s3:
     # MinIO must be running externally (port 9070)
     endpoint: "http://host.docker.internal:9070"
+    # Presigned URLs handed back to API callers must resolve from the caller's
+    # network (browser/curl on the host), not from inside the container.
+    public-endpoint: "http://localhost:9070"
   memory:
     semantic:
       base-url: "http://ascend-memory:7020"

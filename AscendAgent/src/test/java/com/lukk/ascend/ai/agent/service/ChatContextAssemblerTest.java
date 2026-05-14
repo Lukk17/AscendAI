@@ -3,6 +3,9 @@ package com.lukk.ascend.ai.agent.service;
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryClient;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryItem;
+import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
+import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
+import com.lukk.ascend.ai.agent.service.rag.SourceRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -110,33 +113,40 @@ class ChatContextAssemblerTest {
     @Test
     void buildUserMessage_WhenNoDocAndNoRag_ThenReturnsOriginalPrompt() {
         // given
-        when(ragRetrievalService.retrieveContext(DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER)).thenReturn("");
+        when(ragRetrievalService.retrieve(DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(RagRetrievalResult.empty());
 
         // when
-        String result = assembler.buildUserMessage(DEFAULT_USER_PROMPT, null, DEFAULT_EMBEDDING_PROVIDER);
+        BuiltUserMessage result = assembler.buildUserMessage(DEFAULT_USER_PROMPT, null, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
-        assertThat(result).isEqualTo(DEFAULT_USER_PROMPT);
+        assertThat(result.text()).isEqualTo(DEFAULT_USER_PROMPT);
+        assertThat(result.sources()).isEmpty();
+        assertThat(result.ragRetrievalRan()).isTrue();
     }
 
     @Test
-    void buildUserMessage_WhenDocAndRagExist_ThenAppendsBoth() {
+    void buildUserMessage_WhenDocAndRagExist_ThenAppendsBothAndPropagatesSources() {
         // given
         MultipartFile document = mock(MultipartFile.class);
         when(document.isEmpty()).thenReturn(false);
         when(documentIngestionService.processDocument(document)).thenReturn("\n[Doc Content]");
 
         String intermediatePrompt = DEFAULT_USER_PROMPT + "\n[Doc Content]";
-        when(ragRetrievalService.retrieveContext(intermediatePrompt, DEFAULT_EMBEDDING_PROVIDER)).thenReturn("[RAG Content]");
+        SourceRef ref = new SourceRef("bucket", "manual.pdf", "manual.pdf", "application/pdf");
+        when(ragRetrievalService.retrieve(intermediatePrompt, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(new RagRetrievalResult("[RAG Content]", List.of(ref), true));
 
         // when
-        String result = assembler.buildUserMessage(DEFAULT_USER_PROMPT, document, DEFAULT_EMBEDDING_PROVIDER);
+        BuiltUserMessage result = assembler.buildUserMessage(DEFAULT_USER_PROMPT, document, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
-        assertThat(result)
+        assertThat(result.text())
                 .contains(DEFAULT_USER_PROMPT)
                 .contains("[Doc Content]")
                 .contains("[RAG Content]");
+        assertThat(result.sources()).containsExactly(ref);
+        assertThat(result.ragRetrievalRan()).isTrue();
     }
 
     @Test
@@ -144,13 +154,29 @@ class ChatContextAssemblerTest {
         // given
         MultipartFile document = mock(MultipartFile.class);
         when(document.isEmpty()).thenReturn(true);
-        when(ragRetrievalService.retrieveContext(DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER)).thenReturn("");
+        when(ragRetrievalService.retrieve(DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(RagRetrievalResult.empty());
 
         // when
-        String result = assembler.buildUserMessage(DEFAULT_USER_PROMPT, document, DEFAULT_EMBEDDING_PROVIDER);
+        BuiltUserMessage result = assembler.buildUserMessage(DEFAULT_USER_PROMPT, document, DEFAULT_EMBEDDING_PROVIDER);
 
         // then
-        assertThat(result).isEqualTo(DEFAULT_USER_PROMPT);
+        assertThat(result.text()).isEqualTo(DEFAULT_USER_PROMPT);
+        assertThat(result.sources()).isEmpty();
+    }
+
+    @Test
+    void buildUserMessage_WhenRagDisabled_ThenRagRetrievalRanIsFalse() {
+        // given
+        when(ragRetrievalService.retrieve(DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(RagRetrievalResult.skipped());
+
+        // when
+        BuiltUserMessage result = assembler.buildUserMessage(DEFAULT_USER_PROMPT, null, DEFAULT_EMBEDDING_PROVIDER);
+
+        // then
+        assertThat(result.text()).isEqualTo(DEFAULT_USER_PROMPT);
+        assertThat(result.ragRetrievalRan()).isFalse();
     }
 
     private SemanticMemoryItem createMemoryItem(String text) {

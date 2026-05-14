@@ -3,6 +3,8 @@ package com.lukk.ascend.ai.agent.service;
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryClient;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryItem;
+import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
+import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,22 +46,22 @@ public class ChatContextAssembler {
         return sb.toString();
     }
 
-    public String buildUserMessage(String originalPrompt, MultipartFile document, String embeddingProvider) {
+    public BuiltUserMessage buildUserMessage(String originalPrompt, MultipartFile document, String embeddingProvider) {
         String userPrompt = originalPrompt;
 
         if (document != null && !document.isEmpty()) {
             userPrompt += documentIngestionService.processDocument(document);
         }
 
-        String ragContext = ragRetrievalService.retrieveContext(userPrompt, embeddingProvider);
-        if (!ragContext.isBlank()) {
-            userPrompt += "\n\n" + ragContext;
+        RagRetrievalResult retrieval = ragRetrievalService.retrieve(userPrompt, embeddingProvider);
+        if (!retrieval.context().isBlank()) {
+            userPrompt += "\n\n" + retrieval.context();
         }
 
-        log.info("Assembled UserMessage. State -> DocumentAttached: {}, RAG Context Injected: {}", 
-                (document != null && !document.isEmpty()) ? "YES" : "NO", !ragContext.isBlank() ? "YES" : "NO");
+        log.info("Assembled UserMessage. State -> DocumentAttached: {}, RAG Context Injected: {}",
+                (document != null && !document.isEmpty()) ? "YES" : "NO", !retrieval.context().isBlank() ? "YES" : "NO");
 
-        return userPrompt;
+        return new BuiltUserMessage(userPrompt, retrieval.sources(), retrieval.retrievalRan());
     }
 
     private List<SemanticMemoryItem> fetchSemanticMemory(String userId, String userPrompt, String embeddingProvider) {

@@ -18,6 +18,7 @@ import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.web.client.RestClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -50,6 +51,9 @@ public class AppConfig {
 
     @Value("${app.s3.endpoint}")
     private String s3Endpoint;
+
+    @Value("${app.s3.public-endpoint:${app.s3.endpoint}}")
+    private String s3PublicEndpoint;
 
     @Value("${app.s3.access-key}")
     private String s3AccessKey;
@@ -105,6 +109,24 @@ public class AppConfig {
                         .create(
                                 AwsBasicCredentials
                                         .create(s3AccessKey, s3SecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
+    }
+
+    /**
+     * Presigner uses the PUBLIC endpoint so the resulting URLs are reachable from
+     * the caller's network (host browser / curl), not just from inside the docker
+     * network where the agent runs.
+     */
+    @Bean
+    public S3Presigner s3Presigner() {
+        return S3Presigner.builder()
+                .endpointOverride(URI.create(s3PublicEndpoint))
+                .region(Region.US_EAST_1)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(s3AccessKey, s3SecretKey)))
                 .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)
                         .build())

@@ -91,6 +91,11 @@ class PropertiesTest {
         assertThat(props.getTopK()).isEqualTo(5);
         assertThat(props.getSimilarityThreshold()).isEqualTo(0.4d);
         assertThat(props.getMaxContextChars()).isEqualTo(4000);
+        assertThat(props.getSourceAttachments()).isNotNull();
+        assertThat(props.getSourceAttachments().isEnabled()).isTrue();
+        assertThat(props.getSourceAttachments().getPresignTtl()).isEqualTo(java.time.Duration.ofMinutes(15));
+        assertThat(props.getSourceAttachments().getMaxFileSize())
+                .isEqualTo(org.springframework.util.unit.DataSize.ofMegabytes(25));
 
         // setters
         props.setEnabled(false);
@@ -98,10 +103,20 @@ class PropertiesTest {
         props.setSimilarityThreshold(0.8d);
         props.setMaxContextChars(2000);
 
+        RagProperties.SourceAttachments sa = new RagProperties.SourceAttachments();
+        sa.setEnabled(false);
+        sa.setPresignTtl(java.time.Duration.ofMinutes(5));
+        sa.setMaxFileSize(org.springframework.util.unit.DataSize.ofMegabytes(50));
+        props.setSourceAttachments(sa);
+
         assertThat(props.isEnabled()).isFalse();
         assertThat(props.getTopK()).isEqualTo(10);
         assertThat(props.getSimilarityThreshold()).isEqualTo(0.8d);
         assertThat(props.getMaxContextChars()).isEqualTo(2000);
+        assertThat(props.getSourceAttachments().isEnabled()).isFalse();
+        assertThat(props.getSourceAttachments().getPresignTtl()).isEqualTo(java.time.Duration.ofMinutes(5));
+        assertThat(props.getSourceAttachments().getMaxFileSize())
+                .isEqualTo(org.springframework.util.unit.DataSize.ofMegabytes(50));
     }
 
     @Test

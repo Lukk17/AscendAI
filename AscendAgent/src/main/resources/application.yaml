@@ -86,6 +86,11 @@ app:
   s3:
     bucket: knowledge-base
     endpoint: http://localhost:9070
+    # Endpoint embedded into presigned URLs returned to API callers. Defaults to
+    # `endpoint`; override when the agent reaches MinIO via a docker-internal host
+    # (e.g. http://minio:9000) but callers reach it via a different one
+    # (e.g. http://localhost:9070).
+    public-endpoint: ${app.s3.endpoint}
     access-key: admin
     secret-key: password
 
@@ -213,6 +218,16 @@ app:
     # the top-K raw scores on every query so you can pick the right floor.
     similarity-threshold: 0.4
     max-context-chars: 4000
+    source-attachments:
+      # Kill-switch for the opt-in `attachSources` flag. When false, the flag is
+      # accepted but no presigning runs and an empty array is returned.
+      enabled: true
+      # TTL of presigned MinIO/S3 URLs returned in `AiResponse.sources`. Clamped
+      # at startup to [PT1M, PT1H] with a WARN if outside the bounds.
+      presign-ttl: PT15M
+      # Max object size eligible for attachment. Larger sources are skipped with
+      # a WARN log and the rest of the response is unaffected.
+      max-file-size: 25MB
 
   system-prompt: |
     You are AscendAI, an intelligent assistant grounded in the user's own data.

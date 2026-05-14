@@ -69,6 +69,10 @@ public class PromptController {
                     example = "lmstudio")
             @RequestParam(value = "embeddingProvider", required = false) String embeddingProvider,
 
+            @Parameter(description = "If true, the response includes presigned download URLs for the source documents that grounded the RAG answer. Defaults to false.",
+                    example = "false")
+            @RequestParam(value = "attachSources", required = false) Boolean attachSources,
+
             @Parameter(description = "User identifier for chat history and memory. Defaults to app.user.default-id from config.",
                     example = "user1")
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
@@ -93,6 +97,7 @@ public class PromptController {
             return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(body);
         }
 
-        return ResponseEntity.ok(ascendChatService.prompt(prompt, image, document, userId, provider, model, embeddingProvider));
+        boolean attach = attachSources != null && attachSources;
+        return ResponseEntity.ok(ascendChatService.prompt(prompt, image, document, userId, provider, model, embeddingProvider, attach));
     }
 }

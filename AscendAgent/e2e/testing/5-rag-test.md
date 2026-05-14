@@ -160,3 +160,49 @@ For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that 
 - `AscendAgent/e2e/fixtures/markdown-canary.md`
 - `AscendAgent/e2e/fixtures/banana-price-poland.pdf`
 - `AscendAgent/e2e/fixtures/pierogi-recipe.docx`
+
+## Optional — attach source files
+
+The `attachSources=true` form field opts the response into a `sources` array of presigned MinIO URLs for the documents that grounded the answer. Default is `false` (response shape unchanged).
+
+Send a prompt with the flag set.
+
+```bash
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -F "attachSources=true" -H "X-User-Id: user1"
+```
+
+Expected response shape (truncated):
+
+```json
+{
+  "content": "...PURPLE-MOOSE-42...",
+  "metadata": { "...": "..." },
+  "sources": [
+    {
+      "name": "markdown-canary.md",
+      "mimeType": "text/markdown",
+      "downloadUrl": "http://localhost:9070/knowledge-base/markdown/markdown-canary.md?X-Amz-...",
+      "expiresAt": "2026-05-14T06:14:34Z",
+      "sizeBytes": 412
+    }
+  ]
+}
+```
+
+Verify the `downloadUrl` resolves to a 200 GET against MinIO from the host network.
+
+```bash
+curl -fsS -o /tmp/source.bin "<paste downloadUrl from previous response>"
+```
+
+Re-run the same prompt without `attachSources=true`; assert the response JSON does NOT contain a `sources` key (byte-for-byte backward compat).
+
+```bash
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -H "X-User-Id: user1"
+```
+
+Send a prompt that retrieves nothing with `attachSources=true`; expect `"sources": []`.
+
+```bash
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the airspeed velocity of an unladen swallow?" -F "attachSources=true" -H "X-User-Id: user1"
+```

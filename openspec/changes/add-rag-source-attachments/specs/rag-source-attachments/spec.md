@@ -72,7 +72,7 @@ When multiple retrieved chunks point to the same underlying source document (sam
 
 ### Requirement: Presigned URLs for source documents
 
-`AiResponse.sources[*].downloadUrl` SHALL be a presigned `GET` URL signed using the agent's MinIO credentials and scoped to a single object. The URL SHALL be reachable from the caller's network (signed against `app.minio.public-endpoint`, which defaults to `app.minio.endpoint` but may be overridden so containerised callers and host callers both succeed). The TTL SHALL default to 15 minutes and be configurable via `app.rag.source-attachments.presign-ttl` within the bounds `[1 minute, 1 hour]`. Values outside the bounds SHALL be clamped at startup with a WARN log.
+`AiResponse.sources[*].downloadUrl` SHALL be a presigned `GET` URL signed using the agent's MinIO credentials and scoped to a single object. The URL SHALL be reachable from the caller's network (signed against `app.s3.public-endpoint`, which defaults to `app.s3.endpoint` but may be overridden so containerised callers and host callers both succeed). The TTL SHALL default to 15 minutes and be configurable via `app.rag.source-attachments.presign-ttl` within the bounds `[1 minute, 1 hour]`. Values outside the bounds SHALL be clamped at startup with a WARN log.
 
 #### Scenario: Default TTL
 
@@ -92,7 +92,7 @@ When multiple retrieved chunks point to the same underlying source document (sam
 
 #### Scenario: URL fetchable from caller's network
 
-- **GIVEN** the agent runs in docker-compose with `app.minio.endpoint=http://minio:9000` and `app.minio.public-endpoint=http://localhost:9070`
+- **GIVEN** the agent runs in docker-compose with `app.s3.endpoint=http://minio:9000` and `app.s3.public-endpoint=http://localhost:9070`
 - **WHEN** a caller on the host receives a `downloadUrl` and issues a GET against it
 - **THEN** the GET returns 200 with the file bytes
 - **AND** the URL's host portion is `localhost:9070`, NOT `minio:9000`
