@@ -1,9 +1,11 @@
 package com.lukk.ascend.ai.agent.memory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -12,12 +14,10 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,50 +32,59 @@ public class PersistentChatMemory implements ChatMemory {
     private final ChatHistoryRepository repository;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final ChatHistoryProperties chatHistoryProperties;
 
-    @Value("${app.memory.chat-history.max-size}")
-    private int maxSize;
-
-    /**
-     * TTL applied to the Redis chat-history list after every write so dormant
-     * conversations don't pile up forever. Postgres pruning is a separate
-     * follow-up — see openspec change 'fix-ascend-agent-bugs' Bug 6.
-     */
-    @Value("${app.memory.chat-history.ttl:PT24H}")
-    private Duration ttl;
+    @PostConstruct
+    void logToggleState() {
+        log.info("[PersistentChatMemory] Chat history backends - Redis: [{}], Postgres: [{}]",
+                chatHistoryProperties.getRedis().isEnabled() ? "Enabled" : "Disabled",
+                chatHistoryProperties.getPostgres().isEnabled() ? "Enabled" : "Disabled");
+    }
 
     public List<Message> get(String conversationId, int lastN) {
+        boolean redisEnabled = chatHistoryProperties.getRedis().isEnabled();
+        boolean postgresEnabled = chatHistoryProperties.getPostgres().isEnabled();
+        if (!redisEnabled && !postgresEnabled) {
+            return Collections.emptyList();
+        }
+
         String key = "chat:" + conversationId;
         try {
-            List<String> cachedJson = redisTemplate.opsForList().range(key, 0, -1);
-            if (cachedJson != null && !cachedJson.isEmpty()) {
-                List<Message> cachedMessages = new ArrayList<>();
-                for (String json : cachedJson) {
-                    MessageDto dto = objectMapper.readValue(json, MessageDto.class);
-                    cachedMessages.add(mapDtoToMessage(dto));
-                }
+            if (redisEnabled) {
+                List<String> cachedJson = redisTemplate.opsForList().range(key, 0, -1);
+                if (cachedJson != null && !cachedJson.isEmpty()) {
+                    List<Message> cachedMessages = new ArrayList<>();
+                    for (String json : cachedJson) {
+                        MessageDto dto = objectMapper.readValue(json, MessageDto.class);
+                        cachedMessages.add(mapDtoToMessage(dto));
+                    }
 
-                int start = Math.max(0, cachedMessages.size() - lastN);
-                List<Message> result = cachedMessages.subList(start, cachedMessages.size());
-                log.info("Retrieved History | Size: {} | Source: REDIS", result.size());
-                return result;
+                    int start = Math.max(0, cachedMessages.size() - lastN);
+                    List<Message> result = cachedMessages.subList(start, cachedMessages.size());
+                    log.info("Retrieved History | Size: {} | Source: REDIS", result.size());
+                    return result;
+                }
             }
 
-            List<ChatHistory> history = repository.findRecentHistory(conversationId, maxSize);
+            if (!postgresEnabled) {
+                return Collections.emptyList();
+            }
+
+            List<ChatHistory> history = repository.findRecentHistory(conversationId, chatHistoryProperties.getMaxSize());
 
             List<Message> hydrated = history.stream()
                     .map(this::mapToMessage)
                     .collect(Collectors.toList());
             Collections.reverse(hydrated);
 
-            if (!hydrated.isEmpty()) {
+            if (redisEnabled && !hydrated.isEmpty()) {
                 List<String> jsonMessages = new ArrayList<>();
                 for (Message msg : hydrated) {
                     jsonMessages.add(objectMapper
                             .writeValueAsString(new MessageDto(msg.getMessageType().getValue(), msg.getText())));
                 }
                 redisTemplate.opsForList().rightPushAll(key, jsonMessages);
-                redisTemplate.expire(key, ttl);
+                redisTemplate.expire(key, chatHistoryProperties.getTtl());
             }
 
             int start = Math.max(0, hydrated.size() - lastN);
@@ -91,7 +100,7 @@ public class PersistentChatMemory implements ChatMemory {
 
     @Override
     public List<Message> get(String conversationId) {
-        return get(conversationId, maxSize);
+        return get(conversationId, chatHistoryProperties.getMaxSize());
     }
 
     private Message mapToMessage(ChatHistory h) {
@@ -115,17 +124,28 @@ public class PersistentChatMemory implements ChatMemory {
 
     @Override
     public void add(String conversationId, List<Message> messages) {
+        boolean redisEnabled = chatHistoryProperties.getRedis().isEnabled();
+        boolean postgresEnabled = chatHistoryProperties.getPostgres().isEnabled();
+        if (!redisEnabled && !postgresEnabled) {
+            return;
+        }
+
         String key = "chat:" + conversationId;
         try {
             for (Message message : messages) {
-                String json = objectMapper
-                        .writeValueAsString(new MessageDto(message.getMessageType().getValue(), message.getText()));
-                redisTemplate.opsForList().rightPush(key, json);
-
-                persistToDb(conversationId, message);
+                if (redisEnabled) {
+                    String json = objectMapper
+                            .writeValueAsString(new MessageDto(message.getMessageType().getValue(), message.getText()));
+                    redisTemplate.opsForList().rightPush(key, json);
+                }
+                if (postgresEnabled) {
+                    persistToDb(conversationId, message);
+                }
             }
-            redisTemplate.opsForList().trim(key, 0, maxSize - 1);
-            redisTemplate.expire(key, ttl);
+            if (redisEnabled) {
+                redisTemplate.opsForList().trim(key, 0, chatHistoryProperties.getMaxSize() - 1);
+                redisTemplate.expire(key, chatHistoryProperties.getTtl());
+            }
         } catch (Exception e) {
             log.error("Failed to add messages to memory for conversation: {}", conversationId, e);
             throw new ServiceException("Failed to add to chat memory", e);

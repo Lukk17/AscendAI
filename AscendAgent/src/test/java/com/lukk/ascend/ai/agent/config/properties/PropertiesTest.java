@@ -150,6 +150,32 @@ class PropertiesTest {
     }
 
     @Test
+    void chatHistoryProperties_DefaultsAndSetters() {
+        ChatHistoryProperties props = new ChatHistoryProperties();
+
+        assertThat(props.getMaxSize()).isEqualTo(5);
+        assertThat(props.getTtl()).isEqualTo(java.time.Duration.ofHours(24));
+        assertThat(props.getRedis()).isNotNull();
+        assertThat(props.getRedis().isEnabled()).isTrue();
+        assertThat(props.getPostgres()).isNotNull();
+        assertThat(props.getPostgres().isEnabled()).isTrue();
+
+        props.setMaxSize(20);
+        props.setTtl(java.time.Duration.ofMinutes(15));
+        ChatHistoryProperties.Redis redis = new ChatHistoryProperties.Redis();
+        redis.setEnabled(false);
+        props.setRedis(redis);
+        ChatHistoryProperties.Postgres postgres = new ChatHistoryProperties.Postgres();
+        postgres.setEnabled(false);
+        props.setPostgres(postgres);
+
+        assertThat(props.getMaxSize()).isEqualTo(20);
+        assertThat(props.getTtl()).isEqualTo(java.time.Duration.ofMinutes(15));
+        assertThat(props.getRedis().isEnabled()).isFalse();
+        assertThat(props.getPostgres().isEnabled()).isFalse();
+    }
+
+    @Test
     void ingestionUploadProperties_DefaultsAndSetters() {
         IngestionUploadProperties props = new IngestionUploadProperties();
 

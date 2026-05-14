@@ -93,6 +93,14 @@ app:
     chat-history:
       max-size: 5
       ttl: 86400s
+      # Independent backend toggles. Both default true (current behavior).
+      # Flip either off to opt out of that persistence layer. When BOTH are
+      # false, turn-by-turn history is dropped entirely and cross-turn
+      # coherence relies on semantic memory (Qdrant via AscendMemory) only.
+      redis:
+        enabled: true
+      postgres:
+        enabled: true
     user-profile:
       ttl: 86400s
     semantic:

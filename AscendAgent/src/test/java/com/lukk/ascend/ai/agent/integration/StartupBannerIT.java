@@ -68,6 +68,7 @@ class StartupBannerIT extends TestcontainersBase {
         assertThat(banner).contains("Qdrant:");
         assertThat(banner).contains("S3 Ingested:");
         assertThat(banner).contains("AscendMemory:");
+        assertThat(banner).contains("Chat History:");
         assertThat(banner).contains("MCP Tools:");
 
         // Each backing-service line carries one of the status markers — this guards against
