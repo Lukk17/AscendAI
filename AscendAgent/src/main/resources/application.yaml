@@ -275,8 +275,11 @@ app:
       # at startup to [PT1M, PT1H] with a WARN if outside the bounds.
       presign-ttl: PT15M
       # Max object size eligible for attachment. Larger sources are skipped with
-      # a WARN log and the rest of the response is unaffected.
-      max-file-size: 25MB
+      # a WARN log and the rest of the response is unaffected. Default is
+      # intentionally generous (1 GB) for personal-grade single-user
+      # deployments — operators running a multi-tenant agent should lower this
+      # to bound bandwidth (e.g. 25MB or 100MB).
+      max-file-size: 1GB
 
   system-prompt: |
     You are AscendAI, an intelligent assistant grounded in the user's own data.
