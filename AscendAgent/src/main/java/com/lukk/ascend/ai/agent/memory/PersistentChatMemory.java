@@ -1,12 +1,12 @@
 package com.lukk.ascend.ai.agent.memory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class PersistentChatMemory implements ChatMemory {
 
@@ -33,12 +32,29 @@ public class PersistentChatMemory implements ChatMemory {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final ChatHistoryProperties chatHistoryProperties;
+    private final ChatHistoryCompactionProperties compactionProperties;
+    private final ChatHistoryCompactionService compactionService;
+
+    public PersistentChatMemory(ChatHistoryRepository repository,
+                                StringRedisTemplate redisTemplate,
+                                ObjectMapper objectMapper,
+                                ChatHistoryProperties chatHistoryProperties,
+                                ChatHistoryCompactionProperties compactionProperties,
+                                ChatHistoryCompactionService compactionService) {
+        this.repository = repository;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.chatHistoryProperties = chatHistoryProperties;
+        this.compactionProperties = compactionProperties;
+        this.compactionService = compactionService;
+    }
 
     @PostConstruct
     void logToggleState() {
-        log.info("[PersistentChatMemory] Chat history backends - Redis: [{}], Postgres: [{}]",
+        log.info("[PersistentChatMemory] Chat history backends - Redis: [{}], Postgres: [{}]; Compaction: [{}]",
                 chatHistoryProperties.getRedis().isEnabled() ? "Enabled" : "Disabled",
-                chatHistoryProperties.getPostgres().isEnabled() ? "Enabled" : "Disabled");
+                chatHistoryProperties.getPostgres().isEnabled() ? "Enabled" : "Disabled",
+                compactionProperties.isEnabled() ? "Enabled" : "Disabled");
     }
 
     public List<Message> get(String conversationId, int lastN) {
@@ -70,7 +86,7 @@ public class PersistentChatMemory implements ChatMemory {
                 return Collections.emptyList();
             }
 
-            List<ChatHistory> history = repository.findRecentHistory(conversationId, chatHistoryProperties.getMaxSize());
+            List<ChatHistory> history = repository.findRecentHistory(conversationId, effectiveCacheSize());
 
             List<Message> hydrated = history.stream()
                     .map(this::mapToMessage)
@@ -100,7 +116,7 @@ public class PersistentChatMemory implements ChatMemory {
 
     @Override
     public List<Message> get(String conversationId) {
-        return get(conversationId, chatHistoryProperties.getMaxSize());
+        return get(conversationId, effectiveCacheSize());
     }
 
     private Message mapToMessage(ChatHistory h) {
@@ -124,6 +140,10 @@ public class PersistentChatMemory implements ChatMemory {
 
     @Override
     public void add(String conversationId, List<Message> messages) {
+        add(conversationId, messages, null, CompactionOverride.EMPTY);
+    }
+
+    public void add(String conversationId, List<Message> messages, String primaryProvider, CompactionOverride override) {
         boolean redisEnabled = chatHistoryProperties.getRedis().isEnabled();
         boolean postgresEnabled = chatHistoryProperties.getPostgres().isEnabled();
         if (!redisEnabled && !postgresEnabled) {
@@ -143,13 +163,33 @@ public class PersistentChatMemory implements ChatMemory {
                 }
             }
             if (redisEnabled) {
-                redisTemplate.opsForList().trim(key, 0, chatHistoryProperties.getMaxSize() - 1);
+                redisTemplate.opsForList().trim(key, 0, effectiveCacheSize() - 1);
                 redisTemplate.expire(key, chatHistoryProperties.getTtl());
             }
         } catch (Exception e) {
             log.error("Failed to add messages to memory for conversation: {}", conversationId, e);
             throw new ServiceException("Failed to add to chat memory", e);
         }
+
+        // Fire-and-forget compaction. @Async dispatches off the request thread.
+        try {
+            compactionService.maybeCompact(conversationId, primaryProvider, override);
+        } catch (Exception e) {
+            log.warn("Compaction dispatch threw for conversation '{}': {}", conversationId, e.getMessage());
+        }
+    }
+
+    /**
+     * When compaction is enabled the Redis cap must accommodate the post-compaction
+     * shape of {@code 1 summary + keepRecentTurns} entries. Otherwise the regular
+     * trim would drop the freshly-written summary on the next user turn.
+     */
+    private int effectiveCacheSize() {
+        int base = chatHistoryProperties.getMaxSize();
+        if (!compactionProperties.isEnabled()) {
+            return base;
+        }
+        return Math.max(base, compactionProperties.getKeepRecentTurns() + 1);
     }
 
     @Async

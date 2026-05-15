@@ -48,6 +48,8 @@ Token-budget is the modern correct signal — a 20-turn conversation full of one
 
 We estimate tokens with `(string-length / 4)` as the lightweight default — it's the rule-of-thumb every Spring AI sample uses and it is good to within ~15 % for English. When a provider exposes a real tokenizer through its Spring AI client we use that; otherwise the estimate is fine for a decision that only needs to be order-of-magnitude right.
 
+**Implementation deviation**: per-provider context-window values are hardcoded inside `ChatHistoryCompactionService` (`anthropic=200_000`, `openai=128_000`, `gemini=1_000_000`, `minimax=200_000`, `lmstudio=8_192`) with `8_192` as the safe fallback for unknown providers. The original design assumed a `contextWindow` field on `AiProviderProperties.ProviderConfig`; that field doesn't exist today. Adding it would expand the public properties surface for one feature; deferred until there's real demand to override per-deployment.
+
 **Alternative considered**: time-based ("compact after 24 h of inactivity"). Rejected — orthogonal to cost, and conversations going stale is what Redis TTL already handles.
 
 ### D2 — Recency window: keep 8 raw turns
@@ -113,10 +115,14 @@ Output one paragraph. Begin with the exact literal "[Conversation summary]".
 
 When compaction completes:
 
-1. Compute `prefixCount = totalTurns - keepRecentTurns`.
-2. In Postgres: `repository.replacePrefixWithSummary(conversationId, summaryText, prefixCount)` — a single transactional method that deletes the oldest `prefixCount` rows and inserts one new row with `role='system'` and `content=summaryText`. This is the new repository method introduced by the change.
+1. Compute `prefixCount = max(1, totalTurns - keepRecentTurns)`.
+2. In Postgres: the compaction service runs `repository.deleteAllById(prefixIds)` followed by `repository.save(summaryRow)` inside a single `TransactionTemplate.executeWithoutResult(...)` block. **Deviation from initial sketch**: the original design suggested a `repository.replacePrefixWithSummary(...)` default method. Spring Data JDBC default methods on the repository interface don't get `@Transactional` proxy treatment cleanly, so the transactional boundary lives on the service via `TransactionTemplate` instead. Same end state.
 3. In Redis: `LTRIM key prefixCount -1` to drop the oldest `prefixCount`, then `LPUSH key <jsonForSummary>` to prepend the summary, then refresh `EXPIRE` with the configured `ttl`. The two Redis ops are not strictly atomic, but the worst-case interleave is "history briefly has summary AND original prefix" — which a follow-up read tolerates because compaction is idempotent (the marker prevents double-counting on the next compaction tick).
 4. The whole sequence is gated on each backend's toggle (`redis.enabled`, `postgres.enabled`). If both are off, compaction never gets called (see `PersistentChatMemory.add(...)` short-circuit) — when only one is on, only that side is touched.
+
+### D5b — Effective Redis cache size auto-bumps when compaction is enabled
+
+The existing `app.memory.chat-history.max-size` default of `5` is smaller than `keep-recent-turns + 1 = 9`. Without intervention, the next user-turn `add(...)` would trim the Redis list back down to 5, dropping the freshly-written summary. `PersistentChatMemory.effectiveCacheSize()` resolves this by returning `max(maxSize, keepRecentTurns + 1)` whenever compaction is enabled. The same value is used for the `findRecentHistory(...)` limit during cache-miss hydration in `get(...)`. When compaction is disabled, `effectiveCacheSize()` is just `maxSize` — preserving today's behavior bit-for-bit.
 
 **Alternative considered**: a write-ahead "compaction journal" table to make the swap fully durable across crashes. Rejected — overkill for a derived view. Loss of a compaction summary at worst means the next turn pays for one extra raw prefix before compaction runs again.
 
@@ -124,20 +130,22 @@ When compaction completes:
 
 `ChatHistoryCompactionService.maybeCompact(conversationId, requestPrimaryProvider, compactionOverride)` is annotated `@Async` and dispatched **after** `persistToDb`. The user's HTTP response has already been written. Any exception inside compaction is logged at WARN with the conversation id and swallowed. The next turn will see the un-compacted history; the compaction will simply retry on the next `add(...)`.
 
-We rely on the same `TaskExecutor` Spring AI already wires for `@Async`. No new thread pool.
+**Deviation discovered during implementation**: `@EnableAsync` was missing from the codebase entirely. The existing `persistToDb` `@Async` annotation was a silent no-op — the method ran synchronously despite its annotation. This change adds `@EnableAsync(proxyTargetClass = true)` to `AppConfig`. Side-effect: `persistToDb` becomes actually async after this change. CGLIB proxies (`proxyTargetClass = true`) are required because `PersistentChatMemory` is injected as the concrete type by `ChatHistoryService` for the new 4-arg `add(...)` overload that's not on the `ChatMemory` interface; the default JDK-proxy behavior would only expose the interface and break wiring (`BeanNotOfRequiredTypeException` at boot). The `taskExecutor` `@Bean` (virtual-thread per-task executor, already present in `AppConfig`) is reused.
 
 **Alternative considered**: synchronous compaction inside the user's turn. Rejected — would add a full cheap-model round-trip (~300-1500 ms) to every Nth turn. Async is invisible to the user.
 
-### D7 — REST DTO shape
+### D7 — REST shape (multipart, not JSON)
 
-Existing `PromptRequest` (multipart form / JSON, depending on endpoint) gains two optional fields:
+`PromptController` is multipart, so the two new fields are exposed as `@RequestParam(required = false)` strings rather than JSON body fields:
 
 | Field | Type | Default | Validation |
 |---|---|---|---|
-| `compactionProvider` | string | (request `provider`) | must match a configured provider key in `app.ai.providers.*` |
-| `compactionModel` | string | (resolved via D3) | non-empty if present |
+| `compactionProvider` | `String` (form field) | (request `provider`) | must match a key in `AiProviderProperties.getProviders()` — unknown values return HTTP 400 with `unknown_compaction_provider` error code |
+| `compactionModel` | `String` (form field) | (resolved via D3) | non-empty if present |
 
-`PromptController` reads both, builds a `CompactionOverride` value object (immutable record), and threads it to `PersistentChatMemory.add(...)` → `ChatHistoryCompactionService`. The existing primary-chat `provider` / `model` flow is unchanged.
+`PromptController` reads both, builds an immutable `CompactionOverride(provider, model)` record, and threads it through new overloads on `AscendChatService.prompt(...)` (9-arg) → `ChatHistoryService.saveHistory(...)` (5-arg) → `PersistentChatMemory.add(...)` (4-arg). The existing primary-chat `provider` / `model` flow is unchanged.
+
+**Deviation from the original D7**: described as "JSON DTO" in the initial design; actual controller is multipart so `@RequestParam` is the right shape. Behavior is identical to what D7 promised — opt-in, defaults preserved, validated at the boundary.
 
 ### D8 — Banner visibility
 

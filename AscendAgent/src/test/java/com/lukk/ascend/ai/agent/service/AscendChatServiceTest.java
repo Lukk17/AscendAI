@@ -90,7 +90,8 @@ class AscendChatServiceTest {
         assertThat(result.sources()).isNull();
 
         verify(embeddingProviderValidator).validate(DEFAULT_PROVIDER, ACTIVE_EMBEDDING);
-        verify(historyService).saveHistory(DEFAULT_USER_ID, "ProcessedPrompt", "Expected answer");
+        verify(historyService).saveHistory(eq(DEFAULT_USER_ID), eq("ProcessedPrompt"), eq("Expected answer"),
+                eq(DEFAULT_PROVIDER), eq(com.lukk.ascend.ai.agent.memory.CompactionOverride.EMPTY));
         verify(semanticMemoryExtractor).extract(DEFAULT_USER_ID, DEFAULT_PROMPT, DEFAULT_PROVIDER, DEFAULT_MODEL, ACTIVE_EMBEDDING);
         verifyNoInteractions(s3PresignedUrlService);
     }

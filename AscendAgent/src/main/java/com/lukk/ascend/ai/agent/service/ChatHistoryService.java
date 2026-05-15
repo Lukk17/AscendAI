@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.service;
 
+import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.memory.PersistentChatMemory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,9 +24,14 @@ public class ChatHistoryService {
     }
 
     public void saveHistory(String userId, String userPrompt, String responseContent) {
+        saveHistory(userId, userPrompt, responseContent, null, CompactionOverride.EMPTY);
+    }
+
+    public void saveHistory(String userId, String userPrompt, String responseContent,
+                            String primaryProvider, CompactionOverride compactionOverride) {
         log.info("Saving new interaction to chat history for user: '{}' (1 UserMessage, 1 AssistantMessage).", userId);
         Message userMsg = new UserMessage(userPrompt);
         Message assistantMsg = new AssistantMessage(responseContent);
-        persistentChatMemory.add(userId, List.of(userMsg, assistantMsg));
+        persistentChatMemory.add(userId, List.of(userMsg, assistantMsg), primaryProvider, compactionOverride);
     }
 }

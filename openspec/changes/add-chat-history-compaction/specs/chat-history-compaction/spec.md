@@ -151,7 +151,7 @@ When both `app.memory.chat-history.redis.enabled` and `app.memory.chat-history.p
 #### Scenario: Redis disabled, Postgres enabled — only Postgres receives the replace
 
 - **WHEN** compaction fires with `redis.enabled=false`, `postgres.enabled=true`
-- **THEN** the repository's `replacePrefixWithSummary(...)` is called
+- **THEN** the Postgres prefix replacement (delete oldest N rows + insert one summary row) is executed inside a single transaction via `TransactionTemplate`
 - **AND** no Redis call (`LTRIM`, `LPUSH`, `EXPIRE`) is issued
 
 ### Requirement: Startup banner reports compaction state

@@ -106,6 +106,30 @@ app:
         enabled: true
       postgres:
         enabled: true
+      # Async summarisation of older turns when a conversation crosses a
+      # threshold. Replaces the prefix in both backends with a single
+      # `[Conversation summary]` SystemMessage produced by a cheap model.
+      compaction:
+        enabled: ${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:true}
+        # Trigger fires when EITHER threshold is crossed.
+        turn-trigger: 20
+        token-trigger-fraction: 0.5
+        # Most recent turns kept raw (un-compacted) — must stay big enough for
+        # follow-up coherence ("can you do that thing you mentioned earlier?").
+        keep-recent-turns: 8
+        # Cap on the summary size; oversize outputs from the cheap model are rejected.
+        max-summary-tokens: 800
+        # Default cheap-model per provider. Caller can override per request via
+        # /api/v1/ai/prompt's `compactionProvider` and `compactionModel` fields.
+        provider-defaults:
+          openai: gpt-4o-mini
+          anthropic: claude-haiku-4-5
+          gemini: gemini-flash-lite-latest
+          # No published "mini" tier for MiniMax — same as the main model.
+          minimax: ${MINIMAX_MODEL:MiniMax-M2.7}
+          # Local LM Studio — cheapest is the same model; compaction still useful
+          # to reduce context size on subsequent turns.
+          lmstudio: ${LMSTUDIO_MODEL:meta-llama-3.1-8b-instruct}
     user-profile:
       ttl: 86400s
     semantic:

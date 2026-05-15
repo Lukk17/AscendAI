@@ -2,7 +2,9 @@ package com.lukk.ascend.ai.agent.controller;
 
 import com.lukk.ascend.ai.agent.config.api.ApiCommonErrorResponses;
 import com.lukk.ascend.ai.agent.config.api.ApiCommonSuccessResponses;
+import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.dto.AiResponse;
+import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.service.AscendChatService;
 import com.lukk.ascend.ai.agent.service.VisionCapabilityResolver;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +33,7 @@ public class PromptController {
 
     private final AscendChatService ascendChatService;
     private final VisionCapabilityResolver visionCapabilityResolver;
+    private final AiProviderProperties aiProviderProperties;
 
     @Value("${app.user.default-id:user1}")
     private String defaultUserId;
@@ -73,6 +76,14 @@ public class PromptController {
                     example = "false")
             @RequestParam(value = "attachSources", required = false) Boolean attachSources,
 
+            @Parameter(description = "Provider used for the async chat-history compaction call. Defaults to the request's `provider`. Must match a configured provider key.",
+                    example = "openai")
+            @RequestParam(value = "compactionProvider", required = false) String compactionProvider,
+
+            @Parameter(description = "Model override for the async chat-history compaction call. Defaults to the per-provider entry under app.memory.chat-history.compaction.provider-defaults.",
+                    example = "gpt-4o-mini")
+            @RequestParam(value = "compactionModel", required = false) String compactionModel,
+
             @Parameter(description = "User identifier for chat history and memory. Defaults to app.user.default-id from config.",
                     example = "user1")
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
@@ -97,7 +108,19 @@ public class PromptController {
             return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(body);
         }
 
+        if (compactionProvider != null && !compactionProvider.isBlank()
+                && !aiProviderProperties.getProviders().containsKey(compactionProvider)) {
+            com.lukk.ascend.ai.agent.dto.ApiError body = new com.lukk.ascend.ai.agent.dto.ApiError(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "unknown_compaction_provider",
+                    "compactionProvider '" + compactionProvider + "' is not configured. Known providers: "
+                            + aiProviderProperties.getProviders().keySet());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        }
+
         boolean attach = attachSources != null && attachSources;
-        return ResponseEntity.ok(ascendChatService.prompt(prompt, image, document, userId, provider, model, embeddingProvider, attach));
+        CompactionOverride override = new CompactionOverride(compactionProvider, compactionModel);
+        return ResponseEntity.ok(ascendChatService.prompt(prompt, image, document, userId, provider, model,
+                embeddingProvider, attach, override));
     }
 }

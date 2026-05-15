@@ -43,11 +43,11 @@ class PromptControllerTest {
         AiResponse aiResponse = new AiResponse(responseText, null);
         ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean()))
+        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenReturn(aiResponse);
 
         // when
-        ResponseEntity<?> response = promptController.prompt(prompt, null, null, null, null, null, null, "user1");
+        ResponseEntity<?> response = promptController.prompt(prompt, null, null, null, null, null, null, null, null, "user1");
 
         // then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -61,10 +61,10 @@ class PromptControllerTest {
         String prompt = "test prompt";
         ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean()))
+        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenThrow(new RuntimeException("Service Error"));
 
         // then
-        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, null, null, "user1"));
+        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, null, null, null, null, "user1"));
     }
 }

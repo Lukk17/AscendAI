@@ -17,6 +17,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 
 import java.time.Duration;
 import java.util.List;
@@ -48,6 +49,8 @@ class PersistentChatMemoryExtraTest {
     private ListOperations<String, String> listOperations;
 
     private ChatHistoryProperties properties;
+    private com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties compactionProperties;
+    private com.lukk.ascend.ai.agent.memory.ChatHistoryCompactionService compactionService;
     private PersistentChatMemory memory;
 
     @BeforeEach
@@ -55,7 +58,11 @@ class PersistentChatMemoryExtraTest {
         properties = new ChatHistoryProperties();
         properties.setMaxSize(5);
         properties.setTtl(Duration.ofHours(24));
-        memory = new PersistentChatMemory(repository, redisTemplate, new ObjectMapper(), properties);
+        compactionProperties = new com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties();
+        compactionProperties.setEnabled(false);
+        compactionService = org.mockito.Mockito.mock(com.lukk.ascend.ai.agent.memory.ChatHistoryCompactionService.class);
+        memory = new PersistentChatMemory(repository, redisTemplate, new ObjectMapper(),
+                properties, compactionProperties, compactionService);
     }
 
     @Test
@@ -202,6 +209,47 @@ class PersistentChatMemoryExtraTest {
         } else {
             verify(repository, never()).save(any());
         }
+    }
+
+    @Test
+    void add_InvokesMaybeCompactAfterPersistence() {
+        when(redisTemplate.opsForList()).thenReturn(listOperations);
+
+        memory.add(CONVO_ID, List.of(new UserMessage("hello")), "anthropic", new CompactionOverride("openai", "gpt-4o-mini"));
+
+        verify(compactionService).maybeCompact(eq(CONVO_ID), eq("anthropic"), eq(new CompactionOverride("openai", "gpt-4o-mini")));
+    }
+
+    @Test
+    void add_WhenMaybeCompactThrows_ExceptionIsSwallowed() {
+        when(redisTemplate.opsForList()).thenReturn(listOperations);
+        doThrow(new RuntimeException("compaction blew up"))
+                .when(compactionService).maybeCompact(any(), any(), any());
+
+        // Must not throw — compaction failures never break the user's turn.
+        memory.add(CONVO_ID, List.of(new UserMessage("hi")));
+    }
+
+    @Test
+    void add_TwoArgOverload_DelegatesToFourArgWithNullProviderAndEmptyOverride() {
+        when(redisTemplate.opsForList()).thenReturn(listOperations);
+
+        memory.add(CONVO_ID, List.of(new UserMessage("hi")));
+
+        verify(compactionService).maybeCompact(eq(CONVO_ID), eq(null), eq(CompactionOverride.EMPTY));
+    }
+
+    @Test
+    void add_RedisTrim_UsesEffectiveCacheSizeWhenCompactionEnabled() {
+        when(redisTemplate.opsForList()).thenReturn(listOperations);
+        compactionProperties.setEnabled(true);
+        compactionProperties.setKeepRecentTurns(8);
+        properties.setMaxSize(5);
+
+        memory.add(CONVO_ID, List.of(new UserMessage("hello")));
+
+        // effective = max(5, 8 + 1) = 9 → trim to 0..8
+        verify(listOperations).trim(REDIS_KEY, 0, 8);
     }
 
     @Test

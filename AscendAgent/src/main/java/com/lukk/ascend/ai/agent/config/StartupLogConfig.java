@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.config;
 
 
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
+import com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
@@ -42,6 +43,7 @@ public class StartupLogConfig {
     private final EmbeddingProviderProperties embeddingProviderProperties;
     private final SemanticMemoryProperties semanticMemoryProperties;
     private final ChatHistoryProperties chatHistoryProperties;
+    private final ChatHistoryCompactionProperties compactionProperties;
     private final ObjectProvider<QdrantClient> qdrantClientProvider;
 
     public StartupLogConfig(Environment env, DataSource dataSource, StringRedisTemplate redisTemplate,
@@ -50,6 +52,7 @@ public class StartupLogConfig {
                             EmbeddingProviderProperties embeddingProviderProperties,
                             SemanticMemoryProperties semanticMemoryProperties,
                             ChatHistoryProperties chatHistoryProperties,
+                            ChatHistoryCompactionProperties compactionProperties,
                             ObjectProvider<QdrantClient> qdrantClientProvider) {
         this.env = env;
         this.dataSource = dataSource;
@@ -60,6 +63,7 @@ public class StartupLogConfig {
         this.embeddingProviderProperties = embeddingProviderProperties;
         this.semanticMemoryProperties = semanticMemoryProperties;
         this.chatHistoryProperties = chatHistoryProperties;
+        this.compactionProperties = compactionProperties;
         this.qdrantClientProvider = qdrantClientProvider;
     }
 
@@ -110,6 +114,7 @@ public class StartupLogConfig {
                         "\t  S3 Ingested:     \t{}\n" +
                         "\t  AscendMemory:    \t{}\n" +
                         "\t  Chat History:    \t{}\n" +
+                        "\t  Compaction:      \t{}\n" +
                         "\n" +
                         "\tMCP Tools:         \t{}\n" +
                         "\n" +
@@ -130,6 +135,7 @@ public class StartupLogConfig {
                 checkS3(),
                 checkAscendMemory(),
                 formatChatHistoryToggles(),
+                formatCompactionState(),
                 checkMcpTools(),
                 mainPromptUrl);
     }
@@ -214,6 +220,20 @@ public class StartupLogConfig {
         String redis = chatHistoryProperties.getRedis().isEnabled() ? "[Enabled]" : "[Disabled]";
         String postgres = chatHistoryProperties.getPostgres().isEnabled() ? "[Enabled]" : "[Disabled]";
         return String.format("Redis %s, Postgres %s", redis, postgres);
+    }
+
+    private String formatCompactionState() {
+        if (!compactionProperties.isEnabled()) {
+            return "[Disabled]";
+        }
+        String defaults = compactionProperties.getProviderDefaults().entrySet().stream()
+                .map(e -> e.getKey() + "=" + e.getValue())
+                .collect(Collectors.joining(", "));
+        return String.format("[Enabled] (trigger: %d turns / %.0f%% context, keep: %d turns, defaults: %s)",
+                compactionProperties.getTurnTrigger(),
+                compactionProperties.getTokenTriggerFraction() * 100,
+                compactionProperties.getKeepRecentTurns(),
+                defaults);
     }
 
     private String checkAscendMemory() {

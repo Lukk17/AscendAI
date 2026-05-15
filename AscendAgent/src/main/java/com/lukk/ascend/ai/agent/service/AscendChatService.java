@@ -3,6 +3,7 @@ package com.lukk.ascend.ai.agent.service;
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.dto.SourceFile;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
+import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryExtractor;
 import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
 import com.lukk.ascend.ai.agent.service.rag.S3PresignedUrlService;
@@ -30,12 +31,21 @@ public class AscendChatService {
 
     public AiResponse prompt(String prompt, MultipartFile image, MultipartFile document, String userId,
                              String provider, String model, String embeddingProvider) {
-        return prompt(prompt, image, document, userId, provider, model, embeddingProvider, false);
+        return prompt(prompt, image, document, userId, provider, model, embeddingProvider, false,
+                CompactionOverride.EMPTY);
     }
 
     public AiResponse prompt(String prompt, MultipartFile image, MultipartFile document, String userId,
                              String provider, String model, String embeddingProvider, boolean attachSources) {
-        log.info("Starting orchestration for user: {} (attachSources={})", userId, attachSources);
+        return prompt(prompt, image, document, userId, provider, model, embeddingProvider, attachSources,
+                CompactionOverride.EMPTY);
+    }
+
+    public AiResponse prompt(String prompt, MultipartFile image, MultipartFile document, String userId,
+                             String provider, String model, String embeddingProvider, boolean attachSources,
+                             CompactionOverride compactionOverride) {
+        log.info("Starting orchestration for user: {} (attachSources={}, compactionOverride={})",
+                userId, attachSources, compactionOverride);
 
         String activeEmbeddingProvider = Optional.ofNullable(embeddingProvider)
                 .orElseGet(() -> Optional.ofNullable(aiProviderProperties.getProviders().get(provider))
@@ -51,7 +61,9 @@ public class AscendChatService {
 
         AiResponse response = chatExecutor.execute(userId, systemMessages, userMessage.text(), history, image, provider, model);
 
-        historyService.saveHistory(userId, userMessage.text(), response.content());
+        String resolvedPrimaryProvider = Optional.ofNullable(provider).orElse(aiProviderProperties.getDefaultProvider());
+        historyService.saveHistory(userId, userMessage.text(), response.content(),
+                resolvedPrimaryProvider, compactionOverride != null ? compactionOverride : CompactionOverride.EMPTY);
 
         semanticMemoryExtractor.extract(userId, prompt, provider, model, activeEmbeddingProvider);
 

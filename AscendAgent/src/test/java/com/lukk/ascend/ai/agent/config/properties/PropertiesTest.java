@@ -184,6 +184,32 @@ class PropertiesTest {
     }
 
     @Test
+    void chatHistoryCompactionProperties_DefaultsAndSetters() {
+        ChatHistoryCompactionProperties props = new ChatHistoryCompactionProperties();
+
+        assertThat(props.isEnabled()).isTrue();
+        assertThat(props.getTurnTrigger()).isEqualTo(20);
+        assertThat(props.getTokenTriggerFraction()).isEqualTo(0.5d);
+        assertThat(props.getKeepRecentTurns()).isEqualTo(8);
+        assertThat(props.getMaxSummaryTokens()).isEqualTo(800);
+        assertThat(props.getProviderDefaults()).isEmpty();
+
+        props.setEnabled(false);
+        props.setTurnTrigger(50);
+        props.setTokenTriggerFraction(0.7d);
+        props.setKeepRecentTurns(12);
+        props.setMaxSummaryTokens(1200);
+        props.setProviderDefaults(Map.of("anthropic", "claude-haiku-4-5"));
+
+        assertThat(props.isEnabled()).isFalse();
+        assertThat(props.getTurnTrigger()).isEqualTo(50);
+        assertThat(props.getTokenTriggerFraction()).isEqualTo(0.7d);
+        assertThat(props.getKeepRecentTurns()).isEqualTo(12);
+        assertThat(props.getMaxSummaryTokens()).isEqualTo(1200);
+        assertThat(props.getProviderDefaults()).containsEntry("anthropic", "claude-haiku-4-5");
+    }
+
+    @Test
     void chatHistoryProperties_DefaultsAndSetters() {
         ChatHistoryProperties props = new ChatHistoryProperties();
 

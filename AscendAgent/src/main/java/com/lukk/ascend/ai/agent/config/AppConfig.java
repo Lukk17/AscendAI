@@ -11,6 +11,9 @@ import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfig
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.integration.jdbc.metadata.JdbcMetadataStore;
@@ -32,12 +35,22 @@ import java.util.concurrent.Executors;
 
 @Configuration
 @EnableConfigurationProperties({VectorStoreProperties.class, VisionCapabilityProperties.class})
+// CGLIB proxies (proxyTargetClass=true) — PersistentChatMemory implements
+// ChatMemory but is injected as the concrete type by ChatHistoryService for
+// the 4-arg add() overload that's not on the ChatMemory interface. JDK
+// proxies (the default) would only expose the interface and break wiring.
+@EnableAsync(proxyTargetClass = true)
 @Slf4j
 public class AppConfig {
 
     @Bean
     public Executor taskExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();
+    }
+
+    @Bean
+    public TransactionTemplate transactionTemplate(PlatformTransactionManager txManager) {
+        return new TransactionTemplate(txManager);
     }
 
     @Value("${app.system-prompt}")

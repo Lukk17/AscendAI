@@ -48,7 +48,13 @@ class PersistentChatMemoryTest {
     void setup() {
         ChatHistoryProperties properties = new ChatHistoryProperties();
         properties.setMaxSize(5);
-        persistentChatMemory = new PersistentChatMemory(repository, redisTemplate, new ObjectMapper(), properties);
+        com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties compactionProperties =
+                new com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties();
+        compactionProperties.setEnabled(false);
+        com.lukk.ascend.ai.agent.memory.ChatHistoryCompactionService compactionService =
+                org.mockito.Mockito.mock(com.lukk.ascend.ai.agent.memory.ChatHistoryCompactionService.class);
+        persistentChatMemory = new PersistentChatMemory(repository, redisTemplate, new ObjectMapper(),
+                properties, compactionProperties, compactionService);
     }
 
     @Test
