@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SemanticMemoryExtractorExtraTest {
 
     private final SemanticMemoryExtractor extractor = new SemanticMemoryExtractor(
-            null, null, null, new ObjectMapper(), null);
+            null, null, null, new ObjectMapper(), null, null);
 
     @Test
     void extractFactsFromJson_WhenNullOrBlank_ThenReturnsEmpty() {

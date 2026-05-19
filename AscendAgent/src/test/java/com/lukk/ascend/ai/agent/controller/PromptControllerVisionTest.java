@@ -17,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -42,11 +43,11 @@ class PromptControllerVisionTest {
     void prompt_WithImageAndVisionCapableProvider_Returns200() {
         MockMultipartFile image = new MockMultipartFile("image", "cat.png", "image/png", "img".getBytes());
         when(visionCapabilityResolver.supportsImages("anthropic", "claude-sonnet-4-6")).thenReturn(true);
-        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any()))
+        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenReturn(new AiResponse("ok", null));
 
         ResponseEntity<?> response = promptController.prompt(
-                "describe", image, null, "anthropic", "claude-sonnet-4-6", null, "user1");
+                "describe", image, null, "anthropic", "claude-sonnet-4-6", null, null, null, null, "user1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isInstanceOf(AiResponse.class);
@@ -58,7 +59,7 @@ class PromptControllerVisionTest {
         when(visionCapabilityResolver.supportsImages("minimax", "MiniMax-M2.7")).thenReturn(false);
 
         ResponseEntity<?> response = promptController.prompt(
-                "describe", image, null, "minimax", "MiniMax-M2.7", null, "user1");
+                "describe", image, null, "minimax", "MiniMax-M2.7", null, null, null, null, "user1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         ApiError body = (ApiError) response.getBody();
@@ -70,11 +71,11 @@ class PromptControllerVisionTest {
 
     @Test
     void prompt_WithoutImage_AlwaysReturns200_RegardlessOfProvider() {
-        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any()))
+        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenReturn(new AiResponse("ok", null));
 
         ResponseEntity<?> response = promptController.prompt(
-                "hello", null, null, "minimax", "MiniMax-M2.7", null, "user1");
+                "hello", null, null, "minimax", "MiniMax-M2.7", null, null, null, null, "user1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         verifyNoInteractions(visionCapabilityResolver);

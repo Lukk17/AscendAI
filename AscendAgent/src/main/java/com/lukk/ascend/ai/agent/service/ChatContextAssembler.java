@@ -3,6 +3,8 @@ package com.lukk.ascend.ai.agent.service;
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryClient;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryItem;
+import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
+import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,39 +29,43 @@ public class ChatContextAssembler {
     private String baseSystemPrompt;
 
     public String buildSystemMessage(String userId, String userPrompt, String embeddingProvider) {
+        return buildSystemMessages(userId, userPrompt, embeddingProvider).combined();
+    }
+
+    public AssembledSystemMessages buildSystemMessages(String userId, String userPrompt, String embeddingProvider) {
         String instructions = userInstructionService.getInstructions(userId);
 
         List<SemanticMemoryItem> semanticMemory = fetchSemanticMemory(userId, userPrompt, embeddingProvider);
         String semanticMemoryBlock = buildSemanticMemoryBlock(semanticMemory);
 
-        StringBuilder sb = new StringBuilder(baseSystemPrompt);
-        sb.append("\n\nUser Instructions:\n").append(instructions != null ? instructions : "");
+        StringBuilder dynamic = new StringBuilder();
+        dynamic.append("User Instructions:\n").append(instructions != null ? instructions : "");
         if (!semanticMemoryBlock.isBlank()) {
-            sb.append("\n\n").append(semanticMemoryBlock);
+            dynamic.append("\n\n").append(semanticMemoryBlock);
         }
 
         log.info("Assembled SystemMessage for user: '{}'. State -> BaseSystemPrompt: YES, UserInstructions: {}, SemanticMemory: {} ({} items)",
                 userId, (instructions != null && !instructions.isBlank()) ? "YES" : "NO", !semanticMemoryBlock.isBlank() ? "YES" : "NO", semanticMemory != null ? semanticMemory.size() : 0);
 
-        return sb.toString();
+        return new AssembledSystemMessages(baseSystemPrompt, dynamic.toString());
     }
 
-    public String buildUserMessage(String originalPrompt, MultipartFile document, String embeddingProvider) {
+    public BuiltUserMessage buildUserMessage(String originalPrompt, MultipartFile document, String embeddingProvider) {
         String userPrompt = originalPrompt;
 
         if (document != null && !document.isEmpty()) {
             userPrompt += documentIngestionService.processDocument(document);
         }
 
-        String ragContext = ragRetrievalService.retrieveContext(userPrompt, embeddingProvider);
-        if (!ragContext.isBlank()) {
-            userPrompt += "\n\n" + ragContext;
+        RagRetrievalResult retrieval = ragRetrievalService.retrieve(userPrompt, embeddingProvider);
+        if (!retrieval.context().isBlank()) {
+            userPrompt += "\n\n" + retrieval.context();
         }
 
-        log.info("Assembled UserMessage. State -> DocumentAttached: {}, RAG Context Injected: {}", 
-                (document != null && !document.isEmpty()) ? "YES" : "NO", !ragContext.isBlank() ? "YES" : "NO");
+        log.info("Assembled UserMessage. State -> DocumentAttached: {}, RAG Context Injected: {}",
+                (document != null && !document.isEmpty()) ? "YES" : "NO", !retrieval.context().isBlank() ? "YES" : "NO");
 
-        return userPrompt;
+        return new BuiltUserMessage(userPrompt, retrieval.sources(), retrieval.retrievalRan());
     }
 
     private List<SemanticMemoryItem> fetchSemanticMemory(String userId, String userPrompt, String embeddingProvider) {

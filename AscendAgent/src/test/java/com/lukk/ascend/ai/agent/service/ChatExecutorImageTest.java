@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 
 class ChatExecutorImageTest {
 
-    private final ChatExecutor chatExecutor = new ChatExecutor(null, null, null);
+    private final ChatExecutor chatExecutor = new ChatExecutor(null, null, null, null);
 
     static Stream<Arguments> mimeResolutionCases() {
         return Stream.of(

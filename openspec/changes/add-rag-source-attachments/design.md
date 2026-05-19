@@ -56,7 +56,9 @@ Three response-shape options were evaluated:
 - **Cons**: caller must follow the URL (one extra GET per source); presigned URLs are sensitive (anyone with the URL within TTL can fetch); MinIO endpoint must be reachable from the caller's network — for the docker-compose deployment this means the agent should presign against the *external* MinIO URL (`http://localhost:9070`), not the docker-internal hostname (`http://minio:9000`).
 - **Verdict**: chosen. Best fit for the "answer + downloadable sources" UX. Default TTL 15 minutes.
 
-The endpoint-routing concern (internal vs external MinIO host) is solved by introducing `app.minio.public-endpoint` (defaulting to `app.minio.endpoint`). Presigning uses the public endpoint; ingestion writes use the internal one. Production typically sets both to the same managed S3 URL.
+The endpoint-routing concern (internal vs external MinIO host) is solved by introducing `app.s3.public-endpoint` (defaulting to `app.s3.endpoint`). Presigning uses the public endpoint; ingestion writes use the internal one. Production typically sets both to the same managed S3 URL.
+
+**Note on naming**: this property lives under the existing `app.s3.*` configuration block (where bucket/endpoint/access-key/secret-key already live), not under a separate `app.minio.*` block. There is no `app.minio.*` block in the codebase — earlier drafts of this design referenced one, but the actual configuration prefix is `app.s3.*`.
 
 #### Option 3 — Multipart response (`Content-Type: multipart/mixed`)
 
@@ -93,14 +95,29 @@ When `attachSources=false` (default), `AiResponse.sources` is omitted from the J
 
 ### D7 — Tracking sources end-to-end
 
-Today `RagRetrievalService.retrieve(...)` returns `String` (the assembled context block). It needs to return both the assembled context AND the de-duplicated source list. Cleanest shape: introduce a record `RagRetrievalResult(String context, List<SourceRef> sources)` and update the single caller (`ChatContextAssembler`). Internal `SourceRef(String bucket, String key, String displayName, String mimeType)` — populated from each `Document.getMetadata()`. The assembler ignores `sources` when `attachSources=false` so non-RAG paths are unaffected.
+Today `RagRetrievalService.retrieveContext(...)` returns `String` (the assembled context block). It is renamed to `retrieve(...)` returning a new record `RagRetrievalResult(String context, List<SourceRef> sources, boolean retrievalRan)`. The third field distinguishes "RAG was disabled / skipped entirely" from "RAG ran but found nothing above threshold" so the orchestrator can return `[]` vs `null` correctly.
+
+Internal `SourceRef(String bucket, String key, String displayName, String mimeType)` — populated by reading `Document.getMetadata()` with a fallback chain because ingestion currently only writes the `source` / `title` / `type` keys (not the four explicit keys originally assumed). The fallback at the retrieval layer:
+
+| Field | Primary key | Fallback 1 | Fallback 2 |
+|---|---|---|---|
+| `bucket` | `metadata.get("bucket")` | injected `${app.s3.bucket}` | — |
+| `key` | `metadata.get("key")` | `metadata.get("source")` | — (chunk skipped for source-tracking) |
+| `displayName` | `metadata.get("displayName")` | `metadata.get("title")` | basename of `key` |
+| `mimeType` | `metadata.get("mimeType")` | HEAD response `Content-Type` (resolved at presign time) | `null` |
+
+This keeps the feature retroactive against already-ingested chunks (no re-ingest required) AND avoids changing four ingestion sites to write a constant bucket value. Only the bucket field is currently constant across the deployment; if multi-bucket ingestion is ever introduced, ingestion can write the explicit `bucket` key and retrieval will pick it up automatically.
+
+Above the assembler, `ChatContextAssembler.buildUserMessage(...)` returns `BuiltUserMessage(text, sources, ragRetrievalRan)` so the orchestrator (`AscendChatService`) gets both the prompt-augmented text AND the sources without an additional out-of-band call. The assembler ignores `sources` when `attachSources=false` so non-RAG paths are unaffected.
 
 ### D8 — Where to mint presigned URLs
 
 In `AscendChatService` at the very end of the request, AFTER the LLM has returned the textual answer. Reasons:
 - Don't mint URLs that won't be used (if the LLM call throws, the request fails — no need to presign first).
 - The TTL window starts as late as possible so users have the maximum 15 minutes to click after they receive the response.
-- Presigning happens in parallel for all sources (`CompletableFuture.allOf` against the SDK call) so it adds milliseconds, not seconds, to the response latency even with many sources.
+- Presigning happens in parallel for all sources (`CompletableFuture.supplyAsync` on the existing virtual-thread `taskExecutor` bean) so it adds milliseconds, not seconds, to the response latency even with many sources.
+
+**Implementation deviation from D6 — TTL clamp logging**: `S3PresignedUrlService.@PostConstruct init()` resolves the configured TTL once at boot, clamps to `[PT1M, PT1H]`, logs a single WARN if clamped, and stores the effective value in a field. Subsequent presigns reuse the field without re-checking — clamp logic lives in one place, the boot log line announces the effective TTL, and per-request code stays branch-free.
 
 ### D9 — OpenAPI documentation
 

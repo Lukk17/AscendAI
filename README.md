@@ -234,7 +234,19 @@ sequenceDiagram
 
 ### Run it
 
-**1. Bring up the stack** (full 10-container stack via `include:`):
+**1. Provision secrets.** Copy the example file and fill in the API keys you plan to use:
+
+```bash
+cp .env.example .env
+```
+
+```powershell
+Copy-Item .env.example .env
+```
+
+`.env` is gitignored. Provider keys are optional individually — leave a key blank and just don't pick that provider at request time.
+
+**2. Bring up the stack** (full 10-container stack via `include:`, AscendAgent included):
 
 ```bash
 docker compose up -d --build
@@ -250,9 +262,11 @@ Optional — bring up only the web-scraping stack as its own Docker Desktop grou
 docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
 ```
 
-**2. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
+**3. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
 
-**3. Start the AscendAgent**:
+On first start the agent creates the MinIO `knowledge-base` bucket and initialises metadata tables. The API is then available at [http://localhost:9917](http://localhost:9917) — see the startup banner for live status of every dependency.
+
+For active development with hot reload and an attached debugger, run the agent on the host instead of in the container:
 
 ```bash
 cd AscendAgent && ./gradlew bootRun
@@ -262,7 +276,7 @@ cd AscendAgent && ./gradlew bootRun
 cd AscendAgent ; ./gradlew bootRun
 ```
 
-On first start the agent creates the MinIO `knowledge-base` bucket and initialises metadata tables. The API is then available at [http://localhost:9917](http://localhost:9917) — see the startup banner for live status of every dependency.
+Stop the container first (`docker compose stop ascend-agent`) so port 9917 is free.
 
 For advanced compose flags, per-service rebuilds, and production notes see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. For document ingestion see **[docs/INGESTION.md](docs/INGESTION.md)**.
 

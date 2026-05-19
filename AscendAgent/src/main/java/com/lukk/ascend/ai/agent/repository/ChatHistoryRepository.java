@@ -13,4 +13,7 @@ public interface ChatHistoryRepository extends CrudRepository<ChatHistory, Long>
 
     @Query("SELECT * FROM chat_history WHERE user_id = :userId ORDER BY created_at DESC LIMIT :limit")
     List<ChatHistory> findRecentHistory(@Param("userId") String userId, @Param("limit") int limit);
+
+    @Query("SELECT * FROM chat_history WHERE user_id = :userId ORDER BY created_at ASC")
+    List<ChatHistory> findAllHistoryOrdered(@Param("userId") String userId);
 }

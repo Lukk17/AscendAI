@@ -58,6 +58,49 @@ services:
 
   # ─── Application services ───
 
+  ascend-agent:
+    build:
+      context: ./AscendAgent
+      dockerfile: Dockerfile
+    container_name: ascend-agent
+    restart: unless-stopped
+    ports:
+      - "9917:9917"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - ascend-memory
+      - docling-serve
+      - unstructured-api
+    environment:
+      # Activate container-mode overrides (src/main/resources/application-docker.yaml).
+      - SPRING_PROFILES_ACTIVE=docker
+      # Provider API keys — runtime-only, sourced from .env on the host.
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASCEND_ANTHROPIC_API_KEY=${ASCEND_ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      # Chat-history backend toggles. Default true. Set either to false in .env
+      # to opt out of that persistence layer at runtime. The env-var names use
+      # Spring Boot's canonical form for kebab-case properties (hyphens removed):
+      # APP_MEMORY_CHATHISTORY_REDIS_ENABLED binds to app.memory.chat-history.redis.enabled.
+      - APP_MEMORY_CHATHISTORY_REDIS_ENABLED=${APP_MEMORY_CHATHISTORY_REDIS_ENABLED:-true}
+      - APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED=${APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED:-true}
+      # Async summarisation of older chat turns when a conversation crosses the
+      # configured threshold. Only the boolean toggle is env-bindable; the
+      # per-provider compaction-model map stays yaml-only (Spring Boot env-var
+      # binding for nested Map<String,String> is awkward).
+      - APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED=${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:-true}
+    networks:
+      default:
+        aliases:
+          - ascend-agent
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9917/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   ascend-memory:
     build:
       context: ./AscendMemory

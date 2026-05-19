@@ -1,6 +1,6 @@
 app:
   unstructured:
-    base-url: "http://ascend-unstructured:9080"
+    base-url: "http://unstructured-api:8000"
   docling:
     base-url: "http://docling-serve:5001"
   paddleocr:
@@ -8,13 +8,27 @@ app:
   s3:
     # MinIO must be running externally (port 9070)
     endpoint: "http://host.docker.internal:9070"
+    # Presigned URLs handed back to API callers must resolve from the caller's
+    # network (browser/curl on the host), not from inside the container.
+    public-endpoint: "http://localhost:9070"
   memory:
     semantic:
       base-url: "http://ascend-memory:7020"
 
+  ai:
+    providers:
+      lmstudio:
+        base-url: "http://host.docker.internal:1234"
+
+  embedding:
+    providers:
+      lmstudio:
+        base-url: "http://host.docker.internal:1234"
+
 spring:
   datasource:
-    url: jdbc:postgresql://postgres:5432/ascend_ai
+    # Postgres must be running externally (port 5432)
+    url: jdbc:postgresql://host.docker.internal:5432/ascend_ai
   data:
     redis:
       # Redis must be running externally (port 6379)
@@ -24,3 +38,17 @@ spring:
       qdrant:
         # Qdrant must be running externally (port 6333)
         host: host.docker.internal
+    openai:
+      # Spring AI's default OpenAI bean points at LM Studio on the host loopback;
+      # without this override it would dial 127.0.0.1 inside the container and fail.
+      base-url: "http://host.docker.internal:1234"
+    mcp:
+      client:
+        streamable-http:
+          connections:
+            audioscribe:
+              url: http://audio-scribe:7017
+            weather:
+              url: http://weather-mcp:9998
+            ascend-web-search:
+              url: http://ascend-web-search:7021

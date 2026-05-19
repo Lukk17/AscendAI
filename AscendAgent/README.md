@@ -276,9 +276,19 @@ docker compose up -d --build
 External prerequisites (PostgreSQL, Redis, Qdrant, MinIO) must be running on the host first — they aren't part of compose. Compose itself brings up the application services (`ascend-memory`, `ascend-web-search`, `audio-scribe`, etc.) plus the support stack (SearXNG, FlareSolverr, Docling, Unstructured).
 
 ### 2. Run the AscendAgent
+
+The default `docker compose up -d --build` already builds and starts AscendAgent as the `ascend-agent` container on port `9917` using the `docker` Spring profile. See the root [README — Quick Start](../README.md#quick-start) for the `.env.example` → `.env` bootstrap.
+
+For active development (hot reload, attached debugger), stop the container and run on the host instead:
+
+```bash
+docker compose stop ascend-agent
+```
+
 ```bash
 ./gradlew bootRun
 ```
+
 Access the fancy startup log to see the running port (default `9917`) and active profiles.
 It will also display:
 *   Postgres & Redis Connection Status.

@@ -24,12 +24,24 @@ AscendAgent/e2e/
     ├── 4-semantic-memory-tasks.template.md
     ├── 5-rag-test.md
     ├── 5-rag-tasks.template.md
+    ├── 6-attach-sources-test.md
+    ├── 6-attach-sources-tasks.template.md
+    ├── 7-rag-dedup-test.md
+    ├── 7-rag-dedup-tasks.template.md
+    ├── 8-prompt-cache-openai-test.md
+    ├── 8-prompt-cache-openai-tasks.template.md
+    ├── 9-prompt-cache-anthropic-test.md
+    ├── 9-prompt-cache-anthropic-tasks.template.md
+    ├── 10-compaction-fires-test.md
+    ├── 10-compaction-fires-tasks.template.md
+    ├── 11-compaction-idempotency-test.md
+    ├── 11-compaction-idempotency-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<feature>-tasks.md   # one per executed test (gitignored)
 ```
 
-Tests are number-prefixed by setup cost — `1` needs the least, `5` the most. Each spec has a paired tasks template that the runner copies into `runs/` with a sweep timestamp, ticks off checkbox-by-checkbox as it executes, and fills with results, token usage, and wall-clock time.
+Tests are number-prefixed by setup cost — `1` needs the least, `11` the most. Each spec has a paired tasks template that the runner copies into `runs/` with a sweep timestamp, ticks off checkbox-by-checkbox as it executes, and fills with results, token usage, and wall-clock time.
 
 The Bruno collection isn't here. It lives at the **repo root** under `docs/api/request/AscendAI/` (collection root) so it stays a portable API client artifact. Each spec references the matching Bruno request file under `docs/api/request/AscendAI/ascend-agent/testing/`.
 
@@ -116,10 +128,14 @@ Or follow a spec end-to-end manually: read `<N>-<feature>-test.md`, copy its tem
 |---|---|---|
 | `markdown-canary.md` | RAG (test 5) | One-line canary phrase the model can't possibly know |
 | `banana-price-poland.pdf` | RAG (test 5) | Specific recent retail price |
-| `pierogi-recipe.docx` | RAG (test 5) | Recipe with a distinctive rest time |
+| `pierogi-recipe.docx` | RAG (test 5), attach-sources (test 6) | Recipe with a distinctive rest time |
+| `dedup-pierogi-helena.md` | RAG dedup (test 7) | Babcia Helena's pierogi recipe (HELENA-DEDUP-CANARY) |
+| `dedup-pierogi-grandma.md` | RAG dedup (test 7) | Grandma Maria's pierogi recipe (GRANDMA-DEDUP-CANARY) |
 | `argent-saga-chronicle.pdf` | Summarization (test 3) | Fictional saga with unique proper nouns |
 | `image.png` | Image description (test 2) | Recognizable subject the model can describe |
 | `meeting-clip.wav` | (future audio test) | Short meeting recording |
+| `compaction-seeds/seed-compaction-fires.{sql,redis}` | Compaction fires (test 10) | 21-row deterministic chat history with sprinkled facts |
+| `compaction-seeds/seed-compaction-idempotency.{sql,redis}` | Compaction idempotency (test 11) | 1 summary row + 8 raw turns, mimicking post-compaction state |
 
 ### Capability tests
 
@@ -134,6 +150,12 @@ Numbered by setup cost. Easiest first.
 | 3 | [`testing/3-summarization-test.md`](testing/3-summarization-test.md) | [`testing/3-summarization-tasks.template.md`](testing/3-summarization-tasks.template.md) | A PDF attached inline is parsed page-by-page through Docling and summarized from real content |
 | 4 | [`testing/4-semantic-memory-test.md`](testing/4-semantic-memory-test.md) | [`testing/4-semantic-memory-tasks.template.md`](testing/4-semantic-memory-tasks.template.md) | A fact stated in turn 1 is recalled in turn 2 from Qdrant via AscendMemory, after chat history is wiped |
 | 5 | [`testing/5-rag-test.md`](testing/5-rag-test.md) | [`testing/5-rag-tasks.template.md`](testing/5-rag-tasks.template.md) | Uploaded `.md`, `.pdf`, `.docx` ingest into Qdrant and surface in a later prompt with grounded citations |
+| 6 | [`testing/6-attach-sources-test.md`](testing/6-attach-sources-test.md) | [`testing/6-attach-sources-tasks.template.md`](testing/6-attach-sources-tasks.template.md) | `attachSources=true` returns a presigned MinIO URL that resolves with HTTP 200 and uses `localhost:9070` (not the docker-internal hostname) |
+| 7 | [`testing/7-rag-dedup-test.md`](testing/7-rag-dedup-test.md) | [`testing/7-rag-dedup-tasks.template.md`](testing/7-rag-dedup-tasks.template.md) | Multiple chunks across 2 source files collapse into exactly 2 unique entries in `sources[]` (dedup by `(bucket, key)`) |
+| 8 | [`testing/8-prompt-cache-openai-test.md`](testing/8-prompt-cache-openai-test.md) | [`testing/8-prompt-cache-openai-tasks.template.md`](testing/8-prompt-cache-openai-tasks.template.md) | Two consecutive identical prompts on `provider=openai` produce a cache hit on call #2 (`cachedTokens > 0`) |
+| 9 | [`testing/9-prompt-cache-anthropic-test.md`](testing/9-prompt-cache-anthropic-test.md) | [`testing/9-prompt-cache-anthropic-tasks.template.md`](testing/9-prompt-cache-anthropic-tasks.template.md) | Two consecutive identical prompts on `provider=anthropic` produce native `cache_control` cache write on call #1 and cache read on call #2 |
+| 10 | [`testing/10-compaction-fires-test.md`](testing/10-compaction-fires-test.md) | [`testing/10-compaction-fires-tasks.template.md`](testing/10-compaction-fires-tasks.template.md) | After SQL+Redis seed of 21 rows + 1 prompt, async compaction replaces the prefix → exactly 9 rows: 1 `[Conversation summary]` + 8 raw |
+| 11 | [`testing/11-compaction-idempotency-test.md`](testing/11-compaction-idempotency-test.md) | [`testing/11-compaction-idempotency-tasks.template.md`](testing/11-compaction-idempotency-tasks.template.md) | After seed of 1 summary + 8 raw rows, sending 1 more prompt does NOT re-fire compaction (row count goes 9→11, no new summary) |
 
 ### Adding a new capability test
 

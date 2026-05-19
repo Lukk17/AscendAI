@@ -11,6 +11,9 @@ import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfig
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.integration.jdbc.metadata.JdbcMetadataStore;
@@ -18,6 +21,7 @@ import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.web.client.RestClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -31,12 +35,22 @@ import java.util.concurrent.Executors;
 
 @Configuration
 @EnableConfigurationProperties({VectorStoreProperties.class, VisionCapabilityProperties.class})
+// CGLIB proxies (proxyTargetClass=true) — PersistentChatMemory implements
+// ChatMemory but is injected as the concrete type by ChatHistoryService for
+// the 4-arg add() overload that's not on the ChatMemory interface. JDK
+// proxies (the default) would only expose the interface and break wiring.
+@EnableAsync(proxyTargetClass = true)
 @Slf4j
 public class AppConfig {
 
     @Bean
     public Executor taskExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();
+    }
+
+    @Bean
+    public TransactionTemplate transactionTemplate(PlatformTransactionManager txManager) {
+        return new TransactionTemplate(txManager);
     }
 
     @Value("${app.system-prompt}")
@@ -50,6 +64,9 @@ public class AppConfig {
 
     @Value("${app.s3.endpoint}")
     private String s3Endpoint;
+
+    @Value("${app.s3.public-endpoint:${app.s3.endpoint}}")
+    private String s3PublicEndpoint;
 
     @Value("${app.s3.access-key}")
     private String s3AccessKey;
@@ -105,6 +122,24 @@ public class AppConfig {
                         .create(
                                 AwsBasicCredentials
                                         .create(s3AccessKey, s3SecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
+    }
+
+    /**
+     * Presigner uses the PUBLIC endpoint so the resulting URLs are reachable from
+     * the caller's network (host browser / curl), not just from inside the docker
+     * network where the agent runs.
+     */
+    @Bean
+    public S3Presigner s3Presigner() {
+        return S3Presigner.builder()
+                .endpointOverride(URI.create(s3PublicEndpoint))
+                .region(Region.US_EAST_1)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(s3AccessKey, s3SecretKey)))
                 .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)
                         .build())

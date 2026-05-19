@@ -7,6 +7,9 @@ import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties.ProviderConfig;
 import com.lukk.ascend.ai.agent.service.ChatModelResolver;
 import com.lukk.ascend.ai.agent.service.ChatResponseContentResolver;
+import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -63,8 +66,17 @@ class SemanticMemoryExtractorTest {
     @Mock
     private ChatModel chatModel;
 
+    @Mock
+    private PromptCacheStrategyResolver cacheStrategyResolver;
+
     @InjectMocks
     private SemanticMemoryExtractor extractor;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setupCacheResolver() {
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy(DEFAULT_PROVIDER);
+        org.mockito.Mockito.lenient().when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
+    }
 
     @Test
     void extract_WhenValidFactsReturned_ThenSavesMemoryAsynchronously() throws JsonProcessingException {
@@ -200,7 +212,7 @@ class SemanticMemoryExtractorTest {
     class ParserTests {
 
         private final SemanticMemoryExtractor parserExtractor = new SemanticMemoryExtractor(
-                null, null, null, new ObjectMapper(), null);
+                null, null, null, new ObjectMapper(), null, null);
 
         @Test
         void extractFactsFromJson_WhenThinkingResponseWithEmbeddedJson_ThenReturnsAllFacts() {

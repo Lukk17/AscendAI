@@ -1,8 +1,28 @@
 ## ADDED Requirements
 
+### Requirement: CI runs on master pushes, PRs, and manual dispatch only
+
+`ci.yaml` SHALL trigger on `pull_request` (any branch), `push: branches: [master]`, and `workflow_dispatch`. It SHALL NOT trigger on pushes to feature branches — feature work runs CI only via the PR opened against master. The workflow file SHALL use the `.yaml` extension to match the repo's YAML convention.
+
+#### Scenario: Push to feature branch does not trigger CI
+
+- **WHEN** a contributor pushes a commit to a feature branch (no PR open)
+- **THEN** the CI workflow does NOT run for that push
+- **AND** the maintainer can still trigger it manually via `workflow_dispatch` if desired
+
+#### Scenario: Opening a PR triggers CI
+
+- **WHEN** a contributor opens or updates a pull request against `master`
+- **THEN** the CI workflow runs for the PR's head commit
+
+#### Scenario: Push to master triggers CI
+
+- **WHEN** a maintainer merges a PR into `master` (a push event on `master`)
+- **THEN** the CI workflow runs for the merge commit
+
 ### Requirement: Path-filtered matrix per service
 
-`ci.yml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-agent` → `AscendAgent/**`, `weather-mcp` → `WeatherMCP/**`, `audio-scribe` → `AudioScribe/**`, `ascend-web-search` → `AscendWebSearch/**`, `ascend-memory` → `AscendMemory/**`, `paddle-ocr` → `PaddleOCR/**`.
+`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-agent` → `AscendAgent/**`, `weather-mcp` → `WeatherMCP/**`, `audio-scribe` → `AudioScribe/**`, `ascend-web-search` → `AscendWebSearch/**`, `ascend-memory` → `AscendMemory/**`, `paddle-ocr` → `PaddleOCR/**`.
 
 #### Scenario: Docs-only PR runs zero matrix entries
 
@@ -20,7 +40,7 @@
 
 #### Scenario: Workflow-file change forces full matrix
 
-- **WHEN** a pull request changes `.github/workflows/ci.yml`
+- **WHEN** a pull request changes `.github/workflows/ci.yaml`
 - **THEN** every service matrix entry runs regardless of whether that service's directory changed
 - **AND** this is achieved via a `workflows` filter in `dorny/paths-filter` that the matrix `if:` clause OR-combines with the per-service filter
 
@@ -61,7 +81,7 @@ For each Python service in the matrix, the workflow SHALL set up the per-service
 
 ### Requirement: Concurrency cancels superseded PR builds
 
-`ci.yml` SHALL declare `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }` so that a force-push or new commit to the same pull request cancels the in-flight CI run for that ref.
+`ci.yaml` SHALL declare `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }` so that a force-push or new commit to the same pull request cancels the in-flight CI run for that ref.
 
 #### Scenario: Force-push cancels prior run
 
@@ -71,7 +91,7 @@ For each Python service in the matrix, the workflow SHALL set up the per-service
 
 ### Requirement: Read-only permissions and no secret exposure on PR
 
-`ci.yml` SHALL declare top-level `permissions: { contents: read }` and SHALL NOT consume any repository secret. PRs from forks SHALL therefore execute the workflow safely with no privileged access.
+`ci.yaml` SHALL declare top-level `permissions: { contents: read }` and SHALL NOT consume any repository secret. PRs from forks SHALL therefore execute the workflow safely with no privileged access.
 
 #### Scenario: Fork PR has no secret access
 

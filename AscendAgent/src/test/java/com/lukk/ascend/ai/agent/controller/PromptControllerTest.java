@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -42,11 +43,11 @@ class PromptControllerTest {
         AiResponse aiResponse = new AiResponse(responseText, null);
         ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any()))
+        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenReturn(aiResponse);
 
         // when
-        ResponseEntity<?> response = promptController.prompt(prompt, null, null, null, null, null, "user1");
+        ResponseEntity<?> response = promptController.prompt(prompt, null, null, null, null, null, null, null, null, "user1");
 
         // then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -60,10 +61,10 @@ class PromptControllerTest {
         String prompt = "test prompt";
         ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
 
-        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any()))
+        when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenThrow(new RuntimeException("Service Error"));
 
         // then
-        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, null, "user1"));
+        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, null, null, null, null, "user1"));
     }
 }

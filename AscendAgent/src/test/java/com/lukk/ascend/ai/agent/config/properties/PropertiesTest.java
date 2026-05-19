@@ -91,6 +91,11 @@ class PropertiesTest {
         assertThat(props.getTopK()).isEqualTo(5);
         assertThat(props.getSimilarityThreshold()).isEqualTo(0.4d);
         assertThat(props.getMaxContextChars()).isEqualTo(4000);
+        assertThat(props.getSourceAttachments()).isNotNull();
+        assertThat(props.getSourceAttachments().isEnabled()).isTrue();
+        assertThat(props.getSourceAttachments().getPresignTtl()).isEqualTo(java.time.Duration.ofMinutes(15));
+        assertThat(props.getSourceAttachments().getMaxFileSize())
+                .isEqualTo(org.springframework.util.unit.DataSize.ofMegabytes(25));
 
         // setters
         props.setEnabled(false);
@@ -98,10 +103,20 @@ class PropertiesTest {
         props.setSimilarityThreshold(0.8d);
         props.setMaxContextChars(2000);
 
+        RagProperties.SourceAttachments sa = new RagProperties.SourceAttachments();
+        sa.setEnabled(false);
+        sa.setPresignTtl(java.time.Duration.ofMinutes(5));
+        sa.setMaxFileSize(org.springframework.util.unit.DataSize.ofMegabytes(50));
+        props.setSourceAttachments(sa);
+
         assertThat(props.isEnabled()).isFalse();
         assertThat(props.getTopK()).isEqualTo(10);
         assertThat(props.getSimilarityThreshold()).isEqualTo(0.8d);
         assertThat(props.getMaxContextChars()).isEqualTo(2000);
+        assertThat(props.getSourceAttachments().isEnabled()).isFalse();
+        assertThat(props.getSourceAttachments().getPresignTtl()).isEqualTo(java.time.Duration.ofMinutes(5));
+        assertThat(props.getSourceAttachments().getMaxFileSize())
+                .isEqualTo(org.springframework.util.unit.DataSize.ofMegabytes(50));
     }
 
     @Test
@@ -147,6 +162,77 @@ class PropertiesTest {
         assertThat(props.getProviders()).hasSize(2);
         assertThat(props.getProviders().get("openai")).containsExactly("gpt-4o*");
         assertThat(props.getProviders().get("anthropic")).containsExactly("claude-*");
+    }
+
+    @Test
+    void promptCacheProperties_DefaultsTogglesAndSetters() {
+        PromptCacheProperties props = new PromptCacheProperties();
+
+        assertThat(props.isEnabled()).isTrue();
+        assertThat(props.getProviders()).isEmpty();
+        assertThat(props.isProviderEnabled("anthropic")).isTrue();
+
+        PromptCacheProperties.ProviderCache anth = new PromptCacheProperties.ProviderCache();
+        anth.setEnabled(false);
+        props.setProviders(Map.of("anthropic", anth));
+        assertThat(props.isProviderEnabled("anthropic")).isFalse();
+        assertThat(props.isProviderEnabled("openai")).isTrue();
+
+        props.setEnabled(false);
+        assertThat(props.isProviderEnabled("openai")).isFalse();
+        assertThat(props.isProviderEnabled("anthropic")).isFalse();
+    }
+
+    @Test
+    void chatHistoryCompactionProperties_DefaultsAndSetters() {
+        ChatHistoryCompactionProperties props = new ChatHistoryCompactionProperties();
+
+        assertThat(props.isEnabled()).isTrue();
+        assertThat(props.getTurnTrigger()).isEqualTo(20);
+        assertThat(props.getTokenTriggerFraction()).isEqualTo(0.5d);
+        assertThat(props.getKeepRecentTurns()).isEqualTo(8);
+        assertThat(props.getMaxSummaryTokens()).isEqualTo(800);
+        assertThat(props.getProviderDefaults()).isEmpty();
+
+        props.setEnabled(false);
+        props.setTurnTrigger(50);
+        props.setTokenTriggerFraction(0.7d);
+        props.setKeepRecentTurns(12);
+        props.setMaxSummaryTokens(1200);
+        props.setProviderDefaults(Map.of("anthropic", "claude-haiku-4-5"));
+
+        assertThat(props.isEnabled()).isFalse();
+        assertThat(props.getTurnTrigger()).isEqualTo(50);
+        assertThat(props.getTokenTriggerFraction()).isEqualTo(0.7d);
+        assertThat(props.getKeepRecentTurns()).isEqualTo(12);
+        assertThat(props.getMaxSummaryTokens()).isEqualTo(1200);
+        assertThat(props.getProviderDefaults()).containsEntry("anthropic", "claude-haiku-4-5");
+    }
+
+    @Test
+    void chatHistoryProperties_DefaultsAndSetters() {
+        ChatHistoryProperties props = new ChatHistoryProperties();
+
+        assertThat(props.getMaxSize()).isEqualTo(5);
+        assertThat(props.getTtl()).isEqualTo(java.time.Duration.ofHours(24));
+        assertThat(props.getRedis()).isNotNull();
+        assertThat(props.getRedis().isEnabled()).isTrue();
+        assertThat(props.getPostgres()).isNotNull();
+        assertThat(props.getPostgres().isEnabled()).isTrue();
+
+        props.setMaxSize(20);
+        props.setTtl(java.time.Duration.ofMinutes(15));
+        ChatHistoryProperties.Redis redis = new ChatHistoryProperties.Redis();
+        redis.setEnabled(false);
+        props.setRedis(redis);
+        ChatHistoryProperties.Postgres postgres = new ChatHistoryProperties.Postgres();
+        postgres.setEnabled(false);
+        props.setPostgres(postgres);
+
+        assertThat(props.getMaxSize()).isEqualTo(20);
+        assertThat(props.getTtl()).isEqualTo(java.time.Duration.ofMinutes(15));
+        assertThat(props.getRedis().isEnabled()).isFalse();
+        assertThat(props.getPostgres().isEnabled()).isFalse();
     }
 
     @Test
