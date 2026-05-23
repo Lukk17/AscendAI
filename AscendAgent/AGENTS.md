@@ -9,7 +9,7 @@ The AscendAgent is the central Spring Boot API gateway for the AscendAI platform
 - **Language**: Java 21
 - **Framework**: Spring Boot 3.5.4
 - **Build Tool**: Gradle (`build.gradle.kts`)
-- **Key Libraries**: Spring AI 1.1.4, Qdrant client 1.13.0, CommonMark 0.28.0, PDFBox 3.0.7, Liquibase
+- **Key Libraries**: Spring AI 1.1.5, Qdrant client 1.13.0, CommonMark 0.28.0, PDFBox 3.0.7, Liquibase
 
 ## Build & Run Commands
 
@@ -74,11 +74,13 @@ See [`e2e/README.md`](e2e/README.md) for the full contract, capability matrix, a
 
 ## Supported AI Providers
 
-- **OpenAI**: gpt-5.4, gpt-5.1, gpt-5-mini, gpt-4o, gpt-4o-mini
-- **Anthropic**: claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5, claude-haiku-4-5
-- **Gemini**: gemini-3.1-pro, gemini-3.1-flash, gemini-2.5-pro, gemini-2.5-flash
-- **MiniMax**: MiniMax-M2.5, MiniMax-M2.5-highspeed, MiniMax-M2.1
-- **LM Studio**: meta-llama-3.1-8b-instruct (default, local)
+Defaults match `application.yaml`. Any other model the provider accepts works at request time via the `model` form field; the values below are what ships out of the box.
+
+- **OpenAI**: `gpt-4o` (chat default), `gpt-4o-mini` (memory extraction + compaction)
+- **Anthropic**: `claude-sonnet-4-5` (chat default), `claude-3-5-haiku-20241022` (memory extraction), `claude-haiku-4-5` (compaction)
+- **Gemini**: `gemini-flash-latest` (chat default), `gemini-flash-lite-latest` (memory extraction + compaction)
+- **MiniMax**: `MiniMax-M2.7` (chat default + memory extraction + compaction)
+- **LM Studio**: `meta-llama-3.1-8b-instruct` (chat default, local)
 
 ## Key Dependencies
 
