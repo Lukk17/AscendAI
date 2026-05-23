@@ -173,16 +173,35 @@ class ManualIngestionServiceTest {
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-        
+
         when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenThrow(new IngestionException("IO Stream crash")); // S3 client throwing arbitrary unchecked exceptions
 
-        // when 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
         // then
         assertThat(result.failed).isEqualTo(1);
         assertThat(result.indexed).isZero();
+    }
+
+    @Test
+    void run_WhenIngestionFails_ThenRollsBackMetadataMarkerSoRetryIsPossible() {
+        // given — first claim succeeds, then ingestion fails; we expect the marker to be removed
+        // so a subsequent run for the same ETag is not skipped while Qdrant has no points.
+        S3Object obj = S3Object.builder().key("documents/report.pdf").lastModified(Instant.now()).build();
+        ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
+        when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
+
+        when(s3Client.getObject(any(GetObjectRequest.class)))
+                .thenThrow(new IngestionException("simulated mid-ingestion failure"));
+
+        // when
+        manualIngestionService.run(Optional.empty(), "openai");
+
+        // then — the metadata key that was put-if-absent gets removed so future runs retry
+        verify(metadataStore).remove(argThat(s -> s != null && s.startsWith("manual-ingestion:documents/report.pdf:")));
     }
 
     private String enforceMetaKey(String val) {

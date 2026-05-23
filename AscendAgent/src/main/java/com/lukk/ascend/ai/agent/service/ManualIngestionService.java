@@ -91,7 +91,21 @@ public class ManualIngestionService {
             return;
         }
 
-        ingestObject(key, result, embeddingProvider);
+        // Claim is permanent only on success. Two failure modes can leave the marker stale:
+        //   (1) ingestObject catches IngestionException and increments result.failed but does not rethrow;
+        //   (2) ingestObject rethrows IOException as IngestionException after incrementing result.failed.
+        // In both cases, remove the marker so a subsequent ingestion-run for the same ETag retries instead
+        // of skipping the object indefinitely while its Qdrant points are missing.
+        int failedBefore = result.failed;
+        try {
+            ingestObject(key, result, embeddingProvider);
+        } catch (RuntimeException e) {
+            metadataStore.remove(metadataKey);
+            throw e;
+        }
+        if (result.failed > failedBefore) {
+            metadataStore.remove(metadataKey);
+        }
     }
 
     private void ingestObject(String key, ManualIngestionResult result, String embeddingProvider) {
