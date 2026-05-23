@@ -1,4 +1,4 @@
-# C4 Component Diagram (Level 3) — AscendAgent
+# C4 Component Diagram (Level 3): AscendAgent
 
 ```mermaid
 graph TB

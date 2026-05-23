@@ -30,4 +30,5 @@ graph TB
     AscendAgent -->|"REST"| Memory
 ```
 
-The AscendAgent is the central component — it receives user prompts, routes them to the selected AI provider, and invokes MCP tools as needed. AscendMemory provides semantic user context via direct REST.
+The AscendAgent is the central component. It receives user prompts, routes them to the selected AI provider, and
+invokes MCP tools as needed. AscendMemory provides semantic user context via direct REST.
