@@ -53,6 +53,7 @@ services:
       dockerfile: Dockerfile
     # image: lukk17/ascend-web-search:latest
     container_name: ascend-web-search
+    hostname: ascend-web-search
     restart: unless-stopped
     ports:
       - "7021:7021"

@@ -16,23 +16,40 @@ import org.springframework.boot.availability.ReadinessState;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import javax.sql.DataSource;
 import java.net.InetAddress;
-import java.net.URI;
 import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Component
 @Slf4j
 public class StartupLogConfig {
+
+    private static final String BANNER =
+            " █████╗ ███████╗ ██████╗███████╗███╗   ██╗██████╗      █████╗  ██████╗ ███████╗███╗   ██╗████████╗\n" +
+            "██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝\n" +
+            "███████║███████╗██║     █████╗  ██╔██╗ ██║██║  ██║    ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   \n" +
+            "██╔══██║╚════██║██║     ██╔══╝  ██║╚██╗██║██║  ██║    ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   \n" +
+            "██║  ██║███████║╚██████╗███████╗██║ ╚████║██████╔╝    ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   \n" +
+            "╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═══╝╚═════╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ";
+
+    private static final String DIVIDER = "----------------------------------------------------------";
+
+    private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(2);
 
     private final Environment env;
     private final DataSource dataSource;
@@ -72,91 +89,97 @@ public class StartupLogConfig {
         if (event.getState() != ReadinessState.ACCEPTING_TRAFFIC) {
             return;
         }
-        String serverPort = env.getProperty("local.server.port", env.getProperty("server.port"));
+        String port = env.getProperty("local.server.port", env.getProperty("server.port", "9917"));
         String contextPath = env.getProperty("server.servlet.context-path", "");
-        String hostAddress = "localhost";
-        try {
-            hostAddress = InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-            log.warn("The host name could not be determined, using `localhost` as fallback");
-        }
-
         String protocol = env.getProperty("server.ssl.key-store") != null ? "https" : "http";
-        String appName = env.getProperty("spring.application.name", "AscendAI Agent");
-        String mainPromptUrl = String.format("%s://localhost:%s%s/api/v1/ai/prompt", protocol, serverPort, contextPath);
+        String hostAddress = resolveHostAddress();
+        String appName = env.getProperty("spring.application.name", "ascend-ai-agent");
+
+        String localUrl = String.format("%s://localhost:%s%s", protocol, port, contextPath);
+        String hostnameUrl = String.format("%s://%s:%s%s", protocol, hostAddress, port, contextPath);
+        String promptEndpoint = localUrl + "/api/v1/ai/prompt";
 
         String[] profiles = env.getActiveProfiles();
         String activeProfiles = (profiles.length == 0) ? "default" : String.join(", ", profiles);
 
-        log.info("\n" +
-                        "    _    ___  ___ ___ _  _ ___      _  ___ \n" +
-                        "   /_\\  / __|/ __/ __| \\| |   \\    /_\\|_ _|\n" +
-                        "  / _ \\ \\__ \\ (__| _|| .` | |) |  / _ \\| | \n" +
-                        " /_/ \\_\\|___/\\___|___|_|\\_|___/  /_/ \\_\\___|\n" +
-                        "\n" +
-                        "----------------------------------------------------------\n" +
-                        "\tApplication '{}' is running!\n" +
-                        "\n" +
-                        "\tAccess URLs:\n" +
-                        "\t  Local:    \t{}://localhost:{}{}\n" +
-                        "\t  External: \t{}://{}:{}{}\n" +
-                        "\n" +
-                        "\tProfile(s): \t{}\n" +
-                        "\n" +
-                        "\tChat providers (default = {}):\n" +
-                        "{}\n" +
-                        "\tEmbedding providers (default = {}):\n" +
-                        "{}\n" +
-                        "\tInfrastructure:\n" +
-                        "\t  Postgres:        \t{}\n" +
-                        "\t  Redis:           \t{}\n" +
-                        "\t  Qdrant:          \t{}\n" +
-                        "\t  S3 Ingested:     \t{}\n" +
-                        "\t  AscendMemory:    \t{}\n" +
-                        "\t  Chat History:    \t{}\n" +
-                        "\t  Compaction:      \t{}\n" +
-                        "\n" +
-                        "\tMCP Tools:         \t{}\n" +
-                        "\n" +
-                        "\tMAIN PROMPT ENDPOINT:\n" +
-                        "\t  POST           \t{}\n" +
-                        "----------------------------------------------------------",
-                appName,
-                protocol, serverPort, contextPath,
-                protocol, hostAddress, serverPort, contextPath,
-                activeProfiles,
-                aiProviderProperties.getDefaultProvider(),
-                formatChatProviders(),
-                embeddingProviderProperties.getDefaultProvider(),
-                formatEmbeddingProviders(),
-                checkDatabase(),
-                checkRedis(),
-                checkQdrant(),
-                checkS3(),
-                checkAscendMemory(),
-                formatChatHistoryToggles(),
-                formatCompactionState(),
-                checkMcpTools(),
-                mainPromptUrl);
+        List<String> lines = new ArrayList<>();
+        lines.add("");
+        lines.add(BANNER);
+        lines.add(DIVIDER);
+        lines.add("    Application '" + appName + "' is running!");
+        lines.add("");
+        lines.add("    Access URLs:");
+        lines.add("      Local:     " + localUrl);
+        lines.add("      Hostname:  " + hostnameUrl);
+        lines.add("");
+        lines.add("    Profile(s): " + activeProfiles);
+        lines.add("");
+        lines.add("    Database:");
+        lines.add("      Postgres:  " + checkDatabase());
+        lines.add("");
+        lines.add("    External services:");
+        lines.add("      Redis:        " + checkRedis());
+        lines.add("      Qdrant:       " + checkQdrant());
+        lines.add("      S3 (MinIO):   " + checkS3());
+        lines.add("      AscendMemory: " + checkAscendMemory());
+        lines.add("");
+        lines.add("    Actuator:");
+        lines.add("      Health:     " + localUrl + "/actuator/health");
+        lines.add("      Liveness:   " + localUrl + "/actuator/health/liveness");
+        lines.add("      Readiness:  " + localUrl + "/actuator/health/readiness");
+        lines.add("");
+        lines.add("    API documentation:");
+        lines.add("      OpenAPI:    " + localUrl + "/v3/api-docs");
+        lines.add("      Swagger UI: " + localUrl + "/swagger-ui/index.html");
+        lines.add("");
+        lines.add("    Observability:");
+        lines.add("      Logging:    console pattern with [AscendAI] tag (logging.pattern.console)");
+        lines.add("");
+        lines.add("    Chat providers (default = " + aiProviderProperties.getDefaultProvider() + "):");
+        lines.add(formatChatProviders());
+        lines.add("");
+        lines.add("    Embedding providers (default = " + embeddingProviderProperties.getDefaultProvider() + "):");
+        lines.add(formatEmbeddingProviders());
+        lines.add("");
+        lines.add("    Chat history: " + formatChatHistoryToggles());
+        lines.add("    Compaction:   " + formatCompactionState());
+        lines.add("");
+        lines.add("    MCP tools:    " + checkMcpTools());
+        lines.add("");
+        lines.add("    MAIN PROMPT ENDPOINT:");
+        lines.add("      POST  " + promptEndpoint);
+        lines.add(DIVIDER);
+
+        log.info("\n{}", String.join("\n", lines));
+    }
+
+    private String resolveHostAddress() {
+        try {
+            return InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            log.debug("Could not resolve host name; using localhost fallback", e);
+            return "localhost";
+        }
     }
 
     private String formatChatProviders() {
         Map<String, AiProviderProperties.ProviderConfig> providers = aiProviderProperties.getProviders();
         if (providers == null || providers.isEmpty()) {
-            return "\t  (none configured)";
+            return "      (none configured)";
         }
         return providers.entrySet().stream()
-                .map(e -> String.format("\t  - %-10s\ttype=%s\tmodel=%s", e.getKey(), e.getValue().getType(), e.getValue().getModel()))
+                .map(e -> String.format("      - %-10s type=%s model=%s",
+                        e.getKey(), e.getValue().getType(), e.getValue().getModel()))
                 .collect(Collectors.joining("\n"));
     }
 
     private String formatEmbeddingProviders() {
         Map<String, EmbeddingProviderProperties.EmbeddingConfig> providers = embeddingProviderProperties.getProviders();
         if (providers == null || providers.isEmpty()) {
-            return "\t  (none configured)";
+            return "      (none configured)";
         }
         return providers.entrySet().stream()
-                .map(e -> String.format("\t  - %-10s\tdims=%d\tmodel=%s\tcollection=ascendai-%d",
+                .map(e -> String.format("      - %-10s dims=%d model=%s collection=ascendai-%d",
                         e.getKey(), e.getValue().getDimensions(), e.getValue().getModel(), e.getValue().getDimensions()))
                 .collect(Collectors.joining("\n"));
     }
@@ -164,55 +187,85 @@ public class StartupLogConfig {
     private String checkDatabase() {
         try (Connection connection = dataSource.getConnection()) {
             DatabaseMetaData metaData = connection.getMetaData();
-            return Optional.ofNullable(metaData.getURL())
-                    .map(url -> url.replace("jdbc:", ""))
-                    .map(URI::create)
-                    .map(uri -> String.format("[Connected] %s:%d / %s",
-                            uri.getHost(), uri.getPort(),
-                            Optional.ofNullable(uri.getPath()).map(this::sanitizeDatabaseName).orElse("Unknown")))
-                    .orElse("[Connected] Unknown");
+            String url = Optional.ofNullable(metaData.getURL())
+                    .map(u -> u.replace("jdbc:", ""))
+                    .orElse("unknown");
+            return url + " [Connected]";
         } catch (Exception e) {
-            return "[FAILED] " + e.getMessage();
+            log.debug("Postgres probe failed", e);
+            String url = env.getProperty("spring.datasource.url", "unknown").replace("jdbc:", "");
+            return url + " [FAILED]";
         }
     }
 
-    private String sanitizeDatabaseName(String path) {
-        return path.startsWith("/") ? path.substring(1) : path;
-    }
-
     private String checkRedis() {
+        String host = env.getProperty("spring.data.redis.host", "unknown");
+        String port = env.getProperty("spring.data.redis.port", "6379");
+        String url = String.format("redis://%s:%s", host, port);
         try {
             redisTemplate.getConnectionFactory().getConnection().ping();
-            String host = env.getProperty("spring.data.redis.host");
-            String port = env.getProperty("spring.data.redis.port");
-            return String.format("[Connected] %s:%s", host, port);
+            return url + " [Connected]";
         } catch (Exception e) {
-            return "[FAILED] " + e.getMessage();
+            log.debug("Redis probe failed", e);
+            return url + " [FAILED]";
         }
     }
 
     private String checkQdrant() {
+        String host = env.getProperty("spring.ai.vectorstore.qdrant.host", "unknown");
+        String port = env.getProperty("spring.ai.vectorstore.qdrant.port", "6334");
+        String url = String.format("%s:%s", host, port);
         try {
             QdrantClient client = qdrantClientProvider.getIfAvailable();
             if (client == null) {
-                return "[Warning] no QdrantClient bean";
+                return url + " [Warning (no client bean)]";
             }
-            int count = client.listCollectionsAsync().get().size();
-            String host = env.getProperty("spring.ai.vectorstore.qdrant.host", "unknown");
-            String port = env.getProperty("spring.ai.vectorstore.qdrant.port", "6334");
-            return String.format("[Connected] %s:%s | Collections: %d", host, port, count);
+            int count = client.listCollectionsAsync().get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).size();
+            return url + " [Connected] (collections: " + count + ")";
         } catch (Exception e) {
-            return "[FAILED] " + e.getMessage();
+            log.debug("Qdrant probe failed", e);
+            return url + " [FAILED]";
         }
     }
 
     private String checkS3() {
+        String bucket = env.getProperty("app.s3.bucket", "knowledge-base");
+        String endpoint = env.getProperty("app.s3.endpoint", "unknown");
+        String url = String.format("%s/%s", endpoint, bucket);
         try {
-            String bucket = env.getProperty("app.s3.bucket", "knowledge-base");
             long count = s3Client.listObjects(b -> b.bucket(bucket)).contents().size();
-            return String.format("[Connected] %s | Files: %d", bucket, count);
+            return url + " [Connected] (objects: " + count + ")";
         } catch (Exception e) {
-            return "[FAILED] " + e.getMessage();
+            log.debug("S3 probe failed", e);
+            return url + " [FAILED]";
+        }
+    }
+
+    private String checkAscendMemory() {
+        String baseUrl = semanticMemoryProperties.getBaseUrl();
+        if (!semanticMemoryProperties.isEnabled()) {
+            return baseUrl + " [Disabled]";
+        }
+        try {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout((int) PROBE_TIMEOUT.toMillis());
+            factory.setReadTimeout((int) PROBE_TIMEOUT.toMillis());
+            int status = RestClient.builder()
+                    .requestFactory(factory)
+                    .build()
+                    .get()
+                    .uri(baseUrl + "/health")
+                    .retrieve()
+                    .toBodilessEntity()
+                    .getStatusCode()
+                    .value();
+            if (status == 200) {
+                return baseUrl + " [Connected]";
+            }
+            return baseUrl + String.format(" [Warning (status=%d)]", status);
+        } catch (Exception e) {
+            log.debug("AscendMemory probe failed", e);
+            return baseUrl + " [FAILED]";
         }
     }
 
@@ -236,36 +289,23 @@ public class StartupLogConfig {
                 defaults);
     }
 
-    private String checkAscendMemory() {
-        if (!semanticMemoryProperties.isEnabled()) {
-            return "[Disabled] (app.memory.semantic.enabled=false)";
-        }
-        try {
-            String baseUrl = semanticMemoryProperties.getBaseUrl();
-            int status = RestClient.create().get().uri(baseUrl + "/health").retrieve().toBodilessEntity().getStatusCode().value();
-            return status == 200 ? String.format("[Connected] %s", baseUrl)
-                    : String.format("[Warning] %s (status=%d)", baseUrl, status);
-        } catch (Exception e) {
-            return "[FAILED] " + e.getMessage();
-        }
-    }
-
     private String checkMcpTools() {
         try {
             ToolCallbackProvider provider = toolCallbackProvider.getIfAvailable();
             if (provider == null) {
-                return "[Warning] No ToolCallbackProvider found";
+                return "[Warning (no ToolCallbackProvider)]";
             }
             ToolCallback[] tools = provider.getToolCallbacks();
             if (tools == null || tools.length == 0) {
                 return "[Connected] no tools registered";
             }
-            String toolNames = java.util.Arrays.stream(tools)
+            String toolNames = Arrays.stream(tools)
                     .map(t -> t.getToolDefinition().name())
                     .collect(Collectors.joining(", "));
             return String.format("[Connected] %d tools: [%s]", tools.length, toolNames);
         } catch (Exception e) {
-            return "[FAILED] " + e.getMessage();
+            log.debug("MCP tool listing failed", e);
+            return "[FAILED]";
         }
     }
 }

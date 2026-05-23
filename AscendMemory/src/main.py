@@ -9,6 +9,7 @@ from src.api.mcp.mcp_server import mcp
 from src.api.rest.rest_endpoints import rest_router
 from src.config.config import settings
 from src.config.logging_config import setup_logging, get_uvicorn_log_config
+from src.config.startup_banner import log_startup_banner
 from src.service.memory_client import get_memory_client
 
 setup_logging()
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
         # Initialize MCP server lifespan
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(app))
+            await log_startup_banner()
             yield
 
     app = FastAPI(title="AscendMemory", lifespan=lifespan)

@@ -41,6 +41,7 @@ services:
       context: ./PaddleOCR
       dockerfile: Dockerfile
     container_name: ascend-paddle-ocr
+    hostname: ascend-paddle-ocr
     restart: unless-stopped
     ports:
       - "7022:7022"
@@ -63,6 +64,7 @@ services:
       context: ./AscendAgent
       dockerfile: Dockerfile
     container_name: ascend-agent
+    hostname: ascend-agent
     restart: unless-stopped
     ports:
       - "9917:9917"
@@ -106,6 +108,7 @@ services:
       context: ./AscendMemory
       dockerfile: Dockerfile
     container_name: ascend-memory
+    hostname: ascend-memory
     restart: unless-stopped
     ports:
       - "7020:7020"
@@ -140,6 +143,7 @@ services:
       dockerfile: Dockerfile
     # image: lukk17/weather-mcp:latest
     container_name: weather-mcp
+    hostname: weather-mcp
     restart: unless-stopped
     ports:
       - "9998:9998"
@@ -154,6 +158,7 @@ services:
       dockerfile: Dockerfile
     # image: lukk17/audio-scribe:latest
     container_name: audio-scribe
+    hostname: audio-scribe
     restart: unless-stopped
     ports:
       - "7017:7017"

@@ -8,6 +8,7 @@ from src.api.mcp.mcp_server import mcp
 from src.api.middleware.force_json_utf8 import ForceJSONUTF8Middleware
 from src.api.rest.rest_endpoints import rest_router
 from src.config.logging_config import setup_logging, get_uvicorn_log_config
+from src.config.startup_banner import log_startup_banner
 
 setup_logging()
 logger = logging.getLogger("AudioScribe")
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
         # Initialize MCP server lifespan
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(mcp_app.router.lifespan_context(app))
+            await log_startup_banner()
             yield
 
     app = FastAPI(

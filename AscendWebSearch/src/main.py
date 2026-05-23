@@ -18,6 +18,7 @@ from src.api.rest.rest_endpoints import rest_router, rest_router_v2
 from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
 from src.config.logging_config import setup_logging, get_uvicorn_log_config
+from src.config.startup_banner import log_startup_banner
 
 setup_logging()
 logger = logging.getLogger("uvicorn")
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
         # Initialize MCP server lifespan
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(app))
+            await log_startup_banner()
             yield
 
     app = FastAPI(title="AscendWebSearch", lifespan=lifespan)
