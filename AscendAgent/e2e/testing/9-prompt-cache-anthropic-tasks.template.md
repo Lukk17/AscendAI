@@ -1,4 +1,4 @@
-# Prompt cache — Anthropic — run tasks template
+# Prompt cache: Anthropic: run tasks template
 
 Spec: [9-prompt-cache-anthropic-test.md](9-prompt-cache-anthropic-test.md)
 
@@ -16,13 +16,13 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 
 ### Reset state
 
-- [ ] Truncated `chat_history` rows for user `cache-test-anthropic`
-- [ ] Deleted Redis key `chat:cache-test-anthropic`
+- [ ] Truncated `chat_history` rows for user `frostyPromptCacheAnthropicTest`
+- [ ] Deleted Redis key `chat:frostyPromptCacheAnthropicTest`
 
 ### Run
 
-- [ ] Step 1 — sent `prompt-cache-anthropic.yml` (cache-miss / cache-write call), HTTP 200, captured `usage`
-- [ ] Step 2 — sent `prompt-cache-anthropic.yml` again within 5 minutes, HTTP 200, captured `usage`
+- [ ] Step 1: sent `prompt-cache-anthropic.yml` (cache-miss / cache-write call), HTTP 200, captured `usage`
+- [ ] Step 2: sent `prompt-cache-anthropic.yml` again within 5 minutes, HTTP 200, captured `usage`
 
 ### Expected
 

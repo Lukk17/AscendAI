@@ -8,7 +8,7 @@ http:
   url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
   headers:
     - name: X-User-Id
-      value: cache-test-openai
+      value: frostyPromptCacheOpenaiTest
   body:
     type: multipart-form
     data:

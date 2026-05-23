@@ -1,4 +1,4 @@
-# RAG dedup — run tasks template
+# RAG dedup: run tasks template
 
 Spec: [7-rag-dedup-test.md](7-rag-dedup-test.md)
 
@@ -22,14 +22,14 @@ Copy this file to `runs/<UTC-timestamp>_7-rag-dedup-tasks.md` before starting a 
 - [ ] Dropped `markdown/dedup-pierogi-helena.md` and `markdown/dedup-pierogi-grandma.md` from MinIO
 - [ ] Removed `int_metadata_store` rows for both fixtures
 - [ ] Wiped Qdrant points for both fixtures
-- [ ] Truncated `chat_history` rows for user `dedup-test`
-- [ ] Deleted Redis key `chat:dedup-test`
+- [ ] Truncated `chat_history` rows for user `frostyRagDedupTest`
+- [ ] Deleted Redis key `chat:frostyRagDedupTest`
 
 ### Run
 
-- [ ] Step 1 — sent `rag-dedup-upload.yml`, HTTP 200
-- [ ] Step 2 — sent `rag-ingestion-run.yml`, HTTP 200 with `indexed >= 2`
-- [ ] Step 3 — sent `rag-dedup-prompt.yml`, HTTP 200
+- [ ] Step 1: sent `rag-dedup-upload.yml`, HTTP 200
+- [ ] Step 2: sent `rag-ingestion-run.yml`, HTTP 200 with `indexed >= 2`
+- [ ] Step 3: sent `rag-dedup-prompt.yml`, HTTP 200
 
 ### Expected
 

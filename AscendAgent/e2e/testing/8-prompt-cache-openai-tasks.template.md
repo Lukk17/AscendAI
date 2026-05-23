@@ -1,4 +1,4 @@
-# Prompt cache — OpenAI — run tasks template
+# Prompt cache: OpenAI: run tasks template
 
 Spec: [8-prompt-cache-openai-test.md](8-prompt-cache-openai-test.md)
 
@@ -16,13 +16,13 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 
 ### Reset state
 
-- [ ] Truncated `chat_history` rows for user `cache-test-openai`
-- [ ] Deleted Redis key `chat:cache-test-openai`
+- [ ] Truncated `chat_history` rows for user `frostyPromptCacheOpenaiTest`
+- [ ] Deleted Redis key `chat:frostyPromptCacheOpenaiTest`
 
 ### Run
 
-- [ ] Step 1 — sent `prompt-cache-openai.yml` (cache-miss seed call), HTTP 200, captured `usage` block
-- [ ] Step 2 — sent `prompt-cache-openai.yml` again within 5 minutes, HTTP 200, captured `usage` block
+- [ ] Step 1: sent `prompt-cache-openai.yml` (cache-miss seed call), HTTP 200, captured `usage` block
+- [ ] Step 2: sent `prompt-cache-openai.yml` again within 5 minutes, HTTP 200, captured `usage` block
 
 ### Expected
 

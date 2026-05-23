@@ -1,11 +1,11 @@
-DEL chat:compaction-idempotency-test
-RPUSH chat:compaction-idempotency-test "{\"role\":\"system\",\"content\":\"[Conversation summary] User has a beagle named Rex (rescued from a Praga shelter), is based in Warsaw, works as a backend engineer at TechCorp, and prefers Spring Boot but is considering Quarkus for one service. Rex slipped on a wet floor recently but is fine; vaccinations due next month at the Warsaw clinic.\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"user\",\"content\":\"Quick follow-up - what was the name of my dog again?\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"assistant\",\"content\":\"Your dog is Rex, a beagle.\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"user\",\"content\":\"And which city am I in?\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"assistant\",\"content\":\"You mentioned you're based in Warsaw.\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"user\",\"content\":\"Right. What framework do I prefer at work?\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"assistant\",\"content\":\"Spring Boot - though you said you're evaluating Quarkus for one service.\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"user\",\"content\":\"Good memory. Where do I work?\"}"
-RPUSH chat:compaction-idempotency-test "{\"role\":\"assistant\",\"content\":\"You work as a backend engineer at TechCorp.\"}"
-EXPIRE chat:compaction-idempotency-test 86400
+DEL chat:frostyCompactionIdempotencyTest
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"system\",\"content\":\"[Conversation summary] User has a beagle named Rex (rescued from a Praga shelter), is based in Warsaw, works as a backend engineer at TechCorp, and prefers Spring Boot but is considering Quarkus for one service. Rex slipped on a wet floor recently but is fine; vaccinations due next month at the Warsaw clinic.\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"user\",\"content\":\"Quick follow-up - what was the name of my dog again?\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"assistant\",\"content\":\"Your dog is Rex, a beagle.\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"user\",\"content\":\"And which city am I in?\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"assistant\",\"content\":\"You mentioned you're based in Warsaw.\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"user\",\"content\":\"Right. What framework do I prefer at work?\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"assistant\",\"content\":\"Spring Boot - though you said you're evaluating Quarkus for one service.\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"user\",\"content\":\"Good memory. Where do I work?\"}"
+RPUSH chat:frostyCompactionIdempotencyTest "{\"role\":\"assistant\",\"content\":\"You work as a backend engineer at TechCorp.\"}"
+EXPIRE chat:frostyCompactionIdempotencyTest 86400

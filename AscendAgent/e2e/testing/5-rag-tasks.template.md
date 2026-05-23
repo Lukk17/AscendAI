@@ -1,4 +1,4 @@
-# RAG — run tasks template
+# RAG: run tasks template
 
 Spec: [5-rag-test.md](5-rag-test.md)
 
@@ -27,11 +27,11 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 
 ### Run
 
-- [ ] Step 1 — sent `rag-ingestion-upload.yml` and waited for HTTP 200 with three uploaded keys
-- [ ] Step 2 — sent `rag-ingestion-run.yml` and waited for HTTP 200 with `indexed >= 3`
-- [ ] Step 3a — sent `rag-prompt.yml` for the markdown-canary prompt
-- [ ] Step 3b — enabled the next `prompt=` row, sent `rag-prompt.yml` for the banana-price prompt
-- [ ] Step 3c — enabled the next `prompt=` row, sent `rag-prompt.yml` for the pierogi-recipe prompt
+- [ ] Step 1: sent `rag-ingestion-upload.yml` and waited for HTTP 200 with three uploaded keys
+- [ ] Step 2: sent `rag-ingestion-run.yml` and waited for HTTP 200 with `indexed >= 3`
+- [ ] Step 3a: sent `rag-prompt.yml` for the markdown-canary prompt
+- [ ] Step 3b: enabled the next `prompt=` row, sent `rag-prompt.yml` for the banana-price prompt
+- [ ] Step 3c: enabled the next `prompt=` row, sent `rag-prompt.yml` for the pierogi-recipe prompt
 
 ### Expected
 

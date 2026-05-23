@@ -8,7 +8,7 @@ http:
   url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ingestion/upload"
   headers:
     - name: X-User-Id
-      value: dedup-test
+      value: frostyRagDedupTest
   body:
     type: multipart-form
     data:

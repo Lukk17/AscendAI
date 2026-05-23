@@ -1,4 +1,4 @@
-# Chat-history compaction — idempotency — e2e test
+# Chat-history compaction: idempotency: e2e test
 
 ## What this verifies
 
@@ -31,49 +31,49 @@ docker exec -i redis redis-cli < AscendAgent/e2e/fixtures/compaction-seeds/seed-
 Verify the seed worked.
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'compaction-idempotency-test';"
+docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'frostyCompactionIdempotencyTest';"
 ```
 
 Expect exactly `9`.
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'compaction-idempotency-test' AND role = 'system' AND content LIKE '[Conversation summary]%';"
+docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'frostyCompactionIdempotencyTest' AND role = 'system' AND content LIKE '[Conversation summary]%';"
 ```
 
 Expect exactly `1`.
 
 ## Run
 
-Step 1 — send one prompt as `compaction-idempotency-test`. The chat history grows from 9 → 11 rows (1 new user + 1 new assistant). The compaction trigger should NOT fire because turns past the existing summary (10) is less than the trigger (20).
+Step 1. Send one prompt as `frostyCompactionIdempotencyTest`. The chat history grows from 9 → 11 rows (1 new user + 1 new assistant). The compaction trigger should NOT fire because turns past the existing summary (10) is less than the trigger (20).
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/compaction-idempotency-prompt.yml" --env ascend-local
 ```
 
-Step 2 — wait long enough that any async compaction would have completed if it were going to.
+Step 2. Wait long enough that any async compaction would have completed if it were going to.
 
 ```bash
 sleep 5
 ```
 
-Step 3 — assert no second compaction fired.
+Step 3. Assert no second compaction fired.
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'compaction-idempotency-test';"
+docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'frostyCompactionIdempotencyTest';"
 ```
 
 Expect exactly `11`.
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'compaction-idempotency-test' AND role = 'system' AND content LIKE '[Conversation summary]%';"
+docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat_history WHERE user_id = 'frostyCompactionIdempotencyTest' AND role = 'system' AND content LIKE '[Conversation summary]%';"
 ```
 
-Expect exactly `1` (still only the original seeded summary row — no new one).
+Expect exactly `1` (still only the original seeded summary row, no new one).
 
 ## Expected
 
 - Step 1: HTTP 200. Normal chat completion. The model should reference the seeded facts (Rex the beagle, Warsaw, TechCorp, Spring Boot / Quarkus) since they're in the visible chat history (1 summary + 8 raw turns + the new user msg).
-- Step 3: `chat_history` row count for `compaction-idempotency-test` equals exactly **11**.
+- Step 3: `chat_history` row count for `frostyCompactionIdempotencyTest` equals exactly **11**.
 - Step 3: exactly **1** `[Conversation summary]` row exists (no second one was written).
 - Latency: step 1's response time should NOT include a compaction-call window (no async LLM was dispatched for compaction).
 

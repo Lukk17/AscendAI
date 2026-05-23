@@ -1,4 +1,4 @@
-# Document summarization — e2e test
+# Document summarization: e2e test
 
 ## What this verifies
 
@@ -58,7 +58,7 @@ The Bruno output shows HTTP 200.
 
 The response body's `content` field is a coherent summary that quotes specific facts from the source document. For `argent-saga-chronicle.pdf` it contains at least three of: `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `81 duels`, `Iren Hask`, `498 A.E.`. Presence of those proper nouns proves the PDF was parsed page-by-page through Docling and the extracted text reached the model.
 
-The response body's `content` field is NOT a refusal like "the document context block is empty" or "I don't see a document attached" — either indicates the parse pipeline silently returned nothing.
+The response body's `content` field is NOT a refusal like "the document context block is empty" or "I don't see a document attached". Either indicates the parse pipeline silently returned nothing.
 
 ## Fixtures
 

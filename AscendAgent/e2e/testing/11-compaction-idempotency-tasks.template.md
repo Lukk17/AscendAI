@@ -1,4 +1,4 @@
-# Chat-history compaction — idempotency — run tasks template
+# Chat-history compaction: idempotency: run tasks template
 
 Spec: [11-compaction-idempotency-test.md](11-compaction-idempotency-test.md)
 
@@ -19,14 +19,14 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 - [ ] Applied `seed-compaction-idempotency.sql` to Postgres
 - [ ] Applied `seed-compaction-idempotency.redis` to Redis
-- [ ] Verified Postgres has 9 rows (1 summary + 8 raw) for `compaction-idempotency-test`
+- [ ] Verified Postgres has 9 rows (1 summary + 8 raw) for `frostyCompactionIdempotencyTest`
 - [ ] Verified the summary row exists with `[Conversation summary]` prefix
 
 ### Run
 
-- [ ] Step 1 — sent `compaction-idempotency-prompt.yml`, HTTP 200
-- [ ] Step 2 — waited 5 seconds
-- [ ] Step 3 — queried Postgres for post-step state
+- [ ] Step 1: sent `compaction-idempotency-prompt.yml`, HTTP 200
+- [ ] Step 2: waited 5 seconds
+- [ ] Step 3: queried Postgres for post-step state
 
 ### Expected
 

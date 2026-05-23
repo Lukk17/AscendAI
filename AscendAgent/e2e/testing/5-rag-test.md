@@ -1,4 +1,4 @@
-# RAG — e2e test
+# RAG: e2e test
 
 ## What this verifies
 
@@ -84,22 +84,30 @@ Expect all three paths to print.
 
 ## Reset state
 
-Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in `docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below runs through `sh -c` so the env vars expand *inside* the container — the host shell doesn't have them set.
+Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in `docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below runs through `sh -c` so the env vars expand *inside* the container. The host shell doesn't have them set.
 
 ```bash
 docker exec minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"'
 ```
 
-Drop all objects from the `knowledge-base` bucket so the upload step is fresh.
+Drop only this test's three fixtures from MinIO so re-upload is clean. Does NOT touch other tests' fixtures sharing the same bucket.
 
 ```bash
-docker exec minio mc rm --recursive --force local/knowledge-base
+docker exec minio mc rm --force local/knowledge-base/markdown/markdown-canary.md
 ```
 
-Truncate the Spring Integration metadata store so the run step does not classify files as already-ingested via stored ETags.
+```bash
+docker exec minio mc rm --force local/knowledge-base/documents/banana-price-poland.pdf
+```
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "TRUNCATE TABLE int_metadata_store;"
+docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.docx
+```
+
+Delete only the `int_metadata_store` rows for these three fixtures so the run step does not classify them as already-ingested. Trailing `%` in each pattern matches the ETag suffix appended to the metadata key.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%markdown-canary.md%' OR metadata_key LIKE '%banana-price-poland.pdf%' OR metadata_key LIKE '%pierogi-recipe.docx%';"
 ```
 
 Wipe RAG points for the three fixtures from Qdrant.
@@ -110,19 +118,19 @@ curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "C
 
 ## Run
 
-Step 1 — upload the three fixtures in one multipart request. Wait for HTTP 200 before continuing.
+Step 1. Upload the three fixtures in one multipart request. Wait for HTTP 200 before continuing.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
 ```
 
-Step 2 — trigger ingestion (no prefix → scans the whole bucket). Wait for HTTP 200 and a non-zero `indexed` count before continuing.
+Step 2. Trigger ingestion (no prefix → scans the whole bucket). Wait for HTTP 200 and a non-zero `indexed` count before continuing.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
 ```
 
-Step 3 — send the RAG prompt. The Bruno request saves three alternative `prompt=` rows on the same field; only one is enabled by default. Run the request once with the current default, then edit the YAML to enable the next prompt row (and disable the previous) and re-run. Do this once per fixture for full coverage.
+Step 3. Send the RAG prompt. The Bruno request saves three alternative `prompt=` rows on the same field; only one is enabled by default. Run the request once with the current default, then edit the YAML to enable the next prompt row (and disable the previous) and re-run. Do this once per fixture for full coverage.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-prompt.yml" --env ascend-local
@@ -153,7 +161,7 @@ After step 3b (banana-price prompt) the response body's `content` field contains
 
 After step 3c (pierogi-recipe prompt) the response body's `content` field contains the rest time from the DOCX fixture (`30 minutes`).
 
-For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that document" — a refusal means the RAG retrieval did not inject the relevant chunk into the prompt.
+For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that document". A refusal means the RAG retrieval did not inject the relevant chunk into the prompt.
 
 ## Fixtures
 
@@ -161,7 +169,7 @@ For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that 
 - `AscendAgent/e2e/fixtures/banana-price-poland.pdf`
 - `AscendAgent/e2e/fixtures/pierogi-recipe.docx`
 
-## Optional — attach source files
+## Optional: attach source files
 
 The `attachSources=true` form field opts the response into a `sources` array of presigned MinIO URLs for the documents that grounded the answer. Default is `false` (response shape unchanged).
 

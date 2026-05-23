@@ -1,10 +1,10 @@
-# Attach-sources — e2e test
+# Attach-sources: e2e test
 
 ## What this verifies
 
 When `attachSources=true` is sent on a prompt request, the response carries a `sources[]` array whose `downloadUrl` (a) returns HTTP 200 from MinIO when followed from the host network, and (b) uses the host-reachable hostname `localhost:9070`, NOT the docker-internal `host.docker.internal:9070`. This proves end-to-end that the presigning service works AND that the `app.s3.public-endpoint` override is in effect under the docker profile.
 
-The spec is hermetic: it owns its own MinIO key + Qdrant points + chat-history rows for the user-id `attach-sources-test`. It re-uses the existing `pierogi-recipe.docx` fixture from the rag suite.
+The spec is hermetic: it owns its own MinIO key + Qdrant points + chat-history rows for the user-id `frostyAttachSourcesTest`. It re-uses the existing `pierogi-recipe.docx` fixture from the rag suite.
 
 ## Prerequisites
 
@@ -67,7 +67,7 @@ docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.do
 Truncate Spring Integration metadata so the run step does not classify the file as already-ingested.
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%pierogi-recipe.docx';"
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%pierogi-recipe.docx%';"
 ```
 
 Wipe Qdrant points for the pierogi fixture.
@@ -79,28 +79,34 @@ curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "C
 Truncate this user's chat-history rows + Redis key.
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'attach-sources-test';"
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyAttachSourcesTest';"
 ```
 
 ```bash
-docker exec redis redis-cli DEL chat:attach-sources-test
+docker exec redis redis-cli DEL chat:frostyAttachSourcesTest
 ```
 
 ## Run
 
-Step 1 — upload the pierogi-recipe fixture (the existing rag-ingestion-upload sends three; for this spec we re-use it because dropping just one upload from the multipart request and re-running it for one file is overkill — the other two uploads are idempotent against MinIO).
+Step 1. Upload the pierogi-recipe fixture. The existing rag-ingestion-upload sends three; for this spec we re-use it because dropping just one upload from the multipart request and re-running it for one file is overkill. The other two uploads are idempotent against MinIO.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
 ```
 
-Step 2 — trigger ingestion (no prefix → scans the whole bucket).
+Step 2. Trigger ingestion (no prefix → scans the whole bucket).
+
+A previous ingestion-run that failed mid-way may have left a stale `int_metadata_store` row for the pierogi key (with the same ETag as the freshly-uploaded object). That stale row would make the scanner skip this file. The product code already removes the marker on ingestion failure (see `ManualIngestionService.processObject`), but as a belt-and-braces guard the test re-deletes the row immediately before the run so the test does not depend on the prior run's exit path.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%pierogi-recipe.docx%';"
+```
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
 ```
 
-Step 3 — send the attach-sources prompt. This request asks about Helena's pierogi recipe with `attachSources=true` and the test user-id `attach-sources-test`.
+Step 3. Send the attach-sources prompt. This request asks about Helena's pierogi recipe with `attachSources=true` and the test user-id `frostyAttachSourcesTest`.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/attach-sources-prompt.yml" --env ascend-local
@@ -108,7 +114,7 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/attach-sources-pro
 
 Capture the response body (Bruno prints it on success). Extract `response.sources[0].downloadUrl` from the JSON.
 
-Step 4 — follow the presigned URL.
+Step 4. Follow the presigned URL.
 
 ```bash
 curl -fsS -o /tmp/attach-sources-payload "<paste the downloadUrl from step 3 here>"

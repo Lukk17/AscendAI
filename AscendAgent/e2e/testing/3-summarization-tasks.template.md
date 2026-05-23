@@ -1,4 +1,4 @@
-# Document summarization — run tasks template
+# Document summarization: run tasks template
 
 Spec: [3-summarization-test.md](3-summarization-test.md)
 

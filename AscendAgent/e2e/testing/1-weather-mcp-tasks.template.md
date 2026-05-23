@@ -1,4 +1,4 @@
-# Weather MCP — run tasks template
+# Weather MCP: run tasks template
 
 Spec: [1-weather-mcp-test.md](1-weather-mcp-test.md)
 

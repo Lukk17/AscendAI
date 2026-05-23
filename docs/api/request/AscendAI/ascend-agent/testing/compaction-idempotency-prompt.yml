@@ -8,7 +8,7 @@ http:
   url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
   headers:
     - name: X-User-Id
-      value: compaction-idempotency-test
+      value: frostyCompactionIdempotencyTest
   body:
     type: multipart-form
     data:

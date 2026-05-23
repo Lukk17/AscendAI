@@ -1,4 +1,4 @@
-# Attach-sources — run tasks template
+# Attach-sources: run tasks template
 
 Spec: [6-attach-sources-test.md](6-attach-sources-test.md)
 
@@ -22,15 +22,15 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 - [ ] Dropped `documents/pierogi-recipe.docx` from MinIO
 - [ ] Removed `int_metadata_store` rows for the pierogi fixture
 - [ ] Wiped Qdrant points for `documents/pierogi-recipe.docx`
-- [ ] Truncated `chat_history` rows for user `attach-sources-test`
-- [ ] Deleted Redis key `chat:attach-sources-test`
+- [ ] Truncated `chat_history` rows for user `frostyAttachSourcesTest`
+- [ ] Deleted Redis key `chat:frostyAttachSourcesTest`
 
 ### Run
 
-- [ ] Step 1 — sent `rag-ingestion-upload.yml`, HTTP 200
-- [ ] Step 2 — sent `rag-ingestion-run.yml`, HTTP 200 with `indexed >= 1`
-- [ ] Step 3 — sent `attach-sources-prompt.yml`, HTTP 200
-- [ ] Step 4 — captured `response.sources[0].downloadUrl`, issued GET against it
+- [ ] Step 1: sent `rag-ingestion-upload.yml`, HTTP 200
+- [ ] Step 2: sent `rag-ingestion-run.yml`, HTTP 200 with `indexed >= 1`
+- [ ] Step 3: sent `attach-sources-prompt.yml`, HTTP 200
+- [ ] Step 4: captured `response.sources[0].downloadUrl`, issued GET against it
 
 ### Expected
 
