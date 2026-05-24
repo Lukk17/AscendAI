@@ -79,7 +79,7 @@ public class IngestionService {
             String title = extractTitleFromMarkdown(content);
 
             if (title == null || title.isBlank()) {
-                title = filename;
+                title = basename(filename);
             }
 
             String cleanText = renderTextFromMarkdown(content);
@@ -150,6 +150,11 @@ public class IngestionService {
         return visitor.getTitle();
     }
 
+    private static String basename(String key) {
+        int slash = key.lastIndexOf('/');
+        return slash >= 0 ? key.substring(slash + 1) : key;
+    }
+
     private List<Document> parseUnstructuredResponse(String jsonResponse, String filename) {
         List<Document> documents = new ArrayList<>();
         try {
@@ -173,7 +178,7 @@ public class IngestionService {
                 }
 
                 if (!fullText.isEmpty()) {
-                    String title = (extractedTitle != null) ? extractedTitle : filename;
+                    String title = (extractedTitle != null) ? extractedTitle : basename(filename);
                     Document doc = new Document(fullText.toString(), Map.of(
                             KEY_SOURCE, filename,
                             KEY_TITLE, title,

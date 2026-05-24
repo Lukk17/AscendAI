@@ -86,6 +86,24 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history 
 docker exec redis redis-cli DEL chat:frostyAttachSourcesTest
 ```
 
+Wipe Test 7's dedup-pierogi fixtures too. Test 7 owns them, but if it ran earlier in the same sweep its chunks linger in the shared `ascendai-1536` collection — and the "How long should I rest the pierogi dough" retrieval would then pull extra sources, drowning out this spec's single-source assertion.
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/markdown/dedup-pierogi-helena.md
+```
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/markdown/dedup-pierogi-grandma.md
+```
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%dedup-pierogi-%';"
+```
+
+```bash
+curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"source","match":{"any":["markdown/dedup-pierogi-helena.md","markdown/dedup-pierogi-grandma.md"]}}]}}'
+```
+
 ## Run
 
 Step 1. Upload the pierogi-recipe fixture. The existing rag-ingestion-upload sends three; for this spec we re-use it because dropping just one upload from the multipart request and re-running it for one file is overkill. The other two uploads are idempotent against MinIO.

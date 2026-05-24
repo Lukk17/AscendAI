@@ -87,6 +87,23 @@ class IngestionServiceTest {
     }
 
     @Test
+    void processMarkdown_WhenNoH1PresentAndFilenameHasS3Prefix_ThenUsesBasenameAsTitle() {
+        // given — ManualIngestionService passes the full S3 key (with the "markdown/" prefix);
+        // the title fallback should be just the basename, not the full key.
+        String markdown = "## Subtitle\nSome content.";
+        InputStream inputStream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8));
+        String s3Key = "markdown/uploaded-doc.md";
+
+        // when
+        List<Document> documents = ingestionService.processMarkdown(inputStream, s3Key);
+
+        // then
+        assertThat(documents).hasSize(1);
+        assertThat(documents.get(0).getMetadata()).containsEntry("source", s3Key);
+        assertThat(documents.get(0).getMetadata()).containsEntry("title", "uploaded-doc.md");
+    }
+
+    @Test
     void processMarkdown_WhenInputStreamThrowsIOException_ThenThrowsIngestionException() throws IOException {
         // given
         InputStream inputStream = mock(InputStream.class);
@@ -177,6 +194,43 @@ class IngestionServiceTest {
         assertThat(documents.get(0).getText())
                 .contains("Acme 2026 Annual Report")
                 .contains("Body paragraph...");
+    }
+
+    @Test
+    void processUnstructured_WhenNoTitleElementAndFilenameHasS3Prefix_ThenUsesBasenameAsTitleFallback() throws Exception {
+        // given — Unstructured returns only NarrativeText elements (no Title);
+        // the title fallback should strip the "documents/" prefix from the S3 key.
+        InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());
+        String s3Key = "documents/pierogi-recipe.docx";
+        String jsonResponse = "[{\"type\":\"NarrativeText\",\"text\":\"Body paragraph\"}]";
+
+        mockRestClientSetup();
+        when(responseSpec.body(String.class)).thenReturn(jsonResponse);
+
+        JsonNode rootNode = mock(JsonNode.class);
+        JsonNode bodyNode = mock(JsonNode.class);
+        JsonNode typeVal = mock(JsonNode.class);
+        JsonNode textVal = mock(JsonNode.class);
+
+        when(objectMapper.readTree(jsonResponse)).thenReturn(rootNode);
+        when(rootNode.isArray()).thenReturn(true);
+        when(rootNode.iterator()).thenReturn(List.of(bodyNode).iterator());
+
+        when(bodyNode.has("type")).thenReturn(true);
+        when(bodyNode.get("type")).thenReturn(typeVal);
+        when(typeVal.asText()).thenReturn("NarrativeText");
+        when(bodyNode.has("text")).thenReturn(true);
+        when(bodyNode.get("text")).thenReturn(textVal);
+        when(textVal.asText()).thenReturn("Body paragraph");
+
+        // when
+        List<Document> documents = ingestionService.processUnstructured(inputStream, s3Key);
+
+        // then
+        assertThat(documents).hasSize(1);
+        assertThat(documents.get(0).getMetadata())
+                .containsEntry("source", s3Key)
+                .containsEntry("title", "pierogi-recipe.docx");
     }
 
     @Test
