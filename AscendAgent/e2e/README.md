@@ -96,6 +96,40 @@ fields) and **Additional tasks I did** (anything done outside the spec). The run
 
 ---
 
+### Parallelism and execution order
+
+Each test pins its own per-test `X-User-Id` (`frosty<TestName>Test`), so per-user state in Redis, Postgres
+`chat_history`, and Qdrant memory points is naturally isolated. The only state still shared across tests is the
+RAG layer: MinIO bucket `knowledge-base` and Qdrant collection `ascendai-1536`. That gives three execution groups.
+
+| Group | Tests | Why this grouping | Parallelism within group |
+| :---- | :---- | :---------------- | :----------------------- |
+| **A — RAG suite** | 5, 6, 7 | Share the MinIO bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. | **Strict serial: 5 → 6 → 7.** |
+| **B — fast tests** | 1, 2, 3, 4 | Unique user-ids; no RAG / MinIO writes. Single-prompt or two-prompt flows. | Sequential within one agent, or parallel across multiple agents — either works. |
+| **C — cache + compaction** | 8, 9, 10, 11 | Unique user-ids; isolated chat-history slots. Tests 10 / 11 apply their own seed scripts before running. | Sequential within one agent, or parallel — either works. |
+
+The three groups themselves are fully independent: no user-id overlap, no MinIO / Qdrant collision (groups B and C
+don't touch the RAG layer at all). So the suggested execution layout is **three agents running in parallel**, one per
+group:
+
+- **Agent A**: tests 5 → 6 → 7 (sequential within agent).
+- **Agent B**: tests 1, 2, 3, 4 (sequential within agent, can be reordered).
+- **Agent C**: tests 8, 9, 10, 11 (sequential within agent, can be reordered).
+
+Total wall-clock ≈ max of the three group durations. In recent sweeps that bottomed out around the RAG group at
+~13 minutes; the other two groups finish in 3-5 minutes.
+
+A single-process sequential run is also valid for debugging — just run tests 1 through 11 in numeric order. The
+parallel layout only matters when you care about wall-clock.
+
+#### Do not, under any circumstances
+
+- Share `X-User-Id: frosty` (or any other id) across two specs. The old "all default to frosty" convention is
+  removed; cross-test pollution will surface as flaky memory / chat-history assertions.
+- Run two ingestion-runs concurrently. Group A's strict sequential ordering exists to avoid this.
+
+---
+
 ### Prerequisites before any test
 
 1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, MinIO `:9070`.

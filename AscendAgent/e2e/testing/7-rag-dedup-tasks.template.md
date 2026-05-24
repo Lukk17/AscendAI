@@ -36,7 +36,8 @@ Copy this file to `runs/<UTC-timestamp>_7-rag-dedup-tasks.md` before starting a 
 - [ ] Step 1: response `uploaded` includes both dedup fixture keys
 - [ ] Step 2: `indexed >= 2`, `failed == 0`
 - [ ] Step 3: response `sources` array has exactly 2 entries
-- [ ] Step 3: `sources[*].name` includes both `dedup-pierogi-helena.md` and `dedup-pierogi-grandma.md`
+- [ ] Step 3: one entry's `downloadUrl` contains `markdown/dedup-pierogi-helena.md`; the other's contains `markdown/dedup-pierogi-grandma.md` (in either order)
+- [ ] Step 3: each entry's `name` carries the document's H1 title per the `SourceFile.name` contract (H1 when extractable, filename basename otherwise)
 - [ ] Step 3 (soft): response `content` references both recipes (Helena/Maria, or sauerkraut/potato fillings)
 
 ### Verdict

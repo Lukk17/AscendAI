@@ -90,7 +90,7 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-dedup-prompt.y
 
 - After step 1: HTTP 200, `uploaded` field includes both `markdown/dedup-pierogi-helena.md` and `markdown/dedup-pierogi-grandma.md`.
 - After step 2: HTTP 200, `indexed >= 2`.
-- After step 3: HTTP 200. Response body has a `sources` array with **exactly 2 entries**. The two entries' `name` fields equal `dedup-pierogi-helena.md` and `dedup-pierogi-grandma.md` (in either order).
+- After step 3: HTTP 200. Response body has a `sources` array with **exactly 2 entries**, proving the dedup collapse (multiple Qdrant chunks across two files → one source entry per unique file). Identify which file each entry points at by inspecting `downloadUrl`: one entry's URL path contains `markdown/dedup-pierogi-helena.md`, the other's contains `markdown/dedup-pierogi-grandma.md` (in either order). Each entry's `name` field carries the document's H1 title (`Babcia Helena's pierogi recipe (e2e dedup fixture)` and `Grandma Maria's pierogi recipe (e2e dedup fixture)`) per the `SourceFile.name` contract. Don't assert on `name` equality with the filename; the contract is "H1 title when extractable, filename basename otherwise" (see `SourceFile.java`).
 - The response `content` references both recipes (mentions Helena AND Grandma / Maria, or alternately mentions both filling types: sauerkraut/mushroom AND potato/cheese). This is a soft assertion that the LLM actually used both retrieved sources; if it only mentions one, the retrieval still pulled chunks from both files (verifiable from `sources[]`) but the LLM chose to draw on one.
 
 ## Fixtures

@@ -114,6 +114,7 @@ class IngestionServiceTest {
         when(mockRootNode.isArray()).thenReturn(true);
         Iterator<JsonNode> iterator = List.of(mockTextNode).iterator();
         when(mockRootNode.iterator()).thenReturn(iterator);
+        when(mockTextNode.has("type")).thenReturn(false);
         when(mockTextNode.has("text")).thenReturn(true);
         when(mockTextNode.get("text")).thenReturn(mockTextNode);
         when(mockTextNode.asText()).thenReturn("extracted text");
@@ -125,6 +126,57 @@ class IngestionServiceTest {
         assertThat(documents).hasSize(1);
         assertThat(documents.get(0).getText()).contains("extracted text");
         assertThat(documents.get(0).getMetadata()).containsEntry("type", "unstructured");
+        // No "Title" element in the response, so title falls back to the filename.
+        assertThat(documents.get(0).getMetadata()).containsEntry("title", filename);
+    }
+
+    @Test
+    void processUnstructured_WhenResponseContainsTitleElement_ThenExtractsItAsTitleMetadata() throws Exception {
+        // given — Unstructured returns the document's title as an element of type "Title".
+        // The first such element wins; subsequent ones are folded into the body text only.
+        InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());
+        String filename = "annual-report.pdf";
+        String jsonResponse = "[{\"type\":\"Title\",\"text\":\"Acme 2026 Annual Report\"},{\"type\":\"NarrativeText\",\"text\":\"Body paragraph...\"}]";
+
+        mockRestClientSetup();
+        when(responseSpec.body(String.class)).thenReturn(jsonResponse);
+
+        JsonNode rootNode = mock(JsonNode.class);
+        JsonNode titleNode = mock(JsonNode.class);
+        JsonNode titleTypeVal = mock(JsonNode.class);
+        JsonNode titleTextVal = mock(JsonNode.class);
+        JsonNode bodyNode = mock(JsonNode.class);
+        JsonNode bodyTextVal = mock(JsonNode.class);
+
+        when(objectMapper.readTree(jsonResponse)).thenReturn(rootNode);
+        when(rootNode.isArray()).thenReturn(true);
+        when(rootNode.iterator()).thenReturn(List.of(titleNode, bodyNode).iterator());
+
+        when(titleNode.has("type")).thenReturn(true);
+        when(titleNode.get("type")).thenReturn(titleTypeVal);
+        when(titleTypeVal.asText()).thenReturn("Title");
+        when(titleNode.has("text")).thenReturn(true);
+        when(titleNode.get("text")).thenReturn(titleTextVal);
+        when(titleTextVal.asText()).thenReturn("Acme 2026 Annual Report");
+
+        // bodyNode.has("type") is never invoked because the title-extraction guard short-circuits once
+        // extractedTitle is set from titleNode above, so no stub for it.
+        when(bodyNode.has("text")).thenReturn(true);
+        when(bodyNode.get("text")).thenReturn(bodyTextVal);
+        when(bodyTextVal.asText()).thenReturn("Body paragraph...");
+
+        // when
+        List<Document> documents = ingestionService.processUnstructured(inputStream, filename);
+
+        // then
+        assertThat(documents).hasSize(1);
+        assertThat(documents.get(0).getMetadata())
+                .containsEntry("source", filename)
+                .containsEntry("title", "Acme 2026 Annual Report")
+                .containsEntry("type", "unstructured");
+        assertThat(documents.get(0).getText())
+                .contains("Acme 2026 Annual Report")
+                .contains("Body paragraph...");
     }
 
     @Test

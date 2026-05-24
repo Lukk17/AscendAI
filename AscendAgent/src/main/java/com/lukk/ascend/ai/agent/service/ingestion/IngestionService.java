@@ -46,6 +46,7 @@ public class IngestionService {
     private static final String KEY_TYPE = "type";
     private static final String KEY_TEXT = "text";
     private static final String PARAM_FILES = "files";
+    private static final String UNSTRUCTURED_TITLE_ELEMENT = "Title";
 
     @Qualifier("ingestionRestClient")
     private final RestClient restClient;
@@ -155,15 +156,27 @@ public class IngestionService {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             if (rootNode.isArray()) {
                 StringBuilder fullText = new StringBuilder();
+                String extractedTitle = null;
                 for (JsonNode node : rootNode) {
+                    if (extractedTitle == null
+                            && node.has(KEY_TYPE)
+                            && UNSTRUCTURED_TITLE_ELEMENT.equals(node.get(KEY_TYPE).asText())
+                            && node.has(KEY_TEXT)) {
+                        String candidate = node.get(KEY_TEXT).asText();
+                        if (candidate != null && !candidate.isBlank()) {
+                            extractedTitle = candidate;
+                        }
+                    }
                     if (node.has(KEY_TEXT)) {
                         fullText.append(node.get(KEY_TEXT).asText()).append("\n");
                     }
                 }
 
                 if (!fullText.isEmpty()) {
+                    String title = (extractedTitle != null) ? extractedTitle : filename;
                     Document doc = new Document(fullText.toString(), Map.of(
                             KEY_SOURCE, filename,
+                            KEY_TITLE, title,
                             KEY_TYPE, TYPE_UNSTRUCTURED));
                     documents.add(doc);
                 }
