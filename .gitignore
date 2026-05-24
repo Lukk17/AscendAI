@@ -54,6 +54,12 @@ out/
 AscendAgent/e2e/testing/runs/*
 !AscendAgent/e2e/testing/runs/README.md
 
+# Bruno CLI run-output dump. Bruno writes the report next to the collection
+# root when invoked with `--output` (the file is named after the format —
+# `json`, `junit.xml`, etc.). Transient test output, not source.
+docs/api/request/AscendAI/json
+docs/api/request/AscendAI/junit.xml
+
 
 # =============================================================================
 # Language & Framework Specific
