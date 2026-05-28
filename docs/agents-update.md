@@ -26,8 +26,8 @@ exist upstream are swallowed by the stderr redirects.
 git fetch agent-standards && git checkout agent-standards/master -- docs/AGENT_TOOLING.md docs/MCP_SETUP.md && for d in .agents/skills/*/; do git checkout agent-standards/master -- "$d" 2>/dev/null; done && for f in .claude/agents/*.md; do git checkout agent-standards/master -- "$f" 2>/dev/null; done && for f in .opencode/agents/*.md; do git checkout agent-standards/master -- "$f" 2>/dev/null; done
 ```
 
-**PowerShell 7+:**
+**PowerShell (5.1 and 7+):**
 
 ```powershell
-git fetch agent-standards && git checkout agent-standards/master -- docs/AGENT_TOOLING.md docs/MCP_SETUP.md && (Get-ChildItem .agents/skills -Directory | ForEach-Object { git checkout agent-standards/master -- ".agents/skills/$($_.Name)" 2>$null }) && (Get-ChildItem .claude/agents -Filter *.md | ForEach-Object { git checkout agent-standards/master -- ".claude/agents/$($_.Name)" 2>$null }) && (Get-ChildItem .opencode/agents -Filter *.md | ForEach-Object { git checkout agent-standards/master -- ".opencode/agents/$($_.Name)" 2>$null })
+git fetch agent-standards; git checkout agent-standards/master -- docs/AGENT_TOOLING.md docs/MCP_SETUP.md; Get-ChildItem .agents/skills -Directory | ForEach-Object { git checkout agent-standards/master -- ".agents/skills/$($_.Name)" 2>$null }; Get-ChildItem .claude/agents -Filter *.md | ForEach-Object { git checkout agent-standards/master -- ".claude/agents/$($_.Name)" 2>$null }; Get-ChildItem .opencode/agents -Filter *.md | ForEach-Object { git checkout agent-standards/master -- ".opencode/agents/$($_.Name)" 2>$null }
 ```
