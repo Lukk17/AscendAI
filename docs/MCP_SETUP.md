@@ -22,13 +22,10 @@ Default servers, in order:
 | Server            | Purpose                                     | External dependency                              |
 | ----------------- | ------------------------------------------- | ------------------------------------------------ |
 | `context7`        | Up-to-date library docs lookup              | none (hosted HTTP, free tier without API key)    |
-| `mongodb`         | Read-only MongoDB introspection             | a running MongoDB (dev only, never prod)         |
 | `grafana`         | Grafana dashboards, queries, alerts         | a Grafana instance plus service-account token    |
 | `playwright`      | Cross-browser automation for UI tests       | downloads ~500 MB of browsers on first run       |
 | `chrome-devtools` | Performance, network, console debugging     | Chrome installed locally                         |
 | `redis`           | Redis cache / queue introspection           | a running Redis (dev only)                       |
-| `sonarqube`       | Code-quality issues lookup                  | Docker plus a SonarQube instance and token       |
-| `n8n`             | n8n workflow node docs plus optional control| none for docs-only; n8n instance plus key for full |
 
 Disable a server you don't use. In `opencode.json` set `"enabled": false` on the block. In `.mcp.json` delete the
 block; Claude Code's schema has no `enabled` flag.
@@ -58,9 +55,8 @@ commit them. If you keep `${VAR}` or `{env:VAR}` placeholders and never inline s
 - **`uv`** runs the `grafana` and `redis` MCPs. Install per OS:
   - Linux/macOS: `curl -LsSf https://astral.sh/uv/install.sh | sh` or `brew install uv`.
   - Windows: `winget install --id=astral-sh.uv`.
-- **Docker** runs the `sonarqube` MCP. Verify: `docker --version`.
-- The backing services (`mongodb`, `grafana`, `redis`, `sonarqube`, `n8n`) must be running before the MCP can connect.
-  If you don't have one, disable that server.
+- The backing services (`grafana`, `redis`) must be running before the MCP can connect. If you don't have one,
+  disable that server.
 
 ---
 
@@ -73,12 +69,9 @@ set, `.mcp.json` parses and every MCP starts. Tokens only matter for the server 
 | -------------------------------- | -------------------------------------------------------------------------------- | --------------------------------- |
 | `CONTEXT7_API_KEY`               | [Context7 dashboard](https://context7.com/dashboard)                             | you want paid tier or higher limits |
 | `GRAFANA_SERVICE_ACCOUNT_TOKEN`  | Grafana UI, Administration, Service accounts, Add service account, token         | you actually use the grafana MCP  |
-| `SONARQUBE_TOKEN`                | SonarQube UI, My Account, Security, Generate Token                               | you actually use the sonarqube MCP|
-| `N8N_API_KEY`                    | n8n UI, Settings, API, Create API key                                            | you want n8n workflow management  |
 
 Use read-only or least-privilege tokens. The Grafana account just needs `Viewer` for dashboards and `Editor` only if
-you want the MCP to create alerts. The SonarQube token needs `Execute Analysis` only if you also write code-quality
-results back; otherwise read-only.
+you want the MCP to create alerts.
 
 If you don't use a server, the cleanest move is to delete its block from `.mcp.json` and set `"enabled": false` on it
 in `opencode.json`. That way it never spawns and you don't see auth-failure noise in logs.
@@ -162,14 +155,9 @@ or supply a real token.
 | Variable                          | Used by      | Effect when unset                                |
 | --------------------------------- | ------------ | ------------------------------------------------ |
 | `CONTEXT7_API_KEY`                | `context7`   | header sent empty (Context7 free tier)           |
-| `MONGODB_URL`                     | `mongodb`    | falls back to `mongodb://localhost:27017`        |
 | `GRAFANA_URL`                     | `grafana`    | falls back to `http://localhost:3000`            |
 | `GRAFANA_SERVICE_ACCOUNT_TOKEN`   | `grafana`    | token sent empty (Grafana MCP will fail to auth) |
 | `REDIS_URL`                       | `redis`      | falls back to `redis://localhost:6379/0`         |
-| `SONARQUBE_TOKEN`                 | `sonarqube`  | token sent empty (SonarQube MCP will fail)       |
-| `SONARQUBE_URL`                   | `sonarqube`  | falls back to `http://localhost:9000`            |
-| `N8N_API_URL`                     | `n8n`        | falls back to `http://localhost:5678`            |
-| `N8N_API_KEY`                     | `n8n`        | n8n MCP runs in docs-only mode                   |
 
 Important asymmetry between the two files:
 
@@ -239,16 +227,6 @@ Path: `~/.codex/config.toml`. Different format (TOML, not JSON). Global-only, no
 [mcp_servers.context7]
 command = "npx"
 args = ["-y", "@upstash/context7-mcp@latest"]
-
-[mcp_servers.mongodb]
-command = "npx"
-args = [
-    "-y",
-    "mongodb-mcp-server@latest",
-    "--readOnly",
-    "--connectionString",
-    "mongodb://localhost:27017",
-]
 ```
 
 Codex has no built-in env-var substitution. If you want secrets out of the file, wrap the command in a small shell
