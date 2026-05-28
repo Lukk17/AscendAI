@@ -12,17 +12,16 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
 
 @Service
 @RequiredArgsConstructor
@@ -120,14 +119,14 @@ public class ChatModelResolver {
         Duration timeout = Duration.ofSeconds(
                 Optional.ofNullable(timeoutSeconds).orElse(DEFAULT_READ_TIMEOUT_SECONDS)
         );
-        
+
         HttpClient.Builder builder = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS));
-        
+
         Optional.of(isHttp1Required)
                 .filter(Boolean::booleanValue)
                 .ifPresent(ignored -> builder.version(HttpClient.Version.HTTP_1_1));
-        
+
         HttpClient httpClient = builder.build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(timeout);

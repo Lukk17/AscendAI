@@ -126,7 +126,7 @@ class ChatModelResolverTest {
         // then
         assertThat(resolved).isInstanceOf(AnthropicChatModel.class);
     }
-    
+
     @Test
     void initializeProviders_WhenUnsupportedType_ThenThrowsException() {
         // given

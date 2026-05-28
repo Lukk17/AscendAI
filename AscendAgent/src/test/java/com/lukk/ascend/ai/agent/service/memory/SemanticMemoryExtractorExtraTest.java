@@ -4,13 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Direct exercise of {@code findLastBalancedJsonArray} (via the public {@code extractFactsFromJson}
- * facade) covering the deeply-nested, escaped-quote, only-{@code [}, only-{@code ]}, blank-input and
+ * facade) covering the deeply nested, escaped-quote, only-{@code [}, only-{@code ]}, blank-input and
  * "balanced-but-invalid JSON" branches.
  */
 class SemanticMemoryExtractorExtraTest {

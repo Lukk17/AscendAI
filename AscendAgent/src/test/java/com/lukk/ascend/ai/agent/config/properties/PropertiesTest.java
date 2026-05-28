@@ -146,8 +146,8 @@ class PropertiesTest {
         props.setCollections(List.of(cfg));
 
         assertThat(props.getCollections()).hasSize(1);
-        assertThat(props.getCollections().get(0).getName()).isEqualTo("ascendai-768");
-        assertThat(props.getCollections().get(0).getSize()).isEqualTo(768);
+        assertThat(props.getCollections().getFirst().getName()).isEqualTo("ascendai-768");
+        assertThat(props.getCollections().getFirst().getSize()).isEqualTo(768);
     }
 
     @Test

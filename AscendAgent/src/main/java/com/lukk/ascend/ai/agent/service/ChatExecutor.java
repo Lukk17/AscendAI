@@ -147,10 +147,10 @@ public class ChatExecutor {
     /**
      * Resolves a never-null {@link MimeType} for the uploaded image. Order:
      * 1. Try {@code Content-Type} header — but reject obviously broken values
-     *    ({@code null}, blank, no slash, "file", "application/octet-stream").
+     * ({@code null}, blank, no slash, "file", "application/octet-stream").
      * 2. Try filename extension (.jpg, .jpeg, .png, .webp, .gif).
      * 3. Default to {@code image/png}.
-     * Logs at INFO when a fallback path is taken so a malformed client header
+     * Logs at INFO when a fallback path is taken, so a malformed client header
      * is visible without poisoning the request.
      */
     MimeType resolveImageMimeType(MultipartFile image) {

@@ -17,15 +17,15 @@ import org.testcontainers.utility.DockerImageName;
  *
  * <p>Spins up Postgres, Redis, Qdrant, and MinIO via Testcontainers and wires them into
  * the Spring context via {@link DynamicPropertySource} before the application boots.
- * Tests extending this class get a fully-real data layer — no mocks for backing
+ * Tests extending this class get a fully real data layer — no mocks for backing
  * infrastructure — so they exercise the {@code @Bean} factories in {@code AppConfig},
  * {@code VectorStoreConfig}, etc., that unit tests can't reach.
  *
  * <p>Tagged {@code @Tag("integration")} so the default {@code gradle test} skips them.
  * Run via {@code ./gradlew integrationTest}; requires Docker.
  *
- * <p>The MCP client is disabled and the chat-model providers point at unreachable URLs
- * so the context starts without external network. ITs that exercise the chat path
+ * <p>The MCP client is disabled, and the chat-model providers point at unreachable URLs
+ * so the context starts without an external network. It's that exercise the chat path
  * should mock {@code ChatModelResolver} or use {@code @MockBean} for {@code AscendChatService}.
  */
 @SpringBootTest
@@ -73,12 +73,12 @@ public abstract class TestcontainersBase {
         registry.add("spring.ai.vectorstore.qdrant.use-tls", () -> false);
 
         // MinIO
-        registry.add("app.s3.endpoint", () -> MINIO.getS3URL());
+        registry.add("app.s3.endpoint", MINIO::getS3URL);
         registry.add("app.s3.access-key", MINIO::getUserName);
         registry.add("app.s3.secret-key", MINIO::getPassword);
         registry.add("app.s3.bucket", () -> "knowledge-base");
 
-        // AscendMemory sidecar — point at a port that won't bind so the optional
+        // AscendMemory sidecar — point at a port that won't bind, so the optional
         // search returns empty rather than blocking. Tests that exercise memory
         // should override this to point at a stub server.
         registry.add("app.memory.semantic.base-url", () -> "http://localhost:1");

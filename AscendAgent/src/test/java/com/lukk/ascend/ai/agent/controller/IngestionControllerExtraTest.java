@@ -132,7 +132,7 @@ class IngestionControllerExtraTest {
                 (com.lukk.ascend.ai.agent.dto.UploadResponse) response.getBody();
         assertThat(body.uploaded()).containsExactly("markdown/ok.md");
         assertThat(body.failures()).hasSize(1);
-        assertThat(body.failures().get(0)).contains("io failed");
+        assertThat(body.failures().getFirst()).contains("io failed");
     }
 
     @Test

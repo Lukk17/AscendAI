@@ -30,7 +30,7 @@ class CustomMetadataTest {
         assertThat(a).isEqualTo(a);
         assertThat(a.hashCode()).isEqualTo(a.hashCode());
         // toolsUsed differs → not equal (callSuper=true means same delegate ref helps,
-        // but Lombok's generated equals also compares the toolsUsed list)
+        // but Lombok's generated equals also compare the toolsUsed list)
         assertThat(a).isNotEqualTo(different);
         // null + foreign type
         assertThat(a).isNotEqualTo(null);

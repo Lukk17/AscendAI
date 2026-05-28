@@ -3,7 +3,6 @@ package com.lukk.ascend.ai.agent.controller;
 import com.lukk.ascend.ai.agent.config.api.ApiCommonErrorResponses;
 import com.lukk.ascend.ai.agent.config.api.ApiCommonSuccessResponses;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
-import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.service.AscendChatService;
 import com.lukk.ascend.ai.agent.service.VisionCapabilityResolver;
@@ -13,16 +12,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 @Slf4j
 @RestController

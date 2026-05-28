@@ -25,11 +25,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -101,7 +100,7 @@ class ManualIngestionServiceTest {
         S3Object validObject = S3Object.builder().key("markdown/file.md").eTag("v1").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(validObject)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
-        
+
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn("EXISTING_TIMESTAMP");
 
         // when
@@ -119,13 +118,13 @@ class ManualIngestionServiceTest {
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-        
+
         ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
-        
+
         Document processedDoc = new Document("MD Text");
         when(ingestionService.processMarkdown(any(), eq("markdown/test.md"))).thenReturn(List.of(processedDoc));
-        
+
         Document chunk1 = new Document("Chunk 1");
         Document chunk2 = new Document("Chunk 2");
         when(documentService.splitDocuments(any())).thenReturn(List.of(chunk1, chunk2));
@@ -137,7 +136,7 @@ class ManualIngestionServiceTest {
         // then
         assertThat(result.indexed).isEqualTo(2);
         assertThat(result.skipped).isZero();
-        
+
         verify(documentService).removeOldDocuments(any(), eq(vectorStore));
         verify(vectorStore).add(List.of(chunk1));
         verify(vectorStore).add(List.of(chunk2));
@@ -150,10 +149,10 @@ class ManualIngestionServiceTest {
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(enforceMetaKey("manual-ingestion:documents/report.pdf:unknown"), anyString())).thenReturn(null);
-        
+
         ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
-        
+
         Document processedDoc = new Document("PDF Text");
         when(ingestionService.processUnstructured(any(), eq("documents/report.pdf"))).thenReturn(List.of(processedDoc));
         when(documentService.splitDocuments(any())).thenReturn(List.of(processedDoc));
@@ -165,7 +164,7 @@ class ManualIngestionServiceTest {
         // then
         assertThat(result.indexed).isEqualTo(1);
     }
-    
+
     @Test
     void run_WhenIngestionExceptionOccurs_ThenIncrementsFailedCounter() {
         // given

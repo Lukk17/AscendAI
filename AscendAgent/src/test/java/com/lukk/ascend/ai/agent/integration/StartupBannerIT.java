@@ -52,7 +52,7 @@ class StartupBannerIT extends TestcontainersBase {
 
     @Test
     void banner_reportsStructureWithStatusMarkersAndPromptEndpoint() {
-        // Re-publish readiness so the @EventListener writes to our freshly-attached appender.
+        // Re-publish readiness so the @EventListener writes to our freshly attached appender.
         AvailabilityChangeEvent.publish(applicationContext, ReadinessState.ACCEPTING_TRAFFIC);
 
         String banner = appender.list.stream()

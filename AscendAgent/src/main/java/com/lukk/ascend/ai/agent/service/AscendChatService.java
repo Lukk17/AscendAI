@@ -1,8 +1,8 @@
 package com.lukk.ascend.ai.agent.service;
 
+import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.dto.SourceFile;
-import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryExtractor;
 import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;

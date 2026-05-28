@@ -59,7 +59,7 @@ public class IngestionPipelineConfig {
     /**
      * Configures the S3 Message Source for streaming files.
      * <p>
-     * Instead of downloading files to local disk, this source provides an
+     * Instead of downloading files to the local disk, this source provides an
      * InputStream
      * to the file content on S3. It uses a persistent filter to prevent
      * re-ingestion.

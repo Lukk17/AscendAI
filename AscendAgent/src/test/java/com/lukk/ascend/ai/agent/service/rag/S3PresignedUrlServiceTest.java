@@ -72,7 +72,7 @@ class S3PresignedUrlServiceTest {
         List<SourceFile> result = service.presignAll(List.of(ref));
 
         assertThat(result).hasSize(1);
-        SourceFile f = result.get(0);
+        SourceFile f = result.getFirst();
         assertThat(f.name()).isEqualTo("manual.pdf");
         assertThat(f.mimeType()).isEqualTo("application/pdf");
         assertThat(f.downloadUrl()).contains("X-Amz-Signature");
@@ -113,7 +113,7 @@ class S3PresignedUrlServiceTest {
         List<SourceFile> result = service.presignAll(List.of(good, bad));
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).name()).isEqualTo("good.pdf");
+        assertThat(result.getFirst().name()).isEqualTo("good.pdf");
     }
 
     @Test
@@ -187,7 +187,7 @@ class S3PresignedUrlServiceTest {
 
         assertThat(result).hasSize(1);
         // expiresAt should be approximately 1 hour out, not 2
-        long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.get(0).expiresAt()).getSeconds();
+        long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.getFirst().expiresAt()).getSeconds();
         assertThat(secondsToExpiry).isBetween(3500L, 3700L);
     }
 
@@ -213,7 +213,7 @@ class S3PresignedUrlServiceTest {
 
         assertThat(result).hasSize(1);
         // clamped to 1 minute = 60s (not 10s)
-        long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.get(0).expiresAt()).getSeconds();
+        long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.getFirst().expiresAt()).getSeconds();
         assertThat(secondsToExpiry).isBetween(50L, 70L);
     }
 }

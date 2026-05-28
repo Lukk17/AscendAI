@@ -11,22 +11,22 @@ import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfig
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.integration.jdbc.metadata.JdbcMetadataStore;
 import org.springframework.integration.metadata.ConcurrentMetadataStore;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3Configuration;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
-import java.net.URI;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -129,7 +129,7 @@ public class AppConfig {
     }
 
     /**
-     * Presigner uses the PUBLIC endpoint so the resulting URLs are reachable from
+     * Presigner uses the PUBLIC endpoint, so the resulting URLs are reachable from
      * the caller's network (host browser / curl), not just from inside the docker
      * network where the agent runs.
      */
@@ -152,7 +152,7 @@ public class AppConfig {
      * This ensures files are processed only once, even across application restarts.
      * </p>
      *
-     * @param dataSource The generic DataSource (auto-configured by Spring Boot).
+     * @param dataSource The generic DataSource (autoconfigured by Spring Boot).
      * @return A ConcurrentMetadataStore backed by the database.
      */
     @Bean

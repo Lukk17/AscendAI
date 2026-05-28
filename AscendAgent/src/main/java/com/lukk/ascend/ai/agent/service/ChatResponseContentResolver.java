@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,7 @@ public class ChatResponseContentResolver {
     private String extractText(Generation generation) {
         return Optional.ofNullable(generation)
                 .map(Generation::getOutput)
-                .map(output -> output.getText())
+                .map(AbstractMessage::getText)
                 .orElse(null);
     }
 }

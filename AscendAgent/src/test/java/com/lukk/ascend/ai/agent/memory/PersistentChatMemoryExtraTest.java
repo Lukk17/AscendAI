@@ -17,7 +17,6 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 
 import java.time.Duration;
 import java.util.List;
@@ -91,8 +90,8 @@ class PersistentChatMemoryExtraTest {
         List<Message> result = memory.get(CONVO_ID, 5);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0)).isInstanceOf(UserMessage.class);
-        assertThat(result.get(0).getText()).isEqualTo("meh");
+        assertThat(result.getFirst()).isInstanceOf(UserMessage.class);
+        assertThat(result.getFirst().getText()).isEqualTo("meh");
     }
 
     @Test

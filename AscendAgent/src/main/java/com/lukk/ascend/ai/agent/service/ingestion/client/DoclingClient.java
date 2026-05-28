@@ -29,7 +29,7 @@ public class DoclingClient {
     private static final String KEY_SOURCE = "source";
     private static final String KEY_TYPE = "type";
     // Docling's /v1/convert/file endpoint binds the multipart field to "files" (plural) —
-    // the path segment is "file" (singular) but the form field is "files" because the
+    // the path segment is "file" (singular), but the form field is "files" because the
     // endpoint supports multi-file batches. Sending "file" returns HTTP 422
     // {"type":"missing","loc":["body","files"],"msg":"Field required"}.
     private static final String PARAM_FILE = "files";
@@ -119,8 +119,8 @@ public class DoclingClient {
 
     /**
      * Docling Serve's /v1/convert/file with to_formats=json returns
-     *   { "status": "success", "document": { "md_content": "...", "text_content": "...",
-     *                                        "json_content": {...}, "html_content": "..." }, ... }
+     * { "status": "success", "document": { "md_content": "...", "text_content": "...",
+     * "json_content": {...}, "html_content": "..." }, ... }
      * Earlier versions of the agent walked the tree for "text" keys, which matched an older
      * (Docling Core) response shape where each text item was {"text": "..."}. The newer
      * Docling Serve response stores the full rendering as a single string on document.md_content

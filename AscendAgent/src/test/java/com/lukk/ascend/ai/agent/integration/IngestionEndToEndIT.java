@@ -174,7 +174,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
         List<String> keys = objectMapper.convertValue(body.get("uploaded"), List.class);
 
         assertThat(keys).hasSize(1);
-        String key = keys.get(0);
+        String key = keys.getFirst();
 
         // IngestionSecurity strips path segments and dot-runs; the resulting key must NOT
         // contain ".." anywhere and must NOT have a leading slash on the filename portion.
@@ -193,7 +193,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
     @Test
     void runIngestion_processesUploadedMarkdown_andPersistsMetadataAndCallsVectorStore() throws Exception {
-        // Upload a single markdown file — the run pipeline should ingest it.
+        // Upload a single Markdown file — the run pipeline should ingest it.
         MockMultipartFile mdFile = new MockMultipartFile(
                 "file", "run-target.md", "text/markdown",
                 ("# Heading\n\n" + "Body content. ".repeat(50)).getBytes());
@@ -238,7 +238,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 "SELECT COUNT(*) FROM INT_METADATA_STORE WHERE METADATA_KEY LIKE 'manual-ingestion:%'",
                 Integer.class);
 
-        // Reset interactions on the mock so the second-run assertion is unambiguous —
+        // Reset interactions on the mock, so the second-run assertion is unambiguous —
         // we want to prove the second run did NOT call add() at all (the metadata store
         // dedupes everything).
         reset(mockVectorStore);
@@ -275,7 +275,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
     }
 
     /**
-     * Smallest structurally-valid PDF-1.4 byte sequence Tika reliably sniffs as application/pdf.
+     * Smallest structurally valid PDF-1.4 byte sequence Tika reliably sniffs as application/pdf.
      */
     private static byte[] minimalPdfBytes() {
         String pdf = "%PDF-1.4\n"

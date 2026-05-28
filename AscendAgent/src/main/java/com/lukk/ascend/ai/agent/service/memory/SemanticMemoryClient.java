@@ -47,7 +47,8 @@ public class SemanticMemoryClient {
                 .uri(properties.getBaseUrl() + "/api/v1/memory/search?user_id={userId}&query={query}&limit={limit}&provider={provider}",
                         userId, query, limit, embeddingProvider)
                 .retrieve()
-                .body(new ParameterizedTypeReference<>() {});
+                .body(new ParameterizedTypeReference<>() {
+                });
 
         List<SemanticMemoryItem> finalResult = Optional.ofNullable(result).orElseGet(List::of);
         log.info("Received {} semantic memory items for user: '{}'", finalResult.size(), userId);

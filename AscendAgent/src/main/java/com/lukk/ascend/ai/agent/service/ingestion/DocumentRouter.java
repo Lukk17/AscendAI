@@ -122,8 +122,8 @@ public class DocumentRouter {
             List<CompletableFuture<PageResult>> futures = new ArrayList<>(pageWork.size());
             for (PageWork work : pageWork) {
                 futures.add(CompletableFuture.supplyAsync(() ->
-                        new PageResult(work.pageNumber,
-                                routeSinglePdfPage(work.pdfBytes, work.pageFilename, work.textLength)),
+                                new PageResult(work.pageNumber,
+                                        routeSinglePdfPage(work.pdfBytes, work.pageFilename, work.textLength)),
                         pool));
             }
 
@@ -162,8 +162,11 @@ public class DocumentRouter {
         }
     }
 
-    private record PageWork(int pageNumber, String pageFilename, byte[] pdfBytes, int textLength) {}
-    private record PageResult(int pageNumber, List<Document> documents) {}
+    private record PageWork(int pageNumber, String pageFilename, byte[] pdfBytes, int textLength) {
+    }
+
+    private record PageResult(int pageNumber, List<Document> documents) {
+    }
 
     private List<Document> routeSinglePdfPage(byte[] pageBytes, String pageFilename, int textLength) {
         if (textLength < pdfMinTextThresholdPerPage) {

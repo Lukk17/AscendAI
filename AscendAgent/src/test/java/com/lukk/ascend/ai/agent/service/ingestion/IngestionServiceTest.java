@@ -67,8 +67,8 @@ class IngestionServiceTest {
 
         // then
         assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getMetadata()).containsEntry("title", "My Title");
-        assertThat(documents.get(0).getMetadata()).containsEntry("source", filename);
+        assertThat(documents.getFirst().getMetadata()).containsEntry("title", "My Title");
+        assertThat(documents.getFirst().getMetadata()).containsEntry("source", filename);
     }
 
     @Test
@@ -83,7 +83,7 @@ class IngestionServiceTest {
 
         // then
         assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getMetadata()).containsEntry("title", filename);
+        assertThat(documents.getFirst().getMetadata()).containsEntry("title", filename);
     }
 
     @Test
@@ -99,8 +99,8 @@ class IngestionServiceTest {
 
         // then
         assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getMetadata()).containsEntry("source", s3Key);
-        assertThat(documents.get(0).getMetadata()).containsEntry("title", "uploaded-doc.md");
+        assertThat(documents.getFirst().getMetadata()).containsEntry("source", s3Key);
+        assertThat(documents.getFirst().getMetadata()).containsEntry("title", "uploaded-doc.md");
     }
 
     @Test
@@ -141,10 +141,10 @@ class IngestionServiceTest {
 
         // then
         assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getText()).contains("extracted text");
-        assertThat(documents.get(0).getMetadata()).containsEntry("type", "unstructured");
+        assertThat(documents.getFirst().getText()).contains("extracted text");
+        assertThat(documents.getFirst().getMetadata()).containsEntry("type", "unstructured");
         // No "Title" element in the response, so title falls back to the filename.
-        assertThat(documents.get(0).getMetadata()).containsEntry("title", filename);
+        assertThat(documents.getFirst().getMetadata()).containsEntry("title", filename);
     }
 
     @Test
@@ -187,11 +187,11 @@ class IngestionServiceTest {
 
         // then
         assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getMetadata())
+        assertThat(documents.getFirst().getMetadata())
                 .containsEntry("source", filename)
                 .containsEntry("title", "Acme 2026 Annual Report")
                 .containsEntry("type", "unstructured");
-        assertThat(documents.get(0).getText())
+        assertThat(documents.getFirst().getText())
                 .contains("Acme 2026 Annual Report")
                 .contains("Body paragraph...");
     }
@@ -228,7 +228,7 @@ class IngestionServiceTest {
 
         // then
         assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getMetadata())
+        assertThat(documents.getFirst().getMetadata())
                 .containsEntry("source", s3Key)
                 .containsEntry("title", "pierogi-recipe.docx");
     }
@@ -268,7 +268,8 @@ class IngestionServiceTest {
 
         mockRestClientSetup();
         when(responseSpec.body(String.class)).thenReturn(jsonResponse);
-        when(objectMapper.readTree(jsonResponse)).thenThrow(new JsonProcessingException("Broken json") {});
+        when(objectMapper.readTree(jsonResponse)).thenThrow(new JsonProcessingException("Broken json") {
+        });
 
         // when / then
         assertThatThrownBy(() -> ingestionService.processUnstructured(inputStream, filename))

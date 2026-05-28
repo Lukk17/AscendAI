@@ -13,7 +13,9 @@ public interface PromptCacheStrategy {
      */
     ChatOptions buildOptions(String model);
 
-    /** Read cache-token counters from the response metadata and emit a single INFO log line. */
+    /**
+     * Read cache-token counters from the response metadata and emit a single INFO log line.
+     */
     void recordOutcome(String userId, ChatResponse response);
 
     /**

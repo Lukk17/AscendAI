@@ -181,8 +181,8 @@ public class PersistentChatMemory implements ChatMemory {
 
     /**
      * When compaction is enabled the Redis cap must accommodate the post-compaction
-     * shape of {@code 1 summary + keepRecentTurns} entries. Otherwise the regular
-     * trim would drop the freshly-written summary on the next user turn.
+     * shape of {@code 1 summary + keepRecentTurns} entries. Otherwise, the regular
+     * trim would drop the freshly written summary on the next user turn.
      */
     private int effectiveCacheSize() {
         int base = chatHistoryProperties.getMaxSize();

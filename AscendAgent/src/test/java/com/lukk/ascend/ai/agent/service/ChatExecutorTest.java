@@ -19,9 +19,9 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -177,10 +177,10 @@ class ChatExecutorTest {
         if (toolCalls != null && !toolCalls.isEmpty()) {
             when(assistantMessage.getToolCalls()).thenReturn(toolCalls);
         }
-        
+
         Generation generation = mock(Generation.class);
         when(generation.getOutput()).thenReturn(assistantMessage);
-        
+
         ChatResponse chatResponse = mock(ChatResponse.class);
         when(chatResponse.getResult()).thenReturn(generation);
         when(chatResponse.getMetadata()).thenReturn(mock(ChatResponseMetadata.class));

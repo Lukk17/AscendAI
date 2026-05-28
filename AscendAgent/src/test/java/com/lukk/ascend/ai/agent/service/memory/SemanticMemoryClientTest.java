@@ -4,6 +4,7 @@ import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,7 +27,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class SemanticMemoryClientTest {

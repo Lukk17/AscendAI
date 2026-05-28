@@ -1,5 +1,9 @@
 package com.lukk.ascend.ai.agent.service.memory;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -23,12 +28,6 @@ import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
 import java.util.Map;
-
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
-import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -148,7 +147,8 @@ class SemanticMemoryExtractorTest {
         when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(invalidJson);
 
         when(objectMapper.readValue(any(String.class), any(TypeReference.class)))
-                .thenThrow(new JsonProcessingException("Malformatted JSON") {});
+                .thenThrow(new JsonProcessingException("Malformatted JSON") {
+                });
 
         // when
         extractor.extract(DEFAULT_USER_ID, DEFAULT_USER_TEXT, DEFAULT_PROVIDER, null, DEFAULT_EMBEDDING_PROVIDER);
@@ -175,7 +175,8 @@ class SemanticMemoryExtractorTest {
 
         // First call with full text fails, second call with extracted array succeeds
         when(objectMapper.readValue(eq(thinkingWithEmbeddedJson), any(TypeReference.class)))
-                .thenThrow(new JsonProcessingException("Not valid JSON") {});
+                .thenThrow(new JsonProcessingException("Not valid JSON") {
+                });
         when(objectMapper.readValue(eq(embeddedArray), any(TypeReference.class)))
                 .thenReturn(List.of("User has a dog named Rex"));
 

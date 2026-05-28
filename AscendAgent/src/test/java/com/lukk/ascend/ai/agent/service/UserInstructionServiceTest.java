@@ -1,8 +1,8 @@
 package com.lukk.ascend.ai.agent.service;
 
+import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.model.UserInstruction;
 import com.lukk.ascend.ai.agent.repository.UserInstructionRepository;
-import com.lukk.ascend.ai.agent.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -83,7 +82,7 @@ class UserInstructionServiceTest {
         // given
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get(CACHE_KEY)).thenReturn(null);
-        
+
         UserInstruction entity = new UserInstruction(DEFAULT_USER_ID, INSTRUCTION_TEXT, LocalDateTime.now());
         when(repository.findById(DEFAULT_USER_ID)).thenReturn(Optional.of(entity));
 

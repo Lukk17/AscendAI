@@ -1,7 +1,6 @@
 package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.memory.CompactionOverride;
-import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.memory.PersistentChatMemory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,11 +73,11 @@ class ChatHistoryServiceTest {
         // then
         verify(persistentChatMemory).add(eq(DEFAULT_USER_ID), messageListCaptor.capture(),
                 eq((String) null), eq(CompactionOverride.EMPTY));
-        
+
         List<Message> capturedMessages = messageListCaptor.getValue();
         assertThat(capturedMessages).hasSize(2);
-        
-        Message capturedUserMsg = capturedMessages.get(0);
+
+        Message capturedUserMsg = capturedMessages.getFirst();
         assertThat(capturedUserMsg).isInstanceOf(UserMessage.class);
         assertThat(capturedUserMsg.getText()).isEqualTo(userPrompt);
 

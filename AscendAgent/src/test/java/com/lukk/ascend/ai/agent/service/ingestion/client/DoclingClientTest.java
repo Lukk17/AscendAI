@@ -41,11 +41,11 @@ class DoclingClientTest {
     void process_WhenValidResponse_ThenExtractsTextSuccessfully() {
         // given
         String jsonResponse = "{ \"text\": \"Extracted text\", \"pages\": [ { \"text\": \"Nested page text\" } ] }";
-        
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
@@ -58,10 +58,10 @@ class DoclingClientTest {
 
         // then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getText())
+        assertThat(result.getFirst().getText())
                 .contains("Extracted text")
                 .contains("Nested page text");
-        assertThat(result.get(0).getMetadata())
+        assertThat(result.getFirst().getMetadata())
                 .containsEntry("source", FILENAME)
                 .containsEntry("type", "docling");
     }
@@ -71,7 +71,7 @@ class DoclingClientTest {
         // given
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
@@ -88,11 +88,11 @@ class DoclingClientTest {
     void process_WhenInvalidJsonReturned_ThenThrowsIngestionException() throws Exception {
         // given
         String invalidJson = "{ invalid: j!son }";
-        
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);

@@ -92,7 +92,7 @@ class EmbeddingProviderValidatorTest {
         // given
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_LMSTUDIO);
         when(embeddingProviderProperties.getDefaultProvider()).thenReturn(EMBED_PROVIDER_LMSTUDIO);
-        
+
         EmbeddingConfig embedConfig = new EmbeddingConfig();
         embedConfig.setDimensions(768);
         when(embeddingProviderProperties.getProviders()).thenReturn(Map.of(EMBED_PROVIDER_LMSTUDIO, embedConfig));
@@ -107,7 +107,7 @@ class EmbeddingProviderValidatorTest {
         // given
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_LMSTUDIO);
         when(embeddingProviderProperties.getDefaultProvider()).thenReturn(EMBED_PROVIDER_OPENAI);
-        
+
         EmbeddingConfig embedConfig = new EmbeddingConfig();
         embedConfig.setDimensions(1536);
         when(embeddingProviderProperties.getProviders()).thenReturn(Map.of(EMBED_PROVIDER_OPENAI, embedConfig));
@@ -128,7 +128,7 @@ class EmbeddingProviderValidatorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown embedding provider: 'nonexistent'");
     }
-    
+
     @Test
     void validate_WhenResolvingUnknownDefaultEmbeddingProvider_ThenThrowsIllegalArgumentException() {
         // given
@@ -144,7 +144,7 @@ class EmbeddingProviderValidatorTest {
 
     private void setupProviderMocks(String chatProvider, String embedProvider, int dimensions) {
         when(aiProviderProperties.getDefaultProvider()).thenReturn(chatProvider);
-        
+
         EmbeddingConfig embedConfig = new EmbeddingConfig();
         embedConfig.setDimensions(dimensions);
         when(embeddingProviderProperties.getProviders()).thenReturn(Map.of(embedProvider, embedConfig));

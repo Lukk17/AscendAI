@@ -41,11 +41,11 @@ class PaddleOcrClientTest {
     void process_WhenValidResponse_ThenExtractsLinesSuccessfully() {
         // given
         String jsonResponse = "{\"pages\": [{\"lines\": [{\"text\": \"Total: $100\"}, {\"text\": \"Tax: $5\"}]}]}";
-        
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
@@ -58,10 +58,10 @@ class PaddleOcrClientTest {
 
         // then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getText())
+        assertThat(result.getFirst().getText())
                 .contains("Total: $100")
                 .contains("Tax: $5");
-        assertThat(result.get(0).getMetadata())
+        assertThat(result.getFirst().getMetadata())
                 .containsEntry("source", FILENAME)
                 .containsEntry("type", "paddleocr");
     }
@@ -71,7 +71,7 @@ class PaddleOcrClientTest {
         // given
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
@@ -88,11 +88,11 @@ class PaddleOcrClientTest {
     void process_WhenInvalidJsonReturned_ThenThrowsIngestionException() {
         // given
         String invalidJson = "<xml>not json</xml>";
-        
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);

@@ -84,7 +84,7 @@ class PersistentChatMemoryTest {
         List<Message> result = persistentChatMemory.get(DEFAULT_CONVERSATION_ID, 10);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getText()).isEqualTo("DB Hello");
+        assertThat(result.getFirst().getText()).isEqualTo("DB Hello");
 
         verify(listOperations).rightPushAll(eq(REDIS_KEY), eq(List.of("{\"role\":\"user\",\"content\":\"DB Hello\"}")));
     }

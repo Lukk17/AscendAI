@@ -24,10 +24,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -115,7 +113,7 @@ public class ChatHistoryCompactionService {
             return;
         }
 
-        boolean alreadySummarised = isSummary(history.get(0));
+        boolean alreadySummarised = isSummary(history.getFirst());
         if (alreadySummarised && (turns - 1) < compactionProperties.getTurnTrigger()) {
             return;
         }
@@ -264,7 +262,9 @@ public class ChatHistoryCompactionService {
         return new ResolvedCompactionTarget(provider, model);
     }
 
-    /** Convert SystemMessage/UserMessage/AssistantMessage list to a flat string for token estimation in tests. */
+    /**
+     * Convert SystemMessage/UserMessage/AssistantMessage list to a flat string for token estimation in tests.
+     */
     int estimateTokensFromMessages(List<Message> messages) {
         int total = 0;
         for (Message m : messages) {

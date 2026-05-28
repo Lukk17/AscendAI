@@ -168,7 +168,7 @@ class RagRetrievalServiceTest {
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
         assertThat(result.sources()).hasSize(1);
-        SourceRef ref = result.sources().get(0);
+        SourceRef ref = result.sources().getFirst();
         assertThat(ref.bucket()).isEqualTo("custom-bucket");
         assertThat(ref.key()).isEqualTo("folder/file.pdf");
         assertThat(ref.displayName()).isEqualTo("Custom Display.pdf");
@@ -190,7 +190,7 @@ class RagRetrievalServiceTest {
                 .contains("Has source.")
                 .contains("Orphan chunk.");
         assertThat(result.sources()).hasSize(1);
-        assertThat(result.sources().get(0).key()).isEqualTo("real.pdf");
+        assertThat(result.sources().getFirst().key()).isEqualTo("real.pdf");
     }
 
     @Test
@@ -204,7 +204,7 @@ class RagRetrievalServiceTest {
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
         assertThat(result.sources()).hasSize(1);
-        assertThat(result.sources().get(0).displayName()).isEqualTo("document.pdf");
+        assertThat(result.sources().getFirst().displayName()).isEqualTo("document.pdf");
     }
 
     private void setupRagProperties(boolean enabled, int topK, double threshold, int maxChars) {
