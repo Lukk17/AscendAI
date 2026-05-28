@@ -71,7 +71,7 @@ set, `.mcp.json` parses and every MCP starts. Tokens only matter for the server 
 
 | Key                              | Where to get it                                                                  | Needed when                       |
 | -------------------------------- | -------------------------------------------------------------------------------- | --------------------------------- |
-| `CONTEXT7_API_KEY`               | <https://context7.com/dashboard>                                                 | you want paid tier or higher limits |
+| `CONTEXT7_API_KEY`               | [Context7 dashboard](https://context7.com/dashboard)                             | you want paid tier or higher limits |
 | `GRAFANA_SERVICE_ACCOUNT_TOKEN`  | Grafana UI, Administration, Service accounts, Add service account, token         | you actually use the grafana MCP  |
 | `SONARQUBE_TOKEN`                | SonarQube UI, My Account, Security, Generate Token                               | you actually use the sonarqube MCP|
 | `N8N_API_KEY`                    | n8n UI, Settings, API, Create API key                                            | you want n8n workflow management  |
@@ -155,8 +155,9 @@ quit (system-tray icon) and relaunched.
 ### Step 5, variables you can override
 
 Every variable in the table is optional. The defaults are baked into the template files, either via `${VAR:-default}`
-in [.mcp.json.example](../.mcp.json.example) or as hardcoded literals in [opencode.json.example](../opencode.json.example).
-Set a variable only when you need to point at a non-default host or supply a real token.
+in [.mcp.json.example](../.mcp.json.example) or as hardcoded literals in
+[opencode.json.example](../opencode.json.example). Set a variable only when you need to point at a non-default host
+or supply a real token.
 
 | Variable                          | Used by      | Effect when unset                                |
 | --------------------------------- | ------------ | ------------------------------------------------ |

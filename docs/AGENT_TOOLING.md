@@ -127,7 +127,7 @@ OpenCode and Kilo share the same directory. Codex CLI has no per-agent file mech
 
 These files are **generated artifacts**. Do not hand-edit them. Your changes will be overwritten on the next pull. To
 modify a subagent permanently, change its canonical source in the agent-standards repo (`subagents/<name>.md`), run
-`python tools/gen-subagents.py` there, and re-import via Step 2.
+`python tools/gen_subagents.py` there, and re-import via Step 2.
 
 The catalogue covers code review, architecture, debugging, stack experts (Java, Python, Flutter, Angular,
 React/Next.js), DevOps, databases, APIs, security, design, accessibility, docs, content, and legal. List the active
@@ -175,10 +175,8 @@ cp opencode.json.example opencode.json
 ```
 
 Full human setup (prerequisites, key acquisition, environment-variable export per OS, Claude Desktop and Codex CLI
-global configs, verification) lives in [MCP_SETUP.md](MCP_SETUP.md). The AI agent does not run that setup; a person
-configures the machine once.
-
-Default servers: `context7`, `mongodb`, `grafana`, `playwright`, `chrome-devtools`, `redis`, `sonarqube`, `n8n`.
+global configs, verification, and the full default-server list) lives in [MCP_SETUP.md](MCP_SETUP.md). The AI agent
+does not run that setup; a person configures the machine once.
 
 ---
 
@@ -238,6 +236,57 @@ openspec/
 ```
 
 Restart your IDE and terminal after initialisation.
+
+#### Optional: install a custom schema for e2e capability tests
+
+For projects that want spec-driven end-to-end capability tests through OpenSpec's lifecycle
+(`/opsx:new` → `/opsx:continue` → `/opsx:apply`), install the
+[`e2e-runbooks`](https://github.com/Lukk17/openspec-schemas/tree/master/e2e-runbooks) schema from the
+companion repo. OpenSpec has no schema-install CLI yet, so copy the bundle into the project's `openspec/schemas/`
+directory.
+
+Linux / macOS:
+
+```bash
+git clone --depth 1 https://github.com/Lukk17/openspec-schemas /tmp/lukk17-schemas
+```
+
+```bash
+cp -r /tmp/lukk17-schemas/e2e-runbooks openspec/schemas/
+```
+
+```bash
+rm -rf /tmp/lukk17-schemas
+```
+
+Windows (PowerShell 7+):
+
+```powershell
+git clone --depth 1 https://github.com/Lukk17/openspec-schemas $env:TEMP\lukk17-schemas
+```
+
+```powershell
+Copy-Item -Recurse $env:TEMP\lukk17-schemas\e2e-runbooks openspec\schemas\
+```
+
+```powershell
+Remove-Item -Recurse -Force $env:TEMP\lukk17-schemas
+```
+
+Use it per-change:
+
+```bash
+openspec new --schema e2e-runbooks "add weather-mcp capability test"
+```
+
+Or set as the project default in `openspec/config.yaml`:
+
+```yaml
+default_schema: e2e-runbooks
+```
+
+The methodology behind the schema is documented in the [`e2e-runbooks` skill](../.agents/skills/e2e-runbooks/SKILL.md);
+the schema operationalises the same methodology for OpenSpec users. Either works alone, both reinforce each other.
 
 #### Tool directories reference
 
