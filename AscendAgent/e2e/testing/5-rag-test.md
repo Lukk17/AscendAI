@@ -169,6 +169,12 @@ For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that 
 - `AscendAgent/e2e/fixtures/banana-price-poland.pdf`
 - `AscendAgent/e2e/fixtures/pierogi-recipe.docx`
 
+## Concurrency
+
+- **Mutates:** MinIO bucket `knowledge-base` (`markdown/markdown-canary.md`, `documents/banana-price-poland.pdf`, `documents/pierogi-recipe.docx`); Qdrant collection `ascendai-1536` (filtered by these `source` values); Postgres `int_metadata_store` (rows for these object keys); Postgres `chat_history` (user_id=`frostyRagTest`); Redis key `chat:frostyRagTest`
+- **Conflicts with:** `6-attach-sources`, `7-rag-dedup` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
+- **Serial:** false
+
 ## Optional: attach source files
 
 The `attachSources=true` form field opts the response into a `sources` array of presigned MinIO URLs for the documents that grounded the answer. Default is `false` (response shape unchanged).

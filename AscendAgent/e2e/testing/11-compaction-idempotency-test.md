@@ -81,3 +81,9 @@ Expect exactly `1` (still only the original seeded summary row, no new one).
 
 - `AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-idempotency.sql`
 - `AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-idempotency.redis`
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyCompactionIdempotencyTest`); Redis key `chat:frostyCompactionIdempotencyTest`
+- **Conflicts with:** none
+- **Serial:** false

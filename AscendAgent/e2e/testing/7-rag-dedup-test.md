@@ -97,3 +97,9 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-dedup-prompt.y
 
 - `AscendAgent/e2e/fixtures/dedup-pierogi-helena.md`
 - `AscendAgent/e2e/fixtures/dedup-pierogi-grandma.md`
+
+## Concurrency
+
+- **Mutates:** MinIO bucket `knowledge-base` (`markdown/dedup-pierogi-helena.md`, `markdown/dedup-pierogi-grandma.md`); Qdrant collection `ascendai-1536` (dedup `source` filters); Postgres `int_metadata_store` (dedup keys); Postgres `chat_history` (user_id=`frostyRagDedupTest`); Redis key `chat:frostyRagDedupTest`
+- **Conflicts with:** `5-rag`, `6-attach-sources` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
+- **Serial:** false

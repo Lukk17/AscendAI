@@ -48,8 +48,8 @@ Capture response 2's `metadata.usage`. Note `cacheReadInputTokens` (expected: > 
 
 ## Expected
 
-- After step 1: HTTP 200. Response `metadata.usage.cacheCreationInputTokens > 0` (Anthropic charges to populate the cache; this is a one-time per-window cost). `cacheReadInputTokens` is 0 or absent.
-- After step 2: HTTP 200. Response `metadata.usage.cacheReadInputTokens > 0`. The read count should approximate step-1's `cacheCreationInputTokens` (the cached chunk hasn't grown).
+- After step 1: HTTP 200. Response `metadata.usage.cacheCreationInputTokens > 0` OR `metadata.usage.cacheReadInputTokens > 0`. Anthropic charges to populate the cache on a true cold start; on a warm-cache cold-test (a previous identical prompt fired within the last ~5 minutes, e.g. during in-session iteration on the test itself) you observe a read instead of a creation. Either path proves the `cache_control` directive was accepted.
+- After step 2: HTTP 200. Response `metadata.usage.cacheReadInputTokens > 0`. The read count should approximate step-1's `cacheCreationInputTokens + cacheReadInputTokens` total (the cached chunk hasn't grown between the two calls).
 - Both responses succeed structurally.
 
 If `cacheReadInputTokens` is 0 on step 2:
@@ -61,3 +61,9 @@ If `cacheReadInputTokens` is 0 on step 2:
 ## Fixtures
 
 (none)
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyPromptCacheAnthropicTest`); Redis key `chat:frostyPromptCacheAnthropicTest`
+- **Conflicts with:** none
+- **Serial:** false

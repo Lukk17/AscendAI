@@ -55,3 +55,9 @@ The response body's `content` field is NOT a refusal like "I don't see an image"
 ## Fixtures
 
 - `AscendAgent/e2e/fixtures/image.png`: pick something with one obvious correct answer (a specific subject, a unique logo, an annotated chart) so the description can be visually verified.
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyImageDescriptionTest`); Redis key `chat:frostyImageDescriptionTest`
+- **Conflicts with:** none
+- **Serial:** false

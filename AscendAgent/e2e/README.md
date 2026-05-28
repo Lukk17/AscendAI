@@ -142,6 +142,57 @@ individual spec also has explicit prereq checks the runner executes before start
 
 ---
 
+### Claude Code permission allowlist (local-only setup)
+
+If you drive the suite via Claude Code's `e2e-runner` subagent, the sandbox classifier will block the spec-prescribed
+reset commands (`docker exec ... mc rm`, `docker exec postgres psql -c "DELETE ..."`, `curl -X POST
+http://localhost:6333/.../points/delete`) unless you allowlist them in your per-project local settings. Without the
+allowlist, the runner finishes but the test verdicts are environmental noise: leaked state from the previous wave
+contaminates the result, not the product behaviour.
+
+The allowlist lives in [.claude/settings.local.json](../../.claude/settings.local.json), which is gitignored, so the
+list is *not* shared via the repo. Each developer adds the same shapes to their own local copy. The shapes the e2e
+specs need:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker exec minio mc *)",
+      "Bash(docker exec minio sh -c *)",
+      "Bash(docker exec -i minio *)",
+      "Bash(docker exec postgres psql *)",
+      "Bash(docker exec -i postgres psql *)",
+      "Bash(docker exec redis redis-cli *)",
+      "Bash(docker exec -i redis redis-cli *)",
+      "Bash(docker exec ascend-agent printenv *)",
+      "Bash(docker exec ascend-agent ls *)",
+      "Bash(curl -fsS http://localhost:6333/*)",
+      "Bash(curl -X POST http://localhost:6333/*)",
+      "Bash(curl -fsS http://localhost:9070/*)",
+      "Bash(curl -fsS http://localhost:9917/*)",
+      "Bash(curl -X POST http://localhost:9917/*)",
+      "Bash(curl -s -X POST http://localhost:9917/*)",
+      "Bash(curl -fsS http://localhost:9998/*)",
+      "Bash(curl -fsS http://localhost:7020/*)",
+      "Bash(bru --version)",
+      "Bash(bru run *)",
+      "Bash(cd docs/api/request/AscendAI && bru run *)"
+    ]
+  }
+}
+```
+
+Each entry is narrowed to a specific container (`minio`, `postgres`, `redis`, `ascend-agent`) or a specific localhost
+port (`:6333` Qdrant, `:9070` MinIO, `:9917` AscendAgent, `:9998` WeatherMCP, `:7020` AscendMemory). No blanket
+`docker exec *` or `curl *`. If you only run a subset of tests, you can prune.
+
+If you skip this setup, the suite still runs but environmental failures (leaked fixtures re-indexed as extra
+sources, partially-completed resets etc.) will look like product regressions in the runner reports. Always check the
+runner's `notes:` block for classifier-blocked commands before treating a FAIL as a real bug.
+
+---
+
 ### Running tests
 
 Install the Bruno CLI once.

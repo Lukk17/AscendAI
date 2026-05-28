@@ -9,9 +9,9 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import java.util.List;
 
 @RequiredArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode
 @Getter
-public class CustomMetadata extends ChatResponseMetadata {
+public class CustomMetadata {
 
     @JsonUnwrapped
     private final ChatResponseMetadata delegate;

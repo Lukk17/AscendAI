@@ -57,3 +57,9 @@ The response body's `content` field does NOT contain refusal phrases like "I can
 ## Fixtures
 
 None.
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyWeatherMcpTest`); Redis key `chat:frostyWeatherMcpTest`
+- **Conflicts with:** none
+- **Serial:** false

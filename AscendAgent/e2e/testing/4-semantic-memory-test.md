@@ -131,3 +131,9 @@ The response body's `content` field is NOT a refusal like "I don't know your nam
 ## Fixtures
 
 None.
+
+## Concurrency
+
+- **Mutates:** Qdrant collections `ascend_memory_*` (user-scoped: `frostySemanticMemoryTest`); Postgres `chat_history` (user_id=`frostySemanticMemoryTest`); Redis key `chat:frostySemanticMemoryTest`
+- **Conflicts with:** none
+- **Serial:** false

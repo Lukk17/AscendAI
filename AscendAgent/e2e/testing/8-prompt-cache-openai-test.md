@@ -62,3 +62,9 @@ If `cachedTokens` is 0 on step 2 with promptTokens ≥ 1024:
 ## Fixtures
 
 (none. Uses no MinIO / Qdrant content; the prompt is self-contained.)
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyPromptCacheOpenaiTest`); Redis key `chat:frostyPromptCacheOpenaiTest`
+- **Conflicts with:** none
+- **Serial:** false

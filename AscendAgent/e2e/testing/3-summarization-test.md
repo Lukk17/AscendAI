@@ -63,3 +63,9 @@ The response body's `content` field is NOT a refusal like "the document context 
 ## Fixtures
 
 - `AscendAgent/e2e/fixtures/argent-saga-chronicle.pdf` (with the `.md` source alongside for regeneration).
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostySummarizationTest`); Redis key `chat:frostySummarizationTest`
+- **Conflicts with:** none
+- **Serial:** false

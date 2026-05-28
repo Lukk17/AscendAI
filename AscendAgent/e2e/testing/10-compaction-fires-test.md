@@ -103,3 +103,9 @@ Expect exactly `8`.
 
 - `AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-fires.sql`
 - `AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-fires.redis`
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyCompactionFiresTest`); Redis key `chat:frostyCompactionFiresTest`
+- **Conflicts with:** none
+- **Serial:** false

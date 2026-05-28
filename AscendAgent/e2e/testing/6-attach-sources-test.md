@@ -149,3 +149,9 @@ curl -fsS -o /tmp/attach-sources-payload "<paste the downloadUrl from step 3 her
 ## Fixtures
 
 - `AscendAgent/e2e/fixtures/pierogi-recipe.docx` (re-used from the rag suite)
+
+## Concurrency
+
+- **Mutates:** MinIO bucket `knowledge-base` (`documents/pierogi-recipe.docx`, plus prophylactic wipe of `markdown/dedup-pierogi-helena.md` and `markdown/dedup-pierogi-grandma.md`); Qdrant collection `ascendai-1536` (pierogi `source` filters); Postgres `int_metadata_store` (pierogi keys); Postgres `chat_history` (user_id=`frostyAttachSourcesTest`); Redis key `chat:frostyAttachSourcesTest`
+- **Conflicts with:** `5-rag`, `7-rag-dedup` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
+- **Serial:** false

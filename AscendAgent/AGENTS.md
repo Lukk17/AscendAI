@@ -43,7 +43,7 @@ Quick invocation:
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
 ```
 
-See [`e2e/README.md`](e2e/README.md) for the full contract, capability matrix, and how to add a new test.
+See [`e2e/README.md`](e2e/README.md) for the full contract, capability matrix, and how to add a new test. If you drive the suite via Claude Code's `e2e-runner` subagent, allowlist the spec-prescribed reset commands in your local [`.claude/settings.local.json`](../.claude/settings.local.json) per the "Claude Code permission allowlist" section of `e2e/README.md`. Without the allowlist the runner finishes but verdicts are environmental noise from leaked state.
 
 ## Architecture
 
