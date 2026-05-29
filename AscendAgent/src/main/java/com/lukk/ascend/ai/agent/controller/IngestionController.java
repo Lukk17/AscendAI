@@ -31,13 +31,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Controller for handling file ingestion requests.
- * <p>
- * This controller exposes endpoints for uploading documents to be processed
- * by the ingestion pipeline.
- * </p>
- */
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -127,12 +120,6 @@ public class IngestionController {
         return ResponseEntity.ok(manualIngestionService.run(Optional.ofNullable(prefix), embeddingProvider));
     }
 
-    /**
-     * Determines the folder path based on the filename.
-     *
-     * @param filename The name of the file.
-     * @return The folder path (including trailing slash).
-     */
     private String determineFolder(String filename) {
         if (filename != null && filename.endsWith(".md")) {
             return markdownFolder + "/";

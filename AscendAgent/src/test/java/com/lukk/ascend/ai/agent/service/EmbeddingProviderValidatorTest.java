@@ -42,7 +42,7 @@ class EmbeddingProviderValidatorTest {
         // given
         setupProviderMocks(CHAT_PROVIDER_LMSTUDIO, EMBED_PROVIDER_LMSTUDIO, 768);
 
-        // when / then
+        // then
         assertThatCode(() -> validator.validate(CHAT_PROVIDER_LMSTUDIO, EMBED_PROVIDER_LMSTUDIO))
                 .doesNotThrowAnyException();
     }
@@ -53,7 +53,7 @@ class EmbeddingProviderValidatorTest {
         // given
         setupProviderMocks(CHAT_PROVIDER_GEMINI, EMBED_PROVIDER_LMSTUDIO, 768);
 
-        // when / then
+        // then
         assertThatCode(() -> validator.validate(CHAT_PROVIDER_GEMINI, EMBED_PROVIDER_LMSTUDIO))
                 .doesNotThrowAnyException();
     }
@@ -64,7 +64,7 @@ class EmbeddingProviderValidatorTest {
         // given
         setupProviderMocks(CHAT_PROVIDER_OPENAI, EMBED_PROVIDER_OPENAI, 1536);
 
-        // when / then
+        // then
         assertThatCode(() -> validator.validate(CHAT_PROVIDER_OPENAI, EMBED_PROVIDER_OPENAI))
                 .doesNotThrowAnyException();
     }
@@ -75,7 +75,7 @@ class EmbeddingProviderValidatorTest {
         // given
         setupProviderMocks(CHAT_PROVIDER_LMSTUDIO, EMBED_PROVIDER_OPENAI, 1536);
 
-        // when / then
+        // then
         assertThatThrownBy(() -> validator.validate(CHAT_PROVIDER_LMSTUDIO, EMBED_PROVIDER_OPENAI))
                 .isInstanceOf(IncompatibleEmbeddingException.class)
                 .hasMessageContaining("Chat provider 'lmstudio' is incompatible with embedding provider 'openai'");
@@ -87,7 +87,7 @@ class EmbeddingProviderValidatorTest {
         // given
         setupProviderMocks(CHAT_PROVIDER_OPENAI, EMBED_PROVIDER_LMSTUDIO, 768);
 
-        // when / then
+        // then
         assertThatThrownBy(() -> validator.validate(CHAT_PROVIDER_OPENAI, EMBED_PROVIDER_LMSTUDIO))
                 .isInstanceOf(IncompatibleEmbeddingException.class)
                 .hasMessageContaining("Chat provider 'openai' is incompatible with embedding provider 'lmstudio'");
@@ -104,7 +104,7 @@ class EmbeddingProviderValidatorTest {
         embedConfig.setDimensions(768);
         when(embeddingProviderProperties.getProviders()).thenReturn(Map.of(EMBED_PROVIDER_LMSTUDIO, embedConfig));
 
-        // when / then
+        // then
         assertThatCode(() -> validator.validate(null, null))
                 .doesNotThrowAnyException();
     }
@@ -120,7 +120,7 @@ class EmbeddingProviderValidatorTest {
         embedConfig.setDimensions(1536);
         when(embeddingProviderProperties.getProviders()).thenReturn(Map.of(EMBED_PROVIDER_OPENAI, embedConfig));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> validator.validate(null, null))
                 .isInstanceOf(IncompatibleEmbeddingException.class);
     }
@@ -132,7 +132,7 @@ class EmbeddingProviderValidatorTest {
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_GEMINI);
         when(embeddingProviderProperties.getProviders()).thenReturn(Map.of()); // No embeddings mapped
 
-        // when / then
+        // then
         assertThatThrownBy(() -> validator.validate(CHAT_PROVIDER_GEMINI, "nonexistent"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown embedding provider: 'nonexistent'");
@@ -146,7 +146,7 @@ class EmbeddingProviderValidatorTest {
         when(embeddingProviderProperties.getDefaultProvider()).thenReturn("nonexistent");
         when(embeddingProviderProperties.getProviders()).thenReturn(Map.of());
 
-        // when / then
+        // then
         assertThatThrownBy(() -> validator.validate(null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown embedding provider: 'nonexistent'");

@@ -90,10 +90,7 @@ public class SemanticMemoryClient {
         log.info("Successfully inserted memory fact for user: '{}'", userId);
     }
 
-    /**
-     * Removes every memory for the given user via {@code POST /api/v1/memory/wipe}.
-     * Body is snake_case to match the FastAPI contract on the AscendMemory side.
-     */
+    // Body is snake_case to match the FastAPI contract on the AscendMemory side.
     public void wipeUserMemory(String userId, String embeddingProvider) {
         if (isMissingUserId(userId, "wipeUserMemory")) {
             return;
@@ -118,9 +115,6 @@ public class SemanticMemoryClient {
         }
     }
 
-    /**
-     * Deletes a single memory by its mem0 id via {@code DELETE /api/v1/memory?memory_id=...}.
-     */
     public void deleteMemory(String userId, String memoryId, String embeddingProvider) {
         if (isMissingUserId(userId, "deleteMemory")) {
             return;

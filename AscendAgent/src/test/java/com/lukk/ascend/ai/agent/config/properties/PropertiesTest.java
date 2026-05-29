@@ -11,9 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PropertiesTest {
 
-    // -------------------------------------------------------------------------
     // Helpers
-    // -------------------------------------------------------------------------
 
     private static AiProviderProperties.ProviderConfig buildProviderConfig() {
         AiProviderProperties.ProviderConfig cfg = new AiProviderProperties.ProviderConfig();
@@ -47,9 +45,7 @@ class PropertiesTest {
         return pc;
     }
 
-    // -------------------------------------------------------------------------
     // AiProviderProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("AiProviderProperties getters return values set via setters")
@@ -79,9 +75,7 @@ class PropertiesTest {
         assertThat(got.getTimeoutSeconds()).isEqualTo(30L);
     }
 
-    // -------------------------------------------------------------------------
     // EmbeddingProviderProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("EmbeddingProviderProperties active accessors resolve the default provider")
@@ -119,9 +113,7 @@ class PropertiesTest {
         assertThatThrownBy(props::getActiveDimensions).isInstanceOf(NullPointerException.class);
     }
 
-    // -------------------------------------------------------------------------
     // RagProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("RagProperties exposes correct defaults and accepts new values via setters")
@@ -163,9 +155,7 @@ class PropertiesTest {
                 .isEqualTo(org.springframework.util.unit.DataSize.ofMegabytes(50));
     }
 
-    // -------------------------------------------------------------------------
     // SemanticMemoryProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("SemanticMemoryProperties exposes correct defaults and accepts updated values")
@@ -189,9 +179,7 @@ class PropertiesTest {
         assertThat(props.getSearchLimit()).isEqualTo(20);
     }
 
-    // -------------------------------------------------------------------------
     // VectorStoreProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("VectorStoreProperties getters and setters work correctly for collection config")
@@ -211,9 +199,7 @@ class PropertiesTest {
         assertThat(props.getCollections().getFirst().getSize()).isEqualTo(768);
     }
 
-    // -------------------------------------------------------------------------
     // VisionCapabilityProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("VisionCapabilityProperties stores provider-to-glob-patterns map")
@@ -233,9 +219,7 @@ class PropertiesTest {
         assertThat(props.getProviders().get("anthropic")).containsExactly("claude-*");
     }
 
-    // -------------------------------------------------------------------------
     // PromptCacheProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("PromptCacheProperties master toggle and per-provider toggles interact correctly")
@@ -263,9 +247,7 @@ class PropertiesTest {
         assertThat(props.isProviderEnabled("anthropic")).isFalse();
     }
 
-    // -------------------------------------------------------------------------
     // ChatHistoryCompactionProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("ChatHistoryCompactionProperties exposes correct defaults and accepts updated values")
@@ -298,9 +280,7 @@ class PropertiesTest {
         assertThat(props.getProviderDefaults()).containsEntry("anthropic", "claude-haiku-4-5");
     }
 
-    // -------------------------------------------------------------------------
     // ChatHistoryProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("ChatHistoryProperties exposes correct defaults and accepts updated values")
@@ -333,9 +313,7 @@ class PropertiesTest {
         assertThat(props.getPostgres().isEnabled()).isFalse();
     }
 
-    // -------------------------------------------------------------------------
     // IngestionUploadProperties
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("IngestionUploadProperties defaults to empty allowed-mime list and accepts new values")

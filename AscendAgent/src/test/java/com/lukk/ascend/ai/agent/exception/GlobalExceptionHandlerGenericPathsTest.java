@@ -14,7 +14,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
-class GlobalExceptionHandlerExtraTest {
+class GlobalExceptionHandlerGenericPathsTest {
 
     @InjectMocks
     private GlobalExceptionHandler handler;

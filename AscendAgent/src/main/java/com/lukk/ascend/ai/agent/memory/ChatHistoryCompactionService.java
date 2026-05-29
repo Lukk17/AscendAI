@@ -22,6 +22,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 @Slf4j
@@ -253,10 +254,7 @@ public class ChatHistoryCompactionService {
     }
 
     int contextWindow(String provider) {
-        if (provider == null) {
-            return CONTEXT_WINDOW_DEFAULTS.getOrDefault("lmstudio", 8_192);
-        }
-        return CONTEXT_WINDOW_DEFAULTS.getOrDefault(provider, 8_192);
+        return CONTEXT_WINDOW_DEFAULTS.getOrDefault(Objects.requireNonNullElse(provider, "lmstudio"), 8_192);
     }
 
     ResolvedCompactionTarget resolveTarget(String primaryProvider, CompactionOverride override) {
@@ -279,7 +277,8 @@ public class ChatHistoryCompactionService {
     private record MessageDto(String role, String content) {
     }
 
-    private record CompactionDecision(int prefixCount, int tokenEstimate, boolean turnTriggered, boolean tokenTriggered) {
+    private record CompactionDecision(int prefixCount, int tokenEstimate, boolean turnTriggered,
+                                      boolean tokenTriggered) {
 
         static CompactionDecision noCompaction() {
             return new CompactionDecision(0, 0, false, false);

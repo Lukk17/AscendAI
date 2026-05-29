@@ -125,10 +125,6 @@ public class SemanticMemoryExtractor {
         log.warn("Failed to extract or insert semantic memory asynchronously for user '{}'. Reason: {}", userId, e.getMessage());
     }
 
-    /**
-     * Resolves which model to use for extraction.
-     * Priority: user's requested model > provider's configured memoryExtractionModel > null (provider default).
-     */
     private String resolveExtractionModel(String provider, String requestedModel) {
         if (StringUtils.hasText(requestedModel)) {
             return requestedModel;

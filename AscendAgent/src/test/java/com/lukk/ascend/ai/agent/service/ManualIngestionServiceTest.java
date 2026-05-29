@@ -124,7 +124,7 @@ class ManualIngestionServiceTest {
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
 
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
 
         Document processedDoc = new Document("MD Text");
@@ -157,7 +157,7 @@ class ManualIngestionServiceTest {
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(enforceMetaKey("manual-ingestion:documents/report.pdf:unknown"), anyString())).thenReturn(null);
 
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
 
         Document processedDoc = new Document("PDF Text");
@@ -224,7 +224,7 @@ class ManualIngestionServiceTest {
                 .thenReturn(null);
 
         when(s3Client.getObject(any(GetObjectRequest.class)))
-                .thenReturn(mock(ResponseInputStream.class));
+                .thenReturn(org.mockito.Mockito.<ResponseInputStream<GetObjectResponse>>mock());
         when(ingestionService.processMarkdown(any(), eq("markdown/notes.md")))
                 .thenReturn(List.of(new Document("text")));
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));
@@ -248,7 +248,7 @@ class ManualIngestionServiceTest {
                 .thenReturn(null);
 
         when(s3Client.getObject(any(GetObjectRequest.class)))
-                .thenReturn(mock(ResponseInputStream.class));
+                .thenReturn(org.mockito.Mockito.<ResponseInputStream<GetObjectResponse>>mock());
         when(ingestionService.processUnstructured(any(), eq("documents/contract.docx")))
                 .thenReturn(List.of(new Document("docx text")));
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));

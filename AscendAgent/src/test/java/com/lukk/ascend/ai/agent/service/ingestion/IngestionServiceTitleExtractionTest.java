@@ -27,14 +27,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * Extra branch coverage for IngestionService: title extraction from basename when path has no slash,
- * processUnstructured: no JSON array returned (empty title/text paths),
- * non-Title element text extraction, basename vs. path extraction.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class IngestionServiceExtraTest {
+class IngestionServiceTitleExtractionTest {
 
     @Mock
     private RestClient restClient;
@@ -51,161 +46,170 @@ class IngestionServiceExtraTest {
         ReflectionTestUtils.setField(ingestionService, "unstructuredApiPath", "/general/v0/general");
     }
 
-    // ------------------------------------------------------------------ processMarkdown
 
     @Test
     @DisplayName("processMarkdown extracts basename for title when filename has no path separator")
-    void processMarkdown_FilenameWithoutPath_UsesBareFilenameAsTitle() {
+    void processMarkdown_FilenameWithoutPath_UsesBareFilenameAsTitle() throws java.io.IOException {
         // given — markdown with no H1, filename is just "readme.md" (no slash)
         String markdown = "Some content without a heading.";
-        InputStream stream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8));
+        try (InputStream stream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8))) {
 
-        // when
-        List<Document> docs = ingestionService.processMarkdown(stream, "readme.md");
+            // when
+            List<Document> docs = ingestionService.processMarkdown(stream, "readme.md");
 
-        // then — title falls back to the full filename since there's no slash
-        assertThat(docs).hasSize(1);
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("readme.md");
+            // then — title falls back to the full filename since there's no slash
+            assertThat(docs).hasSize(1);
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("readme.md");
+        }
     }
 
     @Test
     @DisplayName("processMarkdown uses the substring after the last slash as title fallback")
-    void processMarkdown_FilenameWithSlash_UsesBasenameAsTitle() {
+    void processMarkdown_FilenameWithSlash_UsesBasenameAsTitle() throws java.io.IOException {
         // given
         String markdown = "Content without heading.";
-        InputStream stream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8));
+        try (InputStream stream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8))) {
 
-        // when
-        List<Document> docs = ingestionService.processMarkdown(stream, "folder/subfolder/notes.md");
+            // when
+            List<Document> docs = ingestionService.processMarkdown(stream, "folder/subfolder/notes.md");
 
-        // then
-        assertThat(docs).hasSize(1);
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("notes.md");
+            // then
+            assertThat(docs).hasSize(1);
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("notes.md");
+        }
     }
 
-    // ------------------------------------------------------------------ processUnstructured
 
     @Test
     @DisplayName("processUnstructured returns empty list when response is not a JSON array")
-    void processUnstructured_NonArrayResponse_ReturnsEmpty() {
+    void processUnstructured_NonArrayResponse_ReturnsEmpty() throws java.io.IOException {
         // given
         stubUnstructured("{\"error\":\"unsupported\"}");
 
-        InputStream stream = new ByteArrayInputStream("data".getBytes());
+        try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
-        // when
-        List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
+            // when
+            List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
-        // then
-        assertThat(docs).isEmpty();
+            // then
+            assertThat(docs).isEmpty();
+        }
     }
 
     @Test
     @DisplayName("processUnstructured returns empty list when JSON array is empty")
-    void processUnstructured_EmptyArray_ReturnsEmpty() {
+    void processUnstructured_EmptyArray_ReturnsEmpty() throws java.io.IOException {
         stubUnstructured("[]");
 
-        InputStream stream = new ByteArrayInputStream("data".getBytes());
+        try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
-        List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
+            List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
-        assertThat(docs).isEmpty();
+            assertThat(docs).isEmpty();
+        }
     }
 
     @Test
     @DisplayName("processUnstructured uses non-Title element text but falls back to filename for title")
-    void processUnstructured_ElementsWithoutTitleType_UsesFallbackTitle() {
+    void processUnstructured_ElementsWithoutTitleType_UsesFallbackTitle() throws java.io.IOException {
         // given — no element has type "Title", so title falls back to basename
         stubUnstructured("[{\"type\":\"NarrativeText\",\"text\":\"Some body text.\"}]");
 
-        InputStream stream = new ByteArrayInputStream("data".getBytes());
+        try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
-        List<Document> docs = ingestionService.processUnstructured(stream, "folder/report.pdf");
+            List<Document> docs = ingestionService.processUnstructured(stream, "folder/report.pdf");
 
-        assertThat(docs).hasSize(1);
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("report.pdf");
-        assertThat(docs.getFirst().getText()).contains("Some body text.");
+            assertThat(docs).hasSize(1);
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("report.pdf");
+            assertThat(docs.getFirst().getText()).contains("Some body text.");
+        }
     }
 
     @Test
     @DisplayName("processUnstructured skips elements that lack a text field")
-    void processUnstructured_ElementWithNoTextField_SkippedFromText() {
+    void processUnstructured_ElementWithNoTextField_SkippedFromText() throws java.io.IOException {
         // given — second element has no "text" field; only first contributes
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"My Title\"},{\"type\":\"Image\"}]");
 
-        InputStream stream = new ByteArrayInputStream("data".getBytes());
+        try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
-        List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
+            List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
-        assertThat(docs).hasSize(1);
-        // "Image" element contributed no text, only "My Title" row did
-        assertThat(docs.getFirst().getText()).isEqualTo("My Title\n");
+            assertThat(docs).hasSize(1);
+            // "Image" element contributed no text, only "My Title" row did
+            assertThat(docs.getFirst().getText()).isEqualTo("My Title\n");
+        }
     }
 
     @Test
     @DisplayName("processUnstructured ignores Title element with blank text when extracting title")
-    void processUnstructured_TitleElementWithBlankText_FallsBackToFilename() {
+    void processUnstructured_TitleElementWithBlankText_FallsBackToFilename() throws java.io.IOException {
         // given — Title element has blank text candidate
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"   \"},{\"type\":\"NarrativeText\",\"text\":\"body\"}]");
 
-        InputStream stream = new ByteArrayInputStream("data".getBytes());
+        try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
-        List<Document> docs = ingestionService.processUnstructured(stream, "blank_title.pdf");
+            List<Document> docs = ingestionService.processUnstructured(stream, "blank_title.pdf");
 
-        assertThat(docs).hasSize(1);
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("blank_title.pdf");
+            assertThat(docs).hasSize(1);
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("blank_title.pdf");
+        }
     }
 
     @Test
     @DisplayName("processUnstructured captures first Title element as the document title")
-    void processUnstructured_FirstTitleElement_UsedAsTitle() {
+    void processUnstructured_FirstTitleElement_UsedAsTitle() throws java.io.IOException {
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"Real Title\"},{\"type\":\"Title\",\"text\":\"Second Title\"}]");
 
-        InputStream stream = new ByteArrayInputStream("data".getBytes());
+        try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
-        List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
+            List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("Real Title");
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("Real Title");
+        }
     }
 
     @Test
     @DisplayName("processUnstructured skips Title extraction once title is already set")
-    void processUnstructured_TitleAlreadySet_SkipsSubsequentTitleElements() {
+    void processUnstructured_TitleAlreadySet_SkipsSubsequentTitleElements() throws java.io.IOException {
         // First Title is captured; second Title node should be skipped (but its text still appended)
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"First Title\"},{\"type\":\"Title\",\"text\":\"Ignored Title\"}]");
 
-        InputStream stream = new ByteArrayInputStream("data".getBytes());
+        try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
-        List<Document> docs = ingestionService.processUnstructured(stream, "two_titles.pdf");
+            List<Document> docs = ingestionService.processUnstructured(stream, "two_titles.pdf");
 
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("First Title");
-        assertThat(docs.getFirst().getText()).contains("First Title").contains("Ignored Title");
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("First Title");
+            assertThat(docs.getFirst().getText()).contains("First Title").contains("Ignored Title");
+        }
     }
 
     @Test
     @DisplayName("processUnstructured skips Title extraction when Title element has no text field")
-    void processUnstructured_TitleWithNoTextField_FallsBackToFilename() {
+    void processUnstructured_TitleWithNoTextField_FallsBackToFilename() throws java.io.IOException {
         // Title element present BUT has no "text" field -> 4th condition of compound fails -> extractedTitle stays null
         stubUnstructured("[{\"type\":\"Title\"},{\"type\":\"NarrativeText\",\"text\":\"body\"}]");
 
-        java.io.InputStream stream = new java.io.ByteArrayInputStream("data".getBytes());
-        List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
+        try (java.io.InputStream stream = new java.io.ByteArrayInputStream("data".getBytes())) {
+            List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
-        assertThat(docs).hasSize(1);
-        // Title had no text -> title falls back to basename "test.pdf"
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("test.pdf");
+            assertThat(docs).hasSize(1);
+            // Title had no text -> title falls back to basename "test.pdf"
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("test.pdf");
+        }
     }
 
     @Test
     @DisplayName("processMarkdown uses bare filename as title when filename has no path separator")
-    void processMarkdown_FilenameNoSlash_UsesFullFilename() {
+    void processMarkdown_FilenameNoSlash_UsesFullFilename() throws java.io.IOException {
         String markdown = "Some content";
-        InputStream stream = new ByteArrayInputStream(markdown.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        try (InputStream stream = new ByteArrayInputStream(markdown.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
 
-        List<Document> docs = ingestionService.processMarkdown(stream, "nopath.md");
+            List<Document> docs = ingestionService.processMarkdown(stream, "nopath.md");
 
-        assertThat(docs).hasSize(1);
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("nopath.md");
+            assertThat(docs).hasSize(1);
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("nopath.md");
+        }
     }
 
     @Test
@@ -219,13 +223,14 @@ class IngestionServiceExtraTest {
         // An H1 with blank text child -> title = blank
         // Let's test with an H1 that contains spaces only
         String markdown = "#   \n\nSome content.";
-        java.io.InputStream stream = new java.io.ByteArrayInputStream(markdown.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        try (java.io.InputStream stream = new java.io.ByteArrayInputStream(markdown.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
 
-        List<Document> docs = ingestionService.processMarkdown(stream, "test.md");
+            List<Document> docs = ingestionService.processMarkdown(stream, "test.md");
 
-        assertThat(docs).hasSize(1);
-        // H1 with just spaces produces "" title -> isBlank() = true -> use filename
-        assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("test.md");
+            assertThat(docs).hasSize(1);
+            // H1 with just spaces produces "" title -> isBlank() = true -> use filename
+            assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("test.md");
+        }
     }
 
     @Test
@@ -233,16 +238,18 @@ class IngestionServiceExtraTest {
     void processMarkdown_IOExceptionFromStream_ThrowsIngestionException() {
         // Create an InputStream that throws IOException on read
         java.io.InputStream brokenStream = new java.io.InputStream() {
-            @Override public int read() throws java.io.IOException { throw new java.io.IOException("disk error"); }
+            @Override
+            public int read() throws java.io.IOException {
+                throw new java.io.IOException("disk error");
+            }
         };
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> ingestionService.processMarkdown(brokenStream, "broken.md"))
+                        () -> ingestionService.processMarkdown(brokenStream, "broken.md"))
                 .isInstanceOf(com.lukk.ascend.ai.agent.exception.IngestionException.class)
                 .hasMessageContaining("broken.md");
     }
 
-    // ------------------------------------------------------------------ helper
 
     private void stubUnstructured(String jsonResponse) {
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);

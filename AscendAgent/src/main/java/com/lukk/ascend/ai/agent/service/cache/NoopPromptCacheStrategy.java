@@ -4,18 +4,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.util.StringUtils;
 
-public class NoopPromptCacheStrategy implements PromptCacheStrategy {
-
-    private final String providerName;
-
-    public NoopPromptCacheStrategy(String providerName) {
-        this.providerName = providerName;
-    }
-
-    @Override
-    public String providerName() {
-        return providerName;
-    }
+public record NoopPromptCacheStrategy(String providerName) implements PromptCacheStrategy {
 
     @Override
     public ChatOptions buildOptions(String model) {
@@ -24,6 +13,5 @@ public class NoopPromptCacheStrategy implements PromptCacheStrategy {
 
     @Override
     public void recordOutcome(String userId, ChatResponse response) {
-        // intentional no-op
     }
 }

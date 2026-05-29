@@ -5,6 +5,7 @@ import com.lukk.ascend.ai.agent.exception.AiGenerationException;
 import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ChatExecutorTest {
 
-    private static final String DEFAULT_USER_ID = "user1";
+    private static final String DEFAULT_USER_ID = TestConstants.DEFAULT_USER_ID;
     private static final String SYSTEM_TEXT = "You are AI";
     private static final String USER_TEXT = "Hello";
     private static final String PROVIDER = "lmstudio";
@@ -93,7 +94,8 @@ class ChatExecutorTest {
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);
 
-        AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall("1", "toolName", "toolName", "{}");
+        AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall(
+                "1", TestConstants.TEST_TOOL_NAME, TestConstants.TEST_TOOL_NAME, "{}");
         ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE, List.of(toolCall));
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
         when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
@@ -103,7 +105,7 @@ class ChatExecutorTest {
 
         // then
         assertThat(result.content()).isEqualTo(EXPECTED_RESPONSE);
-        assertThat(result.metadata().toolsUsed()).containsExactly("toolName");
+        assertThat(result.metadata().toolsUsed()).containsExactly(TestConstants.TEST_TOOL_NAME);
     }
 
     @Test
@@ -155,7 +157,7 @@ class ChatExecutorTest {
         when(mockImage.isEmpty()).thenReturn(false);
         when(mockImage.getInputStream()).thenThrow(new IOException("Corrupted IO"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> chatExecutor.execute(DEFAULT_USER_ID, SYSTEM_TEXT, USER_TEXT, List.of(), mockImage, PROVIDER, MODEL))
                 .isInstanceOf(AiGenerationException.class)
                 .hasMessageContaining("Failed to process image upload");
@@ -170,7 +172,7 @@ class ChatExecutorTest {
 
         when(chatModel.call(any(Prompt.class))).thenReturn(null);
 
-        // when / then
+        // then
         assertThatThrownBy(() -> chatExecutor.execute(DEFAULT_USER_ID, SYSTEM_TEXT, USER_TEXT, List.of(), null, PROVIDER, MODEL))
                 .isInstanceOf(AiGenerationException.class)
                 .hasMessageContaining("Received null response from ChatClient");

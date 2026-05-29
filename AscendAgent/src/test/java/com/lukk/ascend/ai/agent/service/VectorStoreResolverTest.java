@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,6 +35,7 @@ class VectorStoreResolverTest {
     @InjectMocks
     private VectorStoreResolver vectorStoreResolver;
 
+    @DisplayName("resolve return lmstudio store when explicit lmstudio")
     @Test
     void resolve_WhenExplicitLmstudio_ThenReturnLmstudioStore() {
         // given
@@ -46,6 +48,7 @@ class VectorStoreResolverTest {
         assertThat(result).isEqualTo(vectorStoreLmstudio);
     }
 
+    @DisplayName("resolve return openai store when explicit openai")
     @Test
     void resolve_WhenExplicitOpenai_ThenReturnOpenaiStore() {
         // given
@@ -58,6 +61,7 @@ class VectorStoreResolverTest {
         assertThat(result).isEqualTo(vectorStoreOpenai);
     }
 
+    @DisplayName("resolve return default store when null provider")
     @Test
     void resolve_WhenNullProvider_ThenReturnDefaultStore() {
         // given
@@ -71,6 +75,7 @@ class VectorStoreResolverTest {
         assertThat(result).isEqualTo(vectorStoreLmstudio);
     }
 
+    @DisplayName("resolve return default store when blank provider")
     @Test
     void resolve_WhenBlankProvider_ThenReturnDefaultStore() {
         // given
@@ -84,6 +89,7 @@ class VectorStoreResolverTest {
         assertThat(result).isEqualTo(vectorStoreLmstudio);
     }
 
+    @DisplayName("resolve throw illegal state exception when unknown provider")
     @Test
     void resolve_WhenUnknownProvider_ThenThrowIllegalStateException() {
         // given

@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.memory.PersistentChatMemory;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +25,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ChatHistoryServiceTest {
 
-    private static final String DEFAULT_USER_ID = "user1";
+    private static final String DEFAULT_USER_ID = TestConstants.DEFAULT_USER_ID;
 
     @Mock
     private PersistentChatMemory persistentChatMemory;

@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -35,6 +36,7 @@ class StorageServiceTest {
         ReflectionTestUtils.setField(storageService, "s3Bucket", "test-bucket");
     }
 
+    @DisplayName("upload file should call s3 put object")
     @Test
     void uploadFile_ShouldCallS3PutObject() throws IOException {
         // given
@@ -50,6 +52,7 @@ class StorageServiceTest {
         verify(s3Client, times(1)).putObject(any(PutObjectRequest.class), any(RequestBody.class));
     }
 
+    @DisplayName("upload file should throw io exception when s3 client throws")
     @Test
     void uploadFile_ShouldThrowIOException_WhenS3ClientThrows() {
         // given

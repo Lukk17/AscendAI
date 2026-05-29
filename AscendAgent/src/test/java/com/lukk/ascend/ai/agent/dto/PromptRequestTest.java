@@ -27,12 +27,22 @@ class PromptRequestTest {
         PromptRequest b = new PromptRequest("p", "i", "d");
 
         // then
-        assertThat(a).isEqualTo(b);
+        assertThat(a)
+                .isEqualTo(b)
+                .hasSameHashCodeAs(b)
+                .isNotEqualTo(null);
         assertThat(b).isEqualTo(a);
-        assertThat(a.hashCode()).isEqualTo(b.hashCode());
-        assertThat(a).isEqualTo(a);
-        assertThat(a).isNotEqualTo(null);
-        assertThat(a).isNotEqualTo("not-a-request");
+    }
+
+    @Test
+    @DisplayName("equals returns false when compared with an unrelated type")
+    void equals_ReturnsFalseAgainstUnrelatedType() {
+        // given
+        PromptRequest req = new PromptRequest("p", "i", "d");
+        Object unrelated = "not-a-request";
+
+        // then
+        assertThat(req.equals(unrelated)).isFalse();
     }
 
     @Test

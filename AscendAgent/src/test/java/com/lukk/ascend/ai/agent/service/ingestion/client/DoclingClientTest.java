@@ -81,7 +81,7 @@ class DoclingClientTest {
         when(bodySpecMock.body(any(Object.class))).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenThrow(new RestClientException("Connection Refused"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> doclingClient.process(BYTES, FILENAME))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to process document with Docling");
@@ -104,7 +104,7 @@ class DoclingClientTest {
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
         when(responseSpecMock.body(String.class)).thenReturn(invalidJson);
 
-        // when / then
+        // then
         assertThatThrownBy(() -> doclingClient.process(BYTES, FILENAME))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to parse Docling JSON response");

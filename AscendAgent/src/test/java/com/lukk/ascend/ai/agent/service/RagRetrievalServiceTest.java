@@ -52,10 +52,13 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve returns skipped result without touching vector store when RAG is disabled")
     void retrieve_WhenRagDisabled_ThenReturnsSkipped() {
+        // given
         when(ragProperties.isEnabled()).thenReturn(false);
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.context()).isEmpty();
         assertThat(result.sources()).isEmpty();
         assertThat(result.retrievalRan()).isFalse();
@@ -65,12 +68,15 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve returns empty context and ran=true when vector search returns no results")
     void retrieve_WhenSearchReturnsNoResults_ThenReturnsEmptyButRan() {
-        setupRagProperties(true, 5, 0.75, 4000);
+        // given
+        setupRagProperties(0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.context()).isEmpty();
         assertThat(result.sources()).isEmpty();
         assertThat(result.retrievalRan()).isTrue();
@@ -79,12 +85,15 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve returns empty context and ran=true when all scores are below the threshold")
     void retrieve_WhenAllScoresBelowThreshold_ThenReturnsEmptyButRan() {
-        setupRagProperties(true, 5, 0.75, 4000);
+        // given
+        setupRagProperties(0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.context()).isEmpty();
         assertThat(result.retrievalRan()).isTrue();
     }
@@ -92,13 +101,16 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve returns empty context and ran=true when the similarity search throws")
     void retrieve_WhenSimilaritySearchFails_ThenReturnsEmptyButRan() {
-        setupRagProperties(true, 5, 0.75, 4000);
+        // given
+        setupRagProperties(0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         when(vectorStore.similaritySearch(any(SearchRequest.class)))
                 .thenThrow(new RuntimeException("Qdrant offline"));
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.context()).isEmpty();
         assertThat(result.sources()).isEmpty();
         assertThat(result.retrievalRan()).isTrue();
@@ -107,15 +119,17 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve returns formatted RAG context when chunks score above the threshold")
     void retrieve_WhenScoreAboveThreshold_ThenReturnsFormattedContext() {
-        setupRagProperties(true, 5, 0.75, 4000);
+        // given
+        setupRagProperties(0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-
         Document doc1 = createDocument("Important architecture sentence one.", 0.90, Map.of("source", "manual.pdf"));
         Document doc2 = createDocument("Secondary architecture rule.", 0.82, Map.of("source", "spec.md"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc1, doc2));
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.context())
                 .contains("<rag_context>")
                 .contains("Important architecture sentence one.")
@@ -127,14 +141,16 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve truncates the context snippet when it exceeds maxContextChars")
     void retrieve_WhenMaxCharsExceeded_ThenTruncatesSnippet() {
-        setupRagProperties(true, 5, 0.75, 20);
+        // given
+        setupRagProperties(0.75, 20);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-
         Document doc = createDocument("This is a very long string that should be cut off.", 0.90, Map.of("source", "x.md"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.context()).contains("This is a very long ");
         assertThat(result.context()).doesNotContain("string that should be cut off");
     }
@@ -142,9 +158,9 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve deduplicates sources by bucket and key preserving first-seen order")
     void retrieve_DeduplicatesSourcesByBucketAndKey_PreservingFirstSeenOrder() {
-        setupRagProperties(true, 5, 0.4, 4000);
+        // given
+        setupRagProperties(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-
         Document a1 = createDocument("Chunk 1 of A.", 0.91, Map.of("source", "a.pdf"));
         Document a2 = createDocument("Chunk 2 of A.", 0.85, Map.of("source", "a.pdf"));
         Document b1 = createDocument("Chunk from B.", 0.80, Map.of("source", "b.md"));
@@ -152,8 +168,10 @@ class RagRetrievalServiceTest {
         Document c1 = createDocument("Chunk from C.", 0.70, Map.of("source", "c.txt"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(a1, a2, b1, a3, c1));
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.sources()).hasSize(3);
         assertThat(result.sources()).extracting(SourceRef::key)
                 .containsExactly("a.pdf", "b.md", "c.txt");
@@ -163,9 +181,9 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve uses explicit bucket/key/displayName/mimeType metadata over source fallback")
     void retrieve_PrefersExplicitMetadataOverFallbacks() {
-        setupRagProperties(true, 5, 0.4, 4000);
+        // given
+        setupRagProperties(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-
         Document doc = createDocument("Explicit-metadata chunk.", 0.91, Map.of(
                 "bucket", "custom-bucket",
                 "key", "folder/file.pdf",
@@ -174,8 +192,10 @@ class RagRetrievalServiceTest {
                 "source", "ignored.pdf"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.sources()).hasSize(1);
         SourceRef ref = result.sources().getFirst();
         assertThat(ref.bucket()).isEqualTo("custom-bucket");
@@ -187,15 +207,17 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve includes orphan chunks in context but omits them from sources list")
     void retrieve_TolerateChunksMissingSourceMetadata() {
-        setupRagProperties(true, 5, 0.4, 4000);
+        // given
+        setupRagProperties(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-
         Document withSource = createDocument("Has source.", 0.91, Map.of("source", "real.pdf"));
         Document noSource = createDocument("Orphan chunk.", 0.85, Map.of());
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(withSource, noSource));
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.context())
                 .contains("Has source.")
                 .contains("Orphan chunk.");
@@ -206,21 +228,23 @@ class RagRetrievalServiceTest {
     @Test
     @DisplayName("retrieve uses the basename of the key as the display name when no explicit displayName is set")
     void retrieve_DisplayNameFallsBackToBasenameOfKey() {
-        setupRagProperties(true, 5, 0.4, 4000);
+        // given
+        setupRagProperties(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-
         Document doc = createDocument("Body.", 0.91, Map.of("source", "deep/folder/path/document.pdf"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
 
+        // when
         RagRetrievalResult result = ragRetrievalService.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
+        // then
         assertThat(result.sources()).hasSize(1);
         assertThat(result.sources().getFirst().displayName()).isEqualTo("document.pdf");
     }
 
-    private void setupRagProperties(boolean enabled, int topK, double threshold, int maxChars) {
-        lenient().when(ragProperties.isEnabled()).thenReturn(enabled);
-        lenient().when(ragProperties.getTopK()).thenReturn(topK);
+    private void setupRagProperties(double threshold, int maxChars) {
+        lenient().when(ragProperties.isEnabled()).thenReturn(true);
+        lenient().when(ragProperties.getTopK()).thenReturn(5);
         lenient().when(ragProperties.getSimilarityThreshold()).thenReturn(threshold);
         lenient().when(ragProperties.getMaxContextChars()).thenReturn(maxChars);
         lenient().when(vectorStoreResolver.resolveProviderName(any(String.class))).thenReturn("ascendai-1536");

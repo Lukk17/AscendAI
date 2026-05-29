@@ -84,6 +84,8 @@ dependencies {
     // Lombok
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
 
     // Spring Boot configuration-properties metadata processor (IDE @ConfigurationProperties resolution)
     annotationProcessor(libs.spring.boot.configuration.processor)

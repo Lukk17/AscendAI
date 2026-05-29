@@ -6,6 +6,7 @@ import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryItem;
 import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
 import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ChatContextAssemblerTest {
 
-    private static final String DEFAULT_USER_ID = "user1";
+    private static final String DEFAULT_USER_ID = TestConstants.DEFAULT_USER_ID;
     private static final String DEFAULT_USER_PROMPT = "How do I build this?";
     private static final String DEFAULT_EMBEDDING_PROVIDER = "openai";
     private static final String SYSTEM_PROMPT = "You are an AI assistant.";
@@ -227,6 +228,6 @@ class ChatContextAssemblerTest {
     }
 
     private SemanticMemoryItem createMemoryItem(String text) {
-        return new SemanticMemoryItem("id1", "user1", text, 0.9d, Instant.now(), Map.of());
+        return new SemanticMemoryItem("id1", TestConstants.DEFAULT_USER_ID, text, 0.9d, Instant.now(), Map.of());
     }
 }

@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.integration;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.service.VectorStoreResolver;
@@ -121,8 +122,8 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 .andReturn();
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
-        @SuppressWarnings("unchecked")
-        List<String> keys = objectMapper.convertValue(body.get("uploaded"), List.class);
+        List<String> keys = objectMapper.convertValue(body.get("uploaded"), new TypeReference<List<String>>() {
+        });
 
         assertThat(keys).contains("markdown/notes.md", "documents/report.pdf");
         // DOCX-by-extension is rejected if Tika sniffs the synthesized bytes as plain zip,
@@ -172,8 +173,8 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 .andReturn();
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
-        @SuppressWarnings("unchecked")
-        List<String> keys = objectMapper.convertValue(body.get("uploaded"), List.class);
+        List<String> keys = objectMapper.convertValue(body.get("uploaded"), new TypeReference<List<String>>() {
+        });
 
         assertThat(keys).hasSize(1);
         String key = keys.getFirst();

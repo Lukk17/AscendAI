@@ -34,7 +34,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class PersistentChatMemoryExtraTest {
+class PersistentChatMemoryMessageMappingTest {
 
     private static final String CONVO_ID = "convo-x";
     private static final String REDIS_KEY = "chat:convo-x";
@@ -68,6 +68,7 @@ class PersistentChatMemoryExtraTest {
     @Test
     @DisplayName("get with no limit delegates to overload and returns all messages")
     void getNoLimit_DelegatesToOverloadWithMaxSize() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1))
                 .thenReturn(List.of(
@@ -75,10 +76,12 @@ class PersistentChatMemoryExtraTest {
                         "{\"role\":\"assistant\",\"content\":\"hello\"}",
                         "{\"role\":\"system\",\"content\":\"sys\"}"));
 
+        // when
         List<Message> result = memory.get(CONVO_ID);
 
+        // then
         assertThat(result).hasSize(3);
-        assertThat(result.get(0)).isInstanceOf(UserMessage.class);
+        assertThat(result.getFirst()).isInstanceOf(UserMessage.class);
         assertThat(result.get(1)).isInstanceOf(AssistantMessage.class);
         assertThat(result.get(2)).isInstanceOf(SystemMessage.class);
     }
@@ -86,12 +89,15 @@ class PersistentChatMemoryExtraTest {
     @Test
     @DisplayName("get falls back to UserMessage when message role is unrecognized")
     void get_WhenUnknownRole_ThenFallsBackToUserMessage() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1))
                 .thenReturn(List.of("{\"role\":\"weird\",\"content\":\"meh\"}"));
 
+        // when
         List<Message> result = memory.get(CONVO_ID, 5);
 
+        // then
         assertThat(result).hasSize(1);
         assertThat(result.getFirst()).isInstanceOf(UserMessage.class);
         assertThat(result.getFirst().getText()).isEqualTo("meh");
@@ -100,10 +106,13 @@ class PersistentChatMemoryExtraTest {
     @Test
     @DisplayName("add sets TTL on the Redis key after pushing the message")
     void add_AppliesTtlOnRedisKeyAfterPush() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
+        // when
         memory.add(CONVO_ID, List.of(new UserMessage("hello")));
 
+        // then
         verify(listOperations).rightPush(eq(REDIS_KEY), any());
         verify(redisTemplate).expire(eq(REDIS_KEY), eq(Duration.ofHours(24)));
     }
@@ -111,15 +120,17 @@ class PersistentChatMemoryExtraTest {
     @Test
     @DisplayName("get sets TTL on Redis key when populating cache from Postgres")
     void getFromPostgres_AppliesTtlOnRedisCachePopulation() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1)).thenReturn(List.of());
-
         com.lukk.ascend.ai.agent.model.ChatHistory row = new com.lukk.ascend.ai.agent.model.ChatHistory(
                 1L, CONVO_ID, "user", "from-db", java.time.LocalDateTime.now());
         when(repository.findRecentHistory(CONVO_ID, 5)).thenReturn(List.of(row));
 
+        // when
         memory.get(CONVO_ID, 10);
 
+        // then
         verify(listOperations).rightPushAll(eq(REDIS_KEY), org.mockito.ArgumentMatchers.<java.util.Collection<String>>any());
         verify(redisTemplate).expire(eq(REDIS_KEY), eq(Duration.ofHours(24)));
     }
@@ -127,10 +138,12 @@ class PersistentChatMemoryExtraTest {
     @Test
     @DisplayName("add wraps Redis exception in ServiceException")
     void add_WhenRedisThrows_ThenWrapsInServiceException() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         doThrow(new RuntimeException("redis down"))
                 .when(listOperations).rightPush(eq(REDIS_KEY), any());
 
+        // then
         assertThatThrownBy(() -> memory.add(CONVO_ID, List.of(new UserMessage("x"))))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("Failed to add to chat memory");
@@ -139,8 +152,10 @@ class PersistentChatMemoryExtraTest {
     @Test
     @DisplayName("persistToDb swallows repository failures silently")
     void persistToDb_SwallowsRepositoryFailure() {
+        // given
         doThrow(new RuntimeException("db down")).when(repository).save(any());
 
+        // then
         memory.persistToDb(CONVO_ID, new UserMessage("text"));
     }
 
@@ -220,56 +235,68 @@ class PersistentChatMemoryExtraTest {
     @Test
     @DisplayName("add calls maybeCompact with the supplied provider and override after persisting")
     void add_InvokesMaybeCompactAfterPersistence() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
+        // when
         memory.add(CONVO_ID, List.of(new UserMessage("hello")), "anthropic", new CompactionOverride("openai", "gpt-4o-mini"));
 
+        // then
         verify(compactionService).maybeCompact(eq(CONVO_ID), eq("anthropic"), eq(new CompactionOverride("openai", "gpt-4o-mini")));
     }
 
     @Test
     @DisplayName("add swallows compaction exceptions so the user turn is never broken")
     void add_WhenMaybeCompactThrows_ExceptionIsSwallowed() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         doThrow(new RuntimeException("compaction blew up"))
                 .when(compactionService).maybeCompact(any(), any(), any());
 
-        // Must not throw — compaction failures never break the user's turn.
+        // then — compaction failures never break the user's turn
         memory.add(CONVO_ID, List.of(new UserMessage("hi")));
     }
 
     @Test
     @DisplayName("two-argument add delegates to four-argument overload with null provider and EMPTY override")
     void add_TwoArgOverload_DelegatesToFourArgWithNullProviderAndEmptyOverride() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
+        // when
         memory.add(CONVO_ID, List.of(new UserMessage("hi")));
 
+        // then
         verify(compactionService).maybeCompact(eq(CONVO_ID), eq(null), eq(CompactionOverride.EMPTY));
     }
 
     @Test
     @DisplayName("add trims Redis list to the larger of maxSize and keepRecentTurns+1 when compaction is enabled")
     void add_RedisTrim_UsesEffectiveCacheSizeWhenCompactionEnabled() {
+        // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         compactionProperties.setEnabled(true);
         compactionProperties.setKeepRecentTurns(8);
         properties.setMaxSize(5);
 
+        // when
         memory.add(CONVO_ID, List.of(new UserMessage("hello")));
 
-        // effective = max(5, 8 + 1) = 9 → trim to 0..8
+        // then — effective = max(5, 8 + 1) = 9 → trim to 0..8
         verify(listOperations).trim(REDIS_KEY, 0, 8);
     }
 
     @Test
     @DisplayName("clear always attempts Redis delete even when the Redis backend is disabled")
     void clear_AlwaysAttemptsRedisDelete_EvenWhenRedisDisabled() {
+        // given
         properties.getRedis().setEnabled(false);
         properties.getPostgres().setEnabled(false);
 
+        // when
         memory.clear(CONVO_ID);
 
+        // then
         verify(redisTemplate).delete(REDIS_KEY);
     }
 }

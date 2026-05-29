@@ -114,7 +114,6 @@ public class ChatModelResolver {
                 .build();
     }
 
-    @SuppressWarnings("null")
     private ClientHttpRequestFactory buildRequestFactory(Long timeoutSeconds, boolean isHttp1Required) {
         Duration timeout = Duration.ofSeconds(
                 Optional.ofNullable(timeoutSeconds).orElse(DEFAULT_READ_TIMEOUT_SECONDS)

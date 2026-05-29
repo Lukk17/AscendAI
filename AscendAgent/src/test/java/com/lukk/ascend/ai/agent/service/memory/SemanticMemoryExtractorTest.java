@@ -14,6 +14,7 @@ import com.lukk.ascend.ai.agent.service.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,7 +44,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SemanticMemoryExtractorTest {
 
-    private static final String DEFAULT_USER_ID = "user1";
+    private static final String DEFAULT_USER_ID = TestConstants.DEFAULT_USER_ID;
     private static final String DEFAULT_USER_TEXT = "My dog is named Rex";
     private static final String DEFAULT_PROVIDER = "lmstudio";
     private static final String DEFAULT_EMBEDDING_PROVIDER = "lmstudio";

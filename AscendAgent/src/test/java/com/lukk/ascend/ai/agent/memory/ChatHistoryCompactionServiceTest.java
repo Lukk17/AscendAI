@@ -7,6 +7,7 @@ import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
 import com.lukk.ascend.ai.agent.service.ChatModelResolver;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ChatHistoryCompactionServiceTest {
 
-    private static final String CONVERSATION_ID = "user1";
+    private static final String CONVERSATION_ID = TestConstants.DEFAULT_USER_ID;
     private static final String PRIMARY_PROVIDER = "anthropic";
 
     @Mock
@@ -51,7 +52,6 @@ class ChatHistoryCompactionServiceTest {
 
     private ChatHistoryCompactionProperties compactionProperties;
     private ChatHistoryProperties historyProperties;
-    private AiProviderProperties aiProviderProperties;
     private ChatHistoryCompactionService service;
 
     @BeforeEach
@@ -68,7 +68,7 @@ class ChatHistoryCompactionServiceTest {
 
         historyProperties = new ChatHistoryProperties();
 
-        aiProviderProperties = new AiProviderProperties();
+        AiProviderProperties aiProviderProperties = new AiProviderProperties();
         aiProviderProperties.setDefaultProvider("anthropic");
 
         service = new ChatHistoryCompactionService(compactionProperties, historyProperties, repository,
@@ -78,31 +78,40 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("maybeCompact does nothing when compaction is disabled by master toggle")
     void maybeCompact_DisabledByMaster_NoLlmCall() {
+        // given
         compactionProperties.setEnabled(false);
 
+        // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
 
+        // then
         verifyNoInteractions(repository, redisTemplate, chatModelResolver, transactionTemplate);
     }
 
     @Test
     @DisplayName("maybeCompact does nothing when both Redis and Postgres backends are disabled")
     void maybeCompact_BothBackendsDisabled_NoLlmCall() {
+        // given
         historyProperties.getRedis().setEnabled(false);
         historyProperties.getPostgres().setEnabled(false);
 
+        // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
 
+        // then
         verifyNoInteractions(repository, redisTemplate, chatModelResolver, transactionTemplate);
     }
 
     @Test
     @DisplayName("maybeCompact skips LLM call when history is below turn and token thresholds")
     void maybeCompact_BelowTurnTriggerAndBelowTokenTrigger_NoLlmCall() {
+        // given
         when(repository.findAllHistoryOrdered(CONVERSATION_ID)).thenReturn(buildHistory(5));
 
+        // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
 
+        // then
         verifyNoInteractions(chatModelResolver, transactionTemplate);
         verify(redisTemplate, never()).opsForList();
     }
@@ -110,34 +119,38 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("maybeCompact attempts to invoke chat model when history exceeds turn trigger")
     void maybeCompact_AboveTurnTriggerWithoutSummary_TriesToInvokeChatModel() {
+        // given
         when(repository.findAllHistoryOrdered(CONVERSATION_ID)).thenReturn(buildHistory(25));
         when(chatModelResolver.resolve("anthropic")).thenThrow(new IllegalArgumentException("provider unavailable in unit test"));
 
+        // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
 
-        // Trigger fired and we tried to resolve the model.
+        // then — trigger fired and we tried to resolve the model; no persistence (LLM call failed)
         verify(chatModelResolver).resolve("anthropic");
-        // No persistence happens because the LLM call failed; service swallows.
         verifyNoInteractions(transactionTemplate);
     }
 
     @Test
     @DisplayName("maybeCompact skips LLM call when history already has a summary and raw turns are below trigger")
     void maybeCompact_AlreadySummarisedAndBelowTriggerWithoutTheSummary_NoLlmCall() {
-        // history has 1 summary + 18 raw turns -> turns(history) - 1 = 18 < 20 => skip
+        // given — 1 summary + 18 raw turns -> turns(history) - 1 = 18 < 20 => skip
         List<ChatHistory> hist = new ArrayList<>();
         hist.add(summary());
         hist.addAll(buildHistory(18));
         when(repository.findAllHistoryOrdered(CONVERSATION_ID)).thenReturn(hist);
 
+        // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
 
+        // then
         verifyNoInteractions(chatModelResolver, transactionTemplate);
     }
 
     @Test
     @DisplayName("resolveTarget uses primary provider default model when no override is set")
     void resolveTarget_NoOverride_UsesPrimaryProviderDefault() {
+        // then
         var t = service.resolveTarget("anthropic", CompactionOverride.EMPTY);
 
         assertThat(t.provider()).isEqualTo("anthropic");
@@ -147,6 +160,7 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("resolveTarget uses override provider's default model when provider is overridden")
     void resolveTarget_OverrideProviderOnly_UsesOverrideProviderDefault() {
+        // then
         var t = service.resolveTarget("anthropic", new CompactionOverride("openai", null));
 
         assertThat(t.provider()).isEqualTo("openai");
@@ -156,6 +170,7 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("resolveTarget uses primary provider with overridden model when only model is overridden")
     void resolveTarget_OverrideModelOnly_UsesPrimaryProviderWithOverrideModel() {
+        // then
         var t = service.resolveTarget("anthropic", new CompactionOverride(null, "claude-opus-4-6"));
 
         assertThat(t.provider()).isEqualTo("anthropic");
@@ -165,6 +180,7 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("resolveTarget uses both overridden provider and model when both are set")
     void resolveTarget_BothOverrides_UsesBoth() {
+        // then
         var t = service.resolveTarget("anthropic", new CompactionOverride("openai", "gpt-5.4"));
 
         assertThat(t.provider()).isEqualTo("openai");
@@ -174,6 +190,7 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("contextWindow returns known default token counts for all supported providers")
     void contextWindow_KnownProvider_ReturnsKnownDefault() {
+        // then
         assertThat(service.contextWindow("anthropic")).isEqualTo(200_000);
         assertThat(service.contextWindow("openai")).isEqualTo(128_000);
         assertThat(service.contextWindow("gemini")).isEqualTo(1_000_000);
@@ -183,6 +200,7 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("contextWindow falls back to 8192 safe default for null or unknown provider")
     void contextWindow_UnknownOrNull_FallsBackToLocalSafeDefault() {
+        // then
         assertThat(service.contextWindow(null)).isEqualTo(8_192);
         assertThat(service.contextWindow("unknown-provider")).isEqualTo(8_192);
     }
@@ -190,31 +208,36 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("estimateTokens approximates token count as total chars divided by four")
     void estimateTokens_ApproximatesByCharsOverFour() {
+        // given
         List<ChatHistory> hist = List.of(
                 row("user", "1234"),
                 row("assistant", "12345678"));
 
+        // then
         assertThat(service.estimateTokens(hist)).isEqualTo(1 + 2);
     }
 
     @Test
     @DisplayName("maybeCompact swallows any exception so the caller's turn is never broken")
     void maybeCompact_WhenAnyExceptionThrows_Swallowed() {
+        // given
         when(repository.findAllHistoryOrdered(CONVERSATION_ID))
                 .thenThrow(new RuntimeException("postgres down"));
 
-        // Must not throw.
+        // then
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
     }
 
     @Test
     @DisplayName("maybeCompact treats null CompactionOverride the same as EMPTY")
     void maybeCompact_WhenOverrideIsNull_TreatedAsEmpty() {
+        // given
         when(repository.findAllHistoryOrdered(CONVERSATION_ID)).thenReturn(buildHistory(5));
 
+        // when — 5 turns, well below trigger -> no resolution, no LLM
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, null);
 
-        // 5 turns, well below trigger -> no resolution, no LLM
+        // then
         verifyNoInteractions(chatModelResolver);
     }
 

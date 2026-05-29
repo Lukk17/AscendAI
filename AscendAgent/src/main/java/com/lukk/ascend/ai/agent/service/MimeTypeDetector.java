@@ -26,16 +26,6 @@ public class MimeTypeDetector {
 
     private final Tika tika = new Tika();
 
-    /**
-     * Returns the detected MIME type. Reads at most the first chunk of bytes
-     * (Tika's default mark limit), so this is safe to call before the upload
-     * is committed to S3.
-     *
-     * @param file              multipart file the client is uploading
-     * @param sanitizedFilename filename after {@code IngestionSecurity.sanitizeFilename},
-     *                          used as a hint when bytes alone are ambiguous
-     * @return detected MIME, lowercase. Never null.
-     */
     public String detect(MultipartFile file, String sanitizedFilename) {
         try (InputStream stream = file.getInputStream()) {
             Metadata metadata = new Metadata();

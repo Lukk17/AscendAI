@@ -65,7 +65,6 @@ class ManualIngestionServiceIOExceptionTest {
 
     @Test
     @DisplayName("ingestObject catches IngestionException from stream and increments failed counter")
-    @SuppressWarnings("unchecked")
     void ingestObject_IngestionExceptionFromProcessMarkdown_IncrementsFailedCounter() throws Exception {
         // given
         S3Object obj = S3Object.builder().key("markdown/broken.md").lastModified(Instant.now()).build();
@@ -73,7 +72,7 @@ class ManualIngestionServiceIOExceptionTest {
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
 
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
 
         // Make processMarkdown throw IngestionException -> caught by IngestionException block
@@ -90,7 +89,6 @@ class ManualIngestionServiceIOExceptionTest {
 
     @Test
     @DisplayName("ingestObject rethrows as IngestionException when ResponseInputStream close throws IOException")
-    @SuppressWarnings("unchecked")
     void ingestObject_IOExceptionOnStreamClose_WrapsAndRethrows() throws Exception {
         // given — a ResponseInputStream whose close() throws IOException, triggering the IOException catch
         S3Object obj = S3Object.builder().key("markdown/broken.md").lastModified(Instant.now()).build();
@@ -98,7 +96,7 @@ class ManualIngestionServiceIOExceptionTest {
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
 
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
 
         // processMarkdown succeeds (returns docs), but then close() throws IOException

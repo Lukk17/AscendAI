@@ -19,11 +19,5 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "app.ai.vision")
 public class VisionCapabilityProperties {
 
-    /**
-     * provider key (lmstudio / openai / anthropic / gemini / minimax) → list of
-     * model name globs. A request with an attached image is allowed only if the
-     * resolved provider/model pair matches one of the globs for that provider.
-     * Mutable map so Spring's relaxed binder can populate entries from YAML.
-     */
     private Map<String, List<String>> providers = new LinkedHashMap<>();
 }

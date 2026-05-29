@@ -23,12 +23,8 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Extra branch coverage for DocumentRouter: image routing to PaddleOCR,
- * legacy unstructured-type extensions, null/no-dot filename, markdown routing.
- */
 @ExtendWith(MockitoExtension.class)
-class DocumentRouterExtraTest {
+class DocumentRouterFileTypeRoutingTest {
 
     @Mock
     private IngestionService ingestionService;

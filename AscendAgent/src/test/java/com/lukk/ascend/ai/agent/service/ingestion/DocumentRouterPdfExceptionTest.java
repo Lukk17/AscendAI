@@ -46,16 +46,14 @@ class DocumentRouterPdfExceptionTest {
     @Test
     @DisplayName("routeAndProcess throws DocumentRoutingException when PDF page processing task fails")
     void routeAndProcess_PageProcessingTaskFails_ThrowsDocumentRoutingException() throws IOException {
-        // Set text threshold low so text-page routes to Docling
+        // given — set text threshold low so text-page routes to Docling
         ReflectionTestUtils.setField(documentRouter, "pdfMinTextThresholdPerPage", 0);
         ReflectionTestUtils.setField(documentRouter, "pdfParallelPages", 1);
-
         byte[] pdfBytes = createSinglePagePdf();
-
-        // Make docling throw so the CompletableFuture fails -> ExecutionException
         when(doclingClient.process(any(byte[].class), anyString()))
                 .thenThrow(new RuntimeException("docling service down"));
 
+        // then
         assertThatThrownBy(() -> documentRouter.routeAndProcess(pdfBytes, "test.pdf", "application/pdf"))
                 .isInstanceOf(DocumentRoutingException.class);
     }
@@ -63,15 +61,14 @@ class DocumentRouterPdfExceptionTest {
     @Test
     @DisplayName("routeAndProcess throws DocumentRoutingException when PaddleOCR page task fails")
     void routeAndProcess_PaddleOcrPageFails_ThrowsDocumentRoutingException() throws IOException {
-        // High threshold so page routes to PaddleOCR
+        // given — high threshold so page routes to PaddleOCR
         ReflectionTestUtils.setField(documentRouter, "pdfMinTextThresholdPerPage", 10_000);
         ReflectionTestUtils.setField(documentRouter, "pdfParallelPages", 1);
-
         byte[] pdfBytes = createSinglePagePdf();
-
         when(paddleOcrClient.process(any(byte[].class), anyString(), isNull()))
                 .thenThrow(new RuntimeException("paddle service down"));
 
+        // then
         assertThatThrownBy(() -> documentRouter.routeAndProcess(pdfBytes, "test.pdf", "application/pdf"))
                 .isInstanceOf(DocumentRoutingException.class);
     }

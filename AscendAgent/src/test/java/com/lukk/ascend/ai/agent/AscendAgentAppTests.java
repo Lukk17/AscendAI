@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent;
 
 import com.lukk.ascend.ai.agent.test.BaseIntegrationTest;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -12,6 +13,7 @@ class AscendAgentAppTests extends BaseIntegrationTest {
     @Autowired
     private ApplicationContext applicationContext;
 
+    @DisplayName("context loads")
     @Test
     void contextLoads() {
         assertNotNull(applicationContext, "Application context should load successfully");

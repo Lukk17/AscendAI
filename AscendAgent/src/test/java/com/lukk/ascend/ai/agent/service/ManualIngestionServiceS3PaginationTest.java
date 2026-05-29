@@ -32,15 +32,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Extra branch coverage for ManualIngestionService:
- *  - null/blank S3 object key is skipped
- *  - pagination continuation token path
- *  - documents null/empty after ingestion -> skipped
- *  - IOException rethrown as IngestionException
- */
 @ExtendWith(MockitoExtension.class)
-class ManualIngestionServiceExtraTest {
+class ManualIngestionServiceS3PaginationTest {
 
     @Mock
     private S3Client s3Client;
@@ -73,13 +66,16 @@ class ManualIngestionServiceExtraTest {
     @Test
     @DisplayName("run skips S3 objects with null key")
     void run_NullKeyObject_SkipsIt() {
+        // given
         S3Object nullKey = S3Object.builder().key(null).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder()
                 .contents(List.of(nullKey)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.skipped).isZero();
         assertThat(result.indexed).isZero();
     }
@@ -87,23 +83,24 @@ class ManualIngestionServiceExtraTest {
     @Test
     @DisplayName("run skips S3 objects with blank key")
     void run_BlankKeyObject_SkipsIt() {
+        // given
         S3Object blankKey = S3Object.builder().key("   ").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder()
                 .contents(List.of(blankKey)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
-        // blank key doesn't even hit shouldIngestKey, just returns
+        // then — blank key doesn't even hit shouldIngestKey, just returns
         assertThat(result.indexed).isZero();
     }
 
     @Test
     @DisplayName("run follows continuation token to fetch the next page")
     void run_WithContinuationToken_PaginatesCorrectly() {
-        // First response has a continuation token, second has none
+        // given
         S3Object obj = S3Object.builder().key("irrelevant/skip.txt").build();
-
         ListObjectsV2Response firstPage = ListObjectsV2Response.builder()
                 .contents(List.of(obj))
                 .nextContinuationToken("token123")
@@ -111,32 +108,33 @@ class ManualIngestionServiceExtraTest {
         ListObjectsV2Response secondPage = ListObjectsV2Response.builder()
                 .contents(List.of())
                 .build();
-
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
                 .thenReturn(firstPage)
                 .thenReturn(secondPage);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
-        // skipped=1 (from "irrelevant/skip.txt"), both pages fetched
+        // then — skipped=1 (from "irrelevant/skip.txt"), both pages fetched
         assertThat(result.skipped).isEqualTo(1);
     }
 
     @Test
     @DisplayName("run skips object when ingestionService returns null documents list")
     void run_NullDocumentsReturned_SkipsObject() throws Exception {
+        // given
         S3Object obj = S3Object.builder().key("markdown/doc.md").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
-
         when(ingestionService.processMarkdown(any(), anyString())).thenReturn(null);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.skipped).isEqualTo(1);
         assertThat(result.indexed).isZero();
     }
@@ -144,18 +142,19 @@ class ManualIngestionServiceExtraTest {
     @Test
     @DisplayName("run skips object when ingestionService returns empty documents list")
     void run_EmptyDocumentsReturned_SkipsObject() throws Exception {
+        // given
         S3Object obj = S3Object.builder().key("markdown/doc.md").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
-
         when(ingestionService.processMarkdown(any(), anyString())).thenReturn(List.of());
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.skipped).isEqualTo(1);
         assertThat(result.indexed).isZero();
     }
@@ -163,18 +162,19 @@ class ManualIngestionServiceExtraTest {
     @Test
     @DisplayName("run increments failed counter and removes metadata when IOException is thrown")
     void run_IOExceptionFromStream_IncrementsFailedAndRemovesMetadata() throws Exception {
-        // IOException is wrapped as IngestionException and rethrown so metadata marker is removed
+        // given — IOException is wrapped as IngestionException and rethrown so metadata marker is removed
         S3Object obj = S3Object.builder().key("documents/report.docx").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         when(ingestionService.processUnstructured(any(), anyString())).thenThrow(new IngestionException("IO fail"));
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.failed).isEqualTo(1);
         verify(metadataStore).remove(anyString());
     }
@@ -182,142 +182,155 @@ class ManualIngestionServiceExtraTest {
     @Test
     @DisplayName("run uses lastModified as version when S3 object has no ETag")
     void run_NoEtagButHasLastModified_UsesLastModifiedAsVersion() throws Exception {
+        // given
         Instant ts = Instant.parse("2025-01-01T00:00:00Z");
         S3Object obj = S3Object.builder().key("markdown/notes.md").lastModified(ts).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         when(ingestionService.processMarkdown(any(), anyString())).thenReturn(List.of(new Document("text")));
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.indexed).isEqualTo(1);
     }
 
     @Test
     @DisplayName("run uses 'unknown' as version when S3 object has no ETag and no lastModified")
     void run_NoEtagNoLastModified_UsesUnknownVersion() throws Exception {
-        // No eTag and no lastModified -> version = "unknown"
+        // given — no eTag and no lastModified -> version = "unknown"
         S3Object obj = S3Object.builder().key("markdown/notes.md").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         when(ingestionService.processMarkdown(any(), anyString())).thenReturn(List.of(new Document("text")));
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.indexed).isEqualTo(1);
     }
 
     @Test
     @DisplayName("run uses 'unknown' version when S3 object has a blank ETag")
     void run_BlankEtagAndNoLastModified_UsesUnknownVersion() throws Exception {
-        // Blank eTag (not null) and no lastModified -> falls through to "unknown"
+        // given — blank eTag (not null) and no lastModified -> falls through to "unknown"
         S3Object obj = S3Object.builder().key("markdown/notes.md").eTag("").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         when(ingestionService.processMarkdown(any(), anyString())).thenReturn(List.of(new Document("text")));
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
+        // then
         manualIngestionService.run(Optional.empty(), "openai");
     }
 
     @Test
     @DisplayName("run includes objects in documents/ folder when shouldIngestKey matches documentsFolder")
     void run_DocumentsFolderObject_IncludedForIngestion() throws Exception {
+        // given
         S3Object obj = S3Object.builder().key("documents/report.pdf").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         when(ingestionService.processUnstructured(any(), anyString())).thenReturn(List.of(new Document("pdf")));
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.indexed).isEqualTo(1);
     }
 
     @Test
     @DisplayName("run ingests file in markdown folder that does not end with .md extension")
     void run_MarkdownFolderTxtFile_IncludedForIngestion() throws Exception {
-        // Key doesn't end with .md but IS in markdownFolder -> shouldIngestKey=true via second condition
+        // given — key doesn't end with .md but IS in markdownFolder -> shouldIngestKey=true via second condition
         S3Object obj = S3Object.builder().key("markdown/readme.txt").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         when(ingestionService.processMarkdown(any(), anyString())).thenReturn(List.of(new Document("text")));
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.indexed).isEqualTo(1);
     }
 
     @Test
     @DisplayName("run filters by prefix when a non-blank prefix is provided")
     void run_NonBlankPrefix_PassedToListObjects() {
+        // given
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of()).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.of("markdown/"), "openai");
 
+        // then
         assertThat(result.indexed).isZero();
     }
 
     @Test
     @DisplayName("run does not loop when continuation token is blank")
     void run_BlankContinuationToken_DoesNotLoop() {
-        // nextContinuationToken() returns "" (blank) -> while condition false -> single page
+        // given — nextContinuationToken() returns "" (blank) -> while condition false -> single page
         S3Object obj = S3Object.builder().key("irrelevant/skip.txt").build();
         ListObjectsV2Response firstPage = ListObjectsV2Response.builder()
                 .contents(List.of(obj))
-                .nextContinuationToken("")  // blank token -> while condition false
+                .nextContinuationToken("")
                 .build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(firstPage);
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
-        assertThat(result.skipped).isEqualTo(1); // "irrelevant" path skipped
+        // then — "irrelevant" path skipped
+        assertThat(result.skipped).isEqualTo(1);
     }
 
     @Test
     @DisplayName("run increments failed counter when splitDocuments throws IngestionException")
     void run_SplitDocumentsThrowsIngestionException_IncrementsFailedCounter() throws Exception {
+        // given
         S3Object obj = S3Object.builder().key("markdown/doc.md").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
-
-        ResponseInputStream<GetObjectResponse> mockStream = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockStream = mock();
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockStream);
         when(ingestionService.processMarkdown(any(), anyString())).thenReturn(List.of(new Document("text")));
         when(documentService.splitDocuments(any())).thenThrow(new IngestionException("split failed"));
 
+        // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
+        // then
         assertThat(result.failed).isEqualTo(1);
         verify(metadataStore).remove(anyString());
     }
@@ -325,12 +338,14 @@ class ManualIngestionServiceExtraTest {
     @Test
     @DisplayName("run skips blank prefix (filter removes it from Optional)")
     void run_BlankPrefix_FilteredOutDoesNotSetPrefix() {
+        // given
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of()).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
 
-        // blank prefix -> filter(p -> !p.isBlank()) removes it -> no prefix set on builder
+        // when — blank prefix -> filter(p -> !p.isBlank()) removes it -> no prefix set on builder
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.of("   "), "openai");
 
+        // then
         assertThat(result.indexed).isZero();
     }
 }

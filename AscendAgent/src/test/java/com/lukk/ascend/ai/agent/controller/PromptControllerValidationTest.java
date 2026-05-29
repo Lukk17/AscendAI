@@ -5,6 +5,8 @@ import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.dto.ApiError;
 import com.lukk.ascend.ai.agent.service.AscendChatService;
 import com.lukk.ascend.ai.agent.service.VisionCapabilityResolver;
+import com.lukk.ascend.ai.agent.test.TestConstants;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,15 +30,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * Additional branch coverage for PromptController.
- * Signature (10 params): prompt (String prompt, MultipartFile image, MultipartFile document,
- *   String provider, String model, String embeddingProvider, Boolean attachSources,
- *   String compactionProvider, String compactionModel, String userIdHeader)
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class PromptControllerExtraTest {
+class PromptControllerValidationTest {
 
     @Mock
     private AscendChatService ascendChatService;
@@ -57,7 +53,6 @@ class PromptControllerExtraTest {
                 .thenReturn(new AiResponse("ok", null));
     }
 
-    // ------------------------------------------------------------------ vision guard
 
     @Test
     @DisplayName("prompt returns 415 when image is attached and model does not support vision")
@@ -72,9 +67,10 @@ class PromptControllerExtraTest {
 
         // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        assertThat(response.getBody()).isInstanceOf(ApiError.class);
-        ApiError err = (ApiError) response.getBody();
-        assertThat(err.error()).isEqualTo("vision_unsupported");
+        assertThat(response.getBody())
+                .asInstanceOf(InstanceOfAssertFactories.type(ApiError.class))
+                .extracting(ApiError::error)
+                .isEqualTo("vision_unsupported");
     }
 
     @Test
@@ -116,7 +112,6 @@ class PromptControllerExtraTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
-    // ------------------------------------------------------------------ compaction provider validation
 
     @Test
     @DisplayName("prompt returns 400 when compactionProvider is set but not in the configured providers")
@@ -129,10 +124,12 @@ class PromptControllerExtraTest {
 
         // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).isInstanceOf(ApiError.class);
-        ApiError err = (ApiError) response.getBody();
-        assertThat(err.error()).isEqualTo("unknown_compaction_provider");
-        assertThat(err.message()).contains("nonexistent-provider");
+        assertThat(response.getBody())
+                .asInstanceOf(InstanceOfAssertFactories.type(ApiError.class))
+                .satisfies(err -> {
+                    assertThat(err.error()).isEqualTo("unknown_compaction_provider");
+                    assertThat(err.message()).contains("nonexistent-provider");
+                });
     }
 
     @Test
@@ -168,7 +165,6 @@ class PromptControllerExtraTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
-    // ------------------------------------------------------------------ user id resolution
 
     @Test
     @DisplayName("prompt uses X-User-Id header when it is provided")
@@ -200,7 +196,6 @@ class PromptControllerExtraTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
-    // ------------------------------------------------------------------ attachSources flag
 
     @Test
     @DisplayName("prompt passes attachSources=true to the service when the flag is set")
@@ -238,7 +233,7 @@ class PromptControllerExtraTest {
         when(aiProviderProperties.getProviders()).thenReturn(java.util.Map.of("openai", mock(AiProviderProperties.ProviderConfig.class)));
 
         // when — known compaction provider + model
-        ResponseEntity<?> response = controller.prompt("hello", null, null, "openai", "gpt-4o", null, null, "openai", "gpt-4o-mini", "user1");
+        ResponseEntity<?> response = controller.prompt("hello", null, null, "openai", "gpt-4o", null, null, "openai", "gpt-4o-mini", TestConstants.DEFAULT_USER_ID);
 
         // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

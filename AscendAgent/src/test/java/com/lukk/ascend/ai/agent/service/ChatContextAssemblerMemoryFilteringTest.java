@@ -5,6 +5,7 @@ import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryClient;
 import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryItem;
 import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
 import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,18 +25,11 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-/**
- * Extra branch coverage for ChatContextAssembler:
- *  - null memory items filtered from semantic memory block
- *  - memory item with blank text filtered
- *  - lines list empty after filtering -> returns ""
- *  - RAG context not appended when retrieval.context() is blank but not empty
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class ChatContextAssemblerExtraTest {
+class ChatContextAssemblerMemoryFilteringTest {
 
-    private static final String USER_ID = "frosty";
+    private static final String USER_ID = TestConstants.DEFAULT_USER_ID;
     private static final String USER_PROMPT = "what do you know about me?";
     private static final String EMBED_PROVIDER = "lmstudio";
     private static final String SYSTEM_PROMPT = "You are a helpful assistant.";

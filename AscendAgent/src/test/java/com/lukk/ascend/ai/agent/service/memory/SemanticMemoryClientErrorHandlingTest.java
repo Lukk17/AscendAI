@@ -27,13 +27,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * Targets the gaps left in {@link SemanticMemoryClient} JaCoCo report:
- * non-404 RestClientResponseException branch on search; wipe disabled / wipe error;
- * delete disabled / delete error; insert disabled with non-blank user.
- */
 @ExtendWith(MockitoExtension.class)
-class SemanticMemoryClientExtraTest {
+class SemanticMemoryClientErrorHandlingTest {
 
     private static final String USER = "u1";
     private static final String EMB = "lmstudio";
@@ -51,41 +46,45 @@ class SemanticMemoryClientExtraTest {
     @SuppressWarnings("unchecked")
     @DisplayName("search returns empty list and logs warning when a non-404 HTTP error occurs")
     void search_LogsWarn_WhenNon404HttpError() {
+        // given
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
         RestClientResponseException err = new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE);
-
         when(restClientBuilder.build().get()
                 .uri(anyString(), anyString(), anyString(), any(Integer.class), anyString())
                 .retrieve()
                 .body(any(ParameterizedTypeReference.class)))
                 .thenThrow(err);
 
+        // when
         List<SemanticMemoryItem> result = client.search(USER, "q", 5, EMB);
 
+        // then
         assertThat(result).isEmpty();
     }
 
     @Test
     @DisplayName("wipeUserMemory skips the HTTP call when semantic memory is disabled")
     void wipeUserMemory_WhenDisabled_ThenSkipsHttpCall() {
+        // given
         when(properties.isEnabled()).thenReturn(false);
 
+        // when
         client.wipeUserMemory(USER, EMB);
 
+        // then
         verifyNoInteractions(restClientBuilder);
     }
 
     @Test
     @DisplayName("wipeUserMemory swallows RestClientResponseException and does not throw")
     void wipeUserMemory_SwallowsRestClientResponseException() {
+        // given
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
-
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpec = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec respSpec = mock(RestClient.ResponseSpec.class);
-
         RestClient rest = mock(RestClient.class);
         when(restClientBuilder.build()).thenReturn(rest);
         when(rest.post()).thenReturn(postMock);
@@ -94,17 +93,20 @@ class SemanticMemoryClientExtraTest {
         when(bodySpec.retrieve()).thenReturn(respSpec);
         when(respSpec.toBodilessEntity()).thenThrow(new HttpClientErrorException(HttpStatus.NOT_FOUND));
 
-        // Should NOT throw — error is logged at warn and swallowed.
+        // then — error is logged at warn and swallowed
         assertThatCode(() -> client.wipeUserMemory(USER, EMB)).doesNotThrowAnyException();
     }
 
     @Test
     @DisplayName("deleteMemory skips the HTTP call when semantic memory is disabled")
     void deleteMemory_WhenDisabled_ThenSkipsHttpCall() {
+        // given
         when(properties.isEnabled()).thenReturn(false);
 
+        // when
         client.deleteMemory(USER, "mem-1", EMB);
 
+        // then
         verifyNoInteractions(restClientBuilder);
     }
 
@@ -112,13 +114,12 @@ class SemanticMemoryClientExtraTest {
     @SuppressWarnings({"unchecked", "rawtypes"})
     @DisplayName("deleteMemory swallows RestClientResponseException and does not throw")
     void deleteMemory_SwallowsRestClientResponseException() {
+        // given
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
-
         RestClient.RequestHeadersUriSpec deleteMock = mock(RestClient.RequestHeadersUriSpec.class);
         RestClient.RequestHeadersSpec<?> headersSpec = mock(RestClient.RequestHeadersSpec.class);
         RestClient.ResponseSpec respSpec = mock(RestClient.ResponseSpec.class);
-
         RestClient rest = mock(RestClient.class);
         when(restClientBuilder.build()).thenReturn(rest);
         when(rest.delete()).thenReturn(deleteMock);
@@ -126,6 +127,7 @@ class SemanticMemoryClientExtraTest {
         when(headersSpec.retrieve()).thenReturn(respSpec);
         when(respSpec.toBodilessEntity()).thenThrow(new HttpClientErrorException(HttpStatus.INTERNAL_SERVER_ERROR));
 
+        // then
         assertThatCode(() -> client.deleteMemory(USER, "mem-1", EMB)).doesNotThrowAnyException();
     }
 }

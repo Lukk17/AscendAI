@@ -22,13 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-/**
- * Extra branch coverage for SemanticMemoryExtractor: cache retry path,
- * extractFactsFromJson edge-cases, embedded JSON array fallback, BracketScanState paths.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class SemanticMemoryExtractorExtraCoverageTest {
+class SemanticMemoryExtractorJsonParsingTest {
 
     @Mock
     private ChatModelResolver chatModelResolver;
@@ -57,63 +53,74 @@ class SemanticMemoryExtractorExtraCoverageTest {
                 new ObjectMapper(), chatResponseContentResolver, cacheStrategyResolver);
     }
 
-    // ------------------------------------------------------------------ extractFactsFromJson
 
     @Test
     @DisplayName("extractFactsFromJson returns empty list for null input")
     void extractFactsFromJson_Null_ReturnsEmptyList() {
+        // then
         assertThat(extractor.extractFactsFromJson(null)).isEmpty();
     }
 
     @Test
     @DisplayName("extractFactsFromJson returns empty list for blank string")
     void extractFactsFromJson_BlankString_ReturnsEmptyList() {
+        // then
         assertThat(extractor.extractFactsFromJson("   ")).isEmpty();
     }
 
     @Test
     @DisplayName("extractFactsFromJson parses a clean JSON array of strings")
     void extractFactsFromJson_CleanJsonArray_ReturnsList() {
-        List<String> result = extractor.extractFactsFromJson("[\"fact one\", \"fact two\"]");
-        assertThat(result).containsExactly("fact one", "fact two");
+        // then
+        assertThat(extractor.extractFactsFromJson("[\"fact one\", \"fact two\"]"))
+                .containsExactly("fact one", "fact two");
     }
 
     @Test
     @DisplayName("extractFactsFromJson returns empty list for empty JSON array")
     void extractFactsFromJson_EmptyJsonArray_ReturnsEmptyList() {
+        // then
         assertThat(extractor.extractFactsFromJson("[]")).isEmpty();
     }
 
     @Test
     @DisplayName("extractFactsFromJson strips ```json fences and parses correctly")
     void extractFactsFromJson_WithJsonFence_StripsAndParses() {
+        // given
         String fenced = "```json\n[\"hello\"]\n```";
-        List<String> result = extractor.extractFactsFromJson(fenced);
-        assertThat(result).containsExactly("hello");
+
+        // then
+        assertThat(extractor.extractFactsFromJson(fenced)).containsExactly("hello");
     }
 
     @Test
     @DisplayName("extractFactsFromJson falls back to bracket scan when response has leading prose")
     void extractFactsFromJson_LeadingProse_ExtractsEmbeddedArray() {
+        // given
         String response = "Here are the facts I found: [\"User likes cats\", \"User is a developer\"]";
-        List<String> result = extractor.extractFactsFromJson(response);
-        assertThat(result).containsExactly("User likes cats", "User is a developer");
+
+        // then
+        assertThat(extractor.extractFactsFromJson(response))
+                .containsExactly("User likes cats", "User is a developer");
     }
 
     @Test
     @DisplayName("extractFactsFromJson returns empty list when no valid JSON array is in the response")
     void extractFactsFromJson_NoBracketsInResponse_ReturnsEmptyList() {
-        String response = "There are no facts here.";
-        List<String> result = extractor.extractFactsFromJson(response);
-        assertThat(result).isEmpty();
+        // then
+        assertThat(extractor.extractFactsFromJson("There are no facts here.")).isEmpty();
     }
 
     @Test
     @DisplayName("extractFactsFromJson handles nested arrays by returning the last outermost array")
     void extractFactsFromJson_NestedArrays_ReturnsLastOutermostArray() {
-        // JSON with nested array inside a string element
+        // given — JSON with nested array inside a string element
         String response = "[\"value with \\\"inner quote\\\"\"]";
+
+        // when
         List<String> result = extractor.extractFactsFromJson(response);
+
+        // then
         assertThat(result).hasSize(1);
         assertThat(result.getFirst()).contains("inner quote");
     }
@@ -121,40 +128,40 @@ class SemanticMemoryExtractorExtraCoverageTest {
     @Test
     @DisplayName("extractFactsFromJson returns empty list when candidate JSON array contains non-strings")
     void extractFactsFromJson_ArrayWithNonStrings_ReturnsEmptyList() {
-        // An embedded array that looks like it has objects; parse will fail gracefully
+        // given — integers parse as strings in Jackson, so just verify no throw
         String response = "Some text [1, 2, 3] more text";
-        // This is a valid array of ints, not strings — should fail deserialization to List<String>
-        // and fall through to empty
-        List<String> result = extractor.extractFactsFromJson(response);
-        // integers parse as strings in Jackson, so this might actually succeed — just verify no throw
-        assertThat(result).isNotNull();
+
+        // then
+        assertThat(extractor.extractFactsFromJson(response)).isNotNull();
     }
 
     @Test
     @DisplayName("extractFactsFromJson handles escaped backslash in string content")
     void extractFactsFromJson_EscapedBackslash_ParsesCorrectly() {
-        String response = "[\"path\\\\to\\\\file\"]";
-        List<String> result = extractor.extractFactsFromJson(response);
-        assertThat(result).hasSize(1);
+        // then
+        assertThat(extractor.extractFactsFromJson("[\"path\\\\to\\\\file\"]")).hasSize(1);
     }
 
     @Test
     @DisplayName("extractFactsFromJson handles unmatched closing bracket (] with depth=0)")
     void extractFactsFromJson_UnmatchedClosingBracket_HandledGracefully() {
-        // '] before any [' — the consume() branch where c==']' && depth==0 -> do nothing
-        // Also has a valid array later for successful extraction
+        // given — '] before any [' -> consume() branch where c==']' && depth==0 -> do nothing
         String response = "] some text [\"fact\"]";
-        List<String> result = extractor.extractFactsFromJson(response);
-        // The ']' at position 0 is ignored (depth=0), then '[\"fact\"]' is found and parsed
-        assertThat(result).containsExactly("fact");
+
+        // then — the ']' at position 0 is ignored (depth=0), then '[\"fact\"]' is found and parsed
+        assertThat(extractor.extractFactsFromJson(response)).containsExactly("fact");
     }
 
     @Test
     @DisplayName("extractFactsFromJson handles nested brackets in content string")
     void extractFactsFromJson_NestedBracketsInString_ParsesOutermostArray() {
-        // String containing [] inside quotes - inString flag prevents inner brackets from counting
+        // given — string containing [] inside quotes; inString flag prevents inner brackets from counting
         String response = "[\"user has [special] characters\"]";
+
+        // when
         List<String> result = extractor.extractFactsFromJson(response);
+
+        // then
         assertThat(result).hasSize(1);
         assertThat(result.getFirst()).contains("[special]");
     }

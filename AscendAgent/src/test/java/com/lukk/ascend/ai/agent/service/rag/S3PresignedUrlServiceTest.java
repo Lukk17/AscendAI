@@ -59,20 +59,18 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("presignAll returns presigned URL, MIME type, size, and expiry for a valid object")
     void presignAll_HappyPath_ReturnsUrlAndSize() throws Exception {
+        // given
         SourceRef ref = new SourceRef("bucket", "manual.pdf", "manual.pdf", null);
-
-        HeadObjectResponse head = HeadObjectResponse.builder()
-                .contentLength(2048L)
-                .contentType("application/pdf")
-                .build();
-        when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(head);
-
+        when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
+                HeadObjectResponse.builder().contentLength(2048L).contentType("application/pdf").build());
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
         when(presigned.url()).thenReturn(URI.create("https://minio.example/bucket/manual.pdf?X-Amz-Signature=abc").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
+        // when
         List<SourceFile> result = service.presignAll(List.of(ref));
 
+        // then
         assertThat(result).hasSize(1);
         SourceFile f = result.getFirst();
         assertThat(f.name()).isEqualTo("manual.pdf");
@@ -85,12 +83,15 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("presignAll skips and logs a warning for objects that exceed the configured max file size")
     void presignAll_OversizeObject_IsSkippedAndLogsWarn() {
+        // given
         SourceRef ref = new SourceRef("bucket", "huge.pdf", "huge.pdf", null);
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
                 HeadObjectResponse.builder().contentLength(50L * 1024 * 1024).contentType("application/pdf").build());
 
+        // when
         List<SourceFile> result = service.presignAll(List.of(ref));
 
+        // then
         assertThat(result).isEmpty();
         verify(presigner, never()).presignGetObject(any(GetObjectPresignRequest.class));
     }
@@ -98,9 +99,9 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("presignAll omits the failing source and continues presigning remaining sources")
     void presignAll_HeadFails_OmitsSourceButContinues() throws Exception {
+        // given
         SourceRef good = new SourceRef("bucket", "good.pdf", "good.pdf", "application/pdf");
         SourceRef bad = new SourceRef("bucket", "bad.pdf", "bad.pdf", "application/pdf");
-
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenAnswer(inv -> {
                     HeadObjectRequest req = inv.getArgument(0);
@@ -109,13 +110,14 @@ class S3PresignedUrlServiceTest {
                     }
                     return HeadObjectResponse.builder().contentLength(100L).contentType("application/pdf").build();
                 });
-
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
         when(presigned.url()).thenReturn(URI.create("https://minio.example/bucket/good.pdf?sig=abc").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
+        // when
         List<SourceFile> result = service.presignAll(List.of(good, bad));
 
+        // then
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().name()).isEqualTo("good.pdf");
     }
@@ -123,33 +125,37 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("presignAll omits a source when the presigner throws an S3Exception")
     void presignAll_PresignerThrows_OmitsSource() {
+        // given
         SourceRef ref = new SourceRef("bucket", "x.pdf", "x.pdf", "application/pdf");
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenReturn(HeadObjectResponse.builder().contentLength(100L).contentType("application/pdf").build());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenThrow(S3Exception.builder().message("signing failed").build());
 
+        // when
         List<SourceFile> result = service.presignAll(List.of(ref));
 
+        // then
         assertThat(result).isEmpty();
     }
 
     @Test
     @DisplayName("presignAll presigns all three sources in parallel and returns all results")
     void presignAll_ParallelPresignsThree() throws Exception {
+        // given
         SourceRef a = new SourceRef("b", "a.pdf", "a.pdf", "application/pdf");
         SourceRef b = new SourceRef("b", "b.pdf", "b.pdf", "application/pdf");
         SourceRef c = new SourceRef("b", "c.pdf", "c.pdf", "application/pdf");
-
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenReturn(HeadObjectResponse.builder().contentLength(10L).contentType("application/pdf").build());
-
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
         when(presigned.url()).thenReturn(URI.create("https://minio.example/b/x?sig=1").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
+        // when
         List<SourceFile> result = service.presignAll(List.of(a, b, c));
 
+        // then
         assertThat(result).hasSize(3);
         verify(presigner, times(3)).presignGetObject(any(GetObjectPresignRequest.class));
     }
@@ -157,11 +163,13 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("presignAll returns empty without touching S3 when source attachments are disabled")
     void presignAll_DisabledKillSwitch_ReturnsEmpty() {
+        // given
         ragProperties.getSourceAttachments().setEnabled(false);
-        SourceRef ref = new SourceRef("b", "a.pdf", "a.pdf", null);
 
-        List<SourceFile> result = service.presignAll(List.of(ref));
+        // when
+        List<SourceFile> result = service.presignAll(List.of(new SourceRef("b", "a.pdf", "a.pdf", null)));
 
+        // then
         assertThat(result).isEmpty();
         verify(s3Client, never()).headObject(any(HeadObjectRequest.class));
     }
@@ -169,6 +177,7 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("presignAll returns empty list for empty or null input")
     void presignAll_EmptyInput_ReturnsEmpty() {
+        // then
         assertThat(service.presignAll(List.of())).isEmpty();
         assertThat(service.presignAll(null)).isEmpty();
     }
@@ -176,11 +185,11 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("init clamps TTL down to the maximum allowed value when configured TTL exceeds it")
     void init_ClampsTtlAboveMax() {
+        // given
         ragProperties.getSourceAttachments().setPresignTtl(Duration.ofHours(2));
         S3PresignedUrlService clamped = new S3PresignedUrlService(presigner, s3Client, ragProperties,
                 sameThreadExecutor, "http://localhost:9070");
         clamped.init();
-
         SourceRef ref = new SourceRef("b", "a.pdf", "a.pdf", "application/pdf");
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenReturn(HeadObjectResponse.builder().contentLength(10L).contentType("application/pdf").build());
@@ -192,10 +201,11 @@ class S3PresignedUrlServiceTest {
         }
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
+        // when
         List<SourceFile> result = clamped.presignAll(List.of(ref));
 
+        // then — expiresAt should be approximately 1 hour out, not 2
         assertThat(result).hasSize(1);
-        // expiresAt should be approximately 1 hour out, not 2
         long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.getFirst().expiresAt()).getSeconds();
         assertThat(secondsToExpiry).isBetween(3500L, 3700L);
     }
@@ -203,11 +213,11 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("init clamps TTL up to the minimum allowed value when configured TTL is too short")
     void init_ClampsTtlBelowMin() {
+        // given
         ragProperties.getSourceAttachments().setPresignTtl(Duration.ofSeconds(10));
         S3PresignedUrlService clamped = new S3PresignedUrlService(presigner, s3Client, ragProperties,
                 sameThreadExecutor, "http://localhost:9070");
         clamped.init();
-
         SourceRef ref = new SourceRef("b", "a.pdf", "a.pdf", "application/pdf");
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenReturn(HeadObjectResponse.builder().contentLength(10L).contentType("application/pdf").build());
@@ -219,10 +229,11 @@ class S3PresignedUrlServiceTest {
         }
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
+        // when
         List<SourceFile> result = clamped.presignAll(List.of(ref));
 
+        // then — clamped to 1 minute = 60s (not 10s)
         assertThat(result).hasSize(1);
-        // clamped to 1 minute = 60s (not 10s)
         long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.getFirst().expiresAt()).getSeconds();
         assertThat(secondsToExpiry).isBetween(50L, 70L);
     }

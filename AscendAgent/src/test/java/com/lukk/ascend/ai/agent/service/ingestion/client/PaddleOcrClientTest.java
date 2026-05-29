@@ -81,7 +81,7 @@ class PaddleOcrClientTest {
         when(bodySpecMock.body(any(Object.class))).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenThrow(new RestClientException("Socket Timeout"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> paddleOcrClient.process(BYTES, FILENAME, null))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to process document with PaddleOCR");
@@ -104,7 +104,7 @@ class PaddleOcrClientTest {
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
         when(responseSpecMock.body(String.class)).thenReturn(invalidJson);
 
-        // when / then
+        // then
         assertThatThrownBy(() -> paddleOcrClient.process(BYTES, FILENAME, "pl"))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to parse PaddleOCR JSON response");

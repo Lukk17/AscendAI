@@ -65,11 +65,14 @@ class IngestionControllerSecurityTest {
     @Test
     @DisplayName("returns 415 when content type is not in the allowlist")
     void uploadDocument_WhenContentTypeNotInAllowlist_Returns415() {
+        // given
         MockMultipartFile file = new MockMultipartFile("file", "evil.zip",
                 "application/zip", "evil_payload".getBytes());
 
+        // when
         ResponseEntity<?> response = ingestionController.uploadDocument(List.of(file));
 
+        // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         assertThat(response.getBody()).isNotNull().isInstanceOf(ApiError.class);
         ApiError body = (ApiError) response.getBody();
@@ -80,13 +83,15 @@ class IngestionControllerSecurityTest {
     @Test
     @DisplayName("sanitizes path traversal filename to a safe storage key")
     void uploadDocument_WhenFilenameContainsPathTraversal_SanitizedToSafeKey() throws IOException {
+        // given
         MockMultipartFile file = new MockMultipartFile("file", "../../etc/passwd.txt",
                 "text/plain", "content".getBytes());
 
+        // when
         ResponseEntity<?> response = ingestionController.uploadDocument(List.of(file));
 
+        // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         verify(storageService).uploadFile(keyCaptor.capture(), any(), anyLong());
         String storedKey = keyCaptor.getValue();
@@ -98,13 +103,15 @@ class IngestionControllerSecurityTest {
     @Test
     @DisplayName("replaces Unicode and control characters in filename with safe equivalents")
     void uploadDocument_WhenFilenameHasUnicodeOrControlChars_SanitizedToUnderscores() throws IOException {
+        // given
         MockMultipartFile file = new MockMultipartFile("file", " evil‮.md",
                 "text/markdown", "content".getBytes());
 
+        // when
         ResponseEntity<?> response = ingestionController.uploadDocument(List.of(file));
 
+        // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         verify(storageService).uploadFile(keyCaptor.capture(), any(), anyLong());
         String storedKey = keyCaptor.getValue();

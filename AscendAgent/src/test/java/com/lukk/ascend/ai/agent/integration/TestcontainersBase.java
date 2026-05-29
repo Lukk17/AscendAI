@@ -28,6 +28,10 @@ import org.testcontainers.utility.DockerImageName;
  * so the context starts without an external network. It's that exercise the chat path
  * should mock {@code ChatModelResolver} or use {@code @MockBean} for {@code AscendChatService}.
  */
+// Container fields are intentionally not try-with-resources — the @Testcontainers + @Container
+// annotations manage the lifecycle (start before all tests, close after the class), which the
+// IDE's resource inspection can't detect on its own.
+@SuppressWarnings("resource")
 @SpringBootTest
 @Tag("integration")
 @Testcontainers

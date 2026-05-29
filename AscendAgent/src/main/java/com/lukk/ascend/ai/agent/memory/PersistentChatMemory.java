@@ -201,7 +201,6 @@ public class PersistentChatMemory implements ChatMemory {
             throw new ServiceException("Failed to add to chat memory", e);
         }
 
-        // Fire-and-forget compaction. @Async dispatches off the request thread.
         try {
             compactionService.maybeCompact(conversationId, primaryProvider, override);
         } catch (Exception e) {

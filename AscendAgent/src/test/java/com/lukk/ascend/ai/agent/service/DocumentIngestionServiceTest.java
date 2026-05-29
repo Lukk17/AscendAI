@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.exception.IngestionException;
 import com.lukk.ascend.ai.agent.service.ingestion.DocumentRouter;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +30,7 @@ class DocumentIngestionServiceTest {
     @InjectMocks
     private DocumentIngestionService documentIngestionService;
 
+    @DisplayName("process document returns empty string when file is null")
     @Test
     void processDocument_WhenFileIsNull_ThenReturnsEmptyString() {
         // given
@@ -41,6 +43,7 @@ class DocumentIngestionServiceTest {
         assertThat(result).isEmpty();
     }
 
+    @DisplayName("process document returns empty string when file is empty")
     @Test
     void processDocument_WhenFileIsEmpty_ThenReturnsEmptyString() {
         // given
@@ -53,6 +56,7 @@ class DocumentIngestionServiceTest {
         assertThat(result).isEmpty();
     }
 
+    @DisplayName("process document routes and returns formatted string when valid file")
     @Test
     void processDocument_WhenValidFile_ThenRoutesAndReturnsFormattedString() {
         // given
@@ -75,6 +79,7 @@ class DocumentIngestionServiceTest {
                 .contains("</document_context>");
     }
 
+    @DisplayName("process document throws ingestion exception when io exception")
     @Test
     void processDocument_WhenIOException_ThenThrowsIngestionException() throws IOException {
         // given
@@ -83,9 +88,28 @@ class DocumentIngestionServiceTest {
         when(mockFile.getOriginalFilename()).thenReturn("error.pdf");
         when(mockFile.getBytes()).thenThrow(new IOException("Disk read error"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> documentIngestionService.processDocument(mockFile))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to read file bytes: error.pdf");
+    }
+
+    @DisplayName("process document null original filename uses document fallback")
+    @Test
+    void processDocument_NullOriginalFilename_UsesDocumentFallback() throws IOException {
+        // given — file is not empty but getOriginalFilename() returns null
+        MultipartFile mockFile = mock(MultipartFile.class);
+        when(mockFile.isEmpty()).thenReturn(false);
+        when(mockFile.getOriginalFilename()).thenReturn(null);
+        when(mockFile.getContentType()).thenReturn("application/pdf");
+        when(mockFile.getBytes()).thenReturn("content".getBytes());
+        when(documentRouter.routeAndProcess(org.mockito.ArgumentMatchers.any(byte[].class), eq("document"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of());
+
+        // when
+        String result = documentIngestionService.processDocument(mockFile);
+
+        // then
+        assertThat(result).isNotNull();
     }
 }

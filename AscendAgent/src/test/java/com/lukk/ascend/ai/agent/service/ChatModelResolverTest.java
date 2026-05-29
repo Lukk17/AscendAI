@@ -68,7 +68,7 @@ class ChatModelResolverTest {
         when(aiProviderProperties.getProviders()).thenReturn(Map.of());
         chatModelResolver.initializeProviders();
 
-        // when / then
+        // then
         assertThatThrownBy(() -> chatModelResolver.resolve(PROVIDER_UNKNOWN))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("AI provider 'unknown' is not available");
@@ -83,7 +83,7 @@ class ChatModelResolverTest {
         when(aiProviderProperties.getProviders()).thenReturn(Map.of(PROVIDER_OPENAI, config));
         chatModelResolver.initializeProviders();
 
-        // when / then
+        // then
         assertThatThrownBy(() -> chatModelResolver.resolve(PROVIDER_OPENAI))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("AI provider 'openai' is not available");
@@ -113,7 +113,7 @@ class ChatModelResolverTest {
         when(aiProviderProperties.getDefaultProvider()).thenReturn(PROVIDER_UNKNOWN);
         chatModelResolver.initializeProviders();
 
-        // when / then
+        // then
         assertThatThrownBy(() -> chatModelResolver.resolveDefault())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("AI provider 'unknown' is not available");
@@ -142,7 +142,7 @@ class ChatModelResolverTest {
         ProviderConfig config = createValidConfig("weird", "unsupported-type");
         when(aiProviderProperties.getProviders()).thenReturn(Map.of("weird", config));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> chatModelResolver.initializeProviders())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unsupported AI provider type 'unsupported-type' for provider 'weird'");

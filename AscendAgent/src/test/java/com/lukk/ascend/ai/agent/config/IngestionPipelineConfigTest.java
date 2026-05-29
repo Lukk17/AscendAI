@@ -29,10 +29,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
-/**
- * Tests for IngestionPipelineConfig — specifically the private routing and processing methods
- * that JaCoCo covers as branch-coverage targets.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class IngestionPipelineConfigTest {
@@ -61,142 +57,163 @@ class IngestionPipelineConfigTest {
         ReflectionTestUtils.setField(config, "documentsFolder", "documents/");
     }
 
-    // ------------------------------------------------------------------ routeFile (private, tested via reflection)
 
     @Test
     @DisplayName("routeFile routes .md file to markdownChannel")
     void routeFile_MdExtension_RoutesToMarkdownChannel() throws Exception {
+        // given
         Message<?> msg = MessageBuilder.withPayload(new byte[0])
                 .setHeader(FileHeaders.REMOTE_FILE, "notes.md")
                 .build();
 
+        // when
         String channel = invokeRouteFile(msg);
 
+        // then
         assertThat(channel).isEqualTo("markdownChannel");
     }
 
     @Test
     @DisplayName("routeFile routes markdown/ path to markdownChannel")
     void routeFile_MarkdownFolderPath_RoutesToMarkdownChannel() throws Exception {
+        // given
         Message<?> msg = MessageBuilder.withPayload(new byte[0])
                 .setHeader(FileHeaders.REMOTE_FILE, "markdown/readme.txt")
                 .build();
 
+        // when
         String channel = invokeRouteFile(msg);
 
+        // then
         assertThat(channel).isEqualTo("markdownChannel");
     }
 
     @Test
     @DisplayName("routeFile routes documents/ path to unstructuredChannel")
     void routeFile_DocumentsFolderPath_RoutesToUnstructuredChannel() throws Exception {
+        // given
         Message<?> msg = MessageBuilder.withPayload(new byte[0])
                 .setHeader(FileHeaders.REMOTE_FILE, "documents/report.pdf")
                 .build();
 
+        // when
         String channel = invokeRouteFile(msg);
 
+        // then
         assertThat(channel).isEqualTo("unstructuredChannel");
     }
 
     @Test
     @DisplayName("routeFile routes unknown path to nullChannel")
     void routeFile_UnknownPath_RoutesToNullChannel() throws Exception {
+        // given
         Message<?> msg = MessageBuilder.withPayload(new byte[0])
                 .setHeader(FileHeaders.REMOTE_FILE, "other/image.png")
                 .build();
 
+        // when
         String channel = invokeRouteFile(msg);
 
+        // then
         assertThat(channel).isEqualTo("nullChannel");
     }
 
     @Test
     @DisplayName("routeFile uses file_remoteFile header fallback when REMOTE_FILE header is absent")
     void routeFile_FallbackHeader_UsedWhenRemoteFileAbsent() throws Exception {
+        // given
         Message<?> msg = MessageBuilder.withPayload(new byte[0])
                 .setHeader("file_remoteFile", "documents/doc.pdf")
                 .build();
 
+        // when
         String channel = invokeRouteFile(msg);
 
+        // then
         assertThat(channel).isEqualTo("unstructuredChannel");
     }
 
     @Test
     @DisplayName("routeFile routes to nullChannel when both filename headers are absent")
     void routeFile_NoBothHeaders_RoutesToNullChannel() throws Exception {
+        // given
         Message<?> msg = MessageBuilder.withPayload(new byte[0]).build();
 
+        // when
         String channel = invokeRouteFile(msg);
 
+        // then
         assertThat(channel).isEqualTo("nullChannel");
     }
 
-    // ------------------------------------------------------------------ processMarkdownMessage (private, via reflection)
 
     @Test
     @DisplayName("processMarkdownMessage processes a valid markdown stream")
     void processMarkdownMessage_ValidStream_ReturnsDocuments() throws Exception {
+        // given
         InputStream stream = new ByteArrayInputStream("# Title\nContent".getBytes());
         Message<?> msg = MessageBuilder.withPayload(stream)
                 .setHeader(FileHeaders.REMOTE_FILE, "readme.md")
                 .build();
-
         when(ingestionService.processMarkdown(any(InputStream.class), anyString()))
                 .thenReturn(List.of(new Document("text")));
 
+        // when
         List<Document> docs = invokeProcessMarkdownMessage(msg);
 
+        // then
         assertThat(docs).hasSize(1);
     }
 
     @Test
     @DisplayName("processMarkdownMessage uses 'unknown.md' as filename when header is absent")
     void processMarkdownMessage_NoFilenameHeader_UsesUnknownMd() throws Exception {
+        // given
         InputStream stream = new ByteArrayInputStream("content".getBytes());
         Message<?> msg = MessageBuilder.withPayload(stream).build();
-
         when(ingestionService.processMarkdown(any(InputStream.class), anyString()))
                 .thenReturn(List.of(new Document("text")));
 
+        // when
         List<Document> docs = invokeProcessMarkdownMessage(msg);
 
+        // then
         assertThat(docs).hasSize(1);
     }
 
-    // ------------------------------------------------------------------ processUnstructuredMessage (private, via reflection)
 
     @Test
     @DisplayName("processUnstructuredMessage processes a valid stream")
     void processUnstructuredMessage_ValidStream_ReturnsDocuments() throws Exception {
+        // given
         InputStream stream = new ByteArrayInputStream("pdf content".getBytes());
         Message<?> msg = MessageBuilder.withPayload(stream)
                 .setHeader(FileHeaders.REMOTE_FILE, "report.pdf")
                 .build();
-
         when(ingestionService.processUnstructured(any(InputStream.class), anyString()))
                 .thenReturn(List.of(new Document("text")));
 
+        // when
         List<Document> docs = invokeProcessUnstructuredMessage(msg);
 
+        // then
         assertThat(docs).hasSize(1);
     }
 
     @Test
     @DisplayName("processUnstructuredMessage uses 'unknown' as filename when REMOTE_FILE header is absent")
     void processUnstructuredMessage_NoFilenameHeader_UsesUnknown() throws Exception {
-        // No REMOTE_FILE header -> filename = null -> ternary uses "unknown" (line 192 null branch)
+        // given
         java.io.InputStream stream = new java.io.ByteArrayInputStream("pdf content".getBytes());
         Message<?> msg = MessageBuilder.withPayload(stream).build();
-
         when(ingestionService.processUnstructured(any(java.io.InputStream.class), anyString()))
                 .thenReturn(List.of(new Document("text")));
 
+        // when
         List<Document> docs = invokeProcessUnstructuredMessage(msg);
 
+        // then
         assertThat(docs).hasSize(1);
-        // verify the call was made with "unknown"
         org.mockito.Mockito.verify(ingestionService).processUnstructured(any(java.io.InputStream.class),
                 org.mockito.ArgumentMatchers.eq("unknown"));
     }
@@ -204,14 +221,15 @@ class IngestionPipelineConfigTest {
     @Test
     @DisplayName("processUnstructuredMessage throws IngestionException when processing fails")
     void processUnstructuredMessage_ProcessingFails_ThrowsIngestionException() throws Exception {
+        // given
         InputStream stream = new ByteArrayInputStream("pdf content".getBytes());
         Message<?> msg = MessageBuilder.withPayload(stream)
                 .setHeader(FileHeaders.REMOTE_FILE, "report.pdf")
                 .build();
-
         when(ingestionService.processUnstructured(any(InputStream.class), anyString()))
                 .thenThrow(new RuntimeException("processing failed"));
 
+        // then
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> invokeProcessUnstructuredMessage(msg))
                 .isInstanceOf(Exception.class)
                 .satisfies(e -> {
@@ -222,7 +240,6 @@ class IngestionPipelineConfigTest {
                 });
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private String invokeRouteFile(Message<?> msg) throws Exception {
         Method m = IngestionPipelineConfig.class.getDeclaredMethod("routeFile", Message.class);

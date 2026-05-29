@@ -2,6 +2,8 @@ package com.lukk.ascend.ai.agent.controller;
 
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.service.AscendChatService;
+import com.lukk.ascend.ai.agent.test.TestConstants;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -35,19 +37,20 @@ class PromptControllerTest {
     @InjectMocks
     private PromptController promptController;
 
+    @DisplayName("prompt should return ai response")
     @Test
     void prompt_shouldReturnAiResponse() {
         // given
         String prompt = "test prompt";
         String responseText = "AI Response";
         AiResponse aiResponse = new AiResponse(responseText, null);
-        ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
+        ReflectionTestUtils.setField(promptController, "defaultUserId", TestConstants.DEFAULT_USER_ID);
 
         when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenReturn(aiResponse);
 
         // when
-        ResponseEntity<?> response = promptController.prompt(prompt, null, null, null, null, null, null, null, null, "user1");
+        ResponseEntity<?> response = promptController.prompt(prompt, null, null, null, null, null, null, null, null, TestConstants.DEFAULT_USER_ID);
 
         // then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -55,16 +58,17 @@ class PromptControllerTest {
         assertEquals(responseText, ((AiResponse) response.getBody()).content());
     }
 
+    @DisplayName("prompt should throw exception when service fails")
     @Test
     void prompt_shouldThrowException_whenServiceFails() {
         // given
         String prompt = "test prompt";
-        ReflectionTestUtils.setField(promptController, "defaultUserId", "user1");
+        ReflectionTestUtils.setField(promptController, "defaultUserId", TestConstants.DEFAULT_USER_ID);
 
         when(ascendChatService.prompt(anyString(), any(), any(), anyString(), any(), any(), any(), anyBoolean(), any()))
                 .thenThrow(new RuntimeException("Service Error"));
 
         // then
-        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, null, null, null, null, "user1"));
+        assertThrows(RuntimeException.class, () -> promptController.prompt(prompt, null, null, null, null, null, null, null, null, TestConstants.DEFAULT_USER_ID));
     }
 }

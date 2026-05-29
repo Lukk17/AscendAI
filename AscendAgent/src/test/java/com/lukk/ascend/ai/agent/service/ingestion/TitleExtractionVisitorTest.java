@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service.ingestion;
 
 import org.commonmark.node.Heading;
 import org.commonmark.node.Text;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -9,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 class TitleExtractionVisitorTest {
 
+    @DisplayName("visit should extract first heading")
     @Test
     void visit_ShouldExtractFirstHeading() {
         // given
@@ -25,6 +27,7 @@ class TitleExtractionVisitorTest {
         assertEquals("My Title", visitor.getTitle());
     }
 
+    @DisplayName("visit should return null when no heading exists")
     @Test
     void visit_ShouldReturnNull_WhenNoHeadingExists() {
         // given

@@ -7,6 +7,7 @@ import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryExtractor;
 import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
 import com.lukk.ascend.ai.agent.service.rag.S3PresignedUrlService;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,16 +27,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Extra branch coverage for AscendChatService:
- *  - attachSources=true, ragRetrievalRan=true -> sources presigned and attached
- *  - attachSources=true, ragRetrievalRan=false -> sources are empty
- *  - compactionOverride=null handled gracefully
- *  - embeddingProvider resolved from provider config when null passed in
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class AscendChatServiceExtraTest {
+class AscendChatServiceSourceAttachmentsTest {
 
     @Mock
     private AiProviderProperties aiProviderProperties;
@@ -86,7 +80,7 @@ class AscendChatServiceExtraTest {
                         "https://example.com/key.pdf", java.time.Instant.now(), 1024L)));
 
         // when
-        AiResponse response = ascendChatService.prompt("hello", null, null, "frosty",
+        AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, "openai", true, CompactionOverride.EMPTY);
 
         // then
@@ -102,7 +96,7 @@ class AscendChatServiceExtraTest {
         when(contextAssembler.buildUserMessage(anyString(), any(), any())).thenReturn(userMessage);
 
         // when
-        AiResponse response = ascendChatService.prompt("hello", null, null, "frosty",
+        AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, "openai", true, CompactionOverride.EMPTY);
 
         // then
@@ -117,7 +111,7 @@ class AscendChatServiceExtraTest {
         when(contextAssembler.buildUserMessage(anyString(), any(), any())).thenReturn(userMessage);
 
         // when
-        AiResponse response = ascendChatService.prompt("hello", null, null, "frosty",
+        AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, "openai", false, CompactionOverride.EMPTY);
 
         // then
@@ -132,7 +126,7 @@ class AscendChatServiceExtraTest {
         when(contextAssembler.buildUserMessage(anyString(), any(), any())).thenReturn(userMessage);
 
         // when — must not throw
-        AiResponse response = ascendChatService.prompt("hello", null, null, "frosty",
+        AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, "openai", false, null);
 
         assertThat(response.content()).isEqualTo("reply");
@@ -150,7 +144,7 @@ class AscendChatServiceExtraTest {
         when(contextAssembler.buildUserMessage(anyString(), any(), any())).thenReturn(userMessage);
 
         // when
-        AiResponse response = ascendChatService.prompt("hello", null, null, "frosty",
+        AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, null, false, CompactionOverride.EMPTY);
 
         assertThat(response.content()).isEqualTo("reply");

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -27,6 +28,7 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 
 import javax.sql.DataSource;
@@ -36,18 +38,12 @@ import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for StartupLogConfig probe methods — specifically the failure branches
- * (checkDatabase, checkRedis, checkQdrant, checkS3, checkAscendMemory, checkMcpTools).
- * We reflect-call the private helpers via the event listener instead, so we cover branches
- * without bypassing access modifiers.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class StartupLogConfigTest {
@@ -209,7 +205,7 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
 
-        when(s3Client.listObjects(any(java.util.function.Consumer.class)))
+        when(s3Client.listObjects(ArgumentMatchers.<Consumer<ListObjectsRequest.Builder>>any()))
                 .thenThrow(new RuntimeException("MinIO unavailable"));
 
         stubMcpNoProvider();
@@ -310,7 +306,7 @@ class StartupLogConfigTest {
     @DisplayName("onReadinessChange is a no-op for state other than ACCEPTING_TRAFFIC")
     void onReadinessChange_RefusingTrafficState_DoesNothing() throws Exception {
         // given
-        AvailabilityChangeEvent<ReadinessState> event = mock(AvailabilityChangeEvent.class);
+        AvailabilityChangeEvent<ReadinessState> event = mock();
         when(event.getState()).thenReturn(ReadinessState.REFUSING_TRAFFIC);
 
         // when — no interactions expected
@@ -433,7 +429,7 @@ class StartupLogConfigTest {
     @DisplayName("onReadinessChange logs Warning for AscendMemory when HTTP probe returns non-200 status")
     void onReadinessChange_AscendMemoryNon200_LogsWarning() throws Exception {
         // Enable semantic memory and point it at a URL that returns non-200
-        // Use WireMock would be ideal, but since we can't start a server easily in a unit test,
+        // Use WireMock would be ideal. However, since we can't start a server easily in a unit test,
         // we test the "connection refused" path (same as FAILED) for this scenario.
         // The actual non-200 branch requires a live server returning e.g. 500.
         // This test exercises the "enabled=true" path so checkAscendMemory runs.
@@ -450,11 +446,11 @@ class StartupLogConfigTest {
         config.onReadinessChange(readinessEvent());
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private AvailabilityChangeEvent<ReadinessState> readinessEvent() {
-        AvailabilityChangeEvent<ReadinessState> event = mock(AvailabilityChangeEvent.class);
+        AvailabilityChangeEvent<ReadinessState> event = mock();
         when(event.getState()).thenReturn(ReadinessState.ACCEPTING_TRAFFIC);
+
         return event;
     }
 
@@ -482,7 +478,8 @@ class StartupLogConfigTest {
 
     private void stubS3Success() {
         ListObjectsResponse s3Response = ListObjectsResponse.builder().contents(List.of()).build();
-        when(s3Client.listObjects(any(java.util.function.Consumer.class))).thenReturn(s3Response);
+
+        when(s3Client.listObjects(ArgumentMatchers.<Consumer<ListObjectsRequest.Builder>>any())).thenReturn(s3Response);
     }
 
     private void stubMcpNoProvider() {

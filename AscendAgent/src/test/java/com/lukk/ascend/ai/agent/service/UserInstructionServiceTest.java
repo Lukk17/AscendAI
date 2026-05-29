@@ -3,6 +3,7 @@ package com.lukk.ascend.ai.agent.service;
 import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.model.UserInstruction;
 import com.lukk.ascend.ai.agent.repository.UserInstructionRepository;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,8 +30,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserInstructionServiceTest {
 
-    private static final String DEFAULT_USER_ID = "user1";
-    private static final String CACHE_KEY = "user:user1:instructions";
+    private static final String DEFAULT_USER_ID = TestConstants.DEFAULT_USER_ID;
+    private static final String CACHE_KEY = "user:" + TestConstants.DEFAULT_USER_ID + ":instructions";
     private static final String INSTRUCTION_TEXT = "Be very concise";
     private static final String EMPTY_MARKER = "EMPTY";
     private static final Duration TTL = Duration.ofDays(1);
@@ -121,7 +122,7 @@ class UserInstructionServiceTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get(anyString())).thenThrow(new RuntimeException("Redis disconnected"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> userInstructionService.getInstructions(DEFAULT_USER_ID))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("Failed to fetch user instructions");
@@ -144,7 +145,7 @@ class UserInstructionServiceTest {
         // given
         doThrow(new RuntimeException("DB offline")).when(repository).save(any(UserInstruction.class));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> userInstructionService.updateInstructions(DEFAULT_USER_ID, INSTRUCTION_TEXT))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("Failed to update user instructions");

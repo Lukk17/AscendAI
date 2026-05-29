@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.memory;
 
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
+import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +33,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SemanticMemoryClientTest {
 
-    private static final String DEFAULT_USER_ID = "user1";
+    private static final String DEFAULT_USER_ID = TestConstants.DEFAULT_USER_ID;
     private static final String QUERY = "Find memory";
     private static final int LIMIT = 5;
     private static final String FACT = "User uses Python";
@@ -69,7 +70,7 @@ class SemanticMemoryClientTest {
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
 
-        List<SemanticMemoryItem> expectedItems = List.of(new SemanticMemoryItem("1", "user1", "Memory", 0.9d, Instant.now(), Map.of()));
+        List<SemanticMemoryItem> expectedItems = List.of(new SemanticMemoryItem("1", TestConstants.DEFAULT_USER_ID, "Memory", 0.9d, Instant.now(), Map.of()));
 
         when(restClientBuilder.build().get()
                 .uri(anyString(), eq(DEFAULT_USER_ID), eq(QUERY), eq(LIMIT), eq(EMBEDDING_PROVIDER))
@@ -184,7 +185,7 @@ class SemanticMemoryClientTest {
         when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
 
-        // when / then — no exception
+        // then — no exception
         semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
     }
 
@@ -228,7 +229,7 @@ class SemanticMemoryClientTest {
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
+        @SuppressWarnings({"rawtypes"})
         RestClient.RequestHeadersUriSpec deleteMock = mock(RestClient.RequestHeadersUriSpec.class);
         RestClient.RequestHeadersSpec<?> headersSpecMock = mock(RestClient.RequestHeadersSpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
@@ -291,7 +292,6 @@ class SemanticMemoryClientTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     @DisplayName("insertMemory POSTs a snake_case body with user_id, text, and provider fields")
     void insertMemory_WhenEnabled_ThenPostsSnakeCaseBody() {
         // given

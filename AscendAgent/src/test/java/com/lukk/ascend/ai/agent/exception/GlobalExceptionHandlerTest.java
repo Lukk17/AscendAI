@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.exception;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,9 +30,11 @@ class GlobalExceptionHandlerTest {
 
         // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).containsEntry("status", 400);
-        assertThat(response.getBody()).containsEntry("error", "Bad Request");
-        assertThat(response.getBody().get("message").toString()).contains("exe");
+        assertThat(response.getBody())
+                .containsEntry("status", 400)
+                .containsEntry("error", "Bad Request")
+                .extractingByKey("message", InstanceOfAssertFactories.STRING)
+                .contains("exe");
     }
 
     @Test
@@ -87,8 +90,11 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = globalExceptionHandler.handleUnsupportedFileType(exception);
 
         // then
-        assertThat(response.getBody()).containsKey("timestamp");
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("timestamp").toString()).isNotBlank();
+        assertThat(response.getBody())
+                .isNotNull()
+                .containsKey("timestamp")
+                .extractingByKey("timestamp", InstanceOfAssertFactories.type(Object.class))
+                .extracting(Object::toString, InstanceOfAssertFactories.STRING)
+                .isNotBlank();
     }
 }
