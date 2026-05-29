@@ -11,25 +11,27 @@ e2e/
 ├── README.md                            # this file
 ├── fixtures/                            # canary inputs the tests upload
 │   └── README.md
-└── testing/                             # numbered specs + sidecar templates + run records
+└── testing/                             # numbered specs + templates/ + runs/
     ├── README.md
     ├── 1-<capability>-test.md           # immutable spec
-    ├── 1-<capability>-tasks.template.md # immutable run-record template
     ├── 2-<capability>-test.md
-    ├── 2-<capability>-tasks.template.md
+    ├── templates/                       # immutable run-record templates, one per spec
+    │   ├── README.md
+    │   ├── 1-<capability>-tasks.template.md
+    │   └── 2-<capability>-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<capability>-tasks.md   # one per executed test (gitignored)
 ```
 
-Tests are number-prefixed by setup cost. `1` needs the least, higher numbers need more. Each spec has a paired
-tasks-template that the runner copies into `testing/runs/` with a sweep timestamp, ticks off checkbox by checkbox as
-it executes, and fills with results, token usage, and wall-clock time.
+Tests are number-prefixed by setup cost. `1` needs the least, higher numbers need more. Each spec under `testing/`
+has a paired tasks-template in `testing/templates/` that the runner copies into `testing/runs/` with a sweep
+timestamp, ticks off checkbox by checkbox as it executes, and fills with results, token usage, and wall-clock time.
 
 ## Flow
 
 1. Read the spec at `testing/{N}-<capability>-test.md`.
-2. Copy `testing/{N}-<capability>-tasks.template.md` to
+2. Copy `testing/templates/{N}-<capability>-tasks.template.md` to
    `testing/runs/<UTC-timestamp>_{N}-<capability>-tasks.md`.
 3. Record `Start (UTC)` as the very first action.
 4. Execute prerequisites → reset state → run → expected. Tick boxes as you go.

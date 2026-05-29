@@ -3,8 +3,8 @@
 Spec: [`../{N}-{capability}-test.md`](../{N}-{capability}-test.md)
 
 <!--
-This file is created by copying `../{N}-{capability}-tasks.template.md` to
-this location and filling it in. Filename uses ISO-8601 UTC with colons
+This file is created by copying `../templates/{N}-{capability}-tasks.template.md`
+to this location and filling it in. Filename uses ISO-8601 UTC with colons
 replaced by hyphens: `runs/2026-05-12T17-23-36_{N}-{capability}-tasks.md`.
 
 The Spec back-link above (`../{N}-{capability}-test.md`) is written for the

@@ -53,7 +53,7 @@ explicit dual-write:
 | ---------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
 | `proposal`       | `openspec/changes/<id>/proposal.md`                    | _none — proposal stays in the change dir_                               |
 | `test-spec`      | `openspec/changes/<id>/test-spec.md`                   | `e2e/testing/{N}-{capability}-test.md`                                  |
-| `tasks-template` | `openspec/changes/<id>/tasks-template.md`              | `e2e/testing/{N}-{capability}-tasks.template.md`                        |
+| `tasks-template` | `openspec/changes/<id>/tasks-template.md`              | `e2e/testing/templates/{N}-{capability}-tasks.template.md`              |
 | `run`            | `openspec/changes/<id>/run.md`                         | `e2e/testing/runs/{utc-timestamp}_{N}-{capability}-tasks.md` (gitignored)|
 
 Each artifact's `instruction:` in [`schema.yaml`](./schema.yaml) tells the agent to do the dual-write. `{N}`,

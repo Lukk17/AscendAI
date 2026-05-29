@@ -62,5 +62,5 @@ N:
 After this proposal is approved:
 
 - Generate `e2e/testing/{N}-{capability}-test.md` from the `test-spec` artifact.
-- Generate `e2e/testing/{N}-{capability}-tasks.template.md` from the `tasks-template` artifact.
+- Generate `e2e/testing/templates/{N}-{capability}-tasks.template.md` from the `tasks-template` artifact.
 - Each execution generates a `run` record under `e2e/testing/runs/`.

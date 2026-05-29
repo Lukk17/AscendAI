@@ -4,18 +4,29 @@
 
 OpenSpec assumes every artifact lives under `openspec/changes/<change-id>/` during the proposal cycle and that
 `archive` promotes finished content to `openspec/specs/`. This schema's artifacts have a different final home —
-`e2e/testing/` for spec + tasks-template pairs, `e2e/testing/runs/` for execution records — so the schema instructs a
-**dual write** rather than relying on archive.
+specs under `e2e/testing/`, their run-record templates under `e2e/testing/templates/`, and execution records under
+`e2e/testing/runs/` — so the schema instructs a **dual write** rather than relying on archive.
 
 ```text
-openspec/changes/<change-id>/                       e2e/                     consumer project root
-├── proposal.md                                     ├── README.md
-├── test-spec.md           ─── identical copy ──►   ├── testing/
-├── tasks-template.md      ─── identical copy ──►   │   ├── {N}-{capability}-test.md
-└── run.md                 ─── timestamped copy ─►  │   ├── {N}-{capability}-tasks.template.md
-                                                    │   └── runs/
-                                                    │       └── <UTC-ts>_{N}-{capability}-tasks.md  (gitignored)
-                                                    └── fixtures/
+change-dir artifact                         copy kind          working-tree destination
+─────────────────────────────────────────────────────────────────────────────────────────────────
+openspec/changes/<id>/proposal.md           (none)             stays in the change dir only
+openspec/changes/<id>/test-spec.md          identical     ──►  e2e/testing/{N}-{capability}-test.md
+openspec/changes/<id>/tasks-template.md     identical     ──►  e2e/testing/templates/{N}-{capability}-tasks.template.md
+openspec/changes/<id>/run.md                timestamped   ──►  e2e/testing/runs/<UTC-ts>_{N}-{capability}-tasks.md  (gitignored)
+```
+
+Resulting `e2e/` tree in the consumer project:
+
+```text
+e2e/
+├── fixtures/
+└── testing/
+    ├── {N}-{capability}-test.md              # spec
+    ├── templates/
+    │   └── {N}-{capability}-tasks.template.md
+    └── runs/
+        └── <UTC-ts>_{N}-{capability}-tasks.md   # gitignored
 ```
 
 Why two copies:

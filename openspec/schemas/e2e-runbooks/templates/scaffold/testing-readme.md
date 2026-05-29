@@ -1,8 +1,9 @@
 # e2e testing guide
 
-Self-contained walkthroughs that an AI agent (or a human) can execute end-to-end against a live stack. Each file in
-this directory drives one capability through its API client invocation, with explicit prerequisite checks, reset
-commands, run steps, and expected outcomes.
+Self-contained walkthroughs that an AI agent (or a human) can execute end-to-end against a live stack. Each
+`<N>-<capability>-test.md` spec in this directory drives one capability through its API client invocation, with
+explicit prerequisite checks, reset commands, run steps, and expected outcomes. The paired run-record templates live
+in the `templates/` subdirectory; executed run records land in `runs/`.
 
 ## Format
 
@@ -19,10 +20,11 @@ Every `<N>-<capability>-test.md` file is the **immutable spec** for one test and
    and content, persisted state. NOT log substrings.
 6. **Fixtures.** Paths to local files the test reads.
 
-Alongside each spec lives a `<N>-<capability>-tasks.template.md`. The **checkbox template** for a run. The runner
-never edits the spec or the template directly. Before starting a run, it copies the template into `runs/` with a
-timestamped filename, ticks boxes as it progresses, fills in Result summary and Verdict, and logs anything done
-outside the spec under "Additional tasks I did". See [runs/README.md](runs/README.md) for the full runner contract.
+Each spec has a matching `<N>-<capability>-tasks.template.md` in the `templates/` subdirectory — the **checkbox
+template** for a run. The runner never edits the spec or the template directly. Before starting a run, it copies the
+template from `templates/` into `runs/` with a timestamped filename, ticks boxes as it progresses, fills in Result
+summary and Verdict, and logs anything done outside the spec under "Additional tasks I did". See
+[runs/README.md](runs/README.md) for the full runner contract.
 
 ## Test order
 

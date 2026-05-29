@@ -7,10 +7,11 @@ default.
 ## Contract
 
 1. Specs (`../<N>-<capability>-test.md`) are **immutable** between runs. The runner never edits them.
-2. Templates (`../<N>-<capability>-tasks.template.md`) are also **immutable**. They define the checkbox list for
-   that test.
-3. Each run starts by copying the relevant template into this directory with a UTC timestamp prefix. The runner
-   ticks boxes as it completes each step and fills in **Result summary** and **Additional tasks I did** at the end.
+2. Templates (`../templates/<N>-<capability>-tasks.template.md`) are also **immutable**. They define the checkbox
+   list for that test.
+3. Each run starts by copying the relevant template from `../templates/` into this directory with a UTC timestamp
+   prefix. The runner ticks boxes as it completes each step and fills in **Result summary** and **Additional tasks I
+   did** at the end.
 
 ## Naming
 
@@ -26,7 +27,7 @@ Group all tests from one sweep under the same timestamp; one timestamp = one ful
 ## Runner steps
 
 1. Read the spec for the test.
-2. Copy the template into this directory with a timestamped filename.
+2. Copy the template from `../templates/` into this directory with a timestamped filename.
 3. **Record `Start (UTC)`** as the very first action. Wall-clock instant *before* the prerequisite checks begin.
 4. Execute each task in order. Tick the box on success; record what went wrong on failure.
 5. After the **Verdict** line is decided, **record `End (UTC)`**. Wall-clock instant *after* the last verification

@@ -12,7 +12,7 @@ description: >-
 # also have a permanent home outside the change tree:
 #
 #   - test-spec.md      ──►  e2e/testing/{N}-{capability}-test.md
-#   - tasks-template.md ──►  e2e/testing/{N}-{capability}-tasks.template.md
+#   - tasks-template.md ──►  e2e/testing/templates/{N}-{capability}-tasks.template.md
 #   - run.md            ──►  e2e/testing/runs/{utc-timestamp}_{N}-{capability}-tasks.md
 #
 # OpenSpec's archive command only auto-promotes openspec/specs/ content, so
@@ -39,20 +39,22 @@ artifacts:
       exists; the scaffold is idempotent and one-time):
 
         1. Create directories: `e2e/`, `e2e/fixtures/`, `e2e/testing/`,
-           `e2e/testing/runs/`.
+           `e2e/testing/templates/`, `e2e/testing/runs/`.
         2. Copy `templates/scaffold/e2e-readme.md` to `e2e/README.md`.
         3. Copy `templates/scaffold/fixtures-readme.md` to
            `e2e/fixtures/README.md`.
         4. Copy `templates/scaffold/testing-readme.md` to
            `e2e/testing/README.md`.
-        5. Copy `templates/scaffold/runs-readme.md` to
+        5. Copy `templates/scaffold/templates-readme.md` to
+           `e2e/testing/templates/README.md`.
+        6. Copy `templates/scaffold/runs-readme.md` to
            `e2e/testing/runs/README.md`.
-        6. Append the contents of `templates/scaffold/gitignore-snippet.txt`
+        7. Append the contents of `templates/scaffold/gitignore-snippet.txt`
            to the consumer project's root `.gitignore` (create the file if
            missing). The snippet must ignore `e2e/testing/runs/*.md` but
            keep `e2e/testing/runs/README.md` tracked, so use a negation
            pattern.
-        7. Stage all scaffolded files and the .gitignore change so the
+        8. Stage all scaffolded files and the .gitignore change so the
            user can review.
 
       Then fill the proposal. Behaviour-only assertions: HTTP status codes,
@@ -147,8 +149,11 @@ artifacts:
       Write the file in TWO locations with identical content:
 
         1. `tasks-template.md` in the current change directory.
-        2. `e2e/testing/{N}-{capability}-tasks.template.md` at the consumer
-           project root, substituting {N} and {capability} to match the spec.
+        2. `e2e/testing/templates/{N}-{capability}-tasks.template.md` at the
+           consumer project root, substituting {N} and {capability} to match
+           the spec. The `templates/` subdirectory holds only these run-record
+           templates; the `{N}-{capability}-test.md` specs stay directly under
+           `e2e/testing/`.
     requires: [test-spec]
 
   - id: run
@@ -165,7 +170,10 @@ artifacts:
       File handling:
 
         1. Copy the tasks-template content into `run.md` in the current
-           change directory. This is the artifact OpenSpec tracks.
+           change directory. This is the artifact OpenSpec tracks. When
+           re-running an existing test in a sweep (no fresh change), the
+           template source is
+           `e2e/testing/templates/{N}-{capability}-tasks.template.md`.
         2. The canonical timestamped record lives at
            `e2e/testing/runs/<UTC-timestamp>_{N}-{capability}-tasks.md`
            at the consumer project root. UTC timestamp uses ISO-8601 with

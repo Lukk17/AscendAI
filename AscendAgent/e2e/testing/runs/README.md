@@ -9,10 +9,11 @@ Each manual e2e test run drops a filled-in copy of the matching `*-tasks.templat
 
 1. Specs (`AscendAgent/e2e/testing/<N>-<feature>-test.md`) are **immutable** between runs. The runner never edits
    them.
-2. Templates (`AscendAgent/e2e/testing/<N>-<feature>-tasks.template.md`) are also **immutable**. They define the
-   checkbox list for that test.
-3. Each run starts by copying the relevant template into this directory with a UTC timestamp prefix. The runner
-   ticks boxes as it completes each step and fills in **Result summary** and **Additional tasks I did** at the end.
+2. Templates (`AscendAgent/e2e/testing/templates/<N>-<feature>-tasks.template.md`) are also **immutable**. They
+   define the checkbox list for that test.
+3. Each run starts by copying the relevant template from `../templates/` into this directory with a UTC timestamp
+   prefix. The runner ticks boxes as it completes each step and fills in **Result summary** and **Additional tasks I
+   did** at the end.
 
 ---
 
@@ -34,7 +35,7 @@ Group all five tests from one sweep under the same timestamp; one timestamp = on
 ### What the AI runner does
 
 1. Read the spec for the test.
-2. Copy the template into [runs/](.) with a timestamped filename.
+2. Copy the template from [../templates/](../templates/) into [runs/](.) with a timestamped filename.
 3. **Record `Start (UTC)`** as the very first action. The wall-clock instant *before* the prerequisite checks begin.
 4. Execute each task in order. Tick the box on success; record what went wrong on failure.
 5. After the **Verdict** line is decided, **record `End (UTC)`**. The wall-clock instant *after* the last
