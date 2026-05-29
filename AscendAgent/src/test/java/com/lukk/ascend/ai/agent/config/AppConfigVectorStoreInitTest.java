@@ -133,6 +133,7 @@ class AppConfigVectorStoreInitTest {
         ReflectionTestUtils.setField(config, "s3PublicEndpoint", "http://localhost:9070");
         ReflectionTestUtils.setField(config, "s3AccessKey", "minioadmin");
         ReflectionTestUtils.setField(config, "s3SecretKey", "minioadmin");
+
         return config;
     }
 }

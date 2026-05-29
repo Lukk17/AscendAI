@@ -149,7 +149,8 @@ class ChatContextAssemblerMemoryFilteringTest {
     @DisplayName("buildSystemMessages logs NO for instructions when instructions is blank (not null)")
     void buildSystemMessages_BlankInstructions_LogsNoState() {
         // instructions != null && !instructions.isBlank() = true && false = false -> "NO" in log
-        when(userInstructionService.getInstructions(USER_ID)).thenReturn("   "); // blank, not null
+        // blank, not null
+        when(userInstructionService.getInstructions(USER_ID)).thenReturn("   ");
         when(semanticMemoryClient.search(USER_ID, USER_PROMPT, 5, EMBED_PROVIDER)).thenReturn(List.of());
 
         String result = assembler.buildSystemMessage(USER_ID, USER_PROMPT, EMBED_PROVIDER);

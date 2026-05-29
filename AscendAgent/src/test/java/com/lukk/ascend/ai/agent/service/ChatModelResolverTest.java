@@ -172,6 +172,7 @@ class ChatModelResolverTest {
         config.setApiKey("test-key");
         config.setModel(modelName);
         config.setMaxTokens(100);
+
         return config;
     }
 }

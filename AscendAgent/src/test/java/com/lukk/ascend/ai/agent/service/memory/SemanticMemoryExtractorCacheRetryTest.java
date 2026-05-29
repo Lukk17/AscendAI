@@ -105,6 +105,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("extract does NOT retry when isCacheConfigError returns false (error is propagated)")
     void extract_NonCacheError_DoesNotRetry() throws InterruptedException {
+        // given
         PromptCacheStrategy noCacheError = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -135,6 +136,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("extract uses requestedModel directly when it is non-blank (no provider lookup)")
     void extract_NonBlankRequestedModel_UsesIt() throws InterruptedException {
+        // given
         PromptCacheStrategy noop = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -167,6 +169,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("invokeExtractor passes options to spec when options is not null")
     void invokeExtractor_NonNullOptions_PassesOptionsToSpec() throws InterruptedException {
+        // given
         PromptCacheStrategy withOptions = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -175,7 +178,8 @@ class SemanticMemoryExtractorCacheRetryTest {
 
             @Override
             public ChatOptions buildOptions(String model) {
-                return ChatOptions.builder().model(model).build(); // non-null
+                // non-null
+                return ChatOptions.builder().model(model).build();
             }
 
             @Override
@@ -208,7 +212,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("extract uses null fallback options when extractionModel is blank during cache retry")
     void extract_CacheRetry_WithBlankExtractionModel_UsesFallbackNull() throws InterruptedException {
-        // providers map empty + model null -> extractionModel = null -> fallback = null (line 76 null branch)
+        // given — providers map empty + model null -> extractionModel = null -> fallback = null
         PromptCacheStrategy cacheErrorStrategy = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -250,10 +254,9 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("invokeExtractor skips defaultOptions when options is null and extractionModel is blank")
     void invokeExtractor_NullOptionsAndBlankExtractionModel_NoDefaultOptions() throws InterruptedException {
-        // providers map empty + model null -> extractionModel = null
+        // given — providers map empty + model null -> extractionModel = null
         // Noop buildOptions(null) = null -> decoratedOptions = null
-        // invokeExtractor(chatModel, userText, null, null):
-        //   options==null && hasText(null) = false -> NO defaultOptions set (line 91 false branch)
+        // options==null && hasText(null) = false -> NO defaultOptions set
         PromptCacheStrategy noop = new PromptCacheStrategy() {
             @Override
             public String providerName() {

@@ -47,7 +47,7 @@ class CustomMetadataTest {
     void equals_ReturnsFalseAgainstUnrelatedType() {
         // given
         CustomMetadata meta = new CustomMetadata(null, List.of());
-        Object unrelated = "not-a-metadata";
+        Object unrelated = new Object();
 
         // then
         assertThat(meta.equals(unrelated)).isFalse();

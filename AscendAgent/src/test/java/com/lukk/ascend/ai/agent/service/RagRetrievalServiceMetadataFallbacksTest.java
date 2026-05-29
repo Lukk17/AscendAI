@@ -172,8 +172,10 @@ class RagRetrievalServiceMetadataFallbacksTest {
         // given
         setupRag(0.4, 10);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
-        Document d1 = mockDoc("AAAAAAAAAA", 0.9, Map.of("source", "a.txt")); // exactly 10 chars
-        Document d2 = mockDoc("BBBBBBBBBB", 0.8, Map.of("source", "b.txt")); // should not appear
+        // exactly 10 chars
+        Document d1 = mockDoc("AAAAAAAAAA", 0.9, Map.of("source", "a.txt"));
+        // should not appear
+        Document d2 = mockDoc("BBBBBBBBBB", 0.8, Map.of("source", "b.txt"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(d1, d2));
 
         // when
@@ -287,6 +289,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
         lenient().when(doc.getText()).thenReturn(text);
         lenient().when(doc.getScore()).thenReturn(score);
         lenient().when(doc.getMetadata()).thenReturn(metadata);
+
         return doc;
     }
 }

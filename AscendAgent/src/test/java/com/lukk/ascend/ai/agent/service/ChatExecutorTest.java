@@ -191,6 +191,7 @@ class ChatExecutorTest {
         ChatResponse chatResponse = mock(ChatResponse.class);
         when(chatResponse.getResult()).thenReturn(generation);
         when(chatResponse.getMetadata()).thenReturn(mock(ChatResponseMetadata.class));
+
         return chatResponse;
     }
 }

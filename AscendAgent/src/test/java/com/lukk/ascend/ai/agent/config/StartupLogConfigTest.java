@@ -434,7 +434,8 @@ class StartupLogConfigTest {
         // The actual non-200 branch requires a live server returning e.g. 500.
         // This test exercises the "enabled=true" path so checkAscendMemory runs.
         semanticMemoryProperties.setEnabled(true);
-        semanticMemoryProperties.setBaseUrl("http://127.0.0.1:29999"); // non-listening port -> throws
+        // non-listening port -> throws
+        semanticMemoryProperties.setBaseUrl("http://127.0.0.1:29999");
 
         stubDatabaseSuccess();
         stubRedisSuccess();

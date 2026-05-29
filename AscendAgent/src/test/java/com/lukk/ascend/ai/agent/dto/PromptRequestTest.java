@@ -39,7 +39,7 @@ class PromptRequestTest {
     void equals_ReturnsFalseAgainstUnrelatedType() {
         // given
         PromptRequest req = new PromptRequest("p", "i", "d");
-        Object unrelated = "not-a-request";
+        Object unrelated = new Object();
 
         // then
         assertThat(req.equals(unrelated)).isFalse();

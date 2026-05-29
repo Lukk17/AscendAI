@@ -39,7 +39,7 @@ class DoclingClientResponseParsingTest {
     private DoclingClient client;
 
 
-    private RestClient.RequestBodySpec stubChain(String jsonResponse) {
+    private void stubChain(String jsonResponse) {
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
@@ -50,8 +50,6 @@ class DoclingClientResponseParsingTest {
         when(bodySpecMock.body(any(Object.class))).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
         when(responseSpecMock.body(String.class)).thenReturn(jsonResponse);
-
-        return bodySpecMock;
     }
 
 

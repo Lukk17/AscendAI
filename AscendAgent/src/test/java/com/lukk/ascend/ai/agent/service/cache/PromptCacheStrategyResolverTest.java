@@ -105,6 +105,7 @@ class PromptCacheStrategyResolverTest {
         props.setProviders(map);
         PromptCacheStrategyResolver resolver = new PromptCacheStrategyResolver(props);
         resolver.init();
+
         return resolver;
     }
 }

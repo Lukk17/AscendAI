@@ -151,8 +151,8 @@ class ManualIngestionServiceTest {
     @Test
     @DisplayName("run delegates PDF processing to the unstructured service")
     void run_WhenValidPdfObject_ThenDelegatesToUnstructured() {
-        // given
-        S3Object obj = S3Object.builder().key("documents/report.pdf").build(); // No etag, no lastModified tests unknown fallback
+        // given — No etag, no lastModified tests unknown fallback
+        S3Object obj = S3Object.builder().key("documents/report.pdf").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(enforceMetaKey("manual-ingestion:documents/report.pdf:unknown"), anyString())).thenReturn(null);
@@ -182,8 +182,9 @@ class ManualIngestionServiceTest {
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
         when(metadataStore.putIfAbsent(anyString(), anyString())).thenReturn(null);
 
+        // S3 client throwing arbitrary unchecked exceptions
         when(s3Client.getObject(any(GetObjectRequest.class)))
-                .thenThrow(new IngestionException("IO Stream crash")); // S3 client throwing arbitrary unchecked exceptions
+                .thenThrow(new IngestionException("IO Stream crash"));
 
         // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");

@@ -126,6 +126,7 @@ class AnthropicPromptCacheStrategyTest {
         ChatResponseMetadata md = ChatResponseMetadata.builder().usage(usage).build();
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
+
         return response;
     }
 }

@@ -255,6 +255,7 @@ class RagRetrievalServiceTest {
         lenient().when(mockDoc.getText()).thenReturn(content);
         lenient().when(mockDoc.getScore()).thenReturn(score);
         lenient().when(mockDoc.getMetadata()).thenReturn(metadata);
+
         return mockDoc;
     }
 }

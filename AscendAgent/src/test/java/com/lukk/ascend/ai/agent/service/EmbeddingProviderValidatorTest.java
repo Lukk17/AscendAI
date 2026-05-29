@@ -130,7 +130,8 @@ class EmbeddingProviderValidatorTest {
     void validate_WhenUnknownEmbeddingProvider_ThenThrowsIllegalArgumentException() {
         // given
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_GEMINI);
-        when(embeddingProviderProperties.getProviders()).thenReturn(Map.of()); // No embeddings mapped
+        // No embeddings mapped
+        when(embeddingProviderProperties.getProviders()).thenReturn(Map.of());
 
         // then
         assertThatThrownBy(() -> validator.validate(CHAT_PROVIDER_GEMINI, "nonexistent"))

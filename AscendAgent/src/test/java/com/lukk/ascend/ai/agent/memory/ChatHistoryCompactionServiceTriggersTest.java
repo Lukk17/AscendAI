@@ -257,7 +257,8 @@ class ChatHistoryCompactionServiceTriggersTest {
     @DisplayName("maybeCompact proceeds to persistence when summariser output is missing the marker (auto-prepend)")
     void maybeCompact_SummariserMissingMarker_AutoPrepends() {
         // given — no [Conversation summary] prefix -> service prepends it and proceeds
-        historyProperties.getRedis().setEnabled(false); // only postgres, simpler assertions
+        // only postgres, simpler assertions
+        historyProperties.getRedis().setEnabled(false);
         ChatResponse markerlessResponse = buildChatResponseWithContent("Short valid summary without marker.");
         List<ChatHistory> history = buildHistory(12);
         when(repository.findAllHistoryOrdered(CONV_ID)).thenReturn(history);
@@ -528,6 +529,7 @@ class ChatHistoryCompactionServiceTriggersTest {
         when(gen.getOutput()).thenReturn(msg);
         ChatResponse resp = org.mockito.Mockito.mock(ChatResponse.class);
         when(resp.getResult()).thenReturn(gen);
+
         return resp;
     }
 }

@@ -86,8 +86,10 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
     @DisplayName("recordOutcome uses 0 for prompt tokens when getPromptTokens() returns null")
     void recordOutcome_NullPromptTokensFromUsage_UsesZero() {
         // given
-        AnthropicApi.Usage native_ = new AnthropicApi.Usage(null, 100, 300, 50); // inputTokens=null
-        Usage usage = new DefaultUsage(null, 100, null, native_); // promptTokens=null
+        // inputTokens=null
+        AnthropicApi.Usage native_ = new AnthropicApi.Usage(null, 100, 300, 50);
+        // promptTokens=null
+        Usage usage = new DefaultUsage(null, 100, null, native_);
         ChatResponseMetadata md = ChatResponseMetadata.builder().usage(usage).build();
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);

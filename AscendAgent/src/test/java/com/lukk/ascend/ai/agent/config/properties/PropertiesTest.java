@@ -26,6 +26,7 @@ class PropertiesTest {
         cfg.setTemperature(0.7d);
         cfg.setMaxTokens(1024);
         cfg.setTimeoutSeconds(30L);
+
         return cfg;
     }
 
@@ -36,6 +37,7 @@ class PropertiesTest {
         cfg.setApiKey("k");
         cfg.setModel("text-embedding");
         cfg.setDimensions(1536);
+
         return cfg;
     }
 
@@ -232,10 +234,12 @@ class PropertiesTest {
         assertThat(props.getProviders()).isEmpty();
         assertThat(props.isProviderEnabled("anthropic")).isTrue();
 
-        // when — disable anthropic per-provider
-        props.setProviders(Map.of("anthropic", buildProviderCache(false)));
+        // when — disable anthropic per-provider but explicitly enable openai
+        props.setProviders(Map.of(
+                "anthropic", buildProviderCache(false),
+                "openai", buildProviderCache(true)));
 
-        // then
+        // then — explicit enabled overrides default, explicit disabled blocks
         assertThat(props.isProviderEnabled("anthropic")).isFalse();
         assertThat(props.isProviderEnabled("openai")).isTrue();
 
