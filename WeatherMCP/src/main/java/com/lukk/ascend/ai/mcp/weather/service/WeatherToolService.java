@@ -29,7 +29,7 @@ public class WeatherToolService {
             return "City not found: " + city;
         }
 
-        GeoResult location = geoResponse.results().get(0);
+        GeoResult location = geoResponse.results().getFirst();
         return fetchWeather(location.latitude(), location.longitude(), unit);
     }
 
