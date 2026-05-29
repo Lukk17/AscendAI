@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.memory.CompactionOverride;
 import com.lukk.ascend.ai.agent.memory.PersistentChatMemory;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,6 +36,7 @@ class ChatHistoryServiceTest {
     private ArgumentCaptor<List<Message>> messageListCaptor;
 
     @Test
+    @DisplayName("loadHistory returns messages from persistent chat memory")
     void loadHistory_WhenInvoked_ThenReturnsHistoryFromMemory() {
         // given
         List<Message> expectedHistory = List.of(new UserMessage("Hi"), new AssistantMessage("Hello"));
@@ -49,6 +51,7 @@ class ChatHistoryServiceTest {
     }
 
     @Test
+    @DisplayName("loadHistory returns empty list when no history exists for the conversation")
     void loadHistory_WhenNoHistoryExists_ThenReturnsEmptyList() {
         // given
         when(persistentChatMemory.get(DEFAULT_USER_ID, 100)).thenReturn(List.of());
@@ -62,6 +65,7 @@ class ChatHistoryServiceTest {
     }
 
     @Test
+    @DisplayName("saveHistory wraps prompt and response in user/assistant messages and saves them")
     void saveHistory_WhenInvoked_ThenWrapsAndSavesMessages() {
         // given
         String userPrompt = "What is the weather?";
@@ -72,7 +76,7 @@ class ChatHistoryServiceTest {
 
         // then
         verify(persistentChatMemory).add(eq(DEFAULT_USER_ID), messageListCaptor.capture(),
-                eq((String) null), eq(CompactionOverride.EMPTY));
+                eq(null), eq(CompactionOverride.EMPTY));
 
         List<Message> capturedMessages = messageListCaptor.getValue();
         assertThat(capturedMessages).hasSize(2);

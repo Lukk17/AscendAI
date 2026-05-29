@@ -4,6 +4,7 @@ import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.model.UserInstruction;
 import com.lukk.ascend.ai.agent.repository.UserInstructionRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -52,6 +53,7 @@ class UserInstructionServiceTest {
     }
 
     @Test
+    @DisplayName("getInstructions returns the cached value when it is present in Redis")
     void getInstructions_WhenCachedInRedis_ThenReturnsCachedValue() {
         // given
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -65,6 +67,7 @@ class UserInstructionServiceTest {
     }
 
     @Test
+    @DisplayName("getInstructions returns empty string when Redis contains the EMPTY sentinel marker")
     void getInstructions_WhenRedisEmptyMarker_ThenReturnsEmptyString() {
         // given
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -78,6 +81,7 @@ class UserInstructionServiceTest {
     }
 
     @Test
+    @DisplayName("getInstructions fetches from DB, caches in Redis, and returns the value when not in Redis")
     void getInstructions_WhenNotInRedisButInDb_ThenCachesAndReturnsFromDb() {
         // given
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -95,6 +99,7 @@ class UserInstructionServiceTest {
     }
 
     @Test
+    @DisplayName("getInstructions caches EMPTY marker and returns empty string when absent from both Redis and DB")
     void getInstructions_WhenNotInRedisAndNotInDb_ThenCachesEmptyMarkerAndReturnsEmptyString() {
         // given
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -110,6 +115,7 @@ class UserInstructionServiceTest {
     }
 
     @Test
+    @DisplayName("getInstructions throws ServiceException when Redis access fails")
     void getInstructions_WhenRedisThrowsException_ThenThrowsServiceException() {
         // given
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -122,6 +128,7 @@ class UserInstructionServiceTest {
     }
 
     @Test
+    @DisplayName("updateInstructions saves to DB and evicts the Redis cache key")
     void updateInstructions_WhenInvoked_ThenSavesToDbAndDeletesRedisKey() {
         // when
         userInstructionService.updateInstructions(DEFAULT_USER_ID, INSTRUCTION_TEXT);
@@ -132,6 +139,7 @@ class UserInstructionServiceTest {
     }
 
     @Test
+    @DisplayName("updateInstructions throws ServiceException when DB save fails")
     void updateInstructions_WhenDbFails_ThenThrowsServiceException() {
         // given
         doThrow(new RuntimeException("DB offline")).when(repository).save(any(UserInstruction.class));

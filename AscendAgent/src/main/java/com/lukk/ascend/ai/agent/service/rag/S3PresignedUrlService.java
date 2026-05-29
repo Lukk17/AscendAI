@@ -88,29 +88,38 @@ public class S3PresignedUrlService {
     }
 
     private Optional<SourceFile> presign(SourceRef ref) {
+        return inspectSource(ref).flatMap(metadata -> signUrl(ref, metadata));
+    }
+
+    private Optional<SourceMetadata> inspectSource(SourceRef ref) {
         long maxBytes = ragProperties.getSourceAttachments().getMaxFileSize().toBytes();
 
-        Long sizeBytes = null;
-        String mimeType = ref.mimeType();
         try {
             HeadObjectResponse head = s3Client.headObject(HeadObjectRequest.builder()
                     .bucket(ref.bucket())
                     .key(ref.key())
                     .build());
-            sizeBytes = head.contentLength();
+
+            Long sizeBytes = head.contentLength();
             if (sizeBytes != null && sizeBytes > maxBytes) {
                 log.warn("[S3PresignedUrlService] Skipping source attachment for {} ({} > {} bytes)",
                         ref.s3Uri(), sizeBytes, maxBytes);
+
                 return Optional.empty();
             }
-            if (mimeType == null && head.contentType() != null) {
-                mimeType = head.contentType();
-            }
+
+            String mimeType = ref.mimeType() != null ? ref.mimeType() : head.contentType();
+
+            return Optional.of(new SourceMetadata(sizeBytes, mimeType));
+
         } catch (Exception e) {
             log.warn("[S3PresignedUrlService] HEAD failed for {}: {}", ref.s3Uri(), e.getMessage());
+
             return Optional.empty();
         }
+    }
 
+    private Optional<SourceFile> signUrl(SourceRef ref, SourceMetadata metadata) {
         try {
             GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                     .signatureDuration(effectiveTtl)
@@ -120,15 +129,21 @@ public class S3PresignedUrlService {
             Instant expiresAt = Instant.now().plus(effectiveTtl);
 
             log.info("[S3PresignedUrlService] Presigned {} (TTL {})", ref.s3Uri(), effectiveTtl);
+
             return Optional.of(new SourceFile(
                     ref.displayName(),
-                    mimeType,
+                    metadata.mimeType(),
                     presigned.url().toString(),
                     expiresAt,
-                    sizeBytes));
+                    metadata.sizeBytes()));
+
         } catch (Exception e) {
             log.warn("[S3PresignedUrlService] Presign failed for {}: {}", ref.s3Uri(), e.getMessage());
+
             return Optional.empty();
         }
+    }
+
+    private record SourceMetadata(Long sizeBytes, String mimeType) {
     }
 }

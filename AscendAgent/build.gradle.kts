@@ -85,6 +85,9 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 
+    // Spring Boot configuration-properties metadata processor (IDE @ConfigurationProperties resolution)
+    annotationProcessor(libs.spring.boot.configuration.processor)
+
     // Dev tools
     developmentOnly(libs.spring.boot.devtools)
 

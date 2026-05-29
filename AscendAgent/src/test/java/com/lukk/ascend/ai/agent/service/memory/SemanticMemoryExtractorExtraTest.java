@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import org.junit.jupiter.api.DisplayName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -18,6 +20,7 @@ class SemanticMemoryExtractorExtraTest {
             null, null, null, new ObjectMapper(), null, null);
 
     @Test
+    @DisplayName("extractFactsFromJson returns empty for null, empty, or blank input")
     void extractFactsFromJson_WhenNullOrBlank_ThenReturnsEmpty() {
         assertThat(extractor.extractFactsFromJson(null)).isEmpty();
         assertThat(extractor.extractFactsFromJson("")).isEmpty();
@@ -25,16 +28,19 @@ class SemanticMemoryExtractorExtraTest {
     }
 
     @Test
+    @DisplayName("extractFactsFromJson returns empty when input has only an opening bracket")
     void extractFactsFromJson_WhenOnlyOpenBracket_ThenReturnsEmpty() {
         assertThat(extractor.extractFactsFromJson("Thinking... [")).isEmpty();
     }
 
     @Test
+    @DisplayName("extractFactsFromJson returns empty when input has only a closing bracket")
     void extractFactsFromJson_WhenOnlyCloseBracket_ThenReturnsEmpty() {
         assertThat(extractor.extractFactsFromJson("Thinking... ]")).isEmpty();
     }
 
     @Test
+    @DisplayName("extractFactsFromJson returns empty for deeply nested arrays that cannot be deserialized as List<String>")
     void extractFactsFromJson_WhenDeeplyNestedArrays_ThenSelectsLastBalanced() {
         String input = "intro [\"a\"] more thinking [[\"nested\"], [\"x\", \"y\"]]";
 
@@ -47,6 +53,7 @@ class SemanticMemoryExtractorExtraTest {
     }
 
     @Test
+    @DisplayName("extractFactsFromJson ignores bracket characters inside string literals")
     void extractFactsFromJson_WhenBracketsInsideStrings_ThenIgnoresThem() {
         // The "[" inside the string literal must NOT trip the depth counter.
         String input = "Reasoning: \"the array starts with [\" -- final: [\"User likes [brackets]\"]";
@@ -57,6 +64,7 @@ class SemanticMemoryExtractorExtraTest {
     }
 
     @Test
+    @DisplayName("extractFactsFromJson correctly handles escaped quotes inside string values")
     void extractFactsFromJson_WhenEscapedQuotes_ThenStillExtracts() {
         // Escaped quote inside a string should keep us in-string and not flip inString flag.
         String input = "Some prose [\"User said \\\"hello\\\" loudly\"]";
@@ -67,6 +75,7 @@ class SemanticMemoryExtractorExtraTest {
     }
 
     @Test
+    @DisplayName("extractFactsFromJson returns empty for balanced brackets that contain non-JSON content")
     void extractFactsFromJson_WhenBalancedButInvalidJsonInside_ThenReturnsEmpty() {
         // Balanced brackets but malformed JSON content → embedded parse fails too.
         String input = "Final: [not valid json content]";
@@ -77,6 +86,7 @@ class SemanticMemoryExtractorExtraTest {
     }
 
     @Test
+    @DisplayName("extractFactsFromJson strips markdown code fences and extracts the JSON array")
     void extractFactsFromJson_WhenMarkdownFenceWithJson_ThenStripsFences() {
         String input = "```json\n[\"fact-A\", \"fact-B\"]\n```";
 
@@ -86,6 +96,7 @@ class SemanticMemoryExtractorExtraTest {
     }
 
     @Test
+    @DisplayName("extractFactsFromJson strips trailing markdown fence and extracts facts")
     void extractFactsFromJson_WhenTrailingMarkdownFenceOnly_ThenStripsTrailing() {
         String input = "[\"only-fact\"]\n```";
 

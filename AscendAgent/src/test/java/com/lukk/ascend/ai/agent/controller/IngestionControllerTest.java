@@ -17,6 +17,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.junit.jupiter.api.DisplayName;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -59,6 +61,7 @@ class IngestionControllerTest {
     }
 
     @Test
+    @DisplayName("uploads markdown file to markdown/ folder")
     void uploadDocument_ShouldUploadToMarkdown_WhenFileIsMd() throws IOException {
         MockMultipartFile file = new MockMultipartFile("file", "test.md", "text/markdown", "content".getBytes());
 
@@ -69,6 +72,7 @@ class IngestionControllerTest {
     }
 
     @Test
+    @DisplayName("uploads non-markdown file to documents/ folder")
     void uploadDocument_ShouldUploadToDocuments_WhenFileIsNotMd() throws IOException {
         MockMultipartFile file = new MockMultipartFile("file", "test.pdf", "application/pdf", "content".getBytes());
 
@@ -79,6 +83,7 @@ class IngestionControllerTest {
     }
 
     @Test
+    @DisplayName("returns 400 Bad Request when uploaded file is empty")
     void uploadDocument_ShouldReturnBadRequest_WhenFileIsEmpty() {
         MockMultipartFile file = new MockMultipartFile("file", "test.txt", "text/plain", "".getBytes());
 
@@ -88,6 +93,7 @@ class IngestionControllerTest {
     }
 
     @Test
+    @DisplayName("uploads all files when multiple files are provided in one request")
     void uploadDocument_ShouldUploadAllFiles_WhenMultipleProvided() throws IOException {
         MockMultipartFile md = new MockMultipartFile("file", "notes.md", "text/markdown", "md".getBytes());
         MockMultipartFile pdf = new MockMultipartFile("file", "report.pdf", "application/pdf", "pdf".getBytes());

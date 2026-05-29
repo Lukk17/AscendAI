@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("resource")
 class IngestionServiceTest {
 
     @Mock
@@ -56,6 +58,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processMarkdown extracts H1 heading as the document title")
     void processMarkdown_WhenH1IsPresent_ThenExtractsTitleSuccessfully() {
         // given
         String markdown = "# My Title\nSome content.";
@@ -72,6 +75,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processMarkdown uses the filename as title when no H1 heading is present")
     void processMarkdown_WhenNoH1Present_ThenUsesFilenameAsTitle() {
         // given
         String markdown = "## Subtitle\nSome content.";
@@ -87,6 +91,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processMarkdown strips S3 prefix from filename and uses only the basename as title")
     void processMarkdown_WhenNoH1PresentAndFilenameHasS3Prefix_ThenUsesBasenameAsTitle() {
         // given — ManualIngestionService passes the full S3 key (with the "markdown/" prefix);
         // the title fallback should be just the basename, not the full key.
@@ -104,6 +109,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processMarkdown throws IngestionException when the input stream raises IOException")
     void processMarkdown_WhenInputStreamThrowsIOException_ThenThrowsIngestionException() throws IOException {
         // given
         InputStream inputStream = mock(InputStream.class);
@@ -116,6 +122,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processUnstructured parses Unstructured API JSON response and returns documents")
     void processUnstructured_WhenValidApiResponse_ThenParsesAndReturnsDocuments() throws Exception {
         // given
         InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());
@@ -148,6 +155,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processUnstructured extracts the first Title element from the Unstructured response as title metadata")
     void processUnstructured_WhenResponseContainsTitleElement_ThenExtractsItAsTitleMetadata() throws Exception {
         // given — Unstructured returns the document's title as an element of type "Title".
         // The first such element wins; subsequent ones are folded into the body text only.
@@ -197,6 +205,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processUnstructured uses file basename as title fallback when no Title element and S3 prefix is present")
     void processUnstructured_WhenNoTitleElementAndFilenameHasS3Prefix_ThenUsesBasenameAsTitleFallback() throws Exception {
         // given — Unstructured returns only NarrativeText elements (no Title);
         // the title fallback should strip the "documents/" prefix from the S3 key.
@@ -234,6 +243,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processUnstructured propagates runtime exception when the API call throws")
     void processUnstructured_WhenApiCallThrowsException_ThenWrapsInRuntimeException() {
         // given
         InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());
@@ -248,6 +258,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processUnstructured throws IngestionException when the input stream raises IOException")
     void processUnstructured_WhenInputStreamThrowsIOException_ThenThrowsIngestionException() throws IOException {
         // given
         InputStream inputStream = mock(InputStream.class);
@@ -260,6 +271,7 @@ class IngestionServiceTest {
     }
 
     @Test
+    @DisplayName("processUnstructured throws IngestionException when the API response is invalid JSON")
     void processUnstructured_WhenInvalidJsonResponse_ThenThrowsIngestionException() throws Exception {
         // given
         InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());

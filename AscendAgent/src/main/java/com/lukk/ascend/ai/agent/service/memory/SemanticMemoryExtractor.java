@@ -185,43 +185,69 @@ public class SemanticMemoryExtractor {
         return List.of();
     }
 
+    /**
+     * Single forward pass collecting every top-level {@code [...]} range, returns the last one.
+     * String-aware (ignores brackets inside JSON strings) and escape-aware (handles {@code \"}).
+     */
     private Optional<String> findLastBalancedJsonArray(String text) {
         if (text == null || text.isBlank()) {
             return Optional.empty();
         }
-        for (int closeIdx = text.length() - 1; closeIdx >= 0; closeIdx--) {
-            if (text.charAt(closeIdx) != ']') {
-                continue;
+
+        BracketScanState state = new BracketScanState();
+        for (int i = 0; i < text.length(); i++) {
+            state.consume(text.charAt(i), i);
+        }
+
+        return state.lastRange().map(range -> text.substring(range.start(), range.end() + 1));
+    }
+
+    private record BracketRange(int start, int end) {
+    }
+
+    private static final class BracketScanState {
+
+        private int depth = 0;
+        private int currentStart = -1;
+        private BracketRange lastClosed;
+        private boolean inString = false;
+        private boolean escaped = false;
+
+        void consume(char c, int index) {
+            if (escaped) {
+                escaped = false;
+                return;
             }
-            int depth = 0;
-            boolean inString = false;
-            boolean escaped = false;
-            for (int i = closeIdx; i >= 0; i--) {
-                char c = text.charAt(i);
-                if (escaped) {
-                    escaped = false;
-                    continue;
+            if (c == '\\') {
+                escaped = true;
+                return;
+            }
+            if (c == '"') {
+                inString = !inString;
+                return;
+            }
+            if (inString) {
+                return;
+            }
+
+            if (c == '[') {
+                if (depth == 0) {
+                    currentStart = index;
                 }
-                if (c == '\\') {
-                    escaped = true;
-                    continue;
-                }
-                if (c == '"') {
-                    inString = !inString;
-                    continue;
-                }
-                if (inString) {
-                    continue;
-                }
-                if (c == ']') depth++;
-                else if (c == '[') {
-                    depth--;
-                    if (depth == 0) {
-                        return Optional.of(text.substring(i, closeIdx + 1));
-                    }
+                depth++;
+                return;
+            }
+            if (c == ']' && depth > 0) {
+                depth--;
+                if (depth == 0 && currentStart >= 0) {
+                    lastClosed = new BracketRange(currentStart, index);
+                    currentStart = -1;
                 }
             }
         }
-        return Optional.empty();
+
+        Optional<BracketRange> lastRange() {
+            return Optional.ofNullable(lastClosed);
+        }
     }
 }

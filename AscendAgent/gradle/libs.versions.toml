@@ -70,6 +70,11 @@ spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-
 # Lombok (version managed by Spring Boot BOM)
 lombok = { module = "org.projectlombok:lombok" }
 
+# Spring Boot configuration-properties metadata processor — generates
+# META-INF/spring-configuration-metadata.json so IntelliJ resolves @ConfigurationProperties
+# keys in application.yaml (e.g., app.s3.public-endpoint, app.memory.semantic.*).
+spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
+
 # Test
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 

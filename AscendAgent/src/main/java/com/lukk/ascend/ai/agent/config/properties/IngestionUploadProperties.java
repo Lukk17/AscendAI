@@ -1,5 +1,7 @@
 package com.lukk.ascend.ai.agent.config.properties;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
@@ -12,6 +14,8 @@ import java.util.List;
  * controller because Spring's {@code @Value} with a colon-default does not bind YAML lists —
  * it returned an empty list at runtime, silently disabling the MIME allowlist enforcement.
  */
+@Getter
+@Setter
 @ConfigurationProperties(prefix = "app.ingestion.upload")
 public class IngestionUploadProperties {
 
@@ -20,12 +24,4 @@ public class IngestionUploadProperties {
      * An empty list disables enforcement (controller short-circuits the check).
      */
     private List<String> allowedMimeTypes = new ArrayList<>();
-
-    public List<String> getAllowedMimeTypes() {
-        return allowedMimeTypes;
-    }
-
-    public void setAllowedMimeTypes(List<String> allowedMimeTypes) {
-        this.allowedMimeTypes = allowedMimeTypes;
-    }
 }

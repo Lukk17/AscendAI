@@ -35,7 +35,7 @@ public class DocumentService {
             return;
         }
 
-        Object sourceObj = documents.get(0).getMetadata().get("source");
+        Object sourceObj = documents.getFirst().getMetadata().get("source");
         if (sourceObj instanceof String filename) {
             log.info("Removing old documents for source: {}", filename);
             Filter.Expression filterExpression = new FilterExpressionBuilder()

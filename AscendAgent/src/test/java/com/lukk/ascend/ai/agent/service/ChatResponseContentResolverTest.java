@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.service;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +23,7 @@ class ChatResponseContentResolverTest {
     private ChatResponseContentResolver resolver;
 
     @Test
+    @DisplayName("resolveContent returns the text of a single generation")
     void resolveContent_WhenSingleGeneration_ThenReturnsThatText() {
         // given
         ChatResponse chatResponse = createChatResponse(List.of(ACTUAL_ANSWER));
@@ -34,6 +36,7 @@ class ChatResponseContentResolverTest {
     }
 
     @Test
+    @DisplayName("resolveContent returns the last generation text when a thinking model produces two generations")
     void resolveContent_WhenThinkingModelWithTwoGenerations_ThenReturnsLastGeneration() {
         // given
         ChatResponse chatResponse = createChatResponse(List.of(THINKING_TEXT, ACTUAL_ANSWER));
@@ -46,6 +49,7 @@ class ChatResponseContentResolverTest {
     }
 
     @Test
+    @DisplayName("resolveContent skips blank intermediate generations and returns the last non-blank one")
     void resolveContent_WhenMultipleGenerationsWithBlankIntermediate_ThenReturnsLastNonBlank() {
         // given
         ChatResponse chatResponse = createChatResponse(List.of(THINKING_TEXT, "", ACTUAL_ANSWER));
@@ -58,6 +62,7 @@ class ChatResponseContentResolverTest {
     }
 
     @Test
+    @DisplayName("resolveContent returns empty string when the ChatResponse is null")
     void resolveContent_WhenNullResponse_ThenReturnsEmptyString() {
         // given / when
         String result = resolver.resolveContent(null);
@@ -67,6 +72,7 @@ class ChatResponseContentResolverTest {
     }
 
     @Test
+    @DisplayName("resolveContent returns empty string when the generations list is empty")
     void resolveContent_WhenEmptyGenerationsList_ThenReturnsEmptyString() {
         // given
         ChatResponse chatResponse = new ChatResponse(List.of());
@@ -79,6 +85,7 @@ class ChatResponseContentResolverTest {
     }
 
     @Test
+    @DisplayName("resolveContent returns empty string when all generations are blank")
     void resolveContent_WhenAllGenerationsBlank_ThenReturnsEmptyString() {
         // given
         ChatResponse chatResponse = createChatResponse(List.of("", "   ", ""));
@@ -91,6 +98,7 @@ class ChatResponseContentResolverTest {
     }
 
     @Test
+    @DisplayName("resolveContent returns the last non-blank generation when the final one is blank")
     void resolveContent_WhenLastGenerationBlankButPreviousHasText_ThenReturnsPreviousText() {
         // given
         ChatResponse chatResponse = createChatResponse(List.of(THINKING_TEXT, ACTUAL_ANSWER, ""));

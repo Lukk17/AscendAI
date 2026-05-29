@@ -3,6 +3,7 @@ package com.lukk.ascend.ai.agent.service;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties.ProviderConfig;
 import com.lukk.ascend.ai.agent.config.properties.VisionCapabilityProperties;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,6 +32,7 @@ class VisionCapabilityResolverTest {
     private VisionCapabilityResolver resolver;
 
     @Test
+    @DisplayName("supportsImages returns true when model matches a prefix wildcard pattern like claude-*")
     void supportsImages_WhenProviderHasGlob_AndModelMatchesPrefixWildcard_ThenTrue() {
         // given — claude-* matches claude-sonnet-4-6
         when(visionProperties.getProviders()).thenReturn(Map.of("anthropic", List.of("claude-*")));
@@ -43,6 +45,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns true when model matches a gpt-4o* prefix glob")
     void supportsImages_WhenGptPrefixGlobMatches_ThenTrue() {
         // given — gpt-4o* matches gpt-4o-mini
         when(visionProperties.getProviders()).thenReturn(Map.of("openai", List.of("gpt-4o*")));
@@ -53,6 +56,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns true when model matches a middle-wildcard pattern like *-vl-*")
     void supportsImages_WhenMiddleWildcardMatches_ThenTrue() {
         // given — *-vl-* matches qwen3-vl-4b
         when(visionProperties.getProviders()).thenReturn(Map.of("lmstudio", List.of("*-vl-*")));
@@ -63,6 +67,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns false when model does not match the provider's glob pattern")
     void supportsImages_WhenGlobDoesNotMatchModel_ThenFalse() {
         // given — claude-* does NOT match gpt-4o
         when(visionProperties.getProviders()).thenReturn(Map.of("anthropic", List.of("claude-*")));
@@ -73,6 +78,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns false when the provider has an empty pattern list")
     void supportsImages_WhenProviderHasEmptyPatternList_ThenFalse() {
         // given — empty list means no images allowed
         when(visionProperties.getProviders()).thenReturn(Map.of("minimax", List.of()));
@@ -83,6 +89,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns false when model is null")
     void supportsImages_WhenModelIsNull_ThenFalse() {
         // given
         when(visionProperties.getProviders()).thenReturn(Map.of("anthropic", List.of("claude-*")));
@@ -96,6 +103,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns false when the provider key is not in the vision properties")
     void supportsImages_WhenProviderMissingFromConfig_ThenFalse() {
         // given
         when(visionProperties.getProviders()).thenReturn(Map.of("anthropic", List.of("claude-*")));
@@ -106,6 +114,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns true when model exactly matches a pattern with no wildcards")
     void supportsImages_WhenExactPatternMatches_ThenTrue() {
         // given — pattern without wildcards is an exact match
         when(visionProperties.getProviders()).thenReturn(Map.of("openai", List.of("gpt-4o-mini")));
@@ -116,6 +125,7 @@ class VisionCapabilityResolverTest {
     }
 
     @Test
+    @DisplayName("supportsImages returns false when exact pattern does not match a different model")
     void supportsImages_WhenExactPatternDoesNotMatchDifferentModel_ThenFalse() {
         when(visionProperties.getProviders()).thenReturn(Map.of("openai", List.of("gpt-4o-mini")));
 

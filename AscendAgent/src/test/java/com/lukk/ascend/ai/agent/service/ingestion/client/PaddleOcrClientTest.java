@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service.ingestion.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,6 +39,7 @@ class PaddleOcrClientTest {
     private PaddleOcrClient paddleOcrClient;
 
     @Test
+    @DisplayName("process extracts OCR text lines from a valid PaddleOCR JSON response")
     void process_WhenValidResponse_ThenExtractsLinesSuccessfully() {
         // given
         String jsonResponse = "{\"pages\": [{\"lines\": [{\"text\": \"Total: $100\"}, {\"text\": \"Tax: $5\"}]}]}";
@@ -67,6 +69,7 @@ class PaddleOcrClientTest {
     }
 
     @Test
+    @DisplayName("process throws IngestionException when the REST client call fails")
     void process_WhenRestClientFails_ThenThrowsIngestionException() {
         // given
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
@@ -85,6 +88,7 @@ class PaddleOcrClientTest {
     }
 
     @Test
+    @DisplayName("process throws IngestionException when the API returns malformed JSON")
     void process_WhenInvalidJsonReturned_ThenThrowsIngestionException() {
         // given
         String invalidJson = "<xml>not json</xml>";

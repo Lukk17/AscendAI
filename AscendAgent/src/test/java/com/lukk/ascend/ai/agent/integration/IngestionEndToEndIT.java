@@ -121,6 +121,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 .andReturn();
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        @SuppressWarnings("unchecked")
         List<String> keys = objectMapper.convertValue(body.get("uploaded"), List.class);
 
         assertThat(keys).contains("markdown/notes.md", "documents/report.pdf");
@@ -171,6 +172,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 .andReturn();
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        @SuppressWarnings("unchecked")
         List<String> keys = objectMapper.convertValue(body.get("uploaded"), List.class);
 
         assertThat(keys).hasSize(1);

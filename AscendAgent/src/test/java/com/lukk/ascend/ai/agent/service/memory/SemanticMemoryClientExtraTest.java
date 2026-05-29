@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.memory;
 
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
@@ -48,6 +49,7 @@ class SemanticMemoryClientExtraTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    @DisplayName("search returns empty list and logs warning when a non-404 HTTP error occurs")
     void search_LogsWarn_WhenNon404HttpError() {
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
@@ -65,6 +67,7 @@ class SemanticMemoryClientExtraTest {
     }
 
     @Test
+    @DisplayName("wipeUserMemory skips the HTTP call when semantic memory is disabled")
     void wipeUserMemory_WhenDisabled_ThenSkipsHttpCall() {
         when(properties.isEnabled()).thenReturn(false);
 
@@ -74,6 +77,7 @@ class SemanticMemoryClientExtraTest {
     }
 
     @Test
+    @DisplayName("wipeUserMemory swallows RestClientResponseException and does not throw")
     void wipeUserMemory_SwallowsRestClientResponseException() {
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
@@ -95,6 +99,7 @@ class SemanticMemoryClientExtraTest {
     }
 
     @Test
+    @DisplayName("deleteMemory skips the HTTP call when semantic memory is disabled")
     void deleteMemory_WhenDisabled_ThenSkipsHttpCall() {
         when(properties.isEnabled()).thenReturn(false);
 
@@ -104,6 +109,8 @@ class SemanticMemoryClientExtraTest {
     }
 
     @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @DisplayName("deleteMemory swallows RestClientResponseException and does not throw")
     void deleteMemory_SwallowsRestClientResponseException() {
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");

@@ -7,6 +7,7 @@ import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
 import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -55,6 +56,7 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("buildSystemMessage assembles base prompt, user instructions, and memory items")
     void buildSystemMessage_WhenMemoryAndInstructionsExist_ThenAssemblesCorrectly() {
         // given
         when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn("Be concise.");
@@ -75,6 +77,7 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("buildSystemMessage assembles only the base prompt when memory and instructions are empty")
     void buildSystemMessage_WhenMemoryAndInstructionsEmpty_ThenAssemblesOnlyBasePrompt() {
         // given
         when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn(null);
@@ -93,6 +96,7 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("buildSystemMessage gracefully ignores exceptions from semantic memory search")
     void buildSystemMessage_WhenSemanticMemoryThrowsException_ThenGracefullyIgnores() {
         // given
         when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn("Be concise.");
@@ -111,6 +115,7 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("buildUserMessage returns the original prompt unchanged when no document and no RAG results")
     void buildUserMessage_WhenNoDocAndNoRag_ThenReturnsOriginalPrompt() {
         // given
         when(ragRetrievalService.retrieve(DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER))
@@ -126,6 +131,7 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("buildUserMessage appends document content and RAG context and propagates source refs")
     void buildUserMessage_WhenDocAndRagExist_ThenAppendsBothAndPropagatesSources() {
         // given
         MultipartFile document = mock(MultipartFile.class);
@@ -150,6 +156,7 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("buildUserMessage ignores an empty document attachment")
     void buildUserMessage_WhenEmptyDocAndNoRag_ThenIgnoresDocument() {
         // given
         MultipartFile document = mock(MultipartFile.class);
@@ -166,6 +173,7 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("buildUserMessage returns ragRetrievalRan=false when RAG retrieval was skipped")
     void buildUserMessage_WhenRagDisabled_ThenRagRetrievalRanIsFalse() {
         // given
         when(ragRetrievalService.retrieve(DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER))
@@ -177,6 +185,45 @@ class ChatContextAssemblerTest {
         // then
         assertThat(result.text()).isEqualTo(DEFAULT_USER_PROMPT);
         assertThat(result.ragRetrievalRan()).isFalse();
+    }
+
+    @Test
+    @DisplayName("buildSystemMessage includes a Python-related memory fact in the assembled message")
+    void buildSystemMessage_WhenMemoryContainsPythonFact_ThenIncludesPythonFactInMessage() {
+        // given
+        when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn(null);
+        when(semanticMemoryProperties.getSearchLimit()).thenReturn(10);
+
+        SemanticMemoryItem item = createMemoryItem("User uses Python");
+        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(List.of(item));
+
+        // when
+        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER);
+
+        // then
+        assertThat(result).contains("User uses Python");
+    }
+
+    @Test
+    @DisplayName("buildSystemMessage includes all multiple memory facts in the assembled message")
+    void buildSystemMessage_WhenMemoryContainsMultipleFacts_ThenAllFactsIncluded() {
+        // given
+        when(userInstructionService.getInstructions(DEFAULT_USER_ID)).thenReturn(null);
+        when(semanticMemoryProperties.getSearchLimit()).thenReturn(10);
+
+        SemanticMemoryItem item1 = createMemoryItem("User prefers dark mode");
+        SemanticMemoryItem item2 = createMemoryItem("User works in fintech");
+        when(semanticMemoryClient.search(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, 10, DEFAULT_EMBEDDING_PROVIDER))
+                .thenReturn(List.of(item1, item2));
+
+        // when
+        String result = assembler.buildSystemMessage(DEFAULT_USER_ID, DEFAULT_USER_PROMPT, DEFAULT_EMBEDDING_PROVIDER);
+
+        // then
+        assertThat(result)
+                .contains("User prefers dark mode")
+                .contains("User works in fintech");
     }
 
     private SemanticMemoryItem createMemoryItem(String text) {

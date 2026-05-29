@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.config.properties.RagProperties;
+import com.lukk.ascend.ai.agent.service.ingestion.IngestionMetadataKeys;
 import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
 import lombok.extern.slf4j.Slf4j;
@@ -20,9 +21,7 @@ public class RagRetrievalService {
 
     private static final String META_BUCKET = "bucket";
     private static final String META_KEY = "key";
-    private static final String META_SOURCE = "source";
     private static final String META_DISPLAY_NAME = "displayName";
-    private static final String META_TITLE = "title";
     private static final String META_MIME_TYPE = "mimeType";
 
     private final VectorStoreResolver vectorStoreResolver;
@@ -83,7 +82,7 @@ public class RagRetrievalService {
             Map<String, Object> meta = doc.getMetadata();
             String key = stringMeta(meta, META_KEY);
             if (key == null) {
-                key = stringMeta(meta, META_SOURCE);
+                key = stringMeta(meta, IngestionMetadataKeys.SOURCE);
             }
             if (key == null || key.isBlank()) {
                 log.debug("[RagRetrievalService] Skipping source-tracking for chunk with no key/source metadata");
@@ -97,7 +96,7 @@ public class RagRetrievalService {
 
             String displayName = stringMeta(meta, META_DISPLAY_NAME);
             if (displayName == null) {
-                displayName = stringMeta(meta, META_TITLE);
+                displayName = stringMeta(meta, IngestionMetadataKeys.TITLE);
             }
             if (displayName == null) {
                 displayName = basename(key);
@@ -139,11 +138,12 @@ public class RagRetrievalService {
 
     private List<Document> performSimilaritySearch(VectorStore vectorStore, SearchRequest searchRequest) {
         try {
-            List<Document> documents = vectorStore.similaritySearch(searchRequest);
-            return documents != null ? documents : List.of();
+            return vectorStore.similaritySearch(searchRequest);
+
         } catch (Exception e) {
             log.warn("[RagRetrievalService] Similarity search failed (embedding service may be unavailable): {}",
                     e.getMessage());
+
             return List.of();
         }
     }

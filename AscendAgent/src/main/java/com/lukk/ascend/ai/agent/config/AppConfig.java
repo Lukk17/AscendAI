@@ -53,9 +53,6 @@ public class AppConfig {
         return new TransactionTemplate(txManager);
     }
 
-    @Value("${app.system-prompt}")
-    private String systemPrompt;
-
     @Value("${app.ingestion.connect-timeout}")
     private int connectTimeout;
 
@@ -74,19 +71,7 @@ public class AppConfig {
     @Value("${app.s3.secret-key}")
     private String s3SecretKey;
 
-    /**
-     * Configures the RestClient.Builder.
-     * <p>
-     * This method forces the underlying HttpClient to use HTTP/1.1 instead of
-     * HTTP/2.
-     * This is required to solve compatibility issues with the LM Studio server,
-     * which can hang when receiving HTTP/2 requests from the modern Java 21
-     * HttpClient.
-     * </p>
-     *
-     * @param configurer The Spring Boot configurer to apply default customizations.
-     * @return A configured RestClient.Builder instance using HTTP/1.1.
-     */
+    // Forces HTTP/1.1: LM Studio hangs when the JDK 21 HttpClient negotiates HTTP/2.
     @Bean
     public RestClient.Builder restClientBuilder(RestClientBuilderConfigurer configurer) {
         HttpClient httpClient = HttpClient.newBuilder()
@@ -146,18 +131,9 @@ public class AppConfig {
                 .build();
     }
 
-    /**
-     * Creates a JDBC-backed metadata store for persistent file tracking.
-     * <p>
-     * This ensures files are processed only once, even across application restarts.
-     * </p>
-     *
-     * @param dataSource The generic DataSource (autoconfigured by Spring Boot).
-     * @return A ConcurrentMetadataStore backed by the database.
-     */
+    // JDBC-backed so file-tracking state survives application restarts.
     @Bean
-    public ConcurrentMetadataStore metadataStore(
-            javax.sql.DataSource dataSource) {
+    public ConcurrentMetadataStore metadataStore(javax.sql.DataSource dataSource) {
         return new JdbcMetadataStore(dataSource);
     }
 

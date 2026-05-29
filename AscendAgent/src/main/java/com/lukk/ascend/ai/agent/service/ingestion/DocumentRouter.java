@@ -88,77 +88,118 @@ public class DocumentRouter {
 
         try (PDDocument pdfDocument = Loader.loadPDF(fileBytes)) {
             int totalPages = pdfDocument.getNumberOfPages();
+
             log.info("[DocumentRouter] PDF {} has {} pages", filename, totalPages);
 
-            // Slice up the work serially (PDFBox isn't thread-safe enough to share a
-            // PDDocument across threads — we extract per-page text + a single-page PDF
-            // byte array here, then dispatch the actual Docling / PaddleOCR calls in
-            // parallel below. This is the slow part anyway (network + remote parse).
-            List<PageWork> pageWork = new ArrayList<>(totalPages);
-            for (int pageIndex = 0; pageIndex < totalPages; pageIndex++) {
-                int pageNumber = pageIndex + 1;
-                String pageText = extractTextFromPage(pdfDocument, pageNumber);
-                int textLength = pageText.trim().length();
-                byte[] singlePagePdf = extractSinglePagePdf(pdfDocument, pageIndex);
-                String pageFilename = filename + "_page" + pageNumber + ".pdf";
-                log.info("[DocumentRouter] Page {}/{} of {} has {} characters (threshold: {})",
-                        pageNumber, totalPages, filename, textLength, pdfMinTextThresholdPerPage);
-                pageWork.add(new PageWork(pageNumber, pageFilename, singlePagePdf, textLength));
-            }
+            List<PageWork> pageWork = sliceIntoPageWork(pdfDocument, filename, totalPages);
 
             return dispatchPagesInParallel(pageWork, filename);
+
         } catch (IOException e) {
             throw new DocumentRoutingException("Failed to analyze PDF: " + filename, e);
         }
     }
 
+    // PDFBox isn't thread-safe enough to share a PDDocument across threads — slice
+    // per-page text and a single-page PDF byte array here (sequentially), then dispatch
+    // the slow part (Docling / PaddleOCR network calls) in parallel below.
+    private List<PageWork> sliceIntoPageWork(PDDocument pdfDocument, String filename, int totalPages) throws IOException {
+        List<PageWork> pageWork = new ArrayList<>(totalPages);
+        for (int pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+            pageWork.add(buildPageWork(pdfDocument, pageIndex, totalPages, filename));
+        }
+
+        return pageWork;
+    }
+
+    private PageWork buildPageWork(PDDocument pdfDocument, int pageIndex, int totalPages, String filename) throws IOException {
+        int pageNumber = pageIndex + 1;
+        String pageText = extractTextFromPage(pdfDocument, pageNumber);
+        int textLength = pageText.trim().length();
+        byte[] singlePagePdf = extractSinglePagePdf(pdfDocument, pageIndex);
+        String pageFilename = filename + "_page" + pageNumber + ".pdf";
+
+        log.info("[DocumentRouter] Page {}/{} of {} has {} characters (threshold: {})",
+                pageNumber, totalPages, filename, textLength, pdfMinTextThresholdPerPage);
+
+        return new PageWork(pageNumber, pageFilename, singlePagePdf, textLength);
+    }
+
     private List<Document> dispatchPagesInParallel(List<PageWork> pageWork, String filename) {
-        int parallelism = Math.max(1, Math.min(pdfParallelPages, pageWork.size()));
+        if (pageWork.isEmpty()) {
+            return List.of();
+        }
+
+        int parallelism = Math.clamp(pdfParallelPages, 1, pageWork.size());
+
         log.info("[DocumentRouter] Dispatching {} pages of {} in parallel (parallelism={})",
                 pageWork.size(), filename, parallelism);
 
         ExecutorService pool = Executors.newFixedThreadPool(parallelism);
         try {
-            List<CompletableFuture<PageResult>> futures = new ArrayList<>(pageWork.size());
-            for (PageWork work : pageWork) {
-                futures.add(CompletableFuture.supplyAsync(() ->
-                                new PageResult(work.pageNumber,
-                                        routeSinglePdfPage(work.pdfBytes, work.pageFilename, work.textLength)),
-                        pool));
-            }
+            List<CompletableFuture<PageResult>> futures = submitPageJobs(pageWork, pool);
+            awaitAllPagesOrThrow(futures, filename);
 
-            CompletableFuture<Void> all = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
-            try {
-                all.get();
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                throw new DocumentRoutingException("Interrupted while routing PDF pages: " + filename, ie);
-            } catch (ExecutionException ee) {
-                Throwable cause = ee.getCause() != null ? ee.getCause() : ee;
-                throw new DocumentRoutingException("Failed to route PDF page: " + filename, cause);
-            }
+            return collectInPageOrder(futures);
 
-            List<PageResult> results = new ArrayList<>(futures.size());
-            for (CompletableFuture<PageResult> f : futures) {
-                results.add(f.join());
-            }
-            results.sort((a, b) -> Integer.compare(a.pageNumber, b.pageNumber));
-
-            List<Document> ordered = new ArrayList<>();
-            for (PageResult r : results) {
-                ordered.addAll(r.documents);
-            }
-            return ordered;
         } finally {
-            pool.shutdown();
-            try {
-                if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
-                    pool.shutdownNow();
-                }
-            } catch (InterruptedException ie) {
+            shutdownPool(pool);
+        }
+    }
+
+    private List<CompletableFuture<PageResult>> submitPageJobs(List<PageWork> pageWork, ExecutorService pool) {
+        List<CompletableFuture<PageResult>> futures = new ArrayList<>(pageWork.size());
+        for (PageWork work : pageWork) {
+            futures.add(CompletableFuture.supplyAsync(
+                    () -> new PageResult(work.pageNumber,
+                            routeSinglePdfPage(work.pdfBytes, work.pageFilename, work.textLength)),
+                    pool));
+        }
+
+        return futures;
+    }
+
+    private void awaitAllPagesOrThrow(List<CompletableFuture<PageResult>> futures, String filename) {
+        CompletableFuture<Void> all = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+        try {
+            all.get();
+
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+
+            throw new DocumentRoutingException("Interrupted while routing PDF pages: " + filename, ie);
+
+        } catch (ExecutionException ee) {
+            Throwable cause = ee.getCause() != null ? ee.getCause() : ee;
+
+            throw new DocumentRoutingException("Failed to route PDF page: " + filename, cause);
+        }
+    }
+
+    private List<Document> collectInPageOrder(List<CompletableFuture<PageResult>> futures) {
+        List<PageResult> results = new ArrayList<>(futures.size());
+        for (CompletableFuture<PageResult> f : futures) {
+            results.add(f.join());
+        }
+        results.sort((a, b) -> Integer.compare(a.pageNumber, b.pageNumber));
+
+        List<Document> ordered = new ArrayList<>();
+        for (PageResult r : results) {
+            ordered.addAll(r.documents);
+        }
+
+        return ordered;
+    }
+
+    private void shutdownPool(ExecutorService pool) {
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
                 pool.shutdownNow();
-                Thread.currentThread().interrupt();
             }
+        } catch (InterruptedException ie) {
+            pool.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 

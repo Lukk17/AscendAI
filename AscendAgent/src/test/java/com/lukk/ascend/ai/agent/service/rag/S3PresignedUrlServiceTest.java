@@ -3,6 +3,7 @@ package com.lukk.ascend.ai.agent.service.rag;
 import com.lukk.ascend.ai.agent.config.properties.RagProperties;
 import com.lukk.ascend.ai.agent.dto.SourceFile;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -18,7 +19,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
-import java.net.URL;
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -56,6 +57,7 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("presignAll returns presigned URL, MIME type, size, and expiry for a valid object")
     void presignAll_HappyPath_ReturnsUrlAndSize() throws Exception {
         SourceRef ref = new SourceRef("bucket", "manual.pdf", "manual.pdf", null);
 
@@ -66,7 +68,7 @@ class S3PresignedUrlServiceTest {
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(head);
 
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
-        when(presigned.url()).thenReturn(new URL("https://minio.example/bucket/manual.pdf?X-Amz-Signature=abc"));
+        when(presigned.url()).thenReturn(URI.create("https://minio.example/bucket/manual.pdf?X-Amz-Signature=abc").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
         List<SourceFile> result = service.presignAll(List.of(ref));
@@ -81,6 +83,7 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("presignAll skips and logs a warning for objects that exceed the configured max file size")
     void presignAll_OversizeObject_IsSkippedAndLogsWarn() {
         SourceRef ref = new SourceRef("bucket", "huge.pdf", "huge.pdf", null);
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
@@ -93,6 +96,7 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("presignAll omits the failing source and continues presigning remaining sources")
     void presignAll_HeadFails_OmitsSourceButContinues() throws Exception {
         SourceRef good = new SourceRef("bucket", "good.pdf", "good.pdf", "application/pdf");
         SourceRef bad = new SourceRef("bucket", "bad.pdf", "bad.pdf", "application/pdf");
@@ -107,7 +111,7 @@ class S3PresignedUrlServiceTest {
                 });
 
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
-        when(presigned.url()).thenReturn(new URL("https://minio.example/bucket/good.pdf?sig=abc"));
+        when(presigned.url()).thenReturn(URI.create("https://minio.example/bucket/good.pdf?sig=abc").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
         List<SourceFile> result = service.presignAll(List.of(good, bad));
@@ -117,6 +121,7 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("presignAll omits a source when the presigner throws an S3Exception")
     void presignAll_PresignerThrows_OmitsSource() {
         SourceRef ref = new SourceRef("bucket", "x.pdf", "x.pdf", "application/pdf");
         when(s3Client.headObject(any(HeadObjectRequest.class)))
@@ -130,6 +135,7 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("presignAll presigns all three sources in parallel and returns all results")
     void presignAll_ParallelPresignsThree() throws Exception {
         SourceRef a = new SourceRef("b", "a.pdf", "a.pdf", "application/pdf");
         SourceRef b = new SourceRef("b", "b.pdf", "b.pdf", "application/pdf");
@@ -139,7 +145,7 @@ class S3PresignedUrlServiceTest {
                 .thenReturn(HeadObjectResponse.builder().contentLength(10L).contentType("application/pdf").build());
 
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
-        when(presigned.url()).thenReturn(new URL("https://minio.example/b/x?sig=1"));
+        when(presigned.url()).thenReturn(URI.create("https://minio.example/b/x?sig=1").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
         List<SourceFile> result = service.presignAll(List.of(a, b, c));
@@ -149,6 +155,7 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("presignAll returns empty without touching S3 when source attachments are disabled")
     void presignAll_DisabledKillSwitch_ReturnsEmpty() {
         ragProperties.getSourceAttachments().setEnabled(false);
         SourceRef ref = new SourceRef("b", "a.pdf", "a.pdf", null);
@@ -160,12 +167,14 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("presignAll returns empty list for empty or null input")
     void presignAll_EmptyInput_ReturnsEmpty() {
         assertThat(service.presignAll(List.of())).isEmpty();
         assertThat(service.presignAll(null)).isEmpty();
     }
 
     @Test
+    @DisplayName("init clamps TTL down to the maximum allowed value when configured TTL exceeds it")
     void init_ClampsTtlAboveMax() {
         ragProperties.getSourceAttachments().setPresignTtl(Duration.ofHours(2));
         S3PresignedUrlService clamped = new S3PresignedUrlService(presigner, s3Client, ragProperties,
@@ -177,7 +186,7 @@ class S3PresignedUrlServiceTest {
                 .thenReturn(HeadObjectResponse.builder().contentLength(10L).contentType("application/pdf").build());
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
         try {
-            when(presigned.url()).thenReturn(new URL("https://minio.example/b/a?sig=1"));
+            when(presigned.url()).thenReturn(URI.create("https://minio.example/b/a?sig=1").toURL());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -192,6 +201,7 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
+    @DisplayName("init clamps TTL up to the minimum allowed value when configured TTL is too short")
     void init_ClampsTtlBelowMin() {
         ragProperties.getSourceAttachments().setPresignTtl(Duration.ofSeconds(10));
         S3PresignedUrlService clamped = new S3PresignedUrlService(presigner, s3Client, ragProperties,
@@ -203,7 +213,7 @@ class S3PresignedUrlServiceTest {
                 .thenReturn(HeadObjectResponse.builder().contentLength(10L).contentType("application/pdf").build());
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
         try {
-            when(presigned.url()).thenReturn(new URL("https://minio.example/b/a?sig=1"));
+            when(presigned.url()).thenReturn(URI.create("https://minio.example/b/a?sig=1").toURL());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

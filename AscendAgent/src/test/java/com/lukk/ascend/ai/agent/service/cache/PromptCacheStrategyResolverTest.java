@@ -5,11 +5,14 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
+import org.junit.jupiter.api.DisplayName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PromptCacheStrategyResolverTest {
 
     @Test
+    @DisplayName("resolve returns AnthropicPromptCacheStrategy for anthropic when cache is enabled")
     void resolve_AnthropicWhenEnabled_ReturnsAnthropicStrategy() {
         PromptCacheStrategyResolver resolver = build(true, Map.of("anthropic", true));
         PromptCacheStrategy s = resolver.resolve("anthropic");
@@ -18,6 +21,7 @@ class PromptCacheStrategyResolverTest {
     }
 
     @Test
+    @DisplayName("resolve returns OpenAiPromptCacheStrategy for openai and gemini when cache is enabled")
     void resolve_OpenAiAndGeminiWhenEnabled_ReturnsOpenAiStrategy() {
         PromptCacheStrategyResolver resolver = build(true, Map.of("openai", true, "gemini", true));
         assertThat(resolver.resolve("openai")).isInstanceOf(OpenAiPromptCacheStrategy.class);
@@ -25,6 +29,7 @@ class PromptCacheStrategyResolverTest {
     }
 
     @Test
+    @DisplayName("resolve always returns NoopPromptCacheStrategy for lmstudio and minimax")
     void resolve_LmstudioOrMinimax_AlwaysNoop() {
         PromptCacheStrategyResolver resolver = build(true, Map.of("lmstudio", true, "minimax", true));
         assertThat(resolver.resolve("lmstudio")).isInstanceOf(NoopPromptCacheStrategy.class);
@@ -32,6 +37,7 @@ class PromptCacheStrategyResolverTest {
     }
 
     @Test
+    @DisplayName("resolve returns NoopPromptCacheStrategy for all providers when master toggle is off")
     void resolve_MasterToggleOff_AlwaysNoop() {
         PromptCacheStrategyResolver resolver = build(false, Map.of("anthropic", true));
         assertThat(resolver.resolve("anthropic")).isInstanceOf(NoopPromptCacheStrategy.class);
@@ -39,6 +45,7 @@ class PromptCacheStrategyResolverTest {
     }
 
     @Test
+    @DisplayName("resolve returns Noop only for the provider whose per-provider toggle is off")
     void resolve_PerProviderToggleOff_OnlyThatProviderNoop() {
         PromptCacheStrategyResolver resolver = build(true, Map.of("anthropic", false, "openai", true));
         assertThat(resolver.resolve("anthropic")).isInstanceOf(NoopPromptCacheStrategy.class);
@@ -46,6 +53,7 @@ class PromptCacheStrategyResolverTest {
     }
 
     @Test
+    @DisplayName("resolve returns NoopPromptCacheStrategy for unknown or null provider")
     void resolve_UnknownProvider_ReturnsNoop() {
         PromptCacheStrategyResolver resolver = build(true, Map.of());
         assertThat(resolver.resolve("doesnotexist")).isInstanceOf(NoopPromptCacheStrategy.class);
@@ -53,6 +61,7 @@ class PromptCacheStrategyResolverTest {
     }
 
     @Test
+    @DisplayName("resolve returns the same Noop instance on repeated calls for the same provider")
     void resolve_NoopReusedAcrossCallsForSameProvider() {
         PromptCacheStrategyResolver resolver = build(true, Map.of());
         PromptCacheStrategy a = resolver.resolve("foo");

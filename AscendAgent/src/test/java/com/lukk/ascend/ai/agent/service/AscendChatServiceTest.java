@@ -9,6 +9,7 @@ import com.lukk.ascend.ai.agent.service.memory.SemanticMemoryExtractor;
 import com.lukk.ascend.ai.agent.service.rag.BuiltUserMessage;
 import com.lukk.ascend.ai.agent.service.rag.S3PresignedUrlService;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
@@ -66,6 +67,7 @@ class AscendChatServiceTest {
     private AscendChatService ascendChatService;
 
     @Test
+    @DisplayName("prompt executes chat and triggers async memory extraction when inputs are valid")
     void prompt_WhenValidInputs_ThenExecutesAndExtractsMemory() {
         MultipartFile image = mock(MultipartFile.class);
         MultipartFile doc = mock(MultipartFile.class);
@@ -97,6 +99,7 @@ class AscendChatServiceTest {
     }
 
     @Test
+    @DisplayName("prompt resolves embedding provider from provider config when not explicitly supplied")
     void prompt_WhenEmbeddingProviderNotProvided_ThenResolvesFromPropertiesAndExecutes() {
         ProviderConfig config = new ProviderConfig();
         config.setDefaultEmbedding(ACTIVE_EMBEDDING);
@@ -123,6 +126,7 @@ class AscendChatServiceTest {
     }
 
     @Test
+    @DisplayName("prompt returns null sources field when attachSources is false")
     void prompt_WhenAttachSourcesFalse_ThenNoSourcesField() {
         when(contextAssembler.buildSystemMessages(DEFAULT_USER_ID, DEFAULT_PROMPT, ACTIVE_EMBEDDING))
                 .thenReturn(new AssembledSystemMessages("S", ""));
@@ -142,6 +146,7 @@ class AscendChatServiceTest {
     }
 
     @Test
+    @DisplayName("prompt attaches presigned source files when RAG ran and chunks were retrieved")
     void prompt_WhenAttachSourcesTrue_AndRagRan_AndChunksRetrieved_ThenAttachesPresignedSources() {
         when(contextAssembler.buildSystemMessages(DEFAULT_USER_ID, DEFAULT_PROMPT, ACTIVE_EMBEDDING))
                 .thenReturn(new AssembledSystemMessages("S", ""));
@@ -165,6 +170,7 @@ class AscendChatServiceTest {
     }
 
     @Test
+    @DisplayName("prompt returns empty sources array when RAG ran but retrieved zero chunks")
     void prompt_WhenAttachSourcesTrue_AndRagRan_AndZeroChunks_ThenEmptySourcesArray() {
         when(contextAssembler.buildSystemMessages(DEFAULT_USER_ID, DEFAULT_PROMPT, ACTIVE_EMBEDDING))
                 .thenReturn(new AssembledSystemMessages("S", ""));
@@ -183,6 +189,7 @@ class AscendChatServiceTest {
     }
 
     @Test
+    @DisplayName("prompt returns empty sources array without presigning when RAG was skipped")
     void prompt_WhenAttachSourcesTrue_ButRagSkipped_ThenEmptySourcesArrayWithoutPresigning() {
         when(contextAssembler.buildSystemMessages(DEFAULT_USER_ID, DEFAULT_PROMPT, ACTIVE_EMBEDDING))
                 .thenReturn(new AssembledSystemMessages("S", ""));

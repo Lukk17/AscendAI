@@ -6,6 +6,7 @@ import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,7 +21,6 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -62,12 +62,12 @@ class ChatExecutorTest {
 
     @BeforeEach
     void setupGlobalFields() {
-        ReflectionTestUtils.setField(chatExecutor, "systemPrompt", SYSTEM_TEXT);
         PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio");
         org.mockito.Mockito.lenient().when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
     }
 
     @Test
+    @DisplayName("execute returns AiResponse with empty tools list when no tool calls are present")
     void execute_WhenValidInput_ThenReturnsAiResponse() {
         // given
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
@@ -83,10 +83,11 @@ class ChatExecutorTest {
         // then
         assertThat(result).isNotNull();
         assertThat(result.content()).isEqualTo(EXPECTED_RESPONSE);
-        assertThat(result.metadata().getToolsUsed()).isEmpty();
+        assertThat(result.metadata().toolsUsed()).isEmpty();
     }
 
     @Test
+    @DisplayName("execute returns tool names in metadata when the model invoked tools")
     void execute_WhenToolsInvoked_ThenReturnsToolsInMetadata() {
         // given
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
@@ -102,10 +103,11 @@ class ChatExecutorTest {
 
         // then
         assertThat(result.content()).isEqualTo(EXPECTED_RESPONSE);
-        assertThat(result.metadata().getToolsUsed()).containsExactly("toolName");
+        assertThat(result.metadata().toolsUsed()).containsExactly("toolName");
     }
 
     @Test
+    @DisplayName("execute embeds image as media when an image is attached to the request")
     void execute_WhenImageAttached_ThenEmbedsMediaSuccessfully() {
         // given
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
@@ -124,6 +126,7 @@ class ChatExecutorTest {
     }
 
     @Test
+    @DisplayName("execute returns actual content from the last generation when model produces thinking output")
     void execute_WhenThinkingModel_ThenReturnsActualContent() {
         // given
         String thinkingText = "Let me analyze this step by step...";
@@ -142,6 +145,7 @@ class ChatExecutorTest {
     }
 
     @Test
+    @DisplayName("execute throws AiGenerationException when image processing fails with IOException")
     void execute_WhenImageProcessingFails_ThenThrowsAiGenerationException() throws IOException {
         // given
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
@@ -158,6 +162,7 @@ class ChatExecutorTest {
     }
 
     @Test
+    @DisplayName("execute throws AiGenerationException when the chat model returns null response")
     void execute_WhenChatResponseIsNull_ThenThrowsAiGenerationException() {
         // given
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);

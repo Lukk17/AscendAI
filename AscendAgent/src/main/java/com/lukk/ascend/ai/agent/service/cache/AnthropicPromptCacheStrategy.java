@@ -37,22 +37,26 @@ public class AnthropicPromptCacheStrategy implements PromptCacheStrategy {
 
     @Override
     public void recordOutcome(String userId, ChatResponse response) {
-        if (response == null || response.getMetadata() == null) {
+        if (response == null) {
             return;
         }
+
         Usage usage = response.getMetadata().getUsage();
         if (usage == null) {
             return;
         }
-        Object nativeUsage = usage.getNativeUsage();
-        if (nativeUsage instanceof AnthropicApi.Usage anth) {
-            Integer read = anth.cacheReadInputTokens();
-            Integer creation = anth.cacheCreationInputTokens();
-            int prompt = usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
-            boolean hit = read != null && read > 0;
-            log.info("[PromptCache] provider={} user={} hit={} cache_read_tokens={} cache_creation_tokens={} prompt_tokens={}",
-                    PROVIDER, userId, hit, nullToZero(read), nullToZero(creation), prompt);
+
+        if (!(usage.getNativeUsage() instanceof AnthropicApi.Usage anth)) {
+            return;
         }
+
+        Integer read = anth.cacheReadInputTokens();
+        Integer creation = anth.cacheCreationInputTokens();
+        int prompt = usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
+        boolean hit = read != null && read > 0;
+
+        log.info("[PromptCache] provider={} user={} hit={} cache_read_tokens={} cache_creation_tokens={} prompt_tokens={}",
+                PROVIDER, userId, hit, nullToZero(read), nullToZero(creation), prompt);
     }
 
     @Override

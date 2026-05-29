@@ -58,6 +58,16 @@ class DoclingClientNormalizePathTest {
     }
 
     @Test
+    void normalizePath_WhenSingleSlash_ThenKeepsSlash() {
+        // length == 1 -> trimmed.length() > 1 is false -> trailing slash NOT stripped -> "/" returned
+        // "/" != LEGACY_PATH (/v1/convert) so no auto-correct
+        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "/");
+
+        assertThat((String) ReflectionTestUtils.getField(client, "doclingApiPath"))
+                .isEqualTo("/");
+    }
+
+    @Test
     void logConfiguredEndpoint_DoesNotThrow() {
         DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "/v1/convert/file");
 

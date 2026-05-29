@@ -8,6 +8,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 
+import org.junit.jupiter.api.DisplayName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -17,6 +19,7 @@ class OpenAiPromptCacheStrategyTest {
     private final OpenAiPromptCacheStrategy strategy = new OpenAiPromptCacheStrategy("openai");
 
     @Test
+    @DisplayName("buildOptions returns generic ChatOptions with the model set for a valid model name")
     void buildOptions_WithModel_ReturnsGenericChatOptions() {
         ChatOptions opts = strategy.buildOptions("gpt-4o");
         assertThat(opts).isNotNull();
@@ -24,17 +27,20 @@ class OpenAiPromptCacheStrategyTest {
     }
 
     @Test
+    @DisplayName("buildOptions returns null when model is null or blank")
     void buildOptions_NullModel_ReturnsNull() {
         assertThat(strategy.buildOptions(null)).isNull();
         assertThat(strategy.buildOptions("")).isNull();
     }
 
     @Test
+    @DisplayName("recordOutcome does not throw when response is null")
     void recordOutcome_NullResponse_DoesNotThrow() {
         strategy.recordOutcome("u", null);
     }
 
     @Test
+    @DisplayName("recordOutcome does not throw when response contains cached prompt tokens")
     void recordOutcome_WithCachedTokens_DoesNotThrow() {
         OpenAiApi.Usage.PromptTokensDetails details = new OpenAiApi.Usage.PromptTokensDetails(0, 512);
         OpenAiApi.Usage native_ = new OpenAiApi.Usage(100, 1024, 1124, details, null);
@@ -47,6 +53,7 @@ class OpenAiPromptCacheStrategyTest {
     }
 
     @Test
+    @DisplayName("recordOutcome does not throw when native usage type is not OpenAiApi.Usage")
     void recordOutcome_NoNativeUsage_DoesNotThrow() {
         Usage usage = mock(Usage.class);
         when(usage.getNativeUsage()).thenReturn(new Object());
@@ -59,6 +66,7 @@ class OpenAiPromptCacheStrategyTest {
     }
 
     @Test
+    @DisplayName("providerName returns the value passed to the constructor")
     void providerName_IsConstructorArg() {
         assertThat(new OpenAiPromptCacheStrategy("openai").providerName()).isEqualTo("openai");
         assertThat(new OpenAiPromptCacheStrategy("gemini").providerName()).isEqualTo("gemini");

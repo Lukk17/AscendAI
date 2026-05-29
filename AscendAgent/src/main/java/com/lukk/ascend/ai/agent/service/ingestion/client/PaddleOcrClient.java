@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
+import com.lukk.ascend.ai.agent.service.ingestion.IngestionMetadataKeys;
 import com.lukk.ascend.ai.agent.util.NamedByteArrayResource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -27,10 +28,11 @@ import java.util.Optional;
 public class PaddleOcrClient {
 
     private static final String TYPE_PADDLE_OCR = "paddleocr";
-    private static final String KEY_SOURCE = "source";
-    private static final String KEY_TYPE = "type";
     private static final String PARAM_FILES = "files";
     private static final String PARAM_LANG = "lang";
+    private static final String JSON_PAGES = "pages";
+    private static final String JSON_LINES = "lines";
+    private static final String JSON_TEXT = "text";
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -80,8 +82,8 @@ public class PaddleOcrClient {
 
             if (!fullText.isEmpty()) {
                 documents.add(new Document(fullText.toString(), Map.of(
-                        KEY_SOURCE, filename,
-                        KEY_TYPE, TYPE_PADDLE_OCR)));
+                        IngestionMetadataKeys.SOURCE, filename,
+                        IngestionMetadataKeys.TYPE, TYPE_PADDLE_OCR)));
             }
         } catch (JsonProcessingException e) {
             throw new IngestionException("Failed to parse PaddleOCR JSON response", e);
@@ -90,21 +92,23 @@ public class PaddleOcrClient {
     }
 
     private void extractPagesText(JsonNode rootNode, StringBuilder fullText) {
-        if (!rootNode.has("pages") || !rootNode.get("pages").isArray()) {
+        if (!rootNode.has(JSON_PAGES) || !rootNode.get(JSON_PAGES).isArray()) {
             return;
         }
-        for (JsonNode pageNode : rootNode.get("pages")) {
+
+        for (JsonNode pageNode : rootNode.get(JSON_PAGES)) {
             extractLinesText(pageNode, fullText);
         }
     }
 
     private void extractLinesText(JsonNode pageNode, StringBuilder fullText) {
-        if (!pageNode.has("lines") || !pageNode.get("lines").isArray()) {
+        if (!pageNode.has(JSON_LINES) || !pageNode.get(JSON_LINES).isArray()) {
             return;
         }
-        for (JsonNode lineNode : pageNode.get("lines")) {
-            if (lineNode.has("text")) {
-                fullText.append(lineNode.get("text").asText()).append("\n");
+
+        for (JsonNode lineNode : pageNode.get(JSON_LINES)) {
+            if (lineNode.has(JSON_TEXT)) {
+                fullText.append(lineNode.get(JSON_TEXT).asText()).append("\n");
             }
         }
     }

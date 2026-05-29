@@ -10,6 +10,8 @@ import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 
+import org.junit.jupiter.api.DisplayName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -19,6 +21,7 @@ class AnthropicPromptCacheStrategyTest {
     private final AnthropicPromptCacheStrategy strategy = new AnthropicPromptCacheStrategy();
 
     @Test
+    @DisplayName("buildOptions produces AnthropicChatOptions with SYSTEM_ONLY multi-block caching")
     void buildOptions_ProducesAnthropicOptionsWithSystemOnlyMultiBlockCaching() {
         ChatOptions opts = strategy.buildOptions("claude-sonnet-4-6");
 
@@ -31,6 +34,7 @@ class AnthropicPromptCacheStrategyTest {
     }
 
     @Test
+    @DisplayName("buildOptions produces cache options without a model when null model is passed")
     void buildOptions_NullModel_StillProducesCacheOptionsWithoutModel() {
         ChatOptions opts = strategy.buildOptions(null);
 
@@ -40,11 +44,13 @@ class AnthropicPromptCacheStrategyTest {
     }
 
     @Test
+    @DisplayName("recordOutcome does not throw when response is null")
     void recordOutcome_NullResponse_DoesNotThrow() {
         strategy.recordOutcome("u", null);
     }
 
     @Test
+    @DisplayName("recordOutcome does not throw when native usage is not AnthropicApi.Usage")
     void recordOutcome_NonAnthropicNativeUsage_NoLogNoThrow() {
         ChatResponse response = mock(ChatResponse.class);
         ChatResponseMetadata md = mock(ChatResponseMetadata.class);
@@ -56,19 +62,39 @@ class AnthropicPromptCacheStrategyTest {
     }
 
     @Test
+    @DisplayName("recordOutcome logs cache read tokens on a cache hit")
     void recordOutcome_AnthropicHit_LogsCacheReadTokens() {
+        // cache hit: cacheRead > 0, cacheCreate == 0
         ChatResponse response = anthropicResponse(487, 0, 612);
-        // log assertion would require a log capture; behavior asserted by no-throw + downstream impact.
         strategy.recordOutcome("user1", response);
     }
 
     @Test
+    @DisplayName("recordOutcome logs zeroes on a cold-start cache miss")
     void recordOutcome_AnthropicMiss_LogsZeroes() {
+        // cold start: both cacheRead and cacheCreate are 0
         ChatResponse response = anthropicResponse(0, 0, 612);
         strategy.recordOutcome("user1", response);
     }
 
     @Test
+    @DisplayName("recordOutcome logs cacheCreate tokens on first cache population (write only)")
+    void recordOutcome_AnthropicWrite_LogsCacheCreateTokens() {
+        // cache write: cacheCreate > 0, cacheRead == 0 (first population of cache)
+        ChatResponse response = anthropicResponse(0, 350, 612);
+        strategy.recordOutcome("user1", response);
+    }
+
+    @Test
+    @DisplayName("recordOutcome handles both cacheRead and cacheCreate being non-zero in a partial hit")
+    void recordOutcome_AnthropicHitAndWrite_BothNonZero() {
+        // mixed: cache was partially warmed so both counters > 0
+        ChatResponse response = anthropicResponse(312, 100, 1024);
+        strategy.recordOutcome("user1", response);
+    }
+
+    @Test
+    @DisplayName("isCacheConfigError detects cache_control error messages and ignores unrelated ones")
     void isCacheConfigError_DetectsCacheControlInMessage() {
         assertThat(strategy.isCacheConfigError(new RuntimeException("400 invalid cache_control block"))).isTrue();
         assertThat(strategy.isCacheConfigError(new RuntimeException("HTTP 400 cache-control malformed"))).isTrue();

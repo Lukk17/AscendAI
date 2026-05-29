@@ -18,6 +18,9 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.junit.jupiter.api.DisplayName;
+import org.springframework.lang.NonNull;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -62,6 +65,7 @@ class IngestionControllerExtraTest {
     }
 
     @Test
+    @DisplayName("returns 400 with no_file error when files list is null")
     void uploadDocument_ReturnsBadRequest_WhenFilesListIsNull() {
         ResponseEntity<?> response = controller.uploadDocument(null);
 
@@ -71,6 +75,7 @@ class IngestionControllerExtraTest {
     }
 
     @Test
+    @DisplayName("skips empty file entries and uploads only non-empty files from a mixed list")
     void uploadDocument_SkipsEmptyEntries_WhenMixedListProvided() throws IOException {
         // hits the "if (file.isEmpty()) continue;" branch in the loop
         MockMultipartFile empty = new MockMultipartFile("file", "skip.md", "text/markdown", new byte[0]);
@@ -84,6 +89,7 @@ class IngestionControllerExtraTest {
     }
 
     @Test
+    @DisplayName("returns 415 with unsupported_media_type error when all files have disallowed MIME type")
     void uploadDocument_RejectsAllFiles_WithDisallowedMime_Returns415() {
         MockMultipartFile evil = new MockMultipartFile("file", "evil.exe",
                 "application/x-msdownload", "MZ".getBytes());
@@ -91,17 +97,19 @@ class IngestionControllerExtraTest {
         ResponseEntity<?> response = controller.uploadDocument(List.of(evil));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        assertThat(response.getBody()).isInstanceOf(ApiError.class);
+        assertThat(response.getBody()).isNotNull().isInstanceOf(ApiError.class);
         ApiError err = (ApiError) response.getBody();
         assertThat(err.error()).isEqualTo("unsupported_media_type");
         assertThat(err.message()).contains("disallowed type");
     }
 
     @Test
+    @DisplayName("captures IOException from getInputStream and reports it in failures")
     void uploadDocument_CapturesIOException_AndReportsInFailures() throws IOException {
         // Use a file whose getInputStream() throws.
         MultipartFile broken = new MockMultipartFile("file", "broken.pdf", "application/pdf", "data".getBytes()) {
             @Override
+            @NonNull
             public InputStream getInputStream() throws IOException {
                 throw new IOException("disk full");
             }
@@ -111,15 +119,18 @@ class IngestionControllerExtraTest {
 
         // No file was successfully uploaded → 415 with failures listed.
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getBody()).isNotNull().isInstanceOf(ApiError.class);
         ApiError err = (ApiError) response.getBody();
         assertThat(err.message()).contains("disk full");
     }
 
     @Test
+    @DisplayName("reports IO failure alongside successful uploads in the same response")
     void uploadDocument_ReportsIOFailure_AlongsideSuccessfulUploads() throws IOException {
         MockMultipartFile good = new MockMultipartFile("file", "ok.md", "text/markdown", "x".getBytes());
         MultipartFile broken = new MockMultipartFile("file", "boom.pdf", "application/pdf", "data".getBytes()) {
             @Override
+            @NonNull
             public InputStream getInputStream() throws IOException {
                 throw new IOException("io failed");
             }
@@ -128,6 +139,7 @@ class IngestionControllerExtraTest {
         ResponseEntity<?> response = controller.uploadDocument(List.of(good, broken));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull().isInstanceOf(com.lukk.ascend.ai.agent.dto.UploadResponse.class);
         com.lukk.ascend.ai.agent.dto.UploadResponse body =
                 (com.lukk.ascend.ai.agent.dto.UploadResponse) response.getBody();
         assertThat(body.uploaded()).containsExactly("markdown/ok.md");
@@ -136,6 +148,7 @@ class IngestionControllerExtraTest {
     }
 
     @Test
+    @DisplayName("accepts any MIME type when the allowed list is empty")
     void uploadDocument_AcceptsAllMimes_WhenAllowedListIsEmpty() throws IOException {
         uploadProperties.setAllowedMimeTypes(List.of());
         MockMultipartFile any = new MockMultipartFile("file", "x.bin", "application/x-anything", "x".getBytes());
@@ -146,6 +159,7 @@ class IngestionControllerExtraTest {
     }
 
     @Test
+    @DisplayName("accepts any MIME type when the allowed list is null")
     void uploadDocument_AcceptsAllMimes_WhenAllowedListIsNull() throws IOException {
         uploadProperties.setAllowedMimeTypes(null);
         MockMultipartFile any = new MockMultipartFile("file", "x.bin", "application/x-anything", "x".getBytes());
@@ -156,6 +170,7 @@ class IngestionControllerExtraTest {
     }
 
     @Test
+    @DisplayName("runIngestion delegates to service with provided prefix and embedding provider")
     void runIngestion_DelegatesToService_WithProvidedPrefixAndProvider() {
         ManualIngestionService.ManualIngestionResult expected = new ManualIngestionService.ManualIngestionResult();
         expected.indexed = 3;
@@ -170,6 +185,7 @@ class IngestionControllerExtraTest {
     }
 
     @Test
+    @DisplayName("runIngestion passes empty Optional to service when prefix is null")
     void runIngestion_DelegatesWithEmptyOptional_WhenPrefixIsNull() {
         ManualIngestionService.ManualIngestionResult expected = new ManualIngestionService.ManualIngestionResult();
         when(manualIngestionService.run(eq(Optional.empty()), eq("openai")))
@@ -180,5 +196,36 @@ class IngestionControllerExtraTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("returns 400 when files list is empty (size 0)")
+    void uploadDocument_EmptyList_ReturnsBadRequest() {
+        ResponseEntity<?> response = controller.uploadDocument(java.util.List.of());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("returns 400 when all files in the list are empty")
+    void uploadDocument_AllFilesEmpty_ReturnsBadRequest() {
+        MockMultipartFile e1 = new MockMultipartFile("file", "a.md", "text/markdown", new byte[0]);
+        MockMultipartFile e2 = new MockMultipartFile("file", "b.pdf", "application/pdf", new byte[0]);
+
+        ResponseEntity<?> response = controller.uploadDocument(List.of(e1, e2));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("routes file with null original filename to documentsFolder")
+    void uploadDocument_NullFilename_RoutesToDocumentsFolder() {
+        // MockMultipartFile with no filename (empty string) will be sanitized to unknown_file
+        MockMultipartFile f = new MockMultipartFile("file", (String) null, "application/pdf", "data".getBytes());
+
+        ResponseEntity<?> response = controller.uploadDocument(List.of(f));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // unknown_file goes to documents/ folder
     }
 }

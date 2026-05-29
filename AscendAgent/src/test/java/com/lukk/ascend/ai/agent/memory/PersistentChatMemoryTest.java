@@ -6,6 +6,7 @@ import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -58,6 +59,7 @@ class PersistentChatMemoryTest {
     }
 
     @Test
+    @DisplayName("returns messages from Redis cache when cache is populated")
     void get_WhenInRedis_ThenReturnsFromRedisAndIgnoresDB() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1)).thenReturn(List.of(
@@ -74,6 +76,7 @@ class PersistentChatMemoryTest {
     }
 
     @Test
+    @DisplayName("fetches from Postgres and caches to Redis when Redis cache is empty")
     void get_WhenNotInRedis_ThenReturnsFromPostgresAndCachesToRedis() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1)).thenReturn(List.of());
@@ -90,6 +93,7 @@ class PersistentChatMemoryTest {
     }
 
     @Test
+    @DisplayName("add pushes message to Redis and persists to database")
     void add_WhenInvoked_ThenPushesToRedisAndPersistsToDBAsync() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
@@ -101,6 +105,7 @@ class PersistentChatMemoryTest {
     }
 
     @Test
+    @DisplayName("wraps Redis exception in ServiceException when get throws")
     void get_WhenThrowsException_ThenWrapsInServiceException() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(anyString(), eq(0L), eq(-1L))).thenThrow(new RuntimeException("Redis timeout"));
@@ -111,6 +116,7 @@ class PersistentChatMemoryTest {
     }
 
     @Test
+    @DisplayName("clear deletes the conversation's Redis key")
     void clear_WhenInvoked_ThenDeletesRedisKey() {
         persistentChatMemory.clear(DEFAULT_CONVERSATION_ID);
 

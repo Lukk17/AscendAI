@@ -17,7 +17,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -43,9 +42,6 @@ public class ChatExecutor {
     private final SyncMcpToolCallbackProvider toolCallbackProvider;
     private final ChatResponseContentResolver chatResponseContentResolver;
     private final PromptCacheStrategyResolver cacheStrategyResolver;
-
-    @Value("${app.system-prompt}")
-    private String systemPrompt;
 
     public AiResponse execute(String userId, String systemText, String userText, List<Message> history,
                               MultipartFile image, String provider, String model) {
@@ -167,35 +163,53 @@ public class ChatExecutor {
         }
 
         String filename = image.getOriginalFilename();
-        if (StringUtils.hasText(filename)) {
-            String lower = filename.toLowerCase();
-            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
-                return MimeTypeUtils.IMAGE_JPEG;
-            }
-            if (lower.endsWith(".png")) {
-                return MimeTypeUtils.IMAGE_PNG;
-            }
-            if (lower.endsWith(".webp")) {
-                return MimeType.valueOf("image/webp");
-            }
-            if (lower.endsWith(".gif")) {
-                return MimeType.valueOf("image/gif");
-            }
+        MimeType byExtension = mimeTypeForExtension(filename);
+        if (byExtension != null) {
+            return byExtension;
         }
+
         log.info("Could not infer image MIME from Content-Type or filename '{}' — defaulting to image/png", filename);
+
         return MimeTypeUtils.IMAGE_PNG;
+    }
+
+    private static MimeType mimeTypeForExtension(String filename) {
+        if (!StringUtils.hasText(filename)) {
+            return null;
+        }
+
+        String extension = extractExtension(filename);
+
+        return switch (extension) {
+            case "jpg", "jpeg" -> MimeTypeUtils.IMAGE_JPEG;
+            case "png" -> MimeTypeUtils.IMAGE_PNG;
+            case "webp" -> MimeType.valueOf("image/webp");
+            case "gif" -> MimeType.valueOf("image/gif");
+            default -> null;
+        };
+    }
+
+    private static String extractExtension(String filename) {
+        int dot = filename.lastIndexOf('.');
+        if (dot < 0 || dot == filename.length() - 1) {
+            return "";
+        }
+
+        return filename.substring(dot + 1).toLowerCase();
     }
 
     List<String> extractToolsUsed(ChatResponse chatResponse) {
         try {
-            var output = chatResponse.getResult().getOutput();
-            if (output.getToolCalls() == null || output.getToolCalls().isEmpty()) {
+            var toolCalls = chatResponse.getResult().getOutput().getToolCalls();
+            if (toolCalls.isEmpty()) {
                 return List.of();
             }
-            return output.getToolCalls().stream()
+
+            return toolCalls.stream()
                     .map(AssistantMessage.ToolCall::name)
                     .distinct()
                     .collect(Collectors.toList());
+
         } catch (Exception e) {
             return List.of();
         }

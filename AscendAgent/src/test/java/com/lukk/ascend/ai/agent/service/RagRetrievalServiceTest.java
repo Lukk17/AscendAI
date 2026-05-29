@@ -4,6 +4,7 @@ import com.lukk.ascend.ai.agent.config.properties.RagProperties;
 import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -49,6 +50,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve returns skipped result without touching vector store when RAG is disabled")
     void retrieve_WhenRagDisabled_ThenReturnsSkipped() {
         when(ragProperties.isEnabled()).thenReturn(false);
 
@@ -61,6 +63,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve returns empty context and ran=true when vector search returns no results")
     void retrieve_WhenSearchReturnsNoResults_ThenReturnsEmptyButRan() {
         setupRagProperties(true, 5, 0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -74,6 +77,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve returns empty context and ran=true when all scores are below the threshold")
     void retrieve_WhenAllScoresBelowThreshold_ThenReturnsEmptyButRan() {
         setupRagProperties(true, 5, 0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -86,6 +90,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve returns empty context and ran=true when the similarity search throws")
     void retrieve_WhenSimilaritySearchFails_ThenReturnsEmptyButRan() {
         setupRagProperties(true, 5, 0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -100,6 +105,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve returns formatted RAG context when chunks score above the threshold")
     void retrieve_WhenScoreAboveThreshold_ThenReturnsFormattedContext() {
         setupRagProperties(true, 5, 0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -119,6 +125,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve truncates the context snippet when it exceeds maxContextChars")
     void retrieve_WhenMaxCharsExceeded_ThenTruncatesSnippet() {
         setupRagProperties(true, 5, 0.75, 20);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -133,6 +140,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve deduplicates sources by bucket and key preserving first-seen order")
     void retrieve_DeduplicatesSourcesByBucketAndKey_PreservingFirstSeenOrder() {
         setupRagProperties(true, 5, 0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -153,6 +161,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve uses explicit bucket/key/displayName/mimeType metadata over source fallback")
     void retrieve_PrefersExplicitMetadataOverFallbacks() {
         setupRagProperties(true, 5, 0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -176,6 +185,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve includes orphan chunks in context but omits them from sources list")
     void retrieve_TolerateChunksMissingSourceMetadata() {
         setupRagProperties(true, 5, 0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
@@ -194,6 +204,7 @@ class RagRetrievalServiceTest {
     }
 
     @Test
+    @DisplayName("retrieve uses the basename of the key as the display name when no explicit displayName is set")
     void retrieve_DisplayNameFallsBackToBasenameOfKey() {
         setupRagProperties(true, 5, 0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);

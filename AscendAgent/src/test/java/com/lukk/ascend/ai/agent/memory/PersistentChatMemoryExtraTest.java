@@ -5,6 +5,7 @@ import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -65,6 +66,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("get with no limit delegates to overload and returns all messages")
     void getNoLimit_DelegatesToOverloadWithMaxSize() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1))
@@ -82,6 +84,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("get falls back to UserMessage when message role is unrecognized")
     void get_WhenUnknownRole_ThenFallsBackToUserMessage() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1))
@@ -95,6 +98,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("add sets TTL on the Redis key after pushing the message")
     void add_AppliesTtlOnRedisKeyAfterPush() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
@@ -105,6 +109,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("get sets TTL on Redis key when populating cache from Postgres")
     void getFromPostgres_AppliesTtlOnRedisCachePopulation() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1)).thenReturn(List.of());
@@ -115,11 +120,12 @@ class PersistentChatMemoryExtraTest {
 
         memory.get(CONVO_ID, 10);
 
-        verify(listOperations).rightPushAll(eq(REDIS_KEY), any(List.class));
+        verify(listOperations).rightPushAll(eq(REDIS_KEY), org.mockito.ArgumentMatchers.<java.util.Collection<String>>any());
         verify(redisTemplate).expire(eq(REDIS_KEY), eq(Duration.ofHours(24)));
     }
 
     @Test
+    @DisplayName("add wraps Redis exception in ServiceException")
     void add_WhenRedisThrows_ThenWrapsInServiceException() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         doThrow(new RuntimeException("redis down"))
@@ -131,6 +137,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("persistToDb swallows repository failures silently")
     void persistToDb_SwallowsRepositoryFailure() {
         doThrow(new RuntimeException("db down")).when(repository).save(any());
 
@@ -211,6 +218,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("add calls maybeCompact with the supplied provider and override after persisting")
     void add_InvokesMaybeCompactAfterPersistence() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
@@ -220,6 +228,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("add swallows compaction exceptions so the user turn is never broken")
     void add_WhenMaybeCompactThrows_ExceptionIsSwallowed() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         doThrow(new RuntimeException("compaction blew up"))
@@ -230,6 +239,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("two-argument add delegates to four-argument overload with null provider and EMPTY override")
     void add_TwoArgOverload_DelegatesToFourArgWithNullProviderAndEmptyOverride() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
@@ -239,6 +249,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("add trims Redis list to the larger of maxSize and keepRecentTurns+1 when compaction is enabled")
     void add_RedisTrim_UsesEffectiveCacheSizeWhenCompactionEnabled() {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         compactionProperties.setEnabled(true);
@@ -252,6 +263,7 @@ class PersistentChatMemoryExtraTest {
     }
 
     @Test
+    @DisplayName("clear always attempts Redis delete even when the Redis backend is disabled")
     void clear_AlwaysAttemptsRedisDelete_EvenWhenRedisDisabled() {
         properties.getRedis().setEnabled(false);
         properties.getPostgres().setEnabled(false);

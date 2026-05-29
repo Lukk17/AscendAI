@@ -10,11 +10,7 @@ import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
 import com.lukk.ascend.ai.agent.service.ChatModelResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -91,6 +87,7 @@ public class ChatHistoryCompactionService {
         if (!compactionProperties.isEnabled()) {
             return;
         }
+
         boolean redisOn = chatHistoryProperties.getRedis().isEnabled();
         boolean postgresOn = chatHistoryProperties.getPostgres().isEnabled();
         if (!redisOn && !postgresOn) {
@@ -104,33 +101,18 @@ public class ChatHistoryCompactionService {
             return;
         }
 
-        int turns = history.size();
-        int tokenEstimate = estimateTokens(history);
-        int contextWindow = contextWindow(primaryProvider);
-        boolean turnTriggered = turns >= compactionProperties.getTurnTrigger();
-        boolean tokenTriggered = tokenEstimate >= compactionProperties.getTokenTriggerFraction() * contextWindow;
-        if (!turnTriggered && !tokenTriggered) {
+        CompactionDecision decision = decideCompaction(history, primaryProvider);
+        if (decision.shouldSkip()) {
             return;
         }
 
-        boolean alreadySummarised = isSummary(history.getFirst());
-        if (alreadySummarised && (turns - 1) < compactionProperties.getTurnTrigger()) {
-            return;
-        }
-
-        int prefixCount = Math.max(1, turns - compactionProperties.getKeepRecentTurns());
-        if (prefixCount >= turns) {
-            prefixCount = turns - 1;
-        }
-        if (prefixCount < 1) {
-            return;
-        }
-
-        List<ChatHistory> prefix = history.subList(0, prefixCount);
+        List<ChatHistory> prefix = history.subList(0, decision.prefixCount());
         ResolvedCompactionTarget target = resolveTarget(primaryProvider, override);
 
         log.info("[Compaction] conversation='{}' turns={} estTokens={} trigger=turn:{}/token:{} prefixCount={} compactionProvider={} compactionModel={}",
-                conversationId, turns, tokenEstimate, turnTriggered, tokenTriggered, prefixCount, target.provider(), target.model());
+                conversationId, history.size(), decision.tokenEstimate(),
+                decision.turnTriggered(), decision.tokenTriggered(),
+                decision.prefixCount(), target.provider(), target.model());
 
         String summary = invokeSummariser(target, prefix);
         if (summary == null) {
@@ -138,7 +120,36 @@ public class ChatHistoryCompactionService {
         }
 
         applyToPostgres(conversationId, prefix, summary, postgresOn);
-        applyToRedis(conversationId, prefixCount, summary, redisOn);
+        applyToRedis(conversationId, decision.prefixCount(), summary, redisOn);
+    }
+
+    private CompactionDecision decideCompaction(List<ChatHistory> history, String primaryProvider) {
+        int turns = history.size();
+        int tokenEstimate = estimateTokens(history);
+        int contextWindow = contextWindow(primaryProvider);
+        boolean turnTriggered = turns >= compactionProperties.getTurnTrigger();
+        boolean tokenTriggered = tokenEstimate >= compactionProperties.getTokenTriggerFraction() * contextWindow;
+        if (!turnTriggered && !tokenTriggered) {
+            return CompactionDecision.noCompaction();
+        }
+
+        boolean alreadySummarised = isSummary(history.getFirst());
+        if (alreadySummarised && (turns - 1) < compactionProperties.getTurnTrigger()) {
+            return CompactionDecision.noCompaction();
+        }
+
+        int prefixCount = computePrefixCount(turns);
+        if (prefixCount < 1) {
+            return CompactionDecision.noCompaction();
+        }
+
+        return new CompactionDecision(prefixCount, tokenEstimate, turnTriggered, tokenTriggered);
+    }
+
+    private int computePrefixCount(int turns) {
+        int prefixCount = Math.max(1, turns - compactionProperties.getKeepRecentTurns());
+
+        return prefixCount >= turns ? turns - 1 : prefixCount;
     }
 
     private String invokeSummariser(ResolvedCompactionTarget target, List<ChatHistory> prefix) {
@@ -262,32 +273,20 @@ public class ChatHistoryCompactionService {
         return new ResolvedCompactionTarget(provider, model);
     }
 
-    /**
-     * Convert SystemMessage/UserMessage/AssistantMessage list to a flat string for token estimation in tests.
-     */
-    int estimateTokensFromMessages(List<Message> messages) {
-        int total = 0;
-        for (Message m : messages) {
-            String text;
-            if (m instanceof SystemMessage s) {
-                text = s.getText();
-            } else if (m instanceof UserMessage u) {
-                text = u.getText();
-            } else if (m instanceof AssistantMessage a) {
-                text = a.getText();
-            } else {
-                text = "";
-            }
-            if (text != null) {
-                total += text.length() / 4;
-            }
-        }
-        return total;
-    }
-
     public record ResolvedCompactionTarget(String provider, String model) {
     }
 
     private record MessageDto(String role, String content) {
+    }
+
+    private record CompactionDecision(int prefixCount, int tokenEstimate, boolean turnTriggered, boolean tokenTriggered) {
+
+        static CompactionDecision noCompaction() {
+            return new CompactionDecision(0, 0, false, false);
+        }
+
+        boolean shouldSkip() {
+            return prefixCount < 1;
+        }
     }
 }

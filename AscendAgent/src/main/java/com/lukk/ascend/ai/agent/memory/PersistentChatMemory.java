@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.memory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
@@ -15,6 +16,7 @@ import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -67,17 +69,12 @@ public class PersistentChatMemory implements ChatMemory {
         String key = "chat:" + conversationId;
         try {
             if (redisEnabled) {
-                List<String> cachedJson = redisTemplate.opsForList().range(key, 0, -1);
-                if (cachedJson != null && !cachedJson.isEmpty()) {
-                    List<Message> cachedMessages = new ArrayList<>();
-                    for (String json : cachedJson) {
-                        MessageDto dto = objectMapper.readValue(json, MessageDto.class);
-                        cachedMessages.add(mapDtoToMessage(dto));
-                    }
+                List<Message> cached = loadFromRedis(key);
+                if (!cached.isEmpty()) {
+                    List<Message> result = sliceTail(cached, lastN);
 
-                    int start = Math.max(0, cachedMessages.size() - lastN);
-                    List<Message> result = cachedMessages.subList(start, cachedMessages.size());
                     log.info("Retrieved History | Size: {} | Source: REDIS", result.size());
+
                     return result;
                 }
             }
@@ -86,37 +83,70 @@ public class PersistentChatMemory implements ChatMemory {
                 return Collections.emptyList();
             }
 
-            List<ChatHistory> history = repository.findRecentHistory(conversationId, effectiveCacheSize());
-
-            List<Message> hydrated = history.stream()
-                    .map(this::mapToMessage)
-                    .collect(Collectors.toList());
-            Collections.reverse(hydrated);
-
+            List<Message> hydrated = loadFromPostgres(conversationId);
             if (redisEnabled && !hydrated.isEmpty()) {
-                List<String> jsonMessages = new ArrayList<>();
-                for (Message msg : hydrated) {
-                    jsonMessages.add(objectMapper
-                            .writeValueAsString(new MessageDto(msg.getMessageType().getValue(), msg.getText())));
-                }
-                redisTemplate.opsForList().rightPushAll(key, jsonMessages);
-                redisTemplate.expire(key, chatHistoryProperties.getTtl());
+                populateRedisCache(key, hydrated);
             }
 
-            int start = Math.max(0, hydrated.size() - lastN);
-            List<Message> result = hydrated.subList(start, hydrated.size());
+            List<Message> result = sliceTail(hydrated, lastN);
+
             log.info("Retrieved History | Size: {} | Source: Postgres", result.size());
+
             return result;
 
         } catch (Exception e) {
             log.error("Failed to get messages from memory for conversation: {}", conversationId, e);
+
             throw new ServiceException("Failed to retrieve chat memory", e);
         }
     }
 
     @Override
-    public List<Message> get(String conversationId) {
+    @NonNull
+    public List<Message> get(@NonNull String conversationId) {
         return get(conversationId, effectiveCacheSize());
+    }
+
+    private List<Message> loadFromRedis(String key) throws JsonProcessingException {
+        List<String> cachedJson = redisTemplate.opsForList().range(key, 0, -1);
+        if (cachedJson == null || cachedJson.isEmpty()) {
+            return List.of();
+        }
+
+        List<Message> messages = new ArrayList<>(cachedJson.size());
+        for (String json : cachedJson) {
+            MessageDto dto = objectMapper.readValue(json, MessageDto.class);
+            messages.add(mapDtoToMessage(dto));
+        }
+
+        return messages;
+    }
+
+    private List<Message> loadFromPostgres(String conversationId) {
+        List<ChatHistory> history = repository.findRecentHistory(conversationId, effectiveCacheSize());
+        List<Message> hydrated = history.stream()
+                .map(this::mapToMessage)
+                .collect(Collectors.toList());
+        Collections.reverse(hydrated);
+
+        return hydrated;
+    }
+
+    private void populateRedisCache(String key, List<Message> hydrated) throws JsonProcessingException {
+        List<String> jsonMessages = new ArrayList<>(hydrated.size());
+        for (Message msg : hydrated) {
+            jsonMessages.add(objectMapper
+                    .writeValueAsString(new MessageDto(msg.getMessageType().getValue(), msg.getText())));
+        }
+
+        redisTemplate.opsForList().rightPushAll(key, jsonMessages);
+        redisTemplate.expire(key, chatHistoryProperties.getTtl());
+    }
+
+    private static List<Message> sliceTail(List<Message> messages, int lastN) {
+        int start = Math.max(0, messages.size() - lastN);
+
+        return messages.subList(start, messages.size());
     }
 
     private Message mapToMessage(ChatHistory h) {
@@ -139,7 +169,7 @@ public class PersistentChatMemory implements ChatMemory {
     }
 
     @Override
-    public void add(String conversationId, List<Message> messages) {
+    public void add(@NonNull String conversationId, @NonNull List<Message> messages) {
         add(conversationId, messages, null, CompactionOverride.EMPTY);
     }
 
@@ -208,8 +238,9 @@ public class PersistentChatMemory implements ChatMemory {
     }
 
     @Override
-    public void clear(String conversationId) {
+    public void clear(@NonNull String conversationId) {
         String key = "chat:" + conversationId;
+
         redisTemplate.delete(key);
     }
 

@@ -15,6 +15,7 @@ import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -22,8 +23,10 @@ import org.springframework.web.client.RestClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.time.Duration;
@@ -39,13 +42,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class StartupLogConfig {
 
-    private static final String BANNER =
-            " █████╗ ███████╗ ██████╗███████╗███╗   ██╗██████╗      █████╗  ██████╗ ███████╗███╗   ██╗████████╗\n" +
-            "██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝\n" +
-            "███████║███████╗██║     █████╗  ██╔██╗ ██║██║  ██║    ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   \n" +
-            "██╔══██║╚════██║██║     ██╔══╝  ██║╚██╗██║██║  ██║    ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   \n" +
-            "██║  ██║███████║╚██████╗███████╗██║ ╚████║██████╔╝    ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   \n" +
-            "╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═══╝╚═════╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ";
+    private static final String BANNER_RESOURCE = "banner.txt";
 
     private static final String DIVIDER = "----------------------------------------------------------";
 
@@ -104,7 +101,7 @@ public class StartupLogConfig {
 
         List<String> lines = new ArrayList<>();
         lines.add("");
-        lines.add(BANNER);
+        lines.add(loadBanner());
         lines.add(DIVIDER);
         lines.add("    Application '" + appName + "' is running!");
         lines.add("");
@@ -151,6 +148,24 @@ public class StartupLogConfig {
         lines.add(DIVIDER);
 
         log.info("\n{}", String.join("\n", lines));
+    }
+
+    private String loadBanner() {
+        ClassPathResource resource = new ClassPathResource(BANNER_RESOURCE);
+
+        try (var in = resource.getInputStream()) {
+            String raw = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+
+            return Arrays.stream(raw.split("\\R"))
+                    .filter(line -> !line.contains("${"))
+                    .filter(line -> !line.isBlank())
+                    .collect(Collectors.joining("\n"));
+
+        } catch (IOException e) {
+            log.debug("Could not load {} from classpath; banner will be omitted", BANNER_RESOURCE, e);
+
+            return "";
+        }
     }
 
     private String resolveHostAddress() {
@@ -202,11 +217,20 @@ public class StartupLogConfig {
         String host = env.getProperty("spring.data.redis.host", "unknown");
         String port = env.getProperty("spring.data.redis.port", "6379");
         String url = String.format("redis://%s:%s", host, port);
-        try {
-            redisTemplate.getConnectionFactory().getConnection().ping();
+
+        var connectionFactory = redisTemplate.getConnectionFactory();
+        if (connectionFactory == null) {
+            return url + " [Warning (no connection factory)]";
+        }
+
+        try (var connection = connectionFactory.getConnection()) {
+            connection.ping();
+
             return url + " [Connected]";
+
         } catch (Exception e) {
             log.debug("Redis probe failed", e);
+
             return url + " [FAILED]";
         }
     }
@@ -296,7 +320,7 @@ public class StartupLogConfig {
                 return "[Warning (no ToolCallbackProvider)]";
             }
             ToolCallback[] tools = provider.getToolCallbacks();
-            if (tools == null || tools.length == 0) {
+            if (tools.length == 0) {
                 return "[Connected] no tools registered";
             }
             String toolNames = Arrays.stream(tools)

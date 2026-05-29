@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service;
 
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties.ProviderConfig;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,6 +32,7 @@ class ChatModelResolverTest {
     private ChatModelResolver chatModelResolver;
 
     @Test
+    @DisplayName("resolve returns OpenAiChatModel for a valid openai provider config")
     void resolve_WhenValidOpenAiProvider_ThenReturnsOpenAiChatModel() {
         // given
         ProviderConfig config = createValidConfig(PROVIDER_OPENAI, "openai");
@@ -45,6 +47,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("resolve returns AnthropicChatModel for a valid anthropic provider config")
     void resolve_WhenValidAnthropicProvider_ThenReturnsAnthropicChatModel() {
         // given
         ProviderConfig config = createValidConfig(PROVIDER_ANTHROPIC, "anthropic");
@@ -59,6 +62,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("resolve throws IllegalArgumentException for an unknown provider key")
     void resolve_WhenUnknownProvider_ThenThrowsException() {
         // given
         when(aiProviderProperties.getProviders()).thenReturn(Map.of());
@@ -71,6 +75,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("resolve throws IllegalArgumentException for a provider that is disabled")
     void resolve_WhenDisabledProvider_ThenThrowsException() {
         // given
         ProviderConfig config = createValidConfig(PROVIDER_OPENAI, "openai");
@@ -85,6 +90,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("resolveDefault returns the model for the configured default provider")
     void resolveDefault_WhenInvoked_ThenReturnsMappedDefaultProvider() {
         // given
         ProviderConfig config = createValidConfig(PROVIDER_OPENAI, "openai");
@@ -100,6 +106,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("resolveDefault throws when the default provider key is not in the map")
     void resolveDefault_WhenDefaultProviderMissing_ThenThrowsException() {
         // given
         when(aiProviderProperties.getProviders()).thenReturn(Map.of());
@@ -113,6 +120,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("resolve falls back to the default provider when the provider argument is null")
     void resolve_WhenProviderNull_ThenFallsBackToDefaultProvider() {
         // given
         ProviderConfig config = createValidConfig(PROVIDER_ANTHROPIC, "anthropic");
@@ -128,6 +136,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("initializeProviders throws IllegalArgumentException for an unsupported provider type")
     void initializeProviders_WhenUnsupportedType_ThenThrowsException() {
         // given
         ProviderConfig config = createValidConfig("weird", "unsupported-type");
@@ -140,6 +149,7 @@ class ChatModelResolverTest {
     }
 
     @Test
+    @DisplayName("resolve instantiates model successfully when provider config requires HTTP/1.1")
     void resolve_WhenConfigRequiresHttp1_ThenInstantiatesSuccessfully() {
         // given
         ProviderConfig config = createValidConfig(PROVIDER_OPENAI, "openai");

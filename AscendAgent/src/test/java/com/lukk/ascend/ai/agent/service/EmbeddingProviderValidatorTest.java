@@ -4,6 +4,7 @@ import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties.EmbeddingConfig;
 import com.lukk.ascend.ai.agent.exception.IncompatibleEmbeddingException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +37,7 @@ class EmbeddingProviderValidatorTest {
     private EmbeddingProviderValidator validator;
 
     @Test
+    @DisplayName("validate passes when lmstudio chat provider uses lmstudio embedding provider")
     void validate_WhenLmstudioChatAndLmstudioEmbedding_ThenDoesNotThrowException() {
         // given
         setupProviderMocks(CHAT_PROVIDER_LMSTUDIO, EMBED_PROVIDER_LMSTUDIO, 768);
@@ -46,6 +48,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate passes when gemini chat provider uses lmstudio embedding provider")
     void validate_WhenGeminiChatAndLmstudioEmbedding_ThenDoesNotThrowException() {
         // given
         setupProviderMocks(CHAT_PROVIDER_GEMINI, EMBED_PROVIDER_LMSTUDIO, 768);
@@ -56,6 +59,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate passes when openai chat provider uses openai embedding provider")
     void validate_WhenOpenAiChatAndOpenAiEmbedding_ThenDoesNotThrowException() {
         // given
         setupProviderMocks(CHAT_PROVIDER_OPENAI, EMBED_PROVIDER_OPENAI, 1536);
@@ -66,6 +70,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate throws IncompatibleEmbeddingException when lmstudio chat uses openai embedding")
     void validate_WhenLmstudioChatAndOpenAiEmbedding_ThenThrowsIncompatibleEmbeddingException() {
         // given
         setupProviderMocks(CHAT_PROVIDER_LMSTUDIO, EMBED_PROVIDER_OPENAI, 1536);
@@ -77,6 +82,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate throws IncompatibleEmbeddingException when openai chat uses lmstudio embedding")
     void validate_WhenOpenAiChatAndLmstudioEmbedding_ThenThrowsIncompatibleEmbeddingException() {
         // given
         setupProviderMocks(CHAT_PROVIDER_OPENAI, EMBED_PROVIDER_LMSTUDIO, 768);
@@ -88,6 +94,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate resolves default providers and passes when null is passed for both")
     void validate_WhenNullProvidersPassed_ThenResolvesDefaultsAndValidates() {
         // given
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_LMSTUDIO);
@@ -103,6 +110,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate throws when null providers resolve to incompatible defaults")
     void validate_WhenNullProvidersResolveToIncompatibleDefaults_ThenThrowsException() {
         // given
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_LMSTUDIO);
@@ -118,6 +126,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate throws IllegalArgumentException for an unknown embedding provider")
     void validate_WhenUnknownEmbeddingProvider_ThenThrowsIllegalArgumentException() {
         // given
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_GEMINI);
@@ -130,6 +139,7 @@ class EmbeddingProviderValidatorTest {
     }
 
     @Test
+    @DisplayName("validate throws IllegalArgumentException when default embedding provider is not in the map")
     void validate_WhenResolvingUnknownDefaultEmbeddingProvider_ThenThrowsIllegalArgumentException() {
         // given
         when(aiProviderProperties.getDefaultProvider()).thenReturn(CHAT_PROVIDER_GEMINI);
