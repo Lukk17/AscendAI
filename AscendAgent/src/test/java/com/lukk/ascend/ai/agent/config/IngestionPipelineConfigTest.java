@@ -1,6 +1,6 @@
 package com.lukk.ascend.ai.agent.config;
 
-import com.lukk.ascend.ai.agent.service.DocumentService;
+import com.lukk.ascend.ai.agent.service.ingestion.DocumentService;
 import com.lukk.ascend.ai.agent.service.ingestion.IngestionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

@@ -2,8 +2,8 @@ package com.lukk.ascend.ai.agent.controller;
 
 import com.lukk.ascend.ai.agent.config.properties.IngestionUploadProperties;
 import com.lukk.ascend.ai.agent.dto.UploadResponse;
-import com.lukk.ascend.ai.agent.service.MimeTypeDetector;
-import com.lukk.ascend.ai.agent.service.StorageService;
+import com.lukk.ascend.ai.agent.service.ingestion.MimeTypeDetector;
+import com.lukk.ascend.ai.agent.service.storage.StorageService;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

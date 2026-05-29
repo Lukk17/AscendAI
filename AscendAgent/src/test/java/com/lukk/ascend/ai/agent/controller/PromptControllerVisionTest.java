@@ -2,8 +2,8 @@ package com.lukk.ascend.ai.agent.controller;
 
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.dto.ApiError;
-import com.lukk.ascend.ai.agent.service.AscendChatService;
-import com.lukk.ascend.ai.agent.service.VisionCapabilityResolver;
+import com.lukk.ascend.ai.agent.service.chat.AscendChatService;
+import com.lukk.ascend.ai.agent.service.provider.VisionCapabilityResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

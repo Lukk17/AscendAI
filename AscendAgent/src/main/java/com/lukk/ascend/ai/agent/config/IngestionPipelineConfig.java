@@ -1,7 +1,7 @@
 package com.lukk.ascend.ai.agent.config;
 
 import com.lukk.ascend.ai.agent.exception.IngestionException;
-import com.lukk.ascend.ai.agent.service.DocumentService;
+import com.lukk.ascend.ai.agent.service.ingestion.DocumentService;
 import com.lukk.ascend.ai.agent.service.ingestion.IngestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

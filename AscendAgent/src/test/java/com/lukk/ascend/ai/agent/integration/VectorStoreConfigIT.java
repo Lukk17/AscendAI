@@ -1,7 +1,7 @@
 package com.lukk.ascend.ai.agent.integration;
 
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
-import com.lukk.ascend.ai.agent.service.VectorStoreResolver;
+import com.lukk.ascend.ai.agent.service.provider.VectorStoreResolver;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.vectorstore.VectorStore;

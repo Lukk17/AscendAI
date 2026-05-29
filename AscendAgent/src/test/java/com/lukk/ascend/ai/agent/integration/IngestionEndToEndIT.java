@@ -3,7 +3,7 @@ package com.lukk.ascend.ai.agent.integration;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lukk.ascend.ai.agent.service.VectorStoreResolver;
+import com.lukk.ascend.ai.agent.service.provider.VectorStoreResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * End-to-end integration test for the ingestion pipeline. Drives multipart uploads through
  * the real {@code IngestionController} into MinIO and runs the manual ingestion through
- * {@link com.lukk.ascend.ai.agent.service.ManualIngestionService} against a real Postgres
+ * {@link com.lukk.ascend.ai.agent.service.ingestion.ManualIngestionService} against a real Postgres
  * (for the {@code INT_METADATA_STORE}) while stubbing the embedding/vector store layer
  * because LM Studio / OpenAI are unreachable in CI.
  *

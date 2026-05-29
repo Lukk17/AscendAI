@@ -7,7 +7,7 @@ import com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionPropertie
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
-import com.lukk.ascend.ai.agent.service.ChatModelResolver;
+import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.MessageType;

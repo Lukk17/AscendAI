@@ -2,8 +2,8 @@ package com.lukk.ascend.ai.agent.service.memory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
-import com.lukk.ascend.ai.agent.service.ChatModelResolver;
-import com.lukk.ascend.ai.agent.service.ChatResponseContentResolver;
+import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
+import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;

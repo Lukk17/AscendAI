@@ -2,9 +2,9 @@ package com.lukk.ascend.ai.agent.controller;
 
 import com.lukk.ascend.ai.agent.config.properties.IngestionUploadProperties;
 import com.lukk.ascend.ai.agent.dto.ApiError;
-import com.lukk.ascend.ai.agent.service.ManualIngestionService;
-import com.lukk.ascend.ai.agent.service.MimeTypeDetector;
-import com.lukk.ascend.ai.agent.service.StorageService;
+import com.lukk.ascend.ai.agent.service.ingestion.ManualIngestionService;
+import com.lukk.ascend.ai.agent.service.ingestion.MimeTypeDetector;
+import com.lukk.ascend.ai.agent.service.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

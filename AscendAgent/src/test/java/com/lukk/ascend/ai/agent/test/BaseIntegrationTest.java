@@ -1,6 +1,6 @@
 package com.lukk.ascend.ai.agent.test;
 
-import com.lukk.ascend.ai.agent.service.ChatModelResolver;
+import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.CommandLineRunner;
