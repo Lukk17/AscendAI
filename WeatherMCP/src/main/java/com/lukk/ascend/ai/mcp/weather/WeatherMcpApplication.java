@@ -2,12 +2,14 @@ package com.lukk.ascend.ai.mcp.weather;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
 
 @SpringBootApplication
-public class McpServer {
+@EnableCaching
+public class WeatherMcpApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(McpServer.class, args);
+        SpringApplication.run(WeatherMcpApplication.class, args);
     }
 
 }

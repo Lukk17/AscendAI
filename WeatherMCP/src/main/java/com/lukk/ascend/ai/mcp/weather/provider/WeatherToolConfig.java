@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class ToolProvider {
+public class WeatherToolConfig {
 
     @Bean
     public ToolCallbackProvider weatherTools(WeatherToolService weatherService) {

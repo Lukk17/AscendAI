@@ -1,7 +1,9 @@
 [versions]
-spring-boot = "3.5.4"
-spring-ai = "1.1.4"
+spring-boot = "3.5.14"
+spring-ai = "1.1.5"
 spring-dependency-management = "1.1.7"
+jacoco = "0.8.14"
+caffeine = "3.2.2"
 
 [libraries]
 # Spring Boot starters (versions managed by Spring Boot BOM)
@@ -17,6 +19,10 @@ spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref =
 
 # Lombok (version managed by Spring Boot BOM)
 lombok = { module = "org.projectlombok:lombok" }
+
+# Caching
+spring-boot-starter-cache = { module = "org.springframework.boot:spring-boot-starter-cache" }
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 
 # Test
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }

@@ -53,6 +53,8 @@ out/
 # manually if you want it as an audit artifact.
 AscendAgent/e2e/testing/runs/*
 !AscendAgent/e2e/testing/runs/README.md
+WeatherMCP/e2e/testing/runs/*
+!WeatherMCP/e2e/testing/runs/README.md
 
 # Bruno CLI run-output dump. Bruno writes the report next to the collection
 # root when invoked with `--output` (the file is named after the format —
