@@ -3,6 +3,7 @@ package com.lukk.ascend.ai.mcp.weather.config;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
@@ -20,7 +21,7 @@ public class RestClientConfig {
     @Qualifier(OPEN_METEO_BEAN_NAME)
     public RestClient openMeteoRestClient() {
         return RestClient.builder()
-                .requestFactory(buildRequestFactory())
+                .requestFactory(new BufferingClientHttpRequestFactory(buildRequestFactory()))
                 .requestInterceptor(new ResponseSizeLimitingInterceptor())
                 .build();
     }

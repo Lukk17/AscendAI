@@ -44,15 +44,15 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/invalid-blank-city.yml" --env ascend-local
+bru run "weather-mcp/invalid-blank-city.yml" --env ascend-local
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/invalid-crlf-city.yml" --env ascend-local
+bru run "weather-mcp/invalid-crlf-city.yml" --env ascend-local
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/invalid-country-code.yml" --env ascend-local
+bru run "weather-mcp/invalid-country-code.yml" --env ascend-local
 ```
 
 ## Expected

@@ -58,7 +58,6 @@ class InputValidatorTest {
     @Test
     @DisplayName("validatePlaceName applies NFKC normalisation so compatibility characters are accepted")
     void validatePlaceName_nfkcCompatibilityChar_normalises() {
-        // U+FF37 FULLWIDTH LATIN CAPITAL LETTER W normalises to 'W' under NFKC
         String fullwidthW = "Ｗarsaw";
         assertThat(InputValidator.validatePlaceName(fullwidthW, "City")).isNull();
     }
@@ -223,7 +222,6 @@ class InputValidatorTest {
     @Test
     @DisplayName("normaliseCacheKey applies NFKC normalisation so compatibility characters become ASCII")
     void normaliseCacheKey_fullwidthLetters_normalisesToAscii() {
-        // U+FF37 FULLWIDTH LATIN CAPITAL LETTER W normalises to 'W' → 'w' after lowercasing
         assertThat(InputValidator.normaliseCacheKey("Ｗarsaw")).isEqualTo("warsaw");
     }
 }

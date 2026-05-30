@@ -30,14 +30,14 @@ fills in `Result summary` and `Verdict`, and logs anything done outside the spec
 
 ## Bruno is the source of truth
 
-Every test runs the matching Bruno request file under `docs/api/request/AscendAI/mcp/weather-mcp/` via the Bruno CLI.
+Every test runs the matching Bruno request file under `docs/api/request/AscendAI/weather-mcp/` via the Bruno CLI.
 
 ```powershell
 cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/<request>.yml" --env ascend-local
+bru run "weather-mcp/<request>.yml" --env ascend-local
 ```
 
 The request's saved default rows are what gets sent. To test an alternative payload, edit the disabled rows in the
@@ -67,7 +67,7 @@ versions and aren't visible from every runner's shell. If a behaviour assertion 
 
 ## Adding a new test
 
-1. Add a Bruno request under `docs/api/request/AscendAI/mcp/weather-mcp/<request>.yml`.
+1. Add a Bruno request under `docs/api/request/AscendAI/weather-mcp/<request>.yml`.
 2. Create `WeatherMCP/e2e/testing/<N>-<capability>-test.md` using the template above. Pick the lowest unused number
    prefix that matches its setup-cost position in the order.
 3. Create `WeatherMCP/e2e/testing/templates/<N>-<capability>-tasks.template.md` mirroring the spec's checkboxes.

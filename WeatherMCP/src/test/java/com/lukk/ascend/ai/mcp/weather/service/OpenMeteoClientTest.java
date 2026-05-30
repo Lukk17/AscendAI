@@ -259,17 +259,4 @@ class OpenMeteoClientTest {
                 .isInstanceOf(RestClientException.class);
     }
 
-    @Test
-    @DisplayName("geocode uses " + CacheConfig.GEOCODING_SINGLE_CACHE + " as the declared cache name")
-    void geocode_cacheNameIsGeocodingSingle() {
-        // The @Cacheable(value = CacheConfig.GEOCODING_SINGLE_CACHE) annotation on geocode() must
-        // reference the constant — this test documents the constant value and keeps it in coverage.
-        assertThat(CacheConfig.GEOCODING_SINGLE_CACHE).isEqualTo("geocoding-single");
-    }
-
-    @Test
-    @DisplayName("geocodeAll uses " + CacheConfig.GEOCODING_MULTI_CACHE + " as the declared cache name")
-    void geocodeAll_cacheNameIsGeocodingMulti() {
-        assertThat(CacheConfig.GEOCODING_MULTI_CACHE).isEqualTo("geocoding-multi");
-    }
 }

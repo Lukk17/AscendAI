@@ -1,20 +1,19 @@
 package com.lukk.ascend.ai.mcp.weather.config;
 
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.lang.NonNull;
 import org.springframework.web.client.RestClientException;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 public class ResponseSizeLimitingInterceptor implements ClientHttpRequestInterceptor {
 
     public static final int DEFAULT_MAX_BYTES = 256 * 1024;
+    private static final int READ_CHUNK_BYTES = 8192;
 
     private final int maxBytes;
 
@@ -27,51 +26,35 @@ public class ResponseSizeLimitingInterceptor implements ClientHttpRequestInterce
     }
 
     @Override
-    public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution)
-            throws IOException {
+    @NonNull
+    public ClientHttpResponse intercept(@NonNull HttpRequest request,
+                                        @NonNull byte[] body,
+                                        @NonNull ClientHttpRequestExecution execution) throws IOException {
         ClientHttpResponse response = execution.execute(request, body);
         long advertised = response.getHeaders().getContentLength();
 
         if (advertised > maxBytes) {
+            response.close();
+
             throw new RestClientException(
                     "Upstream response too large: advertised " + advertised + " bytes (max " + maxBytes + ")");
         }
 
-        byte[] buffered = response.getBody().readNBytes(maxBytes + 1);
+        try (InputStream in = response.getBody()) {
+            int total = 0;
+            byte[] chunk = new byte[READ_CHUNK_BYTES];
+            int read;
+            while ((read = in.read(chunk)) != -1) {
+                total += read;
+                if (total > maxBytes) {
+                    response.close();
 
-        if (buffered.length > maxBytes) {
-            throw new RestClientException(
-                    "Upstream response too large: read past " + maxBytes + " bytes");
+                    throw new RestClientException(
+                            "Upstream response too large: read past " + maxBytes + " bytes");
+                }
+            }
         }
 
-        return new BufferedClientHttpResponse(response, buffered);
-    }
-
-    private record BufferedClientHttpResponse(ClientHttpResponse delegate, byte[] buffered) implements ClientHttpResponse {
-
-        @Override
-        public HttpStatusCode getStatusCode() throws IOException {
-            return delegate.getStatusCode();
-        }
-
-        @Override
-        public String getStatusText() throws IOException {
-            return delegate.getStatusText();
-        }
-
-        @Override
-        public void close() {
-            delegate.close();
-        }
-
-        @Override
-        public InputStream getBody() {
-            return new ByteArrayInputStream(buffered);
-        }
-
-        @Override
-        public HttpHeaders getHeaders() {
-            return delegate.getHeaders();
-        }
+        return response;
     }
 }

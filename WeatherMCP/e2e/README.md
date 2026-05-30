@@ -40,7 +40,7 @@ Tests are number-prefixed by setup cost. `1` runs offline; `2`-`6` need outbound
 additionally requires a WeatherMCP container restart to clear the geocoding cache between two probes.
 
 The Bruno collection isn't here. It lives at the **repo root** under
-`docs/api/request/AscendAI/mcp/weather-mcp/` so it stays a portable API client artifact. Each spec references the
+`docs/api/request/AscendAI/weather-mcp/` so it stays a portable API client artifact. Each spec references the
 matching Bruno request file under that path.
 
 ## Flow
@@ -48,7 +48,7 @@ matching Bruno request file under that path.
 ```mermaid
 flowchart LR
     Runner[AI runner or human] -->|copy template| Record[(runs/&lt;ts&gt;_N-&lt;feature&gt;-tasks.md)]
-    Runner -->|bru run| Req[(Bruno request<br/>docs/api/request/AscendAI/mcp/weather-mcp/...)]
+    Runner -->|bru run| Req[(Bruno request<br/>docs/api/request/AscendAI/weather-mcp/...)]
     Req -->|HTTP POST /mcp| Mcp[WeatherMCP :9998]
     Mcp -->|HTTPS GET| OM[(Open-Meteo APIs)]
     Mcp -->|JSON-RPC response| Verify{Behaviour assertions}
@@ -112,7 +112,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/current-warsaw.yml" --env ascend-local
+bru run "weather-mcp/current-warsaw.yml" --env ascend-local
 ```
 
 Run the whole suite (Bruno's directory mode).
@@ -122,7 +122,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "mcp/weather-mcp" --env ascend-local
+bru run "weather-mcp" --env ascend-local
 ```
 
 ## Capability tests
@@ -141,7 +141,7 @@ Numbered by setup cost. Easiest first.
 
 ## Adding a new test
 
-1. Add the Bruno request(s) under `docs/api/request/AscendAI/mcp/weather-mcp/<request>.yml`.
+1. Add the Bruno request(s) under `docs/api/request/AscendAI/weather-mcp/<request>.yml`.
 2. Pick the next number prefix that matches the test's setup cost.
 3. Write `testing/<N>-<capability>-test.md` using the template structure (**What this verifies / Prerequisites /
    Reset state / Run / Expected / Fixtures**). Assert behaviour, not logs.

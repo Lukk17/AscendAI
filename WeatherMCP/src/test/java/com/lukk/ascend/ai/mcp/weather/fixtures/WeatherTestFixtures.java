@@ -8,7 +8,6 @@ public final class WeatherTestFixtures {
     }
 
     public static final String CITY_WARSAW = "Warsaw";
-    public static final String CITY_LONDON = "London";
     public static final String COUNTRY_PL = "PL";
     public static final String UNIT_CELSIUS = "celsius";
     public static final String UNIT_FAHRENHEIT = "fahrenheit";

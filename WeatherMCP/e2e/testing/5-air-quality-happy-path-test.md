@@ -47,7 +47,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/air-quality-warsaw.yml" --env ascend-local
+bru run "weather-mcp/air-quality-warsaw.yml" --env ascend-local
 ```
 
 ## Expected

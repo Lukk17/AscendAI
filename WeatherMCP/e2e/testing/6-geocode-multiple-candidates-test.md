@@ -48,7 +48,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/geocode-springfield.yml" --env ascend-local
+bru run "weather-mcp/geocode-springfield.yml" --env ascend-local
 ```
 
 ## Expected

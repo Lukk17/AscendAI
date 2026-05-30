@@ -54,7 +54,7 @@ class StartupLogConfigTest {
         Resource brokenResource = mock(Resource.class);
         when(brokenResource.getInputStream()).thenThrow(new IOException("simulated read error"));
 
-        // when / then
+        // then
         assertThatNoException().isThrownBy(() ->
                 new StartupLogConfig(env, toolCallbackProvider, brokenResource));
     }
@@ -83,7 +83,7 @@ class StartupLogConfigTest {
         stubToolProvider(buildToolProvider("weather.current"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
-        // when / then
+        // then
         assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
     }
 
@@ -96,7 +96,7 @@ class StartupLogConfigTest {
         stubToolProvider(buildToolProvider("weather.current"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
-        // when / then
+        // then
         assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
     }
 
@@ -108,7 +108,7 @@ class StartupLogConfigTest {
         stubToolProvider(buildToolProvider("weather.current"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
-        // when / then
+        // then
         try (MockedStatic<InetAddress> inetMock = mockStatic(InetAddress.class)) {
             inetMock.when(InetAddress::getLocalHost).thenThrow(new UnknownHostException("no host"));
             assertThatNoException().isThrownBy(() ->
@@ -124,7 +124,7 @@ class StartupLogConfigTest {
         when(toolCallbackProvider.getIfAvailable()).thenReturn(null);
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
-        // when / then
+        // then
         assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
     }
 
@@ -138,7 +138,7 @@ class StartupLogConfigTest {
         when(toolCallbackProvider.getIfAvailable()).thenReturn(emptyProvider);
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
-        // when / then
+        // then
         assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
     }
 
@@ -152,7 +152,7 @@ class StartupLogConfigTest {
         when(toolCallbackProvider.getIfAvailable()).thenReturn(faultyProvider);
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
-        // when / then
+        // then
         assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
     }
 
@@ -164,7 +164,7 @@ class StartupLogConfigTest {
         stubToolProvider(buildToolProvider("weather.current", "weather.forecast"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
-        // when / then
+        // then
         assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
     }
 
@@ -224,12 +224,8 @@ class StartupLogConfigTest {
         assertThat(result).contains("[Warning (status=100)]");
     }
 
-    @SuppressWarnings("unchecked")
     private static AvailabilityChangeEvent<ReadinessState> mockEvent(ReadinessState state) {
-        AvailabilityChangeEvent<ReadinessState> event = mock(AvailabilityChangeEvent.class);
-        when(event.getState()).thenReturn(state);
-
-        return event;
+        return new AvailabilityChangeEvent<>(new Object(), state);
     }
 
     private void stubAcceptingEnv() {

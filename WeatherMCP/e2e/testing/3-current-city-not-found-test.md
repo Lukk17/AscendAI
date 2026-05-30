@@ -51,7 +51,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "mcp/weather-mcp/current-not-found.yml" --env ascend-local
+bru run "weather-mcp/current-not-found.yml" --env ascend-local
 ```
 
 ## Expected
