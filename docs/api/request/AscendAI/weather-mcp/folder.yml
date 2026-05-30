@@ -4,4 +4,7 @@ info:
   seq: 7
 
 request:
+  variables:
+    - name: mcp_protocol_version
+      value: 2025-11-25
   auth: inherit

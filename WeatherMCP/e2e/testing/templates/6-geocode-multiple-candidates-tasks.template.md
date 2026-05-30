@@ -18,7 +18,8 @@ Copy this file to `../runs/<UTC-timestamp>_6-geocode-multiple-candidates-tasks.m
 
 ### Run
 
-- [ ] Send `geocode-springfield.yml` via `bru run` and wait for HTTP 200
+- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:9998/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Send `geocode-springfield.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 
 ### Expected
 

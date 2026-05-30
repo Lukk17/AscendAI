@@ -4,3 +4,5 @@ variables:
     value: localhost
   - name: protocol
     value: http
+  - name: mcp_session_id
+    value: ""

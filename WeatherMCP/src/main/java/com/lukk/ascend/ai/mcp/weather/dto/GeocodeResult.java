@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.mcp.weather.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.lukk.ascend.ai.mcp.weather.config.WeatherApiEndpoints;
 
 import java.time.Instant;
@@ -10,7 +11,7 @@ public record GeocodeResult(
         String message,
         String requestedQuery,
         List<ResolvedLocation> candidates,
-        Instant fetchedAt,
+        @JsonFormat(shape = JsonFormat.Shape.STRING) Instant fetchedAt,
         String source
 ) {
 

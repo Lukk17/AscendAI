@@ -11,6 +11,8 @@ http:
       value: application/json
     - name: Accept
       value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
   body:
     type: json
     data: |-

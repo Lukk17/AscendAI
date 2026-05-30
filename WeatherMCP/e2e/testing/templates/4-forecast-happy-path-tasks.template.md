@@ -18,7 +18,8 @@ Copy this file to `../runs/<UTC-timestamp>_4-forecast-happy-path-tasks.md` befor
 
 ### Run
 
-- [ ] Send `forecast-warsaw-3d.yml` via `bru run` and wait for HTTP 200
+- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:9998/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Send `forecast-warsaw-3d.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 
 ### Expected
 
