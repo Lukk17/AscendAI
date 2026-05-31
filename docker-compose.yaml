@@ -40,22 +40,52 @@ services:
     build:
       context: ./PaddleOCR
       dockerfile: Dockerfile
+    image: ascend-paddle-ocr:local
     container_name: ascend-paddle-ocr
     hostname: ascend-paddle-ocr
     restart: unless-stopped
     ports:
       - "7022:7022"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - API_PORT=7022
       - API_HOST=0.0.0.0
       - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
       - DEFAULT_LANGUAGE=en
       - MAX_FILE_SIZE_MB=50
-      - OCR_REQUEST_TIMEOUT=120
+      - OCR_REQUEST_TIMEOUT=300
+      - ENGINE_CACHE_MAX_SIZE=8
+      # SSRF guard: docker-internal MinIO is reached via the host-bound
+      # localhost address (host.docker.internal:9070) per ADR-001.
+      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
+      - MCP_DOWNLOAD_TIMEOUT_SECONDS=30
+      # file:// is disabled by default; mount a writable dir and set
+      # MCP_FILE_URI_ROOT to the in-container path to enable.
+      # - MCP_FILE_URI_ROOT=/var/lib/paddle-ocr/uploads
+      - RATE_LIMIT_DEFAULT=60/minute
+      - RATE_LIMIT_OCR=20/minute
+      - OTEL_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     networks:
       default:
         aliases:
           - ascend-paddle-ocr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7022/health"]
+      interval: 30s
+      timeout: 30s
+      start_period: 120s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 12G
+        reservations:
+          cpus: "0.5"
+          memory: 2G
 
   # ─── Application services ───
 
