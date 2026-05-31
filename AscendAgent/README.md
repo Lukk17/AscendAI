@@ -124,95 +124,14 @@ For a larger tool set and ambiguous prompts, add a model-router step that return
 
 ### Multi-Provider AI & Model Selection
 
-The agent supports multiple AI providers with **per-request selection** via the `provider` and `model` form fields.
-Defaults below come directly from
-[src/main/resources/application.yaml](src/main/resources/application.yaml) and can be overridden via env vars.
+Five chat providers ship enabled by default: LM Studio (local), OpenAI, Gemini, Anthropic, MiniMax. Per-request
+selection works through the `provider` and `model` form fields on `/api/v1/ai/prompt`. The embedding provider is
+chosen separately via `embeddingProvider`, since chat and embedding can use different backends. Incompatible chat
+plus embedding combinations return 400.
 
-| Provider             | Type              | Default model                 | API key env var      | Enabled env var (default `true`)  |
-| :------------------- | :---------------- | :---------------------------- | :------------------- | :-------------------------------- |
-| `lmstudio` (default) | OpenAI-compatible | `meta-llama-3.1-8b-instruct`  | Not needed           | `LMSTUDIO_ENABLED`                |
-| `openai`             | OpenAI            | `gpt-4o`                      | `OPENAI_API_KEY`     | `OPENAI_ENABLED`                  |
-| `gemini`             | OpenAI-compatible | `gemini-flash-latest`         | `GEMINI_API_KEY`     | `GEMINI_ENABLED`                  |
-| `anthropic`          | Anthropic native  | `claude-sonnet-4-5`           | `ASCEND_ANTHROPIC_API_KEY` | `ANTHROPIC_ENABLED`         |
-| `minimax`            | Anthropic-compat  | `MiniMax-M2.7`                | `MINIMAX_API_KEY`    | `MINIMAX_ENABLED`                 |
-
-The Anthropic key is namespaced `ASCEND_ANTHROPIC_API_KEY` so the agent's Anthropic credentials don't collide with
-Claude Code's own auth (which claims `ANTHROPIC_API_KEY` on the host). Other providers use the standard names.
-
-#### Models wired in application.yaml
-
-These are the model IDs actually referenced in [application.yaml](src/main/resources/application.yaml) for chat
-defaults, asynchronous memory extraction, and chat-history compaction. Any other model the provider accepts works at
-request time via the `model` form field; these are what ships out of the box.
-
-| Provider    | Chat default                  | Memory extraction               | History compaction default      |
-| :---------- | :---------------------------- | :------------------------------ | :------------------------------ |
-| OpenAI      | `gpt-4o`                      | `gpt-4o-mini`                   | `gpt-4o-mini`                   |
-| Anthropic   | `claude-sonnet-4-5`           | `claude-3-5-haiku-20241022`     | `claude-haiku-4-5`              |
-| Gemini      | `gemini-flash-latest`         | `gemini-flash-lite-latest`      | `gemini-flash-lite-latest`      |
-| MiniMax     | `MiniMax-M2.7`                | `MiniMax-M2.7`                  | `MiniMax-M2.7`                  |
-| LM Studio   | `meta-llama-3.1-8b-instruct`  | `meta-llama-3.1-8b-instruct`    | `meta-llama-3.1-8b-instruct`    |
-
-#### Environment variables
-
-| Variable             | Required           | Description                                                                                  |
-| :------------------- | :----------------- | :------------------------------------------------------------------------------------------- |
-| `LMSTUDIO_ENABLED`   | No                 | Enable LM Studio provider (default `true`).                                                  |
-| `OPENAI_ENABLED`     | No                 | Enable OpenAI provider (default `true`).                                                     |
-| `OPENAI_API_KEY`     | If OpenAI enabled  | OpenAI API key from [platform.openai.com](https://platform.openai.com).                      |
-| `GEMINI_ENABLED`     | No                 | Enable Gemini provider (default `true`).                                                     |
-| `GEMINI_API_KEY`     | If Gemini enabled  | Gemini key from [aistudio.google.com](https://aistudio.google.com).                          |
-| `ANTHROPIC_ENABLED`  | No                 | Enable Anthropic provider (default `true`).                                                  |
-| `ASCEND_ANTHROPIC_API_KEY` | If Anthropic enabled | Anthropic key from [platform.claude.com](https://platform.claude.com/settings/keys). |
-| `MINIMAX_ENABLED`    | No                 | Enable MiniMax provider (default `true`).                                                    |
-| `MINIMAX_API_KEY`    | If MiniMax enabled | MiniMax API key.                                                                             |
-| `OPENAI_MODEL`       | No                 | Override default OpenAI model (default `gpt-4o`).                                            |
-| `GEMINI_MODEL`       | No                 | Override default Gemini model (default `gemini-flash-latest`).                               |
-| `ANTHROPIC_MODEL`    | No                 | Override default Anthropic model (default `claude-sonnet-4-5`).                              |
-| `MINIMAX_MODEL`      | No                 | Override default MiniMax model (default `MiniMax-M2.7`).                                     |
-| `LMSTUDIO_MODEL`     | No                 | Override default LM Studio model (default `meta-llama-3.1-8b-instruct`).                     |
-| `EMBEDDING_PROVIDER` | No                 | Embedding provider: `lmstudio` (default), `openai`, or `gemini`.                             |
-
-#### Embedding provider configuration
-
-The embedding provider controls which service generates vector embeddings for RAG and which Qdrant collection is
-used. Set per request via the `embeddingProvider` form field, falling back to the `EMBEDDING_PROVIDER` env var
-(default `lmstudio`).
-
-| Embedding provider     | Model                                       | Dimensions | Requires                          |
-| :--------------------- | :------------------------------------------ | :--------- | :-------------------------------- |
-| `lmstudio` (default)   | `text-embedding-nomic-embed-text-v2-moe`    | 768        | LM Studio running locally         |
-| `openai`               | `text-embedding-3-small`                    | 1536       | `OPENAI_API_KEY`                  |
-| `gemini`               | `gemini-embedding-001`                      | 768        | `GEMINI_API_KEY`                  |
-
-#### Per-request usage
-
-```text
-POST /api/v1/ai/prompt
-  prompt=...
-  provider=anthropic           # chat provider
-  embeddingProvider=lmstudio   # embedding provider (optional)
-```
-
-```text
-POST /api/v1/ingestion/run
-  embeddingProvider=openai     # ingest into 1536-dim collection
-```
-
-#### Compatibility matrix
-
-Incompatible combinations return **400 Bad Request**.
-
-| Embedding →       | `lmstudio` (768) | `gemini` (768) | `openai` (1536) |
-| :---------------- | :--------------- | :------------- | :-------------- |
-| Chat: `lmstudio`  | ✅                | ✅              | ❌               |
-| Chat: `gemini`    | ✅                | ✅              | ✅               |
-| Chat: `anthropic` | ✅                | ✅              | ✅               |
-| Chat: `minimax`   | ✅                | ✅              | ✅               |
-| Chat: `openai`    | ❌                | ❌              | ✅               |
-
-> **Note.** Switching between dimension groups (768 ↔ 1536) requires re-ingesting documents into the target
-> collection.
+The full matrix (per-provider env vars, default models, embedding dimensions, chat-to-embedding compatibility table)
+lives in [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Read it before changing provider defaults or onboarding a
+new key.
 
 ---
 
@@ -283,15 +202,7 @@ every restart.
 
 From the monorepo root.
 
-Bash:
-
 ```bash
-docker compose up -d --build
-```
-
-PowerShell:
-
-```powershell
 docker compose up -d --build
 ```
 
@@ -342,15 +253,7 @@ fixture inventory, and capability matrix.
 
 Install the Bruno CLI once:
 
-Bash:
-
 ```bash
-npm install -g @usebruno/cli
-```
-
-PowerShell:
-
-```powershell
 npm install -g @usebruno/cli
 ```
 
@@ -396,15 +299,7 @@ bru run "ascend-agent/testing" --env ascend-local
 
 Connect.
 
-Bash:
-
 ```bash
-docker exec -it redis redis-cli
-```
-
-PowerShell:
-
-```powershell
 docker exec -it redis redis-cli
 ```
 
@@ -434,15 +329,7 @@ GET user:user1:instructions
 
 Connect.
 
-Bash:
-
 ```bash
-docker exec -it postgres psql -U postgres -d ascend_ai
-```
-
-PowerShell:
-
-```powershell
 docker exec -it postgres psql -U postgres -d ascend_ai
 ```
 
@@ -462,21 +349,14 @@ SELECT * FROM user_instructions WHERE user_id = 'user1';
 
 ### Configuration
 
-Key application properties live in
-[src/main/resources/application.yaml](src/main/resources/application.yaml).
+Runtime configuration lives in two places:
 
-- **Server port.** `9917`.
-- **Embedding provider.** `app.embedding.provider`. Active backend (`lmstudio`, `openai`, `gemini`).
-- **Vector store (Qdrant).** Collections `ascendai-768` and `ascendai-1536` auto-created. Active collection derived
-  from the embedding provider's dimensions.
-- **S3 configuration.** `app.s3.endpoint`: `http://localhost:9070`. `app.s3.bucket`: `knowledge-base`.
-- **Datasource.** Postgres connection for the metadata store.
-- **Unstructured API.** Base URL for the document parsing service.
-- **RAG.** `app.rag.enabled` toggles retrieval-gated soft-RAG. `app.rag.similarity-threshold` controls when retrieved
-  context is injected.
-- **Ingestion.** `app.ingestion.auto.enabled` is off by default to avoid startup latency and embedding costs. Use
-  the manual ingestion endpoint instead.
-- **MCP client.** `spring.ai.mcp.client` connections (Weather, AudioScribe, AscendWebSearch).
+- Application properties in [src/main/resources/application.yaml](src/main/resources/application.yaml) (server port,
+  RAG, S3, datasource, MCP client URLs).
+- The provider, model, embedding, and per-purpose YAML knobs documented in
+  [docs/CONFIGURATION.md](docs/CONFIGURATION.md), including the env-var matrix and the compatibility table.
+
+Spring Boot's standard env-var binding applies: uppercase the YAML key, replace dots and dashes with underscores.
 
 ---
 
@@ -485,6 +365,7 @@ Key application properties live in
 | File                                                                                                                          | What's in it                                                  |
 | :---------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------ |
 | [AGENTS.md](AGENTS.md)                                                                                                        | Module-level instructions for AI coding agents.               |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)                                                                                | Provider + embedding env-var matrix, per-purpose model table, compatibility matrix. |
 | [build.gradle.kts](build.gradle.kts)                                                                                          | Gradle build, dependency versions.                            |
 | [src/main/resources/application.yaml](src/main/resources/application.yaml)                                                    | Server port, provider config, RAG, ingestion, MCP client.     |
 | [src/main/resources/db/changelog/](src/main/resources/db/changelog/)                                                          | Liquibase changelog files.                                    |

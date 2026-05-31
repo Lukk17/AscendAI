@@ -169,15 +169,7 @@ The `-e` flag installs in editable mode so source edits show up without reinstal
 
 **2. Run the uvicorn server.**
 
-Bash:
-
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
-```
-
-PowerShell:
-
-```powershell
 uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
 ```
 
@@ -185,15 +177,7 @@ uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
 
 **1. Build the image.**
 
-Bash:
-
 ```bash
-docker build -t audio-scribe:latest .
-```
-
-PowerShell:
-
-```powershell
 docker build -t audio-scribe:latest .
 ```
 
@@ -390,15 +374,7 @@ AudioScribe can download files without authentication:
 
 Exec into the MinIO container.
 
-Bash:
-
 ```bash
-docker exec -it minio /bin/sh
-```
-
-PowerShell:
-
-```powershell
 docker exec -it minio /bin/sh
 ```
 

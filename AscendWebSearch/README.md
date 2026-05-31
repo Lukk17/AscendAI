@@ -116,29 +116,13 @@ PowerShell:
 
 **3. Install dependencies.**
 
-Bash:
-
 ```bash
-pip install -e .[dev]
-```
-
-PowerShell:
-
-```powershell
 pip install -e .[dev]
 ```
 
 **4. Install Playwright browsers.**
 
-Bash:
-
 ```bash
-playwright install --with-deps chromium
-```
-
-PowerShell:
-
-```powershell
 playwright install --with-deps chromium
 ```
 
@@ -176,29 +160,13 @@ python src/main.py
 
 **1. Build the image.**
 
-Bash:
-
 ```bash
-docker build -t ascend-web-search:latest .
-```
-
-PowerShell:
-
-```powershell
 docker build -t ascend-web-search:latest .
 ```
 
 **2. Run the container.** Inside the compose network, use `http://searxng:8080` instead of `host.docker.internal`.
 
-Bash:
-
 ```bash
-docker run -d --name ascend-web-search -p 7021:7021 -e SEARXNG_BASE_URL="http://host.docker.internal:9020" ascend-web-search:latest
-```
-
-PowerShell:
-
-```powershell
 docker run -d --name ascend-web-search -p 7021:7021 -e SEARXNG_BASE_URL="http://host.docker.internal:9020" ascend-web-search:latest
 ```
 

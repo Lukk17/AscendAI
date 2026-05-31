@@ -53,40 +53,13 @@ When you change endpoint shapes here, update the SKILL.md so downstream agents s
 
 ### Configuration
 
-Settings live in [src/config/config.py](src/config/config.py) (pydantic-settings, reads `.env` automatically).
-Each embedding provider has its own base URL and API key, so a single deployment can serve `provider=lmstudio`,
-`provider=openai`, and `provider=gemini` simultaneously, each routed to its real endpoint.
+Settings live in [src/config/config.py](src/config/config.py) (pydantic-settings, reads `.env` automatically). Each
+embedding provider has its own base URL and API key, so a single deployment can serve `provider=lmstudio`,
+`provider=openai`, and `provider=gemini` side by side. Missing API keys only fail when the matching provider is
+actually invoked.
 
-| Variable                 | Default                                                            | Purpose                                                                  |
-| :----------------------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------- |
-| `LMSTUDIO_BASE_URL`      | `http://localhost:1234/v1`                                         | LM Studio OpenAI-compatible URL                                          |
-| `LMSTUDIO_API_KEY`       | `sk_local`                                                         | Placeholder (LM Studio doesn't validate)                                 |
-| `OPENAI_BASE_URL`        | `https://api.openai.com/v1`                                        | Real OpenAI URL                                                          |
-| `OPENAI_API_KEY`         | (empty)                                                            | Required when `provider=openai` is invoked                               |
-| `GEMINI_BASE_URL`        | `https://generativelanguage.googleapis.com/v1beta/openai/`         | Gemini OpenAI-compatible URL                                             |
-| `GEMINI_API_KEY`         | (empty)                                                            | Required when `provider=gemini` is invoked                               |
-| `MEM0_LLM_MODEL`         | `meta-llama-3.1-8b-instruct`                                       | Model used by mem0 for fact extraction                                   |
-| `MEM0_DEFAULT_PROVIDER`  | `lmstudio`                                                         | Provider used when the request omits `provider`                          |
-| `MEM0_INFER_MEMORY`      | `false`                                                            | When `true`, mem0 infers memories instead of storing raw text            |
-| `API_PORT`               | `7020`                                                             | Service port                                                             |
-| `API_HOST`               | `0.0.0.0`                                                          | Bind address                                                             |
-| `LOG_LEVEL`              | `INFO`                                                             | Log level                                                                |
-| `QDRANT_HOST`            | `localhost`                                                        | `host.docker.internal` from inside Docker, or your managed Qdrant host   |
-| `QDRANT_PORT`            | `6333`                                                             | Qdrant port                                                              |
-
-Missing API keys only fail when the corresponding provider is actually invoked. Run with just the keys you need.
-
-#### Embedding Provider to Qdrant Collection mapping
-
-The service routes each request to the correct Qdrant collection based on the `provider` parameter:
-
-| Provider               | Embedding model                              | Dimensions | Qdrant collection      |
-| :--------------------- | :------------------------------------------- | :--------- | :--------------------- |
-| `lmstudio` (default)   | `text-embedding-nomic-embed-text-v2-moe`     | 768        | `ascend_memory_768`    |
-| `openai`               | `text-embedding-3-small`                     | 1536       | `ascend_memory_1536`   |
-| `gemini`               | `gemini-embedding-001`                       | 768        | `ascend_memory_768`    |
-
-Providers sharing the same dimensions (`lmstudio` and `gemini`) share the same Qdrant collection.
+The full env-var matrix (service, embedding providers, Qdrant) plus the provider-to-collection mapping table lives in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md). Read it before deploying or onboarding a new provider key.
 
 ---
 
@@ -124,15 +97,7 @@ PowerShell:
 
 **3. Install dependencies.** The `-e` flag installs in editable mode so source edits show up without reinstall.
 
-Bash:
-
 ```bash
-pip install -e .[dev]
-```
-
-PowerShell:
-
-```powershell
 pip install -e .[dev]
 ```
 
@@ -171,29 +136,13 @@ python src/main.py
 
 **1. Build the image.**
 
-Bash:
-
 ```bash
-docker build -t ascend-memory:latest .
-```
-
-PowerShell:
-
-```powershell
 docker build -t ascend-memory:latest .
 ```
 
 **2. Run the container.**
 
-Bash:
-
 ```bash
-docker run -d --name ascend-memory -p 7020:7020 -e OPENAI_API_KEY="sk-..." -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
-```
-
-PowerShell:
-
-```powershell
 docker run -d --name ascend-memory -p 7020:7020 -e OPENAI_API_KEY="sk-..." -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
 ```
 
@@ -431,6 +380,7 @@ Dependency management lives in [pyproject.toml](pyproject.toml). Add a new depen
 | File                                                                       | What's in it                                                        |
 | :------------------------------------------------------------------------- | :------------------------------------------------------------------ |
 | [AGENTS.md](AGENTS.md)                                                     | Module-level instructions for AI coding agents.                     |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)                             | Full env-var matrix, embedding-provider routing, Qdrant collections.|
 | [src/config/config.py](src/config/config.py)                               | Settings, provider routing, defaults.                               |
 | [src/service/memory_client.py](src/service/memory_client.py)               | mem0 client wiring, per-provider routing.                           |
 | [src/api/rest/rest_endpoints.py](src/api/rest/rest_endpoints.py)           | REST endpoints under `/api/v1/memory/*`.                            |
