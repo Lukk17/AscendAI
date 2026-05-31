@@ -1,0 +1,27 @@
+info:
+  name: wipe-alpha
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/wipe?user_id=frostyMemoryWipeAlpha&provider=openai"
+  params:
+    - name: user_id
+      value: frostyMemoryWipeAlpha
+      type: query
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,8 +1,10 @@
 import os
-import pytest
 import tempfile
+from unittest.mock import patch
+
+import pytest
+
 from src.model.ocr_models import OcrJsonResponse, OcrPageResult, OcrTextLine
-from unittest.mock import patch, MagicMock
 
 
 class TestOcrProcessTool:

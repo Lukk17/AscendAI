@@ -1,8 +1,10 @@
 import io
+from unittest.mock import patch, MagicMock
+
 import pytest
 from httpx import AsyncClient, ASGITransport
+
 from src.main import create_app
-from unittest.mock import patch, MagicMock, AsyncMock
 
 
 @pytest.fixture

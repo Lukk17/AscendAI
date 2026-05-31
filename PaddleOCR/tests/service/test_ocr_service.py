@@ -1,7 +1,7 @@
-import pytest
+from unittest.mock import patch, MagicMock
+
 from src.model.ocr_models import OcrJsonResponse
 from src.service.ocr_service import OcrService
-from unittest.mock import patch, MagicMock
 
 
 def _create_mock_predict_result() -> list:

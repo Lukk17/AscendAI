@@ -1,13 +1,13 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from src.api.exception_handlers import (
     OcrProcessingError,
     FileSizeExceededError,
     UnsupportedFileTypeError,
     register_exception_handlers,
 )
-from unittest.mock import AsyncMock, MagicMock
 
 
 @pytest.fixture

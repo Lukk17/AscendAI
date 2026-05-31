@@ -1,8 +1,10 @@
 import os
+from typing import Any
+
 from fastmcp import FastMCP
+
 from src.config.logging_config import get_logger
 from src.service.ocr_service import ocr_service
-from typing import Any
 
 logger = get_logger(__name__)
 

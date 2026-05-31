@@ -1,0 +1,36 @@
+info:
+  name: ocr-english
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: files
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\PaddleOCR\e2e\fixtures\argent-saga-chronicles-page1.png
+      - name: lang
+        type: text
+        value: en
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

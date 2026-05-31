@@ -1,5 +1,4 @@
 import pytest
-from pydantic import ValidationError
 
 from src.model.ocr_models import (
     OutputFormat,

@@ -1,0 +1,30 @@
+info:
+  name: search-beta
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/search?user_id=frostyMemoryWipeBeta&query=Where+do+I+like+to+live%3F&provider=openai"
+  params:
+    - name: user_id
+      value: frostyMemoryWipeBeta
+      type: query
+    - name: query
+      value: Where+do+I+like+to+live%3F
+      type: query
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

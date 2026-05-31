@@ -1,15 +1,15 @@
 import os
 import tempfile
 import time
+
 from paddleocr import PaddleOCR
-from src.config.config import settings
+
 from src.config.logging_config import get_logger
 from src.model.ocr_models import (
     OcrTextLine,
     OcrPageResult,
     OcrJsonResponse,
 )
-from typing import Union
 
 logger = get_logger(__name__)
 

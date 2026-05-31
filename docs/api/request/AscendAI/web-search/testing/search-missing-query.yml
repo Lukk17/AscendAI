@@ -1,0 +1,27 @@
+info:
+  name: search-missing-query
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/web/search?limit=3"
+  params:
+    - name: limit
+      value: "3"
+      type: query
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 422", function () {
+            expect(res.getStatus()).to.equal(422);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
