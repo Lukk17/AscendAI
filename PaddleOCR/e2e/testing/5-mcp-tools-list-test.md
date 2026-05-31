@@ -6,7 +6,7 @@
   `initialize` handshake and returns an `Mcp-Session-Id` header.
 - A follow-up `tools/list` JSON-RPC call returns HTTP 200 with a `result.tools` array.
 - That array contains an entry with `name="ocr_process"`.
-- The `ocr_process` entry's `inputSchema.properties` advertises `file_path` (required) and `lang` (optional).
+- The `ocr_process` entry's `inputSchema.properties` advertises `file_uri` (required) and `lang` (optional).
 
 ## Prerequisites
 
@@ -55,8 +55,8 @@ bru run "paddle-ocr/testing/mcp-list-tools.yml" --env ascend-local --env-var "mc
 - `initialize` returns HTTP 200 with a non-empty `Mcp-Session-Id` header.
 - `mcp-list-tools.yml` returns HTTP 200.
 - The JSON-RPC `result.tools` array contains an entry with `name="ocr_process"`.
-- That entry's `inputSchema.properties` includes a key `file_path` and a key `lang`.
-- That entry's `inputSchema.required` array contains `"file_path"`.
+- That entry's `inputSchema.properties` includes a key `file_uri` and a key `lang`.
+- That entry's `inputSchema.required` array contains `"file_uri"`.
 
 ## Fixtures
 

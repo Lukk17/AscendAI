@@ -25,8 +25,8 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-tools-list-tasks.md` before sta
 - [ ] `initialize` returns HTTP 200 with a non-empty `Mcp-Session-Id` header
 - [ ] `mcp-list-tools.yml` returns HTTP 200
 - [ ] `result.tools` array contains an entry with `name="ocr_process"`
-- [ ] That entry's `inputSchema.properties` includes a key `file_path` and a key `lang`
-- [ ] That entry's `inputSchema.required` array contains `"file_path"`
+- [ ] That entry's `inputSchema.properties` includes a key `file_uri` and a key `lang`
+- [ ] That entry's `inputSchema.required` array contains `"file_uri"`
 
 ### Verdict
 

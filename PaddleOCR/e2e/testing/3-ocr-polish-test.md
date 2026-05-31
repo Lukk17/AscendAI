@@ -75,3 +75,16 @@ bru run "paddle-ocr/testing/ocr-polish.yml" --env ascend-local
 
 - [`PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1-polish.png`](../fixtures/argent-saga-chronicles-page1-polish.png) — black `Saga Świetlna / Aenaria / Eklipsą` text
   on a white background, single line, ~100 pt sans-serif font with Latin Extended-A glyph support.
+
+## Concurrency
+
+**Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
+
+Same constraint as spec 2 plus a one-time cost: the Polish engine is NOT pre-warmed at container startup (only
+`DEFAULT_LANGUAGE`, currently `en`, warms during the lifespan). The first `lang=pl` request triggers an in-request
+model load that adds 5–15 s on top of inference. Combined with concurrent calls on other engine specs the timeout
+window is exhausted before the first response is produced. Run sequentially.
+
+Safe to run in parallel with: reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12). Unsafe with: 2, 3, 4, 6.
+
+See [`PaddleOCR/e2e/testing/README.md`](README.md) "Execution order".

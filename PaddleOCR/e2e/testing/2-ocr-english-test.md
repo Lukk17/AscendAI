@@ -70,3 +70,18 @@ bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local
 
 - [`PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1.png`](../fixtures/argent-saga-chronicles-page1.png) — black `Argent Saga / Aenaria / Halen Veyr` text on
   a white background, single line, ~120 pt sans-serif font.
+
+## Concurrency
+
+**Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
+
+This spec calls `ocr_service.process_file` which invokes PaddleOCR's blocking `engine.predict` inside
+`asyncio.to_thread`. PaddleOCR inference is CPU-bound; on WSL2 / Docker Desktop with 4 vCPUs allocated to the
+container, a single 212 KB image takes 5–15 s. Two or more engine specs running at the same time saturate all
+cores; throughput per call drops 4–8× and each `asyncio.wait_for` window (`OCR_REQUEST_TIMEOUT=300`) starts to
+expire, returning `HTTP 500 INTERNAL_ERROR` instead of the expected 200.
+
+Safe to run in parallel with: reject-fast specs that never reach the engine (specs 1, 5, 7, 8, 9, 10, 11, 12).
+Unsafe to run in parallel with: any of specs 2, 3, 4, 6.
+
+See [`PaddleOCR/e2e/testing/README.md`](README.md) "Execution order" section for the canonical fan-out shape.

@@ -43,7 +43,7 @@ Check the running container's `DEFAULT_LANGUAGE` is `en` (the documented default
 environment.
 
 ```powershell
-docker inspect paddle-ocr --format "{{range .Config.Env}}{{println .}}{{end}}"
+docker inspect ascend-paddle-ocr --format "{{range .Config.Env}}{{println .}}{{end}}"
 ```
 
 Look for `DEFAULT_LANGUAGE=en` or its absence (absence means the in-code default of `en` applies).
@@ -77,3 +77,15 @@ bru run "paddle-ocr/testing/ocr-default-lang.yml" --env ascend-local
 ## Fixtures
 
 - [`PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1.png`](../fixtures/argent-saga-chronicles-page1.png) — same fixture as test 2.
+
+## Concurrency
+
+**Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
+
+Same constraint as spec 2: the inference path is CPU-bound on `engine.predict`. Concurrent engine calls on the
+4-vCPU container saturate every core and exhaust `OCR_REQUEST_TIMEOUT`. The fallback-to-`DEFAULT_LANGUAGE` logic is
+trivial; the bottleneck is identical to specs 2, 3, 6.
+
+Safe to run in parallel with reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12). Unsafe with 2, 3, 4, 6.
+
+See [`PaddleOCR/e2e/testing/README.md`](README.md) "Execution order".

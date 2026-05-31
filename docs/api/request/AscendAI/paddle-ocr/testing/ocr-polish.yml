@@ -12,7 +12,7 @@ http:
   body:
     type: multipart-form
     data:
-      - name: files
+      - name: file
         type: file
         value:
           - D:\Development\projekty-IT\AscendAI\PaddleOCR\e2e\fixtures\argent-saga-chronicles-page1-polish.png
@@ -27,6 +27,15 @@ runtime:
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
+        });
+        test("Response carries schema_version=1", function () {
+            expect(res.getBody().schema_version).to.equal("1");
+        });
+        test("Filename echoes back", function () {
+            expect(res.getBody().filename).to.equal("argent-saga-chronicles-page1-polish.png");
+        });
+        test("At least one page", function () {
+            expect(res.getBody().pages.length).to.be.greaterThan(0);
         });
 
 settings:

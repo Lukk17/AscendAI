@@ -2,10 +2,10 @@
 
 ## What this verifies
 
-- `POST /v1/ocr` without the required `files` multipart part is rejected by FastAPI's request-validation layer with
+- `POST /v1/ocr` without the required `file` multipart part is rejected by FastAPI's request-validation layer with
   HTTP 422 before any OCR engine call.
 - The response body is the FastAPI validation envelope: a `detail` array with at least one entry whose `loc`
-  references the missing `files` field.
+  references the missing `file` field.
 - **No OCR engine invocation occurs.** The request short-circuits in FastAPI's dependency resolution; the steady-state
   duration is well under 100 ms.
 
@@ -47,7 +47,7 @@ bru run "paddle-ocr/testing/ocr-invalid-no-file.yml" --env ascend-local
 
 - HTTP status equals `422`.
 - Response body is JSON with a top-level `detail` array.
-- At least one entry in `detail` has `loc` containing the string `"files"` (FastAPI reports the missing required
+- At least one entry in `detail` has `loc` containing the string `"file"` (FastAPI reports the missing required
   field by name).
 - Per-call duration < 500 ms (proxy for "request validation short-circuited; no OCR engine call").
 

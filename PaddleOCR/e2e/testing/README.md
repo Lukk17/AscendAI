@@ -47,17 +47,47 @@ YAML directly.
 
 Install Bruno CLI once with `npm install -g @usebruno/cli`.
 
-## Test order
+## Execution order
 
-Numbered by setup cost (lowest first). Run earliest first when stepping through; each is self-contained so any can
-be run on its own.
+The twelve specs fall into two execution classes. Mixing them in the wrong shape causes false failures from CPU
+contention, not from real defects, so the fan-out shape matters as much as the spec content.
+
+**Reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12).** These return before any `engine.predict` call:
+spec 1 short-circuits at FastAPI validation, spec 5 is a `tools/list` lookup, spec 7 reads `/ready`, specs 8 to
+11 are rejected by the SSRF guard / scheme guard / credentials guard / `file://` jail before any fetch, spec 12 is
+rejected by the magic-byte sniffer. Each finishes in well under 2 seconds. Safe to run all eight in parallel up to
+the runner cap of 5 concurrent; the rest queue and pick up as slots free.
+
+**Engine-bound specs (2, 3, 4, 6).** These all invoke PaddleOCR's blocking `engine.predict` inside
+`asyncio.to_thread`. PaddleOCR inference is CPU-bound; on WSL2 / Docker Desktop with the documented `cpus: 4.0`
+budget, a single 212 KB image takes 5 to 15 seconds. Running two engine specs at the same time saturates every
+core, throughput per call drops 4 to 8 times, and `asyncio.wait_for` exhausts `OCR_REQUEST_TIMEOUT=300` before any
+of them returns: the entire engine batch fails with `HTTP 500 INTERNAL_ERROR` or, in the MCP case, with
+`result.isError=true`. **Engine specs run one at a time.** It is fine to interleave them with reject-fast specs.
+
+Canonical fan-out shape for the full suite from a fresh container:
+
+1. Dispatch all 8 reject-fast specs in parallel (runner default cap of 5; queue 3).
+2. Once those settle (usually under 90 seconds in aggregate), dispatch the 4 engine specs **sequentially**, one at
+   a time. Each will take 30 to 90 seconds against the documented hardware budget.
+
+Total wall-clock with this shape on a 4-vCPU, 12 GB WSL2 container: roughly 5 to 8 minutes for 12 specs.
+
+The historical numbering reflects setup cost (lowest first). Run order within each class is free; the only hard
+constraint is "no two engine specs at the same time."
 
 1. [1-invalid-input-test.md](1-invalid-input-test.md). Validator short-circuit. **No fixture, no OCR call.**
 2. [2-ocr-english-test.md](2-ocr-english-test.md). English canary OCR.
 3. [3-ocr-polish-test.md](3-ocr-polish-test.md). Polish canary OCR.
 4. [4-ocr-default-language-test.md](4-ocr-default-language-test.md). Default-language fallback.
 5. [5-mcp-tools-list-test.md](5-mcp-tools-list-test.md). MCP `tools/list` advertises `ocr_process`.
-6. [6-mcp-ocr-test.md](6-mcp-ocr-test.md). MCP `ocr_process` against a container-visible fixture path.
+6. [6-mcp-ocr-test.md](6-mcp-ocr-test.md). MCP `ocr_process` happy path via MinIO URL.
+7. [7-ready-endpoint-test.md](7-ready-endpoint-test.md). `/ready` returns `status="ready"` post warm-up.
+8. [8-mcp-ssrf-rejection-test.md](8-mcp-ssrf-rejection-test.md). SSRF guard rejects link-local / private-IP targets.
+9. [9-mcp-bad-scheme-test.md](9-mcp-bad-scheme-test.md). Scheme guard rejects `ftp://`, `data:`, etc.
+10. [10-mcp-credentials-rejection-test.md](10-mcp-credentials-rejection-test.md). URI with `user:pass@` rejected.
+11. [11-mcp-file-uri-jail-test.md](11-mcp-file-uri-jail-test.md). `file://` rejected unless `MCP_FILE_URI_ROOT` set + jailed.
+12. [12-ocr-unsupported-mime-test.md](12-ocr-unsupported-mime-test.md). Magic-byte rejection on REST upload.
 
 ## Cross-cutting conventions
 

@@ -23,7 +23,7 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 - [ ] HTTP status equals `422`
 - [ ] Response body is JSON with a top-level `detail` array
-- [ ] At least one `detail` entry has `loc` containing `"files"`
+- [ ] At least one `detail` entry has `loc` containing `"file"`
 - [ ] Per-call duration < 500 ms (proxy for "request validation short-circuited; no OCR engine call")
 
 ### Verdict

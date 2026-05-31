@@ -11,11 +11,19 @@ Copy this file to `../runs/<UTC-timestamp>_6-mcp-ocr-tasks.md` before starting a
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] PaddleOCR `/health` returns HTTP 200 with `"status":"ok"`
 - [ ] `PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1.png` exists on the host
-- [ ] `docker exec paddle-ocr test -f /e2e-fixtures/argent-saga-chronicles-page1.png` returns exit code `0` (fixtures dir mounted into container)
+- [ ] MinIO `/minio/health/live` returns HTTP 200
+- [ ] `docker exec minio mc --version` returns a version string
+- [ ] `docker exec paddle-ocr printenv MCP_ALLOWED_HOSTS` returns `minio` (or a list containing it)
 
 ### Reset state
 
-- [ ] None required
+- [ ] `mc alias set local ...` (inside the minio container) succeeds
+- [ ] `mc mb --ignore-existing local/e2e-fixtures` succeeds
+- [ ] `mc anonymous set download local/e2e-fixtures` succeeds
+- [ ] `mc rm --force local/e2e-fixtures/argent-saga-chronicles-page1.png` succeeds (object cleared)
+- [ ] `docker cp PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1.png minio:/tmp/...` succeeds
+- [ ] `mc cp /tmp/argent-saga-chronicles-page1.png local/e2e-fixtures/argent-saga-chronicles-page1.png` succeeds
+- [ ] `mc ls local/e2e-fixtures/argent-saga-chronicles-page1.png` lists the object
 
 ### Run
 

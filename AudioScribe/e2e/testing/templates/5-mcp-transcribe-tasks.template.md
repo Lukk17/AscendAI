@@ -11,11 +11,19 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-transcribe-tasks.md` before sta
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] AudioScribe `/health` returns HTTP 200 with `{"status":"ok","service":"AudioScribe"}`
 - [ ] `docker exec audio-scribe printenv OPENAI_API_KEY` returns a non-empty string
-- [ ] `docker-compose.override.yaml` bind-mounts `AudioScribe/e2e/fixtures` to `/fixtures:ro` and the container is recreated
-- [ ] `docker exec audio-scribe ls /fixtures/meeting-clip.wav` succeeds
+- [ ] `AudioScribe/e2e/fixtures/meeting-clip.wav` exists on the host
+- [ ] MinIO `/minio/health/live` returns HTTP 200
+- [ ] `docker exec minio mc --version` returns a version string
 
 ### Reset state
 
+- [ ] `mc alias set local ...` (inside the minio container) succeeds
+- [ ] `mc mb --ignore-existing local/e2e-fixtures` succeeds
+- [ ] `mc anonymous set download local/e2e-fixtures` succeeds
+- [ ] `mc rm --force local/e2e-fixtures/meeting-clip.wav` succeeds (object cleared)
+- [ ] `docker cp AudioScribe/e2e/fixtures/meeting-clip.wav minio:/tmp/...` succeeds
+- [ ] `mc cp /tmp/meeting-clip.wav local/e2e-fixtures/meeting-clip.wav` succeeds
+- [ ] `mc ls local/e2e-fixtures/meeting-clip.wav` lists the object
 - [ ] `docker exec audio-scribe sh -c "rm -f /tmp/transcript_*.md"` succeeds
 
 ### Run

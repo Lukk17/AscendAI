@@ -25,7 +25,7 @@ http:
         "params": {
           "name": "transcribe_openai",
           "arguments": {
-            "audio_uri": "file:///fixtures/meeting-clip.wav",
+            "audio_uri": "http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav",
             "model": "whisper-1",
             "language": "en"
           }

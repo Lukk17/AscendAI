@@ -23,7 +23,7 @@ http:
         "params": {
           "name": "ocr_process",
           "arguments": {
-            "file_path": "/e2e-fixtures/argent-saga-chronicles-page1.png",
+            "file_uri": "http://host.docker.internal:9070/e2e-fixtures/argent-saga-chronicles-page1.png",
             "lang": "en"
           }
         }

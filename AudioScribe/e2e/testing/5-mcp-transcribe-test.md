@@ -3,14 +3,14 @@
 ## What this verifies
 
 - The MCP `initialize` handshake against `POST /mcp` returns HTTP 200 with an `Mcp-Session-Id` header.
-- A subsequent `tools/call` for `transcribe_openai` with `audio_uri="file:///fixtures/meeting-clip.wav"`,
+- A subsequent `tools/call` for `transcribe_openai` with `audio_uri="http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav"`,
   `model="whisper-1"`, `language="en"` returns HTTP 200.
 - The JSON-RPC `result.content` array contains one entry of `type="text"`; the entry's `text` parses as JSON.
 - The parsed JSON payload has `source="openai"`, `model="whisper-1"`, `language="en"`, and a `transcription` string
   containing at least one of the canary substrings `Q3`, `Acme`, `Adam`, `Friday`, or `migration` (case-insensitive).
-- The MCP tool reaches the AudioScribe container, resolves the `file://` URI against the bind-mounted
-  `/fixtures` volume, then forwards the audio bytes to the OpenAI Whisper API — proves the full MCP →
-  download_service → OpenAI path works end-to-end.
+- The MCP tool reaches the AudioScribe container, follows the docker-internal `http://minio:9000/...` URL to pull
+  the audio bytes via its `download_service`, then forwards them to the OpenAI Whisper API — proves the full
+  MCP → download_service → OpenAI path works end-to-end without any host-side file mount.
 - The request consumes paid OpenAI quota.
 
 ## Prerequisites
@@ -39,29 +39,79 @@ docker exec audio-scribe printenv OPENAI_API_KEY
 
 Expect a non-empty string.
 
-Check the fixtures directory is bind-mounted into the container at `/fixtures`. The committed `docker-compose.yaml`
-does NOT mount the fixtures path; create or extend `docker-compose.override.yaml` next to it before running this
-test:
-
-```yaml
-services:
-  audio-scribe:
-    volumes:
-      - D:/Development/projekty-IT/AscendAI/AudioScribe/e2e/fixtures:/fixtures:ro
-```
-
-Recreate the container with the override applied, then confirm the mount is visible:
+Check the fixture exists on the host.
 
 ```powershell
-docker exec audio-scribe ls /fixtures/meeting-clip.wav
+Test-Path AudioScribe/e2e/fixtures/meeting-clip.wav
 ```
 
-Expect the path to be listed. If the file is missing, record it per `AudioScribe/e2e/fixtures/README.md` before
-continuing.
+Expect `True`.
+
+Check MinIO is reachable on the host.
+
+```powershell
+curl -fsS http://localhost:9070/minio/health/live
+```
+
+Expect HTTP 200.
+
+Check the MinIO `mc` client is available inside the `minio` container.
+
+```powershell
+docker exec minio mc --version
+```
+
+Expect a version string.
 
 ## Reset state
 
-Delete any stale `.md` cache entries from prior runs to keep `/tmp` clean.
+Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in
+`docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below
+runs through `sh -c` so the env vars expand *inside* the container.
+
+```powershell
+docker exec minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"'
+```
+
+Create the dedicated `e2e-fixtures` bucket (idempotent).
+
+```powershell
+docker exec minio mc mb --ignore-existing local/e2e-fixtures
+```
+
+Open the bucket for anonymous downloads so AudioScribe can fetch the URL without an auth header.
+
+```powershell
+docker exec minio mc anonymous set download local/e2e-fixtures
+```
+
+Drop only this test's fixture from MinIO so re-upload is clean.
+
+```powershell
+docker exec minio mc rm --force local/e2e-fixtures/meeting-clip.wav
+```
+
+Copy the fixture from the host into the `minio` container.
+
+```powershell
+docker cp AudioScribe/e2e/fixtures/meeting-clip.wav minio:/tmp/meeting-clip.wav
+```
+
+Upload the fixture into the bucket.
+
+```powershell
+docker exec minio mc cp /tmp/meeting-clip.wav local/e2e-fixtures/meeting-clip.wav
+```
+
+Verify the object lands in the bucket.
+
+```powershell
+docker exec minio mc ls local/e2e-fixtures/meeting-clip.wav
+```
+
+Expect a single-line listing showing the object name.
+
+Delete any stale `.md` cache entries from prior runs to keep `/tmp` clean inside the AudioScribe container.
 
 ```powershell
 docker exec audio-scribe sh -c "rm -f /tmp/transcript_*.md"
@@ -111,5 +161,11 @@ the error path).
 ## Fixtures
 
 - `AudioScribe/e2e/fixtures/meeting-clip.wav` — same fixture used by spec `2-transcribe-openai-test.md`. The MCP
-  test references it via the in-container path `file:///fixtures/meeting-clip.wav`, which resolves to the
-  bind-mounted host directory documented in **Prerequisites**.
+  test references it via the docker-internal URL `http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav`, which
+  AudioScribe's `download_service` resolves over HTTP using the docker-compose network.
+
+## Concurrency
+
+- **Mutates:** MinIO bucket `e2e-fixtures` (object key `meeting-clip.wav`); MinIO anonymous-download policy on the
+  `e2e-fixtures` bucket; AudioScribe container `/tmp/transcript_*.md` cache entries.
+- **Conflicts with:** any future test that also writes `e2e-fixtures/meeting-clip.wav` — none currently exist.

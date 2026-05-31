@@ -1,0 +1,35 @@
+info:
+  name: ready
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/ready"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is ready", function () {
+            expect(res.getBody().status).to.equal("ready");
+        });
+        test("engine_warm true", function () {
+            expect(res.getBody().engine_warm).to.equal(true);
+        });
+        test("version present", function () {
+            expect(res.getBody().version).to.be.a("string");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

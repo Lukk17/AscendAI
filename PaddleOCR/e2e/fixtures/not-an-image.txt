@@ -1,0 +1,6 @@
+This file is intentionally a plain text file used as an invalid OCR input fixture.
+It does not begin with any of the magic-byte signatures recognised by sniff_mime
+in src/api/mime_sniffer.py — neither PNG (89 50 4E 47), JPEG (FF D8 FF),
+GIF (47 49 46 38), BMP (42 4D), TIFF (49 49 2A 00 or 4D 4D 00 2A), WEBP
+(RIFF....WEBP), nor PDF (25 50 44 46 2D).
+The REST /v1/ocr endpoint MUST return HTTP 400 with code=UNSUPPORTED_FILE_TYPE.
