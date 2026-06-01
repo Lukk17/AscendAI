@@ -101,6 +101,10 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+response.json
 
 # Distribution / packaging
 .Python

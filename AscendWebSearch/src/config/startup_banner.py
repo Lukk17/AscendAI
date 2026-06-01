@@ -32,7 +32,8 @@ def _resolve_host() -> str:
 
 def _probe_http_sync(url: str) -> str:
     try:
-        with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_SECONDS) as response:
+        # Probe URLs come from validated settings, not user input - S310 not applicable here.
+        with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_SECONDS) as response:  # noqa: S310
             status = response.status
         if 200 <= status < 300:
             return f"{url} [Connected]"
@@ -72,42 +73,44 @@ async def log_startup_banner() -> None:
         asyncio.to_thread(_probe_tcp_sync, settings.REDIS_URL),
     )
 
-    block = "\n".join([
-        "",
-        BANNER,
-        DIVIDER,
-        f"    Application '{APP_NAME}' is running!",
-        "",
-        "    Access URLs:",
-        f"      Local:     {local_url}",
-        f"      Hostname:  {hostname_url}",
-        "",
-        f"    Profile(s): default (log level: {settings.LOG_LEVEL})",
-        "",
-        "    External services:",
-        f"      SearXNG:      {searxng_status}",
-        f"      FlareSolverr: {flaresolverr_status}",
-        f"      Redis:        {redis_status}",
-        f"      Blocklist:    {settings.BLOCKLIST_URL} [Loaded at startup]",
-        "",
-        "    Actuator:",
-        f"      Health:    {local_url}/health",
-        "",
-        "    API documentation:",
-        f"      OpenAPI:   {local_url}/openapi.json",
-        f"      Swagger:   {local_url}/docs",
-        f"      Redoc:     {local_url}/redoc",
-        "",
-        "    Observability:",
-        "      Logging:   uvicorn formatter (src.config.logging_config)",
-        "",
-        "    MCP endpoint:",
-        f"      HTTP:      POST {local_url}/mcp",
-        "",
-        "    REST endpoints:",
-        f"      Search v1: GET  {local_url}/v1/search",
-        f"      Read v1:   GET  {local_url}/v1/read",
-        f"      Search v2: POST {local_url}/v2/search",
-        DIVIDER,
-    ])
+    block = "\n".join(
+        [
+            "",
+            BANNER,
+            DIVIDER,
+            f"    Application '{APP_NAME}' is running!",
+            "",
+            "    Access URLs:",
+            f"      Local:     {local_url}",
+            f"      Hostname:  {hostname_url}",
+            "",
+            f"    Profile(s): default (log level: {settings.LOG_LEVEL})",
+            "",
+            "    External services:",
+            f"      SearXNG:      {searxng_status}",
+            f"      FlareSolverr: {flaresolverr_status}",
+            f"      Redis:        {redis_status}",
+            f"      Blocklist:    {settings.BLOCKLIST_URL} [Loaded at startup]",
+            "",
+            "    Actuator:",
+            f"      Health:    {local_url}/health",
+            "",
+            "    API documentation:",
+            f"      OpenAPI:   {local_url}/openapi.json",
+            f"      Swagger:   {local_url}/docs",
+            f"      Redoc:     {local_url}/redoc",
+            "",
+            "    Observability:",
+            "      Logging:   uvicorn formatter (src.config.logging_config)",
+            "",
+            "    MCP endpoint:",
+            f"      HTTP:      POST {local_url}/mcp",
+            "",
+            "    REST endpoints:",
+            f"      Search v1: GET  {local_url}/v1/search",
+            f"      Read v1:   GET  {local_url}/v1/read",
+            f"      Search v2: POST {local_url}/v2/search",
+            DIVIDER,
+        ]
+    )
     logger.info("\n%s", block)

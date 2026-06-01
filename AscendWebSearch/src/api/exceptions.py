@@ -10,7 +10,10 @@ class HumanInterventionRequiredException(Exception):
 
 
 class ChallengeDetectedException(Exception):
-    """Raised by underlying strategies when the ChallengeDetector trips a wall heuristic, triggering an immediate abort."""
+    """
+    Raised by underlying strategies when the ChallengeDetector trips a wall heuristic,
+    triggering an immediate abort.
+    """
 
     def __init__(self, intervention_type: str):
         self.intervention_type = intervention_type

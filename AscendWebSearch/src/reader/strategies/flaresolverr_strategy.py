@@ -18,8 +18,8 @@ class FlareSolverrStrategy(BaseStrategy):
         if not html:
             return ""
 
-        extracted = trafilatura.extract(html)
-        return extracted if extracted else ""
+        extracted: str | None = trafilatura.extract(html)
+        return extracted or ""
 
     async def get_html(self, url: str) -> str:
         if not settings.FLARESOLVERR_URL:
@@ -27,19 +27,12 @@ class FlareSolverrStrategy(BaseStrategy):
             return ""
 
         timeout = settings.EXTRACT_TIMEOUT * 2
-        payload = {
-            "cmd": "request.get",
-            "url": url,
-            "maxTimeout": int((timeout - 2) * 1000)
-        }
+        payload = {"cmd": "request.get", "url": url, "maxTimeout": int((timeout - 2) * 1000)}
 
         try:
+            # noinspection PyArgumentList
             async with requests.AsyncSession() as session:
-                response = await session.post(
-                    settings.FLARESOLVERR_URL,
-                    json=payload,
-                    timeout=timeout
-                )
+                response = await session.post(settings.FLARESOLVERR_URL, json=payload, timeout=timeout)
                 response.raise_for_status()
                 data = response.json()
 
@@ -50,7 +43,9 @@ class FlareSolverrStrategy(BaseStrategy):
                     cookies_list = solution.get("cookies", [])
                     user_agent = solution.get("userAgent", "")
 
-                    cookie_dict = {c.get("name"): c.get("value") for c in cookies_list if "name" in c and "value" in c}
+                    cookie_dict = {
+                        c.get("name"): c.get("value") for c in cookies_list if "name" in c and "value" in c
+                    }
 
                     if "cf_clearance" in cookie_dict:
                         await cookie_manager.save_session_data(url, cookie_dict, user_agent)
@@ -61,16 +56,24 @@ class FlareSolverrStrategy(BaseStrategy):
 
                     if ChallengeDetector.is_blocked(200, html):
                         logger.warning(f"FlareSolverrStrategy: WAF/Cloudflare block detected on {url}")
-                        return ""
+                        # Escalate via the orchestrator like the other strategies do: if
+                        # FlareSolverr itself returns a Cloudflare-blocked page, the next
+                        # tiers (Playwright/Crawlee) won't help — go straight to NoVNC.
+                        raise ChallengeDetectedException(intervention_type="captcha")
 
-                    return html
-                else:
-                    logger.warning(f"FlareSolverr failed on {url}: {data.get('message')}")
-                    return ""
+                    return str(html)
 
+                logger.warning(f"FlareSolverr failed on {url}: {data.get('message')}")
+                return ""
+
+        except ChallengeDetectedException:
+            # Must not be swallowed by the broad except below; the orchestrator
+            # uses ChallengeDetectedException as an explicit escalation signal.
+            raise
         except Exception as e:
             return self._handle_error(url, e)
 
-    def _handle_error(self, url: str, error: Exception) -> str:
+    @staticmethod
+    def _handle_error(url: str, error: Exception) -> str:
         logger.warning(f"FlareSolverrStrategy error on {url}: {error}")
         return ""

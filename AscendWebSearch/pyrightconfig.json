@@ -1,0 +1,22 @@
+{
+  "include": ["src", "tests"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard",
+  "reportMissingImports": "error",
+  "reportMissingTypeStubs": "none",
+  "reportAttributeAccessIssue": "warning",
+  "extraPaths": ["."],
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "extraPaths": [".", "src"],
+      "reportArgumentType": "none",
+      "reportAttributeAccessIssue": "none",
+      "reportCallIssue": "none",
+      "reportOptionalSubscript": "none",
+      "reportPrivateUsage": "none"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class BlocklistLoader:
-    def __init__(self, assets_dir: str = None):
+    def __init__(self, assets_dir: str | None = None):
         if assets_dir:
             self.assets_dir = Path(assets_dir)
         else:
@@ -33,11 +33,11 @@ class BlocklistLoader:
             with httpx.Client() as client:
                 response = client.get(settings.BLOCKLIST_URL, follow_redirects=True)
                 response.raise_for_status()
-                with open(self.blocklist_path, "wb") as f:
+                with self.blocklist_path.open("wb") as f:
                     f.write(response.content)
             logger.info("Blocklist downloaded successfully.")
         except Exception as e:
-            logger.error(f"Failed to download blocklist: {e}")
+            logger.exception("Failed to download blocklist")
             raise RuntimeError(f"Critical: Could not download blocklist from {settings.BLOCKLIST_URL}") from e
 
     def _parse_rules(self) -> AdblockRules:
@@ -46,11 +46,11 @@ class BlocklistLoader:
 
         logger.info("Parsing blocklist rules...")
         try:
-            with open(self.blocklist_path, "r", encoding="utf-8", errors="ignore") as f:
+            with self.blocklist_path.open(encoding="utf-8", errors="ignore") as f:
                 raw_rules = [line.strip() for line in f if line.strip() and not line.strip().startswith("!")]
                 rules = AdblockRules(raw_rules)
             logger.info(f"Loaded {len(raw_rules)} rules.")
             return rules
         except Exception as e:
-            logger.error(f"Failed to parse blocklist rules: {e}")
+            logger.exception("Failed to parse blocklist rules")
             raise RuntimeError("Critical: Could not parse blocklist rules") from e
