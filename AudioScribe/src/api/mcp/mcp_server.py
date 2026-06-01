@@ -1,205 +1,250 @@
+"""MCP surface. URI-only contract (no multipart uploads); every fetch goes
+through `download_to_temp_async` which enforces the SSRF guard, file:// jail,
+and streaming size cap."""
+
+from __future__ import annotations
+
 import asyncio
 import json
-import os
-from typing import Optional
+import logging
+import shutil
+import tempfile
+from typing import Any
 
 from fastmcp import FastMCP
-from mcp.types import TextContent
 
 from src.adapters.download_service import download_to_temp_async
 from src.adapters.file_service import cleanup_temp_file
 from src.config.config import settings
-from src.scribe import openai_speech_transcription, local_speech_transcription, hf_speech_transcription
+from src.scribe import (
+    hf_speech_transcription,
+    local_speech_transcription,
+    openai_speech_transcription,
+)
 from src.transcription.audacity_parser import extract_tracks_from_aup
 from src.transcription.conversation_merger import transcribe_and_merge_tracks
-import tempfile
-import shutil
+
+logger = logging.getLogger(__name__)
 
 URI_NOT_PROVIDED = "URI not provided"
 
 mcp = FastMCP("AudioScribe")
 
 
-def create_error_response(message: str):
-    return {"content": [TextContent(type="text", text=message)], "is_error": True}
+def _resolve_language(language: str | None) -> str:
+    """Narrow `str | None` to `str` for downstream calls. Explicit `if`
+    branches let both pyright and PyCharm tighten the type."""
+
+    if language is None or language == "":
+        return settings.TRANSCRIPTION_LANGUAGE
+    return language
+
+
+def _success_envelope(payload: dict[str, Any]) -> dict[str, Any]:
+    return {"status": "success", **payload}
+
+
+def _error_envelope(operation: str, exc: Exception) -> dict[str, Any]:
+    """Same MCP error envelope shape used by AscendMemory. ValueErrors are
+    user-actionable (unsafe URI, missing key, empty input); everything else
+    is logged server-side and surfaced as a generic 'internal_error'."""
+
+    if isinstance(exc, ValueError):
+        return {
+            "status": "error",
+            "code": "validation_error",
+            "operation": operation,
+            "message": str(exc),
+        }
+
+    logger.exception(f"MCP {operation} failed")
+    return {
+        "status": "error",
+        "code": "internal_error",
+        "operation": operation,
+        "message": "An internal error occurred. Check service logs.",
+    }
+
+
+def _payload_text(payload: dict[str, Any]) -> str:
+    return json.dumps(payload, ensure_ascii=False)
+
+
+async def _collect_local_segments(temp_file_path: str, model: str, lang: str) -> list[dict[str, Any]]:
+    """Materialise the local async-iterator into a concrete `list[dict]`.
+    Returning a list (not the iterator) gives downstream comprehensions a
+    plainly-typed iterable so static analysers don't second-guess the
+    `async for` expression."""
+
+    collected: list[dict[str, Any]] = []
+    async for segment in local_speech_transcription(
+        audio_file_path=temp_file_path, model_path=model, language=lang
+    ):
+        collected.append(segment)
+    return collected
+
+
+def _format_local_transcription(
+    segments: list[dict[str, Any]], with_timestamps: bool
+) -> list[dict[str, Any]] | str:
+    if with_timestamps:
+        return [
+            {"text": s["text"], "timestamp": (s["start"], s["end"])} for s in segments
+        ]
+    return " ".join(s["text"] for s in segments)
 
 
 @mcp.tool(
     name="transcribe_local",
-    description="Transcribes audio from a URI using a local faster-whisper model. "
-                "Supports mp3, wav, aac, flac, ogg, m4a, wma. Converted to 16kHz WAV internally. "
-                "Parameters: "
-                "- audio_uri: The URI of the audio file (e.g., 'file:///path/to/file.wav' or 'http://...'). "
-                "- model: The model path (default: 'Systran/faster-whisper-large-v3'). "
-                "- language: ISO 639-1 language code (e.g., 'en', 'pl', 'fr'). Do NOT use full language names like 'Polish'. "
-                "- with_timestamps: Whether to return timestamps (default: True)."
+    description=(
+        "Transcribes audio from a URI using a local faster-whisper model. "
+        "URI must be file:// (jailed to MCP_FILE_URI_ROOT) or http(s):// "
+        "(SSRF-guarded). Returns segments with timestamps by default."
+    ),
 )
 async def transcribe_local(
-        audio_uri: str,
-        model: str = "Systran/faster-whisper-large-v3",
-        language: Optional[str] = None,
-        with_timestamps: bool = True
-):
-    if not audio_uri:
-        return create_error_response(URI_NOT_PROVIDED)
+    audio_uri: str,
+    model: str = "Systran/faster-whisper-large-v3",
+    language: str | None = None,
+    with_timestamps: bool = True,
+) -> dict[str, Any]:
+    if not audio_uri or not audio_uri.strip():
+        return _error_envelope("transcribe_local", ValueError(URI_NOT_PROVIDED))
 
-    temp_file_path = None
+    # Empty-string sentinel rather than None so the variable's type stays
+    # `str` for downstream call sites (no narrowing dance required).
+    temp_file_path = ""
     try:
         temp_file_path = await download_to_temp_async(audio_uri)
-        if not os.path.exists(temp_file_path):
-            return create_error_response(f"File not accessible after download: {temp_file_path}")
+        lang = _resolve_language(language)
 
-        lang = language if language else settings.TRANSCRIPTION_LANGUAGE
-        all_segments = [segment async for segment in local_speech_transcription(
-            audio_file_path=temp_file_path,
-            model_path=model,
-            language=lang
-        )]
+        segments = await _collect_local_segments(temp_file_path, model, lang)
+        transcription = _format_local_transcription(segments, with_timestamps)
 
-        if with_timestamps:
-            transcription_data = [
-                {"text": s['text'], "timestamp": (s['start'], s['end'])} for s in all_segments
-            ]
-        else:
-            transcription_data = " ".join([s['text'] for s in all_segments])
-
-        payload = {"source": "local", "model": model, "language": lang, "transcription": transcription_data}
-        return {"content": [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]}
-
-    except (ValueError, IOError) as error:
-        return create_error_response(str(error))
-    except Exception as error:
-        return create_error_response(f"An unexpected error occurred: {error}")
+        payload = {"source": "local", "model": model, "language": lang, "transcription": transcription}
+        return _success_envelope({"text": _payload_text(payload)})
+    except Exception as exc:
+        return _error_envelope("transcribe_local", exc)
     finally:
-        if temp_file_path:
-            cleanup_temp_file(temp_file_path)
+        cleanup_temp_file(temp_file_path)
 
 
 @mcp.tool(
     name="transcribe_openai",
-    description="Transcribes audio from a URI with the OpenAI API. Supports mp3, mp4, mpeg, mpga, m4a, wav, and webm. Args: audio_uri (str), model (str, optional), language (str, optional)."
+    description="Transcribes audio from a URI via the OpenAI Whisper API.",
 )
 async def transcribe_openai(
-        audio_uri: str,
-        model: str = "whisper-1",
-        language: Optional[str] = None
-):
+    audio_uri: str,
+    model: str = "whisper-1",
+    language: str | None = None,
+) -> dict[str, Any]:
     if not settings.OPENAI_API_KEY:
-        return create_error_response("OPENAI_API_KEY is not configured on the server.")
-    if not audio_uri:
-        return create_error_response(URI_NOT_PROVIDED)
+        return _error_envelope(
+            "transcribe_openai", ValueError("OPENAI_API_KEY is not configured on the server.")
+        )
+    if not audio_uri or not audio_uri.strip():
+        return _error_envelope("transcribe_openai", ValueError(URI_NOT_PROVIDED))
 
-    temp_file_path = None
+    temp_file_path = ""
     try:
         temp_file_path = await download_to_temp_async(audio_uri)
-        if not os.path.exists(temp_file_path):
-            return create_error_response(f"File not accessible after download: {temp_file_path}")
-
-        lang = language if language else settings.TRANSCRIPTION_LANGUAGE
+        lang = _resolve_language(language)
         response_text = await asyncio.to_thread(
             openai_speech_transcription,
             audio_file_path=temp_file_path,
             model=model,
-            language=lang
+            language=lang,
         )
         payload = {"source": "openai", "model": model, "language": lang, "transcription": response_text}
-        return {"content": [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]}
-    except (ValueError, IOError) as error:
-        return create_error_response(str(error))
-    except Exception as error:
-        return create_error_response(f"An unexpected error occurred: {error}")
+        return _success_envelope({"text": _payload_text(payload)})
+    except Exception as exc:
+        return _error_envelope("transcribe_openai", exc)
     finally:
-        if temp_file_path:
-            cleanup_temp_file(temp_file_path)
+        cleanup_temp_file(temp_file_path)
 
 
 @mcp.tool(
     name="transcribe_hf",
-    description="Transcribes audio from a URI with a Hugging Face provider. "
-                "Supports mp3, wav, aac, flac, ogg, m4a, wma. Converted to 16kHz WAV internally. "
-                "Args: audio_uri (str), model (str, optional), hf_provider (str, optional)."
+    description="Transcribes audio from a URI via a Hugging Face provider.",
 )
 async def transcribe_hf(
-        audio_uri: str,
-        model: str = "openai/whisper-large-v3",
-        hf_provider: str = "hf-inference"
-):
+    audio_uri: str,
+    model: str = "openai/whisper-large-v3",
+    hf_provider: str = "hf-inference",
+) -> dict[str, Any]:
     if not settings.HF_TOKEN:
-        return create_error_response("HF_TOKEN is not configured on the server.")
-    if not audio_uri:
-        return create_error_response(URI_NOT_PROVIDED)
+        return _error_envelope("transcribe_hf", ValueError("HF_TOKEN is not configured on the server."))
+    if not audio_uri or not audio_uri.strip():
+        return _error_envelope("transcribe_hf", ValueError(URI_NOT_PROVIDED))
 
-    temp_file_path = None
+    temp_file_path = ""
     try:
         temp_file_path = await download_to_temp_async(audio_uri)
-        if not os.path.exists(temp_file_path):
-            return create_error_response(f"File not accessible after download: {temp_file_path}")
-
         response_text = await asyncio.to_thread(
             hf_speech_transcription,
             audio_file_path=temp_file_path,
             model=model,
-            provider=hf_provider
+            provider=hf_provider,
         )
-        payload = {"source": "huggingface", "model": model, "provider": hf_provider, "transcription": response_text}
-        return {"content": [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]}
-    except (ValueError, IOError) as error:
-        return create_error_response(str(error))
-    except Exception as error:
-        return create_error_response(f"An unexpected error occurred: {error}")
+        payload = {
+            "source": "huggingface",
+            "model": model,
+            "provider": hf_provider,
+            "transcription": response_text,
+        }
+        return _success_envelope({"text": _payload_text(payload)})
+    except Exception as exc:
+        return _error_envelope("transcribe_hf", exc)
     finally:
-        if temp_file_path:
-            cleanup_temp_file(temp_file_path)
+        cleanup_temp_file(temp_file_path)
 
 
 @mcp.tool(
     name="transcribe_audacity",
-    description="Transcribes a multi-track Audacity project from a URI (.zip containing .aup and _data folder). "
-                "Args: audio_uri (str), provider (str, 'local'|'openai'|'huggingface'), model (str), language (str)."
+    description=(
+        "Transcribes a multi-track Audacity project (.zip containing .aup + _data) from a URI. "
+        "Supports provider=local|openai|huggingface."
+    ),
 )
 async def transcribe_audacity(
-        audio_uri: str,
-        provider: str = "local",
-        model: str = "Systran/faster-whisper-large-v3",
-        language: Optional[str] = None
-):
-    if not audio_uri:
-        return create_error_response(URI_NOT_PROVIDED)
+    audio_uri: str,
+    provider: str = "local",
+    model: str = "Systran/faster-whisper-large-v3",
+    language: str | None = None,
+    hf_provider: str = "hf-inference",
+) -> dict[str, Any]:
+    if not audio_uri or not audio_uri.strip():
+        return _error_envelope("transcribe_audacity", ValueError(URI_NOT_PROVIDED))
 
-    temp_zip_path = None
+    temp_zip_path = ""
     extraction_dir = tempfile.mkdtemp(prefix="mcp_audacity_")
     try:
         temp_zip_path = await download_to_temp_async(audio_uri)
-        if not os.path.exists(temp_zip_path):
-            return create_error_response(f"File not accessible after download: {temp_zip_path}")
-            
-        lang = language if language else settings.TRANSCRIPTION_LANGUAGE
+        lang = _resolve_language(language)
         tracks = await asyncio.to_thread(extract_tracks_from_aup, temp_zip_path, extraction_dir)
-        
         if not tracks:
-             return create_error_response("No usable audio tracks found in the uploaded Audacity project.")
+            return _error_envelope(
+                "transcribe_audacity",
+                ValueError("No usable audio tracks found in the uploaded Audacity project."),
+            )
 
         transcription_text = await transcribe_and_merge_tracks(
-            tracks=tracks,
-            provider=provider,
-            model=model,
-            language=lang
+            tracks=tracks, provider=provider, model=model, language=lang, hf_provider=hf_provider
         )
-        
-        payload = {"source": provider, "model": model, "language": lang, "transcription": transcription_text}
-        return {"content": [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]}
-        
-    except (ValueError, IOError) as error:
-        return create_error_response(str(error))
-    except Exception as error:
-        return create_error_response(f"An unexpected error occurred: {error}")
+        payload = {
+            "source": provider,
+            "model": model,
+            "language": lang,
+            "transcription": transcription_text,
+        }
+        return _success_envelope({"text": _payload_text(payload)})
+    except Exception as exc:
+        return _error_envelope("transcribe_audacity", exc)
     finally:
-        if temp_zip_path:
-            cleanup_temp_file(temp_zip_path)
-        if os.path.exists(extraction_dir):
-            shutil.rmtree(extraction_dir, ignore_errors=True)
+        cleanup_temp_file(temp_zip_path)
+        shutil.rmtree(extraction_dir, ignore_errors=True)
 
 
-@mcp.tool(name="health", description="Simple health check tool.")
-async def health():
-    return {"content": [TextContent(type="text", text="ok")]}
+@mcp.tool(name="health", description="Liveness check tool.")
+def health() -> dict[str, Any]:
+    return {"status": "ok"}

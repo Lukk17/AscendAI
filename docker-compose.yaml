@@ -213,22 +213,36 @@ services:
       - HF_HOME=/hf-cache
       - HF_TOKEN=${HF_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # SSRF guard: docker-internal MinIO is reached via the host-bound
+      # localhost address (host.docker.internal:9070); allow the loopback
+      # aliases plus the in-network MinIO hostname.
+      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1,minio
+      # Enables file:// URIs jailed to /audio (the host Desktop mount).
+      - MCP_FILE_URI_ROOT=/audio
     volumes:
       - D:/Development/AI/hf-cache:/hf-cache
       - C:\Users\Lukk\Desktop:/audio
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:7017/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 300s
+      retries: 3
     deploy:
       resources:
+        limits:
+          cpus: "4.0"
+          memory: 8192M
         reservations:
+          cpus: "0.5"
+          memory: 1024M
           devices:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    security_opt:
+      - no-new-privileges:true
     networks:
       default:
         aliases:
           - audio-scribe
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7017/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3

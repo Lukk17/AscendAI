@@ -2,18 +2,17 @@ import os
 
 os.environ["OPENAI_API_KEY"] = "dummy"  # Set dummy key before importing modules that init OpenAI client
 import json
-
 import tempfile
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
 from asgi_lifespan import LifespanManager
+from httpx import ASGITransport, AsyncClient
 
-from src.main import create_app
 import src.api.mcp.mcp_server as mcp_server_module
 from src.config.config import settings
+from src.main import create_app
 
 pytestmark = pytest.mark.asyncio
 
@@ -158,7 +157,8 @@ async def asgi_client():
 
 async def test_streamable_http_initialize_returns_utf8_and_session_id(asgi_client: AsyncClient):
     session_id = await _initialize_session(asgi_client)
-    assert isinstance(session_id, str) and len(session_id) > 0
+    assert isinstance(session_id, str)
+    assert len(session_id) > 0
 
 
 async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch(monkeypatch, temp_audio_file,
@@ -381,17 +381,20 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch
             trans = inner.get("transcription")
             if isinstance(trans, list) and len(trans) == 2:
                 for item in trans:
-                    assert "text" in item and "timestamp" in item
+                    assert "text" in item
+                    assert "timestamp" in item
                     ts = item["timestamp"]
-                    assert isinstance(ts, (list, tuple)) and len(ts) == 2
+                    assert isinstance(ts, (list, tuple))
+                    assert len(ts) == 2
             else:
-                # Fallback: still ensure our tokens are present
-                assert "one" in text_val and "two" in text_val
+                assert "one" in text_val
+                assert "two" in text_val
         except Exception:
-            assert "one" in text_val and "two" in text_val
+            assert "one" in text_val
+            assert "two" in text_val
     else:
-        # Plain text fallback
-        assert "one" in text_val and "two" in text_val
+        assert "one" in text_val
+        assert "two" in text_val
 
 
 async def test_streamable_http_transcribe_local_file_not_found(monkeypatch, asgi_client: AsyncClient):
@@ -420,7 +423,9 @@ async def test_streamable_http_transcribe_local_file_not_found(monkeypatch, asgi
     assert resp.status_code == 200, resp.text
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "File not accessible" in text
+    # ADR-002: generic OSError → redacted envelope; exception text never leaks.
+    assert "internal_error" in text
+    assert "An internal error occurred" in text
 
 
 async def test_streamable_http_transcribe_local_generator_value_error(monkeypatch, temp_audio_file,
@@ -496,7 +501,8 @@ async def test_streamable_http_transcribe_local_generator_generic_error(monkeypa
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "An unexpected error occurred:" in text
+    assert "internal_error" in text
+    assert "An internal error occurred" in text
 
 
 async def test_streamable_http_transcribe_openai_missing_api_key(monkeypatch, temp_audio_file,
@@ -549,7 +555,9 @@ async def test_streamable_http_transcribe_openai_file_not_found(monkeypatch, asg
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "File not found" in text
+    # file:// without MCP_FILE_URI_ROOT → ValueError → validation_error envelope.
+    assert "validation_error" in text
+    assert "file://" in text
 
 
 async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch, temp_audio_file,
@@ -590,7 +598,7 @@ async def test_streamable_http_transcribe_openai_raises_value_error(monkeypatch,
 async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, temp_audio_file,
                                                                  asgi_client: AsyncClient):
     def _raise_io_error(*, audio_file_path: str, model: str, language: str):
-        raise IOError("disk full")
+        raise OSError("disk full")
 
     monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
     monkeypatch.setattr(mcp_server_module, "openai_speech_transcription", _raise_io_error)
@@ -619,7 +627,9 @@ async def test_streamable_http_transcribe_openai_raises_io_error(monkeypatch, te
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "disk full" in text
+    # ADR-002: IOError → redacted envelope; "disk full" must not leak.
+    assert "disk full" not in text
+    assert "internal_error" in text
 
 
 async def test_streamable_http_transcribe_openai_raises_generic_exception(monkeypatch, temp_audio_file,
@@ -654,7 +664,8 @@ async def test_streamable_http_transcribe_openai_raises_generic_exception(monkey
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "An unexpected error occurred:" in text
+    assert "explode" not in text
+    assert "internal_error" in text
 
 
 async def test_streamable_http_transcribe_hf_missing_token(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
@@ -707,7 +718,8 @@ async def test_streamable_http_transcribe_hf_file_not_found(monkeypatch, asgi_cl
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "File not accessible" in text
+    assert "internal_error" in text
+    assert "An internal error occurred" in text
 
 
 async def test_streamable_http_transcribe_hf_raises_value_error(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
@@ -746,7 +758,7 @@ async def test_streamable_http_transcribe_hf_raises_value_error(monkeypatch, tem
 
 async def test_streamable_http_transcribe_hf_raises_io_error(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
     def _raise_io_error_hf(*, audio_file_path: str, model: str, provider: str):
-        raise IOError("network down")
+        raise OSError("network down")
 
     monkeypatch.setattr(mcp_server_module.settings, "HF_TOKEN", "test")
     monkeypatch.setattr(mcp_server_module, "hf_speech_transcription", _raise_io_error_hf)
@@ -775,7 +787,8 @@ async def test_streamable_http_transcribe_hf_raises_io_error(monkeypatch, temp_a
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "network down" in text
+    assert "network down" not in text
+    assert "internal_error" in text
 
 
 async def test_streamable_http_transcribe_hf_raises_generic_exception(monkeypatch, temp_audio_file,
@@ -810,7 +823,8 @@ async def test_streamable_http_transcribe_hf_raises_generic_exception(monkeypatc
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "An unexpected error occurred:" in text
+    assert "kaboom" not in text
+    assert "internal_error" in text
 
 
 async def test_transcribe_local_validation_error_missing_uri(asgi_client: AsyncClient) -> None:
@@ -938,3 +952,144 @@ async def test_transcribe_hf_missing_token_check(monkeypatch, asgi_client: Async
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "HF_TOKEN is not configured" in text
+
+
+async def _call_tool_with_empty_uri(asgi_client: AsyncClient, tool_name: str, extra: dict | None = None) -> str:
+    session_id = await _initialize_session(asgi_client)
+    arguments = {"audio_uri": ""}
+    if extra:
+        arguments.update(extra)
+    req = {
+        "jsonrpc": "2.0",
+        "id": 60,
+        "method": "tools/call",
+        "params": {"name": tool_name, "arguments": arguments},
+    }
+    resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+    payload = _parse_mcp_response(resp)
+    return _first_text_block(payload)
+
+
+async def test_transcribe_local_empty_uri_returns_validation_error(asgi_client: AsyncClient) -> None:
+    text = await _call_tool_with_empty_uri(asgi_client, "transcribe_local")
+    assert "validation_error" in text
+    assert "URI not provided" in text
+
+
+async def test_transcribe_openai_empty_uri_returns_validation_error(
+    monkeypatch, asgi_client: AsyncClient
+) -> None:
+    monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
+    text = await _call_tool_with_empty_uri(asgi_client, "transcribe_openai")
+    assert "validation_error" in text
+    assert "URI not provided" in text
+
+
+async def test_transcribe_hf_empty_uri_returns_validation_error(
+    monkeypatch, asgi_client: AsyncClient
+) -> None:
+    monkeypatch.setattr(mcp_server_module.settings, "HF_TOKEN", "test")
+    text = await _call_tool_with_empty_uri(asgi_client, "transcribe_hf")
+    assert "validation_error" in text
+    assert "URI not provided" in text
+
+
+async def test_transcribe_audacity_empty_uri_returns_validation_error(asgi_client: AsyncClient) -> None:
+    text = await _call_tool_with_empty_uri(asgi_client, "transcribe_audacity")
+    assert "validation_error" in text
+    assert "URI not provided" in text
+
+
+async def test_transcribe_audacity_no_tracks_returns_validation_error(
+    monkeypatch, temp_audio_file, asgi_client: AsyncClient
+) -> None:
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+
+    def _no_tracks(zip_path: str, extraction_dir: str) -> list:
+        return []
+
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+    monkeypatch.setattr(mcp_server_module, "extract_tracks_from_aup", _no_tracks)
+
+    session_id = await _initialize_session(asgi_client)
+    req = {
+        "jsonrpc": "2.0",
+        "id": 70,
+        "method": "tools/call",
+        "params": {
+            "name": "transcribe_audacity",
+            "arguments": {"audio_uri": f"file://{temp_audio_file}"},
+        },
+    }
+    resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+    payload = _parse_mcp_response(resp)
+    text = _first_text_block(payload)
+    assert "validation_error" in text
+    assert "No usable audio tracks" in text
+
+
+async def test_transcribe_audacity_success(
+    monkeypatch, temp_audio_file, asgi_client: AsyncClient
+) -> None:
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+
+    def _two_tracks(zip_path: str, extraction_dir: str) -> list[str]:
+        return ["track1.wav", "track2.wav"]
+
+    async def _fake_merge(*, tracks, provider, model, language, hf_provider) -> str:
+        return "merged transcript"
+
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+    monkeypatch.setattr(mcp_server_module, "extract_tracks_from_aup", _two_tracks)
+    monkeypatch.setattr(mcp_server_module, "transcribe_and_merge_tracks", _fake_merge)
+
+    session_id = await _initialize_session(asgi_client)
+    req = {
+        "jsonrpc": "2.0",
+        "id": 71,
+        "method": "tools/call",
+        "params": {
+            "name": "transcribe_audacity",
+            "arguments": {
+                "audio_uri": f"file://{temp_audio_file}",
+                "provider": "local",
+                "language": "en",
+            },
+        },
+    }
+    resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+    payload = _parse_mcp_response(resp)
+    text = _first_text_block(payload)
+    assert "success" in text
+    assert "merged transcript" in text
+
+
+async def test_transcribe_audacity_propagates_runtime_error_as_internal_error(
+    monkeypatch, temp_audio_file, asgi_client: AsyncClient
+) -> None:
+    async def _fake_download(uri: str) -> str:
+        return temp_audio_file
+
+    def _boom(zip_path: str, extraction_dir: str) -> list:
+        raise RuntimeError("zip corrupt")
+
+    monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
+    monkeypatch.setattr(mcp_server_module, "extract_tracks_from_aup", _boom)
+
+    session_id = await _initialize_session(asgi_client)
+    req = {
+        "jsonrpc": "2.0",
+        "id": 72,
+        "method": "tools/call",
+        "params": {
+            "name": "transcribe_audacity",
+            "arguments": {"audio_uri": f"file://{temp_audio_file}"},
+        },
+    }
+    resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+    payload = _parse_mcp_response(resp)
+    text = _first_text_block(payload)
+    assert "zip corrupt" not in text
+    assert "internal_error" in text

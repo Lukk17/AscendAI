@@ -38,9 +38,23 @@ hf-cache/
 
 # Documentation
 README.md
+docs/
+AGENTS.md
 
 # Testing
 tests/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 coverage.xml
 .coverage
+
+# Project metadata
+*.iml
+.run/
+build/
+*.egg-info/
+*.postman_collection.json
+*.http
+e2e/
+skills/

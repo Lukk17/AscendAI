@@ -457,12 +457,42 @@ standard Python app and the MCP server.
 
 ---
 
+### Observability
+
+Four diagnostic surfaces follow the platform's standard observability stack:
+
+- `GET /health` — liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound. Targeted by the Docker
+  `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should hit this.
+- `GET /ready` — readiness probe. Checks `ffmpeg` and `ffprobe` are on PATH and the system temp dir is writable.
+  Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded", "checks": {...}}`.
+- `GET /metrics` — Prometheus payload. Counters labelled `provider={local,openai,huggingface}` and `outcome` for
+  request totals + bytes processed, plus per-operation duration histograms. Audacity track count and ffmpeg
+  invocation counters are also exposed.
+- `X-Request-ID` middleware — every request echoes (or generates) a correlation ID, injected into every log line via
+  `[request_id]` so requests can be reassembled from log aggregation without bespoke tracing plumbing.
+
+### Error contract
+
+All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with `Content-Type:
+application/problem+json`.
+
+- `400` — validation failure (`ValueError` raised in the request lifecycle, e.g. unsafe URI, unsupported provider,
+  missing API key). Body includes `detail` with the service-authored failure reason.
+- `413` — upload, download, or Audacity zip exceeds the configured size cap (`MAX_UPLOAD_BYTES`,
+  `MAX_DOWNLOAD_BYTES`, `MAX_ZIP_UNCOMPRESSED_BYTES`; all default 5 GiB).
+- `422` — pydantic schema validation failure (Form / Query parameter shape).
+- `500` — unhandled exception. Body intentionally omits `detail` so upstream stack traces or DSNs never reach the
+  caller. Full diagnostics live in the service logs, correlated by `X-Request-ID`.
+
+The MCP surface returns structured envelopes instead of HTTP status codes (MCP tool results are JSON):
+`{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+
 ### Startup readiness banner
 
 On startup, [src/config/startup_banner.py](src/config/startup_banner.py) logs a single multi-line INFO entry with an
-ANSI Shadow `AUDIO SCRIBE` banner, access URLs, API-key state for OpenAI and Hugging Face, and the list of
-observability and REST endpoints. Shared convention with every other long-running service in the repo. See
-[.agents/skills/coding-standards/SKILL.md](../.agents/skills/coding-standards/SKILL.md).
+ANSI Shadow `AUDIO SCRIBE` banner, access URLs, API-key state for OpenAI and Hugging Face, live HTTP probe results,
+and the list of observability and REST endpoints. Shared convention with every other long-running service in the
+repo. See [.agents/skills/coding-standards/SKILL.md](../.agents/skills/coding-standards/SKILL.md).
 
 ---
 

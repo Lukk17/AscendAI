@@ -1,84 +1,72 @@
-import os
-from unittest.mock import patch, MagicMock, AsyncMock
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.adapters.file_service import safe_suffix_from_filename, cleanup_temp_file, save_upload_to_temp_async, \
-    create_temp_file
+from src.adapters import file_service
+from src.api.exception_handlers import FileSizeExceededError
 
 
-# noinspection PyProtectedMember
-@pytest.mark.parametrize("filename, expected_suffix", [
-    ("test.wav", ".wav"),
-    ("archive.tar.gz", ".gz"),
-    ("no_extension", ""),
-    (None, ""),
-    ("", ""),
-    (12345, ""),  # Test invalid type to cover the except block
-])
-def test_safe_suffix_from_filename(filename, expected_suffix):
-    assert safe_suffix_from_filename(filename) == expected_suffix
+def test_create_temp_file_returns_path() -> None:
+    path = file_service.create_temp_file(suffix=".wav")
+    assert Path(path).exists()
+    Path(path).unlink()
 
 
-@patch('os.path.exists')
-@patch('os.remove')
-def test_cleanup_temp_file_exists(mock_remove, mock_exists):
-    mock_exists.return_value = True
-    file_path = "/fake/path/file.tmp"
-    cleanup_temp_file(file_path)
-    mock_exists.assert_called_once_with(file_path)
-    mock_remove.assert_called_once_with(file_path)
+def test_safe_suffix_with_extension() -> None:
+    assert file_service.safe_suffix_from_filename("clip.wav") == ".wav"
 
 
-@patch('os.path.exists')
-@patch('os.remove')
-def test_cleanup_temp_file_not_exists(mock_remove, mock_exists):
-    mock_exists.return_value = False
-    file_path = "/fake/path/file.tmp"
-    cleanup_temp_file(file_path)
-    mock_exists.assert_called_once_with(file_path)
-    mock_remove.assert_not_called()
+def test_safe_suffix_empty_filename() -> None:
+    assert file_service.safe_suffix_from_filename("") == ""
+    assert file_service.safe_suffix_from_filename("noext") == ""
 
 
-@patch('os.remove', side_effect=OSError("Permission Denied"))
-@patch('os.path.exists', return_value=True)
-def test_cleanup_temp_file_handles_os_error(mock_exists, mock_remove):
-    file_path = "/fake/path/file.tmp"
-    try:
-        cleanup_temp_file(file_path)
-    except OSError:
-        pytest.fail("cleanup_temp_file should handle OSError and not re-raise it.")
-    mock_remove.assert_called_once_with(file_path)
+def test_safe_suffix_handles_exception() -> None:
+    """When Path() raises (rare — usually a passing-non-str filename), the
+    fallback returns an empty string. Patches the symbol the production
+    code calls."""
+
+    with patch.object(file_service, "Path", side_effect=ValueError("boom")):
+        assert file_service.safe_suffix_from_filename("x.wav") == ""
+
+
+def test_cleanup_temp_file_handles_none() -> None:
+    file_service.cleanup_temp_file(None)
+
+
+def test_cleanup_temp_file_swallows_oserror(tmp_path: Path) -> None:
+    path = tmp_path / "x.txt"
+    path.write_text("y", encoding="utf-8")
+    with patch.object(file_service.os, "remove", side_effect=OSError("nope")):
+        file_service.cleanup_temp_file(str(path))
+
+
+def test_cleanup_temp_file_skips_missing_path(tmp_path: Path) -> None:
+    file_service.cleanup_temp_file(str(tmp_path / "missing.txt"))
 
 
 @pytest.mark.asyncio
-@patch('src.adapters.file_service.create_temp_file', return_value="/fake/temp/file.wav")
-@patch('aiofiles.open')
-async def test_save_upload_to_temp_async(mock_aio_open, mock_create_temp):
-    async_file_mock = AsyncMock()
-    mock_aio_open.return_value.__aenter__.return_value = async_file_mock
+async def test_save_upload_streams_and_succeeds(tmp_path: Path) -> None:
+    upload = MagicMock()
+    upload.filename = "clip.wav"
+    upload.seek = AsyncMock()
+    reads = [b"x" * 1024, b"y" * 512, b""]
+    upload.read = AsyncMock(side_effect=reads)
 
-    mock_upload_file = MagicMock()
-    mock_upload_file.filename = "test.wav"
-    mock_upload_file.read = AsyncMock(return_value=b"fake audio data")
-    mock_upload_file.seek = AsyncMock()
-
-    temp_path = await save_upload_to_temp_async(mock_upload_file)
-
-    # noinspection PyProtectedMember
-    mock_create_temp.assert_called_once_with(".wav")
-    assert temp_path == "/fake/temp/file.wav"
-    mock_upload_file.seek.assert_awaited_once_with(0)
-    mock_aio_open.assert_called_once_with("/fake/temp/file.wav", 'wb')
-    async_file_mock.write.assert_awaited_once_with(b"fake audio data")
+    path = await file_service.save_upload_to_temp_async(upload)
+    written = Path(path).read_bytes()
+    Path(path).unlink()
+    assert written == reads[0] + reads[1]
 
 
-def test_create_temp_file_creates_real_file():
-    temp_path = None
-    try:
-        # noinspection PyProtectedMember
-        temp_path = create_temp_file(suffix=".tmp")
-        assert os.path.exists(temp_path)
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
+@pytest.mark.asyncio
+async def test_save_upload_enforces_size_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(file_service.settings, "MAX_UPLOAD_BYTES", 100)
+    monkeypatch.setattr(file_service.settings, "UPLOAD_BUFFER_BYTES", 64)
+    upload = MagicMock()
+    upload.filename = "big.wav"
+    upload.seek = AsyncMock()
+    upload.read = AsyncMock(side_effect=[b"a" * 64, b"b" * 64, b""])
+    with pytest.raises(FileSizeExceededError):
+        await file_service.save_upload_to_temp_async(upload)
