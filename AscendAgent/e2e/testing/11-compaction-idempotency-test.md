@@ -20,12 +20,24 @@ Check default config: turn-trigger=20, keep-recent-turns=8. With 9 pre-seeded ro
 
 ## Reset state
 
+The Postgres seed pipes straight from the host because `psql` reads binary stdin cleanly across shells.
+
 ```bash
 docker exec -i postgres psql -U postgres -d ascend_ai < AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-idempotency.sql
 ```
 
+The Redis seed is delivered via `docker cp` + container-side stdin redirect instead of host-side `<`. Reason: PowerShell's `Get-Content | docker exec -i` (the implicit fallback when `<` isn't supported) prepends a UTF-8 BOM that `redis-cli` parses as part of the first command, silently dropping the `DEL` line. Copying the file in and redirecting inside the container's `sh` keeps the byte stream identical across host shells.
+
 ```bash
-docker exec -i redis redis-cli < AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-idempotency.redis
+docker cp AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-idempotency.redis redis:/tmp/seed-compaction-idempotency.redis
+```
+
+```bash
+docker exec redis sh -c "redis-cli < /tmp/seed-compaction-idempotency.redis"
+```
+
+```bash
+docker exec redis rm /tmp/seed-compaction-idempotency.redis
 ```
 
 Verify the seed worked.

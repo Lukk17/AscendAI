@@ -28,9 +28,9 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 
 - [ ] Step 1: HTTP 200
 - [ ] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold)
-- [ ] Step 1: `usage.promptTokensDetails.cachedTokens == 0` (or absent)
+- [ ] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run)
 - [ ] Step 2: HTTP 200
-- [ ] Step 2: `usage.promptTokensDetails.cachedTokens > 0`
+- [ ] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0`
 
 ### Verdict
 

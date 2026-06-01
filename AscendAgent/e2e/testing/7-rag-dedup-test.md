@@ -52,19 +52,7 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history 
 docker exec redis redis-cli DEL chat:frostyRagDedupTest
 ```
 
-Also clear any leftover `pierogi-recipe.docx` from MinIO, Qdrant, and the metadata store so the dedup prompt's retrieval can't pull a third source from prior RAG-suite runs. Without this, tests 5 / 6 may have left pierogi ingested and the dedup `sources[]` array would contain 3 entries instead of the expected 2.
-
-```bash
-docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.docx
-```
-
-```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%pierogi-recipe.docx%';"
-```
-
-```bash
-curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"source","match":{"value":"documents/pierogi-recipe.docx"}}]}}'
-```
+Per the Group A hermetic contract, this spec only resets its own artifacts (`dedup-pierogi-*` + `frostyRagDedupTest`). Spec 5 and spec 6 are responsible for clearing `pierogi-recipe.docx` in their own `Post-run cleanup` sections; this spec must not reach across into their territory.
 
 ## Run
 
@@ -86,6 +74,38 @@ Step 3. Send the dedup prompt with `attachSources=true`.
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-dedup-prompt.yml" --env ascend-local
 ```
 
+## Post-run cleanup
+
+Every Group A spec self-cleans so the next sweep sees a hermetic RAG state without having to reach into another spec's artifacts. Run these regardless of whether the Run steps passed or failed; they are idempotent.
+
+Drop the two dedup fixtures from MinIO.
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/markdown/dedup-pierogi-helena.md local/knowledge-base/markdown/dedup-pierogi-grandma.md
+```
+
+Drop their `int_metadata_store` rows.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%dedup-pierogi-%';"
+```
+
+Wipe their Qdrant points.
+
+```bash
+curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"source","match":{"any":["markdown/dedup-pierogi-helena.md","markdown/dedup-pierogi-grandma.md"]}}]}}'
+```
+
+Truncate this spec's chat-history rows + Redis key.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyRagDedupTest';"
+```
+
+```bash
+docker exec redis redis-cli DEL chat:frostyRagDedupTest
+```
+
 ## Expected
 
 - After step 1: HTTP 200, `uploaded` field includes both `markdown/dedup-pierogi-helena.md` and `markdown/dedup-pierogi-grandma.md`.
@@ -103,3 +123,4 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-dedup-prompt.y
 - **Mutates:** MinIO bucket `knowledge-base` (`markdown/dedup-pierogi-helena.md`, `markdown/dedup-pierogi-grandma.md`); Qdrant collection `ascendai-1536` (dedup `source` filters); Postgres `int_metadata_store` (dedup keys); Postgres `chat_history` (user_id=`frostyRagDedupTest`); Redis key `chat:frostyRagDedupTest`
 - **Conflicts with:** `5-rag`, `6-attach-sources` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
 - **Serial:** false
+- **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) only touch this spec's own fixtures + user-id; never reaches into other Group A specs' artifacts. Relies on specs 5 and 6 honouring their own post-run cleanup contracts.

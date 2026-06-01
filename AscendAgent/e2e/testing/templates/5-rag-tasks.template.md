@@ -46,6 +46,15 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 - [ ] Step 3c: response `content` contains `30 minutes` (rest time from the DOCX fixture)
 - [ ] None of step 3a/3b/3c returned a refusal like "I don't have that document"
 
+### Post-run cleanup
+
+Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract).
+
+- [ ] Dropped this spec's three fixtures from MinIO (`markdown-canary.md`, `banana-price-poland.pdf`, `pierogi-recipe.docx`)
+- [ ] Deleted `int_metadata_store` rows for the three fixtures
+- [ ] Wiped Qdrant points for the three `source` values in collection `ascendai-1536`
+- [ ] Truncated `chat_history` rows for `frostyRagTest` + deleted Redis key `chat:frostyRagTest`
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)

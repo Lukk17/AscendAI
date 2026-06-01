@@ -41,6 +41,15 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 - [ ] Step 3: `downloadUrl` host portion equals `localhost:9070`, NOT `host.docker.internal:9070`
 - [ ] Step 4: HTTP 200, downloaded file non-empty
 
+### Post-run cleanup
+
+Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract).
+
+- [ ] Dropped `documents/pierogi-recipe.docx` from MinIO
+- [ ] Deleted `int_metadata_store` row for the pierogi key
+- [ ] Wiped Qdrant points for `documents/pierogi-recipe.docx` in collection `ascendai-1536`
+- [ ] Truncated `chat_history` rows for `frostyAttachSourcesTest` + deleted Redis key `chat:frostyAttachSourcesTest`
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)

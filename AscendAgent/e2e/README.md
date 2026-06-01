@@ -84,12 +84,18 @@ Every spec follows the same template:
 1. **What this verifies.** Bullet list of behaviours.
 2. **Prerequisites.** Concrete check commands (`curl`, `docker exec redis redis-cli ping`, etc.), each in its own
    code block with prose stating the success criterion.
-3. **Reset state.** One command per code block, in order, to wipe state so the run is reproducible.
+3. **Reset state.** One command per code block, in order, to wipe state so the run is reproducible. **Hermetic
+   contract: a spec's Reset only touches state owned by that spec** (its own fixtures, its own user-id). Reaching into
+   another test's territory trips the runner's auto-mode classifier and surfaces as "outside reset scope" denials.
 4. **Run.** One or more numbered Bruno CLI invocations. Multi-step tests tell the runner to wait for HTTP 200 before
    continuing.
-5. **Expected.** Observable behaviour only: HTTP status, response content, MinIO listings, Qdrant scrolls, Postgres
+5. **Post-run cleanup.** (Group A specs only — `5-rag`, `6-attach-sources`, `7-rag-dedup`.) Symmetric to Reset state:
+   each spec drops its own MinIO objects + Qdrant points + Postgres metadata + chat-history rows after the test
+   completes. Run regardless of Run-step verdict (idempotent). The serial chain relies on this — spec 6 must not have
+   to clean up spec 5's leftovers, spec 7 must not have to clean up spec 6's leftovers.
+6. **Expected.** Observable behaviour only: HTTP status, response content, MinIO listings, Qdrant scrolls, Postgres
    rows. No log substrings.
-6. **Fixtures.** Paths to local files the test reads.
+7. **Fixtures.** Paths to local files the test reads.
 
 The paired `templates/<N>-<feature>-tasks.template.md` is the runner's checklist for one execution: prerequisites,
 reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**,
@@ -107,7 +113,7 @@ RAG layer: MinIO bucket `knowledge-base` and Qdrant collection `ascendai-1536`. 
 
 | Group | Tests | Why this grouping | Parallelism within group |
 | :---- | :---- | :---------------- | :----------------------- |
-| **A — RAG suite** | 5, 6, 7 | Share the MinIO bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. | **Strict serial: 5 → 6 → 7.** |
+| **A — RAG suite** | 5, 6, 7 | Share the MinIO bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. Each spec is **symmetrically hermetic**: `Reset state` (pre) drops its own artifacts before running, `Post-run cleanup` (post) drops them again after. No spec reaches into another spec's state. | **Strict serial: 5 → 6 → 7.** |
 | **B — fast tests** | 1, 2, 3, 4 | Unique user-ids; no RAG / MinIO writes. Single-prompt or two-prompt flows. | Sequential within one agent, or parallel across multiple agents — either works. |
 | **C — cache + compaction** | 8, 9, 10, 11 | Unique user-ids; isolated chat-history slots. Tests 10 / 11 apply their own seed scripts before running. | Sequential within one agent, or parallel — either works. |
 

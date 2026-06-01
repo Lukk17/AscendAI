@@ -40,6 +40,15 @@ Copy this file to `runs/<UTC-timestamp>_7-rag-dedup-tasks.md` before starting a 
 - [ ] Step 3: each entry's `name` carries the document's H1 title per the `SourceFile.name` contract (H1 when extractable, filename basename otherwise)
 - [ ] Step 3 (soft): response `content` references both recipes (Helena/Maria, or sauerkraut/potato fillings)
 
+### Post-run cleanup
+
+Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract).
+
+- [ ] Dropped both dedup fixtures from MinIO (`dedup-pierogi-helena.md`, `dedup-pierogi-grandma.md`)
+- [ ] Deleted `int_metadata_store` rows for the two dedup keys
+- [ ] Wiped Qdrant points for both `source` values in collection `ascendai-1536`
+- [ ] Truncated `chat_history` rows for `frostyRagDedupTest` + deleted Redis key `chat:frostyRagDedupTest`
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL

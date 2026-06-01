@@ -141,6 +141,46 @@ The three prompts saved in the request:
 - `What was the retail price of bananas in Poland in October 2026?` (PDF fixture)
 - `How long should I rest the pierogi dough according to Babcia Helena's recipe?` (DOCX fixture)
 
+## Post-run cleanup
+
+Every Group A spec self-cleans so the next spec in the chain sees a hermetic RAG state without having to reach into another spec's artifacts. Run these regardless of whether the Run steps passed or failed; they are idempotent and never touch state owned by tests 6 or 7.
+
+Drop this spec's three fixtures from MinIO.
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/markdown/markdown-canary.md
+```
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/documents/banana-price-poland.pdf
+```
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.docx
+```
+
+Drop their `int_metadata_store` rows so subsequent re-ingestion is not skipped.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%markdown-canary.md%' OR metadata_key LIKE '%banana-price-poland.pdf%' OR metadata_key LIKE '%pierogi-recipe.docx%';"
+```
+
+Wipe their Qdrant points.
+
+```bash
+curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"source","match":{"any":["markdown/markdown-canary.md","documents/banana-price-poland.pdf","documents/pierogi-recipe.docx"]}}]}}'
+```
+
+Truncate this spec's chat-history rows + Redis key so the per-user slot is clean.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyRagTest';"
+```
+
+```bash
+docker exec redis redis-cli DEL chat:frostyRagTest
+```
+
 ## Expected
 
 After step 1 the Bruno output shows HTTP 200.
@@ -174,6 +214,7 @@ For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that 
 - **Mutates:** MinIO bucket `knowledge-base` (`markdown/markdown-canary.md`, `documents/banana-price-poland.pdf`, `documents/pierogi-recipe.docx`); Qdrant collection `ascendai-1536` (filtered by these `source` values); Postgres `int_metadata_store` (rows for these object keys); Postgres `chat_history` (user_id=`frostyRagTest`); Redis key `chat:frostyRagTest`
 - **Conflicts with:** `6-attach-sources`, `7-rag-dedup` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
 - **Serial:** false
+- **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) only touch this spec's own fixtures + user-id; never reaches into other Group A specs' artifacts.
 
 ## Optional: attach source files
 
