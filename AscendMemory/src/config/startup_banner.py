@@ -4,17 +4,19 @@ import socket
 import urllib.error
 import urllib.request
 
-from src.config.config import settings, PROVIDER_CONFIGS
+from src.config.config import PROVIDER_CONFIGS, settings
 
 logger = logging.getLogger("uvicorn")
 
+# ASCII banner art has fixed glyph width; wrapping or splitting would corrupt
+# the figlet rendering. E501 silenced on the banner lines only.
 BANNER = (
-    " █████╗ ███████╗ ██████╗███████╗███╗   ██╗██████╗     ███╗   ███╗███████╗███╗   ███╗ ██████╗ ██████╗ ██╗   ██╗\n"
-    "██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗    ████╗ ████║██╔════╝████╗ ████║██╔═══██╗██╔══██╗╚██╗ ██╔╝\n"
-    "███████║███████╗██║     █████╗  ██╔██╗ ██║██║  ██║    ██╔████╔██║█████╗  ██╔████╔██║██║   ██║██████╔╝ ╚████╔╝ \n"
-    "██╔══██║╚════██║██║     ██╔══╝  ██║╚██╗██║██║  ██║    ██║╚██╔╝██║██╔══╝  ██║╚██╔╝██║██║   ██║██╔══██╗  ╚██╔╝  \n"
-    "██║  ██║███████║╚██████╗███████╗██║ ╚████║██████╔╝    ██║ ╚═╝ ██║███████╗██║ ╚═╝ ██║╚██████╔╝██║  ██║   ██║   \n"
-    "╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═══╝╚═════╝     ╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   "
+    " █████╗ ███████╗ ██████╗███████╗███╗   ██╗██████╗     ███╗   ███╗███████╗███╗   ███╗ ██████╗ ██████╗ ██╗   ██╗\n"  # noqa: E501
+    "██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗    ████╗ ████║██╔════╝████╗ ████║██╔═══██╗██╔══██╗╚██╗ ██╔╝\n"  # noqa: E501
+    "███████║███████╗██║     █████╗  ██╔██╗ ██║██║  ██║    ██╔████╔██║█████╗  ██╔████╔██║██║   ██║██████╔╝ ╚████╔╝ \n"  # noqa: E501
+    "██╔══██║╚════██║██║     ██╔══╝  ██║╚██╗██║██║  ██║    ██║╚██╔╝██║██╔══╝  ██║╚██╔╝██║██║   ██║██╔══██╗  ╚██╔╝  \n"  # noqa: E501
+    "██║  ██║███████║╚██████╗███████╗██║ ╚████║██████╔╝    ██║ ╚═╝ ██║███████╗██║ ╚═╝ ██║╚██████╔╝██║  ██║   ██║   \n"  # noqa: E501
+    "╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═══╝╚═════╝     ╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   "  # noqa: E501
 )
 
 DIVIDER = "-" * 58
@@ -29,9 +31,17 @@ def _resolve_host() -> str:
         return "localhost"
 
 
+_ALLOWED_PROBE_SCHEMES = ("http://", "https://")
+
+
 def _probe_http_sync(url: str) -> str:
+    # urlopen accepts file:// and other schemes by default; restrict to http(s)
+    # so a misconfigured QDRANT_HOST cannot turn the startup probe into an
+    # accidental local-file read.
+    if not url.startswith(_ALLOWED_PROBE_SCHEMES):
+        return f"{url} [FAILED (unsupported scheme)]"
     try:
-        with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_SECONDS) as response:  # noqa: S310
             status = response.status
         if 200 <= status < 300:
             return f"{url} [Connected]"
@@ -51,7 +61,10 @@ def _describe_default_embedding() -> str:
     base_url = getattr(settings, config["base_url_setting"], "unknown")
     api_key = getattr(settings, config["api_key_setting"], "")
     key_state = "[Configured]" if api_key else "[Not configured]"
-    return f"{base_url} ({provider}, model={config['embedding_model']}, dims={config['embedding_dims']}) {key_state}"
+    model = config["embedding_model"]
+    dims = config["embedding_dims"]
+
+    return f"{base_url} ({provider}, model={model}, dims={dims}) {key_state}"
 
 
 async def log_startup_banner() -> None:

@@ -175,13 +175,34 @@ uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
 
 #### With Docker (recommended)
 
-**1. Build the image.**
+The service is wired into the main `docker-compose.yaml` at the repo root as `audio-scribe`. Run every compose command
+against the main file (no `-f` flag).
+
+Start (or rebuild) just this service from the repo root:
+
+```bash
+docker compose up -d --build audio-scribe
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f audio-scribe
+```
+
+Force a clean recreate after a Dockerfile or env-var change:
+
+```bash
+docker compose up -d --build --force-recreate audio-scribe
+```
+
+**Standalone build, when iterating outside compose.**
 
 ```bash
 docker build -t audio-scribe:latest .
 ```
 
-**2. Tag and push (optional).**
+**Tag and push (optional).**
 
 Bash:
 

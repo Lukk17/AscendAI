@@ -134,19 +134,40 @@ python src/main.py
 
 #### With Docker (recommended)
 
-**1. Build the image.**
+The service is wired into the main `docker-compose.yaml` at the repo root as `ascend-memory`. Run every compose command
+against the main file (no `-f` flag); the scrapper file is included transitively.
+
+Start (or rebuild) just this service from the repo root:
+
+```bash
+docker compose up -d --build ascend-memory
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f ascend-memory
+```
+
+Force a clean recreate after a Dockerfile or env-var change:
+
+```bash
+docker compose up -d --build --force-recreate ascend-memory
+```
+
+Standalone build, when iterating outside compose:
 
 ```bash
 docker build -t ascend-memory:latest .
 ```
 
-**2. Run the container.**
+Standalone run, when iterating outside compose:
 
 ```bash
 docker run -d --name ascend-memory -p 7020:7020 -e OPENAI_API_KEY="sk-..." -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
 ```
 
-**3. Tag and push to a registry (optional).**
+**Tag and push to a registry (optional).**
 
 Bash:
 
@@ -307,6 +328,41 @@ extension).
 
 ---
 
+### Observability
+
+The service exposes three diagnostic endpoints plus per-operation Prometheus metrics:
+
+- `GET /health` — liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound, regardless of upstream
+  state. Targeted by the Docker `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should
+  hit this.
+- `GET /ready` — readiness probe. Probes Qdrant `/healthz`, the default embedding API `/models`, and constructs the
+  mem0 client. Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded",
+  "checks": {...}}`. Per-probe budget is 3 s; worst-case total latency is ~9 s. Kubernetes readiness probes and
+  load-balancer health checks should hit this.
+- `GET /health/legacy` — combined liveness+readiness shape kept for callers still on the pre-split contract. Returns
+  503 during warmup, 200 after. Scheduled for removal once all callers migrate.
+- `GET /metrics` — Prometheus payload. Four counters (`memory_{insert,search,delete,wipe}_total`) labelled by
+  `provider` and `outcome`, plus four histograms (`memory_*_duration_seconds`) labelled by `provider`.
+
+Every request echoes (or generates) an `X-Request-ID` header. The same value is injected into every log line for that
+request via the `[request_id]` field, so logs can be filtered on a single request in Loki without correlation
+plumbing.
+
+### Error contract
+
+All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with `Content-Type:
+application/problem+json`.
+
+- `400` — validation failure (`ValueError` raised in the request lifecycle). Body includes `detail` with the
+  human-readable failure reason (authored by the service, safe to surface).
+- `422` — pydantic input validation failure (query parameters, request body). Body shape is FastAPI's default
+  validation error envelope.
+- `500` — unhandled exception. Body intentionally omits `detail` to prevent leaking upstream stack traces or DSNs.
+  Full diagnostics live in the service logs, correlated by `X-Request-ID`.
+
+The MCP surface returns a structured envelope instead of HTTP status codes (MCP tool results are JSON):
+`{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+
 ### Startup readiness banner
 
 On startup, [src/config/startup_banner.py](src/config/startup_banner.py) emits a single multi-line INFO log entry
@@ -384,7 +440,12 @@ Dependency management lives in [pyproject.toml](pyproject.toml). Add a new depen
 | [src/config/config.py](src/config/config.py)                               | Settings, provider routing, defaults.                               |
 | [src/service/memory_client.py](src/service/memory_client.py)               | mem0 client wiring, per-provider routing.                           |
 | [src/api/rest/rest_endpoints.py](src/api/rest/rest_endpoints.py)           | REST endpoints under `/api/v1/memory/*`.                            |
+| [src/api/readiness.py](src/api/readiness.py)                               | `/ready` probe — Qdrant, embedding-API, mem0 client construction.   |
 | [src/api/mcp/mcp_server.py](src/api/mcp/mcp_server.py)                     | FastMCP tool definitions.                                           |
+| [src/api/exception_handlers.py](src/api/exception_handlers.py)             | RFC 7807 problem-document handlers for `ValueError` and `Exception`.|
+| [src/observability/request_context.py](src/observability/request_context.py) | `X-Request-ID` middleware and request-id ContextVar.              |
+| [src/observability/metrics.py](src/observability/metrics.py)               | Prometheus counters and histograms exposed at `/metrics`.           |
+| [docs/architecture/decisions/](docs/architecture/decisions/)               | ADRs 1-6 (mem0ai, Qdrant, user_id scope, MCP↔REST, observability, mem0 2.x upgrade). |
 | [mcp_requests.http](mcp_requests.http)                                     | Example MCP requests for the VS Code REST Client extension.         |
 | [skills/ascend-memory/SKILL.md](skills/ascend-memory/SKILL.md)             | Drop-in agent skill for downstream agents.                          |
 | [../README.md](../README.md)                                               | Monorepo overview, architecture, ports.                             |

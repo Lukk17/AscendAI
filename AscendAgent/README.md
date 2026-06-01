@@ -216,6 +216,18 @@ The default `docker compose up -d --build` already builds and starts AscendAgent
 port `9917` using the `docker` Spring profile. See the root [README, Quick Start](../README.md#quick-start) for the
 `.env.example` to `.env` bootstrap.
 
+Rebuild and recreate only this service after a code or Dockerfile change (everything else stays running):
+
+```bash
+docker compose up -d --build --force-recreate ascend-agent
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f ascend-agent
+```
+
 For active development (hot reload, attached debugger), stop the container and run on the host instead.
 
 Bash:

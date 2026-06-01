@@ -59,25 +59,36 @@ PowerShell:
 .\gradlew.bat bootRun
 ```
 
-Or via Docker (wired into [docker-compose.yaml](../docker-compose.yaml) at the monorepo root).
+Or via Docker. The service is wired into the main [docker-compose.yaml](../docker-compose.yaml) at the monorepo root as
+`weather-mcp`. Run every compose command against the main file (no `-f` flag).
 
-Bash:
+Start (or rebuild) just this service from the repo root:
+
+```bash
+docker compose up -d --build weather-mcp
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f weather-mcp
+```
+
+Force a clean recreate after a Dockerfile or env-var change:
+
+```bash
+docker compose up -d --build --force-recreate weather-mcp
+```
+
+Standalone build, when iterating outside compose:
 
 ```bash
 docker build -t weather-mcp:latest .
 ```
 
+Standalone run, when iterating outside compose:
+
 ```bash
-docker run -d -p 9998:9998 --name weather-mcp weather-mcp:latest
-```
-
-PowerShell:
-
-```powershell
-docker build -t weather-mcp:latest .
-```
-
-```powershell
 docker run -d -p 9998:9998 --name weather-mcp weather-mcp:latest
 ```
 

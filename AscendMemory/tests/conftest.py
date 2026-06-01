@@ -23,7 +23,10 @@ from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
-async def _mock_lifespan_context(app):
+async def _mock_lifespan_context(_app):
+    # Intentionally empty: FastAPI's lifespan contract only needs an
+    # enter/exit pair, and the mocked MCP app has no startup or teardown to
+    # perform during tests.
     yield
 
 
@@ -34,8 +37,11 @@ _mock_router.lifespan_context = _mock_lifespan_context
 class _MockMcpAsgiApp:
     router = _mock_router
 
-    async def __call__(self, scope, receive, send):
-        pass
+    async def __call__(self, _scope, _receive, _send):
+        # Intentionally a no-op: tests never invoke the MCP ASGI app
+        # directly; this stub only satisfies the ASGI callable protocol so
+        # the FastAPI mount succeeds during app construction.
+        return None
 
 
 mock_mcp_instance.http_app.return_value = _MockMcpAsgiApp()
@@ -45,7 +51,7 @@ sys.modules["fastmcp"] = mock_fastmcp_module
 
 import pytest
 import pytest_asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 
 from src.main import app
@@ -78,7 +84,10 @@ async def client(override_dependencies) -> AsyncGenerator[AsyncClient, None]:
     Creates an async test client for the FastAPI app.
     Uses the override_dependencies fixture to ensure no real DB calls happen.
     """
-    transport = ASGITransport(app=app)
+    # raise_app_exceptions=False lets the registered global Exception handler
+    # produce its RFC 7807 500 envelope instead of bubbling the exception out
+    # of the ASGI app and failing the test client.
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
 

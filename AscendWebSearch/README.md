@@ -24,8 +24,25 @@ land in Redis so the next request to the same domain reuses them.
 
 ### Quick start
 
+The scrapper compose file is `include:`-d by the main `docker-compose.yaml` at the repo root, so every command runs
+against the main file (no `-f` flag).
+
+Bring up the full stack from the repo root:
+
 ```bash
-docker compose -f ../ascend-scrapper.docker-compose.yaml up -d --build
+docker compose up -d --build
+```
+
+Rebuild and recreate only this service after a code change (everything else stays running):
+
+```bash
+docker compose up -d --build --force-recreate ascend-web-search
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f ascend-web-search
 ```
 
 Hit the health endpoint to verify:
