@@ -38,8 +38,20 @@ Check the SearXNG backend is reachable from the host.
 curl -fsS "http://localhost:9020/search?q=test&format=html"
 ```
 
-Expect HTTP 200 with HTML content (an `<article class="result">` block in the body confirms the parser will find
-results).
+Expect HTTP 200 with HTML content.
+
+Confirm SearXNG's upstream engines actually return results. The settings.yml overlay enables JSON; this query
+fans the meta-search across every enabled engine and parses the count from the response.
+
+```powershell
+$json = curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | ConvertFrom-Json; "$($json.results.Count) results, $($json.unresponsive_engines.Count) blocked engines"
+```
+
+Expect a non-zero results count. If results is `0` and the unresponsive-engines list shows access-denied /
+CAPTCHA across all enabled engines, the residential / shared egress IP is being walled by upstream search
+providers — the AscendWebSearch service itself is healthy but this test cannot exercise the end-to-end happy
+path. Mark this run **BLOCKED** (not FAIL) and re-run when an upstream is reachable; the suspended_times in
+`searxng/settings.yml` are set to seconds-to-minutes so recovery is fast once the upstreams release the IP.
 
 ## Reset state
 
@@ -72,6 +84,11 @@ HTTP 200. The JSON body matches:
 
 Total call duration is typically 1–5 s (SearXNG fan-out time). A duration > 30 s indicates upstream engines are
 timing out — investigate SearXNG health before declaring FAIL.
+
+**Environmental BLOCKED:** if the JSON prereq above returned `0 results` and the same IP cannot reach any
+upstream engine, the run was never able to exercise the end-to-end happy path. Report the verdict as
+**BLOCKED** with the unresponsive-engines list as evidence. This is distinct from a code regression and
+should not block a merge.
 
 ## Fixtures
 

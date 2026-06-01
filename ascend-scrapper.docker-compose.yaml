@@ -10,6 +10,12 @@ services:
     restart: unless-stopped
     ports:
       - "9020:8080"
+    volumes:
+      # use_default_settings: true overlay so engine-suspension windows are
+      # seconds-to-minutes (not days) and JSON format is exposed for /ready.
+      # NOT mounted :ro because SearXNG's container init chowns the file at
+      # boot; a read-only mount makes the container restart-loop.
+      - ./searxng/settings.yml:/etc/searxng/settings.yml
     networks:
       default:
         aliases:

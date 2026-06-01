@@ -1,0 +1,47 @@
+# SearXNG settings overlay for AscendAI.
+#
+# `use_default_settings: true` inherits everything from the upstream
+# image's /usr/local/searxng/searx/settings.yml and lets us patch only
+# what we need. Without this we would have to maintain a full 72KB
+# copy of the upstream defaults.
+#
+# Reason for each override is documented inline. Adjust by editing this
+# file, then `docker compose up -d --build searxng`.
+
+use_default_settings: true
+
+general:
+  instance_name: "AscendAI SearXNG"
+
+search:
+  # Defaults are 24h for access-denied / CAPTCHA and 15 days (!) for
+  # Cloudflare CAPTCHA. On a residential IP that one engine going
+  # offline cascades into the meta-search returning empty for half a
+  # week. Drop them to recovery windows in seconds-to-minutes so a
+  # transient block doesn't kill the e2e suite for days.
+  suspended_times:
+    SearxEngineAccessDenied: 60
+    SearxEngineCaptcha: 60
+    SearxEngineTooManyRequests: 30
+    cf_SearxEngineCaptcha: 120
+    cf_SearxEngineAccessDenied: 60
+    recaptcha_SearxEngineCaptcha: 120
+  # Default is `[html]`. Enabling json lets the readiness probe in
+  # /ready (and the e2e prereq) parse responses programmatically
+  # instead of grepping HTML for an article tag.
+  formats:
+    - html
+    - json
+
+server:
+  # SearXNG's per-IP rate limiter assumes a public-facing instance
+  # behind a CDN. Internal callers from AscendWebSearch share the
+  # docker-network IP, so the limiter trips them in lockstep. Keep
+  # it off; we already rate-limit upstream in AscendWebSearch.
+  limiter: false
+  public_instance: false
+  # SearXNG refuses to boot with the default `ultrasecretkey`. This
+  # value never leaves the docker-network instance (no public-facing
+  # exposure per the README), so a fixed random string is acceptable;
+  # rotate by generating `openssl rand -hex 32` and replacing inline.
+  secret_key: "8f3c2b1e9d7a4f5c6e8b2d1a3f9c7e4b5d8a1c3e9f7b2d4a6c8e5b1d3f9a7c2e"

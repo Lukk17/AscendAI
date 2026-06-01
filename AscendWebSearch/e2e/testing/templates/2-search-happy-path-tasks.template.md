@@ -11,6 +11,7 @@ Copy this file to `../runs/<UTC-timestamp>_2-search-happy-path-tasks.md` before 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] AscendWebSearch `/health` returns HTTP 200 with `{"status":"ok"}`
 - [ ] SearXNG `/search?q=test&format=html` returns HTTP 200 with HTML content
+- [ ] SearXNG `/search?q=openstreetmap&format=json` returns a non-zero `results.Count` (otherwise mark **BLOCKED**, not FAIL)
 
 ### Reset state
 
@@ -31,7 +32,9 @@ Copy this file to `../runs/<UTC-timestamp>_2-search-happy-path-tasks.md` before 
 
 ### Verdict
 
-- [ ] Verdict: PASS / FAIL (delete the wrong one)
+- [ ] Verdict: PASS / FAIL / BLOCKED (delete the two wrong ones)
+- BLOCKED is correct when the JSON prereq returned `0 results` from the same IP, i.e. upstream
+  search engines are walling the egress IP. The AscendWebSearch service is not at fault.
 
 ## Result summary
 
