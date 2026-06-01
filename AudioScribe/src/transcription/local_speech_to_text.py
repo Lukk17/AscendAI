@@ -1,151 +1,111 @@
+"""Local faster-whisper transcription path.
+
+Replaces the per-request `multiprocessing.spawn` worker with a lazy module-
+level WhisperModel singleton guarded by an asyncio semaphore for GPU
+serialisation. Streaming is per-segment now (not the prior batch-then-yield
+shape) so SSE consumers see real progress.
+"""
+
+from __future__ import annotations
+
 import asyncio
 import logging
-import multiprocessing as mp
-import os
-import tempfile
-from multiprocessing.synchronize import Event as EventClass
-
-import torch
-from faster_whisper import WhisperModel
-from pydub import AudioSegment
+import threading
+from typing import TYPE_CHECKING, Any
 
 from src.config.config import settings
-from src.config.logging_config import setup_logging
+from src.transcription.audio_chunker import chunked_audio
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
-CHUNK_LENGTH_MS = settings.CHUNK_LENGTH_MINUTES * 60 * 1000
+_model_lock = threading.Lock()
+_model_instance: Any = None
+_model_path_loaded: str | None = None
+
+_gpu_semaphore = asyncio.Semaphore(1)
 
 
-def _transcribe_and_communicate(
-        model_path: str,
-        audio_path: str,
-        language: str,
-        result_queue: mp.Queue,
-        shutdown_event: EventClass
-):
-    # This is the entry point for the new process, so logging must be configured here.
-    setup_logging()
+def _load_model(model_path: str) -> Any:
+    """Lazy WhisperModel construction. Loads on first use; subsequent calls
+    with the same path return the cached instance. Switching model_path
+    triggers a reload (rare in practice)."""
 
-    process_id = os.getpid()
-    logger.info(f"[Worker {process_id}] Process started.")
+    import torch
+    from faster_whisper import WhisperModel
 
-    temp_audio_chunk_files = []
-    try:
-        logger.info(f"[Worker {process_id}] Loading model '{model_path}'...")
+    global _model_instance, _model_path_loaded  # noqa: PLW0603 — module cache
+
+    with _model_lock:
+        if _model_instance is not None and _model_path_loaded == model_path:
+            return _model_instance
+
         if torch.cuda.is_available():
             device, compute_type = "cuda", "float16"
         else:
             device, compute_type = "cpu", "int8"
-        model = WhisperModel(model_path, device=device, compute_type=compute_type)
-        logger.info(f"[Worker {process_id}] Model loaded successfully.")
+        logger.info(f"Loading WhisperModel '{model_path}' on {device} ({compute_type})...")
+        _model_instance = WhisperModel(model_path, device=device, compute_type=compute_type)
+        _model_path_loaded = model_path
+        logger.info("WhisperModel ready.")
+        return _model_instance
 
-        audio = AudioSegment.from_file(audio_path)
-        logger.info(f"[Worker {process_id}] Audio loaded. Duration: {len(audio) / 1000:.2f}s.")
 
-        num_chunks = (len(audio) // CHUNK_LENGTH_MS) + 1
-        logger.info(f"[Worker {process_id}] Slicing audio into {num_chunks} chunks.")
+def _transcribe_chunk_sync(
+    model_path: str, chunk_path: str, language: str, time_offset_s: float
+) -> list[dict[str, Any]]:
+    """Synchronous per-chunk transcription. Returns a list of segment dicts
+    with `text/start/end` already offset against the original audio."""
 
+    model = _load_model(model_path)
+    segments_chunk, _info = model.transcribe(
+        chunk_path,
+        beam_size=settings.BEAM_SIZE,
+        language=language,
+        best_of=settings.BEST_OF,
+        condition_on_previous_text=settings.CONDITION_ON_PREVIOUS_TEXT,
+        vad_filter=settings.VAD_FILTER,
+        vad_parameters=settings.VAD_PARAMETERS,
+        temperature=settings.TEMPERATURE,
+    )
+    return [
+        {
+            "text": segment.text.strip(),
+            "start": segment.start + time_offset_s,
+            "end": segment.end + time_offset_s,
+        }
+        for segment in segments_chunk
+    ]
+
+
+async def local_speech_transcription_stream(
+    model_path: str, audio_path: str, language: str
+) -> AsyncIterator[dict[str, Any]]:
+    """Per-segment async generator. Chunks the audio on disk via ffmpeg,
+    transcribes each chunk under the GPU semaphore, and yields segments as
+    they arrive — SSE sees the first segment within seconds rather than at
+    the very end of the job."""
+
+    chunk_seconds = settings.CHUNK_LENGTH_MINUTES * 60
+
+    async with _gpu_semaphore:
+        loop = asyncio.get_running_loop()
+        start_time = loop.time()
         logger.info(
-            f"[Worker {process_id}] Transcription Parameters: "
-            f"Language='{language}', "
-            f"ChunkMinutes={settings.CHUNK_LENGTH_MINUTES}, "
-            f"BeamSize={settings.BEAM_SIZE}, "
-            f"BestOf={settings.BEST_OF}, "
-            f"VAD={settings.VAD_FILTER}, "
-            f"VAD_Params={settings.VAD_PARAMETERS}"
+            f"[Local] Transcription parameters: language='{language}', chunk_seconds={chunk_seconds}, "
+            f"beam_size={settings.BEAM_SIZE}, best_of={settings.BEST_OF}, vad={settings.VAD_FILTER}"
         )
 
-        all_segments = []
-        for i, start_ms in enumerate(range(0, len(audio), CHUNK_LENGTH_MS)):
-            chunk_num = i + 1
-            logger.info(f"[Worker {process_id}] Processing chunk {chunk_num}/{num_chunks}...")
-            end_ms = start_ms + CHUNK_LENGTH_MS
-            chunk = audio[start_ms:end_ms]
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
-                chunk = chunk.set_frame_rate(16000)
-                chunk.export(tmp_audio.name, format="wav")
-                temp_audio_chunk_files.append(tmp_audio.name)
-
-                segments_chunk, _ = model.transcribe(
-                    tmp_audio.name,
-                    beam_size=settings.BEAM_SIZE,
-                    language=language,
-                    best_of=settings.BEST_OF,
-                    condition_on_previous_text=settings.CONDITION_ON_PREVIOUS_TEXT,
-                    vad_filter=settings.VAD_FILTER,
-                    vad_parameters=settings.VAD_PARAMETERS,
-                    temperature=settings.TEMPERATURE
+        with chunked_audio(audio_path, chunk_seconds) as chunks:
+            for idx, chunk_path in enumerate(chunks):
+                time_offset_s = float(idx * chunk_seconds)
+                logger.info(f"[Local] Processing chunk {idx + 1}/{len(chunks)}...")
+                segments = await asyncio.to_thread(
+                    _transcribe_chunk_sync, model_path, chunk_path, language, time_offset_s
                 )
+                for segment in segments:
+                    yield segment
 
-                time_offset = start_ms / 1000
-                for segment in segments_chunk:
-                    all_segments.append({
-                        "text": segment.text.strip(),
-                        "start": segment.start + time_offset,
-                        "end": segment.end + time_offset
-                    })
-            logger.info(f"[Worker {process_id}] Chunk {chunk_num}/{num_chunks} complete.")
-
-        logger.info(
-            f"[Worker {process_id}] All chunks processed. Sending {len(all_segments)} segments back to main process.")
-        result_queue.put(all_segments)
-
-    except Exception as e:
-        logger.exception(f"[Worker {process_id}] An error occurred.")
-        result_queue.put(e)
-    finally:
-        logger.info(f"[Worker {process_id}] Waiting for shutdown signal from main process.")
-        shutdown_event.wait()
-
-        for f_path in temp_audio_chunk_files:
-            try:
-                os.remove(f_path)
-            except OSError:
-                pass
-        logger.info(f"[Worker {process_id}] Shutdown signal received. Exiting.")
-
-
-async def local_speech_transcription_stream(model_path: str, audio_path: str, language: str):
-    start_time = asyncio.get_event_loop().time()
-    try:
-        mp.set_start_method('spawn', force=True)
-    except RuntimeError:
-        pass
-
-    ctx = mp.get_context('spawn')
-    result_queue = ctx.Queue()
-    shutdown_event = ctx.Event()
-
-    logger.info(f"[Master process] Spawning worker for transcription of '{audio_path}'.")
-    worker_process = ctx.Process(
-        target=_transcribe_and_communicate,
-        args=(model_path, audio_path, language, result_queue, shutdown_event)
-    )
-    worker_process.start()
-
-    logger.info("[Master process] Waiting for results from worker process...")
-    result = await asyncio.to_thread(result_queue.get)
-    logger.info("[Master process] Results received from worker.")
-
-    logger.info("[Master process] Sending shutdown signal to worker.")
-    shutdown_event.set()
-
-    end_time = asyncio.get_event_loop().time()
-    total_duration = end_time - start_time
-    logger.info(f"[Master process] Full transcription task took {total_duration:.2f} seconds.")
-
-    if isinstance(result, Exception):
-        logger.error("[Master process] Worker process failed with an exception.")
-        raise result
-
-    for segment_dict in result:
-        yield segment_dict
-
-    await asyncio.to_thread(worker_process.join, timeout=10)
-    if worker_process.is_alive():
-        logger.warning("[Master process] Worker process did not terminate cleanly. Forcing termination.")
-        worker_process.terminate()
-
-    logger.info("[Master process] Finished processing transcription.")
+        logger.info(f"[Local] Total transcription took {loop.time() - start_time:.2f}s.")

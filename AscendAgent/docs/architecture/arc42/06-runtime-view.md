@@ -1,6 +1,8 @@
 # 6. Runtime View
 
-## Prompt Processing Flow
+---
+
+### Prompt processing flow
 
 ```mermaid
 sequenceDiagram
@@ -34,7 +36,9 @@ sequenceDiagram
     Controller-->>User: 200 OK + JSON
 ```
 
-## MCP Tool Call Flow
+---
+
+### MCP tool call flow
 
 ```mermaid
 sequenceDiagram
@@ -50,11 +54,13 @@ sequenceDiagram
     LLM-->>Executor: final response
 ```
 
-## REST API: Request / Response Examples
+---
 
-### Prompt Request
+### REST API: request / response examples
 
-```
+#### Prompt request
+
+```text
 POST /api/v1/ai/prompt
 Content-Type: multipart/form-data
 X-User-Id: user1
@@ -64,7 +70,7 @@ provider=lmstudio
 model=meta-llama-3.1-8b-instruct
 ```
 
-### Prompt Response
+#### Prompt response
 
 ```json
 {
@@ -81,15 +87,22 @@ model=meta-llama-3.1-8b-instruct
 }
 ```
 
-### Provider Selection Examples
+#### Provider selection examples
 
-```
-# Use default provider (lmstudio)
+Default provider (lmstudio):
+
+```text
 prompt=Hello
+```
 
-# Use Gemini with specific model
+Gemini with a specific model:
+
+```text
 prompt=Summarize this&provider=gemini&model=gemini-2.5-pro
+```
 
-# Use Anthropic with default model
+Anthropic with the default model:
+
+```text
 prompt=Explain quantum computing&provider=anthropic
 ```

@@ -20,7 +20,7 @@ app:
     auto:
       enabled: false
     token-splitter:
-      # 500 keeps individual chunks tightly on-topic so a recipe / multi-section doc
+      # 500 keeps individual chunks tightly on-topic so a recipe / multisection doc
       # splits into intro / ingredients / dough rest / cooking instead of one mixed chunk.
       # Mixed chunks dilute the embedding and miss retrieval at typical thresholds.
       chunk-size: 500
@@ -86,6 +86,11 @@ app:
   s3:
     bucket: knowledge-base
     endpoint: http://localhost:9070
+    # Endpoint embedded into presigned URLs returned to API callers. Defaults to
+    # `endpoint`; override when the agent reaches MinIO via a docker-internal host
+    # (e.g., http://minio:9000) but callers reach it via a different one
+    # (e.g., http://localhost:9070).
+    public-endpoint: ${app.s3.endpoint}
     access-key: admin
     secret-key: password
 
@@ -93,6 +98,38 @@ app:
     chat-history:
       max-size: 5
       ttl: 86400s
+      # Independent backend toggles. Both default true (current behavior).
+      # Flip either off to opt out of that persistence layer. When BOTH are
+      # false, turn-by-turn history is dropped entirely, and cross-turn
+      # coherence relies on semantic memory (Qdrant via AscendMemory) only.
+      redis:
+        enabled: true
+      postgres:
+        enabled: true
+      # Async summarization of older turns when a conversation crosses a
+      # threshold. Replaces the prefix in both backends with a single
+      # `[Conversation summary]` SystemMessage produced by an inexpensive model.
+      compaction:
+        enabled: ${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:true}
+        # Trigger fires when EITHER threshold is crossed.
+        turn-trigger: 20
+        token-trigger-fraction: 0.5
+        # Most recent turns kept raw (un-compacted) — must stay big enough for
+        # follow-up coherence ("can you do that thing you mentioned earlier?").
+        keep-recent-turns: 8
+        # Cap on the summary size; oversize outputs from the cheap model are rejected.
+        max-summary-tokens: 800
+        # Default inexpensive-model per provider. Caller can override per request via
+        # /api/v1/ai/prompt's `compactionProvider` and `compactionModel` fields.
+        provider-defaults:
+          openai: gpt-4o-mini
+          anthropic: claude-haiku-4-5
+          gemini: gemini-flash-lite-latest
+          # No published "mini" tier for MiniMax — same as the main model.
+          minimax: ${MINIMAX_MODEL:MiniMax-M2.7}
+          # Local LM Studio — cheapest is the same model; compaction still useful
+          # to reduce context size on later turns.
+          lmstudio: ${LMSTUDIO_MODEL:meta-llama-3.1-8b-instruct}
     user-profile:
       ttl: 86400s
     semantic:
@@ -100,14 +137,39 @@ app:
       search-limit: 10
 
   ai:
+    prompt-cache:
+      # Master kill-switch for native provider prompt caching. When false, every
+      # request goes out undecorated and no cached_tokens are read back.
+      enabled: true
+      providers:
+        # Real Anthropic — full native cache_control support via Spring AI 1.1.4.
+        anthropic:
+          enabled: true
+        # OpenAI auto-prefix-caches when prompt >= 1024 tokens. We only read back
+        # cached_tokens — no decoration to apply.
+        openai:
+          enabled: true
+        # Gemini in this repo is wired through the OpenAI-compatible client, so it
+        # rides on OpenAI prefix caching when Google's compat surface returns
+        # cached_tokens. Native CachedContent would need the Vertex client.
+        gemini:
+          enabled: true
+        # MiniMax uses the Anthropic-compat endpoint but does NOT document
+        # cache_control support. Default off; flip on after verifying the endpoint
+        # accepts the marker without 400ing.
+        minimax:
+          enabled: false
+        # Local LM Studio has no cache API.
+        lmstudio:
+          enabled: false
     default-provider: ${MODEL_PROVIDER:lmstudio}
     vision:
       providers:
-        lmstudio: ["*-vl-*", "qwen*-vl*", "*llava*"]
-        openai: ["gpt-4o*", "gpt-5*", "gpt-4-turbo*", "gpt-4-vision*"]
-        anthropic: ["claude-*"]
-        gemini: ["gemini-*"]
-        minimax: []
+        lmstudio: [ "*-vl-*", "qwen*-vl*", "*llava*" ]
+        openai: [ "gpt-4o*", "gpt-5*", "gpt-4-turbo*", "gpt-4-vision*" ]
+        anthropic: [ "claude-*" ]
+        gemini: [ "gemini-*" ]
+        minimax: [ ]
     providers:
       lmstudio:
         enabled: ${LMSTUDIO_ENABLED:true}
@@ -200,11 +262,24 @@ app:
     enabled: true
     top-k: 5
     # 0.75 is too strict for short queries against OpenAI text-embedding-3-small;
-    # relevant matches commonly land in 0.40-0.55. 0.4 gives reliable recall in
+    # relevant matches commonly land in 0.40-0.55. 0.4 gives a reliable recall in
     # manual testing. Tune up if citations get noisy; the RagRetrievalService logs
     # the top-K raw scores on every query so you can pick the right floor.
     similarity-threshold: 0.4
     max-context-chars: 4000
+    source-attachments:
+      # Kill-switch for the opt-in `attachSources` flag. When false, the flag is
+      # accepted but no presigning runs and an empty array is returned.
+      enabled: true
+      # TTL of presigned MinIO/S3 URLs returned in `AiResponse.sources`. Clamped
+      # at startup to [PT1M, PT1H] with a WARN if outside the bounds.
+      presign-ttl: PT15M
+      # Max object size eligible for attachment. Larger sources are skipped with
+      # a WARN log, and the rest of the response is unaffected. Default is
+      # intentionally generous (1 GB) for personal-grade single-user
+      # deployments — operators running a multi-tenant agent should lower this
+      # to bound bandwidth (e.g., 25MB or 100MB).
+      max-file-size: 1GB
 
   system-prompt: |
     You are AscendAI, an intelligent assistant grounded in the user's own data.

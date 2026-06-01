@@ -1,0 +1,16 @@
+.gradle/
+build/
+.idea/
+.vscode/
+bin/
+out/
+*.log
+*.iml
+.env
+.env.local
+.env.*.local
+**/.DS_Store
+docs/
+e2e/
+README.md
+AGENTS.md

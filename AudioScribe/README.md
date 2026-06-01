@@ -1,304 +1,335 @@
 # AudioScribe
 
-AudioScribe is a versatile, dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models. The transcription model is chosen **per-request**, allowing for maximum flexibility.
+A dynamic speech-to-text service supporting local (faster-whisper), OpenAI, and Hugging Face models. The
+transcription backend is chosen **per request** so the same deployment can serve all three.
 
 ---
 
-## Table of Contents
+### Table of Contents
 
-*   [API Documentation](#api-documentation)
-*   [Agent Skill](#agent-skill)
-*   [Prerequisites](#prerequisites)
-*   [Configuration (Environment Variables)](#configuration-environment-variables)
-*   [Running the Service](#running-the-service)
-    *   [Standard Python App](#running-as-a-standard-python-app-without-docker)
-    *   [Docker](#running-with-docker-recommended)
-*   [Making API Requests](#making-api-requests)
-*   [MCP Server Mode](#mcp-server-mode)
-    *   [Using Audio URIs](#using-audio-uris-in-mcp)
-*   [Dependencies](#dependencies)
-*   [Troubleshooting](#troubleshooting)
+- [API Documentation](#api-documentation)
+- [Agent Skill](#agent-skill)
+- [Prerequisites](#prerequisites)
+- [Configuration](#configuration)
+- [Running the Service](#running-the-service)
+- [Making API Requests](#making-api-requests)
+- [MCP Server Mode](#mcp-server-mode)
+- [Dependencies](#dependencies)
+- [Troubleshooting](#troubleshooting)
+- [Docs map](#docs-map)
 
 ---
 
-## API Documentation
+### API Documentation
 
-The REST API is self-documenting via Swagger and Redoc. While the server is running, you can access:
+The REST API is self-documenting via Swagger and Redoc. While the server is running:
 
-*   **Swagger UI**: [http://localhost:7017/docs](http://localhost:7017/docs)
-*   **Redoc**: [http://localhost:7017/redoc](http://localhost:7017/redoc)
+- **Swagger UI**: [http://localhost:7017/docs](http://localhost:7017/docs)
+- **Redoc**: [http://localhost:7017/redoc](http://localhost:7017/redoc)
 
 ---
 
-## Agent Skill
+### Agent Skill
 
-A drop-in skill is shipped at [`skills/audio-scribe/SKILL.md`](skills/audio-scribe/SKILL.md). Copy the `skills/audio-scribe/` directory into your agent's skills folder (`.claude/skills/`, `.agents/skills/`, `.kilocode/skills/`, etc.) and the agent will pick it up automatically.
+A drop-in skill ships at [skills/audio-scribe/SKILL.md](skills/audio-scribe/SKILL.md). Copy
+[skills/audio-scribe/](skills/audio-scribe/) into your agent's skills folder (`.claude/skills/`, `.agents/skills/`,
+`.opencode/skills/`, etc.) and the agent will pick it up automatically.
 
-The skill covers the four endpoints (`/local`, `/openai`, `/hf`, `/audacity`), backend-selection guidance (when to use which), the streaming SSE flow with `download_url`, and the multi-track Audacity / Craig-Bot zip workflow. Base URL is left out (varies per environment) — the agent runtime is expected to provide it.
+The skill covers the four endpoints (`/local`, `/openai`, `/hf`, `/audacity`), backend-selection guidance (when to
+use which), the streaming SSE flow with `download_url`, and the multi-track Audacity / Craig-Bot zip workflow. Base
+URL is intentionally left out (varies per environment); the agent runtime provides it.
 
 When you change endpoint shapes here, update the SKILL.md so downstream agents stay accurate.
 
 ---
 
-## Prerequisites
+### Prerequisites
 
-*   **Python 3.11**
-*   **Nvidia CUDA**
-    * https://developer.nvidia.com/cuda-12-6-0-download-archive
-    * https://developer.nvidia.com/cudnn-downloads  
-    Linux:
-    ```shell
-    wget https://developer.download.nvidia.com/compute/cudnn/9.16.0/local_installers/cudnn-local-repo-ubuntu2404-9.16.0_1.0-1_amd64.deb
-    sudo dpkg -i cudnn-local-repo-ubuntu2404-9.16.0_1.0-1_amd64.deb
-    sudo cp /var/cudnn-local-repo-ubuntu2404-9.16.0/cudnn-*-keyring.gpg /usr/share/keyrings/
-    sudo apt-get update
-    sudo apt-get -y install cudnn9-cuda-12 #correct version for cuda 12
-    ```
+- **Python 3.11**
+- **Nvidia CUDA 12.6** ([download](https://developer.nvidia.com/cuda-12-6-0-download-archive))
+- **cuDNN 9.x** ([download](https://developer.nvidia.com/cudnn-downloads))
+- **PyTorch** with CUDA 12.6 builds ([install guide](https://pytorch.org/get-started/locally/))
+- **ffmpeg** for audio processing
 
-*   **PyTorch**
-    * https://pytorch.org/get-started/locally/ 
-*   **ffmpeg**: Required for audio processing.
-    *   Linux:
-    ```shell
-    sudo apt install ffmpeg
-    ```
-    *   Windows:
-    ```PowerShell
-    choco install ffmpeg
-    ```
+Linux cuDNN install (Ubuntu 24.04):
 
-Python default packages repository:
-https://pypi.org/
+```bash
+wget https://developer.download.nvidia.com/compute/cudnn/9.16.0/local_installers/cudnn-local-repo-ubuntu2404-9.16.0_1.0-1_amd64.deb
+```
+
+```bash
+sudo dpkg -i cudnn-local-repo-ubuntu2404-9.16.0_1.0-1_amd64.deb
+```
+
+```bash
+sudo cp /var/cudnn-local-repo-ubuntu2404-9.16.0/cudnn-*-keyring.gpg /usr/share/keyrings/
+```
+
+```bash
+sudo apt-get update
+```
+
+```bash
+sudo apt-get -y install cudnn9-cuda-12
+```
+
+ffmpeg install. Linux:
+
+```bash
+sudo apt install ffmpeg
+```
+
+Windows:
+
+```powershell
+choco install ffmpeg
+```
+
+Python packages live on [pypi.org](https://pypi.org).
 
 ---
 
-## Configuration (Environment Variables)
+### Configuration
 
-For the service to function, certain environment variables must be set.  
-For local development, it is best practice to set these in your operating system's environment variables,  
-as they include secrets and user-specific paths.
+Settings live in [src/config/config.py](src/config/config.py) (pydantic-settings, reads `.env` automatically). For
+local development, set these in your OS environment so they survive shell restarts and don't end up in source control:
 
-*   `OPENAI_API_KEY`: **(Secret)** Your secret key for the OpenAI API.
-    https://platform.openai.com/settings/organization/api-keys
-*   `HF_TOKEN`: **(Secret)** Your Hugging Face token. Required for downloading models and for using the Hugging Face API provider.
-    https://huggingface.co/settings/tokens
-*   `HF_HOME`: **(Local Path)** The directory where Hugging Face will cache downloaded models. This prevents re-downloading large models every time.
+- `OPENAI_API_KEY`. (Secret) OpenAI API key. See [platform.openai.com](https://platform.openai.com/settings/organization/api-keys).
+- `HF_TOKEN`. (Secret) Hugging Face token. Required for downloading models and for the Hugging Face provider.
+  See [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+- `HF_HOME`. Local directory where Hugging Face caches downloaded models. Prevents re-downloading large models
+  every restart.
 
-**Example `HF_HOME` and Model Parameter:**
+When you POST a transcription request you still pass the public model identifier in the `model` field; the
+`transformers` library transparently maps it to the cached files under `HF_HOME`.
 
-Windows:  
-If you set your `HF_HOME` environment variable to `D:\Development\AI\hf-cache`,  
-the `transformers` library will automatically use this folder.  
+Examples. Linux: add this to `~/.profile`.
 
-Linux:  
-In `~/.profile` add  
-```shell
-export OPENAI_API_KEY="sk-"
-export HF_TOKEN="hf_"
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+```bash
+export HF_TOKEN="hf_..."
+```
+
+```bash
 export HF_HOME="/mnt/01D8E3D9B5224500/Development/AI/hf-cache"
 ```
 
-When you make an API request, you still use the public model *identifier* in the `model` field.  
-The library handles the mapping.
-
-*   **Environment Variable:** `HF_HOME=D:\Development\AI\hf-cache` or `/mnt/01D8E3D9B5224500/Development/AI/hf-cache`
-*   **API `model` parameter:** `openai/whisper-large-v3`
+Windows: set `HF_HOME` in System Properties → Environment Variables, e.g. `HF_HOME=D:\Development\AI\hf-cache`.
 
 ---
 
-## Running the Service
+### Running the Service
 
-### Running as a standard Python App (without Docker)
+#### As a standard Python app
 
-This method is suitable for local development.  
-Ensure you have set the **environment variables** mentioned above.
+Suitable for local development. Ensure the env vars above are set first.
 
-1.  **Install Dependencies:**
-    In `./AudioScribe` directory in terminal:
+**1. Install dependencies.** From the `AudioScribe/` directory:
 
-    ```shell
-    python -m venv .venv
-    ```
-    Activate the virtual environment
-    Windows
-    ```PowerShell
-    .\.venv\Scripts\activate.ps1
-    ```
-    Unix
-    ```shell
-    source .venv/bin/activate
-    ```
-    Install all application requirements (one-liner):
-    ```powershell
-    pip install -r pytorch-requirements.txt; pip install -e .[dev]
-    ```
-    For development (includes tests):
-    ```shell
-    pip install -e .[dev]
-    ```
-    *The `-e` flag stands for "editable". It allows you to modify the source code and see changes immediately without reinstalling the package.*
+Bash:
 
-2.  **Run the Uvicorn Server:**
-    ```shell
-    uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
-    ```
+```bash
+python -m venv .venv
+```
 
-### Running with Docker (Recommended)
+```bash
+source .venv/bin/activate
+```
 
-This is the recommended method for a stable deployment.
+```bash
+pip install -r pytorch-requirements.txt
+```
 
-**1. Build the Docker image:**
+```bash
+pip install -e .[dev]
+```
 
-```shell
+PowerShell:
+
+```powershell
+python -m venv .venv
+```
+
+```powershell
+.\.venv\Scripts\activate.ps1
+```
+
+```powershell
+pip install -r pytorch-requirements.txt
+```
+
+```powershell
+pip install -e .[dev]
+```
+
+The `-e` flag installs in editable mode so source edits show up without reinstall.
+
+**2. Run the uvicorn server.**
+
+```bash
+uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
+```
+
+#### With Docker (recommended)
+
+The service is wired into the main `docker-compose.yaml` at the repo root as `audio-scribe`. Run every compose command
+against the main file (no `-f` flag).
+
+Start (or rebuild) just this service from the repo root:
+
+```bash
+docker compose up -d --build audio-scribe
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f audio-scribe
+```
+
+Force a clean recreate after a Dockerfile or env-var change:
+
+```bash
+docker compose up -d --build --force-recreate audio-scribe
+```
+
+**Standalone build, when iterating outside compose.**
+
+```bash
 docker build -t audio-scribe:latest .
 ```
 
-**2. Tag and Publish (Optional):**
+**Tag and push (optional).**
 
-If you want to push this image to Docker Hub (e.g., to use it in another environment or specific `docker-compose.yaml`):
+Bash:
 
-```shell
+```bash
 docker tag audio-scribe:latest lukk17/audio-scribe:v0.0.1
 ```
 
-```shell
+```bash
 docker push lukk17/audio-scribe:v0.0.1
 ```
 
-**3. Run the container:**
+PowerShell:
 
-**For Linux/macOS:**
-```shell
-docker run -d \
-  --name audio-scribe \
-  --gpus all \
-  -p 7017:7017 \
-  -e OPENAI_API_KEY="sk-..." \
-  -e HF_TOKEN="hf_..." \
-  -e HF_HOME=/hf-cache \
-  -v ~/hf-cache:/hf-cache \
-  audio-scribe:latest
-```
-
-**For Windows (PowerShell):**
-```PowerShell
-docker run -d `
-  --name audio-scribe `
-  --gpus all `
-  -p 7017:7017 `
-  -e OPENAI_API_KEY="sk-..." `
-  -e HF_TOKEN="hf_..." `
-  -e HF_HOME=/hf-cache `
-  -v "D:/path/to/your/hf-cache:/hf-cache" `
-  audio-scribe:latest
-```
-*   `--gpus all`: **Required** for local transcription to run on the GPU.
-*   `-v ...:/hf-cache`: **Recommended**. Mounts a local directory to cache models.
-
----
-
-## Making API Requests
-
-### REST Client
-For testing and examples, you can use the included `mcp_requests.http` file.
-*   [mcp_requests.http](mcp_requests.http): Contains ready-to-use HTTP requests for the REST Client extension in VS Code. It covers both standard API calls and MCP protocol interactions.
-
-### API Requests
-You specify the model and other parameters in the body of your `POST` request.
-
-### Local Transcription
-Uses `faster-whisper` and requires a pre-converted model format.
-*   **model**: (e.g., `Systran/faster-whisper-large-v3`)
-*   **language**: (optional, e.g., `en`, `pl`)
-*   **with_timestamps**: (optional, `true` or `false`, defaults to `true`)
-
-**Example `curl` (Linux/macOS):**
-```shell
-curl -X POST "http://localhost:7017/api/v1/transcribe/local" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@$HOME/Desktop/audio.wav" \
-  -F "model=Systran/faster-whisper-large-v3" \
-  -F "language=en" \
-  -F "with_timestamps=false"
-```
-
-**Example `curl` (Windows PowerShell):**
 ```powershell
-curl -X POST "http://localhost:7017/api/v1/transcribe/local" `
-  -H "Content-Type: multipart/form-data" `
-  -F "file=@$env:USERPROFILE\Desktop\audio.wav" `
-  -F "model=Systran/faster-whisper-large-v3" `
-  -F "language=en" `
-  -F "with_timestamps=false"
+docker tag audio-scribe:latest lukk17/audio-scribe:v0.0.1
 ```
 
-### OpenAI Transcription
-*   **model**: (e.g., `whisper-1`)
-*   **language**: (optional, e.g., `en`, `pl`)
-
-**Example `curl` (Linux/macOS):**
-```shell
-curl -X POST "http://localhost:7017/api/v1/transcribe/openai" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@$HOME/Desktop/audio.wav" \
-  -F "model=whisper-1" \
-  -F "language=en"
-```
-
-**Example `curl` (Windows PowerShell):**
 ```powershell
-curl -X POST "http://localhost:7017/api/v1/transcribe/openai" `
-  -H "Content-Type: multipart/form-data" `
-  -F "file=@$env:USERPROFILE\Desktop\audio.wav" `
-  -F "model=whisper-1" `
-  -F "language=en"
+docker push lukk17/audio-scribe:v0.0.1
 ```
 
-### Hugging Face Transcription
-*   **model**: (e.g., `openai/whisper-large-v3`)
-*   **hf_provider**: (optional, defaults to `hf-inference`)
+**3. Run the container.** `--gpus all` is required for local transcription on the GPU. `-v ~/hf-cache:/hf-cache`
+mounts a host directory so the model cache survives container restarts.
 
-**Example `curl` (Linux/macOS):**
-```shell
-curl -X POST "http://localhost:7017/api/v1/transcribe/hf" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@$HOME/Desktop/audio.wav" \
-  -F "model=openai/whisper-large-v3"
+Bash:
+
+```bash
+docker run -d --name audio-scribe --gpus all -p 7017:7017 -e OPENAI_API_KEY="sk-..." -e HF_TOKEN="hf_..." -e HF_HOME=/hf-cache -v ~/hf-cache:/hf-cache audio-scribe:latest
 ```
 
-**Example `curl` (Windows PowerShell):**
+PowerShell:
+
 ```powershell
-curl -X POST "http://localhost:7017/api/v1/transcribe/hf" `
-  -H "Content-Type: multipart/form-data" `
-  -F "file=@$env:USERPROFILE\Desktop\audio.wav" `
-  -F "model=openai/whisper-large-v3"
+docker run -d --name audio-scribe --gpus all -p 7017:7017 -e OPENAI_API_KEY="sk-..." -e HF_TOKEN="hf_..." -e HF_HOME=/hf-cache -v "D:/path/to/your/hf-cache:/hf-cache" audio-scribe:latest
 ```
 
 ---
 
-## MCP Server Mode
+### Making API Requests
 
-The MCP server is integrated into the main application.
+#### REST client
 
-**Exposed MCP Tools:**
-*   `health()`
-*   `transcribe_local(audio_uri: str, model: str, language: str, with_timestamps: bool)`
-*   `transcribe_openai(audio_uri: str, model: str, language: str)`
-*   `transcribe_hf(audio_uri: str, model: str, hf_provider: str)`
+For ad-hoc testing, [mcp_requests.http](mcp_requests.http) contains ready-to-use HTTP requests for the VS Code REST
+Client extension. It covers both standard API calls and MCP protocol interactions.
 
-### How to use:
+#### Local transcription
+
+Uses `faster-whisper` and requires a pre-converted model.
+
+Form fields:
+
+- `model`. e.g. `Systran/faster-whisper-large-v3`.
+- `language`. Optional, e.g. `en`, `pl`.
+- `with_timestamps`. Optional `true` or `false`. Defaults to `true`.
+
+Bash:
+
+```bash
+curl -X POST "http://localhost:7017/api/v1/transcribe/local" -H "Content-Type: multipart/form-data" -F "file=@$HOME/Desktop/audio.wav" -F "model=Systran/faster-whisper-large-v3" -F "language=en" -F "with_timestamps=false"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -X POST "http://localhost:7017/api/v1/transcribe/local" -H "Content-Type: multipart/form-data" -F "file=@$env:USERPROFILE\Desktop\audio.wav" -F "model=Systran/faster-whisper-large-v3" -F "language=en" -F "with_timestamps=false"
+```
+
+#### OpenAI transcription
+
+Form fields:
+
+- `model`. e.g. `whisper-1`.
+- `language`. Optional, e.g. `en`, `pl`.
+
+Bash:
+
+```bash
+curl -X POST "http://localhost:7017/api/v1/transcribe/openai" -H "Content-Type: multipart/form-data" -F "file=@$HOME/Desktop/audio.wav" -F "model=whisper-1" -F "language=en"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -X POST "http://localhost:7017/api/v1/transcribe/openai" -H "Content-Type: multipart/form-data" -F "file=@$env:USERPROFILE\Desktop\audio.wav" -F "model=whisper-1" -F "language=en"
+```
+
+#### Hugging Face transcription
+
+Form fields:
+
+- `model`. e.g. `openai/whisper-large-v3`.
+- `hf_provider`. Optional, defaults to `hf-inference`.
+
+Bash:
+
+```bash
+curl -X POST "http://localhost:7017/api/v1/transcribe/hf" -H "Content-Type: multipart/form-data" -F "file=@$HOME/Desktop/audio.wav" -F "model=openai/whisper-large-v3"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -X POST "http://localhost:7017/api/v1/transcribe/hf" -H "Content-Type: multipart/form-data" -F "file=@$env:USERPROFILE\Desktop\audio.wav" -F "model=openai/whisper-large-v3"
+```
+
+---
+
+### MCP Server Mode
+
+The MCP server is integrated into the main application on the same port.
+
+**Exposed MCP tools:**
+
+- `health()`
+- `transcribe_local(audio_uri, model, language, with_timestamps)`
+- `transcribe_openai(audio_uri, model, language)`
+- `transcribe_hf(audio_uri, model, hf_provider)`
+
+#### How to use
 
 Streamable HTTP (bidirectional over HTTP):
-  - Endpoint: POST http://localhost:7017/mcp
-  - Headers:  Content-Type: application/json
-              Accept: application/json, text/event-stream
 
-### Example MCP Client Configurations
+- Endpoint: `POST http://localhost:7017/mcp`
+- Headers: `Content-Type: application/json` and `Accept: application/json, text/event-stream`
 
-To use these tools, configure your AI-powered editor or client to connect to the running server's URL.
+#### Example MCP client config
 
-**For Claude Desktop / Generic Clients:**
-Streamable HTTP transport:
 ```json
 {
   "mcpServers": {
@@ -310,181 +341,276 @@ Streamable HTTP transport:
 }
 ```
 
-### Using Audio URIs in MCP
+#### Using audio URIs in MCP
 
-The MCP tools accept an `audio_uri` argument, which supports both local files and HTTP(S) URLs.
+The MCP tools accept an `audio_uri` argument supporting both local files and HTTP(S) URLs.
 
 > [!NOTE]
-> **Docker Users (Postman)**: When testing with the provided Postman collection against a Docker container, use the `{{audio_uri_docker}}` variable (which resolves to `http://host.docker.internal:...`) instead of `{{audio_uri}}` in the request body. Using `localhost` from within the container will fail.
+> **Docker users (Postman).** When testing with the provided Postman collection against a Docker container, use the
+> `{{audio_uri_docker}}` variable (resolves to `http://host.docker.internal:...`) instead of `{{audio_uri}}` in the
+> request body. Using `localhost` from inside the container will fail.
 
-#### 1. Local Files (`file://`)
-To use a file on the server's local filesystem, use the `file://` scheme.
-*   **Windows**: `file:///C:/Users/User/Desktop/audio.wav`
-*   **Linux/macOS**: `file:///home/user/audio.wav`
-*   **Docker**: `file:///audio/audio.wav` (ensure the file is mounted into the container)
+**1. Local files (`file://`)**
 
-#### 2. HTTP/HTTPS URLs (`http://`, `https://`)
-You can also provide a URL to an audio file hosted on a web server. The MCP server will download it to a temporary file for processing.
+Path to a file on the server's local filesystem.
 
-**Example: Serving files locally with `http-server`**
+- Windows: `file:///C:/Users/User/Desktop/audio.wav`
+- Linux / macOS: `file:///home/user/audio.wav`
+- Docker: `file:///audio/audio.wav` (ensure the file is mounted into the container)
 
-If you have audio files on your local machine and want to expose them to the MCP server (especially if running in Docker or a different environment), you can use a simple HTTP server.
+**2. HTTP / HTTPS URLs**
 
-1.  **Install `http-server`** (requires Node.js):
-    ```shell
-    npm install -g http-server
-    ```
+The MCP server downloads HTTP / HTTPS URLs to a temporary file before processing. Useful when running in Docker or a
+different environment from the audio source.
 
-2.  **Run the server** in the directory containing your audio files (e.g., parent of `audio` folder):
-    ```shell
-    http-server -p 9999
-    ```
+To expose a local directory to the MCP server, run `http-server` (requires Node.js):
 
-3.  **Access the file**:
-    If your file is at `./audio/audio.wav` relative to where you ran the command, the URI will be:
-    `http://localhost:9999/audio/audio.wav` (or use your machine's LAN IP if accessing from a Docker container).
+Bash:
 
-#### 3. MinIO (S3-compatible Storage)
+```bash
+npm install -g http-server
+```
 
-If you are running the project with `docker-compose`, you have a MinIO instance available. To make a bucket public so `AudioScribe` can download files without authentication variables, follow these steps:
+```bash
+http-server -p 9999
+```
 
-1.  **Exec into the MinIO container**:
-    ```shell
-    docker exec -it minio /bin/sh
-    ```
+PowerShell:
 
-2.  **Configure the `mc` (MinIO Client) alias**:
-    (Default credentials are usually `admin`/`password` based on your docker-compose)
-    ```shell
-    mc alias set myminio http://localhost:9000 admin password
-    ```
+```powershell
+npm install -g http-server
+```
 
-3.  **Set the bucket as public**:
-    ```shell
-    mc anonymous set public myminio/public-audio
-    ```
+```powershell
+http-server -p 9999
+```
 
-4.  **Upload Audio**:
-    You can now upload files via the Console (`http://localhost:9071`) or CLI.
+If your file lives at `./audio/audio.wav` relative to where you ran the command, the URI is
+`http://localhost:9999/audio/audio.wav` (or your LAN IP when accessing from a Docker container).
 
-5.  **Use the URI**:
-    *   **Inside Docker Network**: `http://minio:9000/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
-    *   **From Localhost**: `http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
-    
-    *(Note: Adjust the `prefix` parameter if your file is in a subdirectory, e.g., `prefix=test%2Faudio.wav`)*
+**3. MinIO (S3-compatible)**
 
-### Example Prompts
+If you're running the project with docker-compose, a MinIO instance is available. To make a bucket public so
+AudioScribe can download files without authentication:
 
-Once connected to an LLM (like via AnythingLLM), you can use natural language to trigger the tools.
+Exec into the MinIO container.
 
-**Local Transcription:**
+```bash
+docker exec -it minio /bin/sh
+```
+
+Configure the `mc` alias (default credentials are `admin` / `password`).
+
+Bash:
+
+```bash
+mc alias set myminio http://localhost:9000 admin password
+```
+
+```bash
+mc anonymous set public myminio/public-audio
+```
+
+Upload your file via the console at `http://localhost:9071` or via `mc cp`.
+
+Use the URI:
+
+- Inside Docker network: `http://minio:9000/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
+- From localhost: `http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
+
+Adjust the `prefix` parameter if the file lives in a subdirectory (e.g. `prefix=test%2Faudio.wav`).
+
+#### Example prompts
+
+Once connected to an LLM (e.g. via AnythingLLM), trigger the tools with natural language:
+
 > "Transcribe the audio file at `http://localhost:9999/audio/audio.wav` using the local model."
 
-**OpenAI Transcription:**
 > "Please use OpenAI to transcribe this file: `file:///C:/Users/Me/Desktop/audio.wav`."
 
-**Hugging Face Transcription:**
 > "Transcribe `https://example.com/audio.wav` using the Hugging Face provider."
 
+#### Tool parameters
 
-### Tool Parameters
+When using the tools (MCP or direct API), specify the following parameters. Defaults differ slightly between the
+standard Python app and the MCP server.
 
-When using the tools (either via MCP or direct API), you can specify the following parameters. Note the defaults may differ between the standard Python app and the MCP server.
+`transcribe_local`:
 
-#### `transcribe_local`
-*   `audio_uri` (MCP) / `file_path` (App): Path or URI to the audio file.
-*   `model`: Path to the faster-whisper model. Default: `Systran/faster-whisper-large-v3`.
-*   `language`: ISO 639-1 code (e.g., `en`, `pl`). Default: `en`.
-*   `with_timestamps`: Boolean.
-    *   **MCP Default**: `True` (returns segments with start/end times).
-    *   **Standard App Default**: `False` (returns full text only).
+- `audio_uri` (MCP) / `file_path` (REST). Path or URI to the audio file.
+- `model`. Path to the faster-whisper model. Default: `Systran/faster-whisper-large-v3`.
+- `language`. ISO 639-1 code (e.g. `en`, `pl`). Default: `en`.
+- `with_timestamps`. Boolean. MCP default `True` (returns segments with start / end times). REST default `False`
+  (full text only).
 
-#### `transcribe_openai`
-*   `audio_uri`: Path or URI to the audio file.
-*   `model`: OpenAI model name. Default: `whisper-1`.
-*   `language`: ISO 639-1 code.
+`transcribe_openai`:
 
-#### `transcribe_hf`
-*   `audio_uri`: Path or URI to the audio file.
-*   `model`: Hugging Face model ID. Default: `openai/whisper-large-v3`.
-*   `hf_provider`: Provider type. Default: `hf-inference`.
+- `audio_uri`. Path or URI.
+- `model`. OpenAI model name. Default: `whisper-1`.
+- `language`. ISO 639-1 code.
+
+`transcribe_hf`:
+
+- `audio_uri`. Path or URI.
+- `model`. Hugging Face model ID. Default: `openai/whisper-large-v3`.
+- `hf_provider`. Provider type. Default: `hf-inference`.
+
+---
+
+### Observability
+
+Four diagnostic surfaces follow the platform's standard observability stack:
+
+- `GET /health` — liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound. Targeted by the Docker
+  `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should hit this.
+- `GET /ready` — readiness probe. Checks `ffmpeg` and `ffprobe` are on PATH and the system temp dir is writable.
+  Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded", "checks": {...}}`.
+- `GET /metrics` — Prometheus payload. Counters labelled `provider={local,openai,huggingface}` and `outcome` for
+  request totals + bytes processed, plus per-operation duration histograms. Audacity track count and ffmpeg
+  invocation counters are also exposed.
+- `X-Request-ID` middleware — every request echoes (or generates) a correlation ID, injected into every log line via
+  `[request_id]` so requests can be reassembled from log aggregation without bespoke tracing plumbing.
+
+### Error contract
+
+All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with `Content-Type:
+application/problem+json`.
+
+- `400` — validation failure (`ValueError` raised in the request lifecycle, e.g. unsafe URI, unsupported provider,
+  missing API key). Body includes `detail` with the service-authored failure reason.
+- `413` — upload, download, or Audacity zip exceeds the configured size cap (`MAX_UPLOAD_BYTES`,
+  `MAX_DOWNLOAD_BYTES`, `MAX_ZIP_UNCOMPRESSED_BYTES`; all default 5 GiB).
+- `422` — pydantic schema validation failure (Form / Query parameter shape).
+- `500` — unhandled exception. Body intentionally omits `detail` so upstream stack traces or DSNs never reach the
+  caller. Full diagnostics live in the service logs, correlated by `X-Request-ID`.
+
+The MCP surface returns structured envelopes instead of HTTP status codes (MCP tool results are JSON):
+`{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+
+### Startup readiness banner
+
+On startup, [src/config/startup_banner.py](src/config/startup_banner.py) logs a single multi-line INFO entry with an
+ANSI Shadow `AUDIO SCRIBE` banner, access URLs, API-key state for OpenAI and Hugging Face, live HTTP probe results,
+and the list of observability and REST endpoints. Shared convention with every other long-running service in the
+repo. See [.agents/skills/coding-standards/SKILL.md](../.agents/skills/coding-standards/SKILL.md).
 
 ---
 
-## Dependencies
+### Dependencies
 
-The project uses a hybrid dependency management approach to ensure stability and proper GPU support:
+The project uses a two-file approach to keep GPU builds reproducible.
 
-*   `pytorch-requirements.txt`: Limits **PyTorch** and related libraries to specific versions compatible with CUDA 12.6. This file MUST be installed first.
-*   `pyproject.toml`: Contains all other application dependencies with frozen versions.
+- [pytorch-requirements.txt](pytorch-requirements.txt). PyTorch and related libraries pinned to CUDA 12.6 builds.
+  Install this first.
+- [pyproject.toml](pyproject.toml). All other dependencies with frozen versions.
 
-To update standard dependencies (non-PyTorch), modify `pyproject.toml`.
-
+To update non-PyTorch dependencies, edit [pyproject.toml](pyproject.toml).
 
 ---
-## Troubleshooting
 
-### Checking lib versions
+### Troubleshooting
 
-#### nvidia drivers
-```shell
+#### Checking library versions
+
+Nvidia drivers:
+
+```bash
 nvidia-smi
 ```
-#### torch
+
+Torch CUDA availability:
+
 ```python
 import torch
 print(torch.cuda.is_available())
 ```
 
-#### cudnn
+cuDNN version through torch:
 
 ```python
 import torch
 print(torch.backends.cudnn.version())
 ```
 
-### Hugging Face Symlinks Warning on Windows
+#### Hugging Face symlinks warning on Windows
 
-When running the application on Windows, you may see a `UserWarning` about symlinks not being supported.
+You may see a `UserWarning` about symlinks not being supported. The `huggingface_hub` library uses symbolic links by
+default to manage its cache efficiently. Standard Windows user accounts can't create symlinks without special
+permissions. It's a warning, not an error; the cache still works but uses more disk space.
 
-**Why it happens:** The `huggingface_hub` library uses symbolic links by default to efficiently manage its cache. Standard user accounts on Windows cannot create symlinks without special permissions. This is a warning, not an error, and the cache will still function, but it may take up more disk space.
+Option 1 (recommended): disable the warning with an env var.
 
-**Solution 1 (Recommended): Set Environment Variable**
-
-The easiest way to resolve this is to disable the warning by setting an environment variable:
-```
+```text
 HF_HUB_DISABLE_SYMLINKS_WARNING=1
 ```
 
-**Solution 2: Enable Developer Mode**
+Option 2: enable Developer Mode in Windows. Settings → System → Advanced → For developers → toggle Developer Mode on.
+Restart your terminal or IDE for the change to take effect.
 
-Alternatively, you can enable Developer Mode on Windows to allow your user account to create symlinks.
-1.  Open **Settings**.
-2.  Go to **System** > **Advanced** > **For developers**.
-3.  Toggle **Developer Mode** to **On**.
-You may need to restart your terminal or IDE for the change to take effect.
+#### Reinstalling Python dependencies
 
----
-
-### Reinstalling python dependencies
 Terminal in your activated virtual environment.
 
-This creates a list of everything that's currently installed, uninstalls it, and then deletes the list file.
+Bash:
 
-```shell
+```bash
 pip freeze > uninstall.txt
 ```
 
-```shell
+```bash
 pip uninstall -y -r uninstall.txt
 ```
 
-```shell
-del uninstall.txt
+```bash
+rm uninstall.txt
 ```
 
-Then reinstall:
-```shell
+```bash
 pip install --no-cache-dir -r pytorch-requirements.txt
+```
+
+```bash
 pip install --no-cache-dir .
 ```
+
+PowerShell:
+
+```powershell
+pip freeze > uninstall.txt
+```
+
+```powershell
+pip uninstall -y -r uninstall.txt
+```
+
+```powershell
+Remove-Item uninstall.txt
+```
+
+```powershell
+pip install --no-cache-dir -r pytorch-requirements.txt
+```
+
+```powershell
+pip install --no-cache-dir .
+```
+
+---
+
+### Docs map
+
+| File                                                                       | What's in it                                                |
+| :------------------------------------------------------------------------- | :---------------------------------------------------------- |
+| [AGENTS.md](AGENTS.md)                                                     | Module-level instructions for AI coding agents.             |
+| [pyproject.toml](pyproject.toml)                                           | Non-PyTorch deps, project version.                          |
+| [pytorch-requirements.txt](pytorch-requirements.txt)                       | PyTorch pinned to CUDA 12.6 builds.                         |
+| [src/main.py](src/main.py)                                                 | FastAPI app, lifespan, uvicorn entry.                       |
+| [src/config/config.py](src/config/config.py)                               | Settings (OpenAI / HF / cache paths / model defaults).      |
+| [src/config/startup_banner.py](src/config/startup_banner.py)               | Startup readiness banner.                                   |
+| [src/transcription/](src/transcription/)                                   | Local / OpenAI / HF backends and the Audacity merger.       |
+| [src/api/rest/rest_endpoints.py](src/api/rest/rest_endpoints.py)           | REST endpoints under `/api/v1/transcribe/*`.                |
+| [src/api/mcp/mcp_server.py](src/api/mcp/mcp_server.py)                     | FastMCP tool definitions.                                   |
+| [mcp_requests.http](mcp_requests.http)                                     | Example REST + MCP requests for the VS Code REST Client.    |
+| [skills/audio-scribe/SKILL.md](skills/audio-scribe/SKILL.md)               | Drop-in agent skill for downstream agents.                  |
+| [../README.md](../README.md)                                               | Monorepo overview, architecture, ports.                     |
+| [../docs/architecture/README.md](../docs/architecture/README.md)           | Monorepo architecture, ADRs.                                |

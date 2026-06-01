@@ -1,401 +1,168 @@
 # AscendWebSearch
 
-AscendWebSearch is a powerful web search and extraction service for the AscendAI ecosystem. It integrates **SearXNG** for meta-search capabilities and combines **Trafilatura** with **Playwright** for robust content extraction (reading).
+*SearXNG meta-search and multi-tier content extraction for the AscendAI platform.*
+
+[![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.60-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-4c1)](#)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
 
-## Table of Contents
+### What it is
 
-*   [API Documentation](#api-documentation)
-*   [Agent Skill](#agent-skill)
-*   [Versioning & Changelog](#versioning--changelog)
-*   [Prerequisites](#prerequisites)
-*   [Configuration (Environment Variables)](#configuration-environment-variables)
-*   [Running the Service](#running-the-service)
-    *   [Standard Python App](#running-as-a-standard-python-app-without-docker)
-    *   [Docker](#running-with-docker-recommended)
-*   [MCP Server Mode](#mcp-server-mode)
-*   [REST API Examples](#rest-api-examples)
-*   [How it Works (Extraction Strategy)](#how-it-works-extraction-strategy)
+AscendWebSearch is a Python microservice (port 7021) that exposes two surfaces over one process: a REST API for
+direct callers and an MCP server for AI agents. It runs SearXNG queries and reads pages through a six-tier
+escalation chain that walks from cheap HTTP fetches to a remote browser session humans can drive over VNC.
+
+Pages get extracted by whichever tier wins first. WAFs (Cloudflare, Turnstile), login walls, and JavaScript
+gating each trigger the next tier rather than a generic failure. Clearance cookies and authenticated sessions
+land in Redis so the next request to the same domain reuses them.
 
 ---
 
-## API Documentation
+### Quick start
 
-*   **Swagger UI**: [http://localhost:7021/docs](http://localhost:7021/docs)
-*   **Redoc**: [http://localhost:7021/redoc](http://localhost:7021/redoc)
+The scrapper compose file is `include:`-d by the main `docker-compose.yaml` at the repo root, so every command runs
+against the main file (no `-f` flag).
 
----
+Bring up the full stack from the repo root:
 
-## Agent Skill
-
-A drop-in skill is shipped at [`skills/ascend-web-scrapper/SKILL.md`](skills/ascend-web-scrapper/SKILL.md). Copy the `skills/ascend-web-scrapper/` directory into your agent's skills folder (`.claude/skills/`, `.agents/skills/`, `.kilocode/skills/`, etc.) and the agent will pick it up automatically.
-
-The skill covers the two endpoints (`POST /api/v2/web/read`, `GET /api/v1/web/search`), the success / error / `human_intervention_required` response shapes, and — most importantly — the CAPTCHA / login-wall flow: surface the returned `vnc_url`, let the user solve it on any device, then re-call `/read` with the same URL so the cached session in Redis takes over. The base URL is intentionally left out of the skill (it differs per environment) — the agent runtime is expected to provide it.
-
-When you change endpoint shapes here, update the SKILL.md so downstream agents stay accurate.
-
----
-
-## Versioning & Changelog
-
-The strict version of the `AscendWebSearch` microservice is managed via the `version` field centrally inside `pyproject.toml`. 
-
-**When to update:**
-You should actively bump the `version` in `pyproject.toml` and manually record the structural changes in `CHANGELOG.md` whenever:
-1. You deploy a new release to Docker Hub.
-2. You introduce new scraping strategies or network-breaking dependencies (e.g., adding FlareSolverr or NoVNC bridges).
-
----
-
-## Prerequisites
-
-*   **Python 3.12**
-*   **SearXNG Instance** (Running on port 8080 or accessible via URL)
-*   **Playwright Browsers** (If running locally)
-*   **Ngrok Auth Token** (For remote CAPTCHA solving. Get free from dashboard.ngrok.com and set as a system environment variable `NGROK_AUTHTOKEN`)
-
----
-
-## Configuration (Environment Variables)
-
-*   `SEARXNG_BASE_URL`: **(Required)** URL of the SearXNG instance. Default: `http://searxng:8080` (Docker) or `http://localhost:9020` (Local).
-*   `API_PORT`: **(Optional)** Port to run the server on. Default: `7021`.
-*   `API_HOST`: **(Optional)** Host to bind to. Default: `0.0.0.0`.
-*   `LOG_LEVEL`: **(Optional)** Logging level. Default: `INFO`.
-*   `NGROK_AUTHTOKEN`: **(Required for remote VNC)** Token required by the Ngrok docker container. Set this directly in your Windows/Linux environment variables. Docker Compose will automatically detect and pass it to the container.
-
----
-
-## Running the Service
-
-### Running as a standard Python App (without Docker)
-
-1.  **Create virtual environment**
-
-    Linux/MacOS:
-    ```shell
-    python3 -m venv .venv
-    ```
-
-    Windows:
-    ```powershell
-    python -m venv .venv
-    ```
-
-2.  **Activate virtual environment**
-
-    Linux/MacOS:
-    ```shell
-    source .venv/bin/activate
-    ```
-
-    Windows:
-    ```powershell
-    .\.venv\Scripts\activate
-    ```
-
-3.  **Install dependencies**
-
-    ```shell
-    pip install -e .[dev]
-    ```
-    *The `-e` flag stands for "editable". It allows you to modify the source code and see changes immediately without reinstalling the package.*
-
-4.  **Install Playwright Browsers**
-
-    ```shell
-    playwright install --with-deps chromium
-    ```
-
-5.  **Run the Server**
-
-    Ensure `SEARXNG_BASE_URL` is set (e.g., `http://localhost:9020` if using Docker mapping).
-
-    *Exporting variables:*
-
-    Linux/MacOS:
-    ```shell
-    export SEARXNG_BASE_URL="http://localhost:9020"
-    export LOG_LEVEL="INFO"
-    ```
-
-    ```shell
-    python src/main.py
-    ```
-
-    Windows:
-    ```powershell
-    $env:SEARXNG_BASE_URL="http://localhost:9020"
-    $env:LOG_LEVEL="INFO"
-    ```
-
-    ```powershell
-    python src/main.py
-    ```
-
-### Running with Docker (Recommended)
-
-1.  **Build the Image**
-
-    ```shell
-    docker build -t ascend-web-search:latest .
-    ```
-
-2.  **Tag and Publish (Optional):**
-
-    If you want to push this image to Docker Hub (e.g., to use it in another environment or specific `docker-compose.yaml`):
-
-    ```shell
-    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:v0.1.0
-    ```
-
-    ```shell
-    docker push lukk17/ascend-web-search:v0.1.0
-    ```
-    
-    ```shell
-    docker tag ascend-ai-ascend-web-search:latest lukk17/ascend-web-search:latest
-    ```
-
-    ```shell
-    docker push lukk17/ascend-web-search:latest
-    ```
-
-3.  **Run the Container**
-
-    Linux/MacOS:
-    ```shell
-    docker run -d \
-      --name ascend-web-search \
-      -p 7021:7021 \
-      -e SEARXNG_BASE_URL="http://host.docker.internal:9020" \
-      ascend-web-search:latest
-    ```
-
-    Windows:
-    ```powershell
-    docker run -d `
-      --name ascend-web-search `
-      -p 7021:7021 `
-      -e SEARXNG_BASE_URL="http://host.docker.internal:9020" `
-      ascend-web-search:latest
-    ```
-
-    *Note: If running in the same Docker Compose network, use `http://searxng:8080` instead of `host.docker.internal`.*
-
----
-
-## MCP Server Mode
-
-The service exposes an MCP server over HTTP at `/mcp`.
-
-### Tool Configuration
-
-```json
-{
-  "mcpServers": {
-    "ascend-web-search": {
-      "type": "sse",
-      "url": "http://localhost:7021/mcp"
-    }
-  }
-}
+```bash
+docker compose up -d --build
 ```
 
-### Available Tools
+Rebuild and recreate only this service after a code change (everything else stays running):
 
-*   `web_search(query, limit)`: Search the web.
-*   `web_read(url)`: Extract content from a URL.
+```bash
+docker compose up -d --build --force-recreate ascend-web-search
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f ascend-web-search
+```
+
+Hit the health endpoint to verify:
+
+```bash
+curl http://localhost:7021/health
+```
+
+Local development without Docker is in [docs/running.md](docs/running.md).
 
 ---
 
-## REST API Examples
+### Architecture
 
-### Health Check
-
-Linux/MacOS:
-```shell
-curl -X GET http://localhost:7021/health
-```
-
-Windows:
-```powershell
-curl -X GET http://localhost:7021/health
-```
-
-### Standard REST API
-
-#### 1. Web Search
-**GET** `/api/v1/web/search`
-
-```shell
-curl "http://localhost:7021/api/v1/web/search?query=AscendAI&limit=3"
-```
-
-#### 2. Web Read
-**GET** `/api/v1/web/read`
-
-```shell
-curl "http://localhost:7021/api/v1/web/read?url=https://example.com"
-```
-
-### Call MCP Tool (POST)
-
-#### 1. Web Search (`web_search`)
-
-**Linux/MacOS**:
-```shell
-curl -X POST http://localhost:7021/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "web_search",
-      "arguments": {
-        "query": "AscendAI",
-        "limit": 1
-      }
-    },
-    "id": 1
-  }'
-```
-
-**Windows**:
-```powershell
-curl -X POST http://localhost:7021/mcp `
-  -H "Content-Type: application/json" `
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "web_search",
-      "arguments": {
-        "query": "AscendAI",
-        "limit": 1
-      }
-    },
-    "id": 1
-  }'
-```
-
-#### 2. Web Read (`web_read`)
-
-**Linux/MacOS**:
-```shell
-curl -X POST http://localhost:7021/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "web_read",
-      "arguments": {
-        "url": "https://example.com"
-      }
-    },
-    "id": 2
-  }'
-```
-
-**Windows**:
-```powershell
-curl -X POST http://localhost:7021/mcp `
-  -H "Content-Type: application/json" `
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "web_read",
-      "arguments": {
-        "url": "https://example.com"
-      }
-    },
-    "id": 2
-  }'
-```
-
----
-
-## How it Works (Extraction Strategy)
-
-The `web_read` tool uses a multi-tiered smart cascade strategy to bypass Web Application Firewalls (WAFs) like Cloudflare, ensuring maximum success rates:
-
-1.  **Fast Path (`curl_cffi`)**: Attempts to fetch the URL using HTTP GET via `curl_cffi` (mimicking a Chrome 120 TLS fingerprint) and extracts content with `trafilatura` or `BeautifulSoup`. This is fast, resource-efficient, and bypasses basic blocks.
-2.  **Automated WAF Solver (`FlareSolverr`)**: If Cloudflare blocks the fast path, the request is sent to a dedicated FlareSolverr container that automatically resolves JavaScript challenges and caches the clearance cookies for future requests.
-3.  **Render Path (`Playwright` & `Crawlee`)**: For complex dynamic sites that require rendering (but aren't actively blocking), it uses `undetected-playwright` running with `headless=False` to mimic human behavior and render the DOM.
-4.  **Human Fallback & Login Auth (`NoVNC`)**: If all automated methods fail to bypass an advanced Captcha, or the requested page requires a manual Account Login, the `ChallengeDetector` triggers a remote Playwright session to the target site. This returns a `human_intervention_required` status with a VNC URL and an `intervention_type` (e.g. `login` or `captcha`). The Ascend orchestrator can present this URL to the user, allowing them to log in or solve the captcha visually in their own browser before the system automatically captures the authenticated session and resumes extraction.
-
-### Remote Human Intervention (Ngrok Flow)
-
-To allow you to solve CAPTCHAs or Logins from anywhere (e.g., your smartphone) without needing an SSH tunnel to your server, AscendWebSearch implements an automated Ngrok integration within the Docker Compose network.
-
-1. **The Dynamic URL Problem:** When the `ngrok` container launches, it assigns a random public domain (e.g. `https://xyz.ngrok.app`). Since this changes every restart, the URL cannot be statically hardcoded.
-2. **The API Solution:** During initialization, AscendWebSearch sets `PUBLIC_VNC_URL=http://ngrok:4040/api/tunnels`. When a CAPTCHA triggers, the Python code calls this local diagnostic API on the Ngrok container. It extracts the *active* public URL dynamically.
-3. **The Result:** The system appends `?autoconnect=true` to the extracted URL and returns it to your Orchestrator chat payload. You tap the link, bypass the VNC login screen, solve the CAPTCHA, and the background task continues.
+The strategy chain escalates one tier at a time, bounded by `READ_TOTAL_BUDGET=90s`. NoVNC is the terminal
+strategy and exits the loop with a 428 response that asks the human to solve the challenge out-of-band.
 
 ```mermaid
-sequenceDiagram
-    participant User (Phone)
-    participant Orchestrator
-    participant API (AscendWebSearch)
-    participant Ngrok
-    participant Selenium (NoVNC)
-    participant Target Website
+graph TB
+    Client[Client / Agent]
+    REST[REST API<br/>/api/v1/web/search<br/>/api/v2/web/read]
+    MCP[MCP Server<br/>web_search, web_read]
+    Reader[WebReader<br/>strategy chain]
+    BS[1: BeautifulSoup<br/>curl_cffi + Chrome120]
+    TR[2: Trafilatura<br/>curl_cffi + Chrome120]
+    FS[3: FlareSolverr<br/>Cloudflare bypass]
+    PW[4: Playwright Stealth<br/>singleton Chromium]
+    CR[5: Crawlee Adaptive]
+    NV[6: NoVNC<br/>human intervention]
+    Redis[(Redis<br/>session cookies)]
+    SX[SearXNG]
 
-    User (Phone)->>Orchestrator: Scrape requested (e.g. Indeed.com)
-    Orchestrator->>API: GET /api/v1/web/read
-    API->>Target Website: Fetch HTML
-    Target Website-->>API: 403 Forbidden (Cloudflare CAPTCHA)
-    
-    Note over API: Detects challenge
-    
-    API->>Ngrok: GET http://ngrok:4040/api/tunnels
-    Ngrok-->>API: Returns active public URL (e.g., https://xyz.ngrok.app)
-    
-    API-->>Orchestrator: {status: human_intervention_required, vnc_url: https://xyz.ngrok.app/vnc.html?autoconnect=true}
-    Orchestrator-->>User (Phone): Passes link to User in Chat
-    
-    Note over User (Phone),Selenium (NoVNC): User taps link on phone
-    
-    User (Phone)->>Selenium (NoVNC): Connects instantly (No password, autoconnect bypass)
-    User (Phone)->>Target Website: Taps CAPTCHA checkbox on screen via VNC
-    Target Website-->>Selenium (NoVNC): Grants cf_clearance cookie
-    Selenium (NoVNC)-->>API: Background task captures session
-    
-    Note over API: Saves session to Redis
-    
-    API->>Orchestrator: Extraction resumed successfully
+    Client --> REST
+    Client -.MCP transport.-> MCP
+    REST --> Reader
+    MCP --> Reader
+    Reader --> BS
+    BS -.miss.-> TR
+    TR -.miss.-> FS
+    FS -.miss.-> PW
+    PW -.miss.-> CR
+    CR -.miss.-> NV
+    BS & TR & FS -.cf_clearance.-> Redis
+    NV -.session.-> Redis
+    REST -.search.-> SX
+    MCP -.search.-> SX
 ```
 
-### Session Persistence (Redis)
-All authenticated sessions, clearance tokens, and captchas solved by the `NoVNC` fallback or `FlareSolverr` are permanently stored within the shared `redis` Docker cache container. This architectural decision ensures that:
-*   **Persistent Auth:** Authenticated sessions outlive `ascend-web-search` API container restarts and deployments.
-*   **Distributed Scaling:** Prevents "split-brain" caching in multi-worker environments. Any of the `N` FastAPI workers can instantly access the shared tokens, fully preventing the system from repeatedly prompting users for manual logins.
+Full architecture in [docs/architecture/](docs/architecture/), strategy chain rationale in
+[ADR-001](docs/architecture/decisions/ADR-001-multi-tier-extraction-strategy.md), budget and singleton
+browser rationale in
+[ADR-005](docs/architecture/decisions/ADR-005-strategy-budget-and-singleton-chromium.md).
 
 ---
 
-## Troubleshooting
+### Features
 
-### Reinstalling python dependencies
-Terminal in your activated virtual environment.
+- **Two surfaces, one process.** REST under `/api/v1`, `/api/v2` and MCP at `/mcp`. Same orchestrator behind
+  both. See [docs/api-examples.md](docs/api-examples.md).
+- **Six-tier escalation chain.** Cheap tiers handle the easy 80%, browser tiers handle the rest, NoVNC handles
+  the irreducible human-needed cases.
+- **PSL-aware cookie persistence.** Clearance cookies keyed by registrable domain via `tldextract`. Sites under
+  shared ccTLDs (`*.co.uk`, `*.com.au`) stay isolated. See
+  [ADR-002](docs/architecture/decisions/ADR-002-cloudflare-cookie-persistence-redis.md).
+- **Singleton Chromium.** One browser process across requests, per-request context. Saves ~1 second per
+  Playwright invocation versus the per-request launch pattern.
+- **Budget-bounded reads.** `READ_TOTAL_BUDGET=90s` caps wall-clock across tiers 1-5. NoVNC exempt.
+- **Observability ready.** `/health` (liveness), `/ready` (dependency probes), `/metrics` (Prometheus
+  counters), `X-Request-ID` middleware on every response.
+- **Remote CAPTCHA solving via Ngrok.** Solve from a phone, no SSH required. See
+  [ADR-003](docs/architecture/decisions/ADR-003-novnc-ngrok-captcha-intervention.md).
 
-This creates a list of everything that's currently installed, uninstalls it, and then deletes the list file.
+---
 
-```shell
-pip freeze > uninstall.txt
-```
+### Configuration
 
-```shell
-pip uninstall -y -r uninstall.txt
-```
+Settings live in [src/config/config.py](src/config/config.py), bound through pydantic-settings against env vars
+and `.env`. The most-used variables:
 
-```shell
-del uninstall.txt
-```
+| Variable             | Default                            | Purpose                                              |
+| :------------------- | :--------------------------------- | :--------------------------------------------------- |
+| `API_PORT`           | `7021`                             | Service port                                         |
+| `SEARXNG_BASE_URL`   | `http://localhost:9020`            | SearXNG meta-search instance                         |
+| `FLARESOLVERR_URL`   | `http://localhost:8191/v1`         | FlareSolverr Cloudflare-bypass instance              |
+| `REDIS_URL`          | `redis://localhost:6379/0`         | Redis for cookie persistence                         |
+| `READ_TOTAL_BUDGET`  | `90.0`                             | Wall-clock cap across the strategy chain (seconds)   |
+| `PLAYWRIGHT_HEADLESS`| `false`                            | Headless Chromium; flip to `true` in CI / no X       |
+| `PUBLIC_VNC_URL`     | `http://localhost:7900`            | NoVNC URL (or `http://ngrok:4040/api/tunnels`)       |
+| `NOVNC_TIMEOUT_SECONDS` | `600`                           | NoVNC monitor task lifetime                          |
 
-Then reinstall:
-```shell
-pip install -e .[dev]
-```
+Full settings reference in [docs/configuration.md](docs/configuration.md).
+
+---
+
+### Agent skill
+
+A drop-in skill ships at [skills/ascend-web-scrapper/SKILL.md](skills/ascend-web-scrapper/SKILL.md). Copy
+[skills/ascend-web-scrapper/](skills/ascend-web-scrapper/) into your agent's skills folder
+(`.claude/skills/`, `.agents/skills/`, `.opencode/skills/`) and the agent picks it up automatically. The
+skill covers both endpoints, the `human_intervention_required` response shape, and the
+captcha-solve-then-resume flow.
+
+---
+
+### Docs map
+
+| File | What's in it |
+| :--- | :--- |
+| [docs/running.md](docs/running.md) | Local Python and Docker run instructions, MCP client setup |
+| [docs/api-examples.md](docs/api-examples.md) | REST and MCP request examples (curl + PowerShell) |
+| [docs/configuration.md](docs/configuration.md) | Every settings field with defaults and effect |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Reinstalling deps, common failure modes |
+| [docs/architecture/README.md](docs/architecture/README.md) | Architecture index: arc42 chapters, ADRs, diagrams |
+| [docs/architecture/decisions/](docs/architecture/decisions/) | ADRs (strategy chain, cookie persistence, NoVNC, SearXNG, budget) |
+| [AGENTS.md](AGENTS.md) | Module-level instructions for AI coding agents |
+| [CHANGELOG.md](CHANGELOG.md) | Structural changes per release |
+| [../README.md](../README.md) | Monorepo overview |
+
+---
+
+### License
+
+MIT. See [LICENSE](LICENSE).

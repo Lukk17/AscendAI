@@ -1,0 +1,45 @@
+info:
+  name: ocr-polish
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\PaddleOCR\e2e\fixtures\argent-saga-chronicles-page1-polish.png
+      - name: lang
+        type: text
+        value: pl
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Response carries schema_version=1", function () {
+            expect(res.getBody().schema_version).to.equal("1");
+        });
+        test("Filename echoes back", function () {
+            expect(res.getBody().filename).to.equal("argent-saga-chronicles-page1-polish.png");
+        });
+        test("At least one page", function () {
+            expect(res.getBody().pages.length).to.be.greaterThan(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

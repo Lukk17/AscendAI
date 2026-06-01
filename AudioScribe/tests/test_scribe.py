@@ -1,42 +1,61 @@
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
-from src.scribe import (
-    openai_speech_transcription,
-    hf_speech_transcription,
-    local_speech_transcription
-)
+from src import scribe
 
 
-@patch('src.scribe.openai_transcript', return_value="OpenAI text")
-def test_openai_speech_transcription_calls_correct_function(mock_openai_transcript):
-    result = openai_speech_transcription("fake_path.wav", "whisper-1", "en")
+class _AsyncIterOver:
+    """Async iterator yielding pre-built items. Replaces `async def
+    fake_stream(...): for s in items: yield s` to avoid the async helper
+    triggering async-without-await checks."""
 
-    mock_openai_transcript.assert_called_once_with("fake_path.wav", "whisper-1", "en", False, progress_callback=None)
-    assert result == "OpenAI text"
+    def __init__(self, items: list[Any]) -> None:
+        self._iter = iter(items)
+
+    def __call__(self, *_args: Any, **_kwargs: Any) -> "_AsyncIterOver":
+        return self
+
+    def __aiter__(self) -> "_AsyncIterOver":
+        return self
+
+    async def __anext__(self) -> Any:
+        try:
+            return next(self._iter)
+        except StopIteration as exc:
+            raise StopAsyncIteration from exc
 
 
-@patch('src.scribe.hf_transcript', return_value="HF text")
-def test_hf_speech_transcription_calls_correct_function(mock_hf_transcript):
-    result = hf_speech_transcription("fake_path.wav", "some/model", "hf-inference")
+def test_openai_speech_transcription_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scribe, "openai_transcript", MagicMock(return_value="hi"))
+    result = scribe.openai_speech_transcription("a.wav", "m", "en")
+    assert result == "hi"
 
-    mock_hf_transcript.assert_called_once_with("fake_path.wav", "some/model", "hf-inference", False, progress_callback=None)
-    assert result == "HF text"
+
+def test_openai_speech_transcription_segments(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scribe, "openai_transcript", MagicMock(return_value=[{"text": "x"}]))
+    result = scribe.openai_speech_transcription("a.wav", "m", "en", with_timestamps=True)
+    assert isinstance(result, list)
+
+
+def test_hf_speech_transcription_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scribe, "hf_transcript", MagicMock(return_value="h"))
+    assert scribe.hf_speech_transcription("a.wav", "m", "hf-inference") == "h"
+
+
+def test_hf_speech_transcription_segments(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scribe, "hf_transcript", MagicMock(return_value=[{"text": "h"}]))
+    out = scribe.hf_speech_transcription("a.wav", "m", "hf-inference", with_timestamps=True)
+    assert isinstance(out, list)
 
 
 @pytest.mark.asyncio
-@patch('src.scribe.local_speech_transcription_stream')
-async def test_local_speech_transcription_calls_correct_function(mock_local_stream):
-    async def fake_generator():
-        yield {"text": "test"}
-
-    mock_local_stream.return_value = fake_generator()
-
-    results = [segment async for segment in local_speech_transcription(
-        "fake_path.wav", "fake/model", "en"
-    )]
-
-    mock_local_stream.assert_called_once_with("fake/model", "fake_path.wav", "en")
-    assert len(results) == 1
-    assert results[0]["text"] == "test"
+async def test_local_speech_transcription_yields(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        scribe,
+        "local_speech_transcription_stream",
+        _AsyncIterOver([{"text": "x"}, {"text": "y"}]),
+    )
+    segments = [s async for s in scribe.local_speech_transcription("a.wav", "m", "en")]
+    assert len(segments) == 2

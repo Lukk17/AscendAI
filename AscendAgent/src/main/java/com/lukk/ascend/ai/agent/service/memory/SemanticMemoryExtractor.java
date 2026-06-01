@@ -4,11 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
-import com.lukk.ascend.ai.agent.service.ChatModelResolver;
-import com.lukk.ascend.ai.agent.service.ChatResponseContentResolver;
+import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
+import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
+import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -26,10 +30,10 @@ public class SemanticMemoryExtractor {
     private static final String EXTRACTOR_INSTRUCTION = """
             Identify exclusively standalone semantic facts (identity, strict preference, name, contact) from the attached user prompt.
             Disregard general knowledge or questions.
-
+            
             Output ONLY a JSON array of strings. No prose, no markdown fences, no chain-of-thought, no explanation.
             If there are no facts to save, output exactly: []
-
+            
             Example output:
             ["User loves playing electric guitar", "User's favorite color is red"]
             """;
@@ -39,6 +43,7 @@ public class SemanticMemoryExtractor {
     private final SemanticMemoryClient memoryClient;
     private final ObjectMapper objectMapper;
     private final ChatResponseContentResolver chatResponseContentResolver;
+    private final PromptCacheStrategyResolver cacheStrategyResolver;
 
     public void extract(String userId, String userText, String provider, String model, String embeddingProvider) {
         Thread.startVirtualThread(() -> processExtraction(userId, userText, provider, model, embeddingProvider));
@@ -56,25 +61,44 @@ public class SemanticMemoryExtractor {
     private void executeExtractionFlow(String userId, String userText, String provider, String model, String embeddingProvider) {
         String extractionModel = resolveExtractionModel(provider, model);
         ChatModel chatModel = chatModelResolver.resolve(provider);
+        PromptCacheStrategy strategy = cacheStrategyResolver.resolve(provider);
+        ChatOptions decoratedOptions = strategy.buildOptions(extractionModel);
 
-        ChatClient.Builder clientBuilder = ChatClient.builder(chatModel)
-                .defaultSystem(EXTRACTOR_INSTRUCTION);
+        ChatResponse chatResponse;
+        try {
+            chatResponse = invokeExtractor(chatModel, userText, extractionModel, decoratedOptions);
+        } catch (RuntimeException e) {
+            if (!strategy.isCacheConfigError(e)) {
+                throw e;
+            }
+            log.warn("[PromptCache] provider={} extractor cache call failed, retrying without cache: {}",
+                    strategy.providerName(), e.getMessage());
+            ChatOptions fallback = StringUtils.hasText(extractionModel)
+                    ? ChatOptions.builder().model(extractionModel).build() : null;
+            chatResponse = invokeExtractor(chatModel, userText, extractionModel, fallback);
+        }
 
-        Optional.ofNullable(extractionModel)
-                .filter(StringUtils::hasText)
-                .ifPresent(m -> clientBuilder.defaultOptions(ChatOptions.builder().model(m).build()));
-
-        ChatClient chatClient = clientBuilder.build();
-
-        ChatResponse chatResponse = chatClient.prompt()
-                .user(userText)
-                .call()
-                .chatResponse();
+        strategy.recordOutcome(userId, chatResponse);
 
         String responseContent = chatResponseContentResolver.resolveContent(chatResponse);
 
         List<String> facts = extractFactsFromJson(responseContent);
         insertFactsWithTally(userId, facts, embeddingProvider);
+    }
+
+    private ChatResponse invokeExtractor(ChatModel chatModel, String userText, String extractionModel, ChatOptions options) {
+        ChatClient.Builder clientBuilder = ChatClient.builder(chatModel);
+        if (options == null && StringUtils.hasText(extractionModel)) {
+            clientBuilder.defaultOptions(ChatOptions.builder().model(extractionModel).build());
+        }
+        ChatClient chatClient = clientBuilder.build();
+
+        List<Message> messages = List.of(new SystemMessage(EXTRACTOR_INSTRUCTION));
+        var spec = chatClient.prompt().messages(messages).user(userText);
+        if (options != null) {
+            spec = spec.options(options);
+        }
+        return spec.call().chatResponse();
     }
 
     private void insertFactsWithTally(String userId, List<String> facts, String embeddingProvider) {
@@ -101,10 +125,6 @@ public class SemanticMemoryExtractor {
         log.warn("Failed to extract or insert semantic memory asynchronously for user '{}'. Reason: {}", userId, e.getMessage());
     }
 
-    /**
-     * Resolves which model to use for extraction.
-     * Priority: user's requested model > provider's configured memoryExtractionModel > null (provider default).
-     */
     private String resolveExtractionModel(String provider, String requestedModel) {
         if (StringUtils.hasText(requestedModel)) {
             return requestedModel;
@@ -133,7 +153,8 @@ public class SemanticMemoryExtractor {
 
     private List<String> parseJsonArray(String cleanedJson) {
         try {
-            return objectMapper.readValue(cleanedJson, new TypeReference<List<String>>() {});
+            return objectMapper.readValue(cleanedJson, new TypeReference<List<String>>() {
+            });
         } catch (JsonProcessingException e) {
             return extractEmbeddedJsonArray(cleanedJson);
         }
@@ -150,7 +171,8 @@ public class SemanticMemoryExtractor {
         Optional<String> candidate = findLastBalancedJsonArray(text);
         if (candidate.isPresent()) {
             try {
-                return objectMapper.readValue(candidate.get(), new TypeReference<List<String>>() {});
+                return objectMapper.readValue(candidate.get(), new TypeReference<List<String>>() {
+                });
             } catch (JsonProcessingException ex) {
                 log.debug("Embedded JSON array candidate parse failed: {}", ex.getMessage());
             }
@@ -159,43 +181,69 @@ public class SemanticMemoryExtractor {
         return List.of();
     }
 
+    /**
+     * Single forward pass collecting every top-level {@code [...]} range, returns the last one.
+     * String-aware (ignores brackets inside JSON strings) and escape-aware (handles {@code \"}).
+     */
     private Optional<String> findLastBalancedJsonArray(String text) {
         if (text == null || text.isBlank()) {
             return Optional.empty();
         }
-        for (int closeIdx = text.length() - 1; closeIdx >= 0; closeIdx--) {
-            if (text.charAt(closeIdx) != ']') {
-                continue;
+
+        BracketScanState state = new BracketScanState();
+        for (int i = 0; i < text.length(); i++) {
+            state.consume(text.charAt(i), i);
+        }
+
+        return state.lastRange().map(range -> text.substring(range.start(), range.end() + 1));
+    }
+
+    private record BracketRange(int start, int end) {
+    }
+
+    private static final class BracketScanState {
+
+        private int depth = 0;
+        private int currentStart = -1;
+        private BracketRange lastClosed;
+        private boolean inString = false;
+        private boolean escaped = false;
+
+        void consume(char c, int index) {
+            if (escaped) {
+                escaped = false;
+                return;
             }
-            int depth = 0;
-            boolean inString = false;
-            boolean escaped = false;
-            for (int i = closeIdx; i >= 0; i--) {
-                char c = text.charAt(i);
-                if (escaped) {
-                    escaped = false;
-                    continue;
+            if (c == '\\') {
+                escaped = true;
+                return;
+            }
+            if (c == '"') {
+                inString = !inString;
+                return;
+            }
+            if (inString) {
+                return;
+            }
+
+            if (c == '[') {
+                if (depth == 0) {
+                    currentStart = index;
                 }
-                if (c == '\\') {
-                    escaped = true;
-                    continue;
-                }
-                if (c == '"') {
-                    inString = !inString;
-                    continue;
-                }
-                if (inString) {
-                    continue;
-                }
-                if (c == ']') depth++;
-                else if (c == '[') {
-                    depth--;
-                    if (depth == 0) {
-                        return Optional.of(text.substring(i, closeIdx + 1));
-                    }
+                depth++;
+                return;
+            }
+            if (c == ']' && depth > 0) {
+                depth--;
+                if (depth == 0 && currentStart >= 0) {
+                    lastClosed = new BracketRange(currentStart, index);
+                    currentStart = -1;
                 }
             }
         }
-        return Optional.empty();
+
+        Optional<BracketRange> lastRange() {
+            return Optional.ofNullable(lastClosed);
+        }
     }
 }

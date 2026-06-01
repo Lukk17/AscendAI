@@ -1,4 +1,4 @@
-# Weather MCP — e2e test
+# Weather MCP: e2e test
 
 ## What this verifies
 
@@ -52,8 +52,14 @@ The response body's `content` field contains a numeric temperature value for the
 
 The response body's `content` field contains a weather condition word (cloudy / clear / sunny / rain / etc.).
 
-The response body's `content` field does NOT contain refusal phrases like "I cannot access live data" or "I don't have real-time data" — those indicate the MCP tool was not invoked.
+The response body's `content` field does NOT contain refusal phrases like "I cannot access live data" or "I don't have real-time data". Those indicate the MCP tool was not invoked.
 
 ## Fixtures
 
 None.
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyWeatherMcpTest`); Redis key `chat:frostyWeatherMcpTest`
+- **Conflicts with:** none
+- **Serial:** false

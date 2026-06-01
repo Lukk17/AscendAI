@@ -1,0 +1,36 @@
+info:
+  name: ocr-unsupported-mime
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\PaddleOCR\e2e\fixtures\not-an-image.txt
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+        test("error code UNSUPPORTED_FILE_TYPE", function () {
+            expect(res.getBody().code).to.equal("UNSUPPORTED_FILE_TYPE");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

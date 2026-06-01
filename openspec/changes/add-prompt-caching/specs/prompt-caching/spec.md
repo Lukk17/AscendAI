@@ -1,26 +1,26 @@
 ## ADDED Requirements
 
-### Requirement: Static prefix is cached on every supported paid provider
+### Requirement: Static prefix is cached per provider via the strategy resolver
 
-AscendAgent SHALL apply a provider-specific prompt-cache strategy to the static prefix of every chat request (the `app.system-prompt` SystemMessage) and every memory-extraction request (the `SemanticMemoryExtractor.EXTRACTOR_INSTRUCTION` prefix). The strategy SHALL use Anthropic `cache_control: ephemeral` markers for Anthropic, an attached `CachedContent` resource for Gemini, prefix-stability verification (no-op decoration) for OpenAI and MiniMax, and a documented no-op for LM Studio.
+AscendAgent SHALL apply a provider-specific prompt-cache strategy (resolved by **provider name**) to the static prefix of every chat request (the `app.system-prompt` SystemMessage) and every memory-extraction request (the `SemanticMemoryExtractor.EXTRACTOR_INSTRUCTION` prefix). The strategy SHALL use Spring AI's native `AnthropicChatOptions.cacheOptions(...)` with `AnthropicCacheStrategy.SYSTEM_ONLY` + `multiBlockSystemCaching=true` for the `anthropic` provider, a read-only outcome logger for `openai` and `gemini` (both wired through Spring AI's OpenAI client in this codebase), and a noop strategy for `minimax` and `lmstudio`.
 
-#### Scenario: Anthropic provider request carries cache_control
+#### Scenario: Anthropic provider request carries native cache options
 
-- **WHEN** `ChatExecutor.execute` is invoked for a request whose resolved provider type is `anthropic` and `app.ai.prompt-cache.enabled` is `true`
-- **THEN** the outgoing provider call has `cache_control: { type: "ephemeral" }` attached to the system message block
-- **AND** the call returns a normal response when Anthropic is healthy
+- **WHEN** `ChatExecutor.execute` is invoked for a request whose resolved provider name is `anthropic` and `app.ai.prompt-cache.providers.anthropic.enabled` is `true`
+- **THEN** the outgoing provider call uses `AnthropicChatOptions` whose `cacheOptions.strategy == SYSTEM_ONLY` and `cacheOptions.multiBlockSystemCaching == true`
+- **AND** the prompt is constructed with the static `app.system-prompt` and the dynamic per-user content as TWO separate `SystemMessage` instances so Spring AI applies `cache_control` to the static block only
 
-#### Scenario: Gemini provider request references a CachedContent
+#### Scenario: OpenAI and Gemini requests log cached_tokens read-only
 
-- **WHEN** `ChatExecutor.execute` is invoked for a request whose resolved provider type is `gemini` and the system-prompt hash has no live cached content
-- **THEN** AscendAgent creates a Gemini `CachedContent` for the system prompt with TTL `app.ai.prompt-cache.providers.gemini.cached-content-ttl`
-- **AND** the outgoing `generateContent` call carries `cachedContent: <resource-name>`
+- **WHEN** `ChatExecutor.execute` is invoked for a request whose resolved provider name is `openai` or `gemini`
+- **THEN** the outgoing options are NOT decorated with cache directives (caching is implicit prefix caching on the provider side)
+- **AND** after the response, `OpenAiApi.Usage.PromptTokensDetails.cachedTokens` is read and logged at INFO
 
-#### Scenario: OpenAI / MiniMax requests have a byte-identical prefix across calls
+#### Scenario: MiniMax and LM Studio receive no cache decoration by default
 
-- **WHEN** two consecutive `ChatExecutor.execute` calls are made for the same user with no system-prompt change
-- **THEN** the SystemMessage text in the outgoing prompt is byte-identical between the two calls
-- **AND** no per-request nondeterministic content (timestamps, request ids) leaks into the cached prefix
+- **WHEN** `ChatExecutor.execute` is invoked for `minimax` or `lmstudio` with default configuration
+- **THEN** the outgoing options carry no cache directive
+- **AND** no `[PromptCache]` outcome line is emitted
 
 ### Requirement: Cache hit and miss are observable in structured logs
 
@@ -28,14 +28,14 @@ Each provider strategy SHALL log a single INFO line per chat call after reading 
 
 #### Scenario: Anthropic cache hit produces an INFO log
 
-- **WHEN** an Anthropic response returns with `cache_read_input_tokens=487`
-- **THEN** AscendAgent logs at INFO `[PromptCache] provider=anthropic hit=true cached_tokens=487 prompt_tokens=<n>`
+- **WHEN** an Anthropic response returns with `cacheReadInputTokens=487`
+- **THEN** AscendAgent logs at INFO `[PromptCache] provider=anthropic user=<id> hit=true cache_read_tokens=487 cache_creation_tokens=<n> prompt_tokens=<n>`
 - **AND** no error or warning is logged
 
 #### Scenario: OpenAI cache miss on first call
 
-- **WHEN** an OpenAI response returns with `prompt_tokens_details.cached_tokens=0`
-- **THEN** AscendAgent logs at INFO `[PromptCache] provider=openai hit=false cached_tokens=0 prompt_tokens=<n>`
+- **WHEN** an OpenAI response returns with `PromptTokensDetails.cachedTokens=0`
+- **THEN** AscendAgent logs at INFO `[PromptCache] provider=openai user=<id> hit=false cached_tokens=0 prompt_tokens=<n>`
 
 ### Requirement: Cache failure never breaks the chat flow
 
@@ -56,7 +56,7 @@ If a cache-decorated provider call fails because of cache configuration (e.g., A
 
 ### Requirement: Master and per-provider toggles disable caching cleanly
 
-`PromptCacheProperties` SHALL expose `app.ai.prompt-cache.enabled` (master) and `app.ai.prompt-cache.providers.<name>.enabled` (per-provider). When either evaluates to `false` for the active provider, AscendAgent SHALL resolve to a no-op strategy that does not decorate the outgoing prompt and does not read response metadata.
+`PromptCacheProperties` SHALL expose `app.ai.prompt-cache.enabled` (master) and `app.ai.prompt-cache.providers.<name>.enabled` (per-provider). When either evaluates to `false` for the active provider, the resolver SHALL return a `NoopPromptCacheStrategy` that does not decorate the outgoing prompt and does not read response metadata. Default values: master `true`; anthropic/openai/gemini per-provider `true`; minimax/lmstudio per-provider `false`.
 
 #### Scenario: Master toggle off
 

@@ -1,0 +1,42 @@
+info:
+  name: transcribe-openai-canary
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7017/api/v1/transcribe/openai"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\AudioScribe\e2e\fixtures\meeting-clip.wav
+      - name: model
+        type: text
+        value: whisper-1
+      - name: language
+        type: text
+        value: en
+      - name: stream
+        type: text
+        value: "false"
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,7 +1,7 @@
 package com.lukk.ascend.ai.agent.integration;
 
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
-import com.lukk.ascend.ai.agent.service.VectorStoreResolver;
+import com.lukk.ascend.ai.agent.service.provider.VectorStoreResolver;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -25,7 +25,7 @@ class VectorStoreConfigIT {
     @TestPropertySource(properties = {
             "app.embedding.default-provider=lmstudio"
     })
-    static class WhenLmStudioProvider extends TestcontainersBase {
+    static class WhenLmStudioProviderIT extends TestcontainersBase {
 
         @org.springframework.test.context.bean.override.mockito.MockitoBean
         org.springframework.ai.mcp.SyncMcpToolCallbackProvider toolCallbackProvider;
@@ -72,7 +72,7 @@ class VectorStoreConfigIT {
     @TestPropertySource(properties = {
             "app.embedding.default-provider=openai"
     })
-    static class WhenOpenAiProvider extends TestcontainersBase {
+    static class WhenOpenAiProviderIT extends TestcontainersBase {
 
         @org.springframework.test.context.bean.override.mockito.MockitoBean
         org.springframework.ai.mcp.SyncMcpToolCallbackProvider toolCallbackProvider;

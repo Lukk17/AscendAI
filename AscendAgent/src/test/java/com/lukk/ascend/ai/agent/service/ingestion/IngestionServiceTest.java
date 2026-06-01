@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -56,118 +57,246 @@ class IngestionServiceTest {
     }
 
     @Test
-    void processMarkdown_WhenH1IsPresent_ThenExtractsTitleSuccessfully() {
+    @DisplayName("processMarkdown extracts H1 heading as the document title")
+    void processMarkdown_WhenH1IsPresent_ThenExtractsTitleSuccessfully() throws IOException {
         // given
         String markdown = "# My Title\nSome content.";
-        InputStream inputStream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8));
         String filename = "file.md";
 
-        // when
-        List<Document> documents = ingestionService.processMarkdown(inputStream, filename);
+        try (InputStream inputStream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8))) {
+            // when
+            List<Document> documents = ingestionService.processMarkdown(inputStream, filename);
 
-        // then
-        assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getMetadata()).containsEntry("title", "My Title");
-        assertThat(documents.get(0).getMetadata()).containsEntry("source", filename);
+            // then
+            assertThat(documents).hasSize(1);
+            assertThat(documents.getFirst().getMetadata()).containsEntry("title", "My Title");
+            assertThat(documents.getFirst().getMetadata()).containsEntry("source", filename);
+        }
     }
 
     @Test
-    void processMarkdown_WhenNoH1Present_ThenUsesFilenameAsTitle() {
+    @DisplayName("processMarkdown uses the filename as title when no H1 heading is present")
+    void processMarkdown_WhenNoH1Present_ThenUsesFilenameAsTitle() throws IOException {
         // given
         String markdown = "## Subtitle\nSome content.";
-        InputStream inputStream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8));
         String filename = "file.md";
 
-        // when
-        List<Document> documents = ingestionService.processMarkdown(inputStream, filename);
+        try (InputStream inputStream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8))) {
+            // when
+            List<Document> documents = ingestionService.processMarkdown(inputStream, filename);
 
-        // then
-        assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getMetadata()).containsEntry("title", filename);
+            // then
+            assertThat(documents).hasSize(1);
+            assertThat(documents.getFirst().getMetadata()).containsEntry("title", filename);
+        }
     }
 
     @Test
+    @DisplayName("processMarkdown strips S3 prefix from filename and uses only the basename as title")
+    void processMarkdown_WhenNoH1PresentAndFilenameHasS3Prefix_ThenUsesBasenameAsTitle() throws IOException {
+        // given — ManualIngestionService passes the full S3 key (with the "markdown/" prefix);
+        // the title fallback should be just the basename, not the full key.
+        String markdown = "## Subtitle\nSome content.";
+        String s3Key = "markdown/uploaded-doc.md";
+
+        try (InputStream inputStream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8))) {
+            // when
+            List<Document> documents = ingestionService.processMarkdown(inputStream, s3Key);
+
+            // then
+            assertThat(documents).hasSize(1);
+            assertThat(documents.getFirst().getMetadata()).containsEntry("source", s3Key);
+            assertThat(documents.getFirst().getMetadata()).containsEntry("title", "uploaded-doc.md");
+        }
+    }
+
+    @Test
+    @DisplayName("processMarkdown throws IngestionException when the input stream raises IOException")
     void processMarkdown_WhenInputStreamThrowsIOException_ThenThrowsIngestionException() throws IOException {
         // given
         InputStream inputStream = mock(InputStream.class);
         when(inputStream.read(any(byte[].class), any(int.class), any(int.class))).thenThrow(new IOException("Disk Error"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> ingestionService.processMarkdown(inputStream, "fail.md"))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to process markdown file");
     }
 
     @Test
+    @DisplayName("processUnstructured parses Unstructured API JSON response and returns documents")
     void processUnstructured_WhenValidApiResponse_ThenParsesAndReturnsDocuments() throws Exception {
         // given
-        InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());
         String filename = "file.pdf";
         String jsonResponse = "[{\"text\": \"extracted text\"}]";
 
         mockRestClientSetup();
         when(responseSpec.body(String.class)).thenReturn(jsonResponse);
 
-        JsonNode mockRootNode = mock(JsonNode.class);
-        JsonNode mockTextNode = mock(JsonNode.class);
-        when(objectMapper.readTree(jsonResponse)).thenReturn(mockRootNode);
-        when(mockRootNode.isArray()).thenReturn(true);
-        Iterator<JsonNode> iterator = List.of(mockTextNode).iterator();
-        when(mockRootNode.iterator()).thenReturn(iterator);
-        when(mockTextNode.has("text")).thenReturn(true);
-        when(mockTextNode.get("text")).thenReturn(mockTextNode);
-        when(mockTextNode.asText()).thenReturn("extracted text");
+        try (InputStream inputStream = new ByteArrayInputStream("dummy".getBytes())) {
 
-        // when
-        List<Document> documents = ingestionService.processUnstructured(inputStream, filename);
+            JsonNode mockRootNode = mock(JsonNode.class);
+            JsonNode mockTextNode = mock(JsonNode.class);
+            when(objectMapper.readTree(jsonResponse)).thenReturn(mockRootNode);
+            when(mockRootNode.isArray()).thenReturn(true);
+            Iterator<JsonNode> iterator = List.of(mockTextNode).iterator();
+            when(mockRootNode.iterator()).thenReturn(iterator);
+            when(mockTextNode.has("type")).thenReturn(false);
+            when(mockTextNode.has("text")).thenReturn(true);
+            when(mockTextNode.get("text")).thenReturn(mockTextNode);
+            when(mockTextNode.asText()).thenReturn("extracted text");
 
-        // then
-        assertThat(documents).hasSize(1);
-        assertThat(documents.get(0).getText()).contains("extracted text");
-        assertThat(documents.get(0).getMetadata()).containsEntry("type", "unstructured");
+            // when
+            List<Document> documents = ingestionService.processUnstructured(inputStream, filename);
+
+            // then
+            assertThat(documents).hasSize(1);
+            assertThat(documents.getFirst().getText()).contains("extracted text");
+            assertThat(documents.getFirst().getMetadata()).containsEntry("type", "unstructured");
+            // No "Title" element in the response, so title falls back to the filename.
+            assertThat(documents.getFirst().getMetadata()).containsEntry("title", filename);
+        }
     }
 
     @Test
-    void processUnstructured_WhenApiCallThrowsException_ThenWrapsInRuntimeException() {
+    @DisplayName("processUnstructured extracts the first Title element from the Unstructured response as title metadata")
+    void processUnstructured_WhenResponseContainsTitleElement_ThenExtractsItAsTitleMetadata() throws Exception {
+        // given — Unstructured returns the document's title as an element of type "Title".
+        // The first such element wins; subsequent ones are folded into the body text only.
+        String filename = "annual-report.pdf";
+        String jsonResponse = "[{\"type\":\"Title\",\"text\":\"Acme 2026 Annual Report\"},{\"type\":\"NarrativeText\",\"text\":\"Body paragraph...\"}]";
+
+        mockRestClientSetup();
+        when(responseSpec.body(String.class)).thenReturn(jsonResponse);
+
+        try (InputStream inputStream = new ByteArrayInputStream("dummy".getBytes())) {
+
+            JsonNode rootNode = mock(JsonNode.class);
+            JsonNode titleNode = mock(JsonNode.class);
+            JsonNode titleTypeVal = mock(JsonNode.class);
+            JsonNode titleTextVal = mock(JsonNode.class);
+            JsonNode bodyNode = mock(JsonNode.class);
+            JsonNode bodyTextVal = mock(JsonNode.class);
+
+            when(objectMapper.readTree(jsonResponse)).thenReturn(rootNode);
+            when(rootNode.isArray()).thenReturn(true);
+            when(rootNode.iterator()).thenReturn(List.of(titleNode, bodyNode).iterator());
+
+            when(titleNode.has("type")).thenReturn(true);
+            when(titleNode.get("type")).thenReturn(titleTypeVal);
+            when(titleTypeVal.asText()).thenReturn("Title");
+            when(titleNode.has("text")).thenReturn(true);
+            when(titleNode.get("text")).thenReturn(titleTextVal);
+            when(titleTextVal.asText()).thenReturn("Acme 2026 Annual Report");
+
+            // bodyNode.has("type") is never invoked because the title-extraction guard short-circuits once
+            // extractedTitle is set from titleNode above, so no stub for it.
+            when(bodyNode.has("text")).thenReturn(true);
+            when(bodyNode.get("text")).thenReturn(bodyTextVal);
+            when(bodyTextVal.asText()).thenReturn("Body paragraph...");
+
+            // when
+            List<Document> documents = ingestionService.processUnstructured(inputStream, filename);
+
+            // then
+            assertThat(documents).hasSize(1);
+            assertThat(documents.getFirst().getMetadata())
+                    .containsEntry("source", filename)
+                    .containsEntry("title", "Acme 2026 Annual Report")
+                    .containsEntry("type", "unstructured");
+            assertThat(documents.getFirst().getText())
+                    .contains("Acme 2026 Annual Report")
+                    .contains("Body paragraph...");
+        }
+    }
+
+    @Test
+    @DisplayName("processUnstructured uses file basename as title fallback when no Title element and S3 prefix is present")
+    void processUnstructured_WhenNoTitleElementAndFilenameHasS3Prefix_ThenUsesBasenameAsTitleFallback() throws Exception {
+        // given — Unstructured returns only NarrativeText elements (no Title);
+        // the title fallback should strip the "documents/" prefix from the S3 key.
+        String s3Key = "documents/pierogi-recipe.docx";
+        String jsonResponse = "[{\"type\":\"NarrativeText\",\"text\":\"Body paragraph\"}]";
+
+        mockRestClientSetup();
+        when(responseSpec.body(String.class)).thenReturn(jsonResponse);
+
+        try (InputStream inputStream = new ByteArrayInputStream("dummy".getBytes())) {
+
+            JsonNode rootNode = mock(JsonNode.class);
+            JsonNode bodyNode = mock(JsonNode.class);
+            JsonNode typeVal = mock(JsonNode.class);
+            JsonNode textVal = mock(JsonNode.class);
+
+            when(objectMapper.readTree(jsonResponse)).thenReturn(rootNode);
+            when(rootNode.isArray()).thenReturn(true);
+            when(rootNode.iterator()).thenReturn(List.of(bodyNode).iterator());
+
+            when(bodyNode.has("type")).thenReturn(true);
+            when(bodyNode.get("type")).thenReturn(typeVal);
+            when(typeVal.asText()).thenReturn("NarrativeText");
+            when(bodyNode.has("text")).thenReturn(true);
+            when(bodyNode.get("text")).thenReturn(textVal);
+            when(textVal.asText()).thenReturn("Body paragraph");
+
+            // when
+            List<Document> documents = ingestionService.processUnstructured(inputStream, s3Key);
+
+            // then
+            assertThat(documents).hasSize(1);
+            assertThat(documents.getFirst().getMetadata())
+                    .containsEntry("source", s3Key)
+                    .containsEntry("title", "pierogi-recipe.docx");
+        }
+    }
+
+    @Test
+    @DisplayName("processUnstructured propagates runtime exception when the API call throws")
+    void processUnstructured_WhenApiCallThrowsException_ThenWrapsInRuntimeException() throws IOException {
         // given
-        InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());
         String filename = "file.pdf";
 
         mockRestClientSetup();
         when(responseSpec.body(String.class)).thenThrow(new RuntimeException("API Error"));
 
-        // when / then
-        assertThatThrownBy(() -> ingestionService.processUnstructured(inputStream, filename))
-                .isInstanceOf(RuntimeException.class);
+        try (InputStream inputStream = new ByteArrayInputStream("dummy".getBytes())) {
+            // then
+            assertThatThrownBy(() -> ingestionService.processUnstructured(inputStream, filename))
+                    .isInstanceOf(RuntimeException.class);
+        }
     }
 
     @Test
+    @DisplayName("processUnstructured throws IngestionException when the input stream raises IOException")
     void processUnstructured_WhenInputStreamThrowsIOException_ThenThrowsIngestionException() throws IOException {
         // given
         InputStream inputStream = mock(InputStream.class);
         when(inputStream.readAllBytes()).thenThrow(new IOException("Stream crash"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> ingestionService.processUnstructured(inputStream, "fail.pdf"))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to read input stream for file: fail.pdf");
     }
 
     @Test
+    @DisplayName("processUnstructured throws IngestionException when the API response is invalid JSON")
     void processUnstructured_WhenInvalidJsonResponse_ThenThrowsIngestionException() throws Exception {
         // given
-        InputStream inputStream = new ByteArrayInputStream("dummy".getBytes());
         String filename = "file.pdf";
         String jsonResponse = "{ broken";
 
         mockRestClientSetup();
         when(responseSpec.body(String.class)).thenReturn(jsonResponse);
-        when(objectMapper.readTree(jsonResponse)).thenThrow(new JsonProcessingException("Broken json") {});
+        when(objectMapper.readTree(jsonResponse)).thenThrow(new JsonProcessingException("Broken json") {
+        });
 
-        // when / then
-        assertThatThrownBy(() -> ingestionService.processUnstructured(inputStream, filename))
-                .isInstanceOf(IngestionException.class)
-                .hasMessageContaining("Failed to parse Unstructured API response");
+        try (InputStream inputStream = new ByteArrayInputStream("dummy".getBytes())) {
+            // then
+            assertThatThrownBy(() -> ingestionService.processUnstructured(inputStream, filename))
+                    .isInstanceOf(IngestionException.class)
+                    .hasMessageContaining("Failed to parse Unstructured API response");
+        }
     }
 
     private void mockRestClientSetup() {

@@ -1,274 +1,297 @@
 # AscendMemory
 
-AscendMemory is a robust, persistent memory service for the AscendAI ecosystem. It leverages `mem0ai` to provide long-term semantic memory storage and retrieval, accessible via both a REST API and an MCP (Model Context Protocol) server.
+A persistent semantic memory service for the AscendAI ecosystem. It uses `mem0ai` for long-term memory storage and
+retrieval, exposed as both a REST API and an MCP (Model Context Protocol) server on the same port.
 
 ---
 
-## Table of Contents
+### Table of Contents
 
-*   [API Documentation](#api-documentation)
-*   [Agent Skill](#agent-skill)
-*   [Prerequisites](#prerequisites)
-*   [Configuration (Environment Variables)](#configuration-environment-variables)
-*   [Running the Service](#running-the-service)
-    *   [Standard Python App](#running-as-a-standard-python-app-without-docker)
-    *   [Docker](#running-with-docker-recommended)
-*   [Making API Requests](#making-api-requests)
-*   [MCP Server Mode](#mcp-server-mode)
-*   [Troubleshooting](#troubleshooting)
-*   [Dependencies](#dependencies)
-
----
-
-## API Documentation
-
-The REST API is self-documenting. While the server is running, you can access:
-
-*   **Swagger UI**: [http://localhost:7020/docs](http://localhost:7020/docs)
-*   **Redoc**: [http://localhost:7020/redoc](http://localhost:7020/redoc)
+- [API Documentation](#api-documentation)
+- [Agent Skill](#agent-skill)
+- [Prerequisites](#prerequisites)
+- [Configuration](#configuration)
+- [Running the Service](#running-the-service)
+- [Making API Requests](#making-api-requests)
+- [MCP Server Mode](#mcp-server-mode)
+- [Troubleshooting](#troubleshooting)
+- [Dependencies](#dependencies)
+- [Docs map](#docs-map)
 
 ---
 
-## Agent Skill
+### API Documentation
 
-A drop-in skill is shipped at [`skills/ascend-memory/SKILL.md`](skills/ascend-memory/SKILL.md). Copy the `skills/ascend-memory/` directory into your agent's skills folder (`.claude/skills/`, `.agents/skills/`, `.kilocode/skills/`, etc.) and the agent will pick it up automatically.
+The REST API is self-documenting. While the server is running:
 
-The skill teaches the agent when to search memory before answering, when to insert new memories, how to scope every call by `user_id`, and when destructive operations like `/wipe` are appropriate. Base URL is left out (varies per environment) — the agent runtime is expected to provide it.
+- **Swagger UI**: [http://localhost:7020/docs](http://localhost:7020/docs)
+- **Redoc**: [http://localhost:7020/redoc](http://localhost:7020/redoc)
+
+---
+
+### Agent Skill
+
+A drop-in skill ships at [skills/ascend-memory/SKILL.md](skills/ascend-memory/SKILL.md). Copy
+[skills/ascend-memory/](skills/ascend-memory/) into your agent's skills folder (`.claude/skills/`, `.agents/skills/`,
+`.opencode/skills/`, etc.) and the agent will pick it up automatically.
+
+The skill teaches the agent when to search memory before answering, when to insert new memories, how to scope every
+call by `user_id`, and when destructive operations like `/wipe` are appropriate. Base URL is left out (varies per
+environment); the agent runtime is expected to provide it.
 
 When you change endpoint shapes here, update the SKILL.md so downstream agents stay accurate.
 
 ---
 
-## Prerequisites
+### Prerequisites
 
-*   **Python 3.11**
-*   **OpenAI API Key** (for embedding generation by `mem0`)
-
----
-
-## Configuration (Environment Variables)
-
-The service is configured via environment variables. You can set them in your shell or use a `.env` file (if supported by your runner, though this project uses `pydantic-settings` which reads `.env` by default if present).
-
-Each embedding provider has its own base URL and API key, so a single deployment can serve `provider=lmstudio`, `provider=openai`, and `provider=gemini` simultaneously, each routed to its real endpoint.
-
-*   `LMSTUDIO_BASE_URL`: LM Studio OpenAI-compatible URL. Default: `http://localhost:1234/v1`.
-*   `LMSTUDIO_API_KEY`: Placeholder key (LM Studio doesn't validate). Default: `sk_local`.
-*   `OPENAI_BASE_URL`: Real OpenAI URL. Default: `https://api.openai.com/v1`.
-*   `OPENAI_API_KEY`: Real OpenAI key. Required when `provider=openai` is invoked.
-*   `GEMINI_BASE_URL`: Gemini OpenAI-compatible URL. Default: `https://generativelanguage.googleapis.com/v1beta/openai/`.
-*   `GEMINI_API_KEY`: Gemini key. Required when `provider=gemini` is invoked.
-*   `MEM0_LLM_MODEL`: Model ID for fact extraction. Default: `meta-llama-3.1-8b-instruct`.
-*   `MEM0_DEFAULT_PROVIDER`: Provider used when the request omits `provider`. Default: `lmstudio`.
-*   `MEM0_INFER_MEMORY`: If `true`, mem0 infers memories from chat messages instead of storing the raw text. Default: `false`.
-*   `API_PORT`: Default `7020`.
-*   `API_HOST`: Default `0.0.0.0`.
-*   `LOG_LEVEL`: Default `INFO`.
-*   `QDRANT_HOST`: `localhost` for native, `host.docker.internal` from inside Docker, or your managed Qdrant host.
-*   `QDRANT_PORT`: Default `6333`.
-
-Missing API keys only fail when the corresponding provider is actually invoked, so you can run with just the keys you need.
-
-### Embedding Provider → Qdrant Collection Mapping
-
-The service routes each request to the correct Qdrant collection based on the `provider` parameter:
-
-| Provider | Embedding Model | Dimensions | Qdrant Collection |
-|---|---|---|---|
-| `lmstudio` (default) | `text-embedding-nomic-embed-text-v2-moe` | 768 | `ascend_memory_768` |
-| `openai` | `text-embedding-3-small` | 1536 | `ascend_memory_1536` |
-| `gemini` | `gemini-embedding-001` | 768 | `ascend_memory_768` |
-
-Providers sharing the same dimensions (`lmstudio` and `gemini`) share the same Qdrant collection.
+- **Python 3.11**
+- **Qdrant** running on `6333` (local or managed)
+- **OpenAI API key** (only when invoking `provider=openai`, for embedding generation by `mem0`)
 
 ---
 
-## Running the Service
+### Configuration
 
-### Running as a standard Python App (without Docker)
+Settings live in [src/config/config.py](src/config/config.py) (pydantic-settings, reads `.env` automatically). Each
+embedding provider has its own base URL and API key, so a single deployment can serve `provider=lmstudio`,
+`provider=openai`, and `provider=gemini` side by side. Missing API keys only fail when the matching provider is
+actually invoked.
 
-1.  **Create virtual environment**
-
-    Linux/MacOS:
-    ```shell
-    python3 -m venv .venv
-    ```
-
-    Windows:
-    ```powershell
-    python -m venv .venv
-    ```
-
-2.  **Activate virtual environment**
-
-    Linux/MacOS:
-    ```shell
-    source .venv/bin/activate
-    ```
-
-    Windows:
-    ```powershell
-    .\.venv\Scripts\activate
-    ```
-
-3.  **Install dependencies**
-
-    ```shell
-    pip install -e .[dev]
-    ```
-    *The `-e` flag stands for "editable". It allows you to modify the source code and see changes immediately without reinstalling the package.*
-
-4.  **Run the Server**
-
-    For local usage (e.g., with LM Studio), ensure the following are set:
-    *   `OPENAI_API_KEY`: (Required)
-    *   `OPENAI_BASE_URL`: (e.g., `http://localhost:1234/v1`)
-    *   `MEM0_LLM_MODEL`: (e.g., `llama-3.2-1b-instruct`)
-
-    **Note:** For local development, you can alternatively modify the default values directly in `src/core/config.py`.
-
-    *Exporting variables (optional if set in system/config.py):*
-
-    Linux/MacOS:
-    ```shell
-    export OPENAI_API_KEY="sk-..."
-    export OPENAI_BASE_URL="http://localhost:1234/v1"
-    export MEM0_LLM_MODEL="llama-3.2-1b-instruct"
-    ```
-
-    ```shell
-    python src/main.py
-    ```
-
-    Windows:
-    ```powershell
-    $env:OPENAI_API_KEY="sk-..."
-    $env:OPENAI_BASE_URL="http://localhost:1234/v1"
-    $env:MEM0_LLM_MODEL="llama-3.2-1b-instruct"
-    ```
-
-    ```powershell
-    python src/main.py
-    ```
-
-### Running with Docker (Recommended)
-
-1.  **Build the Image**
-
-    ```shell
-    docker build -t ascend-memory:latest .
-    ```
-
-2.  **Run the Container**
-
-    Linux/MacOS:
-    ```shell
-    docker run -d \
-      --name ascend-memory \
-      -p 7020:7020 \
-      -e OPENAI_API_KEY="sk-..." \
-      -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" \
-      ascend-memory:latest
-    ```
-
-    Windows:
-    ```powershell
-    docker run -d `
-      --name ascend-memory `
-      -p 7020:7020 `
-      -e OPENAI_API_KEY="sk-..." `
-      -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" `
-      ascend-memory:latest
-    ```
-
-3.  **Tagging and Pushing to Registry**
-
-    Tag with a specific version (e.g., v0.0.1):
-
-    ```shell
-    docker tag ascend-ai-ascend-memory:latest lukk17/ascend-memory:v0.0.1
-    ```
-
-    Tag with latest:
-
-    ```shell
-    docker tag ascend-ai-ascend-memory:latest lukk17/ascend-memory:latest
-    ```
-
-    Push specific version:
-
-    ```shell
-    docker push lukk17/ascend-memory:v0.0.1
-    ```
-
-    Push latest:
-
-    ```shell
-    docker push lukk17/ascend-memory:latest
-    ```
+The full env-var matrix (service, embedding providers, Qdrant) plus the provider-to-collection mapping table lives in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md). Read it before deploying or onboarding a new provider key.
 
 ---
 
-## Making API Requests
+### Running the Service
 
-### 1. Insert Memory (Add)
-Inserts a new memory or infers one from messages.
+#### As a standard Python app
+
+**1. Create a virtual environment.**
+
+Bash:
+
+```bash
+python3 -m venv .venv
+```
+
+PowerShell:
+
+```powershell
+python -m venv .venv
+```
+
+**2. Activate it.**
+
+Bash:
+
+```bash
+source .venv/bin/activate
+```
+
+PowerShell:
+
+```powershell
+.\.venv\Scripts\activate
+```
+
+**3. Install dependencies.** The `-e` flag installs in editable mode so source edits show up without reinstall.
+
+```bash
+pip install -e .[dev]
+```
+
+**4. Run the server.** Defaults in [src/config/config.py](src/config/config.py) point at local LM Studio. Override
+through env vars for any other provider.
+
+Bash:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+```bash
+export OPENAI_BASE_URL="http://localhost:1234/v1"
+```
+
+```bash
+python src/main.py
+```
+
+PowerShell:
+
+```powershell
+$env:OPENAI_API_KEY="sk-..."
+```
+
+```powershell
+$env:OPENAI_BASE_URL="http://localhost:1234/v1"
+```
+
+```powershell
+python src/main.py
+```
+
+#### With Docker (recommended)
+
+The service is wired into the main `docker-compose.yaml` at the repo root as `ascend-memory`. Run every compose command
+against the main file (no `-f` flag); the scrapper file is included transitively.
+
+Start (or rebuild) just this service from the repo root:
+
+```bash
+docker compose up -d --build ascend-memory
+```
+
+Tail the logs:
+
+```bash
+docker logs --tail 80 -f ascend-memory
+```
+
+Force a clean recreate after a Dockerfile or env-var change:
+
+```bash
+docker compose up -d --build --force-recreate ascend-memory
+```
+
+Standalone build, when iterating outside compose:
+
+```bash
+docker build -t ascend-memory:latest .
+```
+
+Standalone run, when iterating outside compose:
+
+```bash
+docker run -d --name ascend-memory -p 7020:7020 -e OPENAI_API_KEY="sk-..." -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
+```
+
+**Tag and push to a registry (optional).**
+
+Bash:
+
+```bash
+docker tag ascend-memory:latest lukk17/ascend-memory:v0.0.1
+```
+
+```bash
+docker push lukk17/ascend-memory:v0.0.1
+```
+
+```bash
+docker tag ascend-memory:latest lukk17/ascend-memory:latest
+```
+
+```bash
+docker push lukk17/ascend-memory:latest
+```
+
+PowerShell:
+
+```powershell
+docker tag ascend-memory:latest lukk17/ascend-memory:v0.0.1
+```
+
+```powershell
+docker push lukk17/ascend-memory:v0.0.1
+```
+
+```powershell
+docker tag ascend-memory:latest lukk17/ascend-memory:latest
+```
+
+```powershell
+docker push lukk17/ascend-memory:latest
+```
+
+---
+
+### Making API Requests
+
+#### 1. Insert memory
+
+Inserts a new memory, or infers one from chat messages when `MEM0_INFER_MEMORY=true`.
 
 **Endpoint:** `POST /api/v1/memory/insert`
 
-**Example:**
+Bash:
+
 ```bash
-curl -X POST "http://localhost:7020/api/v1/memory/insert" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "user_id": "testUser1",
-           "text": "The user prefers dark mode in all applications.",
-           "provider": "lmstudio",
-           "metadata": {"category": "preferences"}
-         }'
+curl -X POST "http://localhost:7020/api/v1/memory/insert" -H "Content-Type: application/json" -d '{"user_id":"testUser1","text":"The user prefers dark mode in all applications.","provider":"lmstudio","metadata":{"category":"preferences"}}'
 ```
 
-The `provider` field is optional — omitting it uses the `MEM0_DEFAULT_PROVIDER` setting.
+PowerShell:
 
-### 2. Search Memory
+```powershell
+Invoke-RestMethod -Uri http://localhost:7020/api/v1/memory/insert -Method Post -ContentType "application/json" -Body '{"user_id":"testUser1","text":"The user prefers dark mode in all applications.","provider":"lmstudio","metadata":{"category":"preferences"}}'
+```
+
+The `provider` field is optional. Omitting it uses the `MEM0_DEFAULT_PROVIDER` setting.
+
+#### 2. Search memory
 
 Retrieve relevant memories based on a semantic query.
 
 **Endpoint:** `GET /api/v1/memory/search`
 
+Bash:
+
 ```bash
 curl "http://localhost:7020/api/v1/memory/search?user_id=testUser1&query=dark%20mode&provider=lmstudio"
 ```
 
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:7020/api/v1/memory/search?user_id=testUser1&query=dark%20mode&provider=lmstudio"
+```
+
 The `provider` query param is optional.
 
-### 3. Delete Memory
+#### 3. Delete memory
 
 Delete a specific memory by its ID.
 
 **Endpoint:** `DELETE /api/v1/memory`
 
+Bash:
+
 ```bash
 curl -X DELETE "http://localhost:7020/api/v1/memory?memory_id=abc-123-def"
 ```
 
-### 4. Wipe User Memory
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:7020/api/v1/memory?memory_id=abc-123-def" -Method Delete
+```
+
+#### 4. Wipe user memory
 
 Delete ALL memories for a specific user.
 
 **Endpoint:** `POST /api/v1/memory/wipe`
 
+Bash:
+
 ```bash
 curl -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=testUser1"
 ```
 
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:7020/api/v1/memory/wipe?user_id=testUser1" -Method Post
+```
+
 ---
 
-## MCP Server Mode
+### MCP Server Mode
 
-The service exposes an MCP (Model Context Protocol) server at the `/mcp` endpoint (mounted via HTTP Streamable).
+The service exposes an MCP server at `/mcp` (mounted via HTTP Streamable).
 
-### Tool Configuration (e.g., for Claude Desktop)
+#### Tool configuration (e.g. for Claude Desktop)
 
 ```json
 {
@@ -281,56 +304,149 @@ The service exposes an MCP (Model Context Protocol) server at the `/mcp` endpoin
 }
 ```
 
-### HTTP Streamable Requirements
-If you are manually invoking the MCP endpoints (e.g., using `mcp_requests.http` or curl):
-1.  **Endpoints**: The standard `http_app` exposes `/sse` (for connection) and `/messages` (for requests). However, configuration may expose `/mcp` handling both.
-2.  **Headers**: You **MUST** include `Accept: application/json, text/event-stream` in your `POST` requests to satisfy the server's content negotiation.
+#### HTTP Streamable requirements
 
-### Available Tools
+When invoking the MCP endpoints manually (e.g. via [mcp_requests.http](mcp_requests.http) or curl):
 
-*   `memory_insert(user_id, text, provider?, metadata?)`: Add a memory. `provider` selects the embedding provider/collection (default: `MEM0_DEFAULT_PROVIDER`).
-*   `memory_search(user_id, query, limit?, provider?)`: Search memories.
-*   `memory_delete(memory_id, provider?)`: Delete a specific memory.
-*   `memory_wipe(user_id, provider?)`: Wipe all user memories.
+1. **Endpoints.** The standard `http_app` exposes `/sse` (for connection) and `/messages` (for requests).
+   Configuration may expose `/mcp` handling both.
+2. **Headers.** You MUST include `Accept: application/json, text/event-stream` in `POST` requests to satisfy the
+   server's content negotiation.
 
-**Testing MCP:**
-A complete collection of example requests is available in the file:
-`AscendMemory/mcp_requests.http`
+#### Available tools
 
-### Troubleshooting
+- `memory_insert(user_id, text, provider?, metadata?)`. Add a memory. `provider` selects the embedding provider and
+  collection (default: `MEM0_DEFAULT_PROVIDER`).
+- `memory_search(user_id, query, limit?, provider?)`. Search memories.
+- `memory_delete(memory_id, provider?)`. Delete a specific memory.
+- `memory_wipe(user_id, provider?)`. Wipe all user memories.
 
-*   **406 Not Acceptable**: Missing proper `Accept` header. Ensure specific Accept types are sent rather than `*/*`.
-*   **No models loaded (LM Studio)**: Ensure `MEM0_LLM_MODEL` in `config.py` matches the exact ID of the model loaded in your LM Studio instance.
-*   **PermissionError (Qdrant)**: Ensure you are connecting to an external Qdrant instance (localhost/docker) and not trying to initialize an embedded one (default behavior overridden in `memory_client.py`).
+#### Testing MCP
+
+A collection of example requests lives at [mcp_requests.http](mcp_requests.http) (use the VS Code REST Client
+extension).
 
 ---
 
-## Dependencies
+### Observability
 
-Dependency management is handled via `pyproject.toml`.
+The service exposes three diagnostic endpoints plus per-operation Prometheus metrics:
 
-To add a new dependency:
-1.  Add it to `pyproject.toml`.
-2.  Reinstall: `pip install .`
+- `GET /health` — liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound, regardless of upstream
+  state. Targeted by the Docker `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should
+  hit this.
+- `GET /ready` — readiness probe. Probes Qdrant `/healthz`, the default embedding API `/models`, and constructs the
+  mem0 client. Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded",
+  "checks": {...}}`. Per-probe budget is 3 s; worst-case total latency is ~9 s. Kubernetes readiness probes and
+  load-balancer health checks should hit this.
+- `GET /health/legacy` — combined liveness+readiness shape kept for callers still on the pre-split contract. Returns
+  503 during warmup, 200 after. Scheduled for removal once all callers migrate.
+- `GET /metrics` — Prometheus payload. Four counters (`memory_{insert,search,delete,wipe}_total`) labelled by
+  `provider` and `outcome`, plus four histograms (`memory_*_duration_seconds`) labelled by `provider`.
 
-### Reinstalling python dependencies
-Terminal in your activated virtual environment.
+Every request echoes (or generates) an `X-Request-ID` header. The same value is injected into every log line for that
+request via the `[request_id]` field, so logs can be filtered on a single request in Loki without correlation
+plumbing.
 
-This creates a list of everything that's currently installed, uninstalls it, and then deletes the list file.
+### Error contract
 
-```shell
+All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with `Content-Type:
+application/problem+json`.
+
+- `400` — validation failure (`ValueError` raised in the request lifecycle). Body includes `detail` with the
+  human-readable failure reason (authored by the service, safe to surface).
+- `422` — pydantic input validation failure (query parameters, request body). Body shape is FastAPI's default
+  validation error envelope.
+- `500` — unhandled exception. Body intentionally omits `detail` to prevent leaking upstream stack traces or DSNs.
+  Full diagnostics live in the service logs, correlated by `X-Request-ID`.
+
+The MCP surface returns a structured envelope instead of HTTP status codes (MCP tool results are JSON):
+`{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+
+### Startup readiness banner
+
+On startup, [src/config/startup_banner.py](src/config/startup_banner.py) emits a single multi-line INFO log entry
+with an ANSI Shadow `ASCEND MEMORY` banner, access URLs, the active embedding provider, a 2 s Qdrant probe, and the
+list of observability and REST endpoints. Shared convention with every other long-running service in the repo. See
+[.agents/skills/coding-standards/SKILL.md](../.agents/skills/coding-standards/SKILL.md).
+
+---
+
+### Troubleshooting
+
+- **406 Not Acceptable.** Missing proper `Accept` header. Send specific Accept types instead of `*/*`.
+- **No models loaded (LM Studio).** Ensure `MEM0_LLM_MODEL` matches the exact ID of the model loaded in your LM
+  Studio instance.
+- **PermissionError (Qdrant).** Ensure you're connecting to an external Qdrant instance (localhost or Docker)
+  and not trying to initialise an embedded one (default behaviour overridden in
+  [src/service/memory_client.py](src/service/memory_client.py)).
+
+#### Reinstalling Python dependencies
+
+Terminal in your activated virtual environment. Lists installed packages, uninstalls them, removes the list, then
+reinstalls.
+
+Bash:
+
+```bash
 pip freeze > uninstall.txt
 ```
 
-```shell
+```bash
 pip uninstall -y -r uninstall.txt
 ```
 
-```shell
-del uninstall.txt
+```bash
+rm uninstall.txt
 ```
 
-Then reinstall:
-```shell
+```bash
 pip install -e .[dev]
 ```
+
+PowerShell:
+
+```powershell
+pip freeze > uninstall.txt
+```
+
+```powershell
+pip uninstall -y -r uninstall.txt
+```
+
+```powershell
+Remove-Item uninstall.txt
+```
+
+```powershell
+pip install -e .[dev]
+```
+
+---
+
+### Dependencies
+
+Dependency management lives in [pyproject.toml](pyproject.toml). Add a new dependency there, then reinstall with
+`pip install -e .[dev]`.
+
+---
+
+### Docs map
+
+| File                                                                       | What's in it                                                        |
+| :------------------------------------------------------------------------- | :------------------------------------------------------------------ |
+| [AGENTS.md](AGENTS.md)                                                     | Module-level instructions for AI coding agents.                     |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)                             | Full env-var matrix, embedding-provider routing, Qdrant collections.|
+| [src/config/config.py](src/config/config.py)                               | Settings, provider routing, defaults.                               |
+| [src/service/memory_client.py](src/service/memory_client.py)               | mem0 client wiring, per-provider routing.                           |
+| [src/api/rest/rest_endpoints.py](src/api/rest/rest_endpoints.py)           | REST endpoints under `/api/v1/memory/*`.                            |
+| [src/api/readiness.py](src/api/readiness.py)                               | `/ready` probe — Qdrant, embedding-API, mem0 client construction.   |
+| [src/api/mcp/mcp_server.py](src/api/mcp/mcp_server.py)                     | FastMCP tool definitions.                                           |
+| [src/api/exception_handlers.py](src/api/exception_handlers.py)             | RFC 7807 problem-document handlers for `ValueError` and `Exception`.|
+| [src/observability/request_context.py](src/observability/request_context.py) | `X-Request-ID` middleware and request-id ContextVar.              |
+| [src/observability/metrics.py](src/observability/metrics.py)               | Prometheus counters and histograms exposed at `/metrics`.           |
+| [docs/architecture/decisions/](docs/architecture/decisions/)               | ADRs 1-6 (mem0ai, Qdrant, user_id scope, MCP↔REST, observability, mem0 2.x upgrade). |
+| [mcp_requests.http](mcp_requests.http)                                     | Example MCP requests for the VS Code REST Client extension.         |
+| [skills/ascend-memory/SKILL.md](skills/ascend-memory/SKILL.md)             | Drop-in agent skill for downstream agents.                          |
+| [../README.md](../README.md)                                               | Monorepo overview, architecture, ports.                             |
+| [../docs/architecture/README.md](../docs/architecture/README.md)           | Monorepo architecture, ADRs.                                        |

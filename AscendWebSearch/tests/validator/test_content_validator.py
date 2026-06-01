@@ -1,47 +1,56 @@
+from unittest.mock import patch
+
 from src.validator.content_validator import ContentValidator
 
 
-def test_validate_content_success():
-    # given
-    validator = ContentValidator()
-    # Content must be > 200 words and have TTR > 0.2
-    sentence = "The quick brown fox jumps over the lazy dog and creates unique content for validation purposes. "
-    content = sentence * 20  # 15 words * 20 = 300 words. Unique ~15. TTR ~ 15/300 = 0.05. Wait.
+def test_validate_passes_for_quality_long_content():
     words = [f"word{i}" for i in range(210)]
     content = " ".join(words)
-
-    # when
-    result = validator.validate(content)
-
-    # then
-    assert result is True
+    assert ContentValidator().validate(content) is True
 
 
-def test_validate_content_empty():
-    # given
-    validator = ContentValidator()
-    content = ""
-
-    # when
-    result = validator.validate(content)
-
-    # then
-    # Assuming empty content is invalid
-    assert result is False
+def test_validate_fails_for_empty_string():
+    assert ContentValidator().validate("") is False
 
 
-def test_validate_content_short():
-    # given
-    validator = ContentValidator()
-    content = "a"  # Too short?
+def test_validate_fails_for_whitespace_only():
+    assert ContentValidator().validate("   \t\n") is False
 
-    # when
-    # Check implementation logic (assumed min length)
-    # If generic, might pass. If strict, fail.
-    # Let's assume basic non-empty check for now or check source?
-    # Source check via test run will confirm.
-    result = validator.validate(content)
 
-    # then
-    # asserting based on likely logic, will fix if fails
-    assert result is True or result is False
+def test_validate_fails_for_short_text():
+    assert ContentValidator().validate("only one") is False
+
+
+def test_validate_fails_on_error_keyword():
+    text = " ".join(["filler"] * 30) + " Access Denied " + " ".join(["more"] * 30)
+    assert ContentValidator().validate(text) is False
+
+
+def test_validate_passes_when_textstat_raises():
+    words = [f"word{i}" for i in range(60)]
+    content = " ".join(words)
+    with patch(
+        "src.validator.content_validator._lexicon_count",
+        side_effect=RuntimeError("nope"),
+    ):
+        assert ContentValidator().validate(content) is True
+
+
+def test_validate_fails_when_low_lexicon_and_low_flesch():
+    # 11 unique words to pass the length gate, lexicon_count < min and flesch < threshold
+    content = "one two three four five six seven eight nine ten eleven"
+    with (
+        patch("src.validator.content_validator._lexicon_count", return_value=5),
+        patch("src.validator.content_validator._flesch_reading_ease", return_value=5.0),
+    ):
+        assert ContentValidator().validate(content) is False
+
+
+def test_validate_fails_on_repetition():
+    # 51 identical words -> TTR < 0.1 -> repetitive
+    content = " ".join(["foo"] * 51)
+    with (
+        patch("src.validator.content_validator._lexicon_count", return_value=51),
+        patch("src.validator.content_validator._flesch_reading_ease", return_value=60.0),
+    ):
+        assert ContentValidator().validate(content) is False

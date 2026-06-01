@@ -1,4 +1,4 @@
-# Semantic memory — e2e test
+# Semantic memory: e2e test
 
 ## What this verifies
 
@@ -6,7 +6,7 @@
 - The fact is retrieved on a later, independent turn after chat history has been cleared.
 - The response on the recall turn references the stored fact.
 
-The reset between turns guarantees that recall cannot come from short-term chat history — only from semantic memory.
+The reset between turns guarantees that recall cannot come from short-term chat history. Only from semantic memory.
 
 ## Prerequisites
 
@@ -58,47 +58,47 @@ docker exec postgres psql -U postgres -d ascend_ai -c "SELECT 1"
 
 Expect a row with `1` in the output.
 
-The Bruno requests pin `X-User-Id: frosty`. The reset commands below assume that user id.
+The Bruno requests pin `X-User-Id: frostySemanticMemoryTest`. The reset commands below assume that user id.
 
 ## Reset state
 
-Clear short-term chat for `frosty` in Redis.
+Clear short-term chat for `frostySemanticMemoryTest` in Redis.
 
 ```bash
-docker exec redis redis-cli DEL chat:frosty
+docker exec redis redis-cli DEL chat:frostySemanticMemoryTest
 ```
 
-Clear archived chat history for `frosty` in Postgres.
+Clear archived chat history for `frostySemanticMemoryTest` in Postgres.
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frosty';"
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostySemanticMemoryTest';"
 ```
 
-Wipe stored semantic memory points for `frosty` in Qdrant.
+Wipe stored semantic memory points for `frostySemanticMemoryTest` in Qdrant.
 
 ```bash
-curl -X POST http://localhost:6333/collections/ascend_memory_1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"user_id","match":{"value":"frosty"}}]}}'
+curl -X POST http://localhost:6333/collections/ascend_memory_1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"user_id","match":{"value":"frostySemanticMemoryTest"}}]}}'
 ```
 
 ## Run
 
-Step 1 — save turn. Send the request and wait for HTTP 200 before continuing.
+Step 1. Save turn. Send the request and wait for HTTP 200 before continuing.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/memory-test-save.yml" --env ascend-local
 ```
 
-Step 2 — clear short-term chat again so the recall turn cannot leak from chat history. Run both commands and wait for them to return before continuing.
+Step 2. Clear short-term chat again so the recall turn cannot leak from chat history. Run both commands and wait for them to return before continuing.
 
 ```bash
-docker exec redis redis-cli DEL chat:frosty
+docker exec redis redis-cli DEL chat:frostySemanticMemoryTest
 ```
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frosty';"
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostySemanticMemoryTest';"
 ```
 
-Step 3 — recall turn. Send the request and wait for the response before moving to the Expected section.
+Step 3. Recall turn. Send the request and wait for the response before moving to the Expected section.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/memory-test-retrieve.yml" --env ascend-local
@@ -114,10 +114,10 @@ Wait ~5 seconds after step 1 returns before running the Qdrant scroll. Mem0 writ
 sleep 5
 ```
 
-After the wait, a Qdrant scroll filtered by `user_id=frosty` on the active `ascend_memory_*` collection returns at least one point whose payload mentions Luke and software engineer:
+After the wait, a Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` on the active `ascend_memory_*` collection returns at least one point whose payload mentions Luke and software engineer:
 
 ```bash
-curl -sS -X POST http://localhost:6333/collections/ascend_memory_1536/points/scroll -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"user_id","match":{"value":"frosty"}}]},"limit":5,"with_payload":true,"with_vector":false}'
+curl -sS -X POST http://localhost:6333/collections/ascend_memory_1536/points/scroll -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"user_id","match":{"value":"frostySemanticMemoryTest"}}]},"limit":5,"with_payload":true,"with_vector":false}'
 ```
 
 The point count returned by that scroll is ≥ 1, and at least one point's `payload.data` (or equivalent payload field) contains `Luke` AND `software engineer`.
@@ -126,8 +126,14 @@ After step 3 the Bruno output shows HTTP 200.
 
 After step 3 the response body's `content` field contains both `Luke` and `software engineer`. Because chat history was wiped between save and recall, the only way the recall response can know those facts is via semantic memory.
 
-The response body's `content` field is NOT a refusal like "I don't know your name" — that indicates the semantic-memory pipeline did not deliver the stored facts.
+The response body's `content` field is NOT a refusal like "I don't know your name". That indicates the semantic-memory pipeline did not deliver the stored facts.
 
 ## Fixtures
 
 None.
+
+## Concurrency
+
+- **Mutates:** Qdrant collections `ascend_memory_*` (user-scoped: `frostySemanticMemoryTest`); Postgres `chat_history` (user_id=`frostySemanticMemoryTest`); Redis key `chat:frostySemanticMemoryTest`
+- **Conflicts with:** none
+- **Serial:** false

@@ -1,17 +1,22 @@
-from typing import Any, Optional
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SSEProgressEvent(BaseModel):
-    type: str = "progress"
+    type: str = Field(default="progress")
     message: str
-    data: Optional[dict[str, Any]] = None
+    data: dict[str, Any] | None = None
 
 
 class SSECompleteEvent(BaseModel):
-    type: str = "complete"
+    type: str = Field(default="complete")
     download_url: str
     source: str
     model: str
     language: str
+
+
+class SSEErrorEvent(BaseModel):
+    type: str = Field(default="error")
+    message: str

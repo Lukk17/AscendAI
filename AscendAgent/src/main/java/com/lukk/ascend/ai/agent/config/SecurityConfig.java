@@ -1,6 +1,8 @@
 package com.lukk.ascend.ai.agent.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.lukk.ascend.ai.agent.config.properties.SecurityProperties;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -28,16 +30,11 @@ import org.springframework.security.web.SecurityFilterChain;
  */
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(SecurityProperties.class)
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${app.security.enabled:false}")
-    private boolean securityEnabled;
-
-    @Value("${app.security.user.username:admin}")
-    private String username;
-
-    @Value("${app.security.user.password:admin}")
-    private String password;
+    private final SecurityProperties securityProperties;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -46,9 +43,11 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(PasswordEncoder encoder) {
+        SecurityProperties.User user = securityProperties.getUser();
+
         return new InMemoryUserDetailsManager(
-                User.withUsername(username)
-                        .password(encoder.encode(password))
+                User.withUsername(user.getUsername())
+                        .password(encoder.encode(user.getPassword()))
                         .roles("USER")
                         .build());
     }
@@ -59,15 +58,21 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        if (securityEnabled) {
+        if (securityProperties.isEnabled()) {
             http
                     .authorizeHttpRequests(auth -> auth
-                            .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                            .requestMatchers(
+                                    "/actuator/health",
+                                    "/v3/api-docs/**",
+                                    "/swagger-ui/**",
+                                    "/swagger-ui.html"
+                            ).permitAll()
                             .anyRequest().authenticated())
                     .httpBasic(Customizer.withDefaults());
         } else {
             http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         }
+
         return http.build();
     }
 }

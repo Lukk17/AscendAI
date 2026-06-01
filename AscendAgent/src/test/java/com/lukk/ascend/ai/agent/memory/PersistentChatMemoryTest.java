@@ -1,22 +1,21 @@
 package com.lukk.ascend.ai.agent.memory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,7 +25,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,82 +43,89 @@ class PersistentChatMemoryTest {
     @Mock
     private ListOperations<String, String> listOperations;
 
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
-
-    @InjectMocks
     private PersistentChatMemory persistentChatMemory;
 
     @BeforeEach
-    void setupGlobalFields() {
-        ReflectionTestUtils.setField(persistentChatMemory, "maxSize", 5);
+    void setup() {
+        ChatHistoryProperties properties = new ChatHistoryProperties();
+        properties.setMaxSize(5);
+        com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties compactionProperties =
+                new com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties();
+        compactionProperties.setEnabled(false);
+        com.lukk.ascend.ai.agent.memory.ChatHistoryCompactionService compactionService =
+                org.mockito.Mockito.mock(com.lukk.ascend.ai.agent.memory.ChatHistoryCompactionService.class);
+        persistentChatMemory = new PersistentChatMemory(repository, redisTemplate, new ObjectMapper(),
+                properties, compactionProperties, compactionService);
     }
 
     @Test
-    void get_WhenInRedis_ThenReturnsFromRedisAndIgnoresDB() throws Exception {
+    @DisplayName("returns messages from Redis cache when cache is populated")
+    void get_WhenInRedis_ThenReturnsFromRedisAndIgnoresDB() {
         // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
-        when(listOperations.range(REDIS_KEY, 0, -1)).thenReturn(List.of("{\"role\":\"user\",\"content\":\"Hello\"}", "{\"role\":\"assistant\",\"content\":\"Hi there\"}"));
+        when(listOperations.range(REDIS_KEY, 0, -1)).thenReturn(List.of(
+                "{\"role\":\"user\",\"content\":\"Hello\"}",
+                "{\"role\":\"assistant\",\"content\":\"Hi there\"}"));
 
         // when
         List<Message> result = persistentChatMemory.get(DEFAULT_CONVERSATION_ID, 10);
 
         // then
         assertThat(result).hasSize(2);
-        assertThat(result.get(0)).isInstanceOf(UserMessage.class);
-        assertThat(result.get(0).getText()).isEqualTo("Hello");
+        assertThat(result.getFirst()).isInstanceOf(UserMessage.class);
+        assertThat(result.getFirst().getText()).isEqualTo("Hello");
         assertThat(result.get(1)).isInstanceOf(AssistantMessage.class);
         assertThat(result.get(1).getText()).isEqualTo("Hi there");
     }
 
     @Test
-    void get_WhenNotInRedis_ThenReturnsFromPostgresAndCachesToRedis() throws Exception {
+    @DisplayName("fetches from Postgres and caches to Redis when Redis cache is empty")
+    void get_WhenNotInRedis_ThenReturnsFromPostgresAndCachesToRedis() {
         // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(REDIS_KEY, 0, -1)).thenReturn(List.of());
-        
         ChatHistory historyRow = new ChatHistory(1L, DEFAULT_CONVERSATION_ID, "user", "DB Hello", LocalDateTime.now());
         when(repository.findRecentHistory(DEFAULT_CONVERSATION_ID, 5)).thenReturn(List.of(historyRow));
-        
+
         // when
         List<Message> result = persistentChatMemory.get(DEFAULT_CONVERSATION_ID, 10);
 
         // then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getText()).isEqualTo("DB Hello");
-        
+        assertThat(result.getFirst().getText()).isEqualTo("DB Hello");
         verify(listOperations).rightPushAll(eq(REDIS_KEY), eq(List.of("{\"role\":\"user\",\"content\":\"DB Hello\"}")));
     }
 
     @Test
-    void add_WhenInvoked_ThenPushesToRedisAndPersistsToDBAsync() throws Exception {
+    @DisplayName("add pushes message to Redis and persists to database")
+    void add_WhenInvoked_ThenPushesToRedisAndPersistsToDBAsync() {
         // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
-        
-        List<Message> messages = List.of(new UserMessage("Save me"));
 
         // when
-        persistentChatMemory.add(DEFAULT_CONVERSATION_ID, messages);
+        persistentChatMemory.add(DEFAULT_CONVERSATION_ID, List.of(new UserMessage("Save me")));
 
         // then
         verify(listOperations).rightPush(REDIS_KEY, "{\"role\":\"user\",\"content\":\"Save me\"}");
-        verify(listOperations).trim(REDIS_KEY, 0, 4); // maxSize - 1
+        verify(listOperations).trim(REDIS_KEY, 0, 4);
         verify(repository).save(any(ChatHistory.class));
     }
 
     @Test
+    @DisplayName("wraps Redis exception in ServiceException when get throws")
     void get_WhenThrowsException_ThenWrapsInServiceException() {
         // given
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(listOperations.range(anyString(), eq(0L), eq(-1L))).thenThrow(new RuntimeException("Redis timeout"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> persistentChatMemory.get(DEFAULT_CONVERSATION_ID))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("Failed to retrieve chat memory");
     }
 
     @Test
+    @DisplayName("clear deletes the conversation's Redis key")
     void clear_WhenInvoked_ThenDeletesRedisKey() {
         // when
         persistentChatMemory.clear(DEFAULT_CONVERSATION_ID);

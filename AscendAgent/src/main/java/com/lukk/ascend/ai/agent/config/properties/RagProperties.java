@@ -1,7 +1,14 @@
 package com.lukk.ascend.ai.agent.config.properties;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
 
+import java.time.Duration;
+
+@Getter
+@Setter
 @ConfigurationProperties(prefix = "app.rag")
 public class RagProperties {
 
@@ -13,36 +20,16 @@ public class RagProperties {
 
     private int maxContextChars = 4000;
 
-    public boolean isEnabled() {
-        return enabled;
-    }
+    private SourceAttachments sourceAttachments = new SourceAttachments();
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
+    @Getter
+    @Setter
+    public static class SourceAttachments {
 
-    public int getTopK() {
-        return topK;
-    }
+        private boolean enabled = true;
 
-    public void setTopK(int topK) {
-        this.topK = topK;
-    }
+        private Duration presignTtl = Duration.ofMinutes(15);
 
-    public double getSimilarityThreshold() {
-        return similarityThreshold;
-    }
-
-    public void setSimilarityThreshold(double similarityThreshold) {
-        this.similarityThreshold = similarityThreshold;
-    }
-
-    public int getMaxContextChars() {
-        return maxContextChars;
-    }
-
-    public void setMaxContextChars(int maxContextChars) {
-        this.maxContextChars = maxContextChars;
+        private DataSize maxFileSize = DataSize.ofMegabytes(25);
     }
 }
-

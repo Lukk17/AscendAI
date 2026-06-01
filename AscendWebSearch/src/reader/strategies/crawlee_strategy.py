@@ -14,36 +14,37 @@ logger = logging.getLogger(__name__)
 
 
 class CrawleeStrategy(BaseStrategy):
-    def __init__(self, url_validator: URLValidator):
+    def __init__(self, url_validator: URLValidator) -> None:
         self.url_validator = url_validator
 
     async def extract(self, url: str) -> str:
         html = await self.get_html(url)
-        extracted = trafilatura.extract(html)
-        return extracted if extracted else ""
+        extracted: str | None = trafilatura.extract(html)
+        return extracted or ""
 
     async def get_html(self, url: str) -> str:
         result_container: dict[str, str] = {"html": ""}
 
+        playwright_kwargs: Any = {
+            "headless": False,
+            "browser_launch_options": {"chromium_sandbox": False},
+            "browser_context_options": {
+                "locale": "en-US",
+                "timezone_id": "America/New_York",
+                "geolocation": {"latitude": 37.7749, "longitude": -122.4194},
+                "permissions": ["geolocation"],
+            },
+        }
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
             max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
-            playwright_crawler_specific_kwargs={
-                "headless": False,
-                "browser_launch_options": {"chromium_sandbox": False},
-                "browser_context_options": {
-                    "locale": "en-US",
-                    "timezone_id": "America/New_York",
-                    "geolocation": {"latitude": 37.7749, "longitude": -122.4194},
-                    "permissions": ["geolocation"]
-                }
-            }
+            playwright_crawler_specific_kwargs=playwright_kwargs,
         )
 
         @crawler.router.default_handler
-        async def request_handler(context):
+        async def request_handler(context: Any) -> None:
             await self._handle_crawlee_request(context, result_container)
 
-        @crawler.pre_navigation_hook
+        @crawler.pre_navigation_hook  # type: ignore[arg-type]
         async def enable_adblock(context: PlaywrightCrawlingContext) -> None:
             await context.page.route("**/*", self.url_validator.route_handler)
 
@@ -60,10 +61,11 @@ class CrawleeStrategy(BaseStrategy):
 
         return html
 
-    async def _handle_crawlee_request(self, context: Any, result_container: dict[str, str]) -> None:
+    @staticmethod
+    async def _handle_crawlee_request(context: Any, result_container: dict[str, str]) -> None:
         if isinstance(context, PlaywrightCrawlingContext):
             result_container["html"] = await context.page.content()
-        elif hasattr(context, 'soup'):
+        elif hasattr(context, "soup"):
             result_container["html"] = str(context.soup)
-        elif hasattr(context, 'response'):
+        elif hasattr(context, "response"):
             result_container["html"] = context.response.text

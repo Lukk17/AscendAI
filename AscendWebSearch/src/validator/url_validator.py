@@ -1,6 +1,7 @@
 import ipaddress
 import logging
 import socket
+from typing import Any
 from urllib.parse import urlparse
 
 from adblockparser import AdblockRules
@@ -11,13 +12,14 @@ _SAFE_SCHEMES = {"http", "https"}
 
 
 class URLValidator:
-    def __init__(self, rules: AdblockRules):
+    def __init__(self, rules: AdblockRules) -> None:
         self.rules = rules
 
     def should_block(self, url: str) -> bool:
-        return self.rules.should_block(url)
+        result: bool = self.rules.should_block(url)
+        return result
 
-    async def route_handler(self, route) -> None:
+    async def route_handler(self, route: Any) -> None:
         url = route.request.url
         if self.should_block(url):
             await route.abort()
@@ -56,7 +58,13 @@ def is_safe_external_url(url: str) -> bool:
             ip = ipaddress.ip_address(info[4][0])
         except ValueError:
             return False
-        if (ip.is_loopback or ip.is_private or ip.is_link_local
-                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+        if (
+            ip.is_loopback
+            or ip.is_private
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
             return False
     return True

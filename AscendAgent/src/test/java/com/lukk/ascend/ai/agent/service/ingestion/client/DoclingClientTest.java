@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service.ingestion.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,14 +39,15 @@ class DoclingClientTest {
     private DoclingClient doclingClient;
 
     @Test
+    @DisplayName("process extracts text from a valid Docling JSON response")
     void process_WhenValidResponse_ThenExtractsTextSuccessfully() {
         // given
         String jsonResponse = "{ \"text\": \"Extracted text\", \"pages\": [ { \"text\": \"Nested page text\" } ] }";
-        
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
@@ -58,41 +60,43 @@ class DoclingClientTest {
 
         // then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getText())
+        assertThat(result.getFirst().getText())
                 .contains("Extracted text")
                 .contains("Nested page text");
-        assertThat(result.get(0).getMetadata())
+        assertThat(result.getFirst().getMetadata())
                 .containsEntry("source", FILENAME)
                 .containsEntry("type", "docling");
     }
 
     @Test
+    @DisplayName("process throws IngestionException when the REST client call fails")
     void process_WhenRestClientFails_ThenThrowsIngestionException() {
         // given
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
         when(bodySpecMock.body(any(Object.class))).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenThrow(new RestClientException("Connection Refused"));
 
-        // when / then
+        // then
         assertThatThrownBy(() -> doclingClient.process(BYTES, FILENAME))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to process document with Docling");
     }
 
     @Test
+    @DisplayName("process throws IngestionException when the API returns malformed JSON")
     void process_WhenInvalidJsonReturned_ThenThrowsIngestionException() throws Exception {
         // given
         String invalidJson = "{ invalid: j!son }";
-        
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
-        
+
         when(restClient.post()).thenReturn(postMock);
         when(postMock.uri(anyString())).thenReturn(bodySpecMock);
         when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
@@ -100,7 +104,7 @@ class DoclingClientTest {
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
         when(responseSpecMock.body(String.class)).thenReturn(invalidJson);
 
-        // when / then
+        // then
         assertThatThrownBy(() -> doclingClient.process(BYTES, FILENAME))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to parse Docling JSON response");

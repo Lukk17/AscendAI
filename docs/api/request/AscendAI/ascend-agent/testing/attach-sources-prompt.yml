@@ -1,0 +1,35 @@
+info:
+  name: attach-sources-prompt
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+  headers:
+    - name: X-User-Id
+      value: frostyAttachSourcesTest
+  body:
+    type: multipart-form
+    data:
+      - name: prompt
+        type: text
+        value: How long should I rest the pierogi dough according to Babcia Helena's recipe?
+      - name: attachSources
+        type: text
+        value: "true"
+      - name: provider
+        type: text
+        value: anthropic
+      - name: model
+        type: text
+        value: claude-sonnet-4-6
+      - name: embeddingProvider
+        type: text
+        value: openai
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

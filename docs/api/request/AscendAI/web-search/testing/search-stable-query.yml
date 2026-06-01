@@ -1,0 +1,30 @@
+info:
+  name: search-stable-query
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/web/search?query=OpenStreetMap&limit=3"
+  params:
+    - name: query
+      value: OpenStreetMap
+      type: query
+    - name: limit
+      value: "3"
+      type: query
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

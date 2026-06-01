@@ -1,0 +1,30 @@
+info:
+  name: search-blank-query
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/web/search?query=   &limit=3"
+  params:
+    - name: query
+      value: "   "
+      type: query
+    - name: limit
+      value: "3"
+      type: query
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

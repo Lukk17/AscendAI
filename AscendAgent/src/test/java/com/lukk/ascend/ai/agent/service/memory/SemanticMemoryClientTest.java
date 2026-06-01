@@ -1,9 +1,12 @@
 package com.lukk.ascend.ai.agent.service.memory;
 
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
+import com.lukk.ascend.ai.agent.test.TestConstants;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,12 +29,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class SemanticMemoryClientTest {
 
-    private static final String DEFAULT_USER_ID = "user1";
+    private static final String DEFAULT_USER_ID = TestConstants.DEFAULT_USER_ID;
     private static final String QUERY = "Find memory";
     private static final int LIMIT = 5;
     private static final String FACT = "User uses Python";
@@ -47,6 +49,7 @@ class SemanticMemoryClientTest {
     private SemanticMemoryClient semanticMemoryClient;
 
     @Test
+    @DisplayName("search returns empty list without HTTP call when semantic memory is disabled")
     void search_WhenDisabled_ThenReturnsEmptyList() {
         // given
         when(properties.isEnabled()).thenReturn(false);
@@ -61,12 +64,13 @@ class SemanticMemoryClientTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    @DisplayName("search returns memory items from the API when enabled and the call succeeds")
     void search_WhenEnabledAndSuccessful_ThenReturnsItems() {
         // given
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
 
-        List<SemanticMemoryItem> expectedItems = List.of(new SemanticMemoryItem("1", "user1", "Memory", 0.9d, Instant.now(), Map.of()));
+        List<SemanticMemoryItem> expectedItems = List.of(new SemanticMemoryItem("1", TestConstants.DEFAULT_USER_ID, "Memory", 0.9d, Instant.now(), Map.of()));
 
         when(restClientBuilder.build().get()
                 .uri(anyString(), eq(DEFAULT_USER_ID), eq(QUERY), eq(LIMIT), eq(EMBEDDING_PROVIDER))
@@ -83,6 +87,7 @@ class SemanticMemoryClientTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    @DisplayName("search returns empty list gracefully when the API responds with 404")
     void search_WhenApiResponseIs404_ThenGracefullyReturnsEmptyList() {
         // given
         when(properties.isEnabled()).thenReturn(true);
@@ -105,6 +110,7 @@ class SemanticMemoryClientTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    @DisplayName("search returns empty list gracefully when a general exception occurs")
     void search_WhenGeneralException_ThenGracefullyReturnsEmptyList() {
         // given
         when(properties.isEnabled()).thenReturn(true);
@@ -124,6 +130,7 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @DisplayName("insertMemory does nothing when semantic memory is disabled")
     void insertMemory_WhenDisabled_ThenDoesNothing() {
         // given
         when(properties.isEnabled()).thenReturn(false);
@@ -137,6 +144,7 @@ class SemanticMemoryClientTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    @DisplayName("search sends user_id as snake_case query parameter in the URI template")
     void search_WhenEnabled_ThenSendsSnakeCaseUserIdQueryParam() {
         // given
         when(properties.isEnabled()).thenReturn(true);
@@ -159,6 +167,7 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @DisplayName("insertMemory POSTs to the memory endpoint when enabled")
     void insertMemory_WhenEnabled_ThenPostsSuccessfully() {
         // given
         when(properties.isEnabled()).thenReturn(true);
@@ -176,11 +185,12 @@ class SemanticMemoryClientTest {
         when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
 
-        // when / then — no exception
+        // then — no exception
         semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
     }
 
     @Test
+    @DisplayName("wipeUserMemory POSTs to the /wipe endpoint with user_id and provider in the body")
     void wipeUserMemory_WhenEnabled_ThenPostsToWipeEndpoint() {
         // given
         when(properties.isEnabled()).thenReturn(true);
@@ -205,7 +215,7 @@ class SemanticMemoryClientTest {
         verify(postMock).uri(uriCaptor.capture());
         assertThat(uriCaptor.getValue()).endsWith("/api/v1/memory/wipe");
 
-        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
         verify(bodySpecMock).body(bodyCaptor.capture());
         Map<String, Object> body = bodyCaptor.getValue();
         assertThat(body).containsEntry("user_id", DEFAULT_USER_ID);
@@ -213,11 +223,13 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @DisplayName("deleteMemory issues a DELETE request with memory_id and provider as query parameters")
     void deleteMemory_WhenEnabled_ThenIssuesDeleteWithQueryParams() {
         // given
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBaseUrl()).thenReturn("http://memory");
 
+        @SuppressWarnings({"rawtypes"})
         RestClient.RequestHeadersUriSpec deleteMock = mock(RestClient.RequestHeadersUriSpec.class);
         RestClient.RequestHeadersSpec<?> headersSpecMock = mock(RestClient.RequestHeadersSpec.class);
         RestClient.ResponseSpec responseSpecMock = mock(RestClient.ResponseSpec.class);
@@ -239,6 +251,7 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @DisplayName("search returns empty list without HTTP call when user ID is blank")
     void search_WhenUserIdIsBlank_ThenReturnsEmptyListWithoutHttpCall() {
         // when
         List<SemanticMemoryItem> result = semanticMemoryClient.search(" ", QUERY, LIMIT, EMBEDDING_PROVIDER);
@@ -249,6 +262,7 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @DisplayName("insertMemory is a no-op without HTTP call when user ID is blank")
     void insertMemory_WhenUserIdIsBlank_ThenNoOpWithoutHttpCall() {
         // when
         semanticMemoryClient.insertMemory("", FACT, EMBEDDING_PROVIDER);
@@ -258,6 +272,7 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @DisplayName("wipeUserMemory is a no-op without HTTP call when user ID is null or blank")
     void wipeUserMemory_WhenUserIdIsBlank_ThenNoOpWithoutHttpCall() {
         // when
         semanticMemoryClient.wipeUserMemory(null, EMBEDDING_PROVIDER);
@@ -267,6 +282,7 @@ class SemanticMemoryClientTest {
     }
 
     @Test
+    @DisplayName("deleteMemory is a no-op without HTTP call when memory ID is blank")
     void deleteMemory_WhenMemoryIdIsBlank_ThenNoOpWithoutHttpCall() {
         // when
         semanticMemoryClient.deleteMemory(DEFAULT_USER_ID, "", EMBEDDING_PROVIDER);
@@ -276,7 +292,7 @@ class SemanticMemoryClientTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
+    @DisplayName("insertMemory POSTs a snake_case body with user_id, text, and provider fields")
     void insertMemory_WhenEnabled_ThenPostsSnakeCaseBody() {
         // given
         when(properties.isEnabled()).thenReturn(true);
@@ -298,7 +314,7 @@ class SemanticMemoryClientTest {
         semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
 
         // then
-        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
         verify(bodySpecMock).body(bodyCaptor.capture());
         Map<String, Object> body = bodyCaptor.getValue();
         assertThat(body).containsEntry("user_id", DEFAULT_USER_ID);

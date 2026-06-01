@@ -15,14 +15,18 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.integration.jdbc.metadata.JdbcMetadataStore;
 import org.springframework.integration.metadata.ConcurrentMetadataStore;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
-import java.net.URI;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -31,6 +35,11 @@ import java.util.concurrent.Executors;
 
 @Configuration
 @EnableConfigurationProperties({VectorStoreProperties.class, VisionCapabilityProperties.class})
+// CGLIB proxies (proxyTargetClass=true) — PersistentChatMemory implements
+// ChatMemory but is injected as the concrete type by ChatHistoryService for
+// the 4-arg add() overload that's not on the ChatMemory interface. JDK
+// proxies (the default) would only expose the interface and break wiring.
+@EnableAsync(proxyTargetClass = true)
 @Slf4j
 public class AppConfig {
 
@@ -39,8 +48,10 @@ public class AppConfig {
         return Executors.newVirtualThreadPerTaskExecutor();
     }
 
-    @Value("${app.system-prompt}")
-    private String systemPrompt;
+    @Bean
+    public TransactionTemplate transactionTemplate(PlatformTransactionManager txManager) {
+        return new TransactionTemplate(txManager);
+    }
 
     @Value("${app.ingestion.connect-timeout}")
     private int connectTimeout;
@@ -51,25 +62,16 @@ public class AppConfig {
     @Value("${app.s3.endpoint}")
     private String s3Endpoint;
 
+    @Value("${app.s3.public-endpoint:${app.s3.endpoint}}")
+    private String s3PublicEndpoint;
+
     @Value("${app.s3.access-key}")
     private String s3AccessKey;
 
     @Value("${app.s3.secret-key}")
     private String s3SecretKey;
 
-    /**
-     * Configures the RestClient.Builder.
-     * <p>
-     * This method forces the underlying HttpClient to use HTTP/1.1 instead of
-     * HTTP/2.
-     * This is required to solve compatibility issues with the LM Studio server,
-     * which can hang when receiving HTTP/2 requests from the modern Java 21
-     * HttpClient.
-     * </p>
-     *
-     * @param configurer The Spring Boot configurer to apply default customizations.
-     * @return A configured RestClient.Builder instance using HTTP/1.1.
-     */
+    // Forces HTTP/1.1: LM Studio hangs when the JDK 21 HttpClient negotiates HTTP/2.
     @Bean
     public RestClient.Builder restClientBuilder(RestClientBuilderConfigurer configurer) {
         HttpClient httpClient = HttpClient.newBuilder()
@@ -112,17 +114,26 @@ public class AppConfig {
     }
 
     /**
-     * Creates a JDBC-backed metadata store for persistent file tracking.
-     * <p>
-     * This ensures files are processed only once, even across application restarts.
-     * </p>
-     *
-     * @param dataSource The generic DataSource (auto-configured by Spring Boot).
-     * @return A ConcurrentMetadataStore backed by the database.
+     * Presigner uses the PUBLIC endpoint, so the resulting URLs are reachable from
+     * the caller's network (host browser / curl), not just from inside the docker
+     * network where the agent runs.
      */
     @Bean
-    public ConcurrentMetadataStore metadataStore(
-            javax.sql.DataSource dataSource) {
+    public S3Presigner s3Presigner() {
+        return S3Presigner.builder()
+                .endpointOverride(URI.create(s3PublicEndpoint))
+                .region(Region.US_EAST_1)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(s3AccessKey, s3SecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
+    }
+
+    // JDBC-backed so file-tracking state survives application restarts.
+    @Bean
+    public ConcurrentMetadataStore metadataStore(javax.sql.DataSource dataSource) {
         return new JdbcMetadataStore(dataSource);
     }
 

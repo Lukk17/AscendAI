@@ -1,0 +1,32 @@
+info:
+  name: invalid-missing-user
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/insert"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "text": "Memory body without a user_id field"
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 422", function () {
+            expect(res.getStatus()).to.equal(422);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

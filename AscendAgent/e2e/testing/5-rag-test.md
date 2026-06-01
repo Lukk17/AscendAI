@@ -1,4 +1,4 @@
-# RAG — e2e test
+# RAG: e2e test
 
 ## What this verifies
 
@@ -84,22 +84,30 @@ Expect all three paths to print.
 
 ## Reset state
 
-Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in `docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below runs through `sh -c` so the env vars expand *inside* the container — the host shell doesn't have them set.
+Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in `docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below runs through `sh -c` so the env vars expand *inside* the container. The host shell doesn't have them set.
 
 ```bash
 docker exec minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"'
 ```
 
-Drop all objects from the `knowledge-base` bucket so the upload step is fresh.
+Drop only this test's three fixtures from MinIO so re-upload is clean. Does NOT touch other tests' fixtures sharing the same bucket.
 
 ```bash
-docker exec minio mc rm --recursive --force local/knowledge-base
+docker exec minio mc rm --force local/knowledge-base/markdown/markdown-canary.md
 ```
 
-Truncate the Spring Integration metadata store so the run step does not classify files as already-ingested via stored ETags.
+```bash
+docker exec minio mc rm --force local/knowledge-base/documents/banana-price-poland.pdf
+```
 
 ```bash
-docker exec postgres psql -U postgres -d ascend_ai -c "TRUNCATE TABLE int_metadata_store;"
+docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.docx
+```
+
+Delete only the `int_metadata_store` rows for these three fixtures so the run step does not classify them as already-ingested. Trailing `%` in each pattern matches the ETag suffix appended to the metadata key.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%markdown-canary.md%' OR metadata_key LIKE '%banana-price-poland.pdf%' OR metadata_key LIKE '%pierogi-recipe.docx%';"
 ```
 
 Wipe RAG points for the three fixtures from Qdrant.
@@ -110,19 +118,19 @@ curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "C
 
 ## Run
 
-Step 1 — upload the three fixtures in one multipart request. Wait for HTTP 200 before continuing.
+Step 1. Upload the three fixtures in one multipart request. Wait for HTTP 200 before continuing.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
 ```
 
-Step 2 — trigger ingestion (no prefix → scans the whole bucket). Wait for HTTP 200 and a non-zero `indexed` count before continuing.
+Step 2. Trigger ingestion (no prefix → scans the whole bucket). Wait for HTTP 200 and a non-zero `indexed` count before continuing.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
 ```
 
-Step 3 — send the RAG prompt. The Bruno request saves three alternative `prompt=` rows on the same field; only one is enabled by default. Run the request once with the current default, then edit the YAML to enable the next prompt row (and disable the previous) and re-run. Do this once per fixture for full coverage.
+Step 3. Send the RAG prompt. The Bruno request saves three alternative `prompt=` rows on the same field; only one is enabled by default. Run the request once with the current default, then edit the YAML to enable the next prompt row (and disable the previous) and re-run. Do this once per fixture for full coverage.
 
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-prompt.yml" --env ascend-local
@@ -132,6 +140,46 @@ The three prompts saved in the request:
 - `What is the Ascend canary phrase?` (markdown fixture)
 - `What was the retail price of bananas in Poland in October 2026?` (PDF fixture)
 - `How long should I rest the pierogi dough according to Babcia Helena's recipe?` (DOCX fixture)
+
+## Post-run cleanup
+
+Every Group A spec self-cleans so the next spec in the chain sees a hermetic RAG state without having to reach into another spec's artifacts. Run these regardless of whether the Run steps passed or failed; they are idempotent and never touch state owned by tests 6 or 7.
+
+Drop this spec's three fixtures from MinIO.
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/markdown/markdown-canary.md
+```
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/documents/banana-price-poland.pdf
+```
+
+```bash
+docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.docx
+```
+
+Drop their `int_metadata_store` rows so subsequent re-ingestion is not skipped.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_store WHERE metadata_key LIKE '%markdown-canary.md%' OR metadata_key LIKE '%banana-price-poland.pdf%' OR metadata_key LIKE '%pierogi-recipe.docx%';"
+```
+
+Wipe their Qdrant points.
+
+```bash
+curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"source","match":{"any":["markdown/markdown-canary.md","documents/banana-price-poland.pdf","documents/pierogi-recipe.docx"]}}]}}'
+```
+
+Truncate this spec's chat-history rows + Redis key so the per-user slot is clean.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyRagTest';"
+```
+
+```bash
+docker exec redis redis-cli DEL chat:frostyRagTest
+```
 
 ## Expected
 
@@ -153,10 +201,63 @@ After step 3b (banana-price prompt) the response body's `content` field contains
 
 After step 3c (pierogi-recipe prompt) the response body's `content` field contains the rest time from the DOCX fixture (`30 minutes`).
 
-For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that document" — a refusal means the RAG retrieval did not inject the relevant chunk into the prompt.
+For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that document". A refusal means the RAG retrieval did not inject the relevant chunk into the prompt.
 
 ## Fixtures
 
 - `AscendAgent/e2e/fixtures/markdown-canary.md`
 - `AscendAgent/e2e/fixtures/banana-price-poland.pdf`
 - `AscendAgent/e2e/fixtures/pierogi-recipe.docx`
+
+## Concurrency
+
+- **Mutates:** MinIO bucket `knowledge-base` (`markdown/markdown-canary.md`, `documents/banana-price-poland.pdf`, `documents/pierogi-recipe.docx`); Qdrant collection `ascendai-1536` (filtered by these `source` values); Postgres `int_metadata_store` (rows for these object keys); Postgres `chat_history` (user_id=`frostyRagTest`); Redis key `chat:frostyRagTest`
+- **Conflicts with:** `6-attach-sources`, `7-rag-dedup` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
+- **Serial:** false
+- **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) only touch this spec's own fixtures + user-id; never reaches into other Group A specs' artifacts.
+
+## Optional: attach source files
+
+The `attachSources=true` form field opts the response into a `sources` array of presigned MinIO URLs for the documents that grounded the answer. Default is `false` (response shape unchanged).
+
+Send a prompt with the flag set.
+
+```bash
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -F "attachSources=true" -H "X-User-Id: user1"
+```
+
+Expected response shape (truncated):
+
+```json
+{
+  "content": "...PURPLE-MOOSE-42...",
+  "metadata": { "...": "..." },
+  "sources": [
+    {
+      "name": "markdown-canary.md",
+      "mimeType": "text/markdown",
+      "downloadUrl": "http://localhost:9070/knowledge-base/markdown/markdown-canary.md?X-Amz-...",
+      "expiresAt": "2026-05-14T06:14:34Z",
+      "sizeBytes": 412
+    }
+  ]
+}
+```
+
+Verify the `downloadUrl` resolves to a 200 GET against MinIO from the host network.
+
+```bash
+curl -fsS -o /tmp/source.bin "<paste downloadUrl from previous response>"
+```
+
+Re-run the same prompt without `attachSources=true`; assert the response JSON does NOT contain a `sources` key (byte-for-byte backward compat).
+
+```bash
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -H "X-User-Id: user1"
+```
+
+Send a prompt that retrieves nothing with `attachSources=true`; expect `"sources": []`.
+
+```bash
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the airspeed velocity of an unladen swallow?" -F "attachSources=true" -H "X-User-Id: user1"
+```

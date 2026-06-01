@@ -1,15 +1,15 @@
-FROM python:3.11-slim AS builder
+FROM python:3.11.12-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    poppler-utils \
-    libgomp1 \
-    gcc \
-    g++ && \
+        libgl1 \
+        libglib2.0-0 \
+        poppler-utils \
+        libgomp1 \
+        gcc \
+        g++ && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -22,7 +22,8 @@ RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \
 
 RUN DISABLE_AUTO_LOGGING_CONFIG=1 python3.11 -c "from paddleocr import PaddleOCR; PaddleOCR(lang='en', enable_mkldnn=False); PaddleOCR(lang='pl', enable_mkldnn=False)"
 
-FROM python:3.11-slim
+
+FROM python:3.11.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -31,10 +32,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DISABLE_AUTO_LOGGING_CONFIG=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    poppler-utils \
-    libgomp1 && \
+        libgl1 \
+        libglib2.0-0 \
+        poppler-utils \
+        libgomp1 \
+        curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -55,5 +57,13 @@ USER $APP_USER
 ENV HOME=/home/$APP_USER
 
 EXPOSE 7022
+
+LABEL org.opencontainers.image.title="PaddleOCR" \
+      org.opencontainers.image.description="FastAPI + FastMCP OCR microservice for AscendAI" \
+      org.opencontainers.image.source="https://github.com/Lukk17/AscendAI" \
+      org.opencontainers.image.licenses="MIT"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD curl --fail --silent http://localhost:7022/health || exit 1
 
 CMD ["python3.11", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "7022"]

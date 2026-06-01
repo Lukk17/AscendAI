@@ -53,6 +53,22 @@ out/
 # manually if you want it as an audit artifact.
 AscendAgent/e2e/testing/runs/*
 !AscendAgent/e2e/testing/runs/README.md
+WeatherMCP/e2e/testing/runs/*
+!WeatherMCP/e2e/testing/runs/README.md
+AscendMemory/e2e/testing/runs/*
+!AscendMemory/e2e/testing/runs/README.md
+AscendWebSearch/e2e/testing/runs/*
+!AscendWebSearch/e2e/testing/runs/README.md
+AudioScribe/e2e/testing/runs/*
+!AudioScribe/e2e/testing/runs/README.md
+PaddleOCR/e2e/testing/runs/*
+!PaddleOCR/e2e/testing/runs/README.md
+
+# Bruno CLI run-output dump. Bruno writes the report next to the collection
+# root when invoked with `--output` (the file is named after the format —
+# `json`, `junit.xml`, etc.). Transient test output, not source.
+docs/api/request/AscendAI/json
+docs/api/request/AscendAI/junit.xml
 
 
 # =============================================================================
@@ -85,6 +101,10 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+response.json
 
 # Distribution / packaging
 .Python

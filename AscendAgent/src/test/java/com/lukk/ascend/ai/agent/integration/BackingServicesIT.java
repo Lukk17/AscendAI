@@ -76,7 +76,7 @@ class BackingServicesIT extends TestcontainersBase {
     @Test
     void minio_isReachableAndBucketCreated() throws Exception {
         // app.s3.bucket = knowledge-base; BucketInitConfig (a separate startup runner)
-        // creates it at boot. If the runner ran successfully the HeadBucket call returns 200.
+        // creates it at boot. If the runner ran successfully, the HeadBucket call returns 200.
         HeadBucketResponse response = s3Client.headBucket(
                 HeadBucketRequest.builder().bucket("knowledge-base").build());
         assertThat(response.sdkHttpResponse().statusCode()).isEqualTo(200);

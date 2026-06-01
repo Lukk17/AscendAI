@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.dto;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 
@@ -10,30 +11,45 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CustomMetadataTest {
 
     @Test
+    @DisplayName("accessor methods return the values passed to the canonical constructor")
     void accessors_ReturnConstructedValues() {
+        // given
         ChatResponseMetadata delegate = ChatResponseMetadata.builder().model("m1").build();
         List<String> tools = List.of("tool-a", "tool-b");
 
+        // when
         CustomMetadata meta = new CustomMetadata(delegate, tools);
 
-        assertThat(meta.getDelegate()).isSameAs(delegate);
-        assertThat(meta.getToolsUsed()).containsExactly("tool-a", "tool-b");
+        // then
+        assertThat(meta.delegate()).isSameAs(delegate);
+        assertThat(meta.toolsUsed()).containsExactly("tool-a", "tool-b");
     }
 
     @Test
+    @DisplayName("equals is reflexive, value-equal on same components, and differentiates on toolsUsed")
     void equalsAndHashCode_AreReflexiveAndDifferentiateOnToolsField() {
+        // given
         ChatResponseMetadata delegate = ChatResponseMetadata.builder().model("m1").build();
-        CustomMetadata a = new CustomMetadata(delegate, List.of("x"));
-        CustomMetadata different = new CustomMetadata(delegate, List.of("y"));
+        CustomMetadata original = new CustomMetadata(delegate, List.of("x"));
+        CustomMetadata sameComponents = new CustomMetadata(delegate, List.of("x"));
+        CustomMetadata differentTools = new CustomMetadata(delegate, List.of("y"));
 
-        // reflexive
-        assertThat(a).isEqualTo(a);
-        assertThat(a.hashCode()).isEqualTo(a.hashCode());
-        // toolsUsed differs → not equal (callSuper=true means same delegate ref helps,
-        // but Lombok's generated equals also compares the toolsUsed list)
-        assertThat(a).isNotEqualTo(different);
-        // null + foreign type
-        assertThat(a).isNotEqualTo(null);
-        assertThat(a).isNotEqualTo("not-a-metadata");
+        // then
+        assertThat(original)
+                .isEqualTo(sameComponents)
+                .hasSameHashCodeAs(sameComponents)
+                .isNotEqualTo(differentTools)
+                .isNotEqualTo(null);
+    }
+
+    @Test
+    @DisplayName("equals returns false when compared with an unrelated type")
+    void equals_ReturnsFalseAgainstUnrelatedType() {
+        // given
+        CustomMetadata meta = new CustomMetadata(null, List.of());
+        Object unrelated = new Object();
+
+        // then
+        assertThat(meta.equals(unrelated)).isFalse();
     }
 }

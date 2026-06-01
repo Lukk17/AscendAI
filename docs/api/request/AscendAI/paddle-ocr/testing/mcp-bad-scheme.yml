@@ -1,0 +1,50 @@
+info:
+  name: mcp-bad-scheme
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp/"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+          "name": "ocr_process",
+          "arguments": {
+            "file_uri": "ftp://example.com/image.png",
+            "lang": "en"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200 (JSON-RPC envelope)", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("JSON-RPC error frame (UNSAFE_URI - unsupported scheme)", function () {
+            const body = res.getBody();
+            const hasError = body.error || (body.result && body.result.isError);
+            expect(hasError).to.be.ok;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

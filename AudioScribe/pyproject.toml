@@ -1,39 +1,165 @@
 [project]
 name = "audio-scribe"
-version = "0.8.0"
+version = "0.9.0"
 description = "A dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models."
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.128.0",
-    "anyio==4.12.1",
-    "fastmcp==2.14.5",
+    "fastapi==0.136.3",
+    "anyio==4.13.0",
+    "fastmcp==3.3.1",
     "faster-whisper==1.2.1",
     "httpx==0.28.1",
-    "huggingface-hub>=0.23.0",
-    "openai==2.17.0",
-    "pydantic==2.11.10",
-    "pydantic-settings==2.12.0",
-    "python-dotenv==1.2.1",
-    "python-multipart==0.0.20",
+    "huggingface-hub==1.17.0",
+    "openai==2.38.0",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.1",
+    "python-dotenv==1.2.2",
+    "python-multipart==0.0.30",
     "pydub==0.25.1",
-    "coloredlogs==15.0.1",
     "colorlog==6.10.1",
-    "uvicorn==0.40.0",
-    "aiofiles>=25.1.0",
-    "aiohttp>=3.13.3"
+    "uvicorn==0.48.0",
+    "aiofiles==25.1.0",
+    "aiohttp==3.13.5",
+    "defusedxml==0.7.1",
+    "prometheus-client==0.25.0"
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.0.2",
+    "pytest==9.0.3",
     "pytest-mock==3.15.1",
-    "pytest-asyncio==1.3.0",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
     "asgi-lifespan==2.1.0",
+    "ruff==0.15.15",
+    "mypy==2.1.0",
+    "pyright==1.1.409"
 ]
 
 [tool.pytest.ini_options]
-pythonpath = [
-  ".",
-  "src",
-]
+pythonpath = [".", "src"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 100
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "N", "UP", "S", "B", "A", "RUF", "SIM", "PL",
+    "C4", "RET", "PIE", "TRY", "PERF", "ARG", "LOG", "G", "T20",
+    "ERA", "PT", "PTH", "FA", "TCH", "DTZ", "ICN", "Q", "TID",
+    "INT", "SLF", "ASYNC", "FURB",
+]
+ignore = [
+    "S101",
+    "PLR0913",
+    "N818",
+    "BLE001",
+    "S110",
+    "PLR2004",
+    "S104",
+    "S311",
+    "PLR0911",
+    "PLC0415",
+    "G004",
+    "TRY003",
+    "TRY300",
+    "TRY301",
+    "PTH",
+    "ASYNC240",
+    "TRY401",
+    "PERF401",
+    "SIM114",
+    "N814",
+    "PLW0108",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101", "S105", "S106", "S108", "PLR2004",
+    "SIM117", "RUF059", "B010", "E501",
+    "PLR1711", "PLE2502",
+    "ARG001", "ARG002", "ARG005",
+    "SLF001", "TC002",
+]
+"tests/conftest.py" = [
+    "E402", "PT022", "I001",
+    "S101", "S105", "S106", "PLR2004",
+    "SIM117", "RUF059", "B010", "E501",
+    "PLR1711", "PLE2502",
+    "ARG001", "ARG002", "ARG005",
+    "SLF001", "TC002",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = false
+disable_error_code = ["no-untyped-call", "type-arg"]
+
+[[tool.mypy.overrides]]
+module = [
+    "faster_whisper.*",
+    "pydub.*",
+    "openai.*",
+    "huggingface_hub.*",
+    "colorlog.*",
+    "fastmcp.*",
+    "prometheus_client.*",
+    "defusedxml.*",
+    "aiofiles.*",
+]
+ignore_missing_imports = true
+
+[tool.pyright]
+include = ["src", "tests"]
+exclude = ["**/__pycache__", "**/.venv"]
+extraPaths = ["."]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownParameterType = false
+reportMissingTypeArgument = false
+reportUntypedFunctionDecorator = false
+reportUnusedFunction = false
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportPrivateUsage = false
+reportUnknownLambdaType = false
+reportArgumentType = false
+reportMissingParameterType = false
+reportMissingTypeArgument = false
+reportGeneralTypeIssues = false
+reportUntypedFunctionDecorator = false
+reportAttributeAccessIssue = false
+
+[tool.setuptools]
+packages = ["src"]

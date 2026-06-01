@@ -1,7 +1,12 @@
 plugins {
     java
+    jacoco
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.management)
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
 }
 
 group = "com.lukk"
@@ -30,16 +35,13 @@ dependencyManagement {
 }
 
 dependencies {
-    // MCP server starter for SSE
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.ai.starter.mcp.server.webmvc)
 
-    // Actuator — health endpoint for e2e prereq probes and Docker healthchecks
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
-    // MCP server starter for STDIO (alternative, disabled)
-    // implementation("org.springframework.boot:spring-boot-starter")
-    // implementation("org.springframework.ai:spring-ai-starter-mcp-server")
+    implementation(libs.spring.boot.starter.cache)
+    implementation(libs.caffeine)
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
@@ -52,9 +54,17 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
 }
 
-// Disable the plain jar to avoid the *.jar conflict
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
 tasks.jar {
     enabled = false
 }

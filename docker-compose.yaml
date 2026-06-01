@@ -40,29 +40,105 @@ services:
     build:
       context: ./PaddleOCR
       dockerfile: Dockerfile
+    image: ascend-paddle-ocr:local
     container_name: ascend-paddle-ocr
+    hostname: ascend-paddle-ocr
     restart: unless-stopped
     ports:
       - "7022:7022"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - API_PORT=7022
       - API_HOST=0.0.0.0
       - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
       - DEFAULT_LANGUAGE=en
       - MAX_FILE_SIZE_MB=50
-      - OCR_REQUEST_TIMEOUT=120
+      - OCR_REQUEST_TIMEOUT=300
+      - ENGINE_CACHE_MAX_SIZE=8
+      # SSRF guard: docker-internal MinIO is reached via the host-bound
+      # localhost address (host.docker.internal:9070) per ADR-001.
+      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
+      - MCP_DOWNLOAD_TIMEOUT_SECONDS=30
+      # file:// is disabled by default; mount a writable dir and set
+      # MCP_FILE_URI_ROOT to the in-container path to enable.
+      # - MCP_FILE_URI_ROOT=/var/lib/paddle-ocr/uploads
+      - RATE_LIMIT_DEFAULT=60/minute
+      - RATE_LIMIT_OCR=20/minute
+      - OTEL_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     networks:
       default:
         aliases:
           - ascend-paddle-ocr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7022/health"]
+      interval: 30s
+      timeout: 30s
+      start_period: 120s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 12G
+        reservations:
+          cpus: "0.5"
+          memory: 2G
 
   # ─── Application services ───
+
+  ascend-agent:
+    build:
+      context: ./AscendAgent
+      dockerfile: Dockerfile
+    container_name: ascend-agent
+    hostname: ascend-agent
+    restart: unless-stopped
+    ports:
+      - "9917:9917"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - ascend-memory
+      - docling-serve
+      - unstructured-api
+    environment:
+      # Activate container-mode overrides (src/main/resources/application-docker.yaml).
+      - SPRING_PROFILES_ACTIVE=docker
+      # Provider API keys — runtime-only, sourced from .env on the host.
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASCEND_ANTHROPIC_API_KEY=${ASCEND_ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      # Chat-history backend toggles. Default true. Set either to false in .env
+      # to opt out of that persistence layer at runtime. The env-var names use
+      # Spring Boot's canonical form for kebab-case properties (hyphens removed):
+      # APP_MEMORY_CHATHISTORY_REDIS_ENABLED binds to app.memory.chat-history.redis.enabled.
+      - APP_MEMORY_CHATHISTORY_REDIS_ENABLED=${APP_MEMORY_CHATHISTORY_REDIS_ENABLED:-true}
+      - APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED=${APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED:-true}
+      # Async summarisation of older chat turns when a conversation crosses the
+      # configured threshold. Only the boolean toggle is env-bindable; the
+      # per-provider compaction-model map stays yaml-only (Spring Boot env-var
+      # binding for nested Map<String,String> is awkward).
+      - APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED=${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:-true}
+    networks:
+      default:
+        aliases:
+          - ascend-agent
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9917/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   ascend-memory:
     build:
       context: ./AscendMemory
       dockerfile: Dockerfile
     container_name: ascend-memory
+    hostname: ascend-memory
     restart: unless-stopped
     ports:
       - "7020:7020"
@@ -86,6 +162,23 @@ services:
       - LOG_LEVEL=INFO
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:7020/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 300s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
     networks:
       default:
         aliases:
@@ -97,6 +190,7 @@ services:
       dockerfile: Dockerfile
     # image: lukk17/weather-mcp:latest
     container_name: weather-mcp
+    hostname: weather-mcp
     restart: unless-stopped
     ports:
       - "9998:9998"
@@ -111,6 +205,7 @@ services:
       dockerfile: Dockerfile
     # image: lukk17/audio-scribe:latest
     container_name: audio-scribe
+    hostname: audio-scribe
     restart: unless-stopped
     ports:
       - "7017:7017"
@@ -118,22 +213,36 @@ services:
       - HF_HOME=/hf-cache
       - HF_TOKEN=${HF_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # SSRF guard: docker-internal MinIO is reached via the host-bound
+      # localhost address (host.docker.internal:9070); allow the loopback
+      # aliases plus the in-network MinIO hostname.
+      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1,minio
+      # Enables file:// URIs jailed to /audio (the host Desktop mount).
+      - MCP_FILE_URI_ROOT=/audio
     volumes:
       - D:/Development/AI/hf-cache:/hf-cache
       - C:\Users\Lukk\Desktop:/audio
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:7017/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 300s
+      retries: 3
     deploy:
       resources:
+        limits:
+          cpus: "4.0"
+          memory: 8192M
         reservations:
+          cpus: "0.5"
+          memory: 1024M
           devices:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    security_opt:
+      - no-new-privileges:true
     networks:
       default:
         aliases:
           - audio-scribe
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7017/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3

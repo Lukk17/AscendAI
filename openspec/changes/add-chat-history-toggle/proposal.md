@@ -23,8 +23,16 @@ No breaking changes: defaults preserve current behavior.
 
 ## Impact
 
-- **Code**: `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/memory/PersistentChatMemory.java`, new `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/config/properties/ChatHistoryProperties.java`, `AscendAgent/src/main/resources/application.yaml`.
-- **Tests**: `AscendAgent/src/test/java/com/lukk/ascend/ai/agent/memory/PersistentChatMemoryExtraTest.java` extended, possibly a new `ChatHistoryToggleTest`, plus a row in `PropertiesTest` for the new properties class.
+- **Code**:
+  - New: `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/config/properties/ChatHistoryProperties.java`.
+  - Modified: `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/memory/PersistentChatMemory.java` (drop the two `@Value` fields, inject `ChatHistoryProperties`, gate Redis / Postgres branches, add a `@PostConstruct` startup log line).
+  - Modified: `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/config/StartupLogConfig.java` (inject `ChatHistoryProperties`, render a `Chat History: Redis [...], Postgres [...]` line in the Infrastructure block of the readiness banner).
+  - Modified: `AscendAgent/src/main/resources/application.yaml` (add `redis.enabled: true` and `postgres.enabled: true` under `app.memory.chat-history` with an inline comment explaining the both-off trade-off).
+- **Tests**:
+  - Modified: `AscendAgent/src/test/java/com/lukk/ascend/ai/agent/config/properties/PropertiesTest.java` — new `chatHistoryProperties_DefaultsAndSetters` row.
+  - Modified: `AscendAgent/src/test/java/com/lukk/ascend/ai/agent/memory/PersistentChatMemoryExtraTest.java` — migrated reflection-based `@Value` setters to a real `ChatHistoryProperties` instance; added parameterized `get_RespectsBackendToggles_ForAllFourCombinations`, parameterized `add_RespectsBackendToggles_ForAllFourCombinations`, and `clear_AlwaysAttemptsRedisDelete_EvenWhenRedisDisabled`.
+  - Modified: `AscendAgent/src/test/java/com/lukk/ascend/ai/agent/memory/PersistentChatMemoryTest.java` — switched from `@InjectMocks` + `ReflectionTestUtils` to explicit constructor injection of a real `ChatHistoryProperties` instance.
+  - Modified: `AscendAgent/src/test/java/com/lukk/ascend/ai/agent/integration/StartupBannerIT.java` — added an assertion that the new `Chat History:` label is present in the banner.
 - **APIs**: No HTTP surface change. Behavior change is internal to chat-history assembly.
 - **Dependencies**: No new dependencies.
-- **Operational**: Operators flipping both flags off run with reduced cross-turn coherence — the model sees only the current user message, the system prompt, and semantic-memory items. This is by design; document the trade-off in `application.yaml` and `docs/DEPLOYMENT.md`.
+- **Operational**: Operators flipping both flags off run with reduced cross-turn coherence — the model sees only the current user message, the system prompt, and semantic-memory items. This is by design; documented inline in `application.yaml` and made visible at boot via the readiness banner's new `Chat History:` line.

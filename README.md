@@ -1,18 +1,17 @@
 <h1 align="center">AscendAI</h1>
 
 <p align="center">
-  <strong>Multi-provider AI orchestrator with MCP, RAG, and semantic memory — built on Spring AI.</strong>
+  <strong>Multi-provider AI orchestrator with MCP, RAG, and semantic memory. Built on Spring AI.</strong>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://openjdk.org/projects/jdk/21/"><img src="https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk&logoColor=white" alt="Java 21"></a>
   <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F.svg?logo=springboot&logoColor=white" alt="Spring Boot 3.5"></a>
-  <a href="https://spring.io/projects/spring-ai"><img src="https://img.shields.io/badge/Spring%20AI-1.1.4-6DB33F.svg" alt="Spring AI 1.1.4"></a>
+  <a href="https://spring.io/projects/spring-ai"><img src="https://img.shields.io/badge/Spring%20AI-1.1.5-6DB33F.svg" alt="Spring AI 1.1.5"></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-enabled-8A2BE2.svg" alt="MCP enabled"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="https://docs.docker.com/compose/"><img src="https://img.shields.io/badge/Docker-Compose-2496ED.svg?logo=docker&logoColor=white" alt="Docker Compose"></a>
-  <a href="https://github.com/Lukk17/AscendAI/stargazers"><img src="https://img.shields.io/github/stars/Lukk17/AscendAI?style=social" alt="GitHub stars"></a>
   <a href="https://github.com/Lukk17/AscendAI/commits"><img src="https://img.shields.io/github/last-commit/Lukk17/AscendAI" alt="Last commit"></a>
 </p>
 
@@ -73,7 +72,7 @@ graph TB
 
 ---
 
-## Table of Contents
+### Table of Contents
 
 - [Why this exists](#why-this-exists)
 - [Features](#features)
@@ -87,33 +86,46 @@ graph TB
 
 ---
 
-## Why this exists
+### Why this exists
 
-I built AscendAI because off-the-shelf orchestrators don't let you swap providers per-request, run a privacy-respecting search backend you fully control, and persist semantic memory across sessions in a single coherent platform. AscendAI does all three: it routes each prompt to the model you choose at call time (local LM Studio, OpenAI, Anthropic, Gemini, MiniMax), wires in MCP tool servers for audio, web, weather, and OCR, and keeps long-term context in a Mem0-backed Qdrant store so conversations actually accumulate knowledge.
-
----
-
-## Features
-
-- **Per-request provider routing** — pick LM Studio, OpenAI, Anthropic, Gemini, or MiniMax on every API call without restarts or config changes.
-- **RAG pipeline with Qdrant** — thresholded soft-retrieval over ingested documents using provider-matched embedding dimensions (768 / 1536).
-- **Semantic memory via Mem0** — long-lived, user-scoped memories searchable across sessions through the AscendMemory service.
-- **MCP tool servers** — first-class integrations for audio transcription (AudioScribe), web search (AscendWebSearch + SearXNG), weather (WeatherMCP), and OCR (PaddleOCR).
-- **Document ingestion to MinIO** — drop files (Markdown, PDF, DOCX) into a bucket and get them parsed via Docling/Unstructured and indexed automatically.
-- **Hybrid chat history** — Redis for the active context window, PostgreSQL for durable long-term archives and analytics.
-- **Privacy-respecting web** — SearXNG meta-search plus FlareSolverr for Cloudflare-protected pages, all self-hosted.
+I built AscendAI because off-the-shelf orchestrators don't let you swap providers per request, run a privacy-respecting
+search backend you fully control, and persist semantic memory across sessions in one coherent platform. AscendAI does
+all three. Each prompt routes to the model you pick at call time (local LM Studio, OpenAI, Anthropic, Gemini, MiniMax).
+MCP tool servers handle audio, web, weather, and OCR. Long-term context lives in a Mem0-backed Qdrant store so
+conversations actually accumulate knowledge.
 
 ---
 
-## How it compares
+### Features
 
-The honest peer set is other **deployable AI orchestration backends** that bundle multi-provider routing, RAG, memory, and tools into one self-hosted service. Not chat UIs, not low-code workflow builders, not pure router proxies, not libraries. All four below are mature and well-known in this niche.
+- **Per-request provider routing.** Pick LM Studio, OpenAI, Anthropic, Gemini, or MiniMax on every API call without
+  restarts or config changes.
+- **RAG pipeline with Qdrant.** Thresholded soft-retrieval over ingested documents using provider-matched embedding
+  dimensions (768 / 1536).
+- **Semantic memory via Mem0.** Long-lived, user-scoped memories searchable across sessions through the AscendMemory
+  service.
+- **MCP tool servers.** First-class integrations for audio transcription ([AudioScribe](AudioScribe/AGENTS.md)), web
+  search ([AscendWebSearch](AscendWebSearch/AGENTS.md) + SearXNG), weather ([WeatherMCP](WeatherMCP/AGENTS.md)), and OCR
+  ([PaddleOCR](PaddleOCR/AGENTS.md)).
+- **Document ingestion to MinIO.** Drop files (Markdown, PDF, DOCX) into a bucket and the pipeline parses them via
+  Docling / Unstructured and indexes them automatically.
+- **Hybrid chat history.** Redis for the active context window, PostgreSQL for durable long-term archives and
+  analytics.
+- **Privacy-respecting web.** SearXNG meta-search plus FlareSolverr for Cloudflare-protected pages, all self-hosted.
+
+---
+
+### How it compares
+
+The honest peer set is other **deployable AI orchestration backends** that bundle multi-provider routing, RAG, memory,
+and tools into one self-hosted service. Not chat UIs, not low-code workflow builders, not pure router proxies, not
+libraries. All four below are mature and well-known in this niche.
 
 |                              | **AscendAI**            | [R2R][r2r]            | [Letta][letta]         | [Onyx][onyx]          | [Quivr][quivr]         | [LangChain][langchain]  |
 | ---------------------------- | ----------------------- | --------------------- | ---------------------- | --------------------- | ---------------------- | ----------------------- |
 | Shape                        | Deployable service      | Deployable service    | Deployable service     | Deployable service    | Deployable service     | Library / framework     |
 | Stack                        | Java 21 / Spring AI     | Python                | Python                 | Python                | Python                 | Python (TS port)        |
-| API-first (no UI shipped)    | Yes                     | Yes                   | Yes (server on `:8283`)| UI bundled, API-driven| UI bundled, API exposed| N/A — you build it      |
+| API-first (no UI shipped)    | Yes                     | Yes                   | Yes (server on `:8283`)| UI bundled, API-driven| UI bundled, API exposed| N/A, you build it       |
 | Per-request provider switch  | Built-in                | Built-in              | Built-in               | Built-in              | Built-in               | Possible via chain rebuild |
 | RAG over uploaded docs       | Built-in (Qdrant + threshold) | Built-in (multimodal, hybrid, KGs) | Lighter, agent-state focused | Built-in (40+ connectors) | Built-in (pluggable stores) | Many backends, you wire it |
 | Persistent semantic memory   | Mem0 + Qdrant           | Add-on                | Native (OS-style hierarchical) | Add-on        | Built-in               | Roll-your-own           |
@@ -126,28 +138,39 @@ The honest peer set is other **deployable AI orchestration backends** that bundl
 [quivr]: https://github.com/QuivrHQ/quivr
 [langchain]: https://github.com/langchain-ai/langchain
 
-LangChain isn't strictly a peer — it's a framework, not a deployable service. It's in the table because it's the most likely thing readers reach for when they think "AI orchestration", and the honest answer is "if you're already wiring your own service in LangChain, you don't need AscendAI."
+LangChain isn't strictly a peer. It's a framework, not a deployable service. It's in the table because it's the most
+likely thing readers reach for when they think "AI orchestration", and the honest answer is "if you're already wiring
+your own service in LangChain, you don't need AscendAI."
 
-### Where AscendAI is honestly distinctive
+#### Where AscendAI is honestly distinctive
 
-- **JVM-native.** Every credible peer in this niche is Python or TypeScript. If you live in Spring Boot already, AscendAI drops in alongside the rest of your services without a polyglot deploy.
-- **MCP-first tool model.** Onyx and Letta do tool use; AscendAI is built around MCP from day one with multiple bundled MCP servers (audio, OCR, web search, weather). Add new tools by pointing the agent at another MCP server, no code changes.
-- **Breadth of integration in one stack.** RAG, semantic memory, MCP tools, multi-provider routing, hot/archive chat history — all present, no add-ons.
+- **JVM-native.** Every credible peer in this niche is Python or TypeScript. If you live in Spring Boot already,
+  AscendAI drops in alongside the rest of your services without a polyglot deploy.
+- **MCP-first tool model.** Onyx and Letta do tool use; AscendAI is built around MCP from day one with multiple bundled
+  MCP servers (audio, OCR, web search, weather). Add new tools by pointing the agent at another MCP server, no code
+  changes.
+- **Breadth of integration in one stack.** RAG, semantic memory, MCP tools, multi-provider routing, hot / archive chat
+  history. All present, no add-ons.
 
-### Where it loses
+#### Where it loses
 
 - **No UI.** Onyx and Quivr ship one. AscendAI is a backend you put behind your own client.
 - **Smaller community.** All four peers above have more stars, more contributors, more battle testing.
-- **RAG depth.** R2R has a more sophisticated RAG pipeline (knowledge graphs, multimodal). AscendAI's RAG is solid but plain.
-- **Memory depth.** Letta's memory architecture is more advanced than Mem0-based memory.
+- **RAG depth.** R2R has a more sophisticated RAG pipeline (knowledge graphs, multimodal). AscendAI's RAG is solid but
+  plain.
+- **Memory depth.** Letta's memory architecture is more advanced than the Mem0-based memory here.
 
-If you're already happy in Python with R2R or Letta, you don't need this. AscendAI exists because I wanted these capabilities in a Spring-native deployment.
+If you're already happy in Python with R2R or Letta, you don't need this. AscendAI exists because I wanted these
+capabilities in a Spring-native deployment.
 
 ---
 
-## Demo
+### Demo
 
-Send a prompt with per-request provider and model selection. The endpoint accepts `multipart/form-data` (so you can attach an optional `image` or `document`):
+Send a prompt with per-request provider and model selection. The endpoint accepts `multipart/form-data` (so you can
+attach an optional `image` or `document`).
+
+Bash:
 
 ```bash
 curl -X POST http://localhost:9917/api/v1/ai/prompt \
@@ -158,7 +181,14 @@ curl -X POST http://localhost:9917/api/v1/ai/prompt \
   -F "embeddingProvider=lmstudio"
 ```
 
-Sample response (`AiResponse` — `content` plus an unwrapped Spring AI `ChatResponseMetadata` and the list of MCP tools invoked during the turn):
+PowerShell 7+ (`-Form` supports multipart):
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:9917/api/v1/ai/prompt -Method Post -Headers @{ "X-User-Id" = "luksarna" } -Form @{ prompt = "Summarize my notes on Spring AI and MCP."; provider = "anthropic"; model = "claude-sonnet-4-6"; embeddingProvider = "lmstudio" }
+```
+
+Sample response (`AiResponse`: `content` plus an unwrapped Spring AI `ChatResponseMetadata` and the list of MCP tools
+invoked during the turn):
 
 ```json
 {
@@ -172,24 +202,26 @@ Sample response (`AiResponse` — `content` plus an unwrapped Spring AI `ChatRes
 
 ---
 
-## Architecture
+### Architecture
 
-📐 **[Monorepo Architecture](docs/architecture/README.md)** — system overview, service interactions, deployment, ADRs.
+Two architecture entry points, depending on what you're after.
 
-📐 **[AscendAgent Internals](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md)** — arc42 documentation, component diagrams, module ADRs.
+- [Monorepo architecture](docs/architecture/README.md). System overview, service interactions, deployment, ADRs.
+- [AscendAgent arc42](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md). Internals, component diagrams,
+  module ADRs.
 
-| Module              | Stack                  | Port | Role                                              |
-| ------------------- | ---------------------- | ---- | ------------------------------------------------- |
-| **AscendAgent**     | Java 21 / Spring Boot  | 9917 | API gateway, multi-provider AI, RAG, MCP client   |
-| **AudioScribe**     | Python / FastMCP       | 7017 | Audio transcription (Whisper / OpenAI / HF)       |
-| **AscendWebSearch** | Python / FastMCP       | 7021 | Web search & scraping via SearXNG                 |
-| **AscendMemory**    | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                   |
-| **WeatherMCP**      | Java / Spring Boot     | 9998 | Weather data MCP server                           |
-| **PaddleOCR**       | Python / FastMCP       | 7022 | OCR service                                       |
+| Module                                                 | Stack                  | Port | Role                                                |
+| ------------------------------------------------------ | ---------------------- | ---- | --------------------------------------------------- |
+| **[AscendAgent](AscendAgent/AGENTS.md)**               | Java 21 / Spring Boot  | 9917 | API gateway, multi-provider AI, RAG, MCP client     |
+| **[AudioScribe](AudioScribe/AGENTS.md)**               | Python / FastMCP       | 7017 | Audio transcription (Whisper / OpenAI / HF)         |
+| **[AscendWebSearch](AscendWebSearch/AGENTS.md)**       | Python / FastMCP       | 7021 | Web search and scraping via SearXNG                 |
+| **[AscendMemory](AscendMemory/AGENTS.md)**             | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                     |
+| **[WeatherMCP](WeatherMCP/AGENTS.md)**                 | Java / Spring Boot     | 9998 | Weather data MCP server                             |
+| **[PaddleOCR](PaddleOCR/AGENTS.md)**                   | Python / FastMCP       | 7022 | OCR service                                         |
 
-### Request flow
+#### Request flow
 
-How a single prompt traverses the platform:
+How a single prompt traverses the platform.
 
 ```mermaid
 sequenceDiagram
@@ -214,119 +246,184 @@ sequenceDiagram
     L-->>A: Tool call request (optional)
     A->>T: Invoke MCP tool
     T-->>A: Tool result
-    A->>L: Tool result → final answer
+    A->>L: Tool result, then final answer
     L-->>A: Response + usage
     A->>R: Append turn
     A->>P: Persist transcript
-    A->>M: Extract & store new memories
+    A->>M: Extract and store new memories
     A-->>U: AiResponse {content, metadata, toolsUsed}
 ```
 
 ---
 
-## Quick Start
+### Quick Start
 
-### Prerequisites
+#### Prerequisites
 
 - Docker Desktop
 - Java 21
-- PostgreSQL on `5432`, Redis on `6379`, Qdrant on `6333`/`6334`, MinIO on `9070`/`9071` (`admin` / `password`)
+- PostgreSQL on `5432`, Redis on `6379`, Qdrant on `6333` / `6334`, MinIO on `9070` / `9071` (`admin` / `password`)
 
-### Run it
+#### Run it
 
-**1. Bring up the stack** (full 10-container stack via `include:`):
+**1. Provision secrets.**
+
+Copy the example file and fill in the API keys you plan to use. `.env` is gitignored. Provider keys are optional
+individually. Leave a key blank and just don't pick that provider at request time.
+
+Bash:
+
+```bash
+cp .env.example .env
+```
+
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+**2. Bring up the stack.**
+
+The main compose file pulls in [ascend-scrapper.docker-compose.yaml](ascend-scrapper.docker-compose.yaml) via `include:`,
+so a single `up` brings up the full stack (AscendAgent + tool services + scrapper).
+
+Bash:
 
 ```bash
 docker compose up -d --build
 ```
 
+PowerShell:
+
 ```powershell
 docker compose up -d --build
 ```
 
-Optional — bring up only the web-scraping stack as its own Docker Desktop group:
+Optional, bring up only the web-scraping stack as its own Docker Desktop group.
+
+Bash:
 
 ```bash
 docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
 ```
 
-**2. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
+PowerShell:
 
-**3. Start the AscendAgent**:
+```powershell
+docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
+```
+
+**3. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
+
+On first start the agent creates the MinIO `knowledge-base` bucket and initialises metadata tables. The API is then
+available at [http://localhost:9917](http://localhost:9917). Check the startup banner for live status of every
+dependency.
+
+**4. Optional: run the agent on the host.**
+
+For active development with hot reload and an attached debugger, run the agent on the host instead of in the container.
+Stop the container first (`docker compose stop ascend-agent`) so port 9917 is free.
+
+Bash:
 
 ```bash
-cd AscendAgent && ./gradlew bootRun
+cd AscendAgent
+```
+
+```bash
+./gradlew bootRun
+```
+
+PowerShell:
+
+```powershell
+cd AscendAgent
 ```
 
 ```powershell
-cd AscendAgent ; ./gradlew bootRun
+./gradlew bootRun
 ```
 
-On first start the agent creates the MinIO `knowledge-base` bucket and initialises metadata tables. The API is then available at [http://localhost:9917](http://localhost:9917) — see the startup banner for live status of every dependency.
-
-For advanced compose flags, per-service rebuilds, and production notes see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. For document ingestion see **[docs/INGESTION.md](docs/INGESTION.md)**.
-
----
-
-## Supported AI Providers
-
-Per-request selection across:
-
-- **OpenAI** — gpt-5.4, gpt-5.1, gpt-5-mini, gpt-4o, gpt-4o-mini
-- **Anthropic** — claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5, claude-haiku-4-5
-- **Gemini** — gemini-3.1-pro, gemini-3.1-flash, gemini-2.5-pro, gemini-2.5-flash
-- **MiniMax** — MiniMax-M2.5, MiniMax-M2.5-highspeed, MiniMax-M2.1
-- **LM Studio** — meta-llama-3.1-8b-instruct (default, local)
+For advanced compose flags, per-service rebuilds, and production notes see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+For document ingestion see [docs/INGESTION.md](docs/INGESTION.md).
 
 ---
 
-## Configuration & Ports
+### Supported AI Providers
 
-### AscendAI services
+Per-request selection across the providers below. Models listed are the ones currently wired in
+[application.yaml](AscendAgent/src/main/resources/application.yaml) (chat default, memory extraction, and history
+compaction). Any model the provider accepts works at request time via the `model` form field; these are the values
+that ship with the agent.
 
-Each service ships both REST and MCP surfaces (except WeatherMCP, MCP-only). The "Used by AscendAgent via" column shows the actual transport AscendAgent uses today; the other surface is available for direct external use.
+- **OpenAI.** `gpt-4o` (default), `gpt-4o-mini` (extraction + compaction).
+- **Anthropic.** `claude-sonnet-4-5` (default), `claude-3-5-haiku-20241022` (extraction), `claude-haiku-4-5`
+  (compaction).
+- **Gemini.** `gemini-flash-latest` (default), `gemini-flash-lite-latest` (extraction + compaction).
+- **MiniMax.** `MiniMax-M2.7` (default + extraction + compaction).
+- **LM Studio.** `meta-llama-3.1-8b-instruct` (default, local).
 
-| Service             | Port    | Surfaces        | Used by AscendAgent via | Role                                                                |
-| :------------------ | :------ | :-------------- | :---------------------- | :------------------------------------------------------------------ |
-| **AscendAgent**     | `9917`  | REST            | —                       | API gateway / orchestrator. `POST /api/v1/ai/prompt` is the entry. |
-| **AscendMemory**    | `7020`  | REST + MCP      | REST                    | Semantic memory store (Mem0 + Qdrant). Search/insert per-user.     |
-| **AudioScribe**     | `7017`  | REST + MCP      | MCP (Streamable HTTP)   | Speech-to-text (faster-whisper / OpenAI / HF / Audacity merge).    |
-| **AscendWebSearch** | `7021`  | REST + MCP      | MCP (Streamable HTTP)   | Web search + content extraction (SearXNG → Cloudflare → NoVNC).    |
-| **PaddleOCR**       | `7022`  | REST + MCP      | MCP (Streamable HTTP)   | Image OCR.                                                         |
-| **WeatherMCP**      | `9998`  | MCP only (SSE)  | MCP (SSE)               | Weather data tool (reference Spring AI MCP server).                |
+Override per request with the `provider` and `model` form fields, or globally via the `*_MODEL` env vars listed in
+[.env.example](.env.example).
 
-### Support services (in-stack, deployed via compose)
+---
 
-| Service                 | Port    | Default credentials | Role                                                       |
-| :---------------------- | :------ | :------------------ | :--------------------------------------------------------- |
-| **SearXNG**             | `9020`  | –                   | Privacy-respecting meta-search; backend for AscendWebSearch.|
-| **FlareSolverr**        | `8191`  | –                   | Cloudflare bypass proxy used by AscendWebSearch.           |
-| **Docling Serve**       | `5001`  | –                   | PDF/DOCX → structured JSON (used by ingestion pipeline).   |
-| **Unstructured API**    | `9080`  | –                   | Generic document parsing fallback for ingestion.           |
+### Configuration & Ports
 
-### External prerequisites (not in compose — managed/cloud in production)
+#### AscendAI services
+
+Each service ships both REST and MCP surfaces (except WeatherMCP, MCP-only). The "Used by AscendAgent via" column shows
+the actual transport AscendAgent uses today. The other surface is available for direct external use.
+
+| Service                                          | Port    | Surfaces        | Used by AscendAgent via | Role                                                                |
+| :----------------------------------------------- | :------ | :-------------- | :---------------------- | :------------------------------------------------------------------ |
+| **[AscendAgent](AscendAgent/AGENTS.md)**         | `9917`  | REST            | (this is the agent)     | API gateway and orchestrator. `POST /api/v1/ai/prompt` is the entry.|
+| **[AscendMemory](AscendMemory/AGENTS.md)**       | `7020`  | REST + MCP      | REST                    | Semantic memory store (Mem0 + Qdrant). Search / insert per user.    |
+| **[AudioScribe](AudioScribe/AGENTS.md)**         | `7017`  | REST + MCP      | MCP (Streamable HTTP)   | Speech-to-text (faster-whisper / OpenAI / HF / Audacity merge).     |
+| **[AscendWebSearch](AscendWebSearch/AGENTS.md)** | `7021`  | REST + MCP      | MCP (Streamable HTTP)   | Web search + content extraction (SearXNG, Cloudflare, NoVNC).       |
+| **[PaddleOCR](PaddleOCR/AGENTS.md)**             | `7022`  | REST + MCP      | MCP (Streamable HTTP)   | Image OCR.                                                          |
+| **[WeatherMCP](WeatherMCP/AGENTS.md)**           | `9998`  | MCP only (SSE)  | MCP (SSE)               | Weather data tool (reference Spring AI MCP server).                 |
+
+#### Support services (in-stack, deployed via compose)
+
+| Service                 | Port    | Default credentials | Role                                                        |
+| :---------------------- | :------ | :------------------ | :---------------------------------------------------------- |
+| **SearXNG**             | `9020`  | (none)              | Privacy-respecting meta-search; backend for AscendWebSearch.|
+| **FlareSolverr**        | `8191`  | (none)              | Cloudflare bypass proxy used by AscendWebSearch.            |
+| **Docling Serve**       | `5001`  | (none)              | PDF / DOCX to structured JSON (used by ingestion pipeline). |
+| **Unstructured API**    | `9080`  | (none)              | Generic document parsing fallback for ingestion.            |
+
+#### External prerequisites (not in compose, managed / cloud in production)
 
 | Service                 | Port            | Default credentials  | Role                                                        |
 | :---------------------- | :-------------- | :------------------- | :---------------------------------------------------------- |
 | **PostgreSQL**          | `5432`          | `postgres` / `local` | Chat-history archive, ingestion metadata, user instructions.|
-| **Redis**               | `6379`          | –                    | Short-term chat-history cache, session state.               |
-| **Qdrant**              | `6333` / `6334` | –                    | Vector DB for RAG (`ascendai-768/1536`) and Mem0 memory.    |
+| **Redis**               | `6379`          | (none)               | Short-term chat-history cache, session state.               |
+| **Qdrant**              | `6333` / `6334` | (none)               | Vector DB for RAG (`ascendai-768/1536`) and Mem0 memory.    |
 | **MinIO**               | `9070` / `9071` | `admin` / `password` | S3-compatible object store for ingested documents.          |
 
 ---
 
-## Documentation
+### Documentation
 
-- **[Monorepo architecture](docs/architecture/README.md)** — system view, ADRs, deployment topology.
-- **[AscendAgent arc42](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md)** — internals, component diagrams.
-- **[Deployment](docs/DEPLOYMENT.md)** — Docker Compose recipes, image publishing, prod notes.
-- **[Document ingestion](docs/INGESTION.md)** — upload flows for the RAG pipeline.
-- **[End-to-end testing](AscendAgent/e2e/README.md)** — capability tests, fixtures, and the Bruno collection at `docs/api/request/AscendAI/`.
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Qdrant / MinIO / PostgreSQL / Redis reset recipes.
-- **[Agent tooling & OpenSpec](docs/AGENT_TOOLING.md)** — agent-standards import, OpenSpec workflow.
+Canonical index. Every doc the repo ships, in one place.
+
+| File                                                                                                                  | What's in it                                                          |
+| :-------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------- |
+| [docs/architecture/README.md](docs/architecture/README.md)                                                            | Monorepo architecture: system view, ADRs, deployment topology.        |
+| [docs/architecture/arc42/01-introduction-and-goals.md](docs/architecture/arc42/01-introduction-and-goals.md)          | Arc42 entry point for the platform.                                   |
+| [AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
+| [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / MinIO / PostgreSQL / Redis reset recipes.                    |
+| [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
+| [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |
+| [AscendAgent/e2e/README.md](AscendAgent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
+| [AGENTS.md](AGENTS.md)                                                                                                | Shared instructions for any AI coding agent operating in this repo.   |
 
 ---
 
-## License
+### License
 
 Released under the [MIT License](LICENSE).

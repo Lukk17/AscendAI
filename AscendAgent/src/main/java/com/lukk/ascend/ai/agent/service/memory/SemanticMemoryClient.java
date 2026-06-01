@@ -23,7 +23,7 @@ public class SemanticMemoryClient {
     private final SemanticMemoryProperties properties;
 
     public List<SemanticMemoryItem> search(String userId, String query, int limit, String embeddingProvider) {
-        if (!hasUserId(userId, "search")) {
+        if (isMissingUserId(userId, "search")) {
             return List.of();
         }
         return Optional.of(properties)
@@ -47,7 +47,8 @@ public class SemanticMemoryClient {
                 .uri(properties.getBaseUrl() + "/api/v1/memory/search?user_id={userId}&query={query}&limit={limit}&provider={provider}",
                         userId, query, limit, embeddingProvider)
                 .retrieve()
-                .body(new ParameterizedTypeReference<>() {});
+                .body(new ParameterizedTypeReference<>() {
+                });
 
         List<SemanticMemoryItem> finalResult = Optional.ofNullable(result).orElseGet(List::of);
         log.info("Received {} semantic memory items for user: '{}'", finalResult.size(), userId);
@@ -68,7 +69,7 @@ public class SemanticMemoryClient {
     }
 
     public void insertMemory(String userId, String fact, String embeddingProvider) {
-        if (!hasUserId(userId, "insertMemory")) {
+        if (isMissingUserId(userId, "insertMemory")) {
             return;
         }
         if (!properties.isEnabled()) {
@@ -89,12 +90,9 @@ public class SemanticMemoryClient {
         log.info("Successfully inserted memory fact for user: '{}'", userId);
     }
 
-    /**
-     * Removes every memory for the given user via {@code POST /api/v1/memory/wipe}.
-     * Body is snake_case to match the FastAPI contract on the AscendMemory side.
-     */
+    // Body is snake_case to match the FastAPI contract on the AscendMemory side.
     public void wipeUserMemory(String userId, String embeddingProvider) {
-        if (!hasUserId(userId, "wipeUserMemory")) {
+        if (isMissingUserId(userId, "wipeUserMemory")) {
             return;
         }
         if (!properties.isEnabled()) {
@@ -117,11 +115,8 @@ public class SemanticMemoryClient {
         }
     }
 
-    /**
-     * Deletes a single memory by its mem0 id via {@code DELETE /api/v1/memory?memory_id=...}.
-     */
     public void deleteMemory(String userId, String memoryId, String embeddingProvider) {
-        if (!hasUserId(userId, "deleteMemory")) {
+        if (isMissingUserId(userId, "deleteMemory")) {
             return;
         }
         if (!StringUtils.hasText(memoryId)) {
@@ -145,11 +140,13 @@ public class SemanticMemoryClient {
         }
     }
 
-    private boolean hasUserId(String userId, String operation) {
-        if (!StringUtils.hasText(userId)) {
-            log.warn("SemanticMemoryClient.{} called with blank userId; short-circuiting", operation);
+    private boolean isMissingUserId(String userId, String operation) {
+        if (StringUtils.hasText(userId)) {
             return false;
         }
+
+        log.warn("SemanticMemoryClient.{} called with blank userId; short-circuiting", operation);
+
         return true;
     }
 }

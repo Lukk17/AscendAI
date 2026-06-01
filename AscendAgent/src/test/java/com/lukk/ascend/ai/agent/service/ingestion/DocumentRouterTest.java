@@ -10,6 +10,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -57,15 +58,19 @@ class DocumentRouterTest {
     }
 
     @Test
+    @DisplayName("routeAndProcess routes markdown files to the ingestion service")
     void routeAndProcess_WhenMarkdownFile_ThenRouteToIngestionService() {
+        // given
         byte[] bytes = "test".getBytes();
         String filename = "test.md";
         Document mockDoc = new Document("markdown text");
         when(ingestionService.processMarkdown(any(InputStream.class), eq(filename)))
                 .thenReturn(List.of(mockDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(bytes, filename, "text/markdown");
 
+        // then
         assertThat(result).containsExactly(mockDoc);
         verify(ingestionService).processMarkdown(any(InputStream.class), eq(filename));
     }
@@ -114,47 +119,52 @@ class DocumentRouterTest {
     }
 
     @Test
+    @DisplayName("routeAndProcess throws UnsupportedFileTypeException for an unsupported extension")
     void routeAndProcess_WhenUnsupportedExtension_ThenThrowUnsupportedFileTypeException() {
-        byte[] bytes = "executable".getBytes();
-        String filename = "malware.exe";
-
-        assertThatThrownBy(() -> documentRouter.routeAndProcess(bytes, filename, "application/octet-stream"))
+        // then
+        assertThatThrownBy(() -> documentRouter.routeAndProcess("executable".getBytes(), "malware.exe", "application/octet-stream"))
                 .isInstanceOf(UnsupportedFileTypeException.class)
                 .hasMessageContaining("exe");
     }
 
     @Test
+    @DisplayName("routeAndProcess throws UnsupportedFileTypeException when filename is null")
     void routeAndProcess_WhenNullFilename_ThenThrowUnsupportedFileTypeException() {
-        byte[] bytes = "content".getBytes();
-
-        assertThatThrownBy(() -> documentRouter.routeAndProcess(bytes, null, "application/octet-stream"))
+        // then
+        assertThatThrownBy(() -> documentRouter.routeAndProcess("content".getBytes(), null, "application/octet-stream"))
                 .isInstanceOf(UnsupportedFileTypeException.class);
     }
 
     @Test
+    @DisplayName("routeAndProcess throws UnsupportedFileTypeException when filename has no extension")
     void routeAndProcess_WhenFilenameWithoutExtension_ThenThrowUnsupportedFileTypeException() {
-        byte[] bytes = "content".getBytes();
-
-        assertThatThrownBy(() -> documentRouter.routeAndProcess(bytes, "noextension", "application/octet-stream"))
+        // then
+        assertThatThrownBy(() -> documentRouter.routeAndProcess("content".getBytes(), "noextension", "application/octet-stream"))
                 .isInstanceOf(UnsupportedFileTypeException.class);
     }
 
     @Test
+    @DisplayName("routeAndProcess routes text-heavy PDF pages to Docling")
     void routeAndProcess_WhenTextPdf_ThenRouteToDocling() throws IOException {
+        // given
         setThreshold(TEXT_THRESHOLD);
         byte[] pdfBytes = createTextPdf(generateLongText());
         String filename = "document.pdf";
         Document mockDoc = new Document("pdf text");
         when(doclingClient.process(any(byte[].class), eq(filename + "_page1.pdf"))).thenReturn(List.of(mockDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(pdfBytes, filename, "application/pdf");
 
+        // then
         assertThat(result).containsExactly(mockDoc);
         verify(doclingClient).process(any(byte[].class), eq(filename + "_page1.pdf"));
     }
 
     @Test
+    @DisplayName("routeAndProcess routes scan (text-sparse) PDF pages to PaddleOCR")
     void routeAndProcess_WhenScanPdf_ThenRouteToPaddleOcr() throws IOException {
+        // given
         setThreshold(TEXT_THRESHOLD);
         byte[] pdfBytes = createTextPdf("Short");
         String filename = "scan.pdf";
@@ -162,14 +172,18 @@ class DocumentRouterTest {
         when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
                 .thenReturn(List.of(mockDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(pdfBytes, filename, "application/pdf");
 
+        // then
         assertThat(result).containsExactly(mockDoc);
         verify(paddleOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
     }
 
     @Test
+    @DisplayName("routeAndProcess routes each page separately for a mixed text/scan PDF")
     void routeAndProcess_WhenMixedPdf_ThenRoutePagesSeparately() throws IOException {
+        // given
         setThreshold(TEXT_THRESHOLD);
         byte[] pdfBytes = createMixedPdf(generateLongText(), "S");
         String filename = "mixed.pdf";
@@ -180,8 +194,10 @@ class DocumentRouterTest {
         when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page2.pdf"), isNull()))
                 .thenReturn(List.of(ocrDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(pdfBytes, filename, "application/pdf");
 
+        // then
         assertThat(result).hasSize(2);
         assertThat(result).containsExactly(doclingDoc, ocrDoc);
         verify(doclingClient).process(any(byte[].class), eq(filename + "_page1.pdf"));
@@ -189,7 +205,9 @@ class DocumentRouterTest {
     }
 
     @Test
+    @DisplayName("routeAndProcess sends all pages to Docling when every page has sufficient text")
     void routeAndProcess_WhenMultiPageAllText_ThenAllPagesToDocling() throws IOException {
+        // given
         setThreshold(TEXT_THRESHOLD);
         byte[] pdfBytes = createMixedPdf(generateLongText(), generateLongText());
         String filename = "alltext.pdf";
@@ -200,26 +218,71 @@ class DocumentRouterTest {
         when(doclingClient.process(any(byte[].class), eq(filename + "_page2.pdf")))
                 .thenReturn(List.of(doc2));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(pdfBytes, filename, "application/pdf");
 
+        // then
         assertThat(result).hasSize(2).containsExactly(doc1, doc2);
         verify(doclingClient).process(any(byte[].class), eq(filename + "_page1.pdf"));
         verify(doclingClient).process(any(byte[].class), eq(filename + "_page2.pdf"));
     }
 
     @Test
-    void routeAndProcess_WhenInvalidPdfBytes_ThenThrowDocumentRoutingException() {
-        setThreshold(TEXT_THRESHOLD);
-        byte[] invalidPdfBytes = "not_a_real_pdf".getBytes();
-        String filename = "broken.pdf";
+    @DisplayName("routeAndProcess routes to Docling when text length is exactly at the threshold boundary")
+    void routeAndProcess_WhenTextLengthExactlyAtThreshold_ThenRouteToDocling() throws IOException {
+        // given — boundary: text length == threshold routes to Docling (not OCR)
+        int threshold = 30;
+        setThreshold(threshold);
+        String borderText = "A".repeat(threshold);
+        byte[] pdfBytes = createTextPdf(borderText);
+        String filename = "border.pdf";
+        Document mockDoc = new Document("border text");
+        when(doclingClient.process(any(byte[].class), eq(filename + "_page1.pdf"))).thenReturn(List.of(mockDoc));
 
-        assertThatThrownBy(() -> documentRouter.routeAndProcess(invalidPdfBytes, filename, "application/pdf"))
-                .isInstanceOf(DocumentRoutingException.class)
-                .hasMessageContaining(filename);
+        // when
+        List<Document> result = documentRouter.routeAndProcess(pdfBytes, filename, "application/pdf");
+
+        // then
+        assertThat(result).containsExactly(mockDoc);
+        verify(doclingClient).process(any(byte[].class), eq(filename + "_page1.pdf"));
     }
 
     @Test
+    @DisplayName("routeAndProcess routes to PaddleOCR when text length is below the threshold")
+    void routeAndProcess_WhenTextLengthBelowThreshold_ThenRouteToPaddleOcr() throws IOException {
+        // given — below threshold: short text on page → treated as scanned → OCR
+        int threshold = 80;
+        setThreshold(threshold);
+        byte[] pdfBytes = createTextPdf("Hi");
+        String filename = "short.pdf";
+        Document mockDoc = new Document("ocr result");
+        when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
+                .thenReturn(List.of(mockDoc));
+
+        // when
+        List<Document> result = documentRouter.routeAndProcess(pdfBytes, filename, "application/pdf");
+
+        // then
+        assertThat(result).containsExactly(mockDoc);
+        verify(paddleOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
+    }
+
+    @Test
+    @DisplayName("routeAndProcess throws DocumentRoutingException for invalid PDF bytes")
+    void routeAndProcess_WhenInvalidPdfBytes_ThenThrowDocumentRoutingException() {
+        // given
+        setThreshold(TEXT_THRESHOLD);
+
+        // then
+        assertThatThrownBy(() -> documentRouter.routeAndProcess("not_a_real_pdf".getBytes(), "broken.pdf", "application/pdf"))
+                .isInstanceOf(DocumentRoutingException.class)
+                .hasMessageContaining("broken.pdf");
+    }
+
+    @Test
+    @DisplayName("routeAndProcess routes a blank single-page PDF to PaddleOCR")
     void routeAndProcess_WhenSinglePageBlankPdf_ThenRouteToPaddleOcr() throws IOException {
+        // given
         setThreshold(TEXT_THRESHOLD);
         byte[] pdfBytes = createBlankPdf();
         String filename = "blank.pdf";
@@ -227,8 +290,10 @@ class DocumentRouterTest {
         when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
                 .thenReturn(List.of(mockDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(pdfBytes, filename, "application/pdf");
 
+        // then
         assertThat(result).containsExactly(mockDoc);
         verify(paddleOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
     }

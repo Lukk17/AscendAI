@@ -1,30 +1,35 @@
-from enum import Enum
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-
-class OutputFormat(str, Enum):
-    JSON = "json"
+SCHEMA_VERSION: Literal["1"] = "1"
 
 
 class OcrTextLine(BaseModel):
-    text: str
-    confidence: float
-    bounding_box: list[list[float]]
+    text: str = Field(max_length=10_000)
+    confidence: float = Field(ge=0.0, le=1.0)
+    bounding_box: list[list[float]] = Field(max_length=32)
 
 
 class OcrPageResult(BaseModel):
-    page_number: int
+    page_number: int = Field(ge=1)
     lines: list[OcrTextLine]
 
 
 class OcrJsonResponse(BaseModel):
-    filename: str
-    language: str
+    schema_version: Literal["1"] = SCHEMA_VERSION
+    filename: str = Field(max_length=512)
+    language: str = Field(pattern=r"^[a-z]{2,5}$")
     pages: list[OcrPageResult]
-    processing_time_seconds: float
+    processing_time_seconds: float = Field(ge=0.0)
 
 
 class HealthResponse(BaseModel):
-    status: str
+    status: Literal["ok", "warming-up"] = "ok"
     version: str
+
+
+class ReadinessResponse(BaseModel):
+    status: Literal["ready", "not-ready"]
+    version: str
+    engine_warm: bool

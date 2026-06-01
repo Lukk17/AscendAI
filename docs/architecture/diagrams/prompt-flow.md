@@ -1,6 +1,8 @@
 # Prompt Processing Flow
 
-## Sequence Diagram
+---
+
+### Sequence diagram
 
 ```mermaid
 sequenceDiagram
@@ -53,17 +55,19 @@ sequenceDiagram
         Chat->>History: saveHistory(userId, prompt, response)
     and Async Memory Extraction
         Chat->>MemExtract: extract(userId, prompt, provider)
-        Note over MemExtract: Virtual Thread — low-cost model<br/>extracts user facts, POSTs to AscendMemory
+        Note over MemExtract: Virtual Thread, low-cost model<br/>extracts user facts, POSTs to AscendMemory
     end
 
     Chat-->>Controller: response DTO
     Controller-->>User: JSON {content, metadata}
 ```
 
-## Key Design Decisions
+---
 
-- **Parallel context assembly**: RAG search and memory search run concurrently
-- **Per-request provider selection**: User chooses AI provider and model at prompt time
-- **Transparent tool routing**: LLM decides when to use tools; Spring AI MCP handles dispatch
-- **Async memory extraction**: Runs on a Virtual Thread after response, uses a cheap/fast model
-- **Dual history store**: Redis for fast reads, PostgreSQL for persistence
+### Key design decisions
+
+- **Parallel context assembly.** RAG search and memory search run concurrently.
+- **Per-request provider selection.** User chooses AI provider and model at prompt time.
+- **Transparent tool routing.** LLM decides when to use tools; Spring AI MCP handles dispatch.
+- **Async memory extraction.** Runs on a Virtual Thread after response, uses a cheap and fast model.
+- **Dual history store.** Redis for fast reads, PostgreSQL for persistence.

@@ -8,7 +8,7 @@ http:
   url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ingestion/run?embeddingProvider=openai"
   headers:
     - name: X-User-Id
-      value: frosty
+      value: frostyRagTest
   params:
     - name: prefix
       value: documents/

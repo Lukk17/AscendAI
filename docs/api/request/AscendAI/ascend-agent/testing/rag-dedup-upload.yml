@@ -1,0 +1,28 @@
+info:
+  name: rag-dedup-upload
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ingestion/upload"
+  headers:
+    - name: X-User-Id
+      value: frostyRagDedupTest
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\dedup-pierogi-helena.md
+      - name: file
+        type: file
+        value:
+          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\dedup-pierogi-grandma.md
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

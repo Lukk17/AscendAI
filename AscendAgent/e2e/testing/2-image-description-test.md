@@ -1,4 +1,4 @@
-# Image description — e2e test
+# Image description: e2e test
 
 ## What this verifies
 
@@ -48,10 +48,16 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/image-description-
 
 The Bruno output shows HTTP 200.
 
-The response body's `content` field is a detailed description (more than a few sentences) that references concrete visual features of `AscendAgent/e2e/fixtures/image.png` — specific subjects, colors, objects, or text in the image.
+The response body's `content` field is a detailed description (more than a few sentences) that references concrete visual features of `AscendAgent/e2e/fixtures/image.png`: specific subjects, colors, objects, or text in the image.
 
-The response body's `content` field is NOT a refusal like "I don't see an image" or "I'm unable to view images" — those indicate the bytes did not reach the model.
+The response body's `content` field is NOT a refusal like "I don't see an image" or "I'm unable to view images". Those indicate the bytes did not reach the model.
 
 ## Fixtures
 
-- `AscendAgent/e2e/fixtures/image.png` — pick something with one obvious correct answer (a specific subject, a unique logo, an annotated chart) so the description can be visually verified.
+- `AscendAgent/e2e/fixtures/image.png`: pick something with one obvious correct answer (a specific subject, a unique logo, an annotated chart) so the description can be visually verified.
+
+## Concurrency
+
+- **Mutates:** Postgres `chat_history` (user_id=`frostyImageDescriptionTest`); Redis key `chat:frostyImageDescriptionTest`
+- **Conflicts with:** none
+- **Serial:** false

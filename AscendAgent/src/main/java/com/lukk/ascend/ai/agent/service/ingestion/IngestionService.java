@@ -27,13 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Service responsible for processing raw input streams into AI Documents.
- * <p>
- * This service handles parsing of Markdown files locally and orchestrates
- * the conversion of other formats (PDF, DOCX, etc.) via the Unstructured API.
- * </p>
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -41,11 +34,13 @@ public class IngestionService {
 
     private static final String TYPE_MARKDOWN = "markdown";
     private static final String TYPE_UNSTRUCTURED = "unstructured";
-    private static final String KEY_SOURCE = "source";
-    private static final String KEY_TITLE = "title";
-    private static final String KEY_TYPE = "type";
-    private static final String KEY_TEXT = "text";
     private static final String PARAM_FILES = "files";
+    private static final String UNSTRUCTURED_TITLE_ELEMENT = "Title";
+
+    // JSON field names in the Unstructured API response — distinct from document-metadata keys
+    // even when the literal happens to match (the API returns objects like {"type":"Title","text":"..."}).
+    private static final String JSON_TYPE = "type";
+    private static final String JSON_TEXT = "text";
 
     @Qualifier("ingestionRestClient")
     private final RestClient restClient;
@@ -58,19 +53,6 @@ public class IngestionService {
     @Value("${app.unstructured.api-path:/general/v0/general}")
     private String unstructuredApiPath;
 
-    /**
-     * Processes a Markdown input stream and converts it into a list of Documents.
-     * <p>
-     * This method reads the stream, parses the Markdown to extract text content,
-     * attempts to find a title from the first H1 heading, and creates a Document
-     * with appropriate metadata.
-     * </p>
-     *
-     * @param inputStream The input stream containing Markdown content.
-     * @param filename    The name of the source file.
-     * @return A list containing the single processed Document.
-     * @throws RuntimeException If reading or parsing fails.
-     */
     public List<Document> processMarkdown(InputStream inputStream, String filename) {
         log.info("Processing Markdown stream for file: {}", filename);
         try {
@@ -78,15 +60,15 @@ public class IngestionService {
             String title = extractTitleFromMarkdown(content);
 
             if (title == null || title.isBlank()) {
-                title = filename;
+                title = basename(filename);
             }
 
             String cleanText = renderTextFromMarkdown(content);
 
             Document doc = new Document(cleanText, Map.of(
-                    KEY_SOURCE, filename,
-                    KEY_TITLE, title,
-                    KEY_TYPE, TYPE_MARKDOWN));
+                    IngestionMetadataKeys.SOURCE, filename,
+                    IngestionMetadataKeys.TITLE, title,
+                    IngestionMetadataKeys.TYPE, TYPE_MARKDOWN));
 
             return List.of(doc);
         } catch (IOException e) {
@@ -95,13 +77,6 @@ public class IngestionService {
         }
     }
 
-    /**
-     * Processes a binary input stream (PDF, etc.) using the Unstructured API.
-     *
-     * @param inputStream The input stream of the file.
-     * @param filename    The name of the file.
-     * @return A list of Documents extracted from the file.
-     */
     public List<Document> processUnstructured(InputStream inputStream, String filename) {
         log.info("Processing Unstructured stream for file: {}", filename);
 
@@ -149,22 +124,39 @@ public class IngestionService {
         return visitor.getTitle();
     }
 
+    private static String basename(String key) {
+        int slash = key.lastIndexOf('/');
+        return slash >= 0 ? key.substring(slash + 1) : key;
+    }
+
     private List<Document> parseUnstructuredResponse(String jsonResponse, String filename) {
         List<Document> documents = new ArrayList<>();
         try {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             if (rootNode.isArray()) {
                 StringBuilder fullText = new StringBuilder();
+                String extractedTitle = null;
                 for (JsonNode node : rootNode) {
-                    if (node.has(KEY_TEXT)) {
-                        fullText.append(node.get(KEY_TEXT).asText()).append("\n");
+                    if (extractedTitle == null
+                            && node.has(JSON_TYPE)
+                            && UNSTRUCTURED_TITLE_ELEMENT.equals(node.get(JSON_TYPE).asText())
+                            && node.has(JSON_TEXT)) {
+                        String candidate = node.get(JSON_TEXT).asText();
+                        if (candidate != null && !candidate.isBlank()) {
+                            extractedTitle = candidate;
+                        }
+                    }
+                    if (node.has(JSON_TEXT)) {
+                        fullText.append(node.get(JSON_TEXT).asText()).append("\n");
                     }
                 }
 
                 if (!fullText.isEmpty()) {
+                    String title = (extractedTitle != null) ? extractedTitle : basename(filename);
                     Document doc = new Document(fullText.toString(), Map.of(
-                            KEY_SOURCE, filename,
-                            KEY_TYPE, TYPE_UNSTRUCTURED));
+                            IngestionMetadataKeys.SOURCE, filename,
+                            IngestionMetadataKeys.TITLE, title,
+                            IngestionMetadataKeys.TYPE, TYPE_UNSTRUCTURED));
                     documents.add(doc);
                 }
             }
