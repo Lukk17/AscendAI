@@ -4,7 +4,7 @@
 
 [agent-standards](https://github.com/Lukk17/agent-standards) is upstream for [.agents/skills/](../.agents/skills/),
 [.claude/agents/](../.claude/agents/), [.opencode/agents/](../.opencode/agents/), [AGENT_TOOLING.md](AGENT_TOOLING.md),
-and [MCP_SETUP.md](MCP_SETUP.md).
+[MCP_SETUP.md](MCP_SETUP.md), and this file ([AGENTS-UPDATE.md](AGENTS-UPDATE.md)) itself.
 
 The bootstrap import in [AGENT_TOOLING.md](AGENT_TOOLING.md) pulls everything from upstream. That is fine the first
 time. On every later update it re-adds skills and subagents you removed on purpose.
@@ -29,10 +29,10 @@ Fetch upstream first.
 git fetch agent-standards
 ```
 
-Refresh the two static docs.
+Refresh the three static docs (including this one).
 
 ```bash
-git checkout agent-standards/master -- docs/AGENT_TOOLING.md docs/MCP_SETUP.md
+git checkout agent-standards/master -- docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/AGENTS-UPDATE.md
 ```
 
 Iterate every skill currently present and pull its upstream copy. Missing-upstream errors are swallowed.
@@ -57,10 +57,10 @@ Fetch upstream first.
 git fetch agent-standards
 ```
 
-Refresh the two static docs.
+Refresh the three static docs (including this one).
 
 ```powershell
-git checkout agent-standards/master -- docs/AGENT_TOOLING.md docs/MCP_SETUP.md
+git checkout agent-standards/master -- docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/AGENTS-UPDATE.md
 ```
 
 Iterate every skill currently present and pull its upstream copy.

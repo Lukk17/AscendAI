@@ -418,6 +418,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / MinIO / PostgreSQL / Redis reset recipes.                    |
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
+| [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |
 | [AscendAgent/e2e/README.md](AscendAgent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
 | [AGENTS.md](AGENTS.md)                                                                                                | Shared instructions for any AI coding agent operating in this repo.   |
