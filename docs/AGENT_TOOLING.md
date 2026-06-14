@@ -45,7 +45,7 @@ git fetch agent-standards
 ```
 
 ```bash
-git checkout agent-standards/master -- .agents .claude .opencode .codex docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/AGENTS-UPDATE.md AGENTS.md.example kilo.jsonc.example opencode.json.example .mcp.json.example
+git checkout agent-standards/master -- .agents .claude .opencode .codex docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/AGENTS-UPDATE.md AGENTS.md.example kilo.jsonc.example opencode.json.example .mcp.json
 ```
 
 Commit the imported files when you're ready.
@@ -86,7 +86,7 @@ cp opencode.json.example opencode.json
 ```
 
 ```bash
-cp .mcp.json.example .mcp.json
+cp .mcp.json .mcp.json
 ```
 
 The `kilo.jsonc`, `opencode.json`, and `.mcp.json` copies are optional. Only `AGENTS.md` is required.
@@ -171,7 +171,7 @@ Two committed templates ship the default MCP servers: [.mcp.json.example](../.mc
 Copy them into place when you want the shared server set:
 
 ```bash
-cp .mcp.json.example .mcp.json
+cp .mcp.json .mcp.json
 ```
 
 ```bash
