@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
@@ -16,7 +17,7 @@ import static org.mockito.Mockito.when;
 
 class OpenAiPromptCacheStrategyTest {
 
-    private final OpenAiPromptCacheStrategy strategy = new OpenAiPromptCacheStrategy("openai");
+    private final OpenAiPromptCacheStrategy strategy = new OpenAiPromptCacheStrategy("openai", new SimpleMeterRegistry());
 
     @Test
     @DisplayName("buildOptions returns generic ChatOptions with the model set for a valid model name")
@@ -78,7 +79,7 @@ class OpenAiPromptCacheStrategyTest {
     @DisplayName("providerName returns the value passed to the constructor")
     void providerName_IsConstructorArg() {
         // then
-        assertThat(new OpenAiPromptCacheStrategy("openai").providerName()).isEqualTo("openai");
-        assertThat(new OpenAiPromptCacheStrategy("gemini").providerName()).isEqualTo("gemini");
+        assertThat(new OpenAiPromptCacheStrategy("openai", new SimpleMeterRegistry()).providerName()).isEqualTo("openai");
+        assertThat(new OpenAiPromptCacheStrategy("gemini", new SimpleMeterRegistry()).providerName()).isEqualTo("gemini");
     }
 }

@@ -13,6 +13,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -23,7 +25,7 @@ import static org.mockito.Mockito.when;
 
 class ChatExecutorImageTest {
 
-    private final ChatExecutor chatExecutor = new ChatExecutor(null, null, null, null);
+    private final ChatExecutor chatExecutor = new ChatExecutor(null, null, null, null, new SimpleMeterRegistry());
 
     static Stream<Arguments> mimeResolutionCases() {
         return Stream.of(

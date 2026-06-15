@@ -13,6 +13,8 @@ import com.lukk.ascend.ai.mcp.weather.dto.HistoricalWeatherResult;
 import com.lukk.ascend.ai.mcp.weather.dto.ResolvedLocation;
 import com.lukk.ascend.ai.mcp.weather.dto.Temperature;
 import com.lukk.ascend.ai.mcp.weather.dto.Wind;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -35,10 +37,16 @@ public class WeatherToolService {
     public static final int MAX_GEOCODE_LIMIT = 10;
     public static final String WIND_UNIT = "km/h";
 
-    private final OpenMeteoClient client;
+    private static final String METRIC_MCP_TOOL_DURATION = "mcp.tool.duration";
+    private static final String OUTCOME_OK = "ok";
+    private static final String OUTCOME_ERROR = "error";
 
-    public WeatherToolService(OpenMeteoClient client) {
+    private final OpenMeteoClient client;
+    private final MeterRegistry meterRegistry;
+
+    public WeatherToolService(OpenMeteoClient client, MeterRegistry meterRegistry) {
         this.client = client;
+        this.meterRegistry = meterRegistry;
     }
 
     @Tool(name = "weather.current",
@@ -70,6 +78,8 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
         try {
             Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
@@ -85,9 +95,15 @@ public class WeatherToolService {
 
             return toResult(geo, upstream, resolvedUnit);
         } catch (RestClientException e) {
+            outcome = OUTCOME_ERROR;
             log.warn("Open-Meteo upstream call failed for city={}", city, e);
 
             return CurrentWeatherResult.upstreamUnavailable();
+        } finally {
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", "weather.current")
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
     }
 
@@ -127,6 +143,8 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
         try {
             Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
@@ -142,9 +160,15 @@ public class WeatherToolService {
 
             return toForecastResult(geo, upstream, resolvedUnit);
         } catch (RestClientException e) {
+            outcome = OUTCOME_ERROR;
             log.warn("Open-Meteo upstream call failed for city={}", city, e);
 
             return ForecastResult.upstreamUnavailable();
+        } finally {
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", "weather.forecast")
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
     }
 
@@ -183,6 +207,8 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
         try {
             Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
@@ -198,9 +224,15 @@ public class WeatherToolService {
 
             return toHistoricalResult(geo, upstream, resolvedUnit);
         } catch (RestClientException e) {
+            outcome = OUTCOME_ERROR;
             log.warn("Open-Meteo archive call failed for city={} date={}", city, date, e);
 
             return HistoricalWeatherResult.upstreamUnavailable();
+        } finally {
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", "weather.historical")
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
     }
 
@@ -229,6 +261,8 @@ public class WeatherToolService {
         String resolvedCountryCode = InputValidator.normaliseCountryCode(countryCode);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
         try {
             Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
@@ -244,9 +278,15 @@ public class WeatherToolService {
 
             return toAirQualityResult(geo, upstream);
         } catch (RestClientException e) {
+            outcome = OUTCOME_ERROR;
             log.warn("Open-Meteo air quality call failed for city={}", city, e);
 
             return AirQualityResult.upstreamUnavailable();
+        } finally {
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", "weather.airQuality")
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
     }
 
@@ -276,6 +316,8 @@ public class WeatherToolService {
 
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
         try {
             List<GeoResult> results = client.geocodeAll(query, resolvedLimit, resolvedLanguage);
             if (results.isEmpty()) {
@@ -288,9 +330,15 @@ public class WeatherToolService {
 
             return GeocodeResult.ok(candidates);
         } catch (RestClientException e) {
+            outcome = OUTCOME_ERROR;
             log.warn("Open-Meteo geocoding call failed for query={}", query, e);
 
             return GeocodeResult.upstreamUnavailable();
+        } finally {
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", "weather.geocode")
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
     }
 

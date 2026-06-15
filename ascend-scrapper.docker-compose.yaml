@@ -79,6 +79,9 @@ services:
       # Redis must be running externally (port 6379)
       - REDIS_URL=redis://host.docker.internal:6379/0
       - NOVNC_TIMEOUT_SECONDS=600
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=ascend-web-search
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
     cap_add:
       - SYS_ADMIN
     shm_size: "2gb"

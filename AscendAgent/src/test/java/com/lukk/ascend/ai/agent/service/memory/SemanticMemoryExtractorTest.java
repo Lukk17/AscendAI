@@ -15,11 +15,14 @@ import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -69,6 +72,9 @@ class SemanticMemoryExtractorTest {
 
     @Mock
     private PromptCacheStrategyResolver cacheStrategyResolver;
+
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @InjectMocks
     private SemanticMemoryExtractor extractor;
@@ -221,7 +227,7 @@ class SemanticMemoryExtractorTest {
     class ParserTests {
 
         private final SemanticMemoryExtractor parserExtractor = new SemanticMemoryExtractor(
-                null, null, null, new ObjectMapper(), null, null);
+                null, null, null, new ObjectMapper(), null, null, new SimpleMeterRegistry());
 
         @Test
         @DisplayName("extractFactsFromJson returns all facts from a thinking response with embedded JSON")

@@ -1,10 +1,40 @@
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 import src.main as main_module
-from src.main import app
+from src.main import _configure_otel, app
+
+
+def _otel_sys_modules() -> dict[str, MagicMock]:
+    m = MagicMock()
+    return {
+        "opentelemetry": m,
+        "opentelemetry.sdk": m,
+        "opentelemetry.sdk.trace": m,
+        "opentelemetry.sdk.trace.export": m,
+        "opentelemetry.sdk.resources": m,
+        "opentelemetry.exporter": m,
+        "opentelemetry.exporter.otlp": m,
+        "opentelemetry.exporter.otlp.proto": m,
+        "opentelemetry.exporter.otlp.proto.grpc": m,
+        "opentelemetry.exporter.otlp.proto.grpc.trace_exporter": m,
+        "opentelemetry.instrumentation": m,
+        "opentelemetry.instrumentation.fastapi": m,
+    }
+
+
+def test_configure_otel_noop_when_env_var_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    _configure_otel()
+
+
+def test_configure_otel_activates_when_endpoint_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel:4317")
+    with patch.dict(sys.modules, _otel_sys_modules()):
+        _configure_otel()
 
 
 def test_liveness_health_always_returns_200(override_dependencies):
@@ -38,7 +68,9 @@ def test_metrics_endpoint_exposes_prometheus_payload(override_dependencies):
         with TestClient(app) as client:
             response = client.get("/metrics")
             assert response.status_code == 200
-            assert "memory_insert_total" in response.text or "process_" in response.text
+            body = response.text
+            assert "process_" in body or "python_" in body
+            assert "memory_search_duration_seconds" in body
 
 
 @pytest.mark.asyncio

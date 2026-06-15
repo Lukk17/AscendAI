@@ -5,11 +5,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: prometheus,health,info
   endpoint:
     health:
+      show-details: when_authorized
       probes:
         enabled: true
+  metrics:
+    tags:
+      service: weather-mcp
+      version: "@project.version@"
 
 spring:
   application:

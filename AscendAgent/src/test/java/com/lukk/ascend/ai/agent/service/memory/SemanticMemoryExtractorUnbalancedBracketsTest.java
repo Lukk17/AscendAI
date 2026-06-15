@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.memory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SemanticMemoryExtractorUnbalancedBracketsTest {
 
     private final SemanticMemoryExtractor extractor = new SemanticMemoryExtractor(
-            null, null, null, new ObjectMapper(), null, null);
+            null, null, null, new ObjectMapper(), null, null, new SimpleMeterRegistry());
 
     @Test
     @DisplayName("extractFactsFromJson returns empty for null, empty, or blank input")

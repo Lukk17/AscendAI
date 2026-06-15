@@ -1,5 +1,12 @@
 from prometheus_client import Counter, Histogram
 
+# outcome label values: "success" | "timeout" | "http_error" | "transport_error"
+SEARCH_RESULTS_TOTAL = Counter(
+    "ascendwebsearch_search_results_total",
+    "Number of search results returned per SearXNG call",
+    ["outcome"],
+)
+
 STRATEGY_ATTEMPTS_TOTAL = Counter(
     "strategy_attempts_total",
     "Strategy invocation outcomes",

@@ -1,0 +1,28 @@
+# Per-provider token pricing in USD per 1,000 tokens.
+# Update this file and restart Grafana (docker compose restart grafana) when
+# provider pricing changes. The token-cost dashboard reads these rates via
+# JSON variable references embedded at dashboard-build time.
+#
+# Rates as of 2026-06 — verify at each provider's pricing page before deploying.
+
+providers:
+
+  openai:
+    input_per_1k:  0.0025   # gpt-4o input
+    output_per_1k: 0.01     # gpt-4o output
+
+  anthropic:
+    input_per_1k:  0.003    # claude-sonnet-4-5 input
+    output_per_1k: 0.015    # claude-sonnet-4-5 output
+
+  gemini:
+    input_per_1k:  0.000075 # gemini-flash-latest input
+    output_per_1k: 0.0003   # gemini-flash-latest output
+
+  minimax:
+    input_per_1k:  0.0007   # MiniMax-M2.7 input
+    output_per_1k: 0.007    # MiniMax-M2.7 output
+
+  lmstudio:
+    input_per_1k:  0.0      # local model, no API cost
+    output_per_1k: 0.0

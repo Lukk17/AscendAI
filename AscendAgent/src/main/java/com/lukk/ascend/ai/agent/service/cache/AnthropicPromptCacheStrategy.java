@@ -1,5 +1,7 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
@@ -14,6 +16,15 @@ import org.springframework.util.StringUtils;
 public class AnthropicPromptCacheStrategy implements PromptCacheStrategy {
 
     private static final String PROVIDER = "anthropic";
+    private static final String METRIC_TOKENS_READ = "prompt_cache.tokens.read";
+    private static final String METRIC_TOKENS_CREATION = "prompt_cache.tokens.creation";
+    private static final String METRIC_TOKENS_TOTAL = "prompt_cache.tokens.total";
+
+    private final MeterRegistry meterRegistry;
+
+    public AnthropicPromptCacheStrategy(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @Override
     public String providerName() {
@@ -57,6 +68,10 @@ public class AnthropicPromptCacheStrategy implements PromptCacheStrategy {
 
         log.info("[PromptCache] provider={} user={} hit={} cache_read_tokens={} cache_creation_tokens={} prompt_tokens={}",
                 PROVIDER, userId, hit, nullToZero(read), nullToZero(creation), prompt);
+
+        Counter.builder(METRIC_TOKENS_READ).tag("provider", PROVIDER).register(meterRegistry).increment(nullToZero(read));
+        Counter.builder(METRIC_TOKENS_CREATION).tag("provider", PROVIDER).register(meterRegistry).increment(nullToZero(creation));
+        Counter.builder(METRIC_TOKENS_TOTAL).tag("provider", PROVIDER).register(meterRegistry).increment(prompt);
     }
 
     @Override

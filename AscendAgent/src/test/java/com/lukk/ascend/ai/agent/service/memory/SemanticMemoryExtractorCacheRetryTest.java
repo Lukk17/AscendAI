@@ -7,6 +7,7 @@ import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,7 +58,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     void setUp() {
         when(aiProviderProperties.getProviders()).thenReturn(Map.of());
         extractor = new SemanticMemoryExtractor(chatModelResolver, aiProviderProperties, memoryClient,
-                new ObjectMapper(), chatResponseContentResolver, cacheStrategyResolver);
+                new ObjectMapper(), chatResponseContentResolver, cacheStrategyResolver, new SimpleMeterRegistry());
     }
 
     @Test

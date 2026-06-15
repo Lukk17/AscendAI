@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
@@ -14,7 +15,7 @@ import static org.mockito.Mockito.when;
 
 class OpenAiPromptCacheStrategyNullSafetyTest {
 
-    private final OpenAiPromptCacheStrategy strategy = new OpenAiPromptCacheStrategy("openai");
+    private final OpenAiPromptCacheStrategy strategy = new OpenAiPromptCacheStrategy("openai", new SimpleMeterRegistry());
 
     @Test
     @DisplayName("recordOutcome does not throw when usage is null")

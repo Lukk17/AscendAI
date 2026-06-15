@@ -1,10 +1,17 @@
 import asyncio
+import time
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from src.config.config import settings
+from src.observability.metrics import (
+    MEMORY_INSERT_DURATION_SECONDS,
+    MEMORY_INSERT_TOTAL,
+    MEMORY_SEARCH_DURATION_SECONDS,
+    MEMORY_SEARCH_TOTAL,
+)
 from src.service.memory_client import get_memory_client, resolve_provider
 
 rest_router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
@@ -55,12 +62,24 @@ async def search_memory(
     resolved_provider = resolve_provider(provider)
     client = get_memory_client(resolved_provider)
 
-    return await asyncio.to_thread(
-        client.search,
-        query=query,
-        user_id=effective_user_id,
-        limit=limit,
-    )
+    started = time.monotonic()
+    outcome = "success"
+    try:
+        result = await asyncio.to_thread(
+            client.search,
+            query=query,
+            user_id=effective_user_id,
+            limit=limit,
+        )
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        MEMORY_SEARCH_DURATION_SECONDS.labels(provider=resolved_provider).observe(
+            time.monotonic() - started
+        )
+        MEMORY_SEARCH_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
+    return result
 
 
 class InsertRequest(BaseModel):
@@ -95,13 +114,25 @@ async def insert_memory(request: InsertRequest) -> list[dict[str, Any]]:
     resolved_provider = resolve_provider(request.provider)
     client = get_memory_client(resolved_provider)
 
-    return await asyncio.to_thread(
-        client.add,
-        user_id=effective_user_id,
-        messages=request.messages,
-        text=request.text,
-        metadata=request.metadata,
-    )
+    started = time.monotonic()
+    outcome = "success"
+    try:
+        result = await asyncio.to_thread(
+            client.add,
+            user_id=effective_user_id,
+            messages=request.messages,
+            text=request.text,
+            metadata=request.metadata,
+        )
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        MEMORY_INSERT_DURATION_SECONDS.labels(provider=resolved_provider).observe(
+            time.monotonic() - started
+        )
+        MEMORY_INSERT_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
+    return result
 
 
 @rest_router.post("/wipe")

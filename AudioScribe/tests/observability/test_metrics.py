@@ -20,7 +20,7 @@ def test_counters_registered() -> None:
 
 
 def test_histograms_registered() -> None:
-    metrics.TRANSCRIPTION_DURATION_SECONDS.labels(provider="local").observe(1.5)
+    metrics.TRANSCRIPTION_DURATION_SECONDS.labels(provider="local", outcome="success").observe(1.5)
     metrics.DOWNLOAD_DURATION_SECONDS.observe(0.5)
 
     payload = generate_latest().decode()

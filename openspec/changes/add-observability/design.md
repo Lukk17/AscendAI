@@ -83,8 +83,8 @@ The same `service` and `version` flow into Vector's log labels (`labels.service`
 | AscendAgent | `/actuator/prometheus` | `127.0.0.1:9917` by default; remote exposure requires `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_REMOTE=true` |
 | WeatherMCP | `/actuator/prometheus` | same model |
 | Python services | `/metrics` | bound to `0.0.0.0` inside the container; exposed only on the docker network |
-| Prometheus | `:9090` | exposed on host |
-| Grafana | `:3030` | exposed on host (anonymous read-only Viewer) |
+| Prometheus | `:7077` (host) → `:9090` (container) | exposed on host |
+| Grafana | `:7078` (host) → `:3000` (container) | exposed on host (anonymous read-only Viewer) |
 | Loki | `:3100` | docker-network only |
 | Tempo | `:3200` | docker-network only |
 | OTel collector | `:4317` (gRPC), `:4318` (HTTP) | docker-network only |

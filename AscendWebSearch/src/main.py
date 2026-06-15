@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import AsyncExitStack, asynccontextmanager
 
 # Apply compatibility patches BEFORE other heavy imports (especially crawlee).
@@ -12,8 +13,7 @@ apply_compatibility_patches()
 import httpx  # noqa: E402
 import uvicorn  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
-from fastapi.responses import Response  # noqa: E402
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest  # noqa: E402
+from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
 
 from src.api.exception_handlers import (  # noqa: E402
     global_exception_handler,
@@ -37,7 +37,34 @@ setup_logging()
 logger = logging.getLogger("uvicorn")
 
 
+def _configure_otel() -> None:
+    """Activate OTel auto-instrumentation when OTEL_EXPORTER_OTLP_ENDPOINT is set.
+
+    A no-op when the env var is absent so local development is unaffected.
+    """
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not endpoint:
+        return
+
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    service_name = os.getenv("OTEL_SERVICE_NAME", "ascend-web-search")
+    resource = Resource.create({"service.name": service_name})
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+    trace.set_tracer_provider(provider)
+    FastAPIInstrumentor().instrument()
+    logger.info("OTel tracing enabled → %s", endpoint)
+
+
 def create_app() -> FastAPI:
+    _configure_otel()
+
     mcp_asgi_app = mcp.http_app()
 
     @asynccontextmanager
@@ -85,13 +112,14 @@ def create_app() -> FastAPI:
     app.include_router(rest_router_v2)
     app.include_router(readiness_router)
 
+    Instrumentator(
+        should_group_status_codes=False,
+        excluded_handlers=["/metrics", "/health", "/ready"],
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, str]:
         return {"status": "ok"}
-
-    @app.get("/metrics", tags=["observability"])
-    def metrics() -> Response:
-        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     # Mount must be last to avoid capturing specific routes
     app.mount("/", mcp_asgi_app)

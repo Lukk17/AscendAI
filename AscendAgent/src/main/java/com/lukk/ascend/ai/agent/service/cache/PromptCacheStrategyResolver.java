@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
 import com.lukk.ascend.ai.agent.config.properties.PromptCacheProperties;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,18 +18,20 @@ public class PromptCacheStrategyResolver {
     private static final Set<String> OPENAI_FAMILY = Set.of("openai", "gemini");
 
     private final PromptCacheProperties properties;
+    private final MeterRegistry meterRegistry;
     private final Map<String, PromptCacheStrategy> strategies = new HashMap<>();
     private final Map<String, PromptCacheStrategy> noopByProvider = new HashMap<>();
 
-    public PromptCacheStrategyResolver(PromptCacheProperties properties) {
+    public PromptCacheStrategyResolver(PromptCacheProperties properties, MeterRegistry meterRegistry) {
         this.properties = properties;
+        this.meterRegistry = meterRegistry;
     }
 
     @PostConstruct
     void init() {
-        strategies.put(ANTHROPIC, new AnthropicPromptCacheStrategy());
+        strategies.put(ANTHROPIC, new AnthropicPromptCacheStrategy(meterRegistry));
         for (String name : OPENAI_FAMILY) {
-            strategies.put(name, new OpenAiPromptCacheStrategy(name));
+            strategies.put(name, new OpenAiPromptCacheStrategy(name, meterRegistry));
         }
         log.info("[PromptCache] master enabled={}, provider toggles={}",
                 properties.isEnabled(), properties.getProviders());

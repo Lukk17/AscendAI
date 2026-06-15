@@ -24,6 +24,11 @@ lombok = { module = "org.projectlombok:lombok" }
 spring-boot-starter-cache = { module = "org.springframework.boot:spring-boot-starter-cache" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 
+# Observability
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
+micrometer-tracing-bridge-otel = { module = "io.micrometer:micrometer-tracing-bridge-otel" }
+opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
+
 # Test
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 

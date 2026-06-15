@@ -7,6 +7,7 @@ import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,7 @@ class SemanticMemoryExtractorJsonParsingTest {
         PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio");
         when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
         extractor = new SemanticMemoryExtractor(chatModelResolver, aiProviderProperties, memoryClient,
-                new ObjectMapper(), chatResponseContentResolver, cacheStrategyResolver);
+                new ObjectMapper(), chatResponseContentResolver, cacheStrategyResolver, new SimpleMeterRegistry());
     }
 
 

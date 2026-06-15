@@ -18,7 +18,7 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 - **WeatherMCP (Spring Boot)**: same Actuator + Prometheus stack, expose `/actuator/prometheus`. Minimal custom metrics (tool-call counter is enough for an MCP server).
 - **Python services (AudioScribe, AscendWebSearch, AscendMemory, PaddleOCR)**: add `prometheus-fastapi-instrumentator` to FastAPI apps and expose `/metrics`. Add a small set of custom domain counters per service (transcription duration, search-result count, memory-search latency, OCR pages-processed).
 - **Prometheus**: new docker-compose service `prometheus` with a checked-in `observability/prometheus/prometheus.yaml` that scrapes all six AscendAI services on their `/metrics` (or `/actuator/prometheus`) endpoints every 15 s, plus the data-layer prerequisites (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`, MinIO native).
-- **Grafana**: new docker-compose service `grafana` with anonymous read-only access on a non-conflicting port (`3030` to avoid clashing with anything), provisioned with the Prometheus datasource, the Loki datasource (logs), the Tempo datasource (traces), and **six checked-in dashboards** (see below).
+- **Grafana**: new docker-compose service `grafana` with anonymous read-only access on a non-conflicting port (`7078` to avoid clashing with anything), provisioned with the Prometheus datasource, the Loki datasource (logs), the Tempo datasource (traces), and **six checked-in dashboards** (see below).
 
 **Logs layer (Vector + Loki):**
 
@@ -60,7 +60,7 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 
 ## Impact
 
-- **New runtime services** (eight new compose containers): `prometheus` (`:9090`), `grafana` (`:3030`), `vector`, `loki` (`:3100` internal), `otel-collector` (`:4317`/`:4318` internal), `tempo` (`:3200` internal), `postgres-exporter`, `redis-exporter`. Combined RAM footprint at idle: ~600 MB.
+- **New runtime services** (eight new compose containers): `prometheus` (`:7077`), `grafana` (`:7078`), `vector`, `loki` (`:3100` internal), `otel-collector` (`:4317`/`:4318` internal), `tempo` (`:3200` internal), `postgres-exporter`, `redis-exporter`. Combined RAM footprint at idle: ~600 MB.
 - **New code (AscendAgent)**:
   - `AscendAgent/build.gradle.kts` — actuator + micrometer-prometheus + opentelemetry-exporter-otlp dependency lines.
   - `AscendAgent/src/main/resources/application.yaml` — `management.endpoints.*`, `management.metrics.*` block; `OTEL_*` env defaults.

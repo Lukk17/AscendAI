@@ -1,0 +1,53 @@
+[sources.docker_logs]
+type = "docker_logs"
+include_containers = [
+  "ascend-agent",
+  "weather-mcp",
+  "ascend-memory",
+  "audio-scribe",
+  "ascend-web-search",
+  "ascend-paddle-ocr",
+]
+
+[sinks.loki]
+type = "loki"
+inputs = ["docker_logs"]
+endpoint = "http://loki:3100"
+encoding.codec = "text"
+
+  [sinks.loki.labels]
+  service = "{{ container_name }}"
+  source = "docker"
+
+# ─── Placeholder sinks for cloud migration ────────────────────────────────────
+# To migrate log shipping, uncomment the desired sink, set the required env var,
+# and remove (or keep) the loki sink above. Services are never touched.
+
+# [sinks.datadog]
+# type = "datadog_logs"
+# inputs = ["docker_logs"]
+# default_api_key = "${DATADOG_API_KEY}"
+# site = "datadoghq.eu"
+#
+#   [sinks.datadog.encoding]
+#   codec = "json"
+
+# [sinks.cloudwatch]
+# type = "aws_cloudwatch_logs"
+# inputs = ["docker_logs"]
+# region = "${AWS_REGION}"
+# group_name = "ascend-ai"
+# stream_name = "{{ container_name }}"
+#
+#   [sinks.cloudwatch.encoding]
+#   codec = "json"
+
+# [sinks.splunk]
+# type = "splunk_hec_logs"
+# inputs = ["docker_logs"]
+# endpoint = "${SPLUNK_HEC_ENDPOINT}"
+# token = "${SPLUNK_HEC_TOKEN}"
+# index = "ascend-ai"
+#
+#   [sinks.splunk.encoding]
+#   codec = "json"

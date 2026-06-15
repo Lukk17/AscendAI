@@ -6,6 +6,8 @@ import com.lukk.ascend.ai.agent.dto.UploadResponse;
 import com.lukk.ascend.ai.agent.service.ingestion.ManualIngestionService;
 import com.lukk.ascend.ai.agent.service.ingestion.MimeTypeDetector;
 import com.lukk.ascend.ai.agent.service.storage.StorageService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +47,9 @@ class IngestionControllerUploadValidationTest {
 
     @Mock
     private MimeTypeDetector mimeTypeDetector;
+
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @Spy
     private IngestionUploadProperties uploadProperties = new IngestionUploadProperties();

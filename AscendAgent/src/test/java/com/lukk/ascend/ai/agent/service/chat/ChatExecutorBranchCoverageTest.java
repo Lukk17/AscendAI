@@ -7,12 +7,14 @@ import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -56,6 +58,9 @@ class ChatExecutorBranchCoverageTest {
 
     @Mock
     private ChatModel chatModel;
+
+    @Spy
+    private io.micrometer.core.instrument.MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @InjectMocks
     private ChatExecutor chatExecutor;

@@ -6,7 +6,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.config.config import settings
-from src.observability.metrics import SEARXNG_DURATION_SECONDS, SEARXNG_REQUESTS_TOTAL
+from src.observability.metrics import SEARCH_RESULTS_TOTAL, SEARXNG_DURATION_SECONDS, SEARXNG_REQUESTS_TOTAL
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,9 @@ class SearxngClient:
         finally:
             SEARXNG_DURATION_SECONDS.observe(time.perf_counter() - started)
 
-        return self._parse_html_results(response.text, limit)
+        results = self._parse_html_results(response.text, limit)
+        SEARCH_RESULTS_TOTAL.labels(outcome="success").inc(len(results))
+        return results
 
     def _parse_html_results(self, html_content: str, limit: int) -> list[dict[str, Any]]:
         soup = BeautifulSoup(html_content, "html.parser")

@@ -25,10 +25,11 @@ FFMPEG_INVOCATIONS_TOTAL = Counter(
 )
 
 # Realistic per-backend latency spread: openai (~3-60s), hf (~5-120s), local (~10-600s on CPU).
+# outcome label values: "success" | "error"
 TRANSCRIPTION_DURATION_SECONDS = Histogram(
     "audioscribe_transcription_duration_seconds",
     "Wall-clock duration of transcription requests",
-    ["provider"],
+    ["provider", "outcome"],
     buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1200),
 )
 

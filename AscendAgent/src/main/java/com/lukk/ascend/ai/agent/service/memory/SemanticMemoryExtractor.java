@@ -8,7 +8,8 @@ import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
 import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
@@ -23,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SemanticMemoryExtractor {
 
@@ -38,12 +38,31 @@ public class SemanticMemoryExtractor {
             ["User loves playing electric guitar", "User's favorite color is red"]
             """;
 
+    private static final String METRIC_PARSE_FAILED = "memory.extraction.parse_failed";
+
     private final ChatModelResolver chatModelResolver;
     private final AiProviderProperties aiProviderProperties;
     private final SemanticMemoryClient memoryClient;
     private final ObjectMapper objectMapper;
     private final ChatResponseContentResolver chatResponseContentResolver;
     private final PromptCacheStrategyResolver cacheStrategyResolver;
+    private final MeterRegistry meterRegistry;
+
+    public SemanticMemoryExtractor(ChatModelResolver chatModelResolver,
+                                   AiProviderProperties aiProviderProperties,
+                                   SemanticMemoryClient memoryClient,
+                                   ObjectMapper objectMapper,
+                                   ChatResponseContentResolver chatResponseContentResolver,
+                                   PromptCacheStrategyResolver cacheStrategyResolver,
+                                   MeterRegistry meterRegistry) {
+        this.chatModelResolver = chatModelResolver;
+        this.aiProviderProperties = aiProviderProperties;
+        this.memoryClient = memoryClient;
+        this.objectMapper = objectMapper;
+        this.chatResponseContentResolver = chatResponseContentResolver;
+        this.cacheStrategyResolver = cacheStrategyResolver;
+        this.meterRegistry = meterRegistry;
+    }
 
     public void extract(String userId, String userText, String provider, String model, String embeddingProvider) {
         Thread.startVirtualThread(() -> processExtraction(userId, userText, provider, model, embeddingProvider));
@@ -82,7 +101,7 @@ public class SemanticMemoryExtractor {
 
         String responseContent = chatResponseContentResolver.resolveContent(chatResponse);
 
-        List<String> facts = extractFactsFromJson(responseContent);
+        List<String> facts = extractFactsFromJson(responseContent, provider, extractionModel);
         insertFactsWithTally(userId, facts, embeddingProvider);
     }
 
@@ -135,11 +154,15 @@ public class SemanticMemoryExtractor {
     }
 
     List<String> extractFactsFromJson(String jsonString) {
+        return extractFactsFromJson(jsonString, "unknown", null);
+    }
+
+    List<String> extractFactsFromJson(String jsonString, String provider, String model) {
         return Optional.ofNullable(jsonString)
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .map(this::removeMarkdownCodeBlocks)
-                .map(this::parseJsonArray)
+                .map(cleaned -> parseJsonArray(cleaned, provider, model))
                 .orElseGet(List::of);
     }
 
@@ -151,12 +174,12 @@ public class SemanticMemoryExtractor {
                 .orElse(json);
     }
 
-    private List<String> parseJsonArray(String cleanedJson) {
+    private List<String> parseJsonArray(String cleanedJson, String provider, String model) {
         try {
             return objectMapper.readValue(cleanedJson, new TypeReference<List<String>>() {
             });
         } catch (JsonProcessingException e) {
-            return extractEmbeddedJsonArray(cleanedJson);
+            return extractEmbeddedJsonArray(cleanedJson, provider, model);
         }
     }
 
@@ -167,7 +190,7 @@ public class SemanticMemoryExtractor {
      * the last balanced {@code [...]} substring (string-aware, depth-counted) and try to parse it.
      * Returns an empty list and logs WARN once if all attempts fail. Never throws.
      */
-    private List<String> extractEmbeddedJsonArray(String text) {
+    private List<String> extractEmbeddedJsonArray(String text, String provider, String model) {
         Optional<String> candidate = findLastBalancedJsonArray(text);
         if (candidate.isPresent()) {
             try {
@@ -178,6 +201,11 @@ public class SemanticMemoryExtractor {
             }
         }
         log.warn("Could not parse memory extraction response as JSON Array. Content: {}", text);
+        Counter.builder(METRIC_PARSE_FAILED)
+                .tag("provider", provider != null ? provider : "unknown")
+                .tag("model", model != null ? model : "unknown")
+                .register(meterRegistry)
+                .increment();
         return List.of();
     }
 

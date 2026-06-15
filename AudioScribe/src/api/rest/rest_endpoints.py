@@ -126,8 +126,7 @@ def _file_response(file_path: str, filename: str) -> FileResponse:
 
 def _record(provider: str, outcome: str, duration_s: float) -> None:
     TRANSCRIPTION_REQUESTS_TOTAL.labels(provider=provider, outcome=outcome).inc()
-    if outcome == "success":
-        TRANSCRIPTION_DURATION_SECONDS.labels(provider=provider).observe(duration_s)
+    TRANSCRIPTION_DURATION_SECONDS.labels(provider=provider, outcome=outcome).observe(duration_s)
 
 
 def _coerce_response_text(response_text: Any) -> str:

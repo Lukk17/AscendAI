@@ -1,0 +1,153 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "L1 Token Cost — estimated USD spend per provider per day. Rates are hardcoded from observability/grafana/dashboards/pricing.yaml; update that file and restart Grafana when provider pricing changes.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Daily Cost Estimate (USD)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Estimated USD cost per provider per day. Formula: (input_tokens * input_rate_per_1k / 1000) + (output_tokens * output_rate_per_1k / 1000) over 24h. Rates from pricing.yaml: OpenAI $0.0025/$0.01 per 1k, Anthropic $0.003/$0.015, Gemini $0.000075/$0.0003, MiniMax $0.0007/$0.007, LM Studio $0.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "currencyUSD",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 1 },
+      "id": 2,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"openai\",gen_ai_token_type=\"input\"}[24h]) * 0.0025 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"openai\",gen_ai_token_type=\"output\"}[24h]) * 0.01 / 1000)",
+          "legendFormat": "openai",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"anthropic\",gen_ai_token_type=\"input\"}[24h]) * 0.003 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"anthropic\",gen_ai_token_type=\"output\"}[24h]) * 0.015 / 1000)",
+          "legendFormat": "anthropic",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"gemini\",gen_ai_token_type=\"input\"}[24h]) * 0.000075 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"gemini\",gen_ai_token_type=\"output\"}[24h]) * 0.0003 / 1000)",
+          "legendFormat": "gemini",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"minimax\",gen_ai_token_type=\"input\"}[24h]) * 0.0007 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"minimax\",gen_ai_token_type=\"output\"}[24h]) * 0.007 / 1000)",
+          "legendFormat": "minimax",
+          "refId": "D"
+        }
+      ],
+      "title": "Estimated USD Spend per Provider (24h rolling)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Total estimated spend across all providers for the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "currencyUSD",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 1 },
+      "id": 3,
+      "options": {
+        "pieType": "donut",
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"openai\",gen_ai_token_type=\"input\"}[$__range]) * 0.0025 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"openai\",gen_ai_token_type=\"output\"}[$__range]) * 0.01 / 1000)",
+          "legendFormat": "openai",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"anthropic\",gen_ai_token_type=\"input\"}[$__range]) * 0.003 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"anthropic\",gen_ai_token_type=\"output\"}[$__range]) * 0.015 / 1000)",
+          "legendFormat": "anthropic",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"gemini\",gen_ai_token_type=\"input\"}[$__range]) * 0.000075 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"gemini\",gen_ai_token_type=\"output\"}[$__range]) * 0.0003 / 1000)",
+          "legendFormat": "gemini",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(increase(gen_ai_client_token_usage_total{gen_ai_system=\"minimax\",gen_ai_token_type=\"input\"}[$__range]) * 0.0007 / 1000) + (increase(gen_ai_client_token_usage_total{gen_ai_system=\"minimax\",gen_ai_token_type=\"output\"}[$__range]) * 0.007 / 1000)",
+          "legendFormat": "minimax",
+          "refId": "D"
+        }
+      ],
+      "title": "Total Cost by Provider",
+      "type": "piechart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 4,
+      "title": "Token Volume",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Total input + output tokens consumed per provider per hour. Metric: gen_ai_client_token_usage_total.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "id": 5,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (gen_ai_system, gen_ai_token_type) (rate(gen_ai_client_token_usage_total[1h])) * 3600",
+          "legendFormat": "{{gen_ai_system}} {{gen_ai_token_type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens per Hour by Provider and Type",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["ascend-ai", "cost", "L1"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "L1 — Token Cost",
+  "uid": "ascend-token-cost",
+  "version": 1
+}

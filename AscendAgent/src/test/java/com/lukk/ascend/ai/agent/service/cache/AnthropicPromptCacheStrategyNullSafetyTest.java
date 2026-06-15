@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.anthropic.api.AnthropicApi;
@@ -14,7 +15,7 @@ import static org.mockito.Mockito.when;
 
 class AnthropicPromptCacheStrategyNullSafetyTest {
 
-    private final AnthropicPromptCacheStrategy strategy = new AnthropicPromptCacheStrategy();
+    private final AnthropicPromptCacheStrategy strategy = new AnthropicPromptCacheStrategy(new SimpleMeterRegistry());
 
     @Test
     @DisplayName("recordOutcome handles null promptTokens (uses 0 as fallback)")

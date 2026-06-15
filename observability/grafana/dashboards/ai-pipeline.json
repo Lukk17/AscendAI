@@ -1,0 +1,214 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "AI Pipeline — token throughput, provider mix, RAG hit rate, memory parse failures, MCP tool latency.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Token Throughput",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Input tokens per minute by provider and model. Metric: gen_ai_client_token_usage_total{gen_ai_token_type=\"input\"} (Spring AI auto-instrumented, Micrometer converts dots to underscores).",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 2,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (gen_ai_system, gen_ai_request_model) (rate(gen_ai_client_token_usage_total{gen_ai_token_type=\"input\"}[5m])) * 60",
+          "legendFormat": "{{gen_ai_system}} / {{gen_ai_request_model}} input",
+          "refId": "A"
+        }
+      ],
+      "title": "Input Tokens per Minute by Provider/Model",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Output tokens per minute by provider and model. Metric: gen_ai_client_token_usage_total{gen_ai_token_type=\"output\"}.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 3,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (gen_ai_system, gen_ai_request_model) (rate(gen_ai_client_token_usage_total{gen_ai_token_type=\"output\"}[5m])) * 60",
+          "legendFormat": "{{gen_ai_system}} / {{gen_ai_request_model}} output",
+          "refId": "A"
+        }
+      ],
+      "title": "Output Tokens per Minute by Provider/Model",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Provider mix — share of total input tokens per provider. Metric: gen_ai_client_token_usage_total.",
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+      "id": 4,
+      "options": { "pieType": "pie", "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (gen_ai_system) (increase(gen_ai_client_token_usage_total{gen_ai_token_type=\"input\"}[$__range]))",
+          "legendFormat": "{{gen_ai_system}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Provider Mix (Input Tokens)",
+      "type": "piechart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 5,
+      "title": "RAG & Memory",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "RAG retrieval hit rate — fraction of retrieved chunks that passed the similarity threshold. Metric: rag_retrieval_hits_total{above_threshold}.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "id": 6,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(rag_retrieval_hits_total{above_threshold=\"true\"}[5m])) / (sum(rate(rag_retrieval_hits_total[5m])) > 0)",
+          "legendFormat": "hit rate",
+          "refId": "A"
+        }
+      ],
+      "title": "RAG Hit Rate (above threshold / total)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Memory extraction parse failure rate. A spike here means a model returned an unexpected response format. Metric: memory_extraction_parse_failed_total.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "id": 7,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (provider, model) (rate(memory_extraction_parse_failed_total[5m]))",
+          "legendFormat": "{{provider}} / {{model}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Memory Extraction Parse Failure Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 8,
+      "title": "MCP Tools",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "MCP tool call rate per tool. Metric: mcp_tool_duration_seconds_count.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "id": 9,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (tool) (rate(mcp_tool_duration_seconds_count[2m]))",
+          "legendFormat": "{{tool}}",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP Tool Call Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "p95 MCP tool latency per tool. Metric: mcp_tool_duration_seconds_bucket.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "id": 10,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (tool, le) (rate(mcp_tool_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{tool}} p95",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP Tool p95 Latency",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ascend-ai", "ai-pipeline"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AI Pipeline",
+  "uid": "ascend-ai-pipeline",
+  "version": 1
+}
