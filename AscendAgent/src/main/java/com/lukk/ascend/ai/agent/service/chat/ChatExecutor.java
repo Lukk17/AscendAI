@@ -18,7 +18,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -41,7 +41,7 @@ public class ChatExecutor {
     private static final String USER_ID_KEY = "user_id";
 
     private final ChatModelResolver chatModelResolver;
-    private final SyncMcpToolCallbackProvider toolCallbackProvider;
+    private final ToolCallbackProvider toolCallbackProvider;
     private final ChatResponseContentResolver chatResponseContentResolver;
     private final PromptCacheStrategyResolver cacheStrategyResolver;
 

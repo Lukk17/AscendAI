@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
@@ -26,9 +25,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * these tests don't touch external networks — only the data layer.
  */
 class BackingServicesIT extends TestcontainersBase {
-
-    @MockitoBean
-    org.springframework.ai.mcp.SyncMcpToolCallbackProvider toolCallbackProvider;
 
     @Autowired
     DataSource dataSource;

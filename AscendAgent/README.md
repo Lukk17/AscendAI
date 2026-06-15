@@ -370,6 +370,27 @@ Runtime configuration lives in two places:
 
 Spring Boot's standard env-var binding applies: uppercase the YAML key, replace dots and dashes with underscores.
 
+#### MCP startup tolerance
+
+The agent boots successfully even if some or all configured MCP servers are unreachable. `initialized: false` in
+`application.yaml` tells Spring AI to build the MCP clients without calling `.initialize()` during context refresh.
+`McpClientStartupInitializer` performs the init loop after the context is ready and records each client as
+`CONNECTED` or `FAILED` in `McpClientStatusRegistry`.
+
+The `app.mcp.startup.init-timeout` property (default `5s`) caps how long the agent waits for each MCP server's
+handshake. Raise it if a healthy server triggers a false negative due to cold-start latency:
+
+```yaml
+app:
+  mcp:
+    startup:
+      init-timeout: 15s
+```
+
+The readiness banner lists each configured MCP server with a `[Connected]` or `[FAILED]` status marker under
+`MCP servers:`. FAILED clients' tools are not advertised to the LLM; the agent still serves requests using the
+remaining providers and MCP servers.
+
 ---
 
 ### Docs map

@@ -258,6 +258,10 @@ app:
       - name: ascendai-1536
         size: 1536
 
+  mcp:
+    startup:
+      init-timeout: 5s
+
   rag:
     enabled: true
     top-k: 5
@@ -364,6 +368,7 @@ spring:
         enabled: true
         name: AscendAI-Agent
         version: 0.0.1
+        initialized: false
         request-timeout: 300s
         type: SYNC
         toolcallback:

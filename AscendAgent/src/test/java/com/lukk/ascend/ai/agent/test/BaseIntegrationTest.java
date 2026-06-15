@@ -1,7 +1,6 @@
 package com.lukk.ascend.ai.agent.test;
 
 import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,9 +24,6 @@ public abstract class BaseIntegrationTest {
 
     @MockitoBean
     protected ChatModelResolver chatModelResolver;
-
-    @MockitoBean
-    protected SyncMcpToolCallbackProvider toolCallbackProvider;
 
     @MockitoBean
     protected S3Client s3Client;

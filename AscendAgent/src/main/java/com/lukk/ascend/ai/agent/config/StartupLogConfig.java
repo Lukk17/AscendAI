@@ -1,6 +1,9 @@
 package com.lukk.ascend.ai.agent.config;
 
 
+import com.lukk.ascend.ai.agent.config.mcp.McpClientEntry;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientStatus;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientStatusRegistry;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
@@ -8,8 +11,6 @@ import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import io.qdrant.client.QdrantClient;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
@@ -32,6 +33,8 @@ import java.sql.DatabaseMetaData;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,33 +55,34 @@ public class StartupLogConfig {
     private final DataSource dataSource;
     private final StringRedisTemplate redisTemplate;
     private final S3Client s3Client;
-    private final ObjectProvider<ToolCallbackProvider> toolCallbackProvider;
     private final AiProviderProperties aiProviderProperties;
     private final EmbeddingProviderProperties embeddingProviderProperties;
     private final SemanticMemoryProperties semanticMemoryProperties;
     private final ChatHistoryProperties chatHistoryProperties;
     private final ChatHistoryCompactionProperties compactionProperties;
     private final ObjectProvider<QdrantClient> qdrantClientProvider;
+    private final McpClientStatusRegistry mcpRegistry;
 
     public StartupLogConfig(Environment env, DataSource dataSource, StringRedisTemplate redisTemplate,
-                            S3Client s3Client, ObjectProvider<ToolCallbackProvider> toolCallbackProvider,
+                            S3Client s3Client,
                             AiProviderProperties aiProviderProperties,
                             EmbeddingProviderProperties embeddingProviderProperties,
                             SemanticMemoryProperties semanticMemoryProperties,
                             ChatHistoryProperties chatHistoryProperties,
                             ChatHistoryCompactionProperties compactionProperties,
-                            ObjectProvider<QdrantClient> qdrantClientProvider) {
+                            ObjectProvider<QdrantClient> qdrantClientProvider,
+                            McpClientStatusRegistry mcpRegistry) {
         this.env = env;
         this.dataSource = dataSource;
         this.redisTemplate = redisTemplate;
         this.s3Client = s3Client;
-        this.toolCallbackProvider = toolCallbackProvider;
         this.aiProviderProperties = aiProviderProperties;
         this.embeddingProviderProperties = embeddingProviderProperties;
         this.semanticMemoryProperties = semanticMemoryProperties;
         this.chatHistoryProperties = chatHistoryProperties;
         this.compactionProperties = compactionProperties;
         this.qdrantClientProvider = qdrantClientProvider;
+        this.mcpRegistry = mcpRegistry;
     }
 
     @EventListener
@@ -141,7 +145,8 @@ public class StartupLogConfig {
         lines.add("    Chat history: " + formatChatHistoryToggles());
         lines.add("    Compaction:   " + formatCompactionState());
         lines.add("");
-        lines.add("    MCP tools:    " + checkMcpTools());
+        lines.add("    MCP servers:");
+        lines.addAll(formatMcpServers());
         lines.add("");
         lines.add("    MAIN PROMPT ENDPOINT:");
         lines.add("      POST  " + promptEndpoint);
@@ -313,23 +318,36 @@ public class StartupLogConfig {
                 defaults);
     }
 
-    private String checkMcpTools() {
-        try {
-            ToolCallbackProvider provider = toolCallbackProvider.getIfAvailable();
-            if (provider == null) {
-                return "[Warning (no ToolCallbackProvider)]";
-            }
-            ToolCallback[] tools = provider.getToolCallbacks();
-            if (tools.length == 0) {
-                return "[Connected] no tools registered";
-            }
-            String toolNames = Arrays.stream(tools)
-                    .map(t -> t.getToolDefinition().name())
-                    .collect(Collectors.joining(", "));
-            return String.format("[Connected] %d tools: [%s]", tools.length, toolNames);
-        } catch (Exception e) {
-            log.debug("MCP tool listing failed", e);
-            return "[FAILED]";
+    private List<String> formatMcpServers() {
+        Collection<McpClientEntry> serverEntries = mcpRegistry.entries();
+        if (serverEntries.isEmpty()) {
+            return List.of("      (none registered)");
         }
+
+        int nameWidth = serverEntries.stream()
+                .mapToInt(e -> e.name().length())
+                .max()
+                .orElse(8);
+
+        long connectedCount = serverEntries.stream()
+                .filter(e -> e.status() == McpClientStatus.CONNECTED)
+                .count();
+
+        List<String> lines = serverEntries.stream()
+                .sorted(Comparator.comparing(McpClientEntry::name))
+                .map(e -> String.format("      %-" + nameWidth + "s  %s %s",
+                        e.name() + ":", e.url(), statusMarker(e.status())))
+                .collect(Collectors.toList());
+
+        lines.add(String.format("      Aggregate: %d/%d connected", connectedCount, serverEntries.size()));
+        return lines;
+    }
+
+    private static String statusMarker(McpClientStatus status) {
+        return switch (status) {
+            case CONNECTED -> "[Connected]";
+            case FAILED -> "[FAILED]";
+            case DISABLED -> "[Disabled]";
+        };
     }
 }

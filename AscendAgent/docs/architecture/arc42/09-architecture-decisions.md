@@ -11,3 +11,4 @@ All significant architecture decisions are documented as Architecture Decision R
 | [ADR-005](../decisions/ADR-005-thinking-model-response-resolution.md)                  | `ChatResponseContentResolver` for thinking-model multi-block responses.           | Accepted |
 | [ADR-006](../decisions/ADR-006-multi-provider-semantic-memory-routing.md)              | Multi-provider semantic memory routing.                                           | Accepted |
 | [ADR-007](../decisions/ADR-007-ingestion-auto-default-off.md)                          | Ingestion auto-poller off by default.                                             | Accepted |
+| [ADR-008](../decisions/ADR-008-mcp-startup-tolerance.md)                              | MCP startup tolerance via `initialized=false` flag and deferred init loop.        | Accepted |

@@ -22,7 +22,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -46,7 +46,7 @@ class ChatExecutorBranchCoverageTest {
     private ChatModelResolver chatModelResolver;
 
     @Mock
-    private SyncMcpToolCallbackProvider toolCallbackProvider;
+    private ToolCallbackProvider toolCallbackProvider;
 
     @Mock
     private ChatResponseContentResolver chatResponseContentResolver;

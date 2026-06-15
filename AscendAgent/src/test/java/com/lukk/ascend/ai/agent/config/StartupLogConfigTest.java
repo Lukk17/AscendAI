@@ -2,6 +2,9 @@ package com.lukk.ascend.ai.agent.config;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientEntry;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientStatus;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientStatusRegistry;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
@@ -17,9 +20,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.ToolCallbackProvider;
-import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
@@ -61,10 +61,10 @@ class StartupLogConfigTest {
     private S3Client s3Client;
 
     @Mock
-    private ObjectProvider<ToolCallbackProvider> toolCallbackProvider;
+    private ObjectProvider<QdrantClient> qdrantClientProvider;
 
     @Mock
-    private ObjectProvider<QdrantClient> qdrantClientProvider;
+    private McpClientStatusRegistry mcpRegistry;
 
     private AiProviderProperties aiProviderProperties;
     private EmbeddingProviderProperties embeddingProviderProperties;
@@ -94,10 +94,14 @@ class StartupLogConfigTest {
         compactionProperties.setEnabled(false);
         compactionProperties.setProviderDefaults(new LinkedHashMap<>());
 
+        when(mcpRegistry.entries()).thenReturn(List.of(
+                new McpClientEntry("weather", "http://localhost:9998", McpClientStatus.CONNECTED)
+        ));
+
         config = new StartupLogConfig(env, dataSource, redisTemplate, s3Client,
-                toolCallbackProvider, aiProviderProperties, embeddingProviderProperties,
+                aiProviderProperties, embeddingProviderProperties,
                 semanticMemoryProperties, chatHistoryProperties, compactionProperties,
-                qdrantClientProvider);
+                qdrantClientProvider, mcpRegistry);
 
         // Stub env calls used in onReadinessChange — use eq() consistently so Mockito sees uniform matchers
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("local.server.port"), org.mockito.ArgumentMatchers.anyString())).thenReturn("9917");
@@ -122,7 +126,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         // when — must not throw even if DB is unavailable
         config.onReadinessChange(readinessEvent());
@@ -142,7 +145,6 @@ class StartupLogConfigTest {
 
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         // when
         config.onReadinessChange(readinessEvent());
@@ -157,7 +159,6 @@ class StartupLogConfigTest {
 
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         // when — should not throw
         config.onReadinessChange(readinessEvent());
@@ -176,7 +177,6 @@ class StartupLogConfigTest {
         when(qdrant.listCollectionsAsync()).thenReturn(failedFuture);
 
         stubS3Success();
-        stubMcpNoProvider();
 
         // when
         config.onReadinessChange(readinessEvent());
@@ -191,7 +191,6 @@ class StartupLogConfigTest {
         when(qdrantClientProvider.getIfAvailable()).thenReturn(null);
 
         stubS3Success();
-        stubMcpNoProvider();
 
         // when
         config.onReadinessChange(readinessEvent());
@@ -208,63 +207,33 @@ class StartupLogConfigTest {
         when(s3Client.listObjects(ArgumentMatchers.<Consumer<ListObjectsRequest.Builder>>any()))
                 .thenThrow(new RuntimeException("MinIO unavailable"));
 
-        stubMcpNoProvider();
 
         // when
         config.onReadinessChange(readinessEvent());
     }
 
     @Test
-    @DisplayName("onReadinessChange logs FAILED for MCP when ToolCallbackProvider.getToolCallbacks throws")
-    void onReadinessChange_McpToolListingFails_LogsFailedStatus() throws Exception {
-        // given
+    @DisplayName("onReadinessChange renders MCP servers section with registry entries")
+    void onReadinessChange_McpRegistryHasEntries_RendersMcpServersSection() throws Exception {
+        // given — registry already has one CONNECTED and one FAILED entry (configured per-test via mcpRegistry mock in setUp)
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
 
-        ToolCallbackProvider provider = mock(ToolCallbackProvider.class);
-        when(toolCallbackProvider.getIfAvailable()).thenReturn(provider);
-        when(provider.getToolCallbacks()).thenThrow(new RuntimeException("MCP broken"));
-
-        // when
+        // when — must not throw
         config.onReadinessChange(readinessEvent());
     }
 
     @Test
-    @DisplayName("onReadinessChange logs connected with tool names when tools are registered")
-    void onReadinessChange_McpToolsRegistered_LogsConnectedWithToolNames() throws Exception {
+    @DisplayName("onReadinessChange renders empty MCP section when registry has no entries")
+    void onReadinessChange_McpRegistryEmpty_RendersNoneRegistered() throws Exception {
         // given
+        when(mcpRegistry.entries()).thenReturn(List.of());
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-
-        ToolCallbackProvider provider = mock(ToolCallbackProvider.class);
-        when(toolCallbackProvider.getIfAvailable()).thenReturn(provider);
-
-        ToolCallback cb = mock(ToolCallback.class);
-        ToolDefinition def = mock(ToolDefinition.class);
-        when(def.name()).thenReturn("weather_tool");
-        when(cb.getToolDefinition()).thenReturn(def);
-        when(provider.getToolCallbacks()).thenReturn(new ToolCallback[]{cb});
-
-        // when — no throw
-        config.onReadinessChange(readinessEvent());
-    }
-
-    @Test
-    @DisplayName("onReadinessChange logs no-tools-registered when ToolCallbackProvider returns empty array")
-    void onReadinessChange_McpNoToolsRegistered_LogsConnectedNoTools() throws Exception {
-        // given
-        stubDatabaseSuccess();
-        stubRedisSuccess();
-        stubQdrantSuccess();
-        stubS3Success();
-
-        ToolCallbackProvider provider = mock(ToolCallbackProvider.class);
-        when(toolCallbackProvider.getIfAvailable()).thenReturn(provider);
-        when(provider.getToolCallbacks()).thenReturn(new ToolCallback[]{});
 
         // when
         config.onReadinessChange(readinessEvent());
@@ -278,7 +247,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         // when
         config.onReadinessChange(readinessEvent());
@@ -295,7 +263,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         // The probe uses an actual RestClient pointing at a non-listening port – it will throw.
         // We just verify it doesn't propagate.
@@ -322,7 +289,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         config.onReadinessChange(readinessEvent());
         // Verifies the https branch in the protocol selection
@@ -337,7 +303,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         config.onReadinessChange(readinessEvent());
     }
@@ -351,7 +316,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         config.onReadinessChange(readinessEvent());
     }
@@ -365,7 +329,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         config.onReadinessChange(readinessEvent());
     }
@@ -383,7 +346,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         config.onReadinessChange(readinessEvent());
     }
@@ -405,7 +367,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         config.onReadinessChange(readinessEvent());
     }
@@ -420,7 +381,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         config.onReadinessChange(readinessEvent());
     }
@@ -441,7 +401,6 @@ class StartupLogConfigTest {
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
-        stubMcpNoProvider();
 
         // must not throw
         config.onReadinessChange(readinessEvent());
@@ -483,7 +442,4 @@ class StartupLogConfigTest {
         when(s3Client.listObjects(ArgumentMatchers.<Consumer<ListObjectsRequest.Builder>>any())).thenReturn(s3Response);
     }
 
-    private void stubMcpNoProvider() {
-        when(toolCallbackProvider.getIfAvailable()).thenReturn(null);
-    }
 }

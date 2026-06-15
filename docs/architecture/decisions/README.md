@@ -26,3 +26,4 @@ Detailed ADRs for the AscendAgent internal architecture live in
 | ADR-005 | Thinking model response resolution.                     |
 | ADR-006 | Multi-provider semantic memory routing.                 |
 | ADR-007 | Ingestion auto-poller off by default.                   |
+| ADR-008 | MCP startup tolerance via `initialized=false` and deferred init loop. |
