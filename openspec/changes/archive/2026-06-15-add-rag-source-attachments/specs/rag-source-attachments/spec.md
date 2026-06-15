@@ -99,7 +99,7 @@ When multiple retrieved chunks point to the same underlying source document (sam
 
 ### Requirement: Size cap for attached sources
 
-Source documents larger than `app.rag.source-attachments.max-file-size` (default 25 MB) SHALL be excluded from the response array. The exclusion SHALL log a single WARN line per skipped source containing the bucket, key, actual size, and configured cap. The exclusion SHALL NOT cause the request to fail; remaining sources SHALL still be returned.
+Source documents larger than `app.rag.source-attachments.max-file-size` (defined in `application.yaml`; shipped default 1 GB) SHALL be excluded from the response array. The exclusion SHALL log a single WARN line per skipped source containing the bucket, key, actual size, and configured cap. The exclusion SHALL NOT cause the request to fail; remaining sources SHALL still be returned.
 
 #### Scenario: One oversize source among many
 

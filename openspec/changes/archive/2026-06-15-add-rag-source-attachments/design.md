@@ -74,7 +74,7 @@ A single retrieved set of N chunks may include 3 chunks from `pdf-A`, 2 chunks f
 
 ### D4 — Size cap before presigning
 
-Before presigning, the service issues a `HEAD` on each candidate object to read `Content-Length`. Objects larger than `app.rag.source-attachments.max-file-size` (default 25 MB) are skipped with a single `WARN` log of the form `Skipping source attachment for s3://{bucket}/{key} ({sizeBytes} > {maxBytes})`. Skipping does NOT fail the request — the rest of the sources are returned and the answer text is unchanged.
+Before presigning, the service issues a `HEAD` on each candidate object to read `Content-Length`. Objects larger than `app.rag.source-attachments.max-file-size` (defined in `application.yaml`; shipped default 1 GB) are skipped with a single `WARN` log of the form `Skipping source attachment for s3://{bucket}/{key} ({sizeBytes} > {maxBytes})`. Skipping does NOT fail the request — the rest of the sources are returned and the answer text is unchanged.
 
 The size is also returned in the response (`sizeBytes`) when known. If the `HEAD` fails (e.g., transient MinIO error), the source is omitted from the response array (best-effort) and a single `WARN` line is logged; the request still returns 200. This protects callers from getting unusable URLs for files that no longer exist or are unreachable.
 
