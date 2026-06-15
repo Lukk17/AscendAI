@@ -92,7 +92,7 @@ After `build-and-push` succeeds, a `release` job:
    - audio-scribe: 0.2.1  (released)
    - ascend-web-search: 1.2.0
    - ascend-memory: 0.4.0
-   - paddle-ocr: 0.1.0
+   - ascend-paddle-ocr: 0.1.0
    ```
 3. Creates Git tag `ascend-ai_<stack_version>` and a GitHub Release via `softprops/action-gh-release@v2` with that body **plus** `generate_release_notes: true` for the PR-title summary since the previous tag.
 
