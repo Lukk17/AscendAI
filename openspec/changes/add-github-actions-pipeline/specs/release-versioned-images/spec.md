@@ -1,107 +1,111 @@
 ## ADDED Requirements
 
-### Requirement: Release is triggered manually via workflow_dispatch only
+### Requirement: Release is manual, with a stack version and per-app selection
 
-`release.yaml` SHALL be triggered exclusively via `workflow_dispatch` with a required `version` input (string, e.g. `1.2.3` or `1.2.3-rc.1`). It SHALL NOT trigger on Git tag pushes, on schedule, on push to any branch, or on pull request events. The workflow file SHALL use the `.yaml` extension to match the repo's YAML convention.
+`release.yaml` SHALL be triggered exclusively via `workflow_dispatch`. It SHALL NOT trigger on Git tag pushes, on schedule, on push to any branch, or on pull-request events. The dispatch inputs SHALL be a required `stack_version` string (e.g. `1.1.1`, naming the monorepo release `ascend-ai_1.1.1`) and one boolean per app selecting whether that app is released. The workflow file SHALL use the `.yaml` extension.
 
-#### Scenario: Manual dispatch with version input runs the release
+#### Scenario: Manual dispatch releases only the selected apps
 
-- **WHEN** the maintainer opens the Actions tab, selects the `Release` workflow, clicks "Run workflow", and enters `version=1.2.3`
-- **THEN** the workflow extracts `version=1.2.3` from `inputs.version`
-- **AND** all six service images are built and pushed
+- **WHEN** the operator dispatches with `stack_version=1.1.1`, `release_ascend_agent=true`, `release_audio_scribe=true`, and the other four app booleans `false`
+- **THEN** only `ascend-agent` and `audio-scribe` images are built and pushed
+- **AND** `weather-mcp`, `ascend-web-search`, `ascend-memory`, and `paddle-ocr` are not built and their images are untouched
 
 #### Scenario: Tag push does not trigger the release
 
-- **WHEN** the maintainer pushes a Git tag `v1.2.3` directly to the repository (without using the workflow_dispatch UI)
-- **THEN** the `Release` workflow does NOT trigger
-- **AND** no images are pushed automatically
+- **WHEN** a Git tag `ascend-ai_1.1.1` is pushed directly without using the dispatch UI
+- **THEN** the `Release` workflow does NOT trigger and no images are pushed
 
-### Requirement: Multi-arch image build for every service
+### Requirement: Image version is read from each app's committed manifest
 
-The workflow SHALL build a multi-arch (`linux/amd64` and `linux/arm64`) Docker image for every service in the monorepo (`AscendAgent`, `WeatherMCP`, `AudioScribe`, `AscendWebSearch`, `AscendMemory`, `PaddleOCR`). Each image SHALL be pushed to Docker Hub at `lukk17/<service-name>:<version>` where `<version>` is the workflow's `inputs.version` value verbatim.
+For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`AscendAgent`, `WeatherMCP`), `[project].version` in `pyproject.toml` for Python services (`AudioScribe`, `AscendWebSearch`, `AscendMemory`, `PaddleOCR`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
 
-#### Scenario: Manual dispatch produces six images
+#### Scenario: Tag equals the manifest version
 
-- **WHEN** the maintainer dispatches the workflow with `version=1.2.3`
-- **THEN** six images are built and pushed: `lukk17/ascend-agent:1.2.3`, `lukk17/weather-mcp:1.2.3`, `lukk17/audio-scribe:1.2.3`, `lukk17/ascend-web-search:1.2.3`, `lukk17/ascend-memory:1.2.3`, `lukk17/paddle-ocr:1.2.3`
-- **AND** each image is multi-arch with manifests for both `linux/amd64` and `linux/arm64`
+- **WHEN** `AscendAgent/build.gradle.kts` declares `version = "1.3.0"` and `ascend-agent` is selected for release
+- **THEN** the pushed image is tagged `lukk17/ascend-agent:1.3.0`
+- **AND** `AscendAgent/build.gradle.kts` on disk is unchanged after the run
 
-#### Scenario: One service build failing does not abort the rest
+#### Scenario: Python manifest version
 
-- **WHEN** the matrix entry for `ascend-memory` fails (e.g., `pip install` times out) during a manual dispatch
-- **THEN** because `strategy.fail-fast: false` is set, the other five services still build and push
-- **AND** the workflow's overall conclusion is `failure`
-- **AND** re-running the workflow with the same `version` input re-pushes the missing image without disturbing the five already-published images
+- **WHEN** `AudioScribe/pyproject.toml` declares `[project] version = "0.2.1"` and `audio-scribe` is selected
+- **THEN** the pushed image is tagged `lukk17/audio-scribe:0.2.1`
+- **AND** `AudioScribe/pyproject.toml` on disk is unchanged after the run
 
-### Requirement: Version sync via build-time override, not by committing
+### Requirement: Release makes no commits
 
-The workflow SHALL pass the version into each service's build as a build-time property and SHALL NOT commit any change back to the repository's `build.gradle.kts` or `pyproject.toml`. Java services SHALL receive the version via `-Pversion=<version>` (Gradle property override). Python services SHALL receive it via `--build-arg BUILD_VERSION=<version>` consumed by the `Dockerfile` (e.g., as a `LABEL org.opencontainers.image.version` and optionally written to a `VERSION` file inside the image).
+The release workflow SHALL NOT create, amend, or push any commit. It SHALL only create a Git tag and a GitHub Release. No manifest, changelog, or version file SHALL be written back to the repository by the workflow.
 
-#### Scenario: Java service version override
+#### Scenario: No commit after release
 
-- **WHEN** the workflow runs with `version=1.2.3` and builds the `ascend-agent` image
-- **THEN** the build invokes Gradle with `-Pversion=1.2.3` (either directly or via a `GRADLE_ARGS` build-arg threaded into the Dockerfile)
-- **AND** the resulting JAR's `Implementation-Version` manifest entry equals `1.2.3`
-- **AND** `AscendAgent/build.gradle.kts` on disk in the repo is unchanged after the workflow finishes
+- **WHEN** a release of any set of apps completes successfully
+- **THEN** the default branch has no new commit authored by the workflow
+- **AND** the only refs created are the tag `ascend-ai_<stack_version>` and its GitHub Release
 
-#### Scenario: Python service version label
+### Requirement: Bump guard against the previous stack release
 
-- **WHEN** the workflow runs with `version=1.2.3` and builds the `audio-scribe` image
-- **THEN** `docker buildx build --build-arg BUILD_VERSION=1.2.3 ...` is invoked
-- **AND** the resulting image carries `LABEL org.opencontainers.image.version=1.2.3`
-- **AND** `AudioScribe/pyproject.toml` on disk in the repo is unchanged after the workflow finishes
+For each selected app, the workflow SHALL compare the app's current manifest version against that app's version at the previous `ascend-ai_*` Git tag. If a selected app's version is unchanged from the previous stack release, the workflow SHALL fail before any image is pushed, with a message naming the offending app. When no previous `ascend-ai_*` tag exists (first release), this guard SHALL be skipped.
 
-### Requirement: `:latest` tag only for stable semver
+#### Scenario: Selected app not bumped fails the run
 
-The workflow SHALL tag an image as `lukk17/<service>:latest` if and only if the input version matches the strict stable semver pattern `^[0-9]+\.[0-9]+\.[0-9]+$`. Pre-release versions (`1.2.3-rc.1`, `1.2.3-beta`, `1.2.3-alpha.2`) SHALL NOT update the `:latest` tag.
+- **WHEN** the previous release `ascend-ai_1.1.0` recorded `weather-mcp` at `1.0.0`, the current `WeatherMCP/build.gradle.kts` still says `1.0.0`, and `weather-mcp` is selected for release
+- **THEN** the workflow fails in the prepare stage with a message identifying `weather-mcp` as not bumped
+- **AND** no `docker login` or image push occurs for any app
 
-#### Scenario: Stable version updates :latest
+#### Scenario: Selected app correctly bumped proceeds
 
-- **WHEN** the maintainer dispatches with `version=1.2.3`
-- **THEN** the regex `^[0-9]+\.[0-9]+\.[0-9]+$` matches `1.2.3` and the `is_stable` output is `true`
-- **AND** every pushed image carries both `lukk17/<service>:1.2.3` and `lukk17/<service>:latest`
+- **WHEN** `weather-mcp` was `1.0.0` at the previous stack tag and its manifest now says `1.1.0`, and it is selected
+- **THEN** the guard passes and `lukk17/weather-mcp:1.1.0` is built and pushed
 
-#### Scenario: Release-candidate version does not touch :latest
+#### Scenario: First release skips the guard
 
-- **WHEN** the maintainer dispatches with `version=1.2.3-rc.1`
-- **THEN** `is_stable` is `false`
-- **AND** every pushed image carries only `lukk17/<service>:1.2.3-rc.1`
-- **AND** the existing `lukk17/<service>:latest` on Docker Hub is unchanged
+- **WHEN** no `ascend-ai_*` tag exists yet and apps are selected for release
+- **THEN** the guard is skipped and each selected app ships at its current manifest version
+
+### Requirement: Released images are tagged version + latest
+
+Each selected app's image SHALL be pushed to Docker Hub at `lukk17/<service>:<manifest-version>` and also `lukk17/<service>:latest`. Unselected apps SHALL NOT have their `:latest` tag modified.
+
+#### Scenario: Released app updates latest
+
+- **WHEN** `ascend-agent` is released at manifest version `1.3.0`
+- **THEN** both `lukk17/ascend-agent:1.3.0` and `lukk17/ascend-agent:latest` point at the new image
+
+#### Scenario: Unselected app latest untouched
+
+- **WHEN** `paddle-ocr` is not selected in a release
+- **THEN** `lukk17/paddle-ocr:latest` is unchanged by the run
 
 ### Requirement: Docker Hub authentication via repository secrets
 
-The workflow SHALL log in to Docker Hub using `docker/login-action@v3` with credentials sourced from repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. The token SHALL be a Docker Hub access token (not a password) with read+write scope on the `lukk17/*` namespace.
+The workflow SHALL log in to Docker Hub using `docker/login-action@v3` with `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets before any push. Credentials SHALL NOT appear in plaintext in logs.
 
-#### Scenario: Login succeeds
+#### Scenario: Missing token fails before push
 
-- **WHEN** the workflow runs and the secrets are configured
-- **THEN** `docker/login-action@v3` succeeds before any `docker buildx build --push` step runs
-- **AND** the credentials never appear in plain text in the workflow log
+- **WHEN** `DOCKERHUB_TOKEN` is not configured and a release is dispatched
+- **THEN** `docker/login-action@v3` fails and no `docker buildx build --push` step runs
 
-#### Scenario: Missing token fails fast with a clear message
+### Requirement: Aggregated monorepo release record listing every app version
 
-- **WHEN** the maintainer dispatches the workflow but `DOCKERHUB_TOKEN` is not configured
-- **THEN** `docker/login-action@v3` fails with the action's standard "no token provided" error
-- **AND** no `docker buildx build --push` step runs
-- **AND** the workflow conclusion is `failure` with the failed step pointing to the login action
+After all selected apps push successfully, the workflow SHALL create the Git tag `ascend-ai_<stack_version>` and a GitHub Release (via `softprops/action-gh-release@v2`) whose body lists the current manifest version of **all six** apps — marking which were released in this run — together with `generate_release_notes: true` PR notes. The workflow SHALL reject a `stack_version` whose `ascend-ai_<stack_version>` tag already exists.
 
-### Requirement: GitHub Release with auto-generated notes
+#### Scenario: Release notes list all app versions
 
-After all matrix images push successfully, the workflow SHALL create a GitHub Release at tag `v<version>` using `softprops/action-gh-release@v2` with `generate_release_notes: true` so that the release body is populated from PR titles and contributors since the previous tag. The action also creates the Git tag if it does not already exist.
+- **WHEN** a release of `ascend-agent` (1.3.0) and `audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at weather-mcp 1.0.0, ascend-web-search 1.2.0, ascend-memory 0.4.0, paddle-ocr 0.1.0
+- **THEN** a GitHub Release tagged `ascend-ai_1.1.1` is created
+- **AND** its body lists all six apps with their current versions, marking `ascend-agent` and `audio-scribe` as released this run
+- **AND** the release is not a draft
 
-#### Scenario: Release notes summarize PRs since previous tag
+#### Scenario: Reusing a stack version is rejected
 
-- **WHEN** the previous release tag was `v1.2.2` and three PRs (`#101`, `#102`, `#103`) merged between then and the current dispatch with `version=1.2.3`
-- **THEN** completing all six matrix builds creates a GitHub Release at `v1.2.3`
-- **AND** the release body lists the three PR titles with their authors as auto-generated by GitHub
-- **AND** the release is NOT marked as a draft
+- **WHEN** a release `ascend-ai_1.1.1` already exists and the operator dispatches `stack_version=1.1.1` again
+- **THEN** the workflow fails because the tag already exists, before pushing any image
 
 ### Requirement: Multi-arch builds use QEMU + Buildx with per-service GHA cache
 
-Each matrix entry SHALL set up `docker/setup-qemu-action@v3` and `docker/setup-buildx-action@v3`, then build with `docker/build-push-action@v6` configured with `platforms: linux/amd64,linux/arm64` and GHA build cache scoped per service (`cache-from: type=gha,scope=<service>` and `cache-to: type=gha,scope=<service>,mode=max`).
+Each selected app SHALL build with `docker/setup-qemu-action@v3`, `docker/setup-buildx-action@v3`, and `docker/build-push-action@v6` configured `platforms: linux/amd64,linux/arm64` with GHA build cache scoped per service (`cache-from`/`cache-to: type=gha,scope=<service>,mode=max`), and `strategy.fail-fast: false`.
 
-#### Scenario: Cache scope isolates services
+#### Scenario: One app failing does not abort the others
 
-- **WHEN** the `ascend-agent` and `paddle-ocr` matrix entries run in parallel
-- **THEN** the buildx step for each entry reads and writes its own cache scope
-- **AND** a cache eviction in the `paddle-ocr` scope does not affect the `ascend-agent` scope's hit rate
+- **WHEN** two apps are selected and one app's build fails
+- **THEN** the other selected app still attempts its build (fail-fast disabled)
+- **AND** the overall run concludes `failure` and the `release` job (tag + GitHub Release) does NOT run
