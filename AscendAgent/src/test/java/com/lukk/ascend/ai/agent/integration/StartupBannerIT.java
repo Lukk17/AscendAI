@@ -66,10 +66,10 @@ class StartupBannerIT extends TestcontainersBase {
         assertThat(banner).contains("Postgres:");
         assertThat(banner).contains("Redis:");
         assertThat(banner).contains("Qdrant:");
-        assertThat(banner).contains("S3 Ingested:");
+        assertThat(banner).contains("S3 (MinIO):");
         assertThat(banner).contains("AscendMemory:");
-        assertThat(banner).contains("Chat History:");
-        assertThat(banner).contains("MCP Tools:");
+        assertThat(banner).contains("Chat history:");
+        assertThat(banner).contains("MCP tools:");
 
         // Each backing-service line carries one of the status markers — this guards against
         // an accidental refactor that drops the [Connected]/[FAILED]/[Warning]/[Disabled] tag.
