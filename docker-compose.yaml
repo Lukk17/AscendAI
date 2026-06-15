@@ -66,7 +66,7 @@ services:
       # - MCP_FILE_URI_ROOT=/var/lib/paddle-ocr/uploads
       - RATE_LIMIT_DEFAULT=60/minute
       - RATE_LIMIT_OCR=20/minute
-      - OTEL_ENABLED=false
+      - OTEL_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-paddle-ocr
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
