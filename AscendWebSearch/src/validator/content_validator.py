@@ -66,7 +66,8 @@ class ContentValidator:
                 return False
 
         except Exception as e:
-            logger.warning(f"Textstat validation error: {e}. Proceeding with content.")
+            logger.warning(f"Textstat validation error: {e}. Rejecting content (fail-closed).")
+            return False
 
         return True
 

@@ -1,6 +1,7 @@
 import logging
 import random
 from collections.abc import Callable
+from typing import Any
 
 import trafilatura
 from playwright.async_api import Browser, BrowserContext, Page, ViewportSize
@@ -9,6 +10,7 @@ from playwright_stealth import Stealth
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.runtime.browser_pool import browser_pool
 from src.validator.url_validator import URLValidator
@@ -34,9 +36,11 @@ class PlaywrightStrategy(BaseStrategy):
         self,
         user_agent_provider: Callable[[], str],
         url_validator: URLValidator,
+        profile: str | None = None,
     ) -> None:
         self.user_agent_provider = user_agent_provider
         self.url_validator = url_validator
+        self.profile = profile
 
     async def extract(self, url: str) -> str:
         html = await self.get_html(url)
@@ -46,7 +50,7 @@ class PlaywrightStrategy(BaseStrategy):
 
     async def get_html(self, url: str) -> str:
         browser = await browser_pool.get_browser()
-        context = await self._create_stealth_context(browser)
+        context = await self._create_stealth_context(browser, url)
         page = await context.new_page()
 
         await self._apply_protections(page)
@@ -98,18 +102,26 @@ class PlaywrightStrategy(BaseStrategy):
             # Only the context is torn down. The browser process lives across requests.
             await context.close()
 
-    async def _create_stealth_context(self, browser: Browser) -> BrowserContext:
+    async def _create_stealth_context(self, browser: Browser, url: str) -> BrowserContext:
         viewport: ViewportSize = {
             "width": random.randint(_VIEWPORT_MIN_WIDTH_PX, _VIEWPORT_MAX_WIDTH_PX),
             "height": random.randint(_VIEWPORT_MIN_HEIGHT_PX, _VIEWPORT_MAX_HEIGHT_PX),
         }
 
-        return await browser.new_context(
-            user_agent=self.user_agent_provider(),
-            viewport=viewport,
-            locale="en-US",
-            timezone_id="UTC",
-        )
+        stored_state = await cookie_manager.get_storage_state(url, self.profile)
+        stored_ua = await cookie_manager.get_user_agent(url, self.profile)
+        user_agent = stored_ua or self.user_agent_provider()
+
+        kwargs: dict[str, Any] = {
+            "user_agent": user_agent,
+            "viewport": viewport,
+            "locale": "en-US",
+            "timezone_id": "UTC",
+        }
+        if stored_state is not None:
+            kwargs["storage_state"] = stored_state
+
+        return await browser.new_context(**kwargs)
 
     async def _apply_protections(self, page: Page) -> None:
         stealth = Stealth()

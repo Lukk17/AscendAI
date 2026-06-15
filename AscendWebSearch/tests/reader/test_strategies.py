@@ -18,6 +18,7 @@ class _MockResponse:
         self.status_code = status
         self.text = html
         self.url = "http://test.com"
+        self.headers: dict[str, str] = {}
 
     def raise_for_status(self):
         return None
@@ -34,9 +35,15 @@ def _make_curl_session(response: _MockResponse) -> MagicMock:
 
 @pytest.fixture
 def patch_cookies_none():
-    with patch(
-        "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_session_data",
-        new=AsyncMock(return_value=None),
+    with (
+        patch(
+            "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_flat_cookies",
+            new=AsyncMock(return_value={}),
+        ),
+        patch(
+            "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_user_agent",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         yield
 
@@ -57,8 +64,12 @@ async def test_curl_cffi_fetcher_uses_cached_cookies():
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     with (
         patch(
-            "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_session_data",
-            new=AsyncMock(return_value={"cookies": {"cf_clearance": "x"}, "user_agent": "cached-ua"}),
+            "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_flat_cookies",
+            new=AsyncMock(return_value={"cf_clearance": "x"}),
+        ),
+        patch(
+            "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_user_agent",
+            new=AsyncMock(return_value="cached-ua"),
         ),
         patch(
             "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",

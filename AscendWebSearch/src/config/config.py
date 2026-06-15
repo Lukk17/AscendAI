@@ -125,5 +125,34 @@ class Settings(BaseSettings):
         description="Redis connection URL for cookie storage",
     )
 
+    # Session TTLs
+    SESSION_AUTH_TTL_SECONDS: int = Field(
+        default=1_209_600,
+        description="Sliding TTL for auth cookies (long-lived; default 14 days)",
+    )
+    SESSION_WAF_TTL_SECONDS: int = Field(
+        default=1800,
+        description="TTL for WAF-clearance cookies (short-lived; default 30 min)",
+    )
+    SESSION_DEFAULT_PROFILE: str = Field(
+        default="default",
+        description="Profile label used when no profile is specified per-request",
+    )
+
+    # Challenge detection
+    CHALLENGE_DETECTION_MAX_BYTES: int = Field(
+        default=50_000,
+        description=(
+            "Prefix length scanned by ChallengeDetector. Pages larger than this "
+            "were previously skipped entirely; now we scan only the prefix."
+        ),
+    )
+
+    # Crawlee storage root (outside src/ to avoid committing runtime state)
+    CRAWLEE_STORAGE_DIR: str = Field(
+        default=".crawlee_storage",
+        description="Out-of-tree directory for Crawlee request queues and key-value stores",
+    )
+
 
 settings = Settings()

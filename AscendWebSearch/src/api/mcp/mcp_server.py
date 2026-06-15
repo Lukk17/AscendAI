@@ -6,6 +6,7 @@ from src.api.exceptions import HumanInterventionRequiredException
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL
 from src.reader.web_reader import WebReader
 from src.search.search_client import SearxngClient
+from src.session.session_manager import session_manager
 from src.validator.url_validator import is_safe_external_url
 
 mcp = FastMCP("AscendWebSearch")
@@ -37,6 +38,7 @@ async def web_read(
     include_links: bool = False,
     link_filter: str | None = None,
     heavy_mode: bool = False,
+    profile: str | None = None,
 ) -> dict[str, Any]:
     """
     Read (scrape) the content of a web page.
@@ -49,20 +51,17 @@ async def web_read(
         link_filter: Optional URL substring - when set, only links whose href contains
                      this string are included in the link map (e.g. '/job-offer/').
         heavy_mode: If True, skips lightweight strategies and jumps straight to advanced browser strategies.
+        profile: Optional session profile label (e.g. 'work', 'personal') for multi-account sites.
     """
     if not is_safe_external_url(url):
         raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
 
     try:
         if include_links:
-            return await web_reader.read_with_links(url, link_filter, heavy_mode=heavy_mode)
+            return await web_reader.read_with_links(url, link_filter, heavy_mode=heavy_mode, profile=profile)
 
-        return await web_reader.read(url, heavy_mode=heavy_mode)
+        return await web_reader.read(url, heavy_mode=heavy_mode, profile=profile)
     except HumanInterventionRequiredException as exc:
-        # The REST surface returns 428 via human_intervention_exception_handler; MCP has no HTTP
-        # status to mirror, so we surface the same payload as a structured tool result. Without
-        # this catch, FastMCP marks the call as a generic tool error and the docstring contract
-        # ("display the vnc_url to the user") is silently broken.
         HUMAN_INTERVENTION_TOTAL.labels(intervention_type=exc.intervention_type).inc()
 
         return {
@@ -71,3 +70,43 @@ async def web_read(
             "vnc_url": exc.vnc_url,
             "message": exc.message,
         }
+
+
+@mcp.tool()
+async def session_establish(url: str, profile: str | None = None) -> dict[str, Any]:
+    """
+    Proactively open the NoVNC login flow for a site.
+    IMPORTANT: When this returns status='human_intervention_required', display the vnc_url to the user
+    and ask them to complete the login in their browser. The session will be captured automatically.
+    Args:
+        url: The site URL to establish a session for.
+        profile: Optional profile label to use (e.g. 'work', 'personal').
+    """
+    if not is_safe_external_url(url):
+        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+
+    vnc_url = await session_manager.establish(url, profile)
+    HUMAN_INTERVENTION_TOTAL.labels(intervention_type="login").inc()
+    return {
+        "status": "human_intervention_required",
+        "intervention_type": "login",
+        "vnc_url": vnc_url,
+        "message": f"Login required. Please visit: {vnc_url}",
+    }
+
+
+@mcp.tool()
+async def session_status(url: str, profile: str | None = None) -> dict[str, Any]:
+    """
+    Query the authentication session status for a URL.
+    Args:
+        url: The site URL to check the session for.
+        profile: Optional profile label (e.g. 'work', 'personal').
+    Returns status ('active', 'expired', 'none'), remaining auth TTL in seconds,
+    and the timestamp of the last validated session.
+    """
+    if not is_safe_external_url(url):
+        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+
+    info = await session_manager.status(url, profile)
+    return {"url": url, **info.to_dict()}

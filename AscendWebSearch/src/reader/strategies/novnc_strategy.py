@@ -68,14 +68,10 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
             start_time = loop.time()
             while loop.time() - start_time < settings.NOVNC_TIMEOUT_SECONDS:
                 try:
-                    cookies = await context.cookies()
-                    # Playwright's Cookie TypedDict marks `name` and `value` as
-                    # optional even though every real cookie has both. Skip the
-                    # rare entries missing either rather than crashing on KeyError.
-                    cookie_dict = {c["name"]: c["value"] for c in cookies if "name" in c and "value" in c}
+                    storage_state = await context.storage_state()
                     user_agent = await page.evaluate("navigator.userAgent")
 
-                    await cookie_manager.save_session_data(url, cookie_dict, user_agent)
+                    await cookie_manager.save_storage_state(url, storage_state, user_agent)
 
                     # Early exit once the user has navigated away from the login/challenge page.
                     # Without this, we keep overwriting Redis every 5 s for the full timeout window

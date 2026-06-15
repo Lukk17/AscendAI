@@ -9,6 +9,7 @@ from adblockparser import AdblockRules
 logger = logging.getLogger(__name__)
 
 _SAFE_SCHEMES = {"http", "https"}
+_MAX_REDIRECTS = 10
 
 
 class URLValidator:
@@ -48,6 +49,11 @@ def is_safe_external_url(url: str) -> bool:
     if not host:
         return False
 
+    return _is_safe_host(host)
+
+
+def _is_safe_host(host: str) -> bool:
+    """Resolve host and verify all returned IPs are public/routable."""
     try:
         infos = socket.getaddrinfo(host, None)
     except socket.gaierror:
@@ -66,5 +72,25 @@ def is_safe_external_url(url: str) -> bool:
             or ip.is_reserved
             or ip.is_unspecified
         ):
+            return False
+    return True
+
+
+def validate_redirect_chain(history: list[Any]) -> bool:
+    """
+    Validate every redirect hop in a response history against the SSRF guard.
+
+    Each item in *history* must expose a `url` attribute (curl_cffi Response objects
+    do). Returns False as soon as any hop fails the guard; True if all are safe.
+
+    FlareSolverr and Crawlee fetch out-of-process, so redirect chains for those tiers
+    cannot be validated hop-by-hop here. Pre-dispatch validation (is_safe_external_url
+    on the initial URL) is the defence for those tiers; residual risk is noted in
+    docs/architecture/decisions/.
+    """
+    for resp in history:
+        hop_url: str = getattr(resp, "url", "") or ""
+        if hop_url and not is_safe_external_url(str(hop_url)):
+            logger.warning("SSRF guard: redirect hop %s failed safety check", hop_url)
             return False
     return True

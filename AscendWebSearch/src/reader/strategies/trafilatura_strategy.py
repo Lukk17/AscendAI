@@ -7,8 +7,9 @@ from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
 
 
 class TrafilaturaStrategy(BaseStrategy):
-    def __init__(self, user_agent_provider: Callable[[], str]) -> None:
+    def __init__(self, user_agent_provider: Callable[[], str], profile: str | None = None) -> None:
         self.user_agent_provider = user_agent_provider
+        self.profile = profile
 
     async def extract(self, url: str) -> str:
         html = await self.get_html(url)
@@ -20,4 +21,4 @@ class TrafilaturaStrategy(BaseStrategy):
         return extracted or ""
 
     async def get_html(self, url: str) -> str:
-        return await fetch_with_curl_cffi(url, self.user_agent_provider, "TrafilaturaStrategy")
+        return await fetch_with_curl_cffi(url, self.user_agent_provider, "TrafilaturaStrategy", self.profile)

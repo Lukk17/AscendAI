@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class FlareSolverrStrategy(BaseStrategy):
+    def __init__(self, profile: str | None = None) -> None:
+        self.profile = profile
+
     async def extract(self, url: str) -> str:
         html = await self.get_html(url)
         if not html:
@@ -27,7 +30,13 @@ class FlareSolverrStrategy(BaseStrategy):
             return ""
 
         timeout = settings.EXTRACT_TIMEOUT * 2
-        payload = {"cmd": "request.get", "url": url, "maxTimeout": int((timeout - 2) * 1000)}
+        payload: dict = {"cmd": "request.get", "url": url, "maxTimeout": int((timeout - 2) * 1000)}
+
+        # Inject any stored auth+WAF cookies via FlareSolverr's cookie array.
+        saved_flat = await cookie_manager.get_flat_cookies(url, self.profile)
+        if saved_flat:
+            payload["cookies"] = [{"name": k, "value": v} for k, v in saved_flat.items()]
+            logger.debug("FlareSolverrStrategy: injecting %d stored cookies for %s", len(saved_flat), url)
 
         try:
             # noinspection PyArgumentList
@@ -47,33 +56,31 @@ class FlareSolverrStrategy(BaseStrategy):
                         c.get("name"): c.get("value") for c in cookies_list if "name" in c and "value" in c
                     }
 
-                    if "cf_clearance" in cookie_dict:
-                        await cookie_manager.save_session_data(url, cookie_dict, user_agent)
+                    # Persist unconditionally when the set is non-empty.
+                    # Previously gated on cf_clearance presence, which silently
+                    # discarded all LinkedIn auth cookies (li_at, JSESSIONID, etc.).
+                    if cookie_dict:
+                        await cookie_manager.save_flat_cookies(url, cookie_dict, user_agent, self.profile)
 
                     if ChallengeDetector.is_login_required(url, html):
-                        logger.warning(f"FlareSolverrStrategy: Login wall detected on {url}")
+                        logger.warning("FlareSolverrStrategy: Login wall detected on %s", url)
                         raise ChallengeDetectedException(intervention_type="login")
 
                     if ChallengeDetector.is_blocked(200, html):
-                        logger.warning(f"FlareSolverrStrategy: WAF/Cloudflare block detected on {url}")
-                        # Escalate via the orchestrator like the other strategies do: if
-                        # FlareSolverr itself returns a Cloudflare-blocked page, the next
-                        # tiers (Playwright/Crawlee) won't help — go straight to NoVNC.
+                        logger.warning("FlareSolverrStrategy: WAF/Cloudflare block detected on %s", url)
                         raise ChallengeDetectedException(intervention_type="captcha")
 
                     return str(html)
 
-                logger.warning(f"FlareSolverr failed on {url}: {data.get('message')}")
+                logger.warning("FlareSolverr failed on %s: %s", url, data.get("message"))
                 return ""
 
         except ChallengeDetectedException:
-            # Must not be swallowed by the broad except below; the orchestrator
-            # uses ChallengeDetectedException as an explicit escalation signal.
             raise
         except Exception as e:
             return self._handle_error(url, e)
 
     @staticmethod
     def _handle_error(url: str, error: Exception) -> str:
-        logger.warning(f"FlareSolverrStrategy error on {url}: {error}")
+        logger.warning("FlareSolverrStrategy error on %s: %s", url, error)
         return ""
