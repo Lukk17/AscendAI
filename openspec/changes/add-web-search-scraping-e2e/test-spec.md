@@ -77,15 +77,15 @@ tiered fallback. Not required — the response shape is identical for cache hits
 domain; document the choice under **Additional tasks I did** if you skip it.
 
 ```powershell
-docker exec ascend-redis redis-cli --scan --pattern "*en.wikipedia.org*" | ForEach-Object { docker exec ascend-redis redis-cli DEL $_ }
+docker exec redis redis-cli --scan --pattern "*en.wikipedia.org*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
 
 ```powershell
-docker exec ascend-redis redis-cli --scan --pattern "*nowsecure.nl*" | ForEach-Object { docker exec ascend-redis redis-cli DEL $_ }
+docker exec redis redis-cli --scan --pattern "*nowsecure.nl*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
 
 ```powershell
-docker exec ascend-redis redis-cli --scan --pattern "*quotes.toscrape.com*" | ForEach-Object { docker exec ascend-redis redis-cli DEL $_ }
+docker exec redis redis-cli --scan --pattern "*quotes.toscrape.com*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
 
 ## Run
