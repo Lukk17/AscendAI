@@ -51,5 +51,5 @@
 
 - [x] 8.1 Add all new settings to `Settings` (auth/WAF TTLs, profiles default, proxy, scroll already-present, cache TTL, breaker thresholds, detection-size threshold) and document them.
 - [x] 8.2 Write ADRs for the per-profile session model and the storage_state reuse strategy; note SSRF residual risk for out-of-process tiers.
-- [ ] 8.3 Add/extend unit tests for session capture/replay per tier, auth/WAF TTL split, SSRF redirect/rebind rejection, fail-closed validation, and structured output; keep coverage gate green.
+- [x] 8.3 Add/extend unit tests for session capture/replay per tier, auth/WAF TTL split, SSRF redirect/rebind rejection, fail-closed validation, and structured output; keep coverage gate green.
 - [ ] 8.4 Confirm the `add-web-search-scraping-e2e` tier tests exercise the authenticated path once this lands.
