@@ -55,6 +55,15 @@ class Settings(BaseSettings):
     DEFAULT_TIMEOUT: float = Field(default=30.0, description="Default HTTP request timeout in seconds")
     SEARCH_TIMEOUT: float = Field(default=10.0, description="Timeout for search requests")
     EXTRACT_TIMEOUT: float = Field(default=30.0, description="Timeout for web extraction")
+    CHALLENGE_CLEAR_WAIT_SECONDS: float = Field(
+        default=12.0,
+        description=(
+            "How long the headful Playwright tier waits for a Cloudflare JS/managed challenge "
+            "to auto-clear before escalating to NoVNC. JS challenges resolve in ~5-10s in a real "
+            "browser; a true interactive Turnstile never auto-clears and escalates after this window. "
+            "Bounded by EXTRACT_TIMEOUT."
+        ),
+    )
     READ_TOTAL_BUDGET: float = Field(
         default=90.0,
         description=(

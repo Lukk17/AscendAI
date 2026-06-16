@@ -344,6 +344,64 @@ async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkeypatch):
+    """A Cloudflare JS challenge that auto-clears within the budget must NOT escalate:
+    the headful tier keeps polling, the challenge resolves, and content is returned."""
+    page = _build_playwright_page_mock("<html><body>content</body></html>")
+    page.wait_for_load_state = AsyncMock(return_value=None)
+    _wire_browser_pool(monkeypatch, page)
+    with (
+        patch(
+            "src.reader.strategies.playwright_strategy.Stealth",
+            return_value=MagicMock(apply_stealth_async=AsyncMock()),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_required",
+            return_value=False,
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_blocked",
+            side_effect=[True, True, False],
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.trafilatura.extract",
+            return_value="Extracted",
+        ),
+    ):
+        strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
+        result = await strategy.extract("http://test.com")
+    assert result == "Extracted"
+
+
+@pytest.mark.asyncio
+async def test_playwright_escalates_when_challenge_never_clears(monkeypatch):
+    """A challenge still present after the auto-clear budget escalates to NoVNC."""
+    page = _build_playwright_page_mock("<html></html>")
+    _wire_browser_pool(monkeypatch, page)
+    with (
+        patch("src.reader.strategies.playwright_strategy.settings.CHALLENGE_CLEAR_WAIT_SECONDS", 3),
+        patch(
+            "src.reader.strategies.playwright_strategy.Stealth",
+            return_value=MagicMock(apply_stealth_async=AsyncMock()),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_required",
+            return_value=False,
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_blocked",
+            return_value=True,
+        ),
+    ):
+        strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
+        with pytest.raises(ChallengeDetectedException) as exc:
+            await strategy.get_html("http://test.com")
+    assert exc.value.intervention_type == "captcha"
+    # Escalated only after polling the auto-clear window, not on the first detection.
+    assert page.wait_for_timeout.await_count >= 2
+
+
+@pytest.mark.asyncio
 async def test_playwright_raises_late_login_wall(monkeypatch):
     page = _build_playwright_page_mock("<html></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)

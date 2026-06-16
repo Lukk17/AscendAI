@@ -51,8 +51,55 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
         patch("asyncio.sleep", new=AsyncMock(side_effect=StopAsyncIteration)),
     ):
         with contextlib.suppress(StopAsyncIteration):
-            await ns._monitor_for_cookies("https://linkedin.com/login")
+            await ns._monitor_for_cookies("https://linkedin.com/login", "login")
 
     mock_save.assert_awaited()
     # Confirm storage_state was called, not cookies
     context.storage_state.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
+    """The captcha monitor must persist the session only after a cf_clearance cookie
+    appears, then stop — never overwrite a good clearance on later polls."""
+    from src.reader.strategies import novnc_strategy as ns
+
+    page = MagicMock()
+    page.goto = AsyncMock()
+    page.evaluate = AsyncMock(return_value="Mozilla/5.0")
+    page.url = "https://nowsecure.nl/"
+
+    context = MagicMock()
+    context.new_page = AsyncMock(return_value=page)
+    # First poll: still challenged (no clearance). Second poll: clearance issued.
+    context.storage_state = AsyncMock(
+        side_effect=[
+            {"cookies": [{"name": "__cf_bm", "value": "x"}], "origins": []},
+            {"cookies": [{"name": "cf_clearance", "value": "GRANTED"}], "origins": []},
+        ]
+    )
+
+    browser = MagicMock()
+    browser.new_context = AsyncMock(return_value=context)
+    browser.close = AsyncMock()
+
+    mock_p = MagicMock()
+    mock_p.__aenter__ = AsyncMock(return_value=mock_p)
+    mock_p.__aexit__ = AsyncMock(return_value=False)
+    mock_p.chromium.launch = AsyncMock(return_value=browser)
+
+    with (
+        patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=mock_p),
+        patch(
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
+            new=AsyncMock(),
+        ) as mock_save,
+        patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch("src.reader.strategies.novnc_strategy.asyncio.sleep", new=AsyncMock()),
+    ):
+        await ns._monitor_for_cookies("https://nowsecure.nl/", "captcha")
+
+    # Saved exactly once — on the poll where cf_clearance appeared — then broke out.
+    mock_save.assert_awaited_once()
+    saved_state = mock_save.await_args.args[1]
+    assert any(c["name"] == "cf_clearance" for c in saved_state["cookies"])

@@ -34,6 +34,11 @@ _NGROK_API_TIMEOUT_SECONDS = 5.0
 _active_monitor_tasks: set[asyncio.Task[None]] = set()
 
 
+def _has_clearance_cookie(storage_state: dict[str, Any]) -> bool:
+    """True once a Cloudflare clearance cookie is present in the captured state."""
+    return any(c.get("name") == "cf_clearance" for c in storage_state.get("cookies", []))
+
+
 async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> None:
     logger.info("Background task started to monitor session for %s (%s)", url, intervention_type)
     browser = None
@@ -70,23 +75,30 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
             start_time = loop.time()
             while loop.time() - start_time < settings.NOVNC_TIMEOUT_SECONDS:
                 try:
-                    storage_state = await context.storage_state()
-                    user_agent = await page.evaluate("navigator.userAgent")
-
-                    await cookie_manager.save_storage_state(
-                        url, cast("dict[str, Any]", storage_state), user_agent
-                    )
-
-                    # Early exit once the user has navigated away from the login/challenge page.
-                    # Without this, we keep overwriting Redis every 5 s for the full timeout window
-                    # even though the human finished the challenge in the first 30 s.
+                    storage_state = cast("dict[str, Any]", await context.storage_state())
                     current_url = page.url or ""
-                    if not ChallengeDetector.is_login_redirect_url(current_url) and current_url != url:
-                        logger.info(
-                            "NoVNC Strategy: challenge appears resolved (now at %s), stopping monitor early",
-                            current_url,
-                        )
-                        break
+
+                    if intervention_type == "captcha":
+                        # Persist exactly once, the moment a clearance cookie is issued, then stop.
+                        # Re-saving on later polls risks overwriting the good clearance with a
+                        # re-challenged state captured after the page re-armed.
+                        if _has_clearance_cookie(storage_state):
+                            user_agent = await page.evaluate("navigator.userAgent")
+                            await cookie_manager.save_storage_state(url, storage_state, user_agent)
+                            logger.info(
+                                "NoVNC Strategy: captcha clearance captured for %s, stopping monitor", url
+                            )
+                            break
+                    else:
+                        # Login: capture auth cookies as they appear; stop once the browser has
+                        # navigated off the login/challenge page.
+                        user_agent = await page.evaluate("navigator.userAgent")
+                        await cookie_manager.save_storage_state(url, storage_state, user_agent)
+                        if not ChallengeDetector.is_login_redirect_url(current_url) and current_url != url:
+                            logger.info(
+                                "NoVNC Strategy: login resolved (now at %s), stopping monitor", current_url
+                            )
+                            break
                 except Exception as e:
                     logger.debug("NoVNC Strategy: Transient error syncing session cookies: %s", e)
 

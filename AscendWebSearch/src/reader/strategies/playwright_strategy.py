@@ -60,9 +60,21 @@ class PlaywrightStrategy(BaseStrategy):
             timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
             initial_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
 
-            # Poll incrementally for networkidle to allow early-exit on known block walls
+            # Poll incrementally for networkidle. A login wall exits immediately; a Cloudflare
+            # JS/managed challenge is given time to auto-clear in this headful browser before we
+            # escalate, since it self-resolves in ~5-10s rather than needing a human.
+            max_challenge_polls = min(
+                int(settings.CHALLENGE_CLEAR_WAIT_SECONDS), int(settings.EXTRACT_TIMEOUT)
+            )
+            challenge_polls = 0
             for _ in range(int(settings.EXTRACT_TIMEOUT)):
-                content = await page.content()
+                try:
+                    content = await page.content()
+                except Exception:
+                    # A challenge reload/navigation is in flight; re-check on the next poll.
+                    await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
+                    continue
+
                 response_status = initial_response.status if initial_response else 200
 
                 if ChallengeDetector.is_login_required(page.url, content):
@@ -70,10 +82,17 @@ class PlaywrightStrategy(BaseStrategy):
                     raise ChallengeDetectedException(intervention_type="login")
 
                 if ChallengeDetector.is_blocked(response_status, content):
-                    logger.warning(
-                        "PlaywrightStrategy: WAF/Cloudflare block detected on %s (early exit)", url
-                    )
-                    raise ChallengeDetectedException(intervention_type="captcha")
+                    challenge_polls += 1
+                    if challenge_polls >= max_challenge_polls:
+                        logger.warning(
+                            "PlaywrightStrategy: WAF/Cloudflare challenge did not auto-clear within "
+                            "%ss on %s; escalating",
+                            settings.CHALLENGE_CLEAR_WAIT_SECONDS,
+                            url,
+                        )
+                        raise ChallengeDetectedException(intervention_type="captcha")
+                    await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
+                    continue
 
                 try:
                     await page.wait_for_load_state("networkidle", timeout=_NETWORKIDLE_POLL_MS)

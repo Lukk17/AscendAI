@@ -6,6 +6,16 @@ from src.api.exceptions import ChallengeDetectedException, HumanInterventionRequ
 from src.reader.web_reader import WebReader
 
 
+@pytest.fixture(autouse=True)
+def _default_no_stored_session():
+    """Keep read() tests hermetic: no stored session unless a test overrides it."""
+    with patch(
+        "src.reader.web_reader.cookie_manager.get_storage_state",
+        new=AsyncMock(return_value=None),
+    ):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_read_succeeds_on_first_strategy():
     with (
@@ -54,6 +64,30 @@ async def test_read_heavy_mode_skips_lightweight():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com", heavy_mode=True)
+    assert result["mode"] == "4-playwright_stealth"
+
+
+@pytest.mark.asyncio
+async def test_read_routes_browser_first_when_stored_session_exists():
+    """A stored session (e.g. a captured cf_clearance) forces the browser tier first
+    even without heavy_mode, so a curl tier can't trip the challenge and bypass the
+    Playwright tier that replays the clearance with its matching user-agent."""
+    with (
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
+            new=AsyncMock(return_value="curl tier content that must be skipped"),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
+            new=AsyncMock(return_value="PW Content"),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+    ):
+        result = await WebReader().read("http://test.com")
     assert result["mode"] == "4-playwright_stealth"
 
 

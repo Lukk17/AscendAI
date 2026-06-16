@@ -16,6 +16,7 @@ from src.observability.metrics import (
     STRATEGY_DURATION_SECONDS,
 )
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.extraction import extract_structured
 from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
@@ -102,7 +103,7 @@ class WebReader:
     def _select_strategies(
         self,
         url: str,
-        heavy_mode: bool,
+        prefer_browser: bool,
         profile: str | None = None,
     ) -> dict[str, BaseStrategy]:
         strategies = self._build_strategies(profile)
@@ -113,7 +114,7 @@ class WebReader:
             )
             return {NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME]}
 
-        if heavy_mode:
+        if prefer_browser:
             return {
                 "4-playwright_stealth": strategies["4-playwright_stealth"],
                 "5-crawlee_adaptive": strategies["5-crawlee_adaptive"],
@@ -121,6 +122,16 @@ class WebReader:
             }
 
         return strategies
+
+    async def _has_stored_session(self, url: str, profile: str | None) -> bool:
+        """Return True when a non-expired auth/WAF session exists for this URL+profile.
+
+        A stored session (e.g. a captured cf_clearance) is only usable by the browser
+        tier, which pins the matching user-agent. Routing browser-first then keeps a
+        curl tier from tripping the challenge and short-circuiting to NoVNC before the
+        clearance is ever replayed.
+        """
+        return await cookie_manager.get_storage_state(url, profile) is not None
 
     @staticmethod
     def _budget_exceeded(started_at: float, name: str) -> bool:
@@ -179,7 +190,8 @@ class WebReader:
             return cached
 
         logger.info("Reading URL: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
-        strategies_to_run = self._select_strategies(url, heavy_mode, profile)
+        prefer_browser = heavy_mode or await self._has_stored_session(url, profile)
+        strategies_to_run = self._select_strategies(url, prefer_browser, profile)
         novnc_strategy = self._build_strategies(profile)[NOVNC_STRATEGY_NAME]
         started_at = time.perf_counter()
         budget_exhausted = False
@@ -214,7 +226,8 @@ class WebReader:
             return cached
 
         logger.info("Reading URL with links: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
-        strategies_to_run = self._select_strategies(url, heavy_mode, profile)
+        prefer_browser = heavy_mode or await self._has_stored_session(url, profile)
+        strategies_to_run = self._select_strategies(url, prefer_browser, profile)
         novnc_strategy = self._build_strategies(profile)[NOVNC_STRATEGY_NAME]
         started_at = time.perf_counter()
         budget_exhausted = False
