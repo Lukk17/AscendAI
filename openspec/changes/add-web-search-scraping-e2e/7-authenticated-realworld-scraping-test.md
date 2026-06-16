@@ -65,8 +65,11 @@ returns **logged-in-only** content, while the same read **without** a session do
 - Default stable login site (NOT LinkedIn): `https://www.saucedemo.com/` — a React SPA test app
   (`standard_user` / `secret_sauce`). Its logged-in page (`/inventory.html`) is **client-side rendered**, so a
   successful read also proves the **browser-tier** session replay (the actual LinkedIn-class fix), not just cookie
-  replay. The success marker is a product always on that page (e.g. `"Sauce Labs Backpack"`). Site, creds, secure
-  URL, and marker all come from `.env.local`, so any stable login site can be swapped in.
+  replay. Only the **credentials** (`SAUCEDEMO_USER` / `SAUCEDEMO_PASS`) come from `.env.local`; the login URL,
+  secure URL, DOM selectors, and the success marker (`"Sauce Labs Backpack"`) are **hardcoded** in the harness
+  (`e2e/harness/seed_authenticated_session.py`) and the auth-read Bruno requests, so the test is fixed. Adding
+  another login-walled service = one more `LoginService` entry in the harness + its `<SERVICE>_USER`/`<SERVICE>_PASS`
+  env pair.
 - **Seeding mechanism (white-box):** the harness writes the captured `storage_state` into the same Redis the
   service uses, at the session store key `session:{registrable_domain}:{profile}` with the auth-record shape
   (`{"auth": {"storage_state": …, "user_agent": …, "saved_at": …}}`). This couples the harness to the store's key
@@ -100,8 +103,9 @@ curl -fsS http://localhost:8191/
 
 Expect HTTP 200. If this fails, row n cannot pass for environmental reasons.
 
-Check the authenticated-section credentials. `AscendWebSearch/e2e/.env.local` (gitignored, copied from `.env.local.example` in that folder) must define `E2E_LOGIN_URL`,
-`E2E_LOGIN_USER`, `E2E_LOGIN_PASS`, `E2E_LOGIN_SECURE_URL`, and `E2E_LOGIN_SUCCESS_MARKER`.
+Check the authenticated-section credentials. `AscendWebSearch/e2e/.env.local` (gitignored, copied from `.env.local.example` in that folder) must define the per-service login
+credentials — for saucedemo, `SAUCEDEMO_USER` and `SAUCEDEMO_PASS` (login/secure URLs, selectors, and markers are
+hardcoded in the tests, not here).
 
 ```powershell
 Test-Path AscendWebSearch/e2e/.env.local
@@ -133,7 +137,7 @@ best-effort rows are logged).
 bru run "web-search/testing/realworld" --env ascend-local
 ```
 
-Step B — authenticated capture (skip if no `.env.local`). The login-and-seed harness logs into `E2E_LOGIN_URL`
+Step B — authenticated capture (skip if no `.env.local`). The login-and-seed harness logs into each configured login service (saucedemo)
 with the `.env.local` creds via Playwright, captures `storage_state`, and seeds the session store under profile
 `e2e`.
 
@@ -160,7 +164,7 @@ bru run "web-search/testing/auth-read-secure-anon.yml" --env ascend-local
 - **Step A — best-effort rows are recorded, not gated:** success rows (f, g, h, i, j, k, l) return
   `status="success"` + content; intervention rows (r, s, t, and m/o/p when walled) return
   `status="human_intervention_required"` with a non-empty `vnc_url`. A best-effort miss is logged, not failed.
-- **Step C (auth read):** HTTP 200, `status="success"`, content contains `E2E_LOGIN_SUCCESS_MARKER` — proving the
+- **Step C (auth read):** HTTP 200, `status="success"`, content contains the saucedemo marker (`Sauce Labs Backpack`) — proving the
   seeded session was replayed headlessly through the browser tier.
 - **Step D (negative auth):** the response does **not** contain the success marker (gets the login page or an
   intervention signal) — proving authenticated content is gated on the session, not leaked anonymously.
@@ -168,7 +172,7 @@ bru run "web-search/testing/auth-read-secure-anon.yml" --env ascend-local
 
 ## Fixtures
 
-None uploaded. The only secrets are the `.env.local` credential keys (`E2E_LOGIN_*`), never committed. The
+None uploaded. The only secrets are the per-service credentials in `.env.local` (`SAUCEDEMO_USER`/`SAUCEDEMO_PASS`, one pair per login service), never committed. The
 login-and-seed harness is a Playwright script under `e2e/harness/`.
 
 ## Concurrency

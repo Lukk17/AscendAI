@@ -12,8 +12,8 @@ boxes as you go. Record every best-effort row's actual verdict and any skip unde
 - [ ] `bru --version` returns a version string.
 - [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
 - [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable, needed for row n).
-- [ ] `AscendWebSearch/e2e/.env.local` exists with `E2E_LOGIN_URL`, `E2E_LOGIN_USER`, `E2E_LOGIN_PASS`, `E2E_LOGIN_SECURE_URL`,
-  `E2E_LOGIN_SUCCESS_MARKER` — OR record the authenticated section as **skipped**.
+- [ ] `AscendWebSearch/e2e/.env.local` exists with the per-service login credentials (saucedemo:
+  `SAUCEDEMO_USER`, `SAUCEDEMO_PASS`) — OR record the authenticated section as **skipped**.
 
 ### Reset state
 
@@ -54,15 +54,15 @@ CAPTCHA / login wall:
 ### Run — Steps B–D: authenticated capture→replay (skip if no `.env.local`)
 
 - [ ] Step B — login-and-seed harness ran; `storage_state` captured and seeded under profile `e2e`.
-- [ ] Step C — authenticated read of `E2E_LOGIN_SECURE_URL` with `profile=e2e` returned HTTP 200.
-- [ ] Step D — anonymous read of `E2E_LOGIN_SECURE_URL` (no session) ran.
+- [ ] Step C — authenticated read of the saucedemo inventory page with `profile=e2e` returned HTTP 200.
+- [ ] Step D — anonymous read of the saucedemo inventory page (no session) ran.
 
 ### Expected
 
 - [ ] Every gated row (a, b, c, d, e, n, q) matched its verdict exactly.
 - [ ] Best-effort verdicts recorded; intervention rows returned `status="human_intervention_required"` + a
   non-empty `vnc_url`.
-- [ ] Step C content contains `E2E_LOGIN_SUCCESS_MARKER` (session replayed headlessly through the browser tier).
+- [ ] Step C content contains the saucedemo marker `Sauce Labs Backpack` (session replayed headlessly through the browser tier).
 - [ ] Step D content does NOT contain the success marker (auth content gated on the session).
 
 ### Verdict

@@ -115,8 +115,9 @@ are caught.
 
 ### Fixtures needed
 
-None uploaded. The only secrets are the `.env.local` keys (`E2E_LOGIN_URL`, `E2E_LOGIN_USER`, `E2E_LOGIN_PASS`,
-`E2E_LOGIN_SECURE_URL`, `E2E_LOGIN_SUCCESS_MARKER`) — never committed. The login-and-seed harness is a Playwright
+None uploaded. The only secrets are the per-service login credentials in `AscendWebSearch/e2e/.env.local`
+(`SAUCEDEMO_USER` / `SAUCEDEMO_PASS`, one pair per login-walled service) — never committed. Login/secure URLs,
+selectors, and markers are hardcoded in the harness and Bruno requests. The login-and-seed harness is a Playwright
 script under `e2e/harness/`.
 
 ### Concurrency profile
