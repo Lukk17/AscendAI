@@ -4,9 +4,8 @@ Before the fix, a textstat exception caused _passes_quality_metrics to return
 True (fail-open), so junk/garbage content could pass validation.  After the fix
 it returns False (fail-closed), causing the orchestrator to try the next tier.
 """
-from unittest.mock import patch
 
-import pytest
+from unittest.mock import patch
 
 from src.validator.content_validator import ContentValidator
 

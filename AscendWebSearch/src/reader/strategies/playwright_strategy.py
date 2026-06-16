@@ -1,27 +1,22 @@
 import logging
-import random
 from collections.abc import Callable
 from typing import Any
 
 import trafilatura
-from playwright.async_api import Browser, BrowserContext, Page, ViewportSize
+from playwright.async_api import Browser, BrowserContext, Page
 from playwright_stealth import Stealth
 
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
+from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.fingerprint import Fingerprint, get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.runtime.browser_pool import browser_pool
 from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
-
-# Viewport jitter — desktop ranges that look human, not bot-perfect.
-_VIEWPORT_MIN_WIDTH_PX = 1280
-_VIEWPORT_MAX_WIDTH_PX = 1920
-_VIEWPORT_MIN_HEIGHT_PX = 720
-_VIEWPORT_MAX_HEIGHT_PX = 1080
 
 # Networkidle is polled in 1-second windows so the loop can early-exit on
 # detected challenge walls instead of blocking for the full extraction window.
@@ -37,10 +32,12 @@ class PlaywrightStrategy(BaseStrategy):
         user_agent_provider: Callable[[], str],
         url_validator: URLValidator,
         profile: str | None = None,
+        fingerprint: Fingerprint | None = None,
     ) -> None:
         self.user_agent_provider = user_agent_provider
         self.url_validator = url_validator
         self.profile = profile
+        self.fingerprint = fingerprint or get_default_fingerprint()
 
     async def extract(self, url: str) -> str:
         html = await self.get_html(url)
@@ -57,7 +54,7 @@ class PlaywrightStrategy(BaseStrategy):
 
         try:
             if ChallengeDetector.is_login_redirect_url(url):
-                logger.warning(f"PlaywrightStrategy: Pre-emptive redirect login URI detected on {url}")
+                logger.warning("PlaywrightStrategy: Pre-emptive redirect login URI detected on %s", url)
                 raise ChallengeDetectedException(intervention_type="login")
 
             timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
@@ -69,11 +66,13 @@ class PlaywrightStrategy(BaseStrategy):
                 response_status = initial_response.status if initial_response else 200
 
                 if ChallengeDetector.is_login_required(page.url, content):
-                    logger.warning(f"PlaywrightStrategy: Login wall detected on {url} (early exit)")
+                    logger.warning("PlaywrightStrategy: Login wall detected on %s (early exit)", url)
                     raise ChallengeDetectedException(intervention_type="login")
 
                 if ChallengeDetector.is_blocked(response_status, content):
-                    logger.warning(f"PlaywrightStrategy: WAF/Cloudflare block detected on {url} (early exit)")
+                    logger.warning(
+                        "PlaywrightStrategy: WAF/Cloudflare block detected on %s (early exit)", url
+                    )
                     raise ChallengeDetectedException(intervention_type="captcha")
 
                 try:
@@ -83,17 +82,19 @@ class PlaywrightStrategy(BaseStrategy):
                     pass
 
             await page.wait_for_timeout(settings.DYNAMIC_CONTENT_WAIT)
+            await self._scroll_page(page)
 
             content = await page.content()
 
             logger.info(
-                f"PlaywrightStrategy: Finished rendering {url}. Extracted HTML Length: {len(content)}"
+                "PlaywrightStrategy: Finished rendering %s. Extracted HTML Length: %d", url, len(content)
             )
 
             if ChallengeDetector.is_login_required(page.url, content):
                 logger.warning(
-                    f"PlaywrightStrategy: Late-stage Login wall detected on {url}. "
-                    f"Content Length: {len(content)}"
+                    "PlaywrightStrategy: Late-stage Login wall detected on %s. Content Length: %d",
+                    url,
+                    len(content),
                 )
                 raise ChallengeDetectedException(intervention_type="login")
 
@@ -102,24 +103,32 @@ class PlaywrightStrategy(BaseStrategy):
             # Only the context is torn down. The browser process lives across requests.
             await context.close()
 
-    async def _create_stealth_context(self, browser: Browser, url: str) -> BrowserContext:
-        viewport: ViewportSize = {
-            "width": random.randint(_VIEWPORT_MIN_WIDTH_PX, _VIEWPORT_MAX_WIDTH_PX),
-            "height": random.randint(_VIEWPORT_MIN_HEIGHT_PX, _VIEWPORT_MAX_HEIGHT_PX),
-        }
+    async def _scroll_page(self, page: Page) -> None:
+        """Scroll down in increments to trigger lazy-load / infinite-scroll content."""
+        for _ in range(settings.SCROLL_ITERATIONS):
+            await page.evaluate(f"window.scrollBy(0, {settings.SCROLL_STEP_PX})")
+            await page.wait_for_timeout(200)
 
+    async def _create_stealth_context(self, browser: Browser, url: str) -> BrowserContext:
+        fp = self.fingerprint
         stored_state = await cookie_manager.get_storage_state(url, self.profile)
         stored_ua = await cookie_manager.get_user_agent(url, self.profile)
-        user_agent = stored_ua or self.user_agent_provider()
+        user_agent = stored_ua or fp.user_agent
 
         kwargs: dict[str, Any] = {
             "user_agent": user_agent,
-            "viewport": viewport,
-            "locale": "en-US",
-            "timezone_id": "UTC",
+            "viewport": {"width": fp.viewport_width, "height": fp.viewport_height},
+            "locale": fp.locale,
+            "timezone_id": fp.timezone_id,
+            "geolocation": fp.geolocation,
+            "permissions": ["geolocation"],
         }
         if stored_state is not None:
             kwargs["storage_state"] = stored_state
+
+        proxy = proxy_provider.for_playwright()
+        if proxy is not None:
+            kwargs["proxy"] = proxy
 
         return await browser.new_context(**kwargs)
 

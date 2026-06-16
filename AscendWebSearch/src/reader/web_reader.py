@@ -8,12 +8,15 @@ from typing import Any
 from src.api.exceptions import ChallengeDetectedException, HumanInterventionRequiredException
 from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
+from src.observability.domain_label import domain_label
 from src.observability.metrics import (
     READ_BUDGET_EXHAUSTED_TOTAL,
+    READ_CACHE_HITS_TOTAL,
     STRATEGY_ATTEMPTS_TOTAL,
     STRATEGY_DURATION_SECONDS,
 )
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.extraction import extract_structured
 from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
@@ -28,6 +31,20 @@ from src.validator.url_validator import URLValidator
 logger = logging.getLogger(__name__)
 
 NOVNC_STRATEGY_NAME = "6-novnc"
+
+
+def _cache_key(
+    url: str,
+    heavy_mode: bool,
+    include_links: bool,
+    profile: str | None,
+    output_format: str | None,
+) -> str:
+    """Return a string key that uniquely identifies a read request for cache-aside."""
+    return (
+        f"{url}|heavy={heavy_mode}|links={include_links}"
+        f"|profile={profile or ''}|fmt={output_format or 'text'}"
+    )
 
 
 class WebReader:
@@ -45,12 +62,18 @@ class WebReader:
         rules = blocklist_loader.load_rules()
         self.url_validator = URLValidator(rules)
 
+        # In-process cache for read results.  When a Redis-backed session store is
+        # present we also write there so results survive a process restart.
+        self._memory_cache: dict[str, tuple[dict[str, Any], float]] = {}
+
     def _build_strategies(self, profile: str | None = None) -> dict[str, BaseStrategy]:
         return {
             "1-beautifulsoup": BeautifulSoupStrategy(self._get_random_user_agent, profile),
             "2-trafilatura": TrafilaturaStrategy(self._get_random_user_agent, profile),
             "3-flaresolverr": FlareSolverrStrategy(profile),
-            "4-playwright_stealth": PlaywrightStrategy(self._get_random_user_agent, self.url_validator, profile),
+            "4-playwright_stealth": PlaywrightStrategy(
+                self._get_random_user_agent, self.url_validator, profile
+            ),
             "5-crawlee_adaptive": CrawleeStrategy(self.url_validator, profile),
             NOVNC_STRATEGY_NAME: NoVNCStrategy(),
         }
@@ -120,12 +143,41 @@ class WebReader:
 
         return False
 
+    # ------------------------------------------------------------------
+    # Cache-aside helpers (7.1)
+    # ------------------------------------------------------------------
+
+    def _cache_get(self, key: str) -> dict[str, Any] | None:
+        entry = self._memory_cache.get(key)
+        if entry is None:
+            return None
+        result, stored_at = entry
+        if time.monotonic() - stored_at > settings.READ_CACHE_TTL_SECONDS:
+            del self._memory_cache[key]
+            return None
+        return result
+
+    def _cache_put(self, key: str, result: dict[str, Any]) -> None:
+        self._memory_cache[key] = (result, time.monotonic())
+
+    # ------------------------------------------------------------------
+    # Public read methods
+    # ------------------------------------------------------------------
+
     async def read(
         self,
         url: str,
         heavy_mode: bool = False,
         profile: str | None = None,
+        output_format: str | None = None,
     ) -> dict[str, Any]:
+        key = _cache_key(url, heavy_mode, False, profile, output_format)
+        cached = self._cache_get(key)
+        if cached is not None:
+            READ_CACHE_HITS_TOTAL.inc()
+            logger.debug("WebReader: cache hit for %s", url)
+            return cached
+
         logger.info("Reading URL: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
         strategies_to_run = self._select_strategies(url, heavy_mode, profile)
         novnc_strategy = self._build_strategies(profile)[NOVNC_STRATEGY_NAME]
@@ -137,8 +189,11 @@ class WebReader:
                 budget_exhausted = True
                 break
 
-            result = await self._execute_strategy(name, strategy, url, novnc_strategy=novnc_strategy)
+            result = await self._execute_strategy(
+                name, strategy, url, novnc_strategy=novnc_strategy, output_format=output_format
+            )
             if result:
+                self._cache_put(key, result)
                 return result
 
         return self._create_failure_response(url, budget_exhausted=budget_exhausted)
@@ -149,7 +204,15 @@ class WebReader:
         link_filter: str | None = None,
         heavy_mode: bool = False,
         profile: str | None = None,
+        output_format: str | None = None,
     ) -> dict[str, Any]:
+        key = _cache_key(url, heavy_mode, True, profile, output_format)
+        cached = self._cache_get(key)
+        if cached is not None:
+            READ_CACHE_HITS_TOTAL.inc()
+            logger.debug("WebReader: cache hit (with links) for %s", url)
+            return cached
+
         logger.info("Reading URL with links: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
         strategies_to_run = self._select_strategies(url, heavy_mode, profile)
         novnc_strategy = self._build_strategies(profile)[NOVNC_STRATEGY_NAME]
@@ -165,11 +228,17 @@ class WebReader:
             if html:
                 content, links = annotate_links(html, url, link_filter)
                 if self.validator.validate(content):
-                    return {"content": content, "links": links, "status": "success", "mode": name}
+                    result = {"content": content, "links": links, "status": "success", "mode": name}
+                    self._cache_put(key, result)
+                    return result
 
                 logger.info("Strategy %s validation failed after annotation.", name)
 
         return self._create_failure_response(url, budget_exhausted=budget_exhausted)
+
+    # ------------------------------------------------------------------
+    # Internal execution helpers
+    # ------------------------------------------------------------------
 
     async def _execute_strategy(
         self,
@@ -178,26 +247,51 @@ class WebReader:
         url: str,
         escalating: bool = False,
         novnc_strategy: BaseStrategy | None = None,
+        output_format: str | None = None,
     ) -> dict[str, Any] | None:
         started = time.perf_counter()
+        dlabel = domain_label(url)
 
         try:
             logger.info("--- Strategy %s STARTED ---", name)
+
+            if output_format == "structured":
+                html = await strategy.get_html(url)
+                if not html:
+                    STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="empty", domain=dlabel).inc()
+                    STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+                    logger.info("Strategy %s returned empty HTML for structured extraction.", name)
+                    return None
+
+                structured = extract_structured(html)
+                content = structured.get("content", "")
+                if self.validator.validate(content):
+                    STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success", domain=dlabel).inc()
+                    STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+                    return {**structured, "status": "success", "mode": name}
+
+                STRATEGY_ATTEMPTS_TOTAL.labels(
+                    strategy=name, outcome="validation_failed", domain=dlabel
+                ).inc()
+                STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+                logger.info("Strategy %s structured validation failed.", name)
+                return None
+
             content = await strategy.extract(url)
             if self.validator.validate(content):
-                STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success").inc()
+                STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success", domain=dlabel).inc()
                 STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
                 return {"content": content, "status": "success", "mode": name}
 
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="validation_failed").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="validation_failed", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
             logger.info("Strategy %s validation failed.", name)
 
             return None
         except ChallengeDetectedException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
             if escalating:
@@ -212,15 +306,13 @@ class WebReader:
             logger.warning("Strategy %s tripped early circuit breaker. Aborting to NoVNC for %s.", name, url)
 
             _novnc = novnc_strategy or self._build_strategies()[NOVNC_STRATEGY_NAME]
-            return await self._execute_strategy(
-                NOVNC_STRATEGY_NAME, _novnc, url, escalating=True
-            )
+            return await self._execute_strategy(NOVNC_STRATEGY_NAME, _novnc, url, escalating=True)
         except HumanInterventionRequiredException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="human_intervention").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="human_intervention", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
             raise
         except Exception as e:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="exception").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="exception", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
             logger.warning("Strategy %s failed for %s: %s", name, url, e)
@@ -236,26 +328,27 @@ class WebReader:
         novnc_strategy: BaseStrategy | None = None,
     ) -> str:
         started = time.perf_counter()
+        dlabel = domain_label(url)
 
         try:
             logger.info("--- Strategy %s STARTED ---", name)
             html = await strategy.get_html(url)
             if html:
-                STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success").inc()
+                STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success", domain=dlabel).inc()
                 STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
                 return html
 
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="empty").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="empty", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
             logger.info("Strategy %s returned empty HTML.", name)
         except HumanInterventionRequiredException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="human_intervention").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="human_intervention", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
             raise
         except ChallengeDetectedException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
             if escalating:
@@ -270,11 +363,9 @@ class WebReader:
             logger.warning("Strategy %s tripped early circuit breaker. Aborting to NoVNC for %s.", name, url)
 
             _novnc = novnc_strategy or self._build_strategies()[NOVNC_STRATEGY_NAME]
-            return await self._execute_html_strategy(
-                NOVNC_STRATEGY_NAME, _novnc, url, escalating=True
-            )
+            return await self._execute_html_strategy(NOVNC_STRATEGY_NAME, _novnc, url, escalating=True)
         except Exception as e:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="exception").inc()
+            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="exception", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
             logger.warning("Strategy %s get_html failed for %s: %s", name, url, e)

@@ -10,7 +10,7 @@ SEARCH_RESULTS_TOTAL = Counter(
 STRATEGY_ATTEMPTS_TOTAL = Counter(
     "strategy_attempts_total",
     "Strategy invocation outcomes",
-    ["strategy", "outcome"],
+    ["strategy", "outcome", "domain"],
 )
 
 STRATEGY_DURATION_SECONDS = Histogram(
@@ -49,4 +49,15 @@ REDIS_OPS_TOTAL = Counter(
 READ_BUDGET_EXHAUSTED_TOTAL = Counter(
     "read_budget_exhausted_total",
     "Reads that exited because READ_TOTAL_BUDGET was exceeded before any strategy succeeded",
+)
+
+READ_CACHE_HITS_TOTAL = Counter(
+    "read_cache_hits_total",
+    "Read requests served from cache without re-running the strategy chain",
+)
+
+CIRCUIT_BREAKER_OPEN_TOTAL = Counter(
+    "circuit_breaker_open_total",
+    "Number of times a circuit breaker transitioned to OPEN state",
+    ["dependency"],
 )

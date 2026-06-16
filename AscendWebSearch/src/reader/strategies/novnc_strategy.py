@@ -3,12 +3,13 @@ import logging
 from typing import Any, cast
 
 import httpx
-from playwright.async_api import Geolocation, async_playwright
+from playwright.async_api import async_playwright
 
 from src.api.exceptions import HumanInterventionRequiredException
 from src.config.config import settings
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.fingerprint import get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -34,8 +35,9 @@ _active_monitor_tasks: set[asyncio.Task[None]] = set()
 
 
 async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> None:
-    logger.info(f"Background task started to monitor session for {url} ({intervention_type})")
+    logger.info("Background task started to monitor session for %s (%s)", url, intervention_type)
     browser = None
+    fp = get_default_fingerprint()
 
     try:
         async with async_playwright() as p:
@@ -51,9 +53,9 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                 ],
             )
             context = await browser.new_context(
-                locale="en-US",
-                timezone_id="America/New_York",
-                geolocation=cast("Geolocation", {"latitude": 37.7749, "longitude": -122.4194}),
+                locale=fp.locale,
+                timezone_id=fp.timezone_id,
+                geolocation=fp.geolocation,
                 permissions=["geolocation"],
             )
 
@@ -62,7 +64,7 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
             try:
                 await page.goto(url, wait_until="commit", timeout=_INITIAL_NAV_TIMEOUT_MS)
             except Exception as e:
-                logger.warning(f"NoVNC Strategy: Initial navigation failed: {e}")
+                logger.warning("NoVNC Strategy: Initial navigation failed: %s", e)
 
             loop = asyncio.get_running_loop()
             start_time = loop.time()
@@ -71,7 +73,9 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                     storage_state = await context.storage_state()
                     user_agent = await page.evaluate("navigator.userAgent")
 
-                    await cookie_manager.save_storage_state(url, storage_state, user_agent)
+                    await cookie_manager.save_storage_state(
+                        url, cast("dict[str, Any]", storage_state), user_agent
+                    )
 
                     # Early exit once the user has navigated away from the login/challenge page.
                     # Without this, we keep overwriting Redis every 5 s for the full timeout window
@@ -79,12 +83,12 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                     current_url = page.url or ""
                     if not ChallengeDetector.is_login_redirect_url(current_url) and current_url != url:
                         logger.info(
-                            f"NoVNC Strategy: challenge appears resolved (now at {current_url}), "
-                            f"stopping monitor early"
+                            "NoVNC Strategy: challenge appears resolved (now at %s), stopping monitor early",
+                            current_url,
                         )
                         break
                 except Exception as e:
-                    logger.debug(f"NoVNC Strategy: Transient error syncing session cookies: {e}")
+                    logger.debug("NoVNC Strategy: Transient error syncing session cookies: %s", e)
 
                 await asyncio.sleep(_COOKIE_SYNC_POLL_SECONDS)
     except Exception:
@@ -94,7 +98,7 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
             try:
                 await browser.close()
             except Exception as e:
-                logger.debug(f"NoVNC Strategy: browser close failed during cleanup: {e}")
+                logger.debug("NoVNC Strategy: browser close failed during cleanup: %s", e)
 
 
 class NoVNCStrategy(BaseStrategy):
@@ -134,7 +138,7 @@ class NoVNCStrategy(BaseStrategy):
                 response.raise_for_status()
                 return self._extract_url_from_ngrok_response(response.json(), api_url)
         except Exception as e:
-            logger.warning(f"Failed to dynamically resolve PUBLIC_VNC_URL: {e}")
+            logger.warning("Failed to dynamically resolve PUBLIC_VNC_URL: %s", e)
             return f"{settings.SELENIUM_BROWSER_VNC_URL}/vnc.html?autoconnect=true"
 
     @staticmethod

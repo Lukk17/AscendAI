@@ -4,7 +4,9 @@ import trafilatura
 from curl_cffi import requests
 
 from src.api.exceptions import ChallengeDetectedException
+from src.circuit_breaker.breaker import flaresolverr_breaker
 from src.config.config import settings
+from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.strategies.base_strategy import BaseStrategy
@@ -29,6 +31,10 @@ class FlareSolverrStrategy(BaseStrategy):
             logger.warning("FlareSolverrStrategy skipped: FLARESOLVERR_URL not configured")
             return ""
 
+        if flaresolverr_breaker.is_open:
+            logger.warning("FlareSolverrStrategy: circuit breaker OPEN, skipping FlareSolverr for %s", url)
+            return ""
+
         timeout = settings.EXTRACT_TIMEOUT * 2
         payload: dict = {"cmd": "request.get", "url": url, "maxTimeout": int((timeout - 2) * 1000)}
 
@@ -37,6 +43,11 @@ class FlareSolverrStrategy(BaseStrategy):
         if saved_flat:
             payload["cookies"] = [{"name": k, "value": v} for k, v in saved_flat.items()]
             logger.debug("FlareSolverrStrategy: injecting %d stored cookies for %s", len(saved_flat), url)
+
+        # Inject optional proxy.
+        fs_proxy = proxy_provider.for_flaresolverr()
+        if fs_proxy is not None:
+            payload["proxy"] = fs_proxy
 
         try:
             # noinspection PyArgumentList
@@ -70,14 +81,17 @@ class FlareSolverrStrategy(BaseStrategy):
                         logger.warning("FlareSolverrStrategy: WAF/Cloudflare block detected on %s", url)
                         raise ChallengeDetectedException(intervention_type="captcha")
 
+                    flaresolverr_breaker.record_success()
                     return str(html)
 
                 logger.warning("FlareSolverr failed on %s: %s", url, data.get("message"))
+                flaresolverr_breaker.record_failure()
                 return ""
 
         except ChallengeDetectedException:
             raise
         except Exception as e:
+            flaresolverr_breaker.record_failure()
             return self._handle_error(url, e)
 
     @staticmethod

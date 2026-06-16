@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 from bs4 import BeautifulSoup
 
+from src.circuit_breaker.breaker import searxng_breaker
 from src.config.config import settings
 from src.observability.metrics import SEARCH_RESULTS_TOTAL, SEARXNG_DURATION_SECONDS, SEARXNG_REQUESTS_TOTAL
 
@@ -38,17 +39,25 @@ class SearxngClient:
             "X-Forwarded-For": settings.SEARXNG_X_FORWARDED_FOR,
         }
 
+        if searxng_breaker.is_open:
+            logger.warning("SearxngClient: circuit breaker OPEN, failing fast for query=%r", query)
+            SEARXNG_REQUESTS_TOTAL.labels(outcome="breaker_open").inc()
+            raise httpx.HTTPError("SearXNG circuit breaker is open")
+
         started = time.perf_counter()
 
         try:
             response = await self.client.get(url, params=params, headers=headers)
             response.raise_for_status()
             SEARXNG_REQUESTS_TOTAL.labels(outcome="success").inc()
+            searxng_breaker.record_success()
         except httpx.TimeoutException:
             SEARXNG_REQUESTS_TOTAL.labels(outcome="timeout").inc()
+            searxng_breaker.record_failure()
             raise
         except httpx.HTTPStatusError:
             SEARXNG_REQUESTS_TOTAL.labels(outcome="http_error").inc()
+            searxng_breaker.record_failure()
             raise
         except httpx.HTTPError:
             SEARXNG_REQUESTS_TOTAL.labels(outcome="transport_error").inc()

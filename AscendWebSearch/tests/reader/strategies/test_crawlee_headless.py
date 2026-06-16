@@ -1,4 +1,5 @@
 """Tests for CrawleeStrategy honouring PLAYWRIGHT_HEADLESS (task 6.5)."""
+
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -53,7 +54,9 @@ async def test_crawlee_uses_playwright_headless_setting():
             "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
             new=AsyncMock(return_value=None),
         ),
-        patch("src.reader.strategies.crawlee_strategy.ChallengeDetector.is_login_required", return_value=False),
+        patch(
+            "src.reader.strategies.crawlee_strategy.ChallengeDetector.is_login_required", return_value=False
+        ),
         patch("src.reader.strategies.crawlee_strategy.ChallengeDetector.is_blocked", return_value=False),
     ):
         strategy = CrawleeStrategy(_mock_url_validator())
@@ -87,7 +90,9 @@ async def test_crawlee_headless_false_when_setting_false():
             "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
             new=AsyncMock(return_value=None),
         ),
-        patch("src.reader.strategies.crawlee_strategy.ChallengeDetector.is_login_required", return_value=False),
+        patch(
+            "src.reader.strategies.crawlee_strategy.ChallengeDetector.is_login_required", return_value=False
+        ),
         patch("src.reader.strategies.crawlee_strategy.ChallengeDetector.is_blocked", return_value=False),
     ):
         strategy = CrawleeStrategy(_mock_url_validator())

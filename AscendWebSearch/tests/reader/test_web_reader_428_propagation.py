@@ -1,4 +1,5 @@
 """Tests for 428 propagation on the include_links path (task 6.1)."""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest

@@ -159,19 +159,20 @@ async def test_beautifulsoup_extract_empty_html(patch_cookies_none):
 
 @pytest.mark.asyncio
 async def test_trafilatura_extract(patch_cookies_none):
+    long_text = "Extracted content. " * 20  # 380 chars, well above READABILITY_FALLBACK_MIN_CHARS
     with (
         patch(
             "src.reader.strategies.trafilatura_strategy.fetch_with_curl_cffi",
             new=AsyncMock(return_value=SAMPLE_HTML),
         ),
         patch(
-            "src.reader.strategies.trafilatura_strategy.trafilatura.extract",
-            return_value="Extracted",
+            "src.reader.extraction.trafilatura.extract",
+            return_value=long_text,
         ),
     ):
         strategy = TrafilaturaStrategy(lambda: "ua")
         result = await strategy.extract("http://test.com")
-    assert result == "Extracted"
+    assert result == long_text
 
 
 @pytest.mark.asyncio
@@ -186,20 +187,34 @@ async def test_trafilatura_extract_empty_html():
 
 
 @pytest.mark.asyncio
-async def test_trafilatura_extract_returns_empty_when_trafilatura_returns_none(patch_cookies_none):
+async def test_trafilatura_extract_falls_back_to_readability_when_trafilatura_returns_none(
+    patch_cookies_none,
+):
+    """When trafilatura returns None the readability fallback content is returned instead of empty string."""
     with (
         patch(
             "src.reader.strategies.trafilatura_strategy.fetch_with_curl_cffi",
             new=AsyncMock(return_value=SAMPLE_HTML),
         ),
         patch(
-            "src.reader.strategies.trafilatura_strategy.trafilatura.extract",
+            "src.reader.extraction.trafilatura.extract",
             return_value=None,
+        ),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value={
+                "content": "<p>Fallback content</p>",
+                "title": "",
+                "author": "",
+                "date": "",
+                "sitename": "",
+                "source": "readability",
+            },
         ),
     ):
         strategy = TrafilaturaStrategy(lambda: "ua")
         result = await strategy.extract("http://test.com")
-    assert result == ""
+    assert result == "<p>Fallback content</p>"
 
 
 # Playwright strategy: use the singleton browser_pool which the conftest already mocked.
@@ -212,6 +227,7 @@ def _build_playwright_page_mock(html: str, current_url: str = "http://test.com")
     page.goto = AsyncMock(return_value=MagicMock(status=200))
     page.wait_for_load_state = AsyncMock(side_effect=Exception("nope"))
     page.wait_for_timeout = AsyncMock()
+    page.evaluate = AsyncMock(return_value=0)
     page.route = AsyncMock()
 
     return page

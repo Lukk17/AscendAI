@@ -1,4 +1,5 @@
 """Tests for the new session store: storage_state capture, auth/WAF TTL split, profile keying."""
+
 import time
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -6,7 +7,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.reader.cloudflare.cookie_manager import CookieManager, _split_storage_state
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -229,6 +229,126 @@ async def test_redis_save_and_load_roundtrip():
     assert result is not None
     names = {c["name"] for c in result["cookies"]}
     assert "li_at" in names
+
+
+# ---------------------------------------------------------------------------
+# get_storage_state: both auth and waf expired → returns None (line 165)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_storage_state_returns_none_when_both_ttls_expired() -> None:
+    """When both auth and waf entries are past their TTL, get_storage_state returns None."""
+    m = _fresh()
+    state = _state([_cookie("li_at"), _cookie("cf_clearance")])
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    domain = m._get_domain("https://example.com")
+    record = m._memory_store[f"{domain}:default"]
+    record["auth"]["saved_at"] = time.time() - 999_999
+    record["waf"]["saved_at"] = time.time() - 999_999
+
+    with (
+        patch("src.config.config.settings.SESSION_AUTH_TTL_SECONDS", 1),
+        patch("src.config.config.settings.SESSION_WAF_TTL_SECONDS", 1),
+    ):
+        result = await m.get_storage_state("https://example.com")
+
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# get_flat_cookies: state not None → returns extracted cookies (line 178)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_flat_cookies_returns_dict_when_state_present() -> None:
+    """get_flat_cookies returns a name→value dict when the domain has stored cookies."""
+    m = _fresh()
+    state = _state([_cookie("auth_token", "tok123")])
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    result = await m.get_flat_cookies("https://example.com")
+
+    assert isinstance(result, dict)
+    assert result["auth_token"] == "tok123"
+
+
+@pytest.mark.asyncio
+async def test_get_flat_cookies_returns_empty_dict_when_no_state() -> None:
+    """get_flat_cookies returns {} when no stored session exists."""
+    m = _fresh()
+    result = await m.get_flat_cookies("https://nothere.example.com")
+    assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# get_user_agent: no auth/waf entry in record → returns None (line 194)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_user_agent_returns_none_when_no_auth_entry() -> None:
+    """When the stored record has no auth or waf sub-entry, get_user_agent returns None."""
+    m = _fresh()
+    # Save a record with neither auth nor waf (edge case: empty record)
+    domain = m._get_domain("https://example.com")
+    m._memory_store[f"{domain}:default"] = {}  # no auth, no waf keys
+
+    result = await m.get_user_agent("https://example.com")
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# save_storage_state: existing record is preserved (line 212)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_save_storage_state_merges_with_existing_record() -> None:
+    """A second save to the same domain updates auth but preserves other fields."""
+    m = _fresh()
+    first_state = _state([_cookie("li_at", "first")])
+    second_state = _state([_cookie("li_at", "second")])
+
+    await m.save_storage_state("https://example.com", first_state, "UA/1")
+    await m.save_storage_state("https://example.com", second_state, "UA/2")
+
+    result = await m.get_storage_state("https://example.com")
+    assert result is not None
+    cookie_vals = {c["name"]: c["value"] for c in result["cookies"]}
+    assert cookie_vals["li_at"] == "second"
+
+
+# ---------------------------------------------------------------------------
+# slide_auth_ttl: record has no auth → early return (line 238)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_slide_auth_ttl_no_op_when_no_auth_entry() -> None:
+    """slide_auth_ttl is a no-op when the domain has no auth entry (line 238 return)."""
+    m = _fresh()
+    domain = m._get_domain("https://example.com")
+    m._memory_store[f"{domain}:default"] = {"waf": {"saved_at": time.time()}}  # no "auth"
+
+    await m.slide_auth_ttl("https://example.com")  # must not raise
+
+    assert "auth" not in m._memory_store[f"{domain}:default"]
+
+
+# ---------------------------------------------------------------------------
+# get_session_data: state is None → returns None (line 301)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_session_data_returns_none_when_no_stored_state() -> None:
+    """get_session_data returns None for a domain with no stored state (line 301)."""
+    m = _fresh()
+    result = await m.get_session_data("https://never-saved.example.com")
+    assert result is None
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,6 @@
 """Tests for NoVNC monitor using context.storage_state() (task 1.5)."""
+
+import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -48,10 +50,8 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
         ),
         patch("asyncio.sleep", new=AsyncMock(side_effect=StopAsyncIteration)),
     ):
-        try:
+        with contextlib.suppress(StopAsyncIteration):
             await ns._monitor_for_cookies("https://linkedin.com/login")
-        except StopAsyncIteration:
-            pass
 
     mock_save.assert_awaited()
     # Confirm storage_state was called, not cookies

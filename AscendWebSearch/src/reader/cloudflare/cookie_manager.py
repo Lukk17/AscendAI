@@ -17,21 +17,6 @@ logger = logging.getLogger(__name__)
 # platform-dependent directory.
 _TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
 
-# Playwright storage_state shape:
-# {
-#   "cookies": [{"name": str, "value": str, "domain": str, ...}],
-#   "origins": [{"origin": str, "localStorage": [...]}],
-# }
-#
-# Stored record shape (two sub-records merged on read):
-# {
-#   "auth": {"storage_state": <playwright dict>, "user_agent": str, "saved_at": float},
-#   "waf":  {"storage_state": <playwright dict>, "user_agent": str, "saved_at": float},
-# }
-#
-# Redis keys: session:{domain}:{profile}
-# In-memory fallback key: "{domain}:{profile}"
-
 
 def _is_waf_cookie(name: str) -> bool:
     """Return True for known short-lived WAF-clearance cookie names."""
@@ -72,11 +57,7 @@ def _merge_storage_states(
 
 def _extract_flat_cookies(storage_state: dict[str, Any]) -> dict[str, str]:
     """Return a name→value dict from a storage_state for use in HTTP headers."""
-    return {
-        c["name"]: c["value"]
-        for c in storage_state.get("cookies", [])
-        if "name" in c and "value" in c
-    }
+    return {c["name"]: c["value"] for c in storage_state.get("cookies", []) if "name" in c and "value" in c}
 
 
 class CookieManager:
@@ -310,7 +291,7 @@ class CookieManager:
         url: str,
         cookies: dict[str, str],
         user_agent: str,
-        ttl_seconds: int = 7200,  # noqa: ARG002 – TTL now driven by auth/WAF split
+        ttl_seconds: int = 7200,  # noqa: ARG002 - TTL now driven by auth/WAF split
         profile: str | None = None,
     ) -> None:
         """Legacy: accept flat cookie dict and persist via save_flat_cookies."""

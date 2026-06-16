@@ -3,17 +3,28 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import AsyncClient
 
+from src.circuit_breaker.breaker import BreakerState
+
+
+def _closed_breaker_state() -> BreakerState:
+    return BreakerState.CLOSED
+
+
+def _open_breaker_state() -> BreakerState:
+    return BreakerState.OPEN
+
 
 @pytest.mark.asyncio
 async def test_ready_all_ok_returns_200(client: AsyncClient):
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
-        patch(
-            "src.api.readiness._probe_flaresolverr",
-            new=AsyncMock(return_value={"status": "ok"}),
-        ),
+        patch("src.api.readiness._probe_flaresolverr", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness.searxng_breaker") as mock_sb,
+        patch("src.api.readiness.flaresolverr_breaker") as mock_fb,
     ):
+        mock_sb.state = BreakerState.CLOSED
+        mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
     assert resp.status_code == 200
     body = resp.json()
@@ -26,11 +37,12 @@ async def test_ready_degrades_when_any_check_fails(client: AsyncClient):
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
-        patch(
-            "src.api.readiness._probe_flaresolverr",
-            new=AsyncMock(return_value={"status": "error"}),
-        ),
+        patch("src.api.readiness._probe_flaresolverr", new=AsyncMock(return_value={"status": "error"})),
+        patch("src.api.readiness.searxng_breaker") as mock_sb,
+        patch("src.api.readiness.flaresolverr_breaker") as mock_fb,
     ):
+        mock_sb.state = BreakerState.CLOSED
+        mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
     assert resp.status_code == 503
     assert resp.json()["status"] == "degraded"
@@ -42,15 +54,70 @@ async def test_ready_response_does_not_leak_exception_detail(client: AsyncClient
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "error"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
-        patch(
-            "src.api.readiness._probe_flaresolverr",
-            new=AsyncMock(return_value={"status": "ok"}),
-        ),
+        patch("src.api.readiness._probe_flaresolverr", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness.searxng_breaker") as mock_sb,
+        patch("src.api.readiness.flaresolverr_breaker") as mock_fb,
     ):
+        mock_sb.state = BreakerState.CLOSED
+        mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
     body = resp.text
     assert "redis://" not in body
     assert "password" not in body.lower()
+
+
+@pytest.mark.asyncio
+async def test_ready_degrades_when_flaresolverr_breaker_open(client: AsyncClient):
+    """An open circuit breaker on FlareSolverr makes /ready return 503."""
+    with (
+        patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness._probe_flaresolverr", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness.searxng_breaker") as mock_sb,
+        patch("src.api.readiness.flaresolverr_breaker") as mock_fb,
+    ):
+        mock_sb.state = BreakerState.CLOSED
+        mock_fb.state = BreakerState.OPEN
+        resp = await client.get("/ready")
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["checks"]["flaresolverr_breaker"]["breaker"] == "open"
+
+
+@pytest.mark.asyncio
+async def test_ready_degrades_when_searxng_breaker_open(client: AsyncClient):
+    """An open SearXNG circuit breaker makes /ready return 503."""
+    with (
+        patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness._probe_flaresolverr", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness.searxng_breaker") as mock_sb,
+        patch("src.api.readiness.flaresolverr_breaker") as mock_fb,
+    ):
+        mock_sb.state = BreakerState.OPEN
+        mock_fb.state = BreakerState.CLOSED
+        resp = await client.get("/ready")
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["checks"]["searxng_breaker"]["breaker"] == "open"
+
+
+@pytest.mark.asyncio
+async def test_ready_degrades_when_breaker_is_half_open(client: AsyncClient):
+    """A HALF_OPEN circuit breaker also makes /ready return 503 with breaker=half_open."""
+    with (
+        patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness._probe_flaresolverr", new=AsyncMock(return_value={"status": "ok"})),
+        patch("src.api.readiness.searxng_breaker") as mock_sb,
+        patch("src.api.readiness.flaresolverr_breaker") as mock_fb,
+    ):
+        mock_sb.state = BreakerState.HALF_OPEN
+        mock_fb.state = BreakerState.CLOSED
+        resp = await client.get("/ready")
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["checks"]["searxng_breaker"]["breaker"] == "half_open"
 
 
 @pytest.mark.asyncio

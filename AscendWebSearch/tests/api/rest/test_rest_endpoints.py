@@ -152,7 +152,9 @@ async def test_establish_session_unsafe_url_returns_400(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_session_status_returns_info(client: AsyncClient):
-    info = SessionInfo(status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default")
+    info = SessionInfo(
+        status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default"
+    )
     with patch.object(SessionManager, "status", new=AsyncMock(return_value=info)):
         resp = await client.post(
             "/api/v2/web/session/status",

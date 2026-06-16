@@ -1,13 +1,15 @@
 import logging
 from collections.abc import Callable
+from typing import Any
 
 from curl_cffi import requests
 
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
+from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
-from src.validator.url_validator import is_safe_external_url, validate_redirect_chain
+from src.validator.url_validator import is_safe_external_url
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +36,22 @@ async def fetch_with_curl_cffi(
 
     headers: dict[str, str] = {"User-Agent": stored_ua or user_agent_provider()}
 
+    curl_proxies = proxy_provider.for_curl_cffi()
+
     try:
         # noinspection PyArgumentList
         async with requests.AsyncSession(impersonate="chrome120") as session:
             # Disable automatic redirect following so we can re-validate each hop.
+            extra_kwargs: dict[str, Any] = {}
+            if curl_proxies is not None:
+                extra_kwargs["proxies"] = curl_proxies
             response = await session.get(
                 url,
                 headers=headers,
                 cookies=flat_cookies,
                 timeout=settings.EXTRACT_TIMEOUT,
                 allow_redirects=False,
+                **extra_kwargs,
             )
 
             # Follow up to _MAX_REDIRECTS hops, validating each Location before fetching.
@@ -59,12 +67,16 @@ async def fetch_with_curl_cffi(
                     )
                     return ""
 
+                hop_kwargs: dict[str, Any] = {}
+                if curl_proxies is not None:
+                    hop_kwargs["proxies"] = curl_proxies
                 response = await session.get(
                     location,
                     headers=headers,
                     cookies=flat_cookies,
                     timeout=settings.EXTRACT_TIMEOUT,
                     allow_redirects=False,
+                    **hop_kwargs,
                 )
                 hops += 1
 

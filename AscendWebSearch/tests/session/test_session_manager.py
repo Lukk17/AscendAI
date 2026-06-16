@@ -1,4 +1,5 @@
 """Tests for SessionManager (task 3.1-3.2)."""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -12,8 +13,6 @@ def mgr() -> SessionManager:
     return SessionManager()
 
 
-# ---------------------------------------------------------------------------
-# status()
 # ---------------------------------------------------------------------------
 
 
@@ -92,8 +91,6 @@ def test_session_info_to_dict(mgr: SessionManager):
 
 
 # ---------------------------------------------------------------------------
-# validate()
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -146,8 +143,6 @@ async def test_validate_slides_ttl_on_success(mgr: SessionManager):
     mock_slide.assert_awaited_once()
 
 
-# ---------------------------------------------------------------------------
-# establish()
 # ---------------------------------------------------------------------------
 
 

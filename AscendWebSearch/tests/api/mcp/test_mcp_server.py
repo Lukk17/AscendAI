@@ -154,7 +154,9 @@ async def test_mcp_session_establish_unsafe_url_raises():
 
 @pytest.mark.asyncio
 async def test_mcp_session_status_returns_info():
-    info = SessionInfo(status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default")
+    info = SessionInfo(
+        status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default"
+    )
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch.object(SessionManager, "status", new=AsyncMock(return_value=info)),

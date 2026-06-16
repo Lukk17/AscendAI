@@ -154,5 +154,48 @@ class Settings(BaseSettings):
         description="Out-of-tree directory for Crawlee request queues and key-value stores",
     )
 
+    # Group 4 — Anti-bot evasion: proxy seam (off by default)
+    PROXY_URL: str = Field(
+        default="",
+        description=(
+            "Optional outbound proxy URL for all fetch tiers (e.g. socks5://user:pass@host:port). "
+            "Empty string (the default) disables proxy egress entirely."
+        ),
+    )
+
+    # Group 5 — Extraction quality: readability fallback threshold
+    READABILITY_FALLBACK_MIN_CHARS: int = Field(
+        default=200,
+        description=(
+            "Minimum character count of trafilatura output below which the readability-lxml "
+            "fallback is attempted.  The higher-scoring result (by character count) is returned."
+        ),
+    )
+
+    # Group 7 — Caching: read-result cache TTL
+    READ_CACHE_TTL_SECONDS: int = Field(
+        default=300,
+        description="TTL in seconds for the read-result cache-aside entries (default 5 min).",
+    )
+
+    # Group 7 — Observability: per-domain metric label cardinality cap
+    DOMAIN_METRIC_CARDINALITY_CAP: int = Field(
+        default=50,
+        description=(
+            "Maximum number of distinct registrable-domain label values tracked in "
+            "STRATEGY_ATTEMPTS_TOTAL.  Domains beyond this cap are bucketed under 'other'."
+        ),
+    )
+
+    # Group 7 — Circuit breaker thresholds
+    BREAKER_FAILURE_THRESHOLD: int = Field(
+        default=3,
+        description="Consecutive failures before a circuit breaker opens.",
+    )
+    BREAKER_RECOVERY_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        description="Seconds after which an open breaker moves to half-open and allows one probe.",
+    )
+
 
 settings = Settings()

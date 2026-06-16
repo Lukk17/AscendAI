@@ -22,15 +22,15 @@
 
 ## 4. Anti-bot evasion
 
-- [ ] 4.1 Introduce a coherent `Fingerprint` value object (UA + locale + timezone + geolocation + viewport) and feed it to every browser tier; remove the mismatched locale/timezone/geo combinations.
-- [ ] 4.2 Evaluate and (if adopted) switch the stealth layer to a stronger option (e.g. `patchright`).
-- [ ] 4.3 Add an optional, off-by-default `ProxyProvider` seam wired into all four fetch tiers via config.
+- [x] 4.1 Introduce a coherent `Fingerprint` value object (UA + locale + timezone + geolocation + viewport) and feed it to every browser tier; remove the mismatched locale/timezone/geo combinations.
+- [x] 4.2 Evaluate and (if adopted) switch the stealth layer to a stronger option (e.g. `patchright`).
+- [x] 4.3 Add an optional, off-by-default `ProxyProvider` seam wired into all four fetch tiers via config.
 
 ## 5. Extraction quality
 
-- [ ] 5.1 Switch extractors to trafilatura metadata extraction; map title/author/date/site-name into a structured response gated by `output_format=structured` (default response shape unchanged).
-- [ ] 5.2 Add a `readability-lxml` fallback scored against trafilatura by length/density; add the dependency.
-- [ ] 5.3 Wire the existing `SCROLL_*` settings into the Playwright tier for lazy-load/infinite-scroll, bounded by iteration count and wall-clock budget.
+- [x] 5.1 Switch extractors to trafilatura metadata extraction; map title/author/date/site-name into a structured response gated by `output_format=structured` (default response shape unchanged).
+- [x] 5.2 Add a `readability-lxml` fallback scored against trafilatura by length/density; add the dependency.
+- [x] 5.3 Wire the existing `SCROLL_*` settings into the Playwright tier for lazy-load/infinite-scroll, bounded by iteration count and wall-clock budget.
 
 ## 6. Fetch-correctness bug fixes
 
@@ -43,13 +43,13 @@
 
 ## 7. Caching and observability
 
-- [ ] 7.1 Add read-result cache-aside keyed by URL + heavy_mode + include_links + profile + output_format, with a configurable TTL.
-- [ ] 7.2 Add a cardinality-capped registrable-domain label to the strategy outcome metrics.
-- [ ] 7.3 Wrap FlareSolverr and SearXNG calls in a circuit breaker; surface breaker state in `/ready`.
+- [x] 7.1 Add read-result cache-aside keyed by URL + heavy_mode + include_links + profile + output_format, with a configurable TTL.
+- [x] 7.2 Add a cardinality-capped registrable-domain label to the strategy outcome metrics.
+- [x] 7.3 Wrap FlareSolverr and SearXNG calls in a circuit breaker; surface breaker state in `/ready`.
 
 ## 8. Config, docs, and tests
 
-- [ ] 8.1 Add all new settings to `Settings` (auth/WAF TTLs, profiles default, proxy, scroll already-present, cache TTL, breaker thresholds, detection-size threshold) and document them.
-- [ ] 8.2 Write ADRs for the per-profile session model and the storage_state reuse strategy; note SSRF residual risk for out-of-process tiers.
+- [x] 8.1 Add all new settings to `Settings` (auth/WAF TTLs, profiles default, proxy, scroll already-present, cache TTL, breaker thresholds, detection-size threshold) and document them.
+- [x] 8.2 Write ADRs for the per-profile session model and the storage_state reuse strategy; note SSRF residual risk for out-of-process tiers.
 - [ ] 8.3 Add/extend unit tests for session capture/replay per tier, auth/WAF TTL split, SSRF redirect/rebind rejection, fail-closed validation, and structured output; keep coverage gate green.
 - [ ] 8.4 Confirm the `add-web-search-scraping-e2e` tier tests exercise the authenticated path once this lands.

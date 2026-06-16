@@ -11,7 +11,9 @@ def test_search_results_total_registered() -> None:
 
 
 def test_strategy_counters_registered() -> None:
-    metrics.STRATEGY_ATTEMPTS_TOTAL.labels(strategy="1-beautifulsoup", outcome="success").inc()
+    metrics.STRATEGY_ATTEMPTS_TOTAL.labels(
+        strategy="1-beautifulsoup", outcome="success", domain="example.com"
+    ).inc()
     metrics.HUMAN_INTERVENTION_TOTAL.labels(intervention_type="captcha").inc()
 
     payload = generate_latest().decode()

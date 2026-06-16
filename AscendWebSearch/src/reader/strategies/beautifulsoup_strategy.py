@@ -23,4 +23,6 @@ class BeautifulSoupStrategy(BaseStrategy):
         return soup.get_text(separator=" ", strip=True)
 
     async def get_html(self, url: str) -> str:
-        return await fetch_with_curl_cffi(url, self.user_agent_provider, "BeautifulSoupStrategy", self.profile)
+        return await fetch_with_curl_cffi(
+            url, self.user_agent_provider, "BeautifulSoupStrategy", self.profile
+        )

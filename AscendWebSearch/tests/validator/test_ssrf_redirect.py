@@ -1,4 +1,5 @@
 """Tests for SSRF redirect / DNS-rebinding validation (task 6.2)."""
+
 import socket
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -11,8 +12,6 @@ def _addr(ip: str) -> tuple:
     return (socket.AF_INET, 0, 0, "", (ip, 0))
 
 
-# ---------------------------------------------------------------------------
-# is_safe_external_url (existing + new)
 # ---------------------------------------------------------------------------
 
 

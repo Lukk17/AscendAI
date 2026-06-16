@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import trafilatura
@@ -7,8 +9,10 @@ from crawlee.crawlers import AdaptivePlaywrightCrawler, PlaywrightCrawlingContex
 
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
+from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.fingerprint import Fingerprint, get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.validator.url_validator import URLValidator
 
@@ -16,9 +20,15 @@ logger = logging.getLogger(__name__)
 
 
 class CrawleeStrategy(BaseStrategy):
-    def __init__(self, url_validator: URLValidator, profile: str | None = None) -> None:
+    def __init__(
+        self,
+        url_validator: URLValidator,
+        profile: str | None = None,
+        fingerprint: Fingerprint | None = None,
+    ) -> None:
         self.url_validator = url_validator
         self.profile = profile
+        self.fingerprint = fingerprint or get_default_fingerprint()
 
     async def extract(self, url: str) -> str:
         html = await self.get_html(url)
@@ -29,15 +39,20 @@ class CrawleeStrategy(BaseStrategy):
         result_container: dict[str, str] = {"html": ""}
 
         storage_state = await cookie_manager.get_storage_state(url, self.profile)
+        fp = self.fingerprint
 
         browser_context_options: dict[str, Any] = {
-            "locale": "en-US",
-            "timezone_id": "America/New_York",
-            "geolocation": {"latitude": 37.7749, "longitude": -122.4194},
+            "locale": fp.locale,
+            "timezone_id": fp.timezone_id,
+            "geolocation": fp.geolocation,
             "permissions": ["geolocation"],
         }
         if storage_state is not None:
             browser_context_options["storage_state"] = storage_state
+
+        proxy = proxy_provider.for_playwright()
+        if proxy is not None:
+            browser_context_options["proxy"] = proxy
 
         playwright_kwargs: Any = {
             "headless": settings.PLAYWRIGHT_HEADLESS,
@@ -58,8 +73,7 @@ class CrawleeStrategy(BaseStrategy):
             await context.page.route("**/*", self.url_validator.route_handler)
 
         # Point Crawlee at an out-of-tree storage dir and purge stale state on each run.
-        storage_dir = os.path.abspath(settings.CRAWLEE_STORAGE_DIR)
-        os.makedirs(storage_dir, exist_ok=True)
+        storage_dir = await asyncio.to_thread(self._prepare_storage_dir, settings.CRAWLEE_STORAGE_DIR)
         os.environ.setdefault("CRAWLEE_STORAGE_DIR", storage_dir)
 
         await crawler.run([url])
@@ -74,6 +88,13 @@ class CrawleeStrategy(BaseStrategy):
             raise ChallengeDetectedException(intervention_type="captcha")
 
         return html
+
+    @staticmethod
+    def _prepare_storage_dir(storage_dir_setting: str) -> str:
+        """Resolve and create the Crawlee storage directory. Runs in a thread executor."""
+        p = Path(storage_dir_setting).resolve()
+        p.mkdir(parents=True, exist_ok=True)
+        return str(p)
 
     @staticmethod
     async def _handle_crawlee_request(context: Any, result_container: dict[str, str]) -> None:

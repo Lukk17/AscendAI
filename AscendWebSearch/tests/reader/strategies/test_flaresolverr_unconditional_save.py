@@ -4,6 +4,7 @@ Previously, cookies were only saved when cf_clearance was present, which silentl
 discarded all LinkedIn auth cookies.  After the fix, any non-empty cookie set
 is persisted regardless of which names are present.
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -126,7 +127,9 @@ async def test_flaresolverr_injects_stored_cookies_into_payload():
             "src.reader.strategies.flaresolverr_strategy.cookie_manager.get_flat_cookies",
             new=AsyncMock(return_value={"li_at": "TOKEN"}),
         ),
-        patch("src.reader.strategies.flaresolverr_strategy.cookie_manager.save_flat_cookies", new=AsyncMock()),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.cookie_manager.save_flat_cookies", new=AsyncMock()
+        ),
         patch("src.reader.strategies.flaresolverr_strategy.trafilatura.extract", return_value="ok"),
     ):
         await FlareSolverrStrategy().extract("https://linkedin.com")

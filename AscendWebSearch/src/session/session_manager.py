@@ -8,13 +8,14 @@ Exposes three operations:
 Complements the passive capture that happens inside NoVNCStrategy; callers
 can pre-emptively establish a session before attempting a read.
 """
+
 import logging
-import time
 from typing import Literal
 
 from src.config.config import settings
-from src.reader.cloudflare.cookie_manager import cookie_manager
-from src.reader.cloudflare.cookie_manager import _extract_flat_cookies  # noqa: PLC2701
+from src.reader.cloudflare.cookie_manager import (
+    cookie_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ SessionStatus = Literal["active", "expired", "none"]
 class SessionInfo:
     """Value object returned by SessionManager.status()."""
 
-    __slots__ = ("status", "auth_ttl_remaining", "last_validated", "profile")
+    __slots__ = ("auth_ttl_remaining", "last_validated", "profile", "status")
 
     def __init__(
         self,
@@ -54,7 +55,7 @@ class SessionManager:
     establish/status/validate API on top.
     """
 
-    async def establish(self, url: str, profile: str | None = None) -> str:
+    async def establish(self, url: str, _profile: str | None = None) -> str:
         """Open the NoVNC flow for *url* and return the VNC URL.
 
         The browser monitor will capture and persist the session once the

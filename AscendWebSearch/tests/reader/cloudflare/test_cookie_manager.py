@@ -56,9 +56,13 @@ async def test_redis_get_returns_parsed_payload():
     # New record format: auth/waf sub-records
     import json
     import time
+
     record = {
         "auth": {
-            "storage_state": {"cookies": [{"name": "cf_clearance", "value": "z", "domain": "example.com", "path": "/"}], "origins": []},
+            "storage_state": {
+                "cookies": [{"name": "cf_clearance", "value": "z", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
             "user_agent": "UA",
             "saved_at": time.time(),
         }
@@ -79,9 +83,13 @@ async def test_redis_get_miss_falls_through_to_memory():
     manager.redis_client = mock_redis
 
     import time
+
     manager._memory_store["example.com:default"] = {
         "auth": {
-            "storage_state": {"cookies": [{"name": "k", "value": "m", "domain": "example.com", "path": "/"}], "origins": []},
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "m", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
             "user_agent": "UA",
             "saved_at": time.time(),
         }
@@ -100,9 +108,13 @@ async def test_redis_get_error_falls_back_to_memory():
     manager.redis_client = mock_redis
 
     import time
+
     manager._memory_store["example.com:default"] = {
         "auth": {
-            "storage_state": {"cookies": [{"name": "k", "value": "m", "domain": "example.com", "path": "/"}], "origins": []},
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "m", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
             "user_agent": "UA",
             "saved_at": time.time(),
         }
@@ -167,10 +179,14 @@ async def test_init_reentry_returns_existing_singleton():
 @pytest.mark.asyncio
 async def test_get_domain_handles_bare_host_without_scheme():
     import time
+
     manager = _fresh_manager()
     manager._memory_store["example.com:default"] = {
         "auth": {
-            "storage_state": {"cookies": [{"name": "k", "value": "v", "domain": "example.com", "path": "/"}], "origins": []},
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "v", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
             "user_agent": "UA",
             "saved_at": time.time(),
         }
@@ -183,10 +199,14 @@ async def test_get_domain_handles_bare_host_without_scheme():
 @pytest.mark.asyncio
 async def test_get_domain_returns_empty_for_empty_url():
     import time
+
     manager = _fresh_manager()
     manager._memory_store[":default"] = {
         "auth": {
-            "storage_state": {"cookies": [{"name": "k", "value": "v", "domain": "", "path": "/"}], "origins": []},
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "v", "domain": "", "path": "/"}],
+                "origins": [],
+            },
             "user_agent": "UA",
             "saved_at": time.time(),
         }
@@ -201,10 +221,14 @@ async def test_get_domain_returns_host_when_no_psl_suffix():
     """tldextract cannot recognise non-PSL hosts (intranet, localhost). The fallback
     is to keep the host as-is so internal addresses still get a unique key."""
     import time
+
     manager = _fresh_manager()
     manager._memory_store["intranet-host:default"] = {
         "auth": {
-            "storage_state": {"cookies": [{"name": "k", "value": "v", "domain": "intranet-host", "path": "/"}], "origins": []},
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "v", "domain": "intranet-host", "path": "/"}],
+                "origins": [],
+            },
             "user_agent": "UA",
             "saved_at": time.time(),
         }
