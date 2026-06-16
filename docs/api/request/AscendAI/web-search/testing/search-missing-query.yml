@@ -13,8 +13,8 @@ http:
   auth: inherit
 
 runtime:
-  tests:
-    - type: after-response
+  scripts:
+    - type: tests
       code: |-
         test("Status code is 422", function () {
             expect(res.getStatus()).to.equal(422);

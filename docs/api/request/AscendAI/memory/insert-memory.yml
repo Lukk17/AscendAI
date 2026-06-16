@@ -21,7 +21,7 @@ http:
 
 runtime:
   scripts:
-    - type: after-response
+    - type: tests
       code: "var jsonData = res.getBody();\r
 
         \r
