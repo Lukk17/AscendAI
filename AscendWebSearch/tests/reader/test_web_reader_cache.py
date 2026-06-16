@@ -18,8 +18,6 @@ async def test_cache_hit_skips_strategy_chain() -> None:
         strategy,
         url: str,
         *,
-        escalating: bool = False,
-        novnc_strategy=None,
         output_format: str | None = None,
     ):
         nonlocal call_count
@@ -64,8 +62,6 @@ async def test_cache_entry_expires_after_ttl() -> None:
         strategy,
         url: str,
         *,
-        escalating: bool = False,
-        novnc_strategy=None,
         output_format: str | None = None,
     ):
         nonlocal call_count
@@ -100,8 +96,6 @@ async def test_cache_hit_increments_metric() -> None:
         strategy,
         url: str,
         *,
-        escalating: bool = False,
-        novnc_strategy=None,
         output_format: str | None = None,
     ):
         nonlocal call_count
@@ -130,9 +124,7 @@ async def test_read_with_links_cache_hit_skips_strategy_chain() -> None:
 
     execute_called = False
 
-    async def _fake_execute(
-        name, strategy, url_, *, escalating=False, novnc_strategy=None, output_format=None
-    ):
+    async def _fake_execute(name, strategy, url_, *, output_format=None):
         nonlocal execute_called
         execute_called = True
         return {"content": "fresh", "status": "success", "mode": name}
@@ -158,8 +150,6 @@ async def test_cache_is_isolated_per_reader_instance() -> None:
         strategy,
         url: str,
         *,
-        escalating: bool = False,
-        novnc_strategy=None,
         output_format: str | None = None,
     ):
         nonlocal count1
@@ -171,8 +161,6 @@ async def test_cache_is_isolated_per_reader_instance() -> None:
         strategy,
         url: str,
         *,
-        escalating: bool = False,
-        novnc_strategy=None,
         output_format: str | None = None,
     ):
         nonlocal count2

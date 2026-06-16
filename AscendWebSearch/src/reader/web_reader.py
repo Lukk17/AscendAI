@@ -192,7 +192,6 @@ class WebReader:
         logger.info("Reading URL: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
         prefer_browser = heavy_mode or await self._has_stored_session(url, profile)
         strategies_to_run = self._select_strategies(url, prefer_browser, profile)
-        novnc_strategy = self._build_strategies(profile)[NOVNC_STRATEGY_NAME]
         started_at = time.perf_counter()
         budget_exhausted = False
 
@@ -201,9 +200,7 @@ class WebReader:
                 budget_exhausted = True
                 break
 
-            result = await self._execute_strategy(
-                name, strategy, url, novnc_strategy=novnc_strategy, output_format=output_format
-            )
+            result = await self._execute_strategy(name, strategy, url, output_format=output_format)
             if result:
                 self._cache_put(key, result)
                 return result
@@ -228,7 +225,6 @@ class WebReader:
         logger.info("Reading URL with links: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
         prefer_browser = heavy_mode or await self._has_stored_session(url, profile)
         strategies_to_run = self._select_strategies(url, prefer_browser, profile)
-        novnc_strategy = self._build_strategies(profile)[NOVNC_STRATEGY_NAME]
         started_at = time.perf_counter()
         budget_exhausted = False
 
@@ -237,7 +233,7 @@ class WebReader:
                 budget_exhausted = True
                 break
 
-            html = await self._execute_html_strategy(name, strategy, url, novnc_strategy=novnc_strategy)
+            html = await self._execute_html_strategy(name, strategy, url)
             if html:
                 content, links = annotate_links(html, url, link_filter)
                 if self.validator.validate(content):
@@ -258,8 +254,6 @@ class WebReader:
         name: str,
         strategy: BaseStrategy,
         url: str,
-        escalating: bool = False,
-        novnc_strategy: BaseStrategy | None = None,
         output_format: str | None = None,
     ) -> dict[str, Any] | None:
         started = time.perf_counter()
@@ -307,19 +301,11 @@ class WebReader:
             STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
-            if escalating:
-                logger.exception(
-                    "Strategy %s raised ChallengeDetectedException during escalation. "
-                    "Aborting to avoid recursion.",
-                    name,
-                )
-
-                return None
-
-            logger.warning("Strategy %s tripped early circuit breaker. Aborting to NoVNC for %s.", name, url)
-
-            _novnc = novnc_strategy or self._build_strategies()[NOVNC_STRATEGY_NAME]
-            return await self._execute_strategy(NOVNC_STRATEGY_NAME, _novnc, url, escalating=True)
+            # Fall through to the next (heavier) tier — FlareSolverr and the headful
+            # Playwright tier can auto-solve many WAF challenges. NoVNC is the last tier
+            # in every ladder, so a genuinely unsolvable challenge still reaches it.
+            logger.info("Strategy %s detected a challenge on %s; falling through to the next tier.", name, url)
+            return None
         except HumanInterventionRequiredException:
             STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="human_intervention", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
@@ -337,8 +323,6 @@ class WebReader:
         name: str,
         strategy: BaseStrategy,
         url: str,
-        escalating: bool = False,
-        novnc_strategy: BaseStrategy | None = None,
     ) -> str:
         started = time.perf_counter()
         dlabel = domain_label(url)
@@ -364,19 +348,9 @@ class WebReader:
             STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
 
-            if escalating:
-                logger.exception(
-                    "Strategy %s raised ChallengeDetectedException during escalation. "
-                    "Aborting to avoid recursion.",
-                    name,
-                )
-
-                return ""
-
-            logger.warning("Strategy %s tripped early circuit breaker. Aborting to NoVNC for %s.", name, url)
-
-            _novnc = novnc_strategy or self._build_strategies()[NOVNC_STRATEGY_NAME]
-            return await self._execute_html_strategy(NOVNC_STRATEGY_NAME, _novnc, url, escalating=True)
+            # Fall through to the next (heavier) tier; NoVNC is the last tier in the ladder.
+            logger.info("Strategy %s detected a challenge on %s; falling through to the next tier.", name, url)
+            return ""
         except Exception as e:
             STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="exception", domain=dlabel).inc()
             STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
