@@ -1,0 +1,34 @@
+info:
+  name: realworld-q-invalid-domain
+  type: http
+  seq: 17
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://this-domain-does-not-exist-xyzzy.invalid/",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is NOT success (fail-closed on DNS failure)", function () {
+            expect(res.getBody()?.status).to.not.equal("success");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

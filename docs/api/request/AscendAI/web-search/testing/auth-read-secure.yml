@@ -1,0 +1,42 @@
+info:
+  name: auth-read-secure
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # URL and success marker match .env.local's E2E_LOGIN_SECURE_URL / E2E_LOGIN_SUCCESS_MARKER.
+    # Defaults are the saucedemo inventory page / "Sauce Labs Backpack" (saucedemo standard_user).
+    data: |-
+      {
+        "url": "https://www.saucedemo.com/inventory.html",
+        "include_links": false,
+        "heavy_mode": true,
+        "profile": "e2e"
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is success (session replayed via browser tier)", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("content contains auth-only marker 'Sauce Labs Backpack'", function () {
+            const b = res.getBody();
+            const c = (b.content || b.text || b.markdown || "").toLowerCase();
+            expect(c).to.include("sauce labs backpack");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

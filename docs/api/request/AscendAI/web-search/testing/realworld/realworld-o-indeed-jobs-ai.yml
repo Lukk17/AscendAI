@@ -1,0 +1,31 @@
+info:
+  name: realworld-o-indeed-jobs-ai
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://www.indeed.com/jobs?q=AI&l=usa&radius=25&fromage=7&from=searchOnDesktopSerp&start=20&pp=gQAeAAABnF_iawAAAAACVo1v-QA6AQEBCD6A99N9SysLaVNWOP602J2TfGu4WMTYl2QVe1DlKNumaEW23YqEO6pnPpwcCdrqVNqmBRvXggAA",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

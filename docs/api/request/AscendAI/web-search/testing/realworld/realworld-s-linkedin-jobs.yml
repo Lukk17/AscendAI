@@ -1,0 +1,31 @@
+info:
+  name: realworld-s-linkedin-jobs
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://www.linkedin.com/jobs/search/?currentJobId=4372540262&f_AL=true&f_E=4&keywords=Java%20Developer&location=United%20States&origin=JOB_SEARCH_PAGE_JOB_FILTER",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

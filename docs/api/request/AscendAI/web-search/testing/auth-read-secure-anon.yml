@@ -1,0 +1,39 @@
+info:
+  name: auth-read-secure-anon
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Same URL and heavy_mode as auth-read-secure.yml but NO profile field.
+    # The service has no session for this request, so it should see the login
+    # page or an intervention signal — never the authenticated inventory content.
+    data: |-
+      {
+        "url": "https://www.saucedemo.com/inventory.html",
+        "include_links": false,
+        "heavy_mode": true
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("content does NOT contain auth-only marker (unauthenticated read gated)", function () {
+            const b = res.getBody();
+            const c = (b.content || b.text || b.markdown || "").toLowerCase();
+            expect(c).to.not.include("sauce labs backpack");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
