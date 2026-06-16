@@ -42,10 +42,13 @@ class ChallengeDetector:
         if re.search(r"Ray ID: \w+", prefix, re.IGNORECASE):
             return True
 
-        if "cf-turnstile" in prefix:
-            return True
+        # An embedded Turnstile widget or a cf_clearance token only signals a block on an
+        # interstitial-sized page. Real pages can host a Turnstile widget while serving full
+        # content (e.g. nowsecure.nl), so size-guard these weak markers.
+        if len(html_content) < settings.CHALLENGE_WALL_MAX_BYTES:
+            return "cf-turnstile" in prefix or "cf_clearance" in prefix
 
-        return "cf_clearance" in prefix
+        return False
 
     @staticmethod
     def is_login_required(url: str, html_content: str) -> bool:  # noqa: ARG004

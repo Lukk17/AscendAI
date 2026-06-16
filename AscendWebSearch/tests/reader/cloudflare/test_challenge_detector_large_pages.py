@@ -70,11 +70,25 @@ def test_challenge_detection_max_bytes_setting_respected():
 
 
 def test_challenge_detection_fires_when_marker_within_max_bytes():
-    """When the marker falls inside the prefix window, detection must fire."""
-    marker = "cf_clearance"
-    html = "prefix " + marker + " suffix " + "a" * 60_000
+    """When a strong marker falls inside the prefix window, detection must fire
+    regardless of total page size."""
+    html = "prefix Ray ID: 89abcdef0123 suffix " + "a" * 60_000
 
     with patch("src.reader.cloudflare.challenge_detector.settings.CHALLENGE_DETECTION_MAX_BYTES", 50_000):
         result = ChallengeDetector.is_blocked(200, html)
 
     assert result is True
+
+
+def test_large_page_embedding_turnstile_widget_is_not_blocked():
+    """A real page that merely embeds a Turnstile widget (e.g. nowsecure.nl) must not
+    be flagged as a challenge wall just because it contains cf-turnstile."""
+    html = "<html><body><div class='cf-turnstile'></div>" + "real content " * 6_000 + "</body></html>"
+    assert len(html) > 50_000
+    assert ChallengeDetector.is_blocked(200, html) is False
+
+
+def test_small_interstitial_with_turnstile_is_blocked():
+    """A small interstitial page dominated by the Turnstile widget is still a block."""
+    html = "<html><body><div class='cf-turnstile'></div></body></html>"
+    assert ChallengeDetector.is_blocked(200, html) is True

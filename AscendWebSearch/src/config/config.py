@@ -156,6 +156,16 @@ class Settings(BaseSettings):
             "were previously skipped entirely; now we scan only the prefix."
         ),
     )
+    CHALLENGE_WALL_MAX_BYTES: int = Field(
+        default=50_000,
+        description=(
+            "Max page size for a weak marker (an embedded Turnstile widget or a "
+            "cf_clearance token) to count as a block. A real page can host a Turnstile "
+            "widget while serving full content (e.g. nowsecure.nl), so these only signal "
+            "a challenge wall on an interstitial-sized page. Strong markers (Ray ID, "
+            "interstitial phrases, third-party captcha scripts) fire regardless of size."
+        ),
+    )
 
     # Crawlee storage root (outside src/ to avoid committing runtime state)
     CRAWLEE_STORAGE_DIR: str = Field(
