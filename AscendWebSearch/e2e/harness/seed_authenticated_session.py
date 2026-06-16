@@ -1,6 +1,6 @@
 """Seed an authenticated Playwright storage_state into the AscendWebSearch session store.
 
-Reads login credentials from environment variables (or .env.local at the repo root),
+Reads login credentials from environment variables (or AscendWebSearch/e2e/.env.local),
 performs a scripted login via Playwright, captures the resulting storage_state, and
 persists it under the 'e2e' profile using the service's own CookieManager so that
 subsequent Bruno test runs can replay the session.
@@ -27,13 +27,13 @@ from typing import Any
 
 
 def _load_env_local() -> None:
-    """Parse .env.local from the repo root (two levels up from this file) into os.environ.
+    """Parse .env.local from the e2e directory (one level up from this harness) into os.environ.
 
     Only sets variables that are not already present in the environment — existing
     values (e.g. from a CI secret store) take precedence.
     """
-    repo_root = Path(__file__).resolve().parents[3]
-    env_local = repo_root / ".env.local"
+    e2e_dir = Path(__file__).resolve().parents[1]
+    env_local = e2e_dir / ".env.local"
     if not env_local.exists():
         return
 
@@ -59,7 +59,7 @@ def _require_env(name: str) -> str:
     if not value:
         sys.stderr.write(
             f"[seed_authenticated_session] Missing required env var: {name}\n"
-            "Set it in .env.local (repo root) or export it before running this script.\n"
+            "Set it in AscendWebSearch/e2e/.env.local or export it before running this script.\n"
             "Skipping authenticated section.\n"
         )
         sys.exit(1)

@@ -12,7 +12,7 @@ boxes as you go. Record every best-effort row's actual verdict and any skip unde
 - [ ] `bru --version` returns a version string.
 - [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
 - [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable, needed for row n).
-- [ ] `.env.local` exists with `E2E_LOGIN_URL`, `E2E_LOGIN_USER`, `E2E_LOGIN_PASS`, `E2E_LOGIN_SECURE_URL`,
+- [ ] `AscendWebSearch/e2e/.env.local` exists with `E2E_LOGIN_URL`, `E2E_LOGIN_USER`, `E2E_LOGIN_PASS`, `E2E_LOGIN_SECURE_URL`,
   `E2E_LOGIN_SUCCESS_MARKER` — OR record the authenticated section as **skipped**.
 
 ### Reset state

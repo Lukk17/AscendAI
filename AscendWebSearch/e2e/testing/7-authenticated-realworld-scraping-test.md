@@ -100,11 +100,11 @@ curl -fsS http://localhost:8191/
 
 Expect HTTP 200. If this fails, row n cannot pass for environmental reasons.
 
-Check the authenticated-section credentials. The repo-root `.env.local` (gitignored) must define `E2E_LOGIN_URL`,
+Check the authenticated-section credentials. `AscendWebSearch/e2e/.env.local` (gitignored, copied from `.env.local.example` in that folder) must define `E2E_LOGIN_URL`,
 `E2E_LOGIN_USER`, `E2E_LOGIN_PASS`, `E2E_LOGIN_SECURE_URL`, and `E2E_LOGIN_SUCCESS_MARKER`.
 
 ```powershell
-Test-Path .env.local
+Test-Path AscendWebSearch/e2e/.env.local
 ```
 
 If `.env.local` (or any key) is absent, **skip** the authenticated section (Steps B–D) and record it as skipped
