@@ -1,34 +1,32 @@
-# Authenticated + real-world scraping: e2e test
+# Real-world + reuse-behavior scraping: e2e test
 
 ## What this verifies
 
-This test drives `POST /api/v2/web/read` against a **difficulty-graded, categorized** list of real-world URLs and
-proves the **authenticated capture→replay** path end-to-end with a test-harness scripted login. It deliberately
-includes **expected negatives** so a regression that turns a refusal into a false `success` (or the reverse) is
-caught.
+Three things, all against **real sites** (no mocks):
 
-Every URL carries an **expected verdict**, and the test asserts the scraper produces *that* verdict:
+1. **A categorized real-world URL matrix** — each URL asserts its **expected verdict** (`success` / `intervention` /
+   `hard-fail`). Stable canaries are **gated** (must match); live sites are **best-effort** (verdict recorded, a
+   miss does not fail the suite).
+2. **Login → session reuse** (automated, saucedemo) — a **2-call before/after**: read the gated page **(1) blocked**
+   (no session) returns no logged-in content, then **(2) after** a scripted login + session seed returns logged-in
+   content. Proves the auth session is **stored and reused**.
+3. **CAPTCHA → clearance reuse** (human, Cloudflare, runs **first**) — a **2-call before/after**: read **(1)
+   blocked** returns the human-intervention `vnc_url` (the interactive challenge can't be auto-solved), the human
+   solves it in the NoVNC browser, then a fresh read **(2) after** reuses the captured `cf_clearance` and returns
+   content. Proves the clearance is **stored and reused** (the challenge is skipped on the second request).
 
-- **`success`** — HTTP 200, `status="success"`, non-empty content field (`content` / `text` / `markdown`), plus a
-  per-URL canary phrase where the page is stable.
-- **`intervention`** — `status="human_intervention_required"` with a non-empty `vnc_url`. The scraper must *refuse
-  and signal*, not return the login/block page as success. **LinkedIn and indeed-auth are intervention-only** (no
-  scripted login — automated LinkedIn login violates ToS and risks an account ban).
-- **`hard-fail`** — `status != "success"`. Validates the fail-closed path produces a clean negative, not a false
-  positive.
+The blocked→unblocked behaviors (login, captcha) are **exactly 2 calls each** — first while blocked, then a fresh
+request after auth/solve — because the regression-prone behavior is precisely "scrape blocked → authorize → scrape
+now succeeds and the session/clearance is reused".
 
-Each difficulty tier forces a **specific scraper code path**, so a verdict pinpoints what broke. Stable rows are
-**gated** (canary — must match its verdict); volatile real-world rows are **best-effort** (verdict recorded in the
-run, a miss does NOT fail the suite, because live sites rotate WAFs and go down).
-
-### URL matrix (by difficulty)
+### Part 1 — Real-world URL matrix (single-call verdict)
 
 | # | URL | Forces | Expected | Gate |
 | :- | :-- | :----- | :------- | :--- |
 | **Easy — curl_cffi static + extraction** | | | | |
 | a | `https://example.com/` | static fetch | success (`"example domain"`) | **gated** |
-| b | `https://en.wikipedia.org/wiki/Web_scraping` | static article extraction | success (`"web scraping"`) | **gated** |
-| c | `https://books.toscrape.com/` | scraping sandbox (static) | success | **gated** |
+| b | `https://en.wikipedia.org/wiki/Web_scraping` | static article | success (`"web scraping"`) | **gated** |
+| c | `https://books.toscrape.com/` | scraping sandbox | success | **gated** |
 | d | `https://news.ycombinator.com/` | minimal static HTML | success | **gated** |
 | **Medium — Playwright JS render** | | | | |
 | e | `https://quotes.toscrape.com/js/` | JS sandbox | success (`"The world as we have created it"`) | **gated** |
@@ -37,45 +35,50 @@ run, a miss does NOT fail the suite, because live sites rotate WAFs and go down)
 | h | `https://stackoverflow.com/questions` | server-rendered Q&A | success | best-effort |
 | i | `https://github.com/python/cpython` | light-JS repo page | success | best-effort |
 | j | `https://www.bbc.com/news` | news + JS | success | best-effort |
-| **Hard — SPA + anti-bot (stealth/fingerprint)** | | | | |
+| **Hard — SPA + anti-bot** | | | | |
 | k | `https://www.reddit.com/` | React SPA + bot checks | success | best-effort |
-| l | `https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes` | Next.js SPA job board | success | best-effort |
-| m | `https://www.glassdoor.com/Job/index.htm` | aggressive anti-bot | success **or** intervention | best-effort |
+| l | `https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes` | Next.js SPA | success | best-effort |
+| m | `https://www.glassdoor.com/Job/index.htm` | aggressive anti-bot | success or intervention | best-effort |
 | **Very hard — enterprise WAF** | | | | |
-| n | `https://nowsecure.nl` | Cloudflare JS challenge → FlareSolverr | success (challenge solved) | **gated** |
-| o | `https://www.indeed.com/jobs?q=AI&l=usa&radius=25&fromage=7&start=20` | DataDome-class | success **or** intervention | best-effort |
-| p | `https://www.g2.com/` | Cloudflare-hard | success **or** intervention | best-effort |
+| n | `https://nowsecure.nl` | Cloudflare JS challenge → FlareSolverr auto-solve | success | **gated** |
+| o | `https://www.indeed.com/jobs?q=AI&l=usa&radius=25&fromage=7&from=searchOnDesktopSerp&start=20` | DataDome-class | success or intervention | best-effort |
+| p | `https://www.g2.com/` | Cloudflare-hard | success or intervention | best-effort |
 | **Impossible — negative** | | | | |
 | q | `https://this-domain-does-not-exist-xyzzy.invalid/` | DNS failure → fail-closed | hard-fail | **gated** |
-| **CAPTCHA — human-intervention path** | | | | |
-| r | `https://www.google.com/recaptcha/api2/demo` | real reCAPTCHA v2 → NoVNC | intervention (+ `vnc_url`) | best-effort |
-| **Login wall — intervention-only** | | | | |
+| **Login wall — intervention-only (not solved here)** | | | | |
 | s | `https://www.linkedin.com/jobs/search/?keywords=Java%20Developer&location=United%20States&f_AL=true` | login wall → NoVNC | intervention (+ `vnc_url`) | best-effort |
 | t | `https://secure.indeed.com/auth?co=US&hl=en_US&branding=page-two-signin` | login wall → NoVNC | intervention (+ `vnc_url`) | best-effort |
 
-> Rows l, o, s, t use abbreviated query strings here for readability; the Bruno request files carry the full URLs
-> verbatim (from the dev request collection).
+> The login behavior is fully covered by Part 2 (saucedemo, a real login + real session); LinkedIn/indeed stay here
+> as best-effort intervention rows (real scripted login to them violates ToS / risks bans).
 
-### Authenticated capture→replay (the test-harness scripted-login flow)
+### Part 2 — Login → session reuse (saucedemo, AUTOMATED, 2 calls)
 
-Proves the anchor end-to-end: log in once on a **stable, automation-friendly** site using `.env.local`
-credentials → capture the browser `storage_state` → seed the AscendWebSearch session store → an authenticated read
-returns **logged-in-only** content, while the same read **without** a session does **not**.
+saucedemo.com is a **real** web app: a real form login that sets a real session cookie, captured as a real
+`storage_state` and replayed through the real browser tier. It is automatable (no human, no ban risk), so it gates
+the login-reuse behavior in CI.
 
-- Default stable login site (NOT LinkedIn): `https://www.saucedemo.com/` — a React SPA test app
-  (`standard_user` / `secret_sauce`). Its logged-in page (`/inventory.html`) is **client-side rendered**, so a
-  successful read also proves the **browser-tier** session replay (the actual LinkedIn-class fix), not just cookie
-  replay. Only the **credentials** (`SAUCEDEMO_USER` / `SAUCEDEMO_PASS`) come from `.env.local`; the login URL,
-  secure URL, DOM selectors, and the success marker (`"Sauce Labs Backpack"`) are **hardcoded** in the harness
-  (`e2e/harness/seed_authenticated_session.py`) and the auth-read Bruno requests, so the test is fixed. Adding
-  another login-walled service = one more `LoginService` entry in the harness + its `<SERVICE>_USER`/`<SERVICE>_PASS`
-  env pair.
-- **Seeding mechanism (white-box):** the harness writes the captured `storage_state` into the same Redis the
-  service uses, at the session store key `session:{registrable_domain}:{profile}` with the auth-record shape
-  (`{"auth": {"storage_state": …, "user_agent": …, "saved_at": …}}`). This couples the harness to the store's key
-  format — flagged deliberately; a future `POST /session/import` endpoint would decouple it.
-- The authenticated section (Steps B–D) is **skipped (not failed)** when the `.env.local` credential keys are
-  absent.
+- **Call 1 — blocked:** read `https://www.saucedemo.com/inventory.html` with **no** session. Expect the response
+  does **not** contain the logged-in marker `"Sauce Labs Backpack"` (the SPA redirects to the login screen).
+- **Seed:** run the harness `e2e/harness/seed_authenticated_session.py` — scripted login with the `.env.local`
+  saucedemo credentials → capture `storage_state` → store under `session:www.saucedemo.com:e2e`.
+- **Call 2 — after login (fresh request):** read the same URL with `profile=e2e`. Expect HTTP 200,
+  `status="success"`, content contains `"Sauce Labs Backpack"` — the stored session is **reused** through the
+  browser tier.
+
+### Part 3 — CAPTCHA → clearance reuse (Cloudflare, HUMAN, runs FIRST, 2 calls)
+
+`https://nopecha.com/demo/cloudflare` is a real Cloudflare **interactive challenge** page (it 403s plain clients).
+FlareSolverr cannot auto-solve an interactive challenge, so the scraper escalates to NoVNC and a human solves it;
+the NoVNC monitor captures the resulting `cf_clearance` into the session store, which the **second** request reuses.
+
+- **Call 1 — blocked:** read `https://nopecha.com/demo/cloudflare` with **no** clearance. Expect
+  `status="human_intervention_required"` with a non-empty `vnc_url`.
+- **Human solve (main thread, first):** open the `vnc_url`, solve the Cloudflare interactive challenge in the NoVNC
+  browser. The monitor stores the captured `cf_clearance` under `session:nopecha.com:default`.
+- **Call 2 — after solve (fresh request):** read the **same** `https://nopecha.com/demo/cloudflare`. Expect HTTP
+  200, `status="success"`, non-empty content — the challenge is **skipped** because the stored `cf_clearance` is
+  reused (the headline regression check: solve once, the next request to the domain is clear).
 
 ## Prerequisites
 
@@ -101,22 +104,22 @@ Check FlareSolverr is reachable (required for the Cloudflare canary, row n).
 curl -fsS http://localhost:8191/
 ```
 
-Expect HTTP 200. If this fails, row n cannot pass for environmental reasons.
+Expect HTTP 200.
 
-Check the authenticated-section credentials. `AscendWebSearch/e2e/.env.local` (gitignored, copied from `.env.local.example` in that folder) must define the per-service login
-credentials — for saucedemo, `SAUCEDEMO_USER` and `SAUCEDEMO_PASS` (login/secure URLs, selectors, and markers are
-hardcoded in the tests, not here).
+Check the saucedemo login credentials for Part 2. `AscendWebSearch/e2e/.env.local` (gitignored, copied from
+`.env.local.example` in that folder) must define `SAUCEDEMO_USER` and `SAUCEDEMO_PASS`.
 
 ```powershell
 Test-Path AscendWebSearch/e2e/.env.local
 ```
 
-If `.env.local` (or any key) is absent, **skip** the authenticated section (Steps B–D) and record it as skipped
-under **Additional tasks I did** — do not fail the test.
+If absent, **skip Part 2** (record as skipped) — do not fail the test. Part 3 needs no credentials (the human types
+nothing; they solve the challenge in the NoVNC browser).
 
 ## Reset state
 
-Optional. Flush the Redis session keys for the target domains and the `e2e` login profile to force cold runs.
+Flush the Redis session keys so both before/after pairs start from a genuine **blocked** state (otherwise a stale
+session/clearance hides the regression).
 
 ```powershell
 docker exec ascend-redis redis-cli --scan --pattern "session:*" | ForEach-Object { docker exec ascend-redis redis-cli DEL $_ }
@@ -124,61 +127,74 @@ docker exec ascend-redis redis-cli --scan --pattern "session:*" | ForEach-Object
 
 ## Run
 
+> Execution model: **Part 3 (human captcha) runs FIRST on the main session** — read #1, you solve the challenge in
+> the NoVNC browser, then read #2. The Part 1 matrix rows and Part 2 (automated saucedemo) fan out across parallel
+> e2e-runner agents while you solve Part 3.
+
 Move into the Bruno collection root first.
 
 ```powershell
 cd docs/api/request/AscendAI
 ```
 
-Step A — public URL matrix (rows a–t). Run the directory; record each row's verdict (gated rows must match;
-best-effort rows are logged).
+Part 3, Call 1 — captcha blocked (main thread, first).
 
 ```powershell
-bru run "web-search/testing/realworld" --env ascend-local
+bru run "web-search/testing/captcha-clearance-blocked.yml" --env ascend-local
 ```
 
-Step B — authenticated capture (skip if no `.env.local`). The login-and-seed harness logs into each configured login service (saucedemo)
-with the `.env.local` creds via Playwright, captures `storage_state`, and seeds the session store under profile
-`e2e`.
+Part 3, Call 2 — after you solve the challenge via the returned `vnc_url`.
 
 ```powershell
-python AscendWebSearch/e2e/harness/seed_authenticated_session.py
+bru run "web-search/testing/captcha-clearance-after-solve.yml" --env ascend-local
 ```
 
-Step C — authenticated read. Read the logged-in-only page with the seeded profile.
-
-```powershell
-bru run "web-search/testing/auth-read-secure.yml" --env ascend-local
-```
-
-Step D — negative auth read. Read the same page with **no** profile/session.
+Part 2, Call 1 — login blocked (anonymous).
 
 ```powershell
 bru run "web-search/testing/auth-read-secure-anon.yml" --env ascend-local
 ```
 
+Part 2, Seed — scripted saucedemo login.
+
+```powershell
+python AscendWebSearch/e2e/harness/seed_authenticated_session.py
+```
+
+Part 2, Call 2 — after login.
+
+```powershell
+bru run "web-search/testing/auth-read-secure.yml" --env ascend-local
+```
+
+Part 1 — the real-world matrix (parallel-safe across runners).
+
+```powershell
+bru run "web-search/testing/realworld" --env ascend-local
+```
+
 ## Expected
 
-- **Step A — gated rows must match exactly:** a, b, c, d, e, n return `status="success"` with non-empty content
-  (and their canary phrase where listed); q returns `status != "success"`.
-- **Step A — best-effort rows are recorded, not gated:** success rows (f, g, h, i, j, k, l) return
-  `status="success"` + content; intervention rows (r, s, t, and m/o/p when walled) return
-  `status="human_intervention_required"` with a non-empty `vnc_url`. A best-effort miss is logged, not failed.
-- **Step C (auth read):** HTTP 200, `status="success"`, content contains the saucedemo marker (`Sauce Labs Backpack`) — proving the
-  seeded session was replayed headlessly through the browser tier.
-- **Step D (negative auth):** the response does **not** contain the success marker (gets the login page or an
-  intervention signal) — proving authenticated content is gated on the session, not leaked anonymously.
-- A skipped authenticated section (no `.env.local`) is not a failure.
+- **Part 1:** gated rows (a, b, c, d, e, n, q) match their verdict exactly; best-effort rows are recorded
+  (intervention rows return `status="human_intervention_required"` + a `vnc_url`; success rows return
+  `status="success"` + content). A best-effort miss is logged, not failed.
+- **Part 2 — login reuse:** Call 1 (anon) content does NOT contain `"Sauce Labs Backpack"`; Call 2 (after login)
+  returns `status="success"` with `"Sauce Labs Backpack"`.
+- **Part 3 — clearance reuse:** Call 1 returns `status="human_intervention_required"` + a `vnc_url`; after the human
+  solve, Call 2 returns `status="success"` with non-empty content (no second challenge).
+- Skipped Part 2 (no `.env.local`) is not a failure.
 
 ## Fixtures
 
-None uploaded. The only secrets are the per-service credentials in `.env.local` (`SAUCEDEMO_USER`/`SAUCEDEMO_PASS`, one pair per login service), never committed. The
-login-and-seed harness is a Playwright script under `e2e/harness/`.
+None uploaded. The only secrets are the per-service credentials in `AscendWebSearch/e2e/.env.local`
+(`SAUCEDEMO_USER`/`SAUCEDEMO_PASS`, one pair per login-walled service), never committed. Login/secure/captcha URLs,
+selectors, and markers are hardcoded in the harness and Bruno requests. The login-and-seed harness is a Playwright
+script under `e2e/harness/`.
 
 ## Concurrency
 
-- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains and the `e2e` profile of the
-  login site.
-- **Conflicts with:** test 6 and any test sharing a target domain's session key; the internal Steps B→C→D are
-  strictly ordered.
-- **Serial:** false (vs non-overlapping tests).
+- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains, `www.saucedemo.com` (`e2e`
+  profile), and `nopecha.com` (`default` profile).
+- **Conflicts with:** test 6 and any test sharing a target domain's session key. Within this test, each before/after
+  pair (Part 2: anon → seed → authed; Part 3: blocked → solve → after) is **strictly ordered**.
+- **Serial:** false vs non-overlapping tests; Part 3's human solve runs first on the main session.

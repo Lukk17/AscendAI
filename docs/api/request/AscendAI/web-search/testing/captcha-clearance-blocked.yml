@@ -1,0 +1,40 @@
+info:
+  name: captcha-clearance-blocked
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Part 3 Call 1 — read the Cloudflare interactive challenge with NO clearance stored.
+    # FlareSolverr cannot auto-solve an interactive challenge, so the scraper escalates to
+    # NoVNC and returns a vnc_url for a human to solve.
+    data: |-
+      {
+        "url": "https://nopecha.com/demo/cloudflare",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("blocked: human intervention required", function () {
+            expect(res.getBody().status).to.equal("human_intervention_required");
+        });
+        test("blocked: a vnc_url is returned for the human to solve", function () {
+            expect(res.getBody().vnc_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

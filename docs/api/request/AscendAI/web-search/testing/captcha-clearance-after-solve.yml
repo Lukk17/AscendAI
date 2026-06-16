@@ -1,0 +1,42 @@
+info:
+  name: captcha-clearance-after-solve
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Part 3 Call 2 — after the human solved the challenge via the vnc_url, the NoVNC monitor
+    # stored cf_clearance under session:nopecha.com:default. This fresh read of the SAME page
+    # must reuse that clearance and skip the challenge (no second vnc_url).
+    data: |-
+      {
+        "url": "https://nopecha.com/demo/cloudflare",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  tests:
+    - type: after-response
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("clearance reused: status is success (challenge skipped)", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("clearance reused: non-empty content returned", function () {
+            const b = res.getBody();
+            const content = b.content || b.text || b.markdown || "";
+            expect(content.length).to.be.at.least(1);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -98,15 +98,18 @@ are caught.
 
 ### What this will verify
 
-- A categorized matrix of real-world URLs each produces its **expected verdict** — `success`, `intervention`
+- **Part 1 — real-world matrix:** each URL produces its **expected verdict** — `success`, `intervention`
   (`status="human_intervention_required"` + `vnc_url`), or `hard-fail` (`status != "success"`). The verdict, not
-  just "some content", is asserted. **LinkedIn / indeed-auth are tested as intervention-only** (no scripted login —
-  ToS / account-ban risk).
-- The **authenticated capture→replay** flow: a test-harness Playwright login on a stable, automation-friendly site
-  using `.env.local` credentials → capture `storage_state` → seed the session store → an authenticated read returns
-  logged-in-only content, while the same read **without** a session does not.
-- Stable canaries (the Cloudflare site, the dead-domain negative) are **gated/must-pass**; live real-world URLs are
-  **best-effort** (verdict recorded, a miss does not fail the suite).
+  just "some content", is asserted. Stable canaries are **gated/must-pass**; live sites are **best-effort**.
+  LinkedIn / indeed-auth stay best-effort intervention rows (no scripted login — ToS / ban risk).
+- **Part 2 — login → session reuse (saucedemo, automated, 2 calls):** read the gated page **blocked** (no session,
+  no marker), then **after** a scripted login + seed, a fresh read returns logged-in content. saucedemo is a real
+  login with a real session (not a mock).
+- **Part 3 — CAPTCHA → clearance reuse (Cloudflare, human, 2 calls, runs first):** read **blocked** returns the
+  intervention `vnc_url`; the human solves the Cloudflare interactive challenge in NoVNC; a fresh read **after**
+  reuses the captured `cf_clearance` and returns content (challenge skipped). Target `https://nopecha.com/demo/cloudflare`.
+- Each blocked→unblocked behavior is **exactly 2 calls** (blocked, then a fresh request after auth/solve) — the
+  reuse on the second call is the regression-prone behavior this test locks down.
 
 ### Setup cost class
 
@@ -124,16 +127,17 @@ script under `e2e/harness/`.
 
 - **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains and the `e2e` profile of the
   login site.
-- **Conflicts with:** test 6 and any test sharing a target domain's session key; the internal Steps B→C→D are
-  strictly ordered.
+- **Conflicts with:** test 6 and any test sharing a target domain's session key. Each before/after pair (Part 2:
+  anon → seed → authed; Part 3: blocked → human solve → after) is strictly ordered; Part 3 runs first on the main
+  session while the matrix + Part 2 fan out across parallel e2e-runner agents.
 - **Serial:** false (vs non-overlapping tests).
 
 ### API client invocation
 
-Bruno requests under `docs/api/request/AscendAI/web-search/testing/realworld/` (one per matrix row), plus
-`auth-read-secure.yml` / `auth-read-secure-anon.yml` for Steps C/D, plus the Playwright harness
-`e2e/harness/seed_authenticated_session.py` for Step B. **All created when this change is applied** — this proposal
-defines the test; implementation follows approval.
+Bruno requests under `docs/api/request/AscendAI/web-search/testing/`: the `realworld/` matrix (one per Part-1 row),
+`captcha-clearance-blocked.yml` / `captcha-clearance-after-solve.yml` (Part 3), and `auth-read-secure-anon.yml` /
+`auth-read-secure.yml` (Part 2). Plus the Playwright harness `e2e/harness/seed_authenticated_session.py` (Part 2
+scripted saucedemo login). Part 3 needs no harness — the human solves via the scraper's own NoVNC flow.
 
 ### Number assignment
 

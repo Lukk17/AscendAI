@@ -1,9 +1,9 @@
-# Authenticated + real-world scraping: run tasks template
+# Real-world + reuse-behavior scraping: run tasks template
 
 Spec: [../7-authenticated-realworld-scraping-test.md](../7-authenticated-realworld-scraping-test.md)
 
 Copy this file to `../runs/<UTC-timestamp>_7-authenticated-realworld-scraping-tasks.md` before starting a run. Tick
-boxes as you go. Record every best-effort row's actual verdict and any skip under **Additional tasks I did**.
+boxes as you go. Record each best-effort row's actual verdict and any skip under **Additional tasks I did**.
 
 ## Tasks
 
@@ -12,58 +12,46 @@ boxes as you go. Record every best-effort row's actual verdict and any skip unde
 - [ ] `bru --version` returns a version string.
 - [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
 - [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable, needed for row n).
-- [ ] `AscendWebSearch/e2e/.env.local` exists with the per-service login credentials (saucedemo:
-  `SAUCEDEMO_USER`, `SAUCEDEMO_PASS`) — OR record the authenticated section as **skipped**.
+- [ ] `AscendWebSearch/e2e/.env.local` exists with `SAUCEDEMO_USER` / `SAUCEDEMO_PASS` — OR record Part 2 as **skipped**.
 
 ### Reset state
 
-- [ ] (Optional) Flushed Redis `session:*` keys for the target domains + the `e2e` profile.
+- [ ] Flushed Redis `session:*` keys so both before/after pairs start genuinely blocked.
 
-### Run — Step A: URL matrix (gated rows MUST match; best-effort rows record the verdict)
+### Part 3 — CAPTCHA clearance reuse (HUMAN, runs FIRST on the main session)
 
-Easy (gated):
-- [ ] a `example.com` → success, content has `"example domain"`.
-- [ ] b `en.wikipedia.org/wiki/Web_scraping` → success, content has `"web scraping"`.
+- [ ] Call 1 (blocked): `captcha-clearance-blocked.yml` → `status="human_intervention_required"` + non-empty `vnc_url`.
+- [ ] Human solve: opened the `vnc_url`, solved the Cloudflare interactive challenge in the NoVNC browser.
+- [ ] Call 2 (after solve): `captcha-clearance-after-solve.yml` → HTTP 200, `status="success"`, non-empty content
+  (challenge skipped — `cf_clearance` reused).
+
+### Part 2 — Login session reuse (saucedemo, AUTOMATED; skip if no `.env.local`)
+
+- [ ] Call 1 (blocked/anon): `auth-read-secure-anon.yml` → content does NOT contain `"Sauce Labs Backpack"`.
+- [ ] Seed: `seed_authenticated_session.py` logged in and stored the session under `session:www.saucedemo.com:e2e`.
+- [ ] Call 2 (after login): `auth-read-secure.yml` → HTTP 200, `status="success"`, content contains `"Sauce Labs Backpack"`.
+
+### Part 1 — Real-world matrix (gated rows MUST match; best-effort record the verdict)
+
+- [ ] a `example.com` → success, `"example domain"`.
+- [ ] b `en.wikipedia.org/wiki/Web_scraping` → success, `"web scraping"`.
 - [ ] c `books.toscrape.com` → success.
 - [ ] d `news.ycombinator.com` → success.
-
-Medium:
-- [ ] e `quotes.toscrape.com/js/` → **gated**: success, content has `"The world as we have created it"`.
+- [ ] e `quotes.toscrape.com/js/` → **gated**: success, `"The world as we have created it"`.
 - [ ] f `wp.pl` → verdict recorded (expect success).
 - [ ] g `old.reddit.com/r/programming/` → verdict recorded (expect success).
 - [ ] h `stackoverflow.com/questions` → verdict recorded (expect success).
 - [ ] i `github.com/python/cpython` → verdict recorded (expect success).
 - [ ] j `bbc.com/news` → verdict recorded (expect success).
-
-Hard / very-hard:
 - [ ] k `www.reddit.com/` → verdict recorded (expect success).
 - [ ] l `justjoin.it/job-offers/...` → verdict recorded (expect success).
 - [ ] m `glassdoor.com/Job/...` → verdict recorded (expect success or intervention).
-- [ ] n `nowsecure.nl` → **gated**: success (Cloudflare challenge solved), non-empty content.
+- [ ] n `nowsecure.nl` → **gated**: success (Cloudflare auto-solved), non-empty content.
 - [ ] o `indeed.com/jobs?...` → verdict recorded (expect success or intervention).
 - [ ] p `g2.com/` → verdict recorded (expect success or intervention).
-
-Impossible (gated negative):
 - [ ] q `this-domain-does-not-exist-xyzzy.invalid` → **gated**: `status != "success"`.
-
-CAPTCHA / login wall:
-- [ ] r `google.com/recaptcha/api2/demo` → verdict recorded (expect intervention + `vnc_url`).
 - [ ] s `linkedin.com/jobs/...` → verdict recorded (expect intervention + `vnc_url`).
 - [ ] t `secure.indeed.com/auth?...` → verdict recorded (expect intervention + `vnc_url`).
-
-### Run — Steps B–D: authenticated capture→replay (skip if no `.env.local`)
-
-- [ ] Step B — login-and-seed harness ran; `storage_state` captured and seeded under profile `e2e`.
-- [ ] Step C — authenticated read of the saucedemo inventory page with `profile=e2e` returned HTTP 200.
-- [ ] Step D — anonymous read of the saucedemo inventory page (no session) ran.
-
-### Expected
-
-- [ ] Every gated row (a, b, c, d, e, n, q) matched its verdict exactly.
-- [ ] Best-effort verdicts recorded; intervention rows returned `status="human_intervention_required"` + a
-  non-empty `vnc_url`.
-- [ ] Step C content contains the saucedemo marker `Sauce Labs Backpack` (session replayed headlessly through the browser tier).
-- [ ] Step D content does NOT contain the success marker (auth content gated on the session).
 
 ### Verdict
 
@@ -85,6 +73,5 @@ Duration:
 
 ## Additional tasks I did
 
-<!-- Record each best-effort row's actual verdict + which tier served it, whether the authenticated section was
-skipped (no .env.local), any manual NoVNC login performed for the intervention rows (r/s/t), and any tier the
-pipeline escalated to unexpectedly. -->
+<!-- Record each best-effort row's actual verdict + serving tier, whether Part 2 was skipped (no .env.local), how
+long the Part 3 human solve took, and any tier the pipeline escalated to unexpectedly. -->
