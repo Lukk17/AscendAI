@@ -1,4 +1,4 @@
-# Tiered web scraping: e2e capability test proposal
+# Web-scraping e2e capability tests proposal: tiered (#6) + authenticated/real-world (#7)
 
 ## Why
 
@@ -82,3 +82,64 @@ After this proposal is approved:
 - Generate `e2e/testing/6-tiered-scraping-test.md` from the `test-spec` artifact.
 - Generate `e2e/testing/templates/6-tiered-scraping-tasks.template.md` from the `tasks-template` artifact.
 - Each execution generates a `run` record under `e2e/testing/runs/`.
+
+---
+
+## Test 7 — Authenticated + real-world scraping coverage
+
+### Why
+
+Test 6 proves each extraction *tier* works against fixed canaries. It does not prove the scraper behaves correctly
+across a **broad set of real-world URLs** (job boards, news, social, login walls), nor does it cover the
+**authenticated capture→replay** path that the `enhance-web-search-scraping` anchor just shipped (the LinkedIn-class
+fix). A regression that makes the scraper return a login/block page as `success`, or that breaks session replay,
+would pass test 6. This test closes both gaps and — crucially — encodes **expected negatives** so false positives
+are caught.
+
+### What this will verify
+
+- A categorized matrix of real-world URLs each produces its **expected verdict** — `success`, `intervention`
+  (`status="human_intervention_required"` + `vnc_url`), or `hard-fail` (`status != "success"`). The verdict, not
+  just "some content", is asserted. **LinkedIn / indeed-auth are tested as intervention-only** (no scripted login —
+  ToS / account-ban risk).
+- The **authenticated capture→replay** flow: a test-harness Playwright login on a stable, automation-friendly site
+  using `.env.local` credentials → capture `storage_state` → seed the session store → an authenticated read returns
+  logged-in-only content, while the same read **without** a session does not.
+- Stable canaries (the Cloudflare site, the dead-domain negative) are **gated/must-pass**; live real-world URLs are
+  **best-effort** (verdict recorded, a miss does not fail the suite).
+
+### Setup cost class
+
+- [x] 5: Seeded state + observation of an async/secondary flow. The authenticated section seeds the session store
+  from a captured browser login before reading. Highest cost in the suite — runs after test 6.
+
+### Fixtures needed
+
+None uploaded. The only secrets are the `.env.local` keys (`E2E_LOGIN_URL`, `E2E_LOGIN_USER`, `E2E_LOGIN_PASS`,
+`E2E_LOGIN_SECURE_URL`, `E2E_LOGIN_SUCCESS_MARKER`) — never committed. The login-and-seed harness is a Playwright
+script under `e2e/harness/`.
+
+### Concurrency profile
+
+- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains and the `e2e` profile of the
+  login site.
+- **Conflicts with:** test 6 and any test sharing a target domain's session key; the internal Steps B→C→D are
+  strictly ordered.
+- **Serial:** false (vs non-overlapping tests).
+
+### API client invocation
+
+Bruno requests under `docs/api/request/AscendAI/web-search/testing/realworld/` (one per matrix row), plus
+`auth-read-secure.yml` / `auth-read-secure-anon.yml` for Steps C/D, plus the Playwright harness
+`e2e/harness/seed_authenticated_session.py` for Step B. **All created when this change is applied** — this proposal
+defines the test; implementation follows approval.
+
+### Number assignment
+
+N: 7
+
+### Open design point
+
+The Step-B seed writes the captured `storage_state` into the service's Redis session store at
+`session:{domain}:{profile}` (white-box coupling to the store's key format). A future `POST /session/import`
+endpoint would decouple the harness from store internals; flagged for a follow-up.
