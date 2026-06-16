@@ -1,23 +1,34 @@
-# Real-world + reuse-behavior scraping: e2e test
+# Real-world + authenticated + human-captcha scraping: e2e test
 
 ## What this verifies
 
 Three things, all against **real sites** (no mocks):
 
 1. **A categorized real-world URL matrix** — each URL asserts its **expected verdict** (`success` / `intervention` /
-   `hard-fail`). Stable canaries are **gated** (must match); live sites are **best-effort** (verdict recorded, a
-   miss does not fail the suite).
-2. **Login → session reuse** (automated, saucedemo) — a **2-call before/after**: read the gated page **(1) blocked**
-   (no session) returns no logged-in content, then **(2) after** a scripted login + session seed returns logged-in
+   `hard-fail`). Stable canaries are **gated** (must match); live sites are **best-effort** (the response must be a
+   valid terminal verdict, but which one is recorded, not gated).
+2. **Login → session reuse** (automated, saucedemo) — a **2-call before/after**: read the page **(1) blocked** (no
+   session) returns no logged-in content, then **(2) after** a scripted login + session seed returns logged-in
    content. Proves the auth session is **stored and reused**.
-3. **CAPTCHA → clearance reuse** (human, Cloudflare, runs **first**) — a **2-call before/after**: read **(1)
-   blocked** returns the human-intervention `vnc_url` (the interactive challenge can't be auto-solved), the human
-   solves it in the NoVNC browser, then a fresh read **(2) after** reuses the captured `cf_clearance` and returns
-   content. Proves the clearance is **stored and reused** (the challenge is skipped on the second request).
+3. **CAPTCHA human-solve + capture** (human, Cloudflare interactive, runs **first**) — read **blocked** returns HTTP
+   428 + a human-intervention `vnc_url`; the human solves the interactive challenge in the NoVNC browser; we then
+   assert the resulting `cf_clearance` was **captured into the session store**.
 
-The blocked→unblocked behaviors (login, captcha) are **exactly 2 calls each** — first while blocked, then a fresh
-request after auth/solve — because the regression-prone behavior is precisely "scrape blocked → authorize → scrape
-now succeeds and the session/clearance is reused".
+### Contract (how the service signals each verdict)
+
+- **success** — HTTP `200`, body `status="success"`, non-empty content.
+- **intervention** — HTTP `428 Precondition Required`, body `status="human_intervention_required"` + a non-empty
+  `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
+- **hard-fail** — a non-2xx the SSRF / host guard fail-closes with (e.g. HTTP `400` for an unresolvable host).
+
+### Why Part 3 asserts capture, not cross-request reuse
+
+A Cloudflare **interactive** clearance (`cf_clearance`) is cryptographically bound to the exact browser fingerprint
+(TLS/JA3, headful build) and IP that solved it. The human solves it in the NoVNC browser, but a later read runs in a
+different browser context — so the clearance is rejected on reuse — and interactive-captcha demo pages re-arm the
+challenge on every visit anyway. Cross-request reuse is therefore not reliably observable. **Capture** (the solved
+clearance landing in the session store) is the deterministic, real signal that the human-intervention path works.
+(Contrast Part 2: an app session cookie is not fingerprint-bound, so it reuses cleanly.)
 
 ### Part 1 — Real-world URL matrix (single-call verdict)
 
@@ -30,27 +41,30 @@ now succeeds and the session/clearance is reused".
 | d | `https://news.ycombinator.com/` | minimal static HTML | success | **gated** |
 | **Medium — Playwright JS render** | | | | |
 | e | `https://quotes.toscrape.com/js/` | JS sandbox | success (`"The world as we have created it"`) | **gated** |
-| f | `https://wp.pl` | heavy news portal | success | best-effort |
-| g | `https://old.reddit.com/r/programming/` | server-rendered Reddit | success | best-effort |
-| h | `https://stackoverflow.com/questions` | server-rendered Q&A | success | best-effort |
-| i | `https://github.com/python/cpython` | light-JS repo page | success | best-effort |
-| j | `https://www.bbc.com/news` | news + JS | success | best-effort |
+| f | `https://wp.pl` | heavy news portal | success or intervention | best-effort |
+| g | `https://old.reddit.com/r/programming/` | server-rendered Reddit | success or intervention | best-effort |
+| h | `https://stackoverflow.com/questions` | server-rendered Q&A | success or intervention | best-effort |
+| i | `https://github.com/python/cpython` | light-JS repo page | success or intervention | best-effort |
+| j | `https://www.bbc.com/news` | news + JS | success or intervention | best-effort |
 | **Hard — SPA + anti-bot** | | | | |
-| k | `https://www.reddit.com/` | React SPA + bot checks | success | best-effort |
-| l | `https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes` | Next.js SPA | success | best-effort |
+| k | `https://www.reddit.com/` | React SPA + bot checks | success or intervention | best-effort |
+| l | `https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes` | Next.js SPA | success or intervention | best-effort |
 | m | `https://www.glassdoor.com/Job/index.htm` | aggressive anti-bot | success or intervention | best-effort |
 | **Very hard — enterprise WAF** | | | | |
-| n | `https://nowsecure.nl` | Cloudflare JS challenge → FlareSolverr auto-solve | success | **gated** |
+| n | `https://nowsecure.nl` | Cloudflare challenge | success or intervention | best-effort |
 | o | `https://www.indeed.com/jobs?q=AI&l=usa&radius=25&fromage=7&from=searchOnDesktopSerp&start=20` | DataDome-class | success or intervention | best-effort |
 | p | `https://www.g2.com/` | Cloudflare-hard | success or intervention | best-effort |
 | **Impossible — negative** | | | | |
-| q | `https://this-domain-does-not-exist-xyzzy.invalid/` | DNS failure → fail-closed | hard-fail | **gated** |
+| q | `https://this-domain-does-not-exist-xyzzy.invalid/` | unresolvable host → fail-closed | hard-fail (HTTP 400) | **gated** |
 | **Login wall — intervention-only (not solved here)** | | | | |
-| s | `https://www.linkedin.com/jobs/search/?keywords=Java%20Developer&location=United%20States&f_AL=true` | login wall → NoVNC | intervention (+ `vnc_url`) | best-effort |
-| t | `https://secure.indeed.com/auth?co=US&hl=en_US&branding=page-two-signin` | login wall → NoVNC | intervention (+ `vnc_url`) | best-effort |
+| s | `https://www.linkedin.com/jobs/search/?keywords=Java%20Developer&location=United%20States&f_AL=true` | login wall → NoVNC | success or intervention | best-effort |
+| t | `https://secure.indeed.com/auth?co=US&hl=en_US&branding=page-two-signin` | login wall → NoVNC | success or intervention | best-effort |
 
-> The login behavior is fully covered by Part 2 (saucedemo, a real login + real session); LinkedIn/indeed stay here
-> as best-effort intervention rows (real scripted login to them violates ToS / risks bans).
+> **Gated rows** (a, b, c, d, e, q) hard-assert their verdict. **Best-effort rows** assert only that the response is a
+> *valid terminal verdict* — either (`200` + `success` + content) **or** (`428` + `human_intervention_required` +
+> `vnc_url`) — never gated on which; a malformed/5xx/empty response fails them. The login behavior is fully covered by
+> Part 2 (saucedemo, a real login + real session); LinkedIn/indeed stay here as best-effort rows (real scripted login
+> to them violates ToS / risks bans).
 
 ### Part 2 — Login → session reuse (saucedemo, AUTOMATED, 2 calls)
 
@@ -58,27 +72,41 @@ saucedemo.com is a **real** web app: a real form login that sets a real session 
 `storage_state` and replayed through the real browser tier. It is automatable (no human, no ban risk), so it gates
 the login-reuse behavior in CI.
 
-- **Call 1 — blocked:** read `https://www.saucedemo.com/inventory.html` with **no** session. Expect the response
-  does **not** contain the logged-in marker `"Sauce Labs Backpack"` (the SPA redirects to the login screen).
-- **Seed:** run the harness `e2e/harness/seed_authenticated_session.py` — scripted login with the `.env.local`
-  saucedemo credentials → capture `storage_state` → store under `session:www.saucedemo.com:e2e`.
-- **Call 2 — after login (fresh request):** read the same URL with `profile=e2e`. Expect HTTP 200,
-  `status="success"`, content contains `"Sauce Labs Backpack"` — the stored session is **reused** through the
-  browser tier.
+- **Call 1 — blocked:** read `https://www.saucedemo.com/inventory.html` with **no** session. Expect HTTP 200 but the
+  content has **none** of the authenticated-inventory product descriptions (the SPA serves the login screen).
+- **Seed:** run the harness `e2e/harness/seed_authenticated_session.py` — scripted login with saucedemo's hardcoded
+  public credentials → capture `storage_state` → store under `session:saucedemo.com:e2e` (the key uses the
+  *registrable* domain; `www.` is stripped).
+- **Call 2 — after login (fresh request):** read the same URL with `profile=e2e`. Expect HTTP 200, `status="success"`,
+  and content containing an **auth-only product description** (e.g. `"ringspun combed cotton"`, `"quarter-zip fleece"`,
+  `"lighting modes"`) — present only on the logged-in inventory. The stored session is **reused** through the browser
+  tier. (Product *titles* like "Sauce Labs Backpack" are stripped by extraction, so the markers are descriptions.)
 
-### Part 3 — CAPTCHA → clearance reuse (Cloudflare, HUMAN, runs FIRST, 2 calls)
+### Part 3 — CAPTCHA human-solve + capture (Cloudflare interactive, HUMAN, runs FIRST)
 
-`https://nopecha.com/demo/cloudflare` is a real Cloudflare **interactive challenge** page (it 403s plain clients).
-FlareSolverr cannot auto-solve an interactive challenge, so the scraper escalates to NoVNC and a human solves it;
-the NoVNC monitor captures the resulting `cf_clearance` into the session store, which the **second** request reuses.
+`https://nopecha.com/demo/cloudflare` is a real Cloudflare **interactive challenge** page that does not auto-clear in
+a headful browser (it re-arms on every visit), so it reliably exercises the NoVNC human-solve path.
 
-- **Call 1 — blocked:** read `https://nopecha.com/demo/cloudflare` with **no** clearance. Expect
-  `status="human_intervention_required"` with a non-empty `vnc_url`.
-- **Human solve (main thread, first):** open the `vnc_url`, solve the Cloudflare interactive challenge in the NoVNC
-  browser. The monitor stores the captured `cf_clearance` under `session:nopecha.com:default`.
-- **Call 2 — after solve (fresh request):** read the **same** `https://nopecha.com/demo/cloudflare`. Expect HTTP
-  200, `status="success"`, non-empty content — the challenge is **skipped** because the stored `cf_clearance` is
-  reused (the headline regression check: solve once, the next request to the domain is clear).
+- **Call 1 — blocked:** read `https://nopecha.com/demo/cloudflare` with **no** clearance. Expect HTTP **428
+  Precondition Required**, `status="human_intervention_required"` with a non-empty `vnc_url`.
+- **Human solve (main thread, first):** the runner **must print the `vnc_url` verbatim into the chat** (see
+  "Human-intervention forwarding" below). The human opens it and solves the Cloudflare interactive challenge in the
+  NoVNC browser. The monitor stores the captured `cf_clearance` under `session:nopecha.com:default`.
+- **Capture check:** assert the session store now holds the solved clearance — `session:nopecha.com:default` exists
+  with a `cf_clearance` cookie in its `waf` entry. This is the deterministic proof the human-solve path captured the
+  clearance. (Cross-request *reuse* is not asserted — see "Why Part 3 asserts capture, not cross-request reuse".)
+
+#### Human-intervention forwarding (mandatory)
+
+Any call in this test that returns `status="human_intervention_required"` returns a `vnc_url` that **a human must
+open**. The agent driving the test **must print that `vnc_url` verbatim into the chat** the moment it is received,
+then **wait** for the human to confirm they solved it before the capture check.
+
+Because a fanned-out `e2e-runner` subagent's output is **never shown to the user**, Part 3 (and any intervention this
+test surfaces that a human must act on) **must be run by the main agent/session**, not delegated to a subagent. The
+automated, no-human parts — the Part 1 matrix and Part 2 (saucedemo) — may still fan out across parallel runners. If
+Part 3 is ever delegated despite this, the **main agent must re-print the subagent's `vnc_url` to the user**;
+otherwise the human never receives the link and the test stalls forever.
 
 ## Prerequisites
 
@@ -98,7 +126,7 @@ curl -fsS http://localhost:7021/health
 
 Expect HTTP 200 with `{"status":"ok"}`.
 
-Check FlareSolverr is reachable (required for the Cloudflare canary, row n).
+Check FlareSolverr is reachable (used by the Cloudflare tiers).
 
 ```powershell
 curl -fsS http://localhost:8191/
@@ -106,30 +134,25 @@ curl -fsS http://localhost:8191/
 
 Expect HTTP 200.
 
-Check the saucedemo login credentials for Part 2. `AscendWebSearch/e2e/.env.local` (gitignored, copied from
-`.env.local.example` in that folder) must define `SAUCEDEMO_USER` and `SAUCEDEMO_PASS`.
-
-```powershell
-Test-Path AscendWebSearch/e2e/.env.local
-```
-
-If absent, **skip Part 2** (record as skipped) — do not fail the test. Part 3 needs no credentials (the human types
-nothing; they solve the challenge in the NoVNC browser).
+Part 2 (saucedemo) and Part 3 (captcha) need **no credentials**: saucedemo's public demo credentials are hardcoded
+in the harness, and the human types nothing for the captcha (they solve it in the NoVNC browser).
 
 ## Reset state
 
-Flush the Redis session keys so both before/after pairs start from a genuine **blocked** state (otherwise a stale
+Flush the Redis session keys so the before/after pairs start from a genuine **blocked** state (otherwise a stale
 session/clearance hides the regression).
 
 ```powershell
-docker exec ascend-redis redis-cli --scan --pattern "session:*" | ForEach-Object { docker exec ascend-redis redis-cli DEL $_ }
+docker exec redis redis-cli --scan --pattern "session:*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
 
 ## Run
 
-> Execution model: **Part 3 (human captcha) runs FIRST on the main session** — read #1, you solve the challenge in
-> the NoVNC browser, then read #2. The Part 1 matrix rows and Part 2 (automated saucedemo) fan out across parallel
-> e2e-runner agents while you solve Part 3.
+> Execution model: **Part 3 (human captcha) is run by the main agent on the main session, FIRST** — never delegate it
+> to an `e2e-runner` subagent, whose output is not shown to the user. Call 1 returns a `vnc_url`; the main agent
+> **prints that `vnc_url` verbatim in the chat** and waits for you to solve the challenge in the NoVNC browser before
+> the capture check. The Part 1 matrix rows and Part 2 (automated saucedemo) may fan out across parallel e2e-runner
+> agents while you solve Part 3. See "Human-intervention forwarding (mandatory)" under Part 3.
 
 Move into the Bruno collection root first.
 
@@ -143,11 +166,13 @@ Part 3, Call 1 — captcha blocked (main thread, first).
 bru run "web-search/testing/captcha-clearance-blocked.yml" --env ascend-local
 ```
 
-Part 3, Call 2 — after you solve the challenge via the returned `vnc_url`.
+Part 3, Capture check — after you solve the challenge via the returned `vnc_url`.
 
 ```powershell
-bru run "web-search/testing/captcha-clearance-after-solve.yml" --env ascend-local
+docker exec redis redis-cli GET "session:nopecha.com:default"
 ```
+
+Expect a JSON value whose `waf` entry contains a `cf_clearance` cookie.
 
 Part 2, Call 1 — login blocked (anonymous).
 
@@ -155,10 +180,14 @@ Part 2, Call 1 — login blocked (anonymous).
 bru run "web-search/testing/auth-read-secure-anon.yml" --env ascend-local
 ```
 
-Part 2, Seed — scripted saucedemo login.
+Part 2, Seed — scripted saucedemo login (harness not in the image; copy it in, then run).
 
 ```powershell
-python AscendWebSearch/e2e/harness/seed_authenticated_session.py
+docker cp AscendWebSearch/e2e/harness/seed_authenticated_session.py ascend-web-search:/tmp/seed.py
+```
+
+```powershell
+docker exec -e PYTHONPATH=/app -w /app ascend-web-search python /tmp/seed.py
 ```
 
 Part 2, Call 2 — after login.
@@ -175,26 +204,25 @@ bru run "web-search/testing/realworld" --env ascend-local
 
 ## Expected
 
-- **Part 1:** gated rows (a, b, c, d, e, n, q) match their verdict exactly; best-effort rows are recorded
-  (intervention rows return `status="human_intervention_required"` + a `vnc_url`; success rows return
-  `status="success"` + content). A best-effort miss is logged, not failed.
-- **Part 2 — login reuse:** Call 1 (anon) content does NOT contain `"Sauce Labs Backpack"`; Call 2 (after login)
-  returns `status="success"` with `"Sauce Labs Backpack"`.
-- **Part 3 — clearance reuse:** Call 1 returns `status="human_intervention_required"` + a `vnc_url`; after the human
-  solve, Call 2 returns `status="success"` with non-empty content (no second challenge).
-- Skipped Part 2 (no `.env.local`) is not a failure.
+- **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly — a–e are `200`/`success` (+ canary where
+  noted), q is the `400` hard-fail. Best-effort rows each return a valid terminal verdict (`200`/`success`/content
+  **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed.
+- **Part 2 — login reuse:** Call 1 (anon) content has **no** auth-only inventory markers; Call 2 (after login)
+  returns `status="success"` with an auth-only product description.
+- **Part 3 — human-solve capture:** Call 1 returns HTTP `428`, `status="human_intervention_required"` + a `vnc_url`;
+  after the human solve, `session:nopecha.com:default` holds a `cf_clearance` in its `waf` entry.
 
 ## Fixtures
 
-None uploaded. The only secrets are the per-service credentials in `AscendWebSearch/e2e/.env.local`
-(`SAUCEDEMO_USER`/`SAUCEDEMO_PASS`, one pair per login-walled service), never committed. Login/secure/captcha URLs,
-selectors, and markers are hardcoded in the harness and Bruno requests. The login-and-seed harness is a Playwright
-script under `e2e/harness/`.
+None — and **no secrets**: saucedemo's credentials are its public demo values, hardcoded in the harness; the captcha
+is human-solved (no credentials); LinkedIn/indeed are intervention-only. URLs, selectors, and markers are hardcoded
+in the harness and Bruno requests. (A future real-secret login would read from the environment, never commit creds.)
+The login-and-seed harness is a Playwright script under `e2e/harness/`.
 
 ## Concurrency
 
-- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains, `www.saucedemo.com` (`e2e`
-  profile), and `nopecha.com` (`default` profile).
-- **Conflicts with:** test 6 and any test sharing a target domain's session key. Within this test, each before/after
-  pair (Part 2: anon → seed → authed; Part 3: blocked → solve → after) is **strictly ordered**.
+- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains, `saucedemo.com` (`e2e` profile),
+  and `nopecha.com` (`default` profile).
+- **Conflicts with:** test 6 and any test sharing a target domain's session key. Within this test, Part 2's sequence
+  (anon → seed → authed) is **strictly ordered**, and Part 3's human solve runs first on the main session.
 - **Serial:** false vs non-overlapping tests; Part 3's human solve runs first on the main session.

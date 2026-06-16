@@ -17,13 +17,13 @@ http:
   auth: inherit
 
 runtime:
-  tests:
-    - type: after-response
+  scripts:
+    - type: tests
       code: |-
-        test("Status code is 200", function () {
-            expect(res.getStatus()).to.equal(200);
+        test("hard-fail: SSRF guard fail-closes with HTTP 400", function () {
+            expect(res.getStatus()).to.equal(400);
         });
-        test("status is NOT success (fail-closed on DNS failure)", function () {
+        test("hard-fail: response is not a success", function () {
             expect(res.getBody()?.status).to.not.equal("success");
         });
 

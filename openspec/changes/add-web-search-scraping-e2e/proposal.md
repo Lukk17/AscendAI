@@ -103,13 +103,15 @@ are caught.
   just "some content", is asserted. Stable canaries are **gated/must-pass**; live sites are **best-effort**.
   LinkedIn / indeed-auth stay best-effort intervention rows (no scripted login — ToS / ban risk).
 - **Part 2 — login → session reuse (saucedemo, automated, 2 calls):** read the gated page **blocked** (no session,
-  no marker), then **after** a scripted login + seed, a fresh read returns logged-in content. saucedemo is a real
-  login with a real session (not a mock).
-- **Part 3 — CAPTCHA → clearance reuse (Cloudflare, human, 2 calls, runs first):** read **blocked** returns the
-  intervention `vnc_url`; the human solves the Cloudflare interactive challenge in NoVNC; a fresh read **after**
-  reuses the captured `cf_clearance` and returns content (challenge skipped). Target `https://nopecha.com/demo/cloudflare`.
-- Each blocked→unblocked behavior is **exactly 2 calls** (blocked, then a fresh request after auth/solve) — the
-  reuse on the second call is the regression-prone behavior this test locks down.
+  no auth markers), then **after** a scripted login + seed, a fresh read returns logged-in content. saucedemo is a
+  real login with a real session (not a mock). The reuse on the second call is the regression-prone behavior this
+  part locks down.
+- **Part 3 — CAPTCHA human-solve + capture (Cloudflare interactive, human, runs first):** read **blocked** returns
+  HTTP 428 + the intervention `vnc_url`; the human solves the Cloudflare interactive challenge in NoVNC; we assert the
+  resulting `cf_clearance` is **captured into the session store** (`session:nopecha.com:default`). Target
+  `https://nopecha.com/demo/cloudflare`. Cross-request *reuse* is not asserted — an interactive `cf_clearance` is
+  bound to the solving browser's fingerprint/IP and the demo re-arms, so reuse is not reliably observable; capture is
+  the deterministic signal that the human-intervention path works.
 
 ### Setup cost class
 
@@ -118,10 +120,11 @@ are caught.
 
 ### Fixtures needed
 
-None uploaded. The only secrets are the per-service login credentials in `AscendWebSearch/e2e/.env.local`
-(`SAUCEDEMO_USER` / `SAUCEDEMO_PASS`, one pair per login-walled service) — never committed. Login/secure URLs,
-selectors, and markers are hardcoded in the harness and Bruno requests. The login-and-seed harness is a Playwright
-script under `e2e/harness/`.
+None uploaded, and **no secrets**: saucedemo's credentials are its public demo values (`standard_user` /
+`secret_sauce`, shown on its own login page), hardcoded in the harness; the captcha is human-solved with no
+credentials. Login/secure URLs, selectors, and markers are hardcoded in the harness and Bruno requests. The
+login-and-seed harness is a Playwright script under `e2e/harness/`. A future real-secret login would read from the
+environment, never commit creds.
 
 ### Concurrency profile
 
@@ -135,9 +138,10 @@ script under `e2e/harness/`.
 ### API client invocation
 
 Bruno requests under `docs/api/request/AscendAI/web-search/testing/`: the `realworld/` matrix (one per Part-1 row),
-`captcha-clearance-blocked.yml` / `captcha-clearance-after-solve.yml` (Part 3), and `auth-read-secure-anon.yml` /
-`auth-read-secure.yml` (Part 2). Plus the Playwright harness `e2e/harness/seed_authenticated_session.py` (Part 2
-scripted saucedemo login). Part 3 needs no harness — the human solves via the scraper's own NoVNC flow.
+`captcha-clearance-blocked.yml` (Part 3 Call 1), and `auth-read-secure-anon.yml` / `auth-read-secure.yml` (Part 2).
+Plus the Playwright harness `e2e/harness/seed_authenticated_session.py` (Part 2 scripted saucedemo login) and a Redis
+`GET session:nopecha.com:default` capture check (Part 3, after the human solve). Part 3 needs no harness — the human
+solves via the scraper's own NoVNC flow.
 
 ### Number assignment
 

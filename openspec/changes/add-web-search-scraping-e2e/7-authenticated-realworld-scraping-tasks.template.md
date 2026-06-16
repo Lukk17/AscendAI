@@ -1,4 +1,4 @@
-# Real-world + reuse-behavior scraping: run tasks template
+# Real-world + authenticated + human-captcha scraping: run tasks template
 
 Spec: [../7-authenticated-realworld-scraping-test.md](../7-authenticated-realworld-scraping-test.md)
 
@@ -11,25 +11,25 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 
 - [ ] `bru --version` returns a version string.
 - [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
-- [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable, needed for row n).
-- [ ] `AscendWebSearch/e2e/.env.local` exists with `SAUCEDEMO_USER` / `SAUCEDEMO_PASS` — OR record Part 2 as **skipped**.
+- [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable).
 
 ### Reset state
 
-- [ ] Flushed Redis `session:*` keys so both before/after pairs start genuinely blocked.
+- [ ] Flushed Redis `session:*` keys so the before/after pairs start genuinely blocked.
 
-### Part 3 — CAPTCHA clearance reuse (HUMAN, runs FIRST on the main session)
+### Part 3 — CAPTCHA human-solve + capture (HUMAN, run by the MAIN agent, FIRST on the main session)
 
-- [ ] Call 1 (blocked): `captcha-clearance-blocked.yml` → `status="human_intervention_required"` + non-empty `vnc_url`.
-- [ ] Human solve: opened the `vnc_url`, solved the Cloudflare interactive challenge in the NoVNC browser.
-- [ ] Call 2 (after solve): `captcha-clearance-after-solve.yml` → HTTP 200, `status="success"`, non-empty content
-  (challenge skipped — `cf_clearance` reused).
+- [ ] Run by the **main agent** (NOT a fanned-out e2e-runner subagent — its output never reaches the user).
+- [ ] Call 1 (blocked): `captcha-clearance-blocked.yml` → HTTP 428, `status="human_intervention_required"` + non-empty `vnc_url`.
+- [ ] Main agent **printed the `vnc_url` verbatim in the chat** for the human to open.
+- [ ] Human solve: opened the `vnc_url`, solved the Cloudflare interactive challenge in the NoVNC browser; confirmed back to the agent.
+- [ ] Capture check: `docker exec redis redis-cli GET "session:nopecha.com:default"` → JSON whose `waf` entry contains a `cf_clearance` cookie.
 
-### Part 2 — Login session reuse (saucedemo, AUTOMATED; skip if no `.env.local`)
+### Part 2 — Login session reuse (saucedemo, AUTOMATED)
 
-- [ ] Call 1 (blocked/anon): `auth-read-secure-anon.yml` → content does NOT contain `"Sauce Labs Backpack"`.
-- [ ] Seed: `seed_authenticated_session.py` logged in and stored the session under `session:www.saucedemo.com:e2e`.
-- [ ] Call 2 (after login): `auth-read-secure.yml` → HTTP 200, `status="success"`, content contains `"Sauce Labs Backpack"`.
+- [ ] Call 1 (blocked/anon): `auth-read-secure-anon.yml` → content has NO auth-only inventory markers.
+- [ ] Seed: `seed_authenticated_session.py` (copied into the container) logged in and stored the session under `session:saucedemo.com:e2e`.
+- [ ] Call 2 (after login): `auth-read-secure.yml` → HTTP 200, `status="success"`, content contains an auth-only product description (e.g. `"ringspun combed cotton"`).
 
 ### Part 1 — Real-world matrix (gated rows MUST match; best-effort record the verdict)
 
@@ -38,20 +38,20 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 - [ ] c `books.toscrape.com` → success.
 - [ ] d `news.ycombinator.com` → success.
 - [ ] e `quotes.toscrape.com/js/` → **gated**: success, `"The world as we have created it"`.
-- [ ] f `wp.pl` → verdict recorded (expect success).
-- [ ] g `old.reddit.com/r/programming/` → verdict recorded (expect success).
-- [ ] h `stackoverflow.com/questions` → verdict recorded (expect success).
-- [ ] i `github.com/python/cpython` → verdict recorded (expect success).
-- [ ] j `bbc.com/news` → verdict recorded (expect success).
-- [ ] k `www.reddit.com/` → verdict recorded (expect success).
-- [ ] l `justjoin.it/job-offers/...` → verdict recorded (expect success).
-- [ ] m `glassdoor.com/Job/...` → verdict recorded (expect success or intervention).
-- [ ] n `nowsecure.nl` → **gated**: success (Cloudflare auto-solved), non-empty content.
-- [ ] o `indeed.com/jobs?...` → verdict recorded (expect success or intervention).
-- [ ] p `g2.com/` → verdict recorded (expect success or intervention).
-- [ ] q `this-domain-does-not-exist-xyzzy.invalid` → **gated**: `status != "success"`.
-- [ ] s `linkedin.com/jobs/...` → verdict recorded (expect intervention + `vnc_url`).
-- [ ] t `secure.indeed.com/auth?...` → verdict recorded (expect intervention + `vnc_url`).
+- [ ] f `wp.pl` → valid terminal verdict recorded.
+- [ ] g `old.reddit.com/r/programming/` → valid terminal verdict recorded.
+- [ ] h `stackoverflow.com/questions` → valid terminal verdict recorded.
+- [ ] i `github.com/python/cpython` → valid terminal verdict recorded.
+- [ ] j `bbc.com/news` → valid terminal verdict recorded.
+- [ ] k `www.reddit.com/` → valid terminal verdict recorded.
+- [ ] l `justjoin.it/job-offers/...` → valid terminal verdict recorded.
+- [ ] m `glassdoor.com/Job/...` → valid terminal verdict recorded.
+- [ ] n `nowsecure.nl` → valid terminal verdict recorded (success or intervention).
+- [ ] o `indeed.com/jobs?...` → valid terminal verdict recorded.
+- [ ] p `g2.com/` → valid terminal verdict recorded.
+- [ ] q `this-domain-does-not-exist-xyzzy.invalid` → **gated**: HTTP 400, `status != "success"`.
+- [ ] s `linkedin.com/jobs/...` → valid terminal verdict recorded.
+- [ ] t `secure.indeed.com/auth?...` → valid terminal verdict recorded.
 
 ### Verdict
 
@@ -73,5 +73,5 @@ Duration:
 
 ## Additional tasks I did
 
-<!-- Record each best-effort row's actual verdict + serving tier, whether Part 2 was skipped (no .env.local), how
-long the Part 3 human solve took, and any tier the pipeline escalated to unexpectedly. -->
+<!-- Record each best-effort row's actual verdict + serving tier, how long the Part 3 human solve took, and any
+tier the pipeline escalated to unexpectedly. -->

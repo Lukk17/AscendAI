@@ -20,16 +20,26 @@ http:
   auth: inherit
 
 runtime:
-  tests:
-    - type: after-response
+  scripts:
+    - type: tests
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("content does NOT contain auth-only marker (unauthenticated read gated)", function () {
+        test("content has NO auth-only inventory markers (unauthenticated read gated)", function () {
             const b = res.getBody();
             const c = (b.content || b.text || b.markdown || "").toLowerCase();
-            expect(c).to.not.include("sauce labs backpack");
+            const authMarkers = [
+                "lighting modes",
+                "ringspun combed cotton",
+                "quarter-zip fleece",
+                "carry.allthethings",
+                "rib cuff",
+            ];
+            expect(
+                authMarkers.every(m => !c.includes(m)),
+                "anon read must not surface authenticated inventory product descriptions"
+            ).to.equal(true);
         });
 
 settings:
