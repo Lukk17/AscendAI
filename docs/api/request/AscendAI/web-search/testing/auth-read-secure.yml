@@ -8,8 +8,8 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
   body:
     type: json
-    # URL and success marker match .env.local's E2E_LOGIN_SECURE_URL / E2E_LOGIN_SUCCESS_MARKER.
-    # Defaults are the saucedemo inventory page / "Sauce Labs Backpack" (saucedemo standard_user).
+    # Hardcoded saucedemo defaults: the inventory page + "Sauce Labs Backpack" marker.
+    # Only credentials live in AscendWebSearch/e2e/.env.local; URLs/markers stay fixed here.
     data: |-
       {
         "url": "https://www.saucedemo.com/inventory.html",
