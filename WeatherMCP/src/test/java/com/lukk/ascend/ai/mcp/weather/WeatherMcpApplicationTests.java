@@ -17,11 +17,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WeatherMcpApplicationTests {
 
     private static final List<String> EXPECTED_TOOL_NAMES = List.of(
-            "weather.current",
-            "weather.forecast",
-            "weather.historical",
-            "weather.airQuality",
-            "weather.geocode"
+            "weather_current",
+            "weather_forecast",
+            "weather_historical",
+            "weather_airQuality",
+            "weather_geocode"
     );
 
     @Autowired

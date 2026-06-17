@@ -49,7 +49,7 @@ public class WeatherToolService {
         this.meterRegistry = meterRegistry;
     }
 
-    @Tool(name = "weather.current",
+    @Tool(name = "weather_current",
             description = """
                     Get the current observed weather for a city via Open-Meteo. Returns a structured result with
                     resolved location (name, country, country code, lat/lon), temperature in the requested unit,
@@ -101,13 +101,13 @@ public class WeatherToolService {
             return CurrentWeatherResult.upstreamUnavailable();
         } finally {
             sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather.current")
+                    .tag("tool", "weather_current")
                     .tag("outcome", outcome)
                     .register(meterRegistry));
         }
     }
 
-    @Tool(name = "weather.forecast",
+    @Tool(name = "weather_forecast",
             description = """
                     Get a multi-day weather forecast for a city via Open-Meteo. Returns a list of daily entries, each
                     containing max/min temperature, precipitation sum, and weather code. 'days' controls how many days
@@ -166,13 +166,13 @@ public class WeatherToolService {
             return ForecastResult.upstreamUnavailable();
         } finally {
             sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather.forecast")
+                    .tag("tool", "weather_forecast")
                     .tag("outcome", outcome)
                     .register(meterRegistry));
         }
     }
 
-    @Tool(name = "weather.historical",
+    @Tool(name = "weather_historical",
             description = """
                     Get historical observed weather for a city on a specific past date via Open-Meteo (archive API).
                     Returns a single daily entry with max/min temperature, precipitation sum, and weather code.
@@ -230,13 +230,13 @@ public class WeatherToolService {
             return HistoricalWeatherResult.upstreamUnavailable();
         } finally {
             sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather.historical")
+                    .tag("tool", "weather_historical")
                     .tag("outcome", outcome)
                     .register(meterRegistry));
         }
     }
 
-    @Tool(name = "weather.airQuality",
+    @Tool(name = "weather_airQuality",
             description = """
                     Get current air quality data for a city via the Open-Meteo Air Quality API. Returns PM10,
                     PM2.5 (both in µg/m³), US AQI, and European AQI. No temperature unit parameter — air quality
@@ -284,13 +284,13 @@ public class WeatherToolService {
             return AirQualityResult.upstreamUnavailable();
         } finally {
             sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather.airQuality")
+                    .tag("tool", "weather_airQuality")
                     .tag("outcome", outcome)
                     .register(meterRegistry));
         }
     }
 
-    @Tool(name = "weather.geocode",
+    @Tool(name = "weather_geocode",
             description = """
                     Geocode a place name and return up to 'limit' candidate locations via the Open-Meteo Geocoding API.
                     Each candidate contains the resolved name, country, country code, latitude, and longitude.
@@ -336,7 +336,7 @@ public class WeatherToolService {
             return GeocodeResult.upstreamUnavailable();
         } finally {
             sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather.geocode")
+                    .tag("tool", "weather_geocode")
                     .tag("outcome", outcome)
                     .register(meterRegistry));
         }

@@ -80,7 +80,7 @@ class StartupLogConfigTest {
         // given
         stubAcceptingEnv();
         when(env.getProperty("server.ssl.key-store")).thenReturn("/etc/ssl/server.keystore");
-        stubToolProvider(buildToolProvider("weather.current"));
+        stubToolProvider(buildToolProvider("weather_current"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
         // then
@@ -93,7 +93,7 @@ class StartupLogConfigTest {
         // given
         stubAcceptingEnv();
         when(env.getActiveProfiles()).thenReturn(new String[0]);
-        stubToolProvider(buildToolProvider("weather.current"));
+        stubToolProvider(buildToolProvider("weather_current"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
         // then
@@ -105,7 +105,7 @@ class StartupLogConfigTest {
     void onReadinessChange_unknownHostException_fallsBackToLocalhost() {
         // given
         stubAcceptingEnv();
-        stubToolProvider(buildToolProvider("weather.current"));
+        stubToolProvider(buildToolProvider("weather_current"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
         // then
@@ -161,7 +161,7 @@ class StartupLogConfigTest {
     void onReadinessChange_toolProviderReturnsTwoTools_logsToolNames() {
         // given
         stubAcceptingEnv();
-        stubToolProvider(buildToolProvider("weather.current", "weather.forecast"));
+        stubToolProvider(buildToolProvider("weather_current", "weather_forecast"));
         StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
 
         // then
