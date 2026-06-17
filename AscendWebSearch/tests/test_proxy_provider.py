@@ -178,7 +178,7 @@ async def test_flaresolverr_strategy_injects_proxy_into_payload() -> None:
 
 @pytest.mark.asyncio
 async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
-    """When proxy_provider.for_playwright() returns a dict, it is added to browser_context_options."""
+    """When proxy_provider.for_playwright() returns a dict, it is added to browser_new_context_options."""
     from src.reader.strategies.crawlee_strategy import CrawleeStrategy
     from src.validator.url_validator import URLValidator
 
@@ -191,7 +191,7 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
 
     def fake_with_beautifulsoup(*args, **kwargs):
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
-        captured_ctx_options.update(playwright_kwargs.get("browser_context_options", {}))
+        captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()
         mock_crawler.run = AsyncMock()
         mock_crawler.router.default_handler = lambda f: f
@@ -306,7 +306,7 @@ async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location() -> None:
 
 @pytest.mark.asyncio
 async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
-    """When get_storage_state() returns a state dict, it is passed as browser_context_options storage_state."""
+    """When get_storage_state() returns a state dict, it is passed as browser_new_context_options storage_state."""
     from src.reader.strategies.crawlee_strategy import CrawleeStrategy
     from src.validator.url_validator import URLValidator
 
@@ -319,7 +319,7 @@ async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
 
     def fake_with_beautifulsoup(*args, **kwargs):
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
-        captured_ctx_options.update(playwright_kwargs.get("browser_context_options", {}))
+        captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()
         mock_crawler.run = AsyncMock()
         mock_crawler.router.default_handler = lambda f: f
