@@ -63,6 +63,10 @@ public class StartupLogConfig {
         if (event.getState() != ReadinessState.ACCEPTING_TRAFFIC) {
             return;
         }
+        log.info("\n{}", buildStartupLog());
+    }
+
+    String buildStartupLog() {
         String port = env.getProperty("local.server.port", env.getProperty("server.port", "9998"));
         String protocol = env.getProperty("server.ssl.key-store") != null ? "https" : "http";
         String hostAddress = resolveHostAddress();
@@ -105,7 +109,7 @@ public class StartupLogConfig {
         lines.add("      POST  " + localUrl + mcpEndpoint);
         lines.add(DIVIDER);
 
-        log.info("\n{}", String.join("\n", lines));
+        return String.join("\n", lines);
     }
 
     private String resolveHostAddress() {

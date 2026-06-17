@@ -23,6 +23,8 @@ import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 @Service
@@ -78,33 +80,21 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        Timer.Sample sample = Timer.start(meterRegistry);
-        String outcome = OUTCOME_OK;
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_current", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return CurrentWeatherResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return CurrentWeatherResult.cityNotFound(city);
-            }
-
             CurrentWeatherUpstream upstream = client.fetchCurrentWeather(geo.latitude(), geo.longitude(), resolvedUnit);
 
             return toResult(geo, upstream, resolvedUnit);
-        } catch (RestClientException e) {
-            outcome = OUTCOME_ERROR;
+        }, e -> {
             log.warn("Open-Meteo upstream call failed for city={}", city, e);
 
             return CurrentWeatherResult.upstreamUnavailable();
-        } finally {
-            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather_current")
-                    .tag("outcome", outcome)
-                    .register(meterRegistry));
-        }
+        });
     }
 
     @Tool(name = "weather_forecast",
@@ -143,33 +133,21 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        Timer.Sample sample = Timer.start(meterRegistry);
-        String outcome = OUTCOME_OK;
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_forecast", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return ForecastResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return ForecastResult.cityNotFound(city);
-            }
-
             ForecastUpstream upstream = client.fetchForecast(geo.latitude(), geo.longitude(), resolvedDays, resolvedUnit);
 
             return toForecastResult(geo, upstream, resolvedUnit);
-        } catch (RestClientException e) {
-            outcome = OUTCOME_ERROR;
+        }, e -> {
             log.warn("Open-Meteo upstream call failed for city={}", city, e);
 
             return ForecastResult.upstreamUnavailable();
-        } finally {
-            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather_forecast")
-                    .tag("outcome", outcome)
-                    .register(meterRegistry));
-        }
+        });
     }
 
     @Tool(name = "weather_historical",
@@ -207,36 +185,24 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        Timer.Sample sample = Timer.start(meterRegistry);
-        String outcome = OUTCOME_OK;
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_historical", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return HistoricalWeatherResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return HistoricalWeatherResult.cityNotFound(city);
-            }
-
             ForecastUpstream upstream = client.fetchHistoricalWeather(geo.latitude(), geo.longitude(), date, resolvedUnit);
 
             return toHistoricalResult(geo, upstream, resolvedUnit);
-        } catch (RestClientException e) {
-            outcome = OUTCOME_ERROR;
+        }, e -> {
             log.warn("Open-Meteo archive call failed for city={} date={}", city, date, e);
 
             return HistoricalWeatherResult.upstreamUnavailable();
-        } finally {
-            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather_historical")
-                    .tag("outcome", outcome)
-                    .register(meterRegistry));
-        }
+        });
     }
 
-    @Tool(name = "weather_airQuality",
+    @Tool(name = "weather_air_quality",
             description = """
                     Get current air quality data for a city via the Open-Meteo Air Quality API. Returns PM10,
                     PM2.5 (both in µg/m³), US AQI, and European AQI. No temperature unit parameter — air quality
@@ -261,33 +227,21 @@ public class WeatherToolService {
         String resolvedCountryCode = InputValidator.normaliseCountryCode(countryCode);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        Timer.Sample sample = Timer.start(meterRegistry);
-        String outcome = OUTCOME_OK;
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_air_quality", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return AirQualityResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return AirQualityResult.cityNotFound(city);
-            }
-
             AirQualityUpstream upstream = client.fetchAirQuality(geo.latitude(), geo.longitude());
 
             return toAirQualityResult(geo, upstream);
-        } catch (RestClientException e) {
-            outcome = OUTCOME_ERROR;
+        }, e -> {
             log.warn("Open-Meteo air quality call failed for city={}", city, e);
 
             return AirQualityResult.upstreamUnavailable();
-        } finally {
-            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather_airQuality")
-                    .tag("outcome", outcome)
-                    .register(meterRegistry));
-        }
+        });
     }
 
     @Tool(name = "weather_geocode",
@@ -316,9 +270,7 @@ public class WeatherToolService {
 
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        Timer.Sample sample = Timer.start(meterRegistry);
-        String outcome = OUTCOME_OK;
-        try {
+        return timed("weather_geocode", () -> {
             List<GeoResult> results = client.geocodeAll(query, resolvedLimit, resolvedLanguage);
             if (results.isEmpty()) {
                 return GeocodeResult.noResults(query);
@@ -329,17 +281,51 @@ public class WeatherToolService {
                     .toList();
 
             return GeocodeResult.ok(candidates);
-        } catch (RestClientException e) {
-            outcome = OUTCOME_ERROR;
+        }, e -> {
             log.warn("Open-Meteo geocoding call failed for query={}", query, e);
 
             return GeocodeResult.upstreamUnavailable();
+        });
+    }
+
+    /**
+     * Runs the upstream-calling body of a tool while recording the {@value #METRIC_MCP_TOOL_DURATION}
+     * timer tagged with the tool name and an ok/error outcome. A {@link RestClientException} from the
+     * body is routed to {@code onError}, which supplies the tool-specific fallback result; any other
+     * throwable propagates unchanged.
+     */
+    private <T> T timed(String toolName, Supplier<T> body, Function<RestClientException, T> onError) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
+        try {
+            return body.get();
+        } catch (RestClientException e) {
+            outcome = OUTCOME_ERROR;
+            return onError.apply(e);
         } finally {
             sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
-                    .tag("tool", "weather_geocode")
+                    .tag("tool", toolName)
                     .tag("outcome", outcome)
                     .register(meterRegistry));
         }
+    }
+
+    /**
+     * Geocodes the city and returns the first match only when it carries usable coordinates;
+     * an empty result means the caller should report the city as not found.
+     */
+    private Optional<GeoResult> resolveCity(String city, String resolvedCountryCode, String resolvedLanguage) {
+        Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        if (match.isEmpty()) {
+            return Optional.empty();
+        }
+
+        GeoResult geo = match.get();
+        if (geo.latitude() == null || geo.longitude() == null) {
+            return Optional.empty();
+        }
+
+        return match;
     }
 
     private static CurrentWeatherResult toResult(GeoResult geo, CurrentWeatherUpstream upstream, String unit) {

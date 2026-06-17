@@ -20,7 +20,7 @@ class WeatherMcpApplicationTests {
             "weather_current",
             "weather_forecast",
             "weather_historical",
-            "weather_airQuality",
+            "weather_air_quality",
             "weather_geocode"
     );
 
