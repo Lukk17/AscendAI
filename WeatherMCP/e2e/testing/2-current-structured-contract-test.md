@@ -2,9 +2,9 @@
 
 ## What this verifies
 
-- `tools/list` advertises a tool named `weather.current` with the documented parameter schema (`city` required;
+- `tools/list` advertises a tool named `weather_current` with the documented parameter schema (`city` required;
   `countryCode`, `unit`, `language` optional).
-- `weather.current` for Warsaw (no `countryCode`, default `unit`, default `language`) returns HTTP 200 and the
+- `weather_current` for Warsaw (no `countryCode`, default `unit`, default `language`) returns HTTP 200 and the
   JSON-RPC `result` content has `status="ok"`.
 - The `location` object contains `name`, `country`, `countryCode`, numeric `latitude`, numeric `longitude`. Country
   code is `"PL"` (Poland is the dominant geocoding match for "Warsaw").
@@ -74,7 +74,7 @@ bru run "weather-mcp/current-warsaw.yml" --env ascend-local --env-var "mcp_sessi
 
 ## Expected
 
-`list-tools.yml` returns HTTP 200. The JSON-RPC `result.tools` array contains an entry with `name="weather.current"`.
+`list-tools.yml` returns HTTP 200. The JSON-RPC `result.tools` array contains an entry with `name="weather_current"`.
 That entry's `inputSchema.properties` advertises `city` (required), `countryCode`, `unit`, `language`.
 
 `current-warsaw.yml` returns HTTP 200. The JSON-RPC `result` content matches:

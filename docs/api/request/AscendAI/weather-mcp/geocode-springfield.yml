@@ -21,7 +21,7 @@ http:
         "id": 1,
         "method": "tools/call",
         "params": {
-          "name": "weather.geocode",
+          "name": "weather_geocode",
           "arguments": {
             "query": "Springfield",
             "limit": 5

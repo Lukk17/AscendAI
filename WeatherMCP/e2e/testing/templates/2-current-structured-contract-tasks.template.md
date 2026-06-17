@@ -24,7 +24,7 @@ Copy this file to `../runs/<UTC-timestamp>_2-current-structured-contract-tasks.m
 
 ### Expected
 
-- [ ] `list-tools.yml`: `result.tools` contains an entry with `name="weather.current"`
+- [ ] `list-tools.yml`: `result.tools` contains an entry with `name="weather_current"`
 - [ ] `list-tools.yml`: that entry's `inputSchema.properties` advertises `city` (required), `countryCode`, `unit`, `language`
 - [ ] `current-warsaw.yml`: `status="ok"`, `message` is null, `requestedQuery` is null
 - [ ] `location.name` contains "Warsaw" (case-insensitive)

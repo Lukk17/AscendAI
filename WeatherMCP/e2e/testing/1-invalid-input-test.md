@@ -2,11 +2,11 @@
 
 ## What this verifies
 
-- `weather.current` with a blank `city` returns HTTP 200 and `status="invalid_input"` with `message` describing the
+- `weather_current` with a blank `city` returns HTTP 200 and `status="invalid_input"` with `message` describing the
   blank-field failure.
-- `weather.current` with a CRLF-injected `city` is rejected with `status="invalid_input"` (the regex blocks control
+- `weather_current` with a CRLF-injected `city` is rejected with `status="invalid_input"` (the regex blocks control
   characters) before any Open-Meteo call.
-- `weather.current` with a non-ISO `countryCode` (`"USA"` — 3 letters, not alpha-2) is rejected with
+- `weather_current` with a non-ISO `countryCode` (`"USA"` — 3 letters, not alpha-2) is rejected with
   `status="invalid_input"`.
 - In every rejection: `requestedQuery` echoes the verbatim user input; `message` is the validator's own error string
   (no echo of the offending value); `location` / `temperature` / `weatherCode` / `wind` / `observedAt` are all `null`;
