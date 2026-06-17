@@ -13,23 +13,18 @@ services:
     restart: unless-stopped
     ports:
       - "5001:5001"
-    # Torch-based OCR/layout workers exhaust the 64 MB default /dev/shm under the
-    # agent's parallel per-page dispatch and a worker dies (OOM). Give shared memory
-    # real headroom and reserve container memory so workers do not get OOM-killed.
+    # Keep UVICORN_WORKERS and the memory limit in sync: each easyocr worker peaks ~2 GB.
     shm_size: "2gb"
     deploy:
       resources:
         reservations:
           memory: 2g
         limits:
-          memory: 6g
+          memory: 8g
     environment:
       - DOCLING_SERVE_ENABLE_UI=1
       - DOCLING_SERVE_OCR_ENGINE=easyocr
-      # 4 uvicorn workers so the AscendAgent's parallel per-page dispatch
-      # (DocumentRouter.dispatchPagesInParallel) gets real CPU parallelism, not
-      # just async-IO concurrency on a single worker. Tune up for heavy PDF traffic.
-      - UVICORN_WORKERS=4
+      - UVICORN_WORKERS=2
     networks:
       default:
         aliases:
