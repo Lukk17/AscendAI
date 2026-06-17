@@ -58,6 +58,8 @@ class CrawleeStrategy(BaseStrategy):
             "headless": settings.PLAYWRIGHT_HEADLESS,
             "browser_launch_options": {"chromium_sandbox": False},
             "browser_new_context_options": browser_new_context_options,
+            # storage_state is only applied to incognito contexts in crawlee 1.x.
+            "use_incognito_pages": True,
         }
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
             max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
@@ -98,9 +100,10 @@ class CrawleeStrategy(BaseStrategy):
 
     @staticmethod
     async def _handle_crawlee_request(context: Any, result_container: dict[str, str]) -> None:
-        if isinstance(context, PlaywrightCrawlingContext):
+        # The adaptive context renders via Playwright when needed; pull the rendered HTML,
+        # falling back to the static snapshot if no page was rendered.
+        try:
             result_container["html"] = await context.page.content()
-        elif hasattr(context, "soup"):
-            result_container["html"] = str(context.soup)
-        elif hasattr(context, "response"):
-            result_container["html"] = context.response.text
+        except Exception:
+            snapshot = await context.get_snapshot()
+            result_container["html"] = snapshot.html or ""
