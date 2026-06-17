@@ -9,7 +9,7 @@ rotate WAFs and go down, so refine it as real targets are discovered.
 | Row | Tier / strategy | URL | Canary assertion | In automated gate |
 | :-- | :-------------- | :-- | :--------------- | :---------------- |
 | 1 | `curl_cffi` — static article | `https://en.wikipedia.org/wiki/Web_scraping` | content (lowercased) contains `"web scraping"` | yes |
-| 2 | FlareSolverr — Cloudflare WAF | `https://nowsecure.nl` *(provisional)* | `status="success"`, content non-empty (challenge solved, not the block page) | yes |
+| 2 | FlareSolverr — Cloudflare WAF | `https://www.scrapingcourse.com/cloudflare-challenge` | `status="success"`, content contains `"cloudflare challenge"` (FlareSolverr bypassed the challenge) | yes |
 | 3 | Playwright — JS-rendered | `https://quotes.toscrape.com/js/` | content contains `"The world as we have created it"`, which is **absent** from the raw (non-JS) HTML | yes |
 | 4 | NoVNC — hard CAPTCHA | *TBD* | human solves CAPTCHA, content returned | **no — manual / best-effort** |
 | 5–8 | real-world categories | *TBD* (job board, news article, product page, docs page) | per-site, defined when added | no — added later |
@@ -81,7 +81,7 @@ docker exec redis redis-cli --scan --pattern "*en.wikipedia.org*" | ForEach-Obje
 ```
 
 ```powershell
-docker exec redis redis-cli --scan --pattern "*nowsecure.nl*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
+docker exec redis redis-cli --scan --pattern "*scrapingcourse.com*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
 
 ```powershell
@@ -144,7 +144,7 @@ None. The read tool takes a URL string; the "fixtures" are the live external URL
 ## Concurrency
 
 - **Mutates:** Redis — AscendWebSearch session / cookie cache, keys for this test's target domains
-  (`en.wikipedia.org`, `nowsecure.nl`, `quotes.toscrape.com`, and any real-world category sites added later). The
+  (`en.wikipedia.org`, `scrapingcourse.com`, `quotes.toscrape.com`, and any real-world category sites added later). The
   extraction pipeline writes per-domain session cookies on a successful fetch.
 - **Conflicts with:** any other test that reads or scrapes the same target URLs and may flush their Redis keys. In
   the current suite there is no overlap with test 3 (`example.com`) unless `example.com` is added to this table.

@@ -8,9 +8,11 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
   body:
     type: json
+    # A genuine Cloudflare challenge page (the curl tier is blocked) that FlareSolverr
+    # solves and that returns real content -- proves the Cloudflare/FlareSolverr tier.
     data: |-
       {
-        "url": "https://nowsecure.nl",
+        "url": "https://www.scrapingcourse.com/cloudflare-challenge",
         "include_links": false,
         "heavy_mode": false
       }
@@ -26,10 +28,11 @@ runtime:
         test("Cloudflare tier: status is success (challenge solved)", function () {
             expect(res.getBody().status).to.equal("success");
         });
-        test("Cloudflare tier: content non-empty (not the block page)", function () {
+        test("Cloudflare tier: content proves the challenge was bypassed", function () {
             const b = res.getBody();
-            const content = b.content || b.text || b.markdown || "";
+            const content = (b.content || b.text || b.markdown || "").toLowerCase();
             expect(content.length).to.be.at.least(50);
+            expect(content).to.include("cloudflare challenge");
         });
 
 settings:
