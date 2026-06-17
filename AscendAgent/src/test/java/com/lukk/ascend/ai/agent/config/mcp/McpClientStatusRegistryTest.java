@@ -1,5 +1,7 @@
 package com.lukk.ascend.ai.agent.config.mcp;
 
+import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.spec.McpSchema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class McpClientStatusRegistryTest {
 
@@ -90,5 +94,40 @@ class McpClientStatusRegistryTest {
 
         assertThat(registry.connectedNames()).isEmpty();
         assertThat(registry.entries()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("resolveConnectionName prefers the client title when present")
+    void resolveConnectionName_TitlePresent_ReturnsTitle() {
+        McpSyncClient client = mock(McpSyncClient.class);
+        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("audioscribe-server", "Audioscribe Title", "0.0.1"));
+
+        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("Audioscribe Title");
+    }
+
+    @Test
+    @DisplayName("resolveConnectionName falls back to the name when the title is blank")
+    void resolveConnectionName_BlankTitleWithName_ReturnsName() {
+        McpSyncClient client = mock(McpSyncClient.class);
+        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("weather", "", "0.0.1"));
+
+        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("weather");
+    }
+
+    @Test
+    @DisplayName("resolveConnectionName gives two unnamed clients distinct, stable fallback names so they do not collapse")
+    void resolveConnectionName_UnnamedClients_ReturnDistinctStableNames() {
+        McpSyncClient first = mock(McpSyncClient.class);
+        McpSyncClient second = mock(McpSyncClient.class);
+        when(first.getClientInfo()).thenReturn(null);
+        when(second.getClientInfo()).thenReturn(null);
+
+        String firstName = McpClientStatusRegistry.resolveConnectionName(first);
+        String secondName = McpClientStatusRegistry.resolveConnectionName(second);
+
+        assertThat(firstName).startsWith("unknown-");
+        assertThat(secondName).startsWith("unknown-");
+        assertThat(firstName).isNotEqualTo(secondName);
+        assertThat(McpClientStatusRegistry.resolveConnectionName(first)).isEqualTo(firstName);
     }
 }

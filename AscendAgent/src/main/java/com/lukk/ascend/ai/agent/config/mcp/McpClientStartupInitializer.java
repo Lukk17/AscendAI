@@ -68,14 +68,7 @@ public class McpClientStartupInitializer {
     }
 
     private String resolveConnectionName(McpSyncClient client) {
-        var clientInfo = client.getClientInfo();
-        if (clientInfo != null && clientInfo.title() != null && !clientInfo.title().isBlank()) {
-            return clientInfo.title();
-        }
-        if (clientInfo != null && clientInfo.name() != null) {
-            return clientInfo.name();
-        }
-        return "unknown";
+        return McpClientStatusRegistry.resolveConnectionName(client);
     }
 
     private String resolveUrl(String connectionName, Map<String, McpStreamableHttpClientProperties.ConnectionParameters> connections) {

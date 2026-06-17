@@ -15,7 +15,9 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -58,9 +60,10 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
             return new ToolCallback[0];
         }
 
-        return Arrays.stream(new SyncMcpToolCallbackProvider(connectedClients).getToolCallbacks())
+        ToolCallback[] sanitized = Arrays.stream(new SyncMcpToolCallbackProvider(connectedClients).getToolCallbacks())
                 .map(FilteredToolCallbackProvider::sanitizeName)
                 .toArray(ToolCallback[]::new);
+        return disambiguateCollisions(sanitized);
     }
 
     /**
@@ -70,7 +73,7 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
      * sanitized name and Spring AI routes the call back through this wrapper to the
      * original MCP tool, so behavior is unchanged.
      */
-    private static ToolCallback sanitizeName(ToolCallback original) {
+    static ToolCallback sanitizeName(ToolCallback original) {
         ToolDefinition def = original.getToolDefinition();
         String cleaned = ILLEGAL_TOOL_NAME_CHARS.matcher(def.name()).replaceAll("_");
         if (cleaned.equals(def.name())) {
@@ -105,14 +108,52 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
         };
     }
 
+    static ToolCallback[] disambiguateCollisions(ToolCallback[] callbacks) {
+        Map<String, Integer> seenCounts = new HashMap<>();
+        ToolCallback[] result = new ToolCallback[callbacks.length];
+        for (int i = 0; i < callbacks.length; i++) {
+            ToolCallback cb = callbacks[i];
+            String name = cb.getToolDefinition().name();
+            int count = seenCounts.merge(name, 1, Integer::sum);
+            if (count == 1) {
+                result[i] = cb;
+            } else {
+                String disambiguated = name + "_" + count;
+                log.warn("MCP tool name collision: '{}' appeared {} times; renaming occurrence to '{}'",
+                        name, count, disambiguated);
+                ToolDefinition def = cb.getToolDefinition();
+                ToolDefinition renamed = DefaultToolDefinition.builder()
+                        .name(disambiguated)
+                        .description(def.description())
+                        .inputSchema(def.inputSchema())
+                        .build();
+                result[i] = new ToolCallback() {
+                    @Override
+                    public ToolDefinition getToolDefinition() {
+                        return renamed;
+                    }
+
+                    @Override
+                    public ToolMetadata getToolMetadata() {
+                        return cb.getToolMetadata();
+                    }
+
+                    @Override
+                    public String call(String toolInput) {
+                        return cb.call(toolInput);
+                    }
+
+                    @Override
+                    public String call(String toolInput, ToolContext toolContext) {
+                        return cb.call(toolInput, toolContext);
+                    }
+                };
+            }
+        }
+        return result;
+    }
+
     private String resolveConnectionName(McpSyncClient client) {
-        var clientInfo = client.getClientInfo();
-        if (clientInfo != null && clientInfo.title() != null && !clientInfo.title().isBlank()) {
-            return clientInfo.title();
-        }
-        if (clientInfo != null && clientInfo.name() != null) {
-            return clientInfo.name();
-        }
-        return "unknown";
+        return McpClientStatusRegistry.resolveConnectionName(client);
     }
 }
