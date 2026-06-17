@@ -73,7 +73,7 @@ class FlareSolverrStrategy(BaseStrategy):
                     if cookie_dict:
                         await cookie_manager.save_flat_cookies(url, cookie_dict, user_agent, self.profile)
 
-                    if ChallengeDetector.is_login_required(url, html):
+                    if ChallengeDetector.is_login_required(html):
                         logger.warning("FlareSolverrStrategy: Login wall detected on %s", url)
                         raise ChallengeDetectedException(intervention_type="login")
 

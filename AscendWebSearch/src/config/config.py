@@ -76,6 +76,10 @@ class Settings(BaseSettings):
         default=600,
         description="Timeout in seconds for NoVNC manual intervention (default 10 mins)",
     )
+    NOVNC_COOKIE_SYNC_POLL_SECONDS: float = Field(
+        default=5.0,
+        description="Poll interval in seconds for the NoVNC cookie-sync background monitor",
+    )
     PLAYWRIGHT_HEADLESS: bool = Field(
         default=False,
         description=(

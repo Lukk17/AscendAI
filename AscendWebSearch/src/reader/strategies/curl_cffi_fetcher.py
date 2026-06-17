@@ -80,7 +80,7 @@ async def fetch_with_curl_cffi(
                 )
                 hops += 1
 
-            if ChallengeDetector.is_login_required(response.url, response.text):
+            if ChallengeDetector.is_login_required(response.text):
                 logger.warning("%s: Login wall detected on %s", strategy_label, url)
                 raise ChallengeDetectedException(intervention_type="login")
 

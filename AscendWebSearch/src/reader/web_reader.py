@@ -63,8 +63,6 @@ class WebReader:
         rules = blocklist_loader.load_rules()
         self.url_validator = URLValidator(rules)
 
-        # In-process cache for read results.  When a Redis-backed session store is
-        # present we also write there so results survive a process restart.
         self._memory_cache: dict[str, tuple[dict[str, Any], float]] = {}
 
     def _build_strategies(self, profile: str | None = None) -> dict[str, BaseStrategy]:
@@ -124,18 +122,18 @@ class WebReader:
         return strategies
 
     async def _has_stored_session(self, url: str, profile: str | None) -> bool:
-        """Return True when a non-expired auth/WAF session exists for this URL+profile.
-
-        A stored session (e.g. a captured cf_clearance) is only usable by the browser
-        tier, which pins the matching user-agent. Routing browser-first then keeps a
-        curl tier from tripping the challenge and short-circuiting to NoVNC before the
-        clearance is ever replayed.
-        """
         return await cookie_manager.get_storage_state(url, profile) is not None
+
+    async def _prefer_browser(self, url: str, heavy_mode: bool, profile: str | None) -> bool:
+        return heavy_mode or await self._has_stored_session(url, profile)
+
+    @staticmethod
+    def _record_strategy_outcome(name: str, outcome: str, dlabel: str, elapsed: float) -> None:
+        STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome=outcome, domain=dlabel).inc()
+        STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(elapsed)
 
     @staticmethod
     def _budget_exceeded(started_at: float, name: str) -> bool:
-        # NoVNC returns 428 immediately, so it is exempt from the wall-clock budget.
         if name == NOVNC_STRATEGY_NAME:
             return False
 
@@ -190,7 +188,7 @@ class WebReader:
             return cached
 
         logger.info("Reading URL: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
-        prefer_browser = heavy_mode or await self._has_stored_session(url, profile)
+        prefer_browser = await self._prefer_browser(url, heavy_mode, profile)
         strategies_to_run = self._select_strategies(url, prefer_browser, profile)
         started_at = time.perf_counter()
         budget_exhausted = False
@@ -204,6 +202,17 @@ class WebReader:
             if result:
                 self._cache_put(key, result)
                 return result
+
+        if budget_exhausted and NOVNC_STRATEGY_NAME in strategies_to_run:
+            novnc_result = await self._execute_strategy(
+                NOVNC_STRATEGY_NAME,
+                strategies_to_run[NOVNC_STRATEGY_NAME],
+                url,
+                output_format=output_format,
+            )
+            if novnc_result:
+                self._cache_put(key, novnc_result)
+                return novnc_result
 
         return self._create_failure_response(url, budget_exhausted=budget_exhausted)
 
@@ -223,7 +232,7 @@ class WebReader:
             return cached
 
         logger.info("Reading URL with links: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
-        prefer_browser = heavy_mode or await self._has_stored_session(url, profile)
+        prefer_browser = await self._prefer_browser(url, heavy_mode, profile)
         strategies_to_run = self._select_strategies(url, prefer_browser, profile)
         started_at = time.perf_counter()
         budget_exhausted = False
@@ -242,6 +251,22 @@ class WebReader:
                     return result
 
                 logger.info("Strategy %s validation failed after annotation.", name)
+
+        if budget_exhausted and NOVNC_STRATEGY_NAME in strategies_to_run:
+            html = await self._execute_html_strategy(
+                NOVNC_STRATEGY_NAME, strategies_to_run[NOVNC_STRATEGY_NAME], url
+            )
+            if html:
+                content, links = annotate_links(html, url, link_filter)
+                if self.validator.validate(content):
+                    result = {
+                        "content": content,
+                        "links": links,
+                        "status": "success",
+                        "mode": NOVNC_STRATEGY_NAME,
+                    }
+                    self._cache_put(key, result)
+                    return result
 
         return self._create_failure_response(url, budget_exhausted=budget_exhausted)
 
@@ -265,57 +290,47 @@ class WebReader:
             if output_format == "structured":
                 html = await strategy.get_html(url)
                 if not html:
-                    STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="empty", domain=dlabel).inc()
-                    STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+                    self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
                     logger.info("Strategy %s returned empty HTML for structured extraction.", name)
                     return None
 
                 structured = extract_structured(html)
                 content = structured.get("content", "")
                 if self.validator.validate(content):
-                    STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success", domain=dlabel).inc()
-                    STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+                    self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
                     return {**structured, "status": "success", "mode": name}
 
-                STRATEGY_ATTEMPTS_TOTAL.labels(
-                    strategy=name, outcome="validation_failed", domain=dlabel
-                ).inc()
-                STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+                elapsed = time.perf_counter() - started
+                self._record_strategy_outcome(name, "validation_failed", dlabel, elapsed)
                 logger.info("Strategy %s structured validation failed.", name)
                 return None
 
             content = await strategy.extract(url)
             if self.validator.validate(content):
-                STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success", domain=dlabel).inc()
-                STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
+                self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
                 return {"content": content, "status": "success", "mode": name}
 
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="validation_failed", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
+            self._record_strategy_outcome(
+                name, "validation_failed", dlabel, time.perf_counter() - started
+            )
             logger.info("Strategy %s validation failed.", name)
-
             return None
         except ChallengeDetectedException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
-            # Fall through to the next (heavier) tier — FlareSolverr and the headful
-            # Playwright tier can auto-solve many WAF challenges. NoVNC is the last tier
-            # in every ladder, so a genuinely unsolvable challenge still reaches it.
-            logger.info("Strategy %s detected a challenge on %s; falling through to the next tier.", name, url)
+            self._record_strategy_outcome(
+                name, "challenge_detected", dlabel, time.perf_counter() - started
+            )
+            logger.info(
+                "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url
+            )
             return None
         except HumanInterventionRequiredException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="human_intervention", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+            self._record_strategy_outcome(
+                name, "human_intervention", dlabel, time.perf_counter() - started
+            )
             raise
         except Exception as e:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="exception", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
+            self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
             logger.warning("Strategy %s failed for %s: %s", name, url, e)
-
             return None
 
     async def _execute_html_strategy(
@@ -331,30 +346,26 @@ class WebReader:
             logger.info("--- Strategy %s STARTED ---", name)
             html = await strategy.get_html(url)
             if html:
-                STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="success", domain=dlabel).inc()
-                STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
+                self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
                 return html
 
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="empty", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
+            self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
             logger.info("Strategy %s returned empty HTML.", name)
         except HumanInterventionRequiredException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="human_intervention", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
+            self._record_strategy_outcome(
+                name, "human_intervention", dlabel, time.perf_counter() - started
+            )
             raise
         except ChallengeDetectedException:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="challenge_detected", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
-            # Fall through to the next (heavier) tier; NoVNC is the last tier in the ladder.
-            logger.info("Strategy %s detected a challenge on %s; falling through to the next tier.", name, url)
+            self._record_strategy_outcome(
+                name, "challenge_detected", dlabel, time.perf_counter() - started
+            )
+            logger.info(
+                "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url
+            )
             return ""
         except Exception as e:
-            STRATEGY_ATTEMPTS_TOTAL.labels(strategy=name, outcome="exception", domain=dlabel).inc()
-            STRATEGY_DURATION_SECONDS.labels(strategy=name).observe(time.perf_counter() - started)
-
+            self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
             logger.warning("Strategy %s get_html failed for %s: %s", name, url, e)
 
         return ""

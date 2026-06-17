@@ -8,12 +8,14 @@ DICT_PATH = Path(__file__).parent / "challenge_dictionary.json"
 try:
     with DICT_PATH.open(encoding="utf-8") as f:
         _BOT_DICT = json.load(f)
-except Exception:
+except (OSError, json.JSONDecodeError):
     _BOT_DICT = {
         "waf_script_signatures": [],
         "waf_strict_phrases": [],
         "login_title_patterns": [],
     }
+
+_LOGIN_REDIRECT_INDICATORS: tuple[str, ...] = ("?login", "continue=", "signin", "login=", "auth?")
 
 
 class ChallengeDetector:
@@ -42,17 +44,13 @@ class ChallengeDetector:
         if re.search(r"Ray ID: \w+", prefix, re.IGNORECASE):
             return True
 
-        # A Turnstile widget, a cf_clearance token, or a DataDome tag only signals a block
-        # on an interstitial-sized page. Real pages embed these scripts while serving full
-        # content (e.g. nowsecure.nl hosts a Turnstile widget; every DataDome-protected page
-        # loads its tag), so size-guard these weak markers.
         if len(html_content) < settings.CHALLENGE_WALL_MAX_BYTES:
             return "cf-turnstile" in prefix or "cf_clearance" in prefix or "datadome" in prefix
 
         return False
 
     @staticmethod
-    def is_login_required(url: str, html_content: str) -> bool:  # noqa: ARG004
+    def is_login_required(html_content: str) -> bool:
         """
         Checks if the response HTML title indicates an authentication wall.
 
@@ -67,7 +65,6 @@ class ChallengeDetector:
         title_matches = re.finditer(r"<title[^>]*>(.*?)</title>", prefix, re.IGNORECASE | re.DOTALL)
         for match in title_matches:
             title_text = match.group(1).strip().lower()
-            # Word-boundary match so a phrase like "sign in" doesn't fire on "design industry".
             for pattern in _BOT_DICT.get("login_title_patterns", []):
                 if re.search(rf"\b{re.escape(pattern)}\b", title_text):
                     return True
@@ -84,6 +81,4 @@ class ChallengeDetector:
             return False
 
         url_lower = url.lower()
-        redirect_indicators = ["?login", "continue=", "signin", "login=", "auth?"]
-
-        return any(indicator in url_lower for indicator in redirect_indicators)
+        return any(indicator in url_lower for indicator in _LOGIN_REDIRECT_INDICATORS)

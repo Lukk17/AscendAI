@@ -107,6 +107,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"e2e/**" = ["S105", "S106"]
 "tests/**" = [
     "S101", "S105", "S106", "PLR2004",
     "SIM117",   # nested `with` mocks are clearer than one combined block

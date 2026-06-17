@@ -104,7 +104,7 @@ def extract_text_with_fallback(html: str) -> str:
         return traf_text or ""
 
     read_result = _readability_extract(html)
-    read_content = read_result.get("content", "")
+    read_content: str = read_result.get("content", "")
     read_len = len(read_content)
 
     if traf_text and traf_len >= read_len:

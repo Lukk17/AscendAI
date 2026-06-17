@@ -1,9 +1,11 @@
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
 import trafilatura
 from playwright.async_api import Browser, BrowserContext, Page
+from playwright.async_api import Error as PlaywrightError
 from playwright_stealth import Stealth
 
 from src.api.exceptions import ChallengeDetectedException
@@ -18,11 +20,7 @@ from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
 
-# Networkidle is polled in 1-second windows so the loop can early-exit on
-# detected challenge walls instead of blocking for the full extraction window.
 _NETWORKIDLE_POLL_MS = 1000
-
-# Convert the per-strategy timeout from seconds to milliseconds.
 _MS_PER_SECOND = 1000
 
 
@@ -60,30 +58,25 @@ class PlaywrightStrategy(BaseStrategy):
             timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
             initial_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
 
-            # Poll incrementally for networkidle. A login wall exits immediately; a Cloudflare
-            # JS/managed challenge is given time to auto-clear in this headful browser before we
-            # escalate, since it self-resolves in ~5-10s rather than needing a human.
-            max_challenge_polls = min(
-                int(settings.CHALLENGE_CLEAR_WAIT_SECONDS), int(settings.EXTRACT_TIMEOUT)
-            )
-            challenge_polls = 0
-            for _ in range(int(settings.EXTRACT_TIMEOUT)):
+            response_status = initial_response.status if initial_response else 200
+            poll_start = time.perf_counter()
+            extract_deadline = poll_start + settings.EXTRACT_TIMEOUT
+            challenge_deadline = poll_start + settings.CHALLENGE_CLEAR_WAIT_SECONDS
+
+            content = ""
+            while time.perf_counter() < extract_deadline:
                 try:
                     content = await page.content()
-                except Exception:
-                    # A challenge reload/navigation is in flight; re-check on the next poll.
+                except PlaywrightError:
                     await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
                     continue
 
-                response_status = initial_response.status if initial_response else 200
-
-                if ChallengeDetector.is_login_required(page.url, content):
+                if ChallengeDetector.is_login_required(content):
                     logger.warning("PlaywrightStrategy: Login wall detected on %s (early exit)", url)
                     raise ChallengeDetectedException(intervention_type="login")
 
                 if ChallengeDetector.is_blocked(response_status, content):
-                    challenge_polls += 1
-                    if challenge_polls >= max_challenge_polls:
+                    if time.perf_counter() >= challenge_deadline:
                         logger.warning(
                             "PlaywrightStrategy: WAF/Cloudflare challenge did not auto-clear within "
                             "%ss on %s; escalating",
@@ -97,7 +90,7 @@ class PlaywrightStrategy(BaseStrategy):
                 try:
                     await page.wait_for_load_state("networkidle", timeout=_NETWORKIDLE_POLL_MS)
                     break
-                except Exception:
+                except PlaywrightError:
                     pass
 
             await page.wait_for_timeout(settings.DYNAMIC_CONTENT_WAIT)
@@ -109,7 +102,13 @@ class PlaywrightStrategy(BaseStrategy):
                 "PlaywrightStrategy: Finished rendering %s. Extracted HTML Length: %d", url, len(content)
             )
 
-            if ChallengeDetector.is_login_required(page.url, content):
+            if ChallengeDetector.is_blocked(response_status, content):
+                logger.warning(
+                    "PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url
+                )
+                raise ChallengeDetectedException(intervention_type="captcha")
+
+            if ChallengeDetector.is_login_required(content):
                 logger.warning(
                     "PlaywrightStrategy: Late-stage Login wall detected on %s. Content Length: %d",
                     url,
@@ -119,7 +118,6 @@ class PlaywrightStrategy(BaseStrategy):
 
             return content
         finally:
-            # Only the context is torn down. The browser process lives across requests.
             await context.close()
 
     async def _scroll_page(self, page: Page) -> None:

@@ -14,21 +14,10 @@ from src.reader.strategies.base_strategy import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-# Chrome DevTools Protocol port. Exposed deliberately per ADR-003 accepted
-# security posture; the operator runs NoVNC on a single-tenant host.
 _CDP_REMOTE_DEBUGGING_PORT = 9222
 _VNC_WINDOW_WIDTH_PX = 1920
 _VNC_WINDOW_HEIGHT_PX = 1080
-
-# Two minutes for the initial navigation to the challenge URL. Anything slower
-# than that is almost certainly a stuck page rather than a slow CAPTCHA load.
 _INITIAL_NAV_TIMEOUT_MS = 120_000
-
-# Cookie-sync poll interval. Five seconds keeps Redis write rate sane while still
-# catching the moment the human finishes the challenge.
-_COOKIE_SYNC_POLL_SECONDS = 5.0
-
-# Ngrok API call budget. Failure falls back to SELENIUM_BROWSER_VNC_URL.
 _NGROK_API_TIMEOUT_SECONDS = 5.0
 
 _active_monitor_tasks: set[asyncio.Task[None]] = set()
@@ -79,23 +68,17 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                     current_url = page.url or ""
 
                     if intervention_type == "captcha":
-                        # Persist exactly once the challenge is solved, then stop. "Solved" means
-                        # the wall is gone (covers DataDome and others) or a Cloudflare clearance
-                        # cookie was issued. Saving once avoids overwriting good cookies if the
-                        # page later re-arms.
                         page_content = await page.content()
                         cleared = bool(page_content) and not ChallengeDetector.is_blocked(200, page_content)
                         if cleared or _has_clearance_cookie(storage_state):
                             user_agent = await page.evaluate("navigator.userAgent")
                             await cookie_manager.save_storage_state(url, storage_state, user_agent)
                             logger.info(
-                                "NoVNC Strategy: captcha solved for %s, captured session and stopping monitor",
+                                "NoVNC Strategy: captcha solved for %s, captured session and stopping",
                                 url,
                             )
                             break
                     else:
-                        # Login: capture auth cookies as they appear; stop once the browser has
-                        # navigated off the login/challenge page.
                         user_agent = await page.evaluate("navigator.userAgent")
                         await cookie_manager.save_storage_state(url, storage_state, user_agent)
                         if not ChallengeDetector.is_login_redirect_url(current_url) and current_url != url:
@@ -106,7 +89,7 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                 except Exception as e:
                     logger.debug("NoVNC Strategy: Transient error syncing session cookies: %s", e)
 
-                await asyncio.sleep(_COOKIE_SYNC_POLL_SECONDS)
+                await asyncio.sleep(settings.NOVNC_COOKIE_SYNC_POLL_SECONDS)
     except Exception:
         logger.exception("Background noVNC monitoring task failed")
     finally:
@@ -119,21 +102,13 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
 
 class NoVNCStrategy(BaseStrategy):
     async def extract(self, url: str) -> str:
-        # get_html always raises HumanInterventionRequiredException; we never
-        # reach the post-call path. The explicit raise satisfies the type checker
-        # without leaving a dead "return ''" that PyCharm flags as redundant.
         await self.get_html(url)
-        raise AssertionError("unreachable: NoVNCStrategy.get_html always raises")  # pragma: no cover
+        raise AssertionError("unreachable: NoVNCStrategy.get_html always raises")
 
     async def get_html(self, url: str) -> str:
-        # is_login_required short-circuits on empty html, so only the URL-pattern check
-        # can ever flip this branch. Keep the URL check; the is_login_required("") call
-        # was dead logic that never contributed.
         intervention_type = "login" if ChallengeDetector.is_login_redirect_url(url) else "captcha"
         final_vnc_url = await self._resolve_public_vnc_url()
 
-        # Hold a strong reference so the event loop's weak set doesn't GC the task mid-flight,
-        # which silently kills the cookie sync and leaves users stuck re-logging.
         task = asyncio.create_task(_monitor_for_cookies(url, intervention_type))
         _active_monitor_tasks.add(task)
         task.add_done_callback(_active_monitor_tasks.discard)

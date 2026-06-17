@@ -5,7 +5,11 @@ from pathlib import Path
 from typing import Any
 
 import trafilatura
-from crawlee.crawlers import AdaptivePlaywrightCrawler, PlaywrightCrawlingContext
+from crawlee.crawlers import (
+    AdaptivePlaywrightCrawler,
+    AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPreNavCrawlingContext,
+)
 
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
@@ -58,7 +62,6 @@ class CrawleeStrategy(BaseStrategy):
             "headless": settings.PLAYWRIGHT_HEADLESS,
             "browser_launch_options": {"chromium_sandbox": False},
             "browser_new_context_options": browser_new_context_options,
-            # storage_state is only applied to incognito contexts in crawlee 1.x.
             "use_incognito_pages": True,
         }
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
@@ -67,21 +70,20 @@ class CrawleeStrategy(BaseStrategy):
         )
 
         @crawler.router.default_handler
-        async def request_handler(context: Any) -> None:
+        async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
             await self._handle_crawlee_request(context, result_container)
 
-        @crawler.pre_navigation_hook  # type: ignore[arg-type]
-        async def enable_adblock(context: PlaywrightCrawlingContext) -> None:
+        @crawler.pre_navigation_hook
+        async def enable_adblock(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
             await context.page.route("**/*", self.url_validator.route_handler)
 
-        # Point Crawlee at an out-of-tree storage dir and purge stale state on each run.
         storage_dir = await asyncio.to_thread(self._prepare_storage_dir, settings.CRAWLEE_STORAGE_DIR)
-        os.environ.setdefault("CRAWLEE_STORAGE_DIR", storage_dir)
+        os.environ["CRAWLEE_STORAGE_DIR"] = storage_dir
 
         await crawler.run([url])
         html = result_container.get("html", "")
 
-        if ChallengeDetector.is_login_required(url, html):
+        if ChallengeDetector.is_login_required(html):
             logger.warning("CrawleeStrategy: Login wall detected on %s", url)
             raise ChallengeDetectedException(intervention_type="login")
 
@@ -99,9 +101,9 @@ class CrawleeStrategy(BaseStrategy):
         return str(p)
 
     @staticmethod
-    async def _handle_crawlee_request(context: Any, result_container: dict[str, str]) -> None:
-        # The adaptive context renders via Playwright when needed; pull the rendered HTML,
-        # falling back to the static snapshot if no page was rendered.
+    async def _handle_crawlee_request(
+        context: AdaptivePlaywrightCrawlingContext, result_container: dict[str, str]
+    ) -> None:
         try:
             result_container["html"] = await context.page.content()
         except Exception:

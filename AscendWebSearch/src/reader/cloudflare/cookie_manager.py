@@ -76,7 +76,7 @@ class CookieManager:
         if self._initialized:
             return
 
-        self.redis_client: redis.Redis | None = None  # type: ignore[type-arg]
+        self.redis_client: redis.Redis | None = None
         if settings.REDIS_URL:
             try:
                 self.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -171,7 +171,8 @@ class CookieManager:
             return None
         auth_entry = record.get("auth") or record.get("waf")
         if auth_entry:
-            return auth_entry.get("user_agent")
+            user_agent = auth_entry.get("user_agent")
+            return user_agent if isinstance(user_agent, str) else None
         return None
 
     async def save_storage_state(
@@ -233,7 +234,8 @@ class CookieManager:
         if record is None or "auth" not in record:
             return 0.0
         auth_entry = record["auth"]
-        elapsed = time.time() - auth_entry.get("saved_at", 0)
+        saved_at = float(auth_entry.get("saved_at", 0) or 0)
+        elapsed = time.time() - saved_at
         remaining = settings.SESSION_AUTH_TTL_SECONDS - elapsed
         return max(remaining, 0.0)
 

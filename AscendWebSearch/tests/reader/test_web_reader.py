@@ -38,7 +38,7 @@ async def test_read_all_strategies_fail_returns_failure_response():
     ):
         result = await WebReader().read("http://fail.com")
     assert result["status"] == "error"
-    assert result["reason"] in ("budget_exhausted", "all_tiers_failed")
+    assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
@@ -173,10 +173,7 @@ async def test_read_returns_failure_when_all_tiers_including_novnc_fail():
     ):
         result = await WebReader().read("http://test.com")
     assert result["status"] == "error"
-    assert result["reason"] in (
-        "budget_exhausted",
-        "all_tiers_failed",
-    )  # all strategies including NoVNC failed without recursion
+    assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
@@ -264,7 +261,7 @@ async def test_read_with_links_all_strategies_fail():
     ):
         result = await WebReader().read_with_links("http://test.com")
     assert result["status"] == "error"
-    assert result["reason"] in ("budget_exhausted", "all_tiers_failed")
+    assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
@@ -341,9 +338,15 @@ async def test_execute_html_strategy_returns_empty_string_when_html_blank():
 
 @pytest.mark.asyncio
 async def test_read_bails_when_budget_exceeded():
-    """READ_TOTAL_BUDGET shortcut path."""
+    """READ_TOTAL_BUDGET shortcut path: NoVNC rescue also fails, so reason stays budget_exhausted."""
     reader = WebReader()
-    with patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0):
+    with (
+        patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.extract",
+            new=AsyncMock(return_value=""),
+        ),
+    ):
         result = await reader.read("http://test.com")
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"
@@ -352,7 +355,13 @@ async def test_read_bails_when_budget_exceeded():
 @pytest.mark.asyncio
 async def test_read_with_links_bails_when_budget_exceeded():
     reader = WebReader()
-    with patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0):
+    with (
+        patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+    ):
         result = await reader.read_with_links("http://test.com")
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"

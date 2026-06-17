@@ -34,7 +34,7 @@ def test_is_login_required_detects_marker_in_large_page(large_cf_page: str):
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
         {"waf_script_signatures": [], "waf_strict_phrases": [], "login_title_patterns": ["sign in"]},
     ):
-        assert ChallengeDetector.is_login_required("https://linkedin.com", large_cf_page) is True
+        assert ChallengeDetector.is_login_required(large_cf_page) is True
 
 
 def test_is_blocked_detects_ray_id_in_large_page(large_waf_page: str):
@@ -50,7 +50,7 @@ def test_is_login_required_clean_large_page_returns_false():
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
         {"waf_script_signatures": [], "waf_strict_phrases": [], "login_title_patterns": ["sign in"]},
     ):
-        assert ChallengeDetector.is_login_required("https://linkedin.com/feed", big_clean) is False
+        assert ChallengeDetector.is_login_required(big_clean) is False
 
 
 def test_challenge_detection_max_bytes_setting_respected():
