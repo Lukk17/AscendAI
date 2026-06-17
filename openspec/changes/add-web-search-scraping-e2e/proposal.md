@@ -106,12 +106,13 @@ are caught.
   no auth markers), then **after** a scripted login + seed, a fresh read returns logged-in content. saucedemo is a
   real login with a real session (not a mock). The reuse on the second call is the regression-prone behavior this
   part locks down.
-- **Part 3 — CAPTCHA human-solve + capture (Cloudflare interactive, human, runs first):** read **blocked** returns
-  HTTP 428 + the intervention `vnc_url`; the human solves the Cloudflare interactive challenge in NoVNC; we assert the
-  resulting `cf_clearance` is **captured into the session store** (`session:nopecha.com:default`). Target
-  `https://nopecha.com/demo/cloudflare`. Cross-request *reuse* is not asserted — an interactive `cf_clearance` is
-  bound to the solving browser's fingerprint/IP and the demo re-arms, so reuse is not reliably observable; capture is
-  the deterministic signal that the human-intervention path works.
+- **Part 3 — CAPTCHA human-solve + capture (reCAPTCHA v2, human, runs first):** read **blocked** returns HTTP 428 +
+  the intervention `vnc_url`; the human solves the reCAPTCHA in NoVNC; we assert the solved session is **captured into
+  the session store** (`session:google.com:default` with a `_GRECAPTCHA` cookie). Target is the Google reCAPTCHA v2
+  demo — the widget always needs a human click, so a headful browser can't auto-pass it and FlareSolverr can't solve
+  it (Cloudflare/DataDome targets are now auto-passed, so they no longer reliably need a human). `_GRECAPTCHA` is set
+  only on interaction, so its capture proves a human acted. Cross-request *reuse* is not asserted — a reCAPTCHA token
+  is single-use; capture is the deterministic signal that the human-intervention path works.
 
 ### Setup cost class
 
@@ -140,7 +141,7 @@ environment, never commit creds.
 Bruno requests under `docs/api/request/AscendAI/web-search/testing/`: the `realworld/` matrix (one per Part-1 row),
 `captcha-clearance-blocked.yml` (Part 3 Call 1), and `auth-read-secure-anon.yml` / `auth-read-secure.yml` (Part 2).
 Plus the Playwright harness `e2e/harness/seed_authenticated_session.py` (Part 2 scripted saucedemo login) and a Redis
-`GET session:nopecha.com:default` capture check (Part 3, after the human solve). Part 3 needs no harness — the human
+`GET session:google.com:default` capture check (Part 3, after the human solve). Part 3 needs no harness — the human
 solves via the scraper's own NoVNC flow.
 
 ### Number assignment

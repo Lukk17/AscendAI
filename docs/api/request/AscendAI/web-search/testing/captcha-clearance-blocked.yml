@@ -8,12 +8,12 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
   body:
     type: json
-    # Part 3 Call 1 — read the Cloudflare interactive challenge with NO clearance stored.
-    # FlareSolverr cannot auto-solve an interactive challenge, so the scraper escalates to
-    # NoVNC and returns a vnc_url for a human to solve.
+    # Part 3 Call 1 — read the Google reCAPTCHA v2 demo with NO session stored. The widget
+    # always requires a human click and cannot be auto-passed or solved by FlareSolverr, so the
+    # scraper escalates to NoVNC and returns a vnc_url for a human to solve the reCAPTCHA.
     data: |-
       {
-        "url": "https://nopecha.com/demo/cloudflare",
+        "url": "https://www.google.com/recaptcha/api2/demo",
         "include_links": false,
         "heavy_mode": false
       }

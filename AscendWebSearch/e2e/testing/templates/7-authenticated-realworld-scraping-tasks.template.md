@@ -22,8 +22,8 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 - [ ] Run by the **main agent** (NOT a fanned-out e2e-runner subagent — its output never reaches the user).
 - [ ] Call 1 (blocked): `captcha-clearance-blocked.yml` → HTTP 428, `status="human_intervention_required"` + non-empty `vnc_url`.
 - [ ] Main agent **printed the `vnc_url` verbatim in the chat** for the human to open.
-- [ ] Human solve: opened the `vnc_url`, solved the Cloudflare interactive challenge in the NoVNC browser; confirmed back to the agent.
-- [ ] Capture check: `docker exec redis redis-cli GET "session:nopecha.com:default"` → JSON whose `waf` entry contains a `cf_clearance` cookie.
+- [ ] Human solve: opened the `vnc_url`, solved the reCAPTCHA in the NoVNC browser; confirmed back to the agent.
+- [ ] Capture check: `docker exec redis redis-cli GET "session:google.com:default"` → JSON whose `auth` entry contains a `_GRECAPTCHA` cookie.
 
 ### Part 2 — Login session reuse (saucedemo, AUTOMATED)
 

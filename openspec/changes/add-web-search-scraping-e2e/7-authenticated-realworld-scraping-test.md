@@ -10,9 +10,12 @@ Three things, all against **real sites** (no mocks):
 2. **Login → session reuse** (automated, saucedemo) — a **2-call before/after**: read the page **(1) blocked** (no
    session) returns no logged-in content, then **(2) after** a scripted login + session seed returns logged-in
    content. Proves the auth session is **stored and reused**.
-3. **CAPTCHA human-solve + capture** (human, Cloudflare interactive, runs **first**) — read **blocked** returns HTTP
-   428 + a human-intervention `vnc_url`; the human solves the interactive challenge in the NoVNC browser; we then
-   assert the resulting `cf_clearance` was **captured into the session store**.
+3. **CAPTCHA human-solve + capture** (human, reCAPTCHA v2, runs **first**) — read **blocked** returns HTTP 428 + a
+   human-intervention `vnc_url`; the human solves the reCAPTCHA in the NoVNC browser; we then assert the solved
+   session (the `_GRECAPTCHA` cookie reCAPTCHA sets on interaction) was **captured into the session store**. The
+   Google reCAPTCHA v2 demo is used because it always requires a human click — it can't be auto-passed by a headful
+   browser or solved by FlareSolverr — so it reliably needs a human, and a captured `_GRECAPTCHA` cookie proves one
+   acted.
 
 ### Contract (how the service signals each verdict)
 
@@ -23,12 +26,11 @@ Three things, all against **real sites** (no mocks):
 
 ### Why Part 3 asserts capture, not cross-request reuse
 
-A Cloudflare **interactive** clearance (`cf_clearance`) is cryptographically bound to the exact browser fingerprint
-(TLS/JA3, headful build) and IP that solved it. The human solves it in the NoVNC browser, but a later read runs in a
-different browser context — so the clearance is rejected on reuse — and interactive-captcha demo pages re-arm the
-challenge on every visit anyway. Cross-request reuse is therefore not reliably observable. **Capture** (the solved
-clearance landing in the session store) is the deterministic, real signal that the human-intervention path works.
-(Contrast Part 2: an app session cookie is not fingerprint-bound, so it reuses cleanly.)
+A reCAPTCHA token (and a WAF clearance like a Cloudflare `cf_clearance`) is single-use or bound to the exact browser
+fingerprint (TLS/JA3, headful build) and IP that solved it. The human solves it in the NoVNC browser, but a later read
+runs in a different browser context, so it is not reusable. Cross-request reuse is therefore not meaningfully
+observable. **Capture** (the solved session landing in the session store) is the deterministic, real signal that the
+human-intervention path works. (Contrast Part 2: an app session cookie is not fingerprint-bound, so it reuses cleanly.)
 
 ### Part 1 — Real-world URL matrix (single-call verdict)
 
@@ -82,19 +84,22 @@ the login-reuse behavior in CI.
   `"lighting modes"`) — present only on the logged-in inventory. The stored session is **reused** through the browser
   tier. (Product *titles* like "Sauce Labs Backpack" are stripped by extraction, so the markers are descriptions.)
 
-### Part 3 — CAPTCHA human-solve + capture (Cloudflare interactive, HUMAN, runs FIRST)
+### Part 3 — CAPTCHA human-solve + capture (reCAPTCHA v2, HUMAN, runs FIRST)
 
-`https://nopecha.com/demo/cloudflare` is a real Cloudflare **interactive challenge** page that does not auto-clear in
-a headful browser (it re-arms on every visit), so it reliably exercises the NoVNC human-solve path.
+`https://www.google.com/recaptcha/api2/demo` always renders the reCAPTCHA v2 "I'm not a robot" widget. A headful
+browser cannot auto-pass it (the checkbox needs a human click) and FlareSolverr cannot solve it, so the scraper
+escalates to NoVNC and a human solves the reCAPTCHA — reliably exercising the human-solve path that a Cloudflare or
+DataDome target no longer does (the scraper now auto-passes those).
 
-- **Call 1 — blocked:** read `https://nopecha.com/demo/cloudflare` with **no** clearance. Expect HTTP **428
+- **Call 1 — blocked:** read `https://www.google.com/recaptcha/api2/demo` with **no** session. Expect HTTP **428
   Precondition Required**, `status="human_intervention_required"` with a non-empty `vnc_url`.
 - **Human solve (main thread, first):** the runner **must print the `vnc_url` verbatim into the chat** (see
-  "Human-intervention forwarding" below). The human opens it and solves the Cloudflare interactive challenge in the
-  NoVNC browser. The monitor stores the captured `cf_clearance` under `session:nopecha.com:default`.
-- **Capture check:** assert the session store now holds the solved clearance — `session:nopecha.com:default` exists
-  with a `cf_clearance` cookie in its `waf` entry. This is the deterministic proof the human-solve path captured the
-  clearance. (Cross-request *reuse* is not asserted — see "Why Part 3 asserts capture, not cross-request reuse".)
+  "Human-intervention forwarding" below). The human opens it and solves the reCAPTCHA in the NoVNC browser (click the
+  checkbox, solve any image challenge). The monitor captures the cleared session under `session:google.com:default`.
+- **Capture check:** assert the session store now holds the solved session — `session:google.com:default` exists with
+  a `_GRECAPTCHA` cookie in its `auth` entry. reCAPTCHA sets `_GRECAPTCHA` only on interaction, and the widget can't be
+  auto-passed, so its presence is deterministic proof a human solved it. (Cross-request *reuse* is not asserted — see
+  "Why Part 3 asserts capture, not cross-request reuse".)
 
 #### Human-intervention forwarding (mandatory)
 
@@ -169,10 +174,10 @@ bru run "web-search/testing/captcha-clearance-blocked.yml" --env ascend-local
 Part 3, Capture check — after you solve the challenge via the returned `vnc_url`.
 
 ```powershell
-docker exec redis redis-cli GET "session:nopecha.com:default"
+docker exec redis redis-cli GET "session:google.com:default"
 ```
 
-Expect a JSON value whose `waf` entry contains a `cf_clearance` cookie.
+Expect a JSON value whose `auth` entry contains a `_GRECAPTCHA` cookie.
 
 Part 2, Call 1 — login blocked (anonymous).
 
@@ -210,7 +215,7 @@ bru run "web-search/testing/realworld" --env ascend-local
 - **Part 2 — login reuse:** Call 1 (anon) content has **no** auth-only inventory markers; Call 2 (after login)
   returns `status="success"` with an auth-only product description.
 - **Part 3 — human-solve capture:** Call 1 returns HTTP `428`, `status="human_intervention_required"` + a `vnc_url`;
-  after the human solve, `session:nopecha.com:default` holds a `cf_clearance` in its `waf` entry.
+  after the human solve, `session:google.com:default` holds a `_GRECAPTCHA` cookie in its `auth` entry.
 
 ## Fixtures
 
@@ -222,7 +227,8 @@ The login-and-seed harness is a Playwright script under `e2e/harness/`.
 ## Concurrency
 
 - **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains, `saucedemo.com` (`e2e` profile),
-  and `nopecha.com` (`default` profile).
-- **Conflicts with:** test 6 and any test sharing a target domain's session key. Within this test, Part 2's sequence
-  (anon → seed → authed) is **strictly ordered**, and Part 3's human solve runs first on the main session.
+  and `google.com` (`default` profile, the reCAPTCHA demo).
+- **Conflicts with:** test 6 and any test sharing a target domain's session key. Part 3 targets `google.com`, which no
+  matrix row touches, so there is no overlap. Within this test, Part 2's sequence (anon → seed → authed) is **strictly
+  ordered**, and Part 3's human solve runs first on the main session.
 - **Serial:** false vs non-overlapping tests; Part 3's human solve runs first on the main session.
