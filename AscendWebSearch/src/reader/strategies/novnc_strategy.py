@@ -79,14 +79,18 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                     current_url = page.url or ""
 
                     if intervention_type == "captcha":
-                        # Persist exactly once, the moment a clearance cookie is issued, then stop.
-                        # Re-saving on later polls risks overwriting the good clearance with a
-                        # re-challenged state captured after the page re-armed.
-                        if _has_clearance_cookie(storage_state):
+                        # Persist exactly once the challenge is solved, then stop. "Solved" means
+                        # the wall is gone (covers DataDome and others) or a Cloudflare clearance
+                        # cookie was issued. Saving once avoids overwriting good cookies if the
+                        # page later re-arms.
+                        page_content = await page.content()
+                        cleared = bool(page_content) and not ChallengeDetector.is_blocked(200, page_content)
+                        if cleared or _has_clearance_cookie(storage_state):
                             user_agent = await page.evaluate("navigator.userAgent")
                             await cookie_manager.save_storage_state(url, storage_state, user_agent)
                             logger.info(
-                                "NoVNC Strategy: captcha clearance captured for %s, stopping monitor", url
+                                "NoVNC Strategy: captcha solved for %s, captured session and stopping monitor",
+                                url,
                             )
                             break
                     else:

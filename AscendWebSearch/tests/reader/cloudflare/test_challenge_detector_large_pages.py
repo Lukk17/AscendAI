@@ -92,3 +92,19 @@ def test_small_interstitial_with_turnstile_is_blocked():
     """A small interstitial page dominated by the Turnstile widget is still a block."""
     html = "<html><body><div class='cf-turnstile'></div></body></html>"
     assert ChallengeDetector.is_blocked(200, html) is True
+
+
+def test_large_page_loading_datadome_tag_is_not_blocked():
+    """A real DataDome-protected page loads the datadome tag while serving full content;
+    it must not be flagged as a challenge wall on the basis of that tag alone."""
+    html = "<html><head><script src='https://js.datadome.co/tags.js'></script></head><body>" + (
+        "real job listings " * 6_000
+    ) + "</body></html>"
+    assert len(html) > 50_000
+    assert ChallengeDetector.is_blocked(200, html) is False
+
+
+def test_small_datadome_interstitial_is_blocked():
+    """A small DataDome challenge interstitial is still a block."""
+    html = "<html><body><script src='https://js.datadome.co/tags.js'></script>captcha</body></html>"
+    assert ChallengeDetector.is_blocked(403, html) is True

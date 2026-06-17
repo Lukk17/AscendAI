@@ -68,6 +68,8 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
     page.goto = AsyncMock()
     page.evaluate = AsyncMock(return_value="Mozilla/5.0")
     page.url = "https://nowsecure.nl/"
+    # Page stays a challenge wall throughout, so cf_clearance (not "cleared") is the trigger.
+    page.content = AsyncMock(return_value="<html><title>Just a moment...</title></html>")
 
     context = MagicMock()
     context.new_page = AsyncMock(return_value=page)
@@ -103,3 +105,52 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
     mock_save.assert_awaited_once()
     saved_state = mock_save.await_args.args[1]
     assert any(c["name"] == "cf_clearance" for c in saved_state["cookies"])
+
+
+@pytest.mark.asyncio
+async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance():
+    """For non-Cloudflare captchas (e.g. DataDome) there is no cf_clearance cookie; the
+    monitor must capture once the challenge wall is gone."""
+    from src.reader.strategies import novnc_strategy as ns
+
+    page = MagicMock()
+    page.goto = AsyncMock()
+    page.evaluate = AsyncMock(return_value="Mozilla/5.0")
+    page.url = "https://www.indeed.com/jobs"
+    # First poll: still on the DataDome wall. Second poll: the real page (no block markers).
+    page.content = AsyncMock(
+        side_effect=[
+            "<html><body>Pardon Our Interruption datadome</body></html>",
+            "<html><body>" + "real job listings " * 50 + "</body></html>",
+        ]
+    )
+
+    context = MagicMock()
+    context.new_page = AsyncMock(return_value=page)
+    context.storage_state = AsyncMock(
+        return_value={"cookies": [{"name": "datadome", "value": "SOLVED"}], "origins": []}
+    )
+
+    browser = MagicMock()
+    browser.new_context = AsyncMock(return_value=context)
+    browser.close = AsyncMock()
+
+    mock_p = MagicMock()
+    mock_p.__aenter__ = AsyncMock(return_value=mock_p)
+    mock_p.__aexit__ = AsyncMock(return_value=False)
+    mock_p.chromium.launch = AsyncMock(return_value=browser)
+
+    with (
+        patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=mock_p),
+        patch(
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
+            new=AsyncMock(),
+        ) as mock_save,
+        patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch("src.reader.strategies.novnc_strategy.asyncio.sleep", new=AsyncMock()),
+    ):
+        await ns._monitor_for_cookies("https://www.indeed.com/jobs", "captcha")
+
+    mock_save.assert_awaited_once()
+    saved_state = mock_save.await_args.args[1]
+    assert any(c["name"] == "datadome" for c in saved_state["cookies"])

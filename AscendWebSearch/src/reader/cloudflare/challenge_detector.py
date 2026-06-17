@@ -42,11 +42,12 @@ class ChallengeDetector:
         if re.search(r"Ray ID: \w+", prefix, re.IGNORECASE):
             return True
 
-        # An embedded Turnstile widget or a cf_clearance token only signals a block on an
-        # interstitial-sized page. Real pages can host a Turnstile widget while serving full
-        # content (e.g. nowsecure.nl), so size-guard these weak markers.
+        # A Turnstile widget, a cf_clearance token, or a DataDome tag only signals a block
+        # on an interstitial-sized page. Real pages embed these scripts while serving full
+        # content (e.g. nowsecure.nl hosts a Turnstile widget; every DataDome-protected page
+        # loads its tag), so size-guard these weak markers.
         if len(html_content) < settings.CHALLENGE_WALL_MAX_BYTES:
-            return "cf-turnstile" in prefix or "cf_clearance" in prefix
+            return "cf-turnstile" in prefix or "cf_clearance" in prefix or "datadome" in prefix
 
         return False
 
