@@ -89,6 +89,25 @@ def test_is_login_required():
     )
 
 
+def test_is_login_required_ignores_login_substring_within_words():
+    """Word-boundary match: 'sign in' must not fire on 'design industry'."""
+    assert (
+        ChallengeDetector.is_login_required(
+            "https://example.com",
+            "<html><head><title>Web Design Industry News</title></head><body></body></html>",
+        )
+        is False
+    )
+    # A genuine login title still fires.
+    assert (
+        ChallengeDetector.is_login_required(
+            "https://example.com",
+            "<html><head><title>Sign in to your account</title></head><body></body></html>",
+        )
+        is True
+    )
+
+
 def test_is_login_required_svg_bypass():
     # Proves the finditer logic prevents <svg> title tags from masking the real <title>
     dirty_html = "<html><body><svg><title id='logo'>Indeed Logo</title></svg><title dir='ltr'>Sign In | Indeed Accounts</title></body></html>"

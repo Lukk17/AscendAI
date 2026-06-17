@@ -67,8 +67,9 @@ class ChallengeDetector:
         title_matches = re.finditer(r"<title[^>]*>(.*?)</title>", prefix, re.IGNORECASE | re.DOTALL)
         for match in title_matches:
             title_text = match.group(1).strip().lower()
+            # Word-boundary match so a phrase like "sign in" doesn't fire on "design industry".
             for pattern in _BOT_DICT.get("login_title_patterns", []):
-                if pattern in title_text:
+                if re.search(rf"\b{re.escape(pattern)}\b", title_text):
                     return True
 
         return False
