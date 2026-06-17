@@ -41,23 +41,23 @@ class CrawleeStrategy(BaseStrategy):
         storage_state = await cookie_manager.get_storage_state(url, self.profile)
         fp = self.fingerprint
 
-        browser_context_options: dict[str, Any] = {
+        browser_new_context_options: dict[str, Any] = {
             "locale": fp.locale,
             "timezone_id": fp.timezone_id,
             "geolocation": fp.geolocation,
             "permissions": ["geolocation"],
         }
         if storage_state is not None:
-            browser_context_options["storage_state"] = storage_state
+            browser_new_context_options["storage_state"] = storage_state
 
         proxy = proxy_provider.for_playwright()
         if proxy is not None:
-            browser_context_options["proxy"] = proxy
+            browser_new_context_options["proxy"] = proxy
 
         playwright_kwargs: Any = {
             "headless": settings.PLAYWRIGHT_HEADLESS,
             "browser_launch_options": {"chromium_sandbox": False},
-            "browser_context_options": browser_context_options,
+            "browser_new_context_options": browser_new_context_options,
         }
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
             max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
