@@ -26,6 +26,14 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("hit the login wall: page says access requires login", function () {
+            const b = res.getBody();
+            const c = (b.content || b.text || b.markdown || "").toLowerCase();
+            expect(
+                c.includes("you can only access") || c.includes("when you are logged in"),
+                "anon read must surface saucedemo's login-required message (confirms the login wall)"
+            ).to.equal(true);
+        });
         test("content has NO auth-only inventory markers (unauthenticated read gated)", function () {
             const b = res.getBody();
             const c = (b.content || b.text || b.markdown || "").toLowerCase();

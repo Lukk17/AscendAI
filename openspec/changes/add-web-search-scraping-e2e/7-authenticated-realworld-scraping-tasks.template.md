@@ -27,7 +27,7 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 
 ### Part 2 — Login session reuse (saucedemo, AUTOMATED)
 
-- [ ] Call 1 (blocked/anon): `auth-read-secure-anon.yml` → content has NO auth-only inventory markers.
+- [ ] Call 1 (blocked/anon): `auth-read-secure-anon.yml` → confirms the login wall (login-required message present) and NO auth-only inventory markers.
 - [ ] Seed: `seed_authenticated_session.py` (copied into the container) logged in and stored the session under `session:saucedemo.com:e2e`.
 - [ ] Call 2 (after login): `auth-read-secure.yml` → HTTP 200, `status="success"`, content contains an auth-only product description (e.g. `"ringspun combed cotton"`).
 

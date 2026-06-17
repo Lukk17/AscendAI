@@ -74,8 +74,10 @@ saucedemo.com is a **real** web app: a real form login that sets a real session 
 `storage_state` and replayed through the real browser tier. It is automatable (no human, no ban risk), so it gates
 the login-reuse behavior in CI.
 
-- **Call 1 — blocked:** read `https://www.saucedemo.com/inventory.html` with **no** session. Expect HTTP 200 but the
-  content has **none** of the authenticated-inventory product descriptions (the SPA serves the login screen).
+- **Call 1 — blocked (confirm the login wall):** read `https://www.saucedemo.com/inventory.html` with **no** session.
+  Expect HTTP 200, the content carries saucedemo's login-required message ("You can only access … when you are logged
+  in") and has **none** of the authenticated-inventory product descriptions. This proves the read hit the login wall
+  *before* any login is attempted.
 - **Seed:** run the harness `e2e/harness/seed_authenticated_session.py` — scripted login with saucedemo's hardcoded
   public credentials → capture `storage_state` → store under `session:saucedemo.com:e2e` (the key uses the
   *registrable* domain; `www.` is stripped).
