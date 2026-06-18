@@ -81,3 +81,12 @@ scrape_configs:
     relabel_configs:
       - target_label: service
         replacement: minio
+
+  - job_name: minio-bucket
+    metrics_path: /minio/v2/metrics/bucket
+    static_configs:
+      - targets:
+          - host.docker.internal:9070
+    relabel_configs:
+      - target_label: service
+        replacement: minio

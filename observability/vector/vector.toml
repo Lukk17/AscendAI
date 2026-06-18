@@ -19,35 +19,11 @@ encoding.codec = "text"
   service = "{{ container_name }}"
   source = "docker"
 
-# ─── Placeholder sinks for cloud migration ────────────────────────────────────
-# To migrate log shipping, uncomment the desired sink, set the required env var,
-# and remove (or keep) the loki sink above. Services are never touched.
-
-# [sinks.datadog]
-# type = "datadog_logs"
-# inputs = ["docker_logs"]
-# default_api_key = "${DATADOG_API_KEY}"
-# site = "datadoghq.eu"
-#
-#   [sinks.datadog.encoding]
-#   codec = "json"
-
-# [sinks.cloudwatch]
-# type = "aws_cloudwatch_logs"
-# inputs = ["docker_logs"]
-# region = "${AWS_REGION}"
-# group_name = "ascend-ai"
-# stream_name = "{{ container_name }}"
-#
-#   [sinks.cloudwatch.encoding]
-#   codec = "json"
-
-# [sinks.splunk]
-# type = "splunk_hec_logs"
-# inputs = ["docker_logs"]
-# endpoint = "${SPLUNK_HEC_ENDPOINT}"
-# token = "${SPLUNK_HEC_TOKEN}"
-# index = "ascend-ai"
-#
-#   [sinks.splunk.encoding]
-#   codec = "json"
+# ─── Cloud migration ──────────────────────────────────────────────────────────
+# To ship logs to a managed backend instead of (or alongside) Loki, add a sink
+# with inputs = ["docker_logs"] of type datadog_logs, aws_cloudwatch_logs, or
+# splunk_hec_logs and its credentials, then drop or keep the loki sink above.
+# Service containers are never touched. See the sink reference for each type:
+# https://vector.dev/docs/reference/configuration/sinks/
+# Do NOT paste literal dollar-brace env-var examples here: Vector interpolates
+# those tokens even inside comments and fails to start when the variable is unset.
