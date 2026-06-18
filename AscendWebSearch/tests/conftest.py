@@ -76,7 +76,7 @@ def mock_mcp_lifespan_global():
     @asynccontextmanager
     async def _mock_run():
         async with anyio.create_task_group() as tg:
-            setattr(main_module.mcp.session_manager, "_task_group", tg)
+            main_module.mcp.session_manager._task_group = tg
             try:
                 yield tg
             finally:

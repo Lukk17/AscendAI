@@ -4,6 +4,12 @@ from pathlib import Path
 
 from src.config.config import settings
 
+
+def _contains_whole_word(text: str, word: str) -> bool:
+    """Return True when *word* appears as a whole word inside *text*."""
+    return bool(re.search(rf"\b{re.escape(word)}\b", text))
+
+
 DICT_PATH = Path(__file__).parent / "challenge_dictionary.json"
 try:
     with DICT_PATH.open(encoding="utf-8") as f:
@@ -66,7 +72,7 @@ class ChallengeDetector:
         for match in title_matches:
             title_text = match.group(1).strip().lower()
             for pattern in _BOT_DICT.get("login_title_patterns", []):
-                if re.search(rf"\b{re.escape(pattern)}\b", title_text):
+                if _contains_whole_word(title_text, pattern):
                     return True
 
         return False
@@ -81,4 +87,5 @@ class ChallengeDetector:
             return False
 
         url_lower = url.lower()
+
         return any(indicator in url_lower for indicator in _LOGIN_REDIRECT_INDICATORS)

@@ -12,6 +12,7 @@ secret credentials should read them from the environment, never commit them here
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from dataclasses import dataclass
 from typing import Any
@@ -25,7 +26,7 @@ class LoginService:
     login_url: str
     secure_url: str
     username_selector: str
-    password_selector: str
+    pw_selector: str
     submit_selector: str
 
 
@@ -33,11 +34,11 @@ SERVICES: tuple[LoginService, ...] = (
     LoginService(
         name="saucedemo",
         username="standard_user",
-        password="secret_sauce",
+        password=os.environ.get("SAUCEDEMO_PASSWORD", "secret_sauce"),
         login_url="https://www.saucedemo.com/",
         secure_url="https://www.saucedemo.com/inventory.html",
         username_selector="#user-name",
-        password_selector="#password",
+        pw_selector="#password",
         submit_selector="#login-button",
     ),
 )
@@ -54,7 +55,7 @@ async def _seed_service(service: LoginService) -> None:
         page = await context.new_page()
         await page.goto(service.login_url)
         await page.fill(service.username_selector, service.username)
-        await page.fill(service.password_selector, service.password)
+        await page.fill(service.pw_selector, service.password)
         await page.click(service.submit_selector)
         await page.wait_for_load_state("networkidle")
         storage_state: dict[str, Any] = await context.storage_state()

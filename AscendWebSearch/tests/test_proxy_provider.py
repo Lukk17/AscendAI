@@ -306,7 +306,8 @@ async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location() -> None:
 
 @pytest.mark.asyncio
 async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
-    """When get_storage_state() returns a state dict, it is passed as browser_new_context_options storage_state."""
+    """When get_storage_state() returns a state dict, it is passed as
+    browser_new_context_options storage_state."""
     from src.reader.strategies.crawlee_strategy import CrawleeStrategy
     from src.validator.url_validator import URLValidator
 

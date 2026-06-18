@@ -114,9 +114,7 @@ def test_extract_structured_prefers_traf_when_traf_below_threshold_but_longer_th
     assert result["source"] == "trafilatura"
 
 
-def test_extract_text_with_fallback_prefers_traf_when_shorter_than_threshold_but_longer_than_readability() -> (
-    None
-):
+def test_extract_text_with_fallback_prefers_traf_below_threshold_when_longer_than_readability() -> None:
     """traf below threshold but still longer than readability → traf text is returned."""
     short_traf = "x" * 50
     very_short_read: dict[str, str] = {

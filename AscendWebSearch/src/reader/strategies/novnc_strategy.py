@@ -77,6 +77,7 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                                 "NoVNC Strategy: captcha solved for %s, captured session and stopping",
                                 url,
                             )
+
                             break
                     else:
                         user_agent = await page.evaluate("navigator.userAgent")
@@ -85,6 +86,7 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                             logger.info(
                                 "NoVNC Strategy: login resolved (now at %s), stopping monitor", current_url
                             )
+
                             break
                 except Exception as e:
                     logger.debug("NoVNC Strategy: Transient error syncing session cookies: %s", e)
@@ -103,6 +105,7 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
 class NoVNCStrategy(BaseStrategy):
     async def extract(self, url: str) -> str:
         await self.get_html(url)
+
         raise AssertionError("unreachable: NoVNCStrategy.get_html always raises")
 
     async def get_html(self, url: str) -> str:
@@ -127,9 +130,11 @@ class NoVNCStrategy(BaseStrategy):
             async with httpx.AsyncClient(timeout=_NGROK_API_TIMEOUT_SECONDS) as client:
                 response = await client.get(api_url)
                 response.raise_for_status()
+
                 return self._extract_url_from_ngrok_response(response.json(), api_url)
         except Exception as e:
             logger.warning("Failed to dynamically resolve PUBLIC_VNC_URL: %s", e)
+
             return f"{settings.SELENIUM_BROWSER_VNC_URL}/vnc.html?autoconnect=true"
 
     @staticmethod

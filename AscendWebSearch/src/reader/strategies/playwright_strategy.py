@@ -73,6 +73,7 @@ class PlaywrightStrategy(BaseStrategy):
 
                 if ChallengeDetector.is_login_required(content):
                     logger.warning("PlaywrightStrategy: Login wall detected on %s (early exit)", url)
+
                     raise ChallengeDetectedException(intervention_type="login")
 
                 if ChallengeDetector.is_blocked(response_status, content):
@@ -83,6 +84,7 @@ class PlaywrightStrategy(BaseStrategy):
                             settings.CHALLENGE_CLEAR_WAIT_SECONDS,
                             url,
                         )
+
                         raise ChallengeDetectedException(intervention_type="captcha")
                     await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
                     continue
@@ -103,9 +105,8 @@ class PlaywrightStrategy(BaseStrategy):
             )
 
             if ChallengeDetector.is_blocked(response_status, content):
-                logger.warning(
-                    "PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url
-                )
+                logger.warning("PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url)
+
                 raise ChallengeDetectedException(intervention_type="captcha")
 
             if ChallengeDetector.is_login_required(content):
@@ -114,6 +115,7 @@ class PlaywrightStrategy(BaseStrategy):
                     url,
                     len(content),
                 )
+
                 raise ChallengeDetectedException(intervention_type="login")
 
             return content

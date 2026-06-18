@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def _readability_extract(html: str) -> dict[str, Any]:
     """Extract main content via readability-lxml and return a structured dict."""
     doc = Document(html)
+
     return {
         "title": doc.title() or "",
         "content": doc.summary() or "",
@@ -44,6 +45,7 @@ def _trafilatura_structured(html: str) -> dict[str, Any] | None:
         import json  # local import to avoid top-level json dep ordering issue
 
         parsed: dict[str, Any] = json.loads(raw)
+
         return {
             "title": parsed.get("title") or "",
             "content": parsed.get("text") or "",
@@ -54,6 +56,7 @@ def _trafilatura_structured(html: str) -> dict[str, Any] | None:
         }
     except Exception:
         logger.debug("trafilatura structured extraction failed", exc_info=True)
+
         return None
 
 

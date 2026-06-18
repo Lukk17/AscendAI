@@ -156,6 +156,7 @@ class CookieManager:
         state = await self.get_storage_state(url, profile)
         if state is None:
             return {}
+
         return _extract_flat_cookies(state)
 
     async def get_user_agent(
@@ -172,7 +173,9 @@ class CookieManager:
         auth_entry = record.get("auth") or record.get("waf")
         if auth_entry:
             user_agent = auth_entry.get("user_agent")
+
             return user_agent if isinstance(user_agent, str) else None
+
         return None
 
     async def save_storage_state(
@@ -237,6 +240,7 @@ class CookieManager:
         saved_at = float(auth_entry.get("saved_at", 0) or 0)
         elapsed = time.time() - saved_at
         remaining = settings.SESSION_AUTH_TTL_SECONDS - elapsed
+
         return max(remaining, 0.0)
 
     # ---------------------------------------------------------------------------
@@ -282,7 +286,9 @@ class CookieManager:
         state = await self.get_storage_state(url, profile)
         if state is None:
             return None
+
         ua = await self.get_user_agent(url, profile)
+
         return {
             "cookies": _extract_flat_cookies(state),
             "user_agent": ua or "",
@@ -293,7 +299,7 @@ class CookieManager:
         url: str,
         cookies: dict[str, str],
         user_agent: str,
-        ttl_seconds: int = 7200,  # noqa: ARG002 - TTL now driven by auth/WAF split
+        _ttl_seconds: int = 7200,
         profile: str | None = None,
     ) -> None:
         """Legacy: accept flat cookie dict and persist via save_flat_cookies."""
@@ -313,6 +319,7 @@ class CookieManager:
                 if raw:
                     REDIS_OPS_TOTAL.labels(op="get", result="hit").inc()
                     loaded: dict[str, Any] = json.loads(raw)
+
                     return loaded
                 REDIS_OPS_TOTAL.labels(op="get", result="miss").inc()
             except Exception as e:
@@ -336,6 +343,7 @@ class CookieManager:
                 )
                 REDIS_OPS_TOTAL.labels(op="set", result="success").inc()
                 logger.info("[CookieManager] Saved session to Redis for %s", domain)
+
                 return
             except Exception as e:
                 REDIS_OPS_TOTAL.labels(op="set", result="error").inc()

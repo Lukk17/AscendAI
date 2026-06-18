@@ -54,7 +54,8 @@ def test_is_login_required():
     )
     assert (
         ChallengeDetector.is_login_required(
-            "<html><head><title>Welcome to the home page</title></head><body>Sign in to continue</body></html>",
+            "<html><head><title>Welcome to the home page</title></head>"
+            "<body>Sign in to continue</body></html>",
         )
         is False
     )
@@ -64,18 +65,10 @@ def test_is_login_required():
         )
         is True
     )
+    assert ChallengeDetector.is_login_required("<html><body>Sign in to continue</body></html>") is False
+    assert ChallengeDetector.is_login_required("<html><body>Enter your password</body></html>") is False
     assert (
-        ChallengeDetector.is_login_required("<html><body>Sign in to continue</body></html>")
-        is False
-    )
-    assert (
-        ChallengeDetector.is_login_required("<html><body>Enter your password</body></html>")
-        is False
-    )
-    assert (
-        ChallengeDetector.is_login_required(
-            "<html><head><title>Welcome</title></head><body></body></html>"
-        )
+        ChallengeDetector.is_login_required("<html><head><title>Welcome</title></head><body></body></html>")
         is False
     )
 
@@ -97,7 +90,12 @@ def test_is_login_required_ignores_login_substring_within_words():
 
 
 def test_is_login_required_svg_bypass():
-    dirty_html = "<html><body><svg><title id='logo'>Indeed Logo</title></svg><title dir='ltr'>Sign In | Indeed Accounts</title></body></html>"
+    dirty_html = (
+        "<html><body>"
+        "<svg><title id='logo'>Indeed Logo</title></svg>"
+        "<title dir='ltr'>Sign In | Indeed Accounts</title>"
+        "</body></html>"
+    )
     assert ChallengeDetector.is_login_required(dirty_html) is True
 
 

@@ -573,7 +573,6 @@ async def test_crawlee_handle_request_playwright_context():
     assert "playwright" in result_container["html"]
 
 
-
 @pytest.mark.asyncio
 async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_raises():
     """When page.content() raises, _handle_crawlee_request must fall back to get_snapshot()."""

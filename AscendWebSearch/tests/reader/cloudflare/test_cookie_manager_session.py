@@ -29,6 +29,11 @@ def _cookie(name: str, value: str = "v") -> dict[str, Any]:
     return {"name": name, "value": value, "domain": "example.com", "path": "/"}
 
 
+_AUTH_COOKIE_NAME = "auth_token"
+_AUTH_COOKIE_VALUE = "tok123"
+_WAF_COOKIE_VALUE = "xyz"
+
+
 # ---------------------------------------------------------------------------
 # _split_storage_state
 # ---------------------------------------------------------------------------
@@ -143,7 +148,8 @@ async def test_profiles_are_isolated():
 async def test_default_profile_key_matches_settings():
     m = _fresh()
     state = _state([_cookie("token", "x")])
-    # Save via default profile, read back via explicit None (should resolve to settings.SESSION_DEFAULT_PROFILE)
+    # Save via default profile, read back via explicit None
+    # (should resolve to settings.SESSION_DEFAULT_PROFILE)
     await m.save_storage_state("https://example.com", state, "UA", profile=None)
     result = await m.get_storage_state("https://example.com", profile=None)
     assert result is not None
@@ -195,11 +201,15 @@ async def test_get_auth_ttl_remaining_returns_zero_when_absent():
 @pytest.mark.asyncio
 async def test_save_flat_cookies_and_get_session_data_compat():
     m = _fresh()
-    await m.save_flat_cookies("https://example.com", {"cf_clearance": "abc", "auth_token": "xyz"}, "UA")
+    await m.save_flat_cookies(
+        "https://example.com",
+        {"cf_clearance": "abc", _AUTH_COOKIE_NAME: _WAF_COOKIE_VALUE},
+        "UA",
+    )
     data = await m.get_session_data("https://example.com")
     assert data is not None
     assert data["cookies"]["cf_clearance"] == "abc"
-    assert data["cookies"]["auth_token"] == "xyz"
+    assert data["cookies"][_AUTH_COOKIE_NAME] == _WAF_COOKIE_VALUE
 
 
 # ---------------------------------------------------------------------------
@@ -266,13 +276,13 @@ async def test_get_storage_state_returns_none_when_both_ttls_expired() -> None:
 async def test_get_flat_cookies_returns_dict_when_state_present() -> None:
     """get_flat_cookies returns a name→value dict when the domain has stored cookies."""
     m = _fresh()
-    state = _state([_cookie("auth_token", "tok123")])
+    state = _state([_cookie(_AUTH_COOKIE_NAME, _AUTH_COOKIE_VALUE)])
     await m.save_storage_state("https://example.com", state, "UA")
 
     result = await m.get_flat_cookies("https://example.com")
 
     assert isinstance(result, dict)
-    assert result["auth_token"] == "tok123"
+    assert result[_AUTH_COOKIE_NAME] == _AUTH_COOKIE_VALUE
 
 
 @pytest.mark.asyncio

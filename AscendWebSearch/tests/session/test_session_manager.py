@@ -26,7 +26,7 @@ async def test_status_returns_none_when_no_session(mgr: SessionManager):
             "src.session.session_manager.cookie_manager._load_record",
             new=AsyncMock(return_value=None),
         ):
-            info = await mgr.status("https://linkedin.com")
+            info = await mgr.status("https://example.com")
 
     assert info.status == "none"
     assert info.auth_ttl_remaining == 0.0
@@ -42,7 +42,7 @@ async def test_status_returns_expired_when_record_exists_but_ttl_zero(mgr: Sessi
             "src.session.session_manager.cookie_manager._load_record",
             new=AsyncMock(return_value={"auth": {"saved_at": 0}}),
         ):
-            info = await mgr.status("https://linkedin.com")
+            info = await mgr.status("https://example.com")
 
     assert info.status == "expired"
 
@@ -57,7 +57,7 @@ async def test_status_returns_active_when_ttl_positive(mgr: SessionManager):
             "src.session.session_manager.cookie_manager._load_record",
             new=AsyncMock(return_value={"auth": {"saved_at": 1_000_000.0}}),
         ):
-            info = await mgr.status("https://linkedin.com")
+            info = await mgr.status("https://example.com")
 
     assert info.status == "active"
     assert info.auth_ttl_remaining == 86400.0
@@ -74,7 +74,7 @@ async def test_status_returns_active_with_no_auth_key_in_record(mgr: SessionMana
             "src.session.session_manager.cookie_manager._load_record",
             new=AsyncMock(return_value={"cookies": []}),
         ):
-            info = await mgr.status("https://linkedin.com")
+            info = await mgr.status("https://example.com")
 
     assert info.status == "active"
     assert info.last_validated is None
@@ -99,7 +99,7 @@ async def test_validate_returns_false_when_ttl_expired(mgr: SessionManager):
         "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
         new=AsyncMock(return_value=0.0),
     ):
-        result = await mgr.validate("https://linkedin.com")
+        result = await mgr.validate("https://example.com")
 
     assert result is False
 
@@ -116,7 +116,7 @@ async def test_validate_returns_false_when_no_cookies(mgr: SessionManager):
             new=AsyncMock(return_value={"cookies": [], "origins": []}),
         ),
     ):
-        result = await mgr.validate("https://linkedin.com")
+        result = await mgr.validate("https://example.com")
 
     assert result is False
 
@@ -130,14 +130,14 @@ async def test_validate_slides_ttl_on_success(mgr: SessionManager):
         ),
         patch(
             "src.session.session_manager.cookie_manager.get_storage_state",
-            new=AsyncMock(return_value={"cookies": [{"name": "li_at", "value": "x"}], "origins": []}),
+            new=AsyncMock(return_value={"cookies": [{"name": "session_id", "value": "x"}], "origins": []}),
         ),
         patch(
             "src.session.session_manager.cookie_manager.slide_auth_ttl",
             new=AsyncMock(),
         ) as mock_slide,
     ):
-        result = await mgr.validate("https://linkedin.com")
+        result = await mgr.validate("https://example.com")
 
     assert result is True
     mock_slide.assert_awaited_once()
@@ -153,7 +153,7 @@ async def test_establish_returns_vnc_url(mgr: SessionManager):
         "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
         new=AsyncMock(side_effect=exc),
     ):
-        result = await mgr.establish("https://linkedin.com/login")
+        result = await mgr.establish("https://example.com/login")
 
     assert result == "http://vnc:7900"
 
@@ -165,4 +165,4 @@ async def test_establish_raises_runtime_error_when_no_intervention(mgr: SessionM
         new=AsyncMock(return_value=""),
     ):
         with pytest.raises(RuntimeError, match="NoVNC flow did not surface a VNC URL"):
-            await mgr.establish("https://linkedin.com/login")
+            await mgr.establish("https://example.com/login")

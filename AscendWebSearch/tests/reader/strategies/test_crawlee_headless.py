@@ -30,6 +30,11 @@ def _mock_crawler(html: str = "<html><body>content</body></html>") -> MagicMock:
     return crawler
 
 
+_CRAWLER_FACTORY_PATH = (
+    "src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser"
+)
+
+
 @pytest.mark.asyncio
 async def test_crawlee_uses_playwright_headless_setting():
     """headless kwarg passed to AdaptivePlaywrightCrawler must equal settings.PLAYWRIGHT_HEADLESS."""
@@ -46,7 +51,7 @@ async def test_crawlee_uses_playwright_headless_setting():
 
     with (
         patch(
-            "src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser",
+            _CRAWLER_FACTORY_PATH,
             side_effect=fake_crawler_factory,
         ),
         patch("src.reader.strategies.crawlee_strategy.settings.PLAYWRIGHT_HEADLESS", True),
@@ -82,7 +87,7 @@ async def test_crawlee_headless_false_when_setting_false():
 
     with (
         patch(
-            "src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser",
+            _CRAWLER_FACTORY_PATH,
             side_effect=fake_crawler_factory,
         ),
         patch("src.reader.strategies.crawlee_strategy.settings.PLAYWRIGHT_HEADLESS", False),

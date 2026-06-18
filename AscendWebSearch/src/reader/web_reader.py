@@ -89,6 +89,7 @@ class WebReader:
         try:
             with path.open(encoding=settings.FILE_ENCODING) as f:
                 loaded: list[str] = json.load(f)
+
                 return loaded
         except Exception:
             logger.exception("Failed to load user agents")
@@ -160,10 +161,13 @@ class WebReader:
         entry = self._memory_cache.get(key)
         if entry is None:
             return None
+
         result, stored_at = entry
         if time.monotonic() - stored_at > settings.READ_CACHE_TTL_SECONDS:
             del self._memory_cache[key]
+
             return None
+
         return result
 
     def _cache_put(self, key: str, result: dict[str, Any]) -> None:
@@ -185,6 +189,7 @@ class WebReader:
         if cached is not None:
             READ_CACHE_HITS_TOTAL.inc()
             logger.debug("WebReader: cache hit for %s", url)
+
             return cached
 
         logger.info("Reading URL: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
@@ -201,6 +206,7 @@ class WebReader:
             result = await self._execute_strategy(name, strategy, url, output_format=output_format)
             if result:
                 self._cache_put(key, result)
+
                 return result
 
         if budget_exhausted and NOVNC_STRATEGY_NAME in strategies_to_run:
@@ -212,6 +218,7 @@ class WebReader:
             )
             if novnc_result:
                 self._cache_put(key, novnc_result)
+
                 return novnc_result
 
         return self._create_failure_response(url, budget_exhausted=budget_exhausted)
@@ -229,6 +236,7 @@ class WebReader:
         if cached is not None:
             READ_CACHE_HITS_TOTAL.inc()
             logger.debug("WebReader: cache hit (with links) for %s", url)
+
             return cached
 
         logger.info("Reading URL with links: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
@@ -248,6 +256,7 @@ class WebReader:
                 if self.validator.validate(content):
                     result = {"content": content, "links": links, "status": "success", "mode": name}
                     self._cache_put(key, result)
+
                     return result
 
                 logger.info("Strategy %s validation failed after annotation.", name)
@@ -266,6 +275,7 @@ class WebReader:
                         "mode": NOVNC_STRATEGY_NAME,
                     }
                     self._cache_put(key, result)
+
                     return result
 
         return self._create_failure_response(url, budget_exhausted=budget_exhausted)
@@ -292,45 +302,47 @@ class WebReader:
                 if not html:
                     self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
                     logger.info("Strategy %s returned empty HTML for structured extraction.", name)
+
                     return None
 
                 structured = extract_structured(html)
                 content = structured.get("content", "")
                 if self.validator.validate(content):
                     self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+
                     return {**structured, "status": "success", "mode": name}
 
                 elapsed = time.perf_counter() - started
                 self._record_strategy_outcome(name, "validation_failed", dlabel, elapsed)
                 logger.info("Strategy %s structured validation failed.", name)
+
                 return None
 
             content = await strategy.extract(url)
             if self.validator.validate(content):
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+
                 return {"content": content, "status": "success", "mode": name}
 
-            self._record_strategy_outcome(
-                name, "validation_failed", dlabel, time.perf_counter() - started
-            )
+            self._record_strategy_outcome(name, "validation_failed", dlabel, time.perf_counter() - started)
             logger.info("Strategy %s validation failed.", name)
+
             return None
         except ChallengeDetectedException:
-            self._record_strategy_outcome(
-                name, "challenge_detected", dlabel, time.perf_counter() - started
-            )
+            self._record_strategy_outcome(name, "challenge_detected", dlabel, time.perf_counter() - started)
             logger.info(
                 "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url
             )
+
             return None
         except HumanInterventionRequiredException:
-            self._record_strategy_outcome(
-                name, "human_intervention", dlabel, time.perf_counter() - started
-            )
+            self._record_strategy_outcome(name, "human_intervention", dlabel, time.perf_counter() - started)
+
             raise
         except Exception as e:
             self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
             logger.warning("Strategy %s failed for %s: %s", name, url, e)
+
             return None
 
     async def _execute_html_strategy(
@@ -347,22 +359,21 @@ class WebReader:
             html = await strategy.get_html(url)
             if html:
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+
                 return html
 
             self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
             logger.info("Strategy %s returned empty HTML.", name)
         except HumanInterventionRequiredException:
-            self._record_strategy_outcome(
-                name, "human_intervention", dlabel, time.perf_counter() - started
-            )
+            self._record_strategy_outcome(name, "human_intervention", dlabel, time.perf_counter() - started)
+
             raise
         except ChallengeDetectedException:
-            self._record_strategy_outcome(
-                name, "challenge_detected", dlabel, time.perf_counter() - started
-            )
+            self._record_strategy_outcome(name, "challenge_detected", dlabel, time.perf_counter() - started)
             logger.info(
                 "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url
             )
+
             return ""
         except Exception as e:
             self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)

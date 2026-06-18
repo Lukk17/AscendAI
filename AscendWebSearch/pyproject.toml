@@ -107,13 +107,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"e2e/**" = ["S105", "S106"]
 "tests/**" = [
-    "S101", "S105", "S106", "PLR2004",
+    "S101",     # assert IS pytest idiom — never replace with if/raise
     "SIM117",   # nested `with` mocks are clearer than one combined block
     "RUF059",   # factory tuple-unpacks intentionally leave some names unused
-    "B010",     # setattr on instances is fine in test setup
-    "E501",     # tabular fixture / table data crosses the line cap
     "PLR1711",  # bare returns in test stubs are explicit
     "PLE2502",  # security tests intentionally use CR/LF and bidi codepoints
     "ARG001",   # pytest fixtures and stub callbacks legitimately take unused args
@@ -122,7 +119,6 @@ ignore = [
     "SLF001",   # tests intentionally inspect / mutate private members
     "TC002",    # tests don't need TYPE_CHECKING guards for fixture imports
 ]
-"src/config/compat.py" = ["BLE001"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -37,6 +37,7 @@ class CrawleeStrategy(BaseStrategy):
     async def extract(self, url: str) -> str:
         html = await self.get_html(url)
         extracted: str | None = trafilatura.extract(html)
+
         return extracted or ""
 
     async def get_html(self, url: str) -> str:
@@ -85,10 +86,12 @@ class CrawleeStrategy(BaseStrategy):
 
         if ChallengeDetector.is_login_required(html):
             logger.warning("CrawleeStrategy: Login wall detected on %s", url)
+
             raise ChallengeDetectedException(intervention_type="login")
 
         if ChallengeDetector.is_blocked(200, html):
             logger.warning("CrawleeStrategy: WAF/Cloudflare block detected on %s", url)
+
             raise ChallengeDetectedException(intervention_type="captcha")
 
         return html
@@ -98,6 +101,7 @@ class CrawleeStrategy(BaseStrategy):
         """Resolve and create the Crawlee storage directory. Runs in a thread executor."""
         p = Path(storage_dir_setting).resolve()
         p.mkdir(parents=True, exist_ok=True)
+
         return str(p)
 
     @staticmethod
