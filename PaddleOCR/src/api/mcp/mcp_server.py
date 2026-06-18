@@ -14,6 +14,10 @@ from fastmcp import FastMCP
 
 from src.api.exception_handlers import (
     DownloadFailedError,
+    ERROR_CODE_DOWNLOAD_FAILED,
+    ERROR_CODE_FILE_TOO_LARGE,
+    ERROR_CODE_UNSAFE_URI,
+    ERROR_CODE_UNSUPPORTED_FILE_TYPE,
     FileSizeExceededError,
     UnsafeUriError,
     UnsupportedFileTypeError,
@@ -84,13 +88,23 @@ async def ocr_process(file_uri: str, lang: str = "en") -> dict[str, object]:
     scheme = parsed.scheme.lower() or "(none)"
     host = parsed.hostname
 
-    with tracer.start_as_current_span(
-        "paddleocr.mcp.fetch",
-        attributes={"scheme": scheme, "host": host or ""},
-    ):
-        file_bytes, filename = await _fetch_file(file_uri)
+    try:
+        with tracer.start_as_current_span(
+            "paddleocr.mcp.fetch",
+            attributes={"scheme": scheme, "host": host or ""},
+        ):
+            file_bytes, filename = await _fetch_file(file_uri)
 
-    sniff_mime(file_bytes)
+        sniff_mime(file_bytes)
+    except UnsafeUriError as exc:
+        raise UnsafeUriError(f"{ERROR_CODE_UNSAFE_URI}: {exc}") from exc
+    except UnsupportedFileTypeError as exc:
+        raise UnsupportedFileTypeError(f"{ERROR_CODE_UNSUPPORTED_FILE_TYPE}: {exc}") from exc
+    except FileSizeExceededError as exc:
+        raise FileSizeExceededError(f"{ERROR_CODE_FILE_TOO_LARGE}: {exc}") from exc
+    except DownloadFailedError as exc:
+        raise DownloadFailedError(f"{ERROR_CODE_DOWNLOAD_FAILED}: {exc}") from exc
+
     emit_mcp_audit("ocr_process", scheme, host, len(file_bytes), "ok")
 
     start = time.monotonic()

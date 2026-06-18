@@ -11,6 +11,7 @@ from src.api.exception_handlers import (
     DownloadFailedError,
     FileSizeExceededError,
     UnsafeUriError,
+    UnsupportedFileTypeError,
 )
 from src.api.mcp import mcp_server
 from src.api.mcp.mcp_server import (
@@ -119,6 +120,60 @@ class TestOcrProcessHappyPaths:
         # Then
         passed_filename = mock_service.process_file.call_args.args[1]
         assert passed_filename == "scan with space.png"
+
+
+class TestOcrProcessErrorCodes:
+    async def test_unsafe_uri_error_code_in_message(self):
+        # Given a URI with embedded credentials (triggers UnsafeUriError before any fetch)
+        # When ocr_process raises, the re-raised message must contain the UNSAFE_URI code
+        with pytest.raises(UnsafeUriError, match="UNSAFE_URI"):
+            await ocr_process("http://user:pass@example.com/x.png", lang="en")
+
+    async def test_unsupported_scheme_error_code_in_message(self):
+        # Given a bare ftp:// URI (not http/https/file — triggers UnsafeUriError for scheme)
+        with pytest.raises(UnsafeUriError, match="UNSAFE_URI"):
+            await ocr_process("ftp://example.com/x.png", lang="en")
+
+    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
+    async def test_unsupported_file_type_error_code_in_message(self, _validate_host_mock):
+        # Given a URL that returns non-image bytes (plain text), sniff_mime raises
+        # UnsupportedFileTypeError; ocr_process re-raises with UNSUPPORTED_FILE_TYPE code
+        session = _FakeSession(_FakeResponse(status=200, body=b"plain text data"))
+        with (
+            patch.object(mcp_server, "_http_session", session),
+            pytest.raises(UnsupportedFileTypeError, match="UNSUPPORTED_FILE_TYPE"),
+        ):
+            await ocr_process("http://example.com/x.txt", lang="en")
+
+    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
+    async def test_file_too_large_error_code_in_message(self, _validate_host_mock, monkeypatch):
+        # Given an oversized Content-Length header, FileSizeExceededError fires during
+        # download; ocr_process re-raises with FILE_TOO_LARGE code
+        monkeypatch.setattr(settings, "MAX_FILE_SIZE_MB", 1)
+        oversize = 2 * 1024 * 1024
+        session = _FakeSession(
+            _FakeResponse(
+                status=200,
+                body=b"x",
+                headers={"Content-Length": str(oversize)},
+            )
+        )
+        with (
+            patch.object(mcp_server, "_http_session", session),
+            pytest.raises(FileSizeExceededError, match="FILE_TOO_LARGE"),
+        ):
+            await ocr_process("http://example.com/big.png", lang="en")
+
+    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
+    async def test_download_failed_error_code_in_message(self, _validate_host_mock):
+        # Given a 404 response, DownloadFailedError fires; ocr_process re-raises
+        # with DOWNLOAD_FAILED code
+        session = _FakeSession(_FakeResponse(status=404, body=b""))
+        with (
+            patch.object(mcp_server, "_http_session", session),
+            pytest.raises(DownloadFailedError, match="DOWNLOAD_FAILED"),
+        ):
+            await ocr_process("http://example.com/missing.png", lang="en")
 
 
 class TestFetchFileRejections:
