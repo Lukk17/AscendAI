@@ -67,6 +67,27 @@ def get_memory_client(provider: str | None = None) -> "AscendMemoryClient":
         return instance
 
 
+def wipe_user_all_collections(user_id: str) -> None:
+    """Wipe a user from every distinct provider collection (each delete is
+    user_id-filtered, so no other user is affected)."""
+
+    wiped_collections: set[str] = set()
+    for provider in supported_providers():
+        collection = PROVIDER_CONFIGS[provider]["collection_name"]
+        if collection in wiped_collections:
+            continue
+
+        try:
+            get_memory_client(provider).wipe_user(user_id)
+
+            wiped_collections.add(collection)
+        except Exception:
+            logger.exception(
+                f"Error wiping collection={collection} provider={provider} "
+                f"user_hash={_hash_user_id(user_id)}"
+            )
+
+
 def get_default_memory_client() -> "AscendMemoryClient":
     """FastAPI Depends-compatible factory for the default provider."""
 

@@ -6,12 +6,14 @@ from unittest.mock import MagicMock
 import pytest
 
 import src.service.memory_client as client_module
+from src.config.config import PROVIDER_CONFIGS
 from src.service.memory_client import (
     AscendMemoryClient,
     _hash_user_id,
     get_default_memory_client,
     get_memory_client,
     resolve_provider,
+    wipe_user_all_collections,
 )
 
 
@@ -229,6 +231,32 @@ def test_wipe_user_re_raises_on_upstream_failure(mock_memory_service: Any) -> No
     client = get_memory_client("lmstudio")
     with pytest.raises(RuntimeError):
         client.wipe_user(user_id="u1")
+
+
+def test_wipe_user_all_collections_wipes_each_distinct_collection_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_client = MagicMock()
+    monkeypatch.setattr(client_module, "get_memory_client", lambda provider: fake_client)
+
+    wipe_user_all_collections(user_id="u1")
+
+    distinct_collections = {cfg["collection_name"] for cfg in PROVIDER_CONFIGS.values()}
+    assert fake_client.wipe_user.call_count == len(distinct_collections)
+    for call in fake_client.wipe_user.call_args_list:
+        assert call.args == ("u1",)
+
+
+def test_wipe_user_all_collections_continues_when_a_collection_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_client = MagicMock()
+    fake_client.wipe_user.side_effect = RuntimeError("qdrant down")
+    monkeypatch.setattr(client_module, "get_memory_client", lambda provider: fake_client)
+
+    wipe_user_all_collections(user_id="u1")
+
+    assert fake_client.wipe_user.called
 
 
 def test_hash_user_id_is_stable_and_short() -> None:

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
@@ -134,13 +136,12 @@ async def test_delete_memory_success(client: AsyncClient, override_dependencies)
 
 @pytest.mark.asyncio
 async def test_wipe_memory_success(client: AsyncClient, override_dependencies):
-    mock_service = override_dependencies
-
-    response = await client.post("/api/v1/memory/wipe", params={"user_id": "u1"})
+    with patch("src.api.rest.rest_endpoints.wipe_user_all_collections") as mock_wipe_all:
+        response = await client.post("/api/v1/memory/wipe", params={"user_id": "u1"})
 
     assert response.status_code == 200
     assert response.json()["status"] == "success"
-    mock_service.wipe_user.assert_called_once_with(user_id="u1")
+    mock_wipe_all.assert_called_once_with(user_id="u1")
 
 
 @pytest.mark.asyncio

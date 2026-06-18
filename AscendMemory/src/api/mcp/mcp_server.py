@@ -4,7 +4,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from src.config.config import settings
-from src.service.memory_client import get_memory_client, resolve_provider
+from src.service.memory_client import get_memory_client, resolve_provider, wipe_user_all_collections
 
 logger = logging.getLogger(__name__)
 
@@ -140,10 +140,12 @@ def memory_wipe(user_id: str | None = None, provider: str | None = None) -> dict
     """
 
     try:
-        resolved_provider = resolve_provider(provider)
         effective_user_id = user_id or settings.DEFAULT_USER_ID
 
-        get_memory_client(resolved_provider).wipe_user(user_id=effective_user_id)
+        if provider is None or not provider.strip():
+            wipe_user_all_collections(user_id=effective_user_id)
+        else:
+            get_memory_client(resolve_provider(provider)).wipe_user(user_id=effective_user_id)
 
         return {"status": "success", "message": f"All memories wiped for user {effective_user_id}."}
     except Exception as exc:

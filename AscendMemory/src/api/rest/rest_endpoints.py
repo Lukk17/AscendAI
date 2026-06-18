@@ -12,7 +12,7 @@ from src.observability.metrics import (
     MEMORY_SEARCH_DURATION_SECONDS,
     MEMORY_SEARCH_TOTAL,
 )
-from src.service.memory_client import get_memory_client, resolve_provider
+from src.service.memory_client import get_memory_client, resolve_provider, wipe_user_all_collections
 
 rest_router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
 
@@ -140,13 +140,16 @@ async def wipe_memory(
     user_id: UserIdQuery = None,
     provider: ProviderQuery = None,
 ) -> dict[str, str]:
-    """Wipe all memories for a user."""
+    """Wipe a user's memories. With no provider, clears every provider collection."""
 
     effective_user_id = user_id or settings.DEFAULT_USER_ID
-    resolved_provider = resolve_provider(provider)
-    client = get_memory_client(resolved_provider)
 
-    await asyncio.to_thread(client.wipe_user, user_id=effective_user_id)
+    if provider is None or not provider.strip():
+        await asyncio.to_thread(wipe_user_all_collections, user_id=effective_user_id)
+    else:
+        client = get_memory_client(resolve_provider(provider))
+
+        await asyncio.to_thread(client.wipe_user, user_id=effective_user_id)
 
     return {"status": "success", "message": f"All memories wiped for user {effective_user_id}"}
 
