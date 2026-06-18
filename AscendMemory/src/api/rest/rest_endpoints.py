@@ -25,6 +25,7 @@ USER_ID_PATTERN = r"^[A-Za-z0-9._\-@:+]{1,128}$"
 class SearchResponseItem(BaseModel):
     id: str
     memory: str
+    user_id: str | None = None
     score: float | None = None
     metadata: dict[str, Any] | None = None
     created_at: str | None = None
@@ -83,11 +84,11 @@ async def search_memory(
 
 
 class InsertRequest(BaseModel):
-    user_id: str | None = Field(
-        default=None,
+    user_id: str = Field(
+        min_length=1,
         max_length=settings.MAX_USER_ID_LENGTH,
         pattern=USER_ID_PATTERN,
-        description="Caller user_id; defaults to DEFAULT_USER_ID when omitted",
+        description="Caller user_id identifying the memory partition to write to",
     )
     text: str | None = Field(
         default=None,
@@ -110,7 +111,6 @@ async def insert_memory(request: InsertRequest) -> list[dict[str, Any]]:
     if request.text is None and not request.messages:
         raise ValueError("Either 'messages' or 'text' must be provided.")
 
-    effective_user_id = request.user_id or settings.DEFAULT_USER_ID
     resolved_provider = resolve_provider(request.provider)
     client = get_memory_client(resolved_provider)
 
@@ -119,7 +119,7 @@ async def insert_memory(request: InsertRequest) -> list[dict[str, Any]]:
     try:
         result = await asyncio.to_thread(
             client.add,
-            user_id=effective_user_id,
+            user_id=request.user_id,
             messages=request.messages,
             text=request.text,
             metadata=request.metadata,
