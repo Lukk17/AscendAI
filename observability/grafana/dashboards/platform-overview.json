@@ -21,7 +21,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "HTTP request rate per service (requests/s). Metric: http_server_requests_seconds_count from Spring Actuator / starlette_requests_total from Python services.",
+      "description": "HTTP request rate per service (requests/s). Metric: http_server_requests_seconds_count from Spring Actuator / http_request_duration_seconds_count from Python services (prometheus-fastapi-instrumentator).",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -42,7 +42,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(starlette_requests_total{service=~\"ascend-memory|audio-scribe|ascend-web-search|ascend-paddle-ocr\"}[2m]))",
+          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|audio-scribe|ascend-web-search|ascend-paddle-ocr\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "B"
         }
@@ -73,7 +73,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(starlette_requests_total{service=~\"ascend-memory|audio-scribe|ascend-web-search|ascend-paddle-ocr\",status_code=~\"5..\"}[2m]))",
+          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|audio-scribe|ascend-web-search|ascend-paddle-ocr\",status=~\"5..\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "B"
         }
@@ -110,7 +110,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(starlette_requests_duration_seconds_bucket{service=~\"ascend-memory|audio-scribe|ascend-web-search|ascend-paddle-ocr\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket{service=~\"ascend-memory|audio-scribe|ascend-web-search|ascend-paddle-ocr\"}[5m])))",
           "legendFormat": "{{service}} p95",
           "refId": "B"
         }
