@@ -62,23 +62,7 @@ scrape_configs:
       - target_label: service
         replacement: ascend-paddle-ocr
 
-  # ─── Data-layer exporters ───
-
-  - job_name: postgres-exporter
-    static_configs:
-      - targets:
-          - postgres-exporter:9187
-    relabel_configs:
-      - target_label: service
-        replacement: postgres
-
-  - job_name: redis-exporter
-    static_configs:
-      - targets:
-          - redis-exporter:9121
-    relabel_configs:
-      - target_label: service
-        replacement: redis
+  # ─── Data stores (native metrics) ───
 
   - job_name: qdrant
     metrics_path: /metrics
