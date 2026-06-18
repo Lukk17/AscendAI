@@ -15,6 +15,9 @@ management:
     tags:
       service: weather-mcp
       version: "@project.version@"
+    distribution:
+      percentiles-histogram:
+        mcp.tool.duration: true
 
 spring:
   application:

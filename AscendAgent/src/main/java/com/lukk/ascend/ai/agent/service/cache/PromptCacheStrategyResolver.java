@@ -46,8 +46,9 @@ public class PromptCacheStrategyResolver {
     }
 
     private PromptCacheStrategy noop(String providerName) {
+        String key = providerName == null ? "unknown" : providerName;
         return noopByProvider.computeIfAbsent(
-                providerName == null ? "unknown" : providerName,
-                NoopPromptCacheStrategy::new);
+                key,
+                name -> new NoopPromptCacheStrategy(name, meterRegistry));
     }
 }

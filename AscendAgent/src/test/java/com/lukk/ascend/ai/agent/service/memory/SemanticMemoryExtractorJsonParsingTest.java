@@ -48,7 +48,7 @@ class SemanticMemoryExtractorJsonParsingTest {
     @BeforeEach
     void setUp() {
         when(aiProviderProperties.getProviders()).thenReturn(java.util.Map.of());
-        PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio");
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio", new SimpleMeterRegistry());
         when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
         extractor = new SemanticMemoryExtractor(chatModelResolver, aiProviderProperties, memoryClient,
                 new ObjectMapper(), chatResponseContentResolver, cacheStrategyResolver, new SimpleMeterRegistry());

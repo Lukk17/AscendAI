@@ -70,7 +70,7 @@ class ChatExecutorTest {
 
     @BeforeEach
     void setupGlobalFields() {
-        PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio");
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio", new SimpleMeterRegistry());
         org.mockito.Mockito.lenient().when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
     }
 

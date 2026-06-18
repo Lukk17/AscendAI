@@ -15,6 +15,10 @@ management:
     tags:
       service: ascend-agent
       version: "@project.version@"
+    distribution:
+      percentiles-histogram:
+        mcp.tool.duration: true
+        rag.top_score: true
 
 app:
   ingestion:

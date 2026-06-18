@@ -81,7 +81,7 @@ class SemanticMemoryExtractorTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setupCacheResolver() {
-        PromptCacheStrategy noop = new NoopPromptCacheStrategy(DEFAULT_PROVIDER);
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy(DEFAULT_PROVIDER, meterRegistry);
         org.mockito.Mockito.lenient().when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
     }
 

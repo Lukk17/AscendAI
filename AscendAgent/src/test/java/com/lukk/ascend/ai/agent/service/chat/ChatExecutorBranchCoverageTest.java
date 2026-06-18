@@ -67,7 +67,7 @@ class ChatExecutorBranchCoverageTest {
 
     @BeforeEach
     void setUpDefaults() {
-        PromptCacheStrategy noop = new NoopPromptCacheStrategy(PROVIDER);
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy(PROVIDER, new SimpleMeterRegistry());
         when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);

@@ -57,6 +57,8 @@ public class OpenAiPromptCacheStrategy implements PromptCacheStrategy {
 
         Counter.builder(METRIC_TOKENS_READ).tag("provider", providerName).register(meterRegistry).increment(cached);
         Counter.builder(METRIC_TOKENS_TOTAL).tag("provider", providerName).register(meterRegistry).increment(prompt);
+
+        GenAiTokenUsageRecorder.record(meterRegistry, response, providerName);
     }
 
     private static Integer extractCachedTokens(Object nativeUsage) {

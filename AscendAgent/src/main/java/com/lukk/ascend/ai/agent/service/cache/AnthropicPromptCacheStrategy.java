@@ -72,6 +72,8 @@ public class AnthropicPromptCacheStrategy implements PromptCacheStrategy {
         Counter.builder(METRIC_TOKENS_READ).tag("provider", PROVIDER).register(meterRegistry).increment(nullToZero(read));
         Counter.builder(METRIC_TOKENS_CREATION).tag("provider", PROVIDER).register(meterRegistry).increment(nullToZero(creation));
         Counter.builder(METRIC_TOKENS_TOTAL).tag("provider", PROVIDER).register(meterRegistry).increment(prompt);
+
+        GenAiTokenUsageRecorder.record(meterRegistry, response, PROVIDER);
     }
 
     @Override
