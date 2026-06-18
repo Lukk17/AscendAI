@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.config.mcp;
 
 import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.spec.McpSchema;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -34,13 +35,14 @@ public class McpClientStatusRegistry {
     }
 
     static String resolveConnectionName(McpSyncClient client) {
-        var clientInfo = client.getClientInfo();
+        McpSchema.Implementation clientInfo = client.getClientInfo();
         if (clientInfo != null && clientInfo.title() != null && !clientInfo.title().isBlank()) {
             return clientInfo.title();
         }
         if (clientInfo != null && clientInfo.name() != null && !clientInfo.name().isBlank()) {
             return clientInfo.name();
         }
+
         return "unknown-" + Integer.toHexString(System.identityHashCode(client));
     }
 }

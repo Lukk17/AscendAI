@@ -288,12 +288,6 @@ public class WeatherToolService {
         });
     }
 
-    /**
-     * Runs the upstream-calling body of a tool while recording the {@value #METRIC_MCP_TOOL_DURATION}
-     * timer tagged with the tool name and an ok/error outcome. A {@link RestClientException} from the
-     * body is routed to {@code onError}, which supplies the tool-specific fallback result; any other
-     * throwable propagates unchanged.
-     */
     private <T> T timed(String toolName, Supplier<T> body, Function<RestClientException, T> onError) {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = OUTCOME_OK;
@@ -310,10 +304,6 @@ public class WeatherToolService {
         }
     }
 
-    /**
-     * Geocodes the city and returns the first match only when it carries usable coordinates;
-     * an empty result means the caller should report the city as not found.
-     */
     private Optional<GeoResult> resolveCity(String city, String resolvedCountryCode, String resolvedLanguage) {
         Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
         if (match.isEmpty()) {

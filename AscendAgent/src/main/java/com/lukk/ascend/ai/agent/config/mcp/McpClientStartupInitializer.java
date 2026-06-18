@@ -79,6 +79,7 @@ public class McpClientStartupInitializer {
         if (params == null) {
             return "unknown";
         }
+
         return params.url() != null ? params.url() : "unknown";
     }
 
@@ -86,6 +87,7 @@ public class McpClientStartupInitializer {
         if (t.getCause() != null) {
             return t.getCause();
         }
+
         return t;
     }
 }

@@ -63,6 +63,7 @@ public class StartupLogConfig {
         if (event.getState() != ReadinessState.ACCEPTING_TRAFFIC) {
             return;
         }
+
         log.info("\n{}", buildStartupLog());
     }
 
@@ -117,6 +118,7 @@ public class StartupLogConfig {
             return InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException e) {
             log.debug("Could not resolve host name; using localhost fallback", e);
+
             return "localhost";
         }
     }
@@ -167,9 +169,11 @@ public class StartupLogConfig {
             String toolNames = Arrays.stream(tools)
                     .map(t -> t.getToolDefinition().name())
                     .collect(Collectors.joining(", "));
+
             return String.format("[Connected] %d tools: [%s]", tools.length, toolNames);
         } catch (Exception e) {
             log.debug("MCP tool listing failed", e);
+
             return "[FAILED]";
         }
     }

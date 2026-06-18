@@ -17,6 +17,7 @@ import org.springframework.boot.availability.ReadinessState;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -90,6 +91,7 @@ public class StartupLogConfig {
         if (event.getState() != ReadinessState.ACCEPTING_TRAFFIC) {
             return;
         }
+
         String port = env.getProperty("local.server.port", env.getProperty("server.port", "9917"));
         String contextPath = env.getProperty("server.servlet.context-path", "");
         String protocol = env.getProperty("server.ssl.key-store") != null ? "https" : "http";
@@ -178,6 +180,7 @@ public class StartupLogConfig {
             return InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException e) {
             log.debug("Could not resolve host name; using localhost fallback", e);
+
             return "localhost";
         }
     }
@@ -187,6 +190,7 @@ public class StartupLogConfig {
         if (providers == null || providers.isEmpty()) {
             return "      (none configured)";
         }
+
         return providers.entrySet().stream()
                 .map(e -> String.format("      - %-10s type=%s model=%s",
                         e.getKey(), e.getValue().getType(), e.getValue().getModel()))
@@ -198,6 +202,7 @@ public class StartupLogConfig {
         if (providers == null || providers.isEmpty()) {
             return "      (none configured)";
         }
+
         return providers.entrySet().stream()
                 .map(e -> String.format("      - %-10s dims=%d model=%s collection=ascendai-%d",
                         e.getKey(), e.getValue().getDimensions(), e.getValue().getModel(), e.getValue().getDimensions()))
@@ -210,10 +215,12 @@ public class StartupLogConfig {
             String url = Optional.ofNullable(metaData.getURL())
                     .map(u -> u.replace("jdbc:", ""))
                     .orElse("unknown");
+
             return url + " [Connected]";
         } catch (Exception e) {
             log.debug("Postgres probe failed", e);
             String url = env.getProperty("spring.datasource.url", "unknown").replace("jdbc:", "");
+
             return url + " [FAILED]";
         }
     }
@@ -223,7 +230,7 @@ public class StartupLogConfig {
         String port = env.getProperty("spring.data.redis.port", "6379");
         String url = String.format("redis://%s:%s", host, port);
 
-        var connectionFactory = redisTemplate.getConnectionFactory();
+        RedisConnectionFactory connectionFactory = redisTemplate.getConnectionFactory();
         if (connectionFactory == null) {
             return url + " [Warning (no connection factory)]";
         }
@@ -250,9 +257,11 @@ public class StartupLogConfig {
                 return url + " [Warning (no client bean)]";
             }
             int count = client.listCollectionsAsync().get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).size();
+
             return url + " [Connected] (collections: " + count + ")";
         } catch (Exception e) {
             log.debug("Qdrant probe failed", e);
+
             return url + " [FAILED]";
         }
     }
@@ -263,9 +272,11 @@ public class StartupLogConfig {
         String url = String.format("%s/%s", endpoint, bucket);
         try {
             long count = s3Client.listObjects(b -> b.bucket(bucket)).contents().size();
+
             return url + " [Connected] (objects: " + count + ")";
         } catch (Exception e) {
             log.debug("S3 probe failed", e);
+
             return url + " [FAILED]";
         }
     }
@@ -291,9 +302,11 @@ public class StartupLogConfig {
             if (status == 200) {
                 return baseUrl + " [Connected]";
             }
+
             return baseUrl + String.format(" [Warning (status=%d)]", status);
         } catch (Exception e) {
             log.debug("AscendMemory probe failed", e);
+
             return baseUrl + " [FAILED]";
         }
     }
@@ -311,6 +324,7 @@ public class StartupLogConfig {
         String defaults = compactionProperties.getProviderDefaults().entrySet().stream()
                 .map(e -> e.getKey() + "=" + e.getValue())
                 .collect(Collectors.joining(", "));
+
         return String.format("[Enabled] (trigger: %d turns / %.0f%% context, keep: %d turns, defaults: %s)",
                 compactionProperties.getTurnTrigger(),
                 compactionProperties.getTokenTriggerFraction() * 100,
@@ -340,6 +354,7 @@ public class StartupLogConfig {
                 .collect(Collectors.toList());
 
         lines.add(String.format("      Aggregate: %d/%d connected", connectedCount, serverEntries.size()));
+
         return lines;
     }
 

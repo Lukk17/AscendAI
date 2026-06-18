@@ -229,7 +229,7 @@ public class ChatExecutor {
 
     List<String> extractToolsUsed(ChatResponse chatResponse) {
         try {
-            var toolCalls = chatResponse.getResult().getOutput().getToolCalls();
+            List<AssistantMessage.ToolCall> toolCalls = chatResponse.getResult().getOutput().getToolCalls();
             if (toolCalls.isEmpty()) {
                 return List.of();
             }

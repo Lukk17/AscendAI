@@ -113,10 +113,11 @@ public class SemanticMemoryExtractor {
         ChatClient chatClient = clientBuilder.build();
 
         List<Message> messages = List.of(new SystemMessage(EXTRACTOR_INSTRUCTION));
-        var spec = chatClient.prompt().messages(messages).user(userText);
+        ChatClient.ChatClientRequestSpec spec = chatClient.prompt().messages(messages).user(userText);
         if (options != null) {
             spec = spec.options(options);
         }
+
         return spec.call().chatResponse();
     }
 

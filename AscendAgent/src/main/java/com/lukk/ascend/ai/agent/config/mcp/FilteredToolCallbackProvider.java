@@ -79,12 +79,14 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
         if (cleaned.equals(def.name())) {
             return original;
         }
+
         log.debug("Sanitized MCP tool name '{}' -> '{}' for provider compatibility", def.name(), cleaned);
         ToolDefinition sanitized = DefaultToolDefinition.builder()
                 .name(cleaned)
                 .description(def.description())
                 .inputSchema(def.inputSchema())
                 .build();
+
         return new ToolCallback() {
             @Override
             public ToolDefinition getToolDefinition() {
@@ -150,6 +152,7 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
                 };
             }
         }
+
         return result;
     }
 
