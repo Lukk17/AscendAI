@@ -15,7 +15,7 @@
         "mcp-grafana"
       ],
       "env": {
-        "GRAFANA_URL": "http://localhost:3000",
+        "GRAFANA_URL": "http://localhost:7078",
         "GRAFANA_SERVICE_ACCOUNT_TOKEN": "{env:GRAFANA_SERVICE_ACCOUNT_TOKEN}"
       }
     },
