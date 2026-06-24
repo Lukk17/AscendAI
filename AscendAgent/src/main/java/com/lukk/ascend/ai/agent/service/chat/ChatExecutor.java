@@ -7,7 +7,8 @@ import com.lukk.ascend.ai.agent.dto.CustomMetadata;
 import com.lukk.ascend.ai.agent.exception.AiGenerationException;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
@@ -18,7 +19,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -34,16 +35,31 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ChatExecutor {
 
     private static final String USER_ID_KEY = "user_id";
+    private static final String METRIC_MCP_TOOL_DURATION = "mcp.tool.duration";
+    private static final String OUTCOME_OK = "ok";
+    private static final String OUTCOME_ERROR = "error";
 
     private final ChatModelResolver chatModelResolver;
-    private final SyncMcpToolCallbackProvider toolCallbackProvider;
+    private final ToolCallbackProvider toolCallbackProvider;
     private final ChatResponseContentResolver chatResponseContentResolver;
     private final PromptCacheStrategyResolver cacheStrategyResolver;
+    private final MeterRegistry meterRegistry;
+
+    public ChatExecutor(ChatModelResolver chatModelResolver,
+                        ToolCallbackProvider toolCallbackProvider,
+                        ChatResponseContentResolver chatResponseContentResolver,
+                        PromptCacheStrategyResolver cacheStrategyResolver,
+                        MeterRegistry meterRegistry) {
+        this.chatModelResolver = chatModelResolver;
+        this.toolCallbackProvider = toolCallbackProvider;
+        this.chatResponseContentResolver = chatResponseContentResolver;
+        this.cacheStrategyResolver = cacheStrategyResolver;
+        this.meterRegistry = meterRegistry;
+    }
 
     public AiResponse execute(String userId, String systemText, String userText, List<Message> history,
                               MultipartFile image, String provider, String model) {
@@ -80,6 +96,7 @@ public class ChatExecutor {
 
         String content = chatResponseContentResolver.resolveContent(chatResponse);
         List<String> toolsUsed = extractToolsUsed(chatResponse);
+        recordToolMetrics(toolsUsed, OUTCOME_OK);
 
         return new AiResponse(content, new CustomMetadata(chatResponse.getMetadata(), toolsUsed));
     }
@@ -200,9 +217,19 @@ public class ChatExecutor {
         return filename.substring(dot + 1).toLowerCase();
     }
 
+    private void recordToolMetrics(List<String> toolsUsed, String outcome) {
+        for (String tool : toolsUsed) {
+            Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", tool)
+                    .tag("outcome", outcome)
+                    .register(meterRegistry)
+                    .record(java.time.Duration.ZERO);
+        }
+    }
+
     List<String> extractToolsUsed(ChatResponse chatResponse) {
         try {
-            var toolCalls = chatResponse.getResult().getOutput().getToolCalls();
+            List<AssistantMessage.ToolCall> toolCalls = chatResponse.getResult().getOutput().getToolCalls();
             if (toolCalls.isEmpty()) {
                 return List.of();
             }

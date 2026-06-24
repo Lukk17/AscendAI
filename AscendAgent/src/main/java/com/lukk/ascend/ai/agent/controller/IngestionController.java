@@ -9,10 +9,11 @@ import com.lukk.ascend.ai.agent.service.ingestion.ManualIngestionService;
 import com.lukk.ascend.ai.agent.service.ingestion.MimeTypeDetector;
 import com.lukk.ascend.ai.agent.service.storage.StorageService;
 import com.lukk.ascend.ai.agent.util.IngestionSecurity;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -33,10 +34,11 @@ import java.util.Set;
 
 @Slf4j
 @RestController
-@RequiredArgsConstructor
 @Tag(name = "Ingestion", description = "External documents ingestion controller.")
 @RequestMapping(value = "/api/v1/ingestion", produces = "application/json")
 public class IngestionController {
+
+    private static final String METRIC_UPLOAD_BYTES = "ingestion.upload.bytes";
 
     @Value("${app.ingestion.folders.markdown:markdown/}")
     private String markdownFolder;
@@ -48,6 +50,19 @@ public class IngestionController {
     private final ManualIngestionService manualIngestionService;
     private final MimeTypeDetector mimeTypeDetector;
     private final IngestionUploadProperties uploadProperties;
+    private final MeterRegistry meterRegistry;
+
+    public IngestionController(StorageService storageService,
+                               ManualIngestionService manualIngestionService,
+                               MimeTypeDetector mimeTypeDetector,
+                               IngestionUploadProperties uploadProperties,
+                               MeterRegistry meterRegistry) {
+        this.storageService = storageService;
+        this.manualIngestionService = manualIngestionService;
+        this.mimeTypeDetector = mimeTypeDetector;
+        this.uploadProperties = uploadProperties;
+        this.meterRegistry = meterRegistry;
+    }
 
     @Operation(summary = "AscendAI upload endpoint",
             description = "Upload one or more files in a single request. Send multiple multipart parts with the same field name 'file'. "
@@ -89,9 +104,19 @@ public class IngestionController {
             try {
                 storageService.uploadFile(key, file.getInputStream(), file.getSize());
                 uploadedKeys.add(key);
+                Counter.builder(METRIC_UPLOAD_BYTES)
+                        .tag("source_type", detected)
+                        .tag("outcome", "ok")
+                        .register(meterRegistry)
+                        .increment(file.getSize());
             } catch (IOException e) {
                 log.error("Error uploading file: {}", key, e);
                 failures.add(key + ": " + e.getMessage());
+                Counter.builder(METRIC_UPLOAD_BYTES)
+                        .tag("source_type", detected)
+                        .tag("outcome", "error")
+                        .register(meterRegistry)
+                        .increment(file.getSize());
             }
         }
 

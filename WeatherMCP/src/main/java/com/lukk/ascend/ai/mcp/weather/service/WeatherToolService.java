@@ -13,6 +13,8 @@ import com.lukk.ascend.ai.mcp.weather.dto.HistoricalWeatherResult;
 import com.lukk.ascend.ai.mcp.weather.dto.ResolvedLocation;
 import com.lukk.ascend.ai.mcp.weather.dto.Temperature;
 import com.lukk.ascend.ai.mcp.weather.dto.Wind;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -21,6 +23,8 @@ import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 @Service
@@ -35,13 +39,19 @@ public class WeatherToolService {
     public static final int MAX_GEOCODE_LIMIT = 10;
     public static final String WIND_UNIT = "km/h";
 
-    private final OpenMeteoClient client;
+    private static final String METRIC_MCP_TOOL_DURATION = "mcp.tool.duration";
+    private static final String OUTCOME_OK = "ok";
+    private static final String OUTCOME_ERROR = "error";
 
-    public WeatherToolService(OpenMeteoClient client) {
+    private final OpenMeteoClient client;
+    private final MeterRegistry meterRegistry;
+
+    public WeatherToolService(OpenMeteoClient client, MeterRegistry meterRegistry) {
         this.client = client;
+        this.meterRegistry = meterRegistry;
     }
 
-    @Tool(name = "weather.current",
+    @Tool(name = "weather_current",
             description = """
                     Get the current observed weather for a city via Open-Meteo. Returns a structured result with
                     resolved location (name, country, country code, lat/lon), temperature in the requested unit,
@@ -70,28 +80,24 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_current", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return CurrentWeatherResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return CurrentWeatherResult.cityNotFound(city);
-            }
-
             CurrentWeatherUpstream upstream = client.fetchCurrentWeather(geo.latitude(), geo.longitude(), resolvedUnit);
 
             return toResult(geo, upstream, resolvedUnit);
-        } catch (RestClientException e) {
+        }, e -> {
             log.warn("Open-Meteo upstream call failed for city={}", city, e);
 
             return CurrentWeatherResult.upstreamUnavailable();
-        }
+        });
     }
 
-    @Tool(name = "weather.forecast",
+    @Tool(name = "weather_forecast",
             description = """
                     Get a multi-day weather forecast for a city via Open-Meteo. Returns a list of daily entries, each
                     containing max/min temperature, precipitation sum, and weather code. 'days' controls how many days
@@ -127,28 +133,24 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_forecast", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return ForecastResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return ForecastResult.cityNotFound(city);
-            }
-
             ForecastUpstream upstream = client.fetchForecast(geo.latitude(), geo.longitude(), resolvedDays, resolvedUnit);
 
             return toForecastResult(geo, upstream, resolvedUnit);
-        } catch (RestClientException e) {
+        }, e -> {
             log.warn("Open-Meteo upstream call failed for city={}", city, e);
 
             return ForecastResult.upstreamUnavailable();
-        }
+        });
     }
 
-    @Tool(name = "weather.historical",
+    @Tool(name = "weather_historical",
             description = """
                     Get historical observed weather for a city on a specific past date via Open-Meteo (archive API).
                     Returns a single daily entry with max/min temperature, precipitation sum, and weather code.
@@ -183,28 +185,24 @@ public class WeatherToolService {
         String resolvedUnit = InputValidator.normaliseUnit(unit);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_historical", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return HistoricalWeatherResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return HistoricalWeatherResult.cityNotFound(city);
-            }
-
             ForecastUpstream upstream = client.fetchHistoricalWeather(geo.latitude(), geo.longitude(), date, resolvedUnit);
 
             return toHistoricalResult(geo, upstream, resolvedUnit);
-        } catch (RestClientException e) {
+        }, e -> {
             log.warn("Open-Meteo archive call failed for city={} date={}", city, date, e);
 
             return HistoricalWeatherResult.upstreamUnavailable();
-        }
+        });
     }
 
-    @Tool(name = "weather.airQuality",
+    @Tool(name = "weather_air_quality",
             description = """
                     Get current air quality data for a city via the Open-Meteo Air Quality API. Returns PM10,
                     PM2.5 (both in µg/m³), US AQI, and European AQI. No temperature unit parameter — air quality
@@ -229,28 +227,24 @@ public class WeatherToolService {
         String resolvedCountryCode = InputValidator.normaliseCountryCode(countryCode);
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        try {
-            Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        return timed("weather_air_quality", () -> {
+            Optional<GeoResult> match = resolveCity(city, resolvedCountryCode, resolvedLanguage);
             if (match.isEmpty()) {
                 return AirQualityResult.cityNotFound(city);
             }
 
             GeoResult geo = match.get();
-            if (geo.latitude() == null || geo.longitude() == null) {
-                return AirQualityResult.cityNotFound(city);
-            }
-
             AirQualityUpstream upstream = client.fetchAirQuality(geo.latitude(), geo.longitude());
 
             return toAirQualityResult(geo, upstream);
-        } catch (RestClientException e) {
+        }, e -> {
             log.warn("Open-Meteo air quality call failed for city={}", city, e);
 
             return AirQualityResult.upstreamUnavailable();
-        }
+        });
     }
 
-    @Tool(name = "weather.geocode",
+    @Tool(name = "weather_geocode",
             description = """
                     Geocode a place name and return up to 'limit' candidate locations via the Open-Meteo Geocoding API.
                     Each candidate contains the resolved name, country, country code, latitude, and longitude.
@@ -276,7 +270,7 @@ public class WeatherToolService {
 
         String resolvedLanguage = InputValidator.normaliseLanguage(language);
 
-        try {
+        return timed("weather_geocode", () -> {
             List<GeoResult> results = client.geocodeAll(query, resolvedLimit, resolvedLanguage);
             if (results.isEmpty()) {
                 return GeocodeResult.noResults(query);
@@ -287,11 +281,41 @@ public class WeatherToolService {
                     .toList();
 
             return GeocodeResult.ok(candidates);
-        } catch (RestClientException e) {
+        }, e -> {
             log.warn("Open-Meteo geocoding call failed for query={}", query, e);
 
             return GeocodeResult.upstreamUnavailable();
+        });
+    }
+
+    private <T> T timed(String toolName, Supplier<T> body, Function<RestClientException, T> onError) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
+        try {
+            return body.get();
+        } catch (RestClientException e) {
+            outcome = OUTCOME_ERROR;
+            return onError.apply(e);
+        } finally {
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", toolName)
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
+    }
+
+    private Optional<GeoResult> resolveCity(String city, String resolvedCountryCode, String resolvedLanguage) {
+        Optional<GeoResult> match = client.geocode(city, resolvedCountryCode, resolvedLanguage);
+        if (match.isEmpty()) {
+            return Optional.empty();
+        }
+
+        GeoResult geo = match.get();
+        if (geo.latitude() == null || geo.longitude() == null) {
+            return Optional.empty();
+        }
+
+        return match;
     }
 
     private static CurrentWeatherResult toResult(GeoResult geo, CurrentWeatherUpstream upstream, String unit) {

@@ -26,14 +26,16 @@ def test_validate_fails_on_error_keyword():
     assert ContentValidator().validate(text) is False
 
 
-def test_validate_passes_when_textstat_raises():
+def test_validate_fails_closed_when_textstat_raises():
+    """ContentValidator must fail closed (return False) when textstat errors, so the
+    orchestrator escalates to the next tier rather than accepting junk content."""
     words = [f"word{i}" for i in range(60)]
     content = " ".join(words)
     with patch(
         "src.validator.content_validator._lexicon_count",
         side_effect=RuntimeError("nope"),
     ):
-        assert ContentValidator().validate(content) is True
+        assert ContentValidator().validate(content) is False
 
 
 def test_validate_fails_when_low_lexicon_and_low_flesch():

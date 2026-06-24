@@ -1,0 +1,92 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: ascend-ai-local
+
+scrape_configs:
+
+  # ─── AscendAI application services ───
+
+  - job_name: ascend-agent
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - ascend-agent:9917
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-agent
+
+  - job_name: weather-mcp
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - weather-mcp:9998
+    relabel_configs:
+      - target_label: service
+        replacement: weather-mcp
+
+  - job_name: ascend-memory
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ascend-memory:7020
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-memory
+
+  - job_name: audio-scribe
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - audio-scribe:7017
+    relabel_configs:
+      - target_label: service
+        replacement: audio-scribe
+
+  - job_name: ascend-web-search
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ascend-web-search:7021
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-web-search
+
+  - job_name: ascend-paddle-ocr
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ascend-paddle-ocr:7022
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-paddle-ocr
+
+  # ─── Data stores (native metrics) ───
+
+  - job_name: qdrant
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:6333
+    relabel_configs:
+      - target_label: service
+        replacement: qdrant
+
+  - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets:
+          - host.docker.internal:9070
+    relabel_configs:
+      - target_label: service
+        replacement: minio
+
+  - job_name: minio-bucket
+    metrics_path: /minio/v2/metrics/bucket
+    static_configs:
+      - targets:
+          - host.docker.internal:9070
+    relabel_configs:
+      - target_label: service
+        replacement: minio

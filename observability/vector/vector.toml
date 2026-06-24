@@ -1,0 +1,29 @@
+[sources.docker_logs]
+type = "docker_logs"
+include_containers = [
+  "ascend-agent",
+  "weather-mcp",
+  "ascend-memory",
+  "audio-scribe",
+  "ascend-web-search",
+  "ascend-paddle-ocr",
+]
+
+[sinks.loki]
+type = "loki"
+inputs = ["docker_logs"]
+endpoint = "http://loki:3100"
+encoding.codec = "text"
+
+  [sinks.loki.labels]
+  service = "{{ container_name }}"
+  source = "docker"
+
+# ─── Cloud migration ──────────────────────────────────────────────────────────
+# To ship logs to a managed backend instead of (or alongside) Loki, add a sink
+# with inputs = ["docker_logs"] of type datadog_logs, aws_cloudwatch_logs, or
+# splunk_hec_logs and its credentials, then drop or keep the loki sink above.
+# Service containers are never touched. See the sink reference for each type:
+# https://vector.dev/docs/reference/configuration/sinks/
+# Do NOT paste literal dollar-brace env-var examples here: Vector interpolates
+# those tokens even inside comments and fails to start when the variable is unset.

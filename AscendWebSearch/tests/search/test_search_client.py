@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+from src.circuit_breaker.breaker import CircuitBreaker
 from src.search.search_client import SearxngClient
 
 
@@ -135,6 +136,20 @@ async def test_search_raises_on_transport_error():
     client = SearxngClient()
     with patch.object(client.client, "get", new=mock_get):
         with pytest.raises(httpx.ConnectError):
+            await client.search("q")
+
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_search_fails_fast_when_breaker_open() -> None:
+    """When the searxng circuit breaker is OPEN, search() raises without making an HTTP call."""
+    breaker = CircuitBreaker("test-searxng", failure_threshold=1, recovery_timeout=999.0)
+    breaker.record_failure()  # opens the breaker
+
+    client = SearxngClient()
+    with patch("src.search.search_client.searxng_breaker", breaker):
+        with pytest.raises(httpx.HTTPError):
             await client.search("q")
 
     await client.aclose()

@@ -55,9 +55,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class IngestionEndToEndIT extends TestcontainersBase {
 
-    @MockitoBean
-    org.springframework.ai.mcp.SyncMcpToolCallbackProvider toolCallbackProvider;
-
     /**
      * Replace the real (network-bound) embedding/vector-store wiring. The mock resolver
      * hands back a mock {@link VectorStore} so {@code documentService.removeOldDocuments}

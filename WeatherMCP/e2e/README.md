@@ -132,11 +132,11 @@ Numbered by setup cost. Easiest first.
 | #  | Spec | What it proves |
 | :- | :--- | :--- |
 | 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `InputValidator` short-circuits blank, CRLF-injected, and over-length city values before any upstream call. No Open-Meteo egress required. |
-| 2  | [testing/2-current-structured-contract-test.md](testing/2-current-structured-contract-test.md) | `tools/list` advertises `weather.current` with the documented schema; a call for Warsaw returns `status="ok"` plus structured `location` / `temperature` / `wind` / `weatherCode` fields. |
+| 2  | [testing/2-current-structured-contract-test.md](testing/2-current-structured-contract-test.md) | `tools/list` advertises `weather_current` with the documented schema; a call for Warsaw returns `status="ok"` plus structured `location` / `temperature` / `wind` / `weatherCode` fields. |
 | 3  | [testing/3-current-city-not-found-test.md](testing/3-current-city-not-found-test.md) | An impossible city name returns `status="city_not_found"`, the verbatim input in `requestedQuery`, fixed string `"Location not found"` in `message`, all payload fields null. |
-| 4  | [testing/4-forecast-happy-path-test.md](testing/4-forecast-happy-path-test.md) | `weather.forecast` with `days=3` returns 3 daily entries, ISO dates strictly increasing, numeric max/min temperature, integer weather code. |
-| 5  | [testing/5-air-quality-happy-path-test.md](testing/5-air-quality-happy-path-test.md) | `weather.airQuality` for Warsaw returns numeric AQI + PM fields, location matches Warsaw / PL, source `"open-meteo"`. |
-| 6  | [testing/6-geocode-multiple-candidates-test.md](testing/6-geocode-multiple-candidates-test.md) | `weather.geocode` for `"Springfield"` with `limit=5` returns ≥3 entries with distinct lat/lon, at least one US candidate. |
+| 4  | [testing/4-forecast-happy-path-test.md](testing/4-forecast-happy-path-test.md) | `weather_forecast` with `days=3` returns 3 daily entries, ISO dates strictly increasing, numeric max/min temperature, integer weather code. |
+| 5  | [testing/5-air-quality-happy-path-test.md](testing/5-air-quality-happy-path-test.md) | `weather_air_quality` for Warsaw returns numeric AQI + PM fields, location matches Warsaw / PL, source `"open-meteo"`. |
+| 6  | [testing/6-geocode-multiple-candidates-test.md](testing/6-geocode-multiple-candidates-test.md) | `weather_geocode` for `"Springfield"` with `limit=5` returns ≥3 entries with distinct lat/lon, at least one US candidate. |
 | 7  | [testing/7-current-country-code-disambiguation-test.md](testing/7-current-country-code-disambiguation-test.md) | `Warsaw` with no `countryCode` resolves to Poland (PL, ~52.23°N); the same `Warsaw` with `countryCode="US"` resolves to a US Warsaw (~41.24°N for Warsaw, IN) with distinct `latitude` band. |
 
 ## Adding a new test

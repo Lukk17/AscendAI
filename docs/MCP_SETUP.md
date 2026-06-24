@@ -37,7 +37,7 @@ block; Claude Code's schema has no `enabled` flag.
 From the project root:
 
 ```bash
-cp .mcp.json.example .mcp.json
+cp .mcp.json .mcp.json
 ```
 
 ```bash
@@ -189,7 +189,7 @@ If the file already exists, merge the `mcpServers` block by hand; Claude Code ke
 To populate from scratch:
 
 ```bash
-cp .mcp.json.example ~/.claude.json
+cp .mcp.json ~/.claude.json
 ```
 
 #### Claude Desktop

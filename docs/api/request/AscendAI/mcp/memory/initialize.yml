@@ -28,7 +28,7 @@ http:
 
 runtime:
   scripts:
-    - type: after-response
+    - type: tests
       code: "// Automatically extract header and save to collection variable\r
 
         // pm.collectionVariables.set(\"mcp_session_id\", res.getHeader(\"MCP-Session-Id\"));\r

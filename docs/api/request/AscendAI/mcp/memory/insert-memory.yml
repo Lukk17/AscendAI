@@ -34,7 +34,7 @@ http:
 
 runtime:
   scripts:
-    - type: after-response
+    - type: tests
       code: "var rawText = JSON.stringify(res.getBody());\r
 
         // Split by \"data: \" to handle Server-Sent Events\r

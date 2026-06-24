@@ -1,0 +1,42 @@
+info:
+  name: extract-tier-cloudflare
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # A genuine Cloudflare challenge page (the curl tier is blocked) that FlareSolverr
+    # solves and that returns real content -- proves the Cloudflare/FlareSolverr tier.
+    data: |-
+      {
+        "url": "https://www.scrapingcourse.com/cloudflare-challenge",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Cloudflare tier: status is success (challenge solved)", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("Cloudflare tier: content proves the challenge was bypassed", function () {
+            const b = res.getBody();
+            const content = (b.content || b.text || b.markdown || "").toLowerCase();
+            expect(content.length).to.be.at.least(50);
+            expect(content).to.include("cloudflare challenge");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

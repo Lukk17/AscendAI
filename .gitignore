@@ -128,3 +128,8 @@ MANIFEST
 # Temporary files
 *.swp
 *~
+
+# Crawlee runtime state — request queues and key-value stores are ephemeral
+# artifacts produced at scrape time. They contain scraped URLs and responses
+# and must not be committed.
+AscendWebSearch/src/storage/

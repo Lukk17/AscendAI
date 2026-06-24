@@ -1,0 +1,39 @@
+info:
+  name: realworld-d-hacker-news
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://news.ycombinator.com/",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is success", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("content contains canary 'hacker news'", function () {
+            const b = res.getBody();
+            const c = (b.content || b.text || b.markdown || "").toLowerCase();
+            expect(c).to.include("hacker news");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

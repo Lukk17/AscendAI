@@ -11,7 +11,8 @@ def _build_playwright_factory(*, cookies=None, page_url="http://test.com", goto_
     page.goto = AsyncMock(side_effect=RuntimeError("nav") if goto_error else AsyncMock())
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
-    context.cookies = AsyncMock(return_value=cookies or [])
+    # Monitor now calls storage_state(), not cookies()
+    context.storage_state = AsyncMock(return_value={"cookies": cookies or [], "origins": []})
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)
@@ -33,10 +34,14 @@ async def test_monitor_breaks_early_when_url_changes():
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
-            "src.reader.strategies.novnc_strategy.cookie_manager.save_session_data",
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
             new=AsyncMock(),
         ) as mock_save,
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch(
+            "src.reader.strategies.novnc_strategy.ChallengeDetector.is_login_redirect_url",
+            return_value=False,
+        ),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
     mock_save.assert_awaited()
@@ -53,10 +58,14 @@ async def test_monitor_handles_goto_failure_and_still_polls():
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
-            "src.reader.strategies.novnc_strategy.cookie_manager.save_session_data",
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
             new=AsyncMock(),
         ),
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch(
+            "src.reader.strategies.novnc_strategy.ChallengeDetector.is_login_redirect_url",
+            return_value=False,
+        ),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
     browser.close.assert_awaited()
@@ -64,17 +73,25 @@ async def test_monitor_handles_goto_failure_and_still_polls():
 
 @pytest.mark.asyncio
 async def test_monitor_swallows_transient_cookie_sync_error():
+    """When storage_state() raises transiently the loop swallows the error and keeps going."""
     factory, browser, context, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}], page_url="http://test.com/done"
     )
-    context.cookies = AsyncMock(side_effect=[RuntimeError("transient"), []])
+    # First call raises; the except block (lines 88-89) catches it and continues.
+    # Second call succeeds and the URL change causes an early break.
+    context.storage_state = AsyncMock(side_effect=[RuntimeError("transient"), {"cookies": [], "origins": []}])
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
-            "src.reader.strategies.novnc_strategy.cookie_manager.save_session_data",
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
             new=AsyncMock(),
         ),
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch(
+            "src.reader.strategies.novnc_strategy.ChallengeDetector.is_login_redirect_url",
+            return_value=False,
+        ),
+        patch("src.reader.strategies.novnc_strategy.asyncio.sleep", new=AsyncMock()),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
     browser.close.assert_awaited()
@@ -100,9 +117,13 @@ async def test_monitor_browser_close_failure_is_tolerated():
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
-            "src.reader.strategies.novnc_strategy.cookie_manager.save_session_data",
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
             new=AsyncMock(),
         ),
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch(
+            "src.reader.strategies.novnc_strategy.ChallengeDetector.is_login_redirect_url",
+            return_value=False,
+        ),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")

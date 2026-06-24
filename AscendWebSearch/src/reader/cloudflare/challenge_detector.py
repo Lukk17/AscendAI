@@ -2,16 +2,26 @@ import json
 import re
 from pathlib import Path
 
+from src.config.config import settings
+
+
+def _contains_whole_word(text: str, word: str) -> bool:
+    """Return True when *word* appears as a whole word inside *text*."""
+    return bool(re.search(rf"\b{re.escape(word)}\b", text))
+
+
 DICT_PATH = Path(__file__).parent / "challenge_dictionary.json"
 try:
     with DICT_PATH.open(encoding="utf-8") as f:
         _BOT_DICT = json.load(f)
-except Exception:
+except (OSError, json.JSONDecodeError):
     _BOT_DICT = {
         "waf_script_signatures": [],
         "waf_strict_phrases": [],
         "login_title_patterns": [],
     }
+
+_LOGIN_REDIRECT_INDICATORS: tuple[str, ...] = ("?login", "continue=", "signin", "login=", "auth?")
 
 
 class ChallengeDetector:
@@ -19,45 +29,50 @@ class ChallengeDetector:
     def is_blocked(status_code: int, html_content: str) -> bool:
         """
         Checks if the response indicates a WAF/Cloudflare block.
+
+        Pages larger than CHALLENGE_DETECTION_MAX_BYTES are now scanned on a bounded
+        prefix rather than skipped entirely, preventing large authenticated pages from
+        being misidentified as clean when they actually contain a challenge wall.
         """
         if not html_content:
             return status_code in (403, 429, 503)
 
-        if len(html_content) > 50000:
-            return False
+        prefix = html_content[: settings.CHALLENGE_DETECTION_MAX_BYTES]
 
         for signature in _BOT_DICT.get("waf_script_signatures", []):
-            if signature in html_content:
+            if signature in prefix:
                 return True
 
         for phrase in _BOT_DICT.get("waf_strict_phrases", []):
-            if phrase in html_content:
+            if phrase in prefix:
                 return True
 
-        if re.search(r"Ray ID: \w+", html_content, re.IGNORECASE):
+        if re.search(r"Ray ID: \w+", prefix, re.IGNORECASE):
             return True
 
-        if "cf-turnstile" in html_content:
-            return True
+        if len(html_content) < settings.CHALLENGE_WALL_MAX_BYTES:
+            return "cf-turnstile" in prefix or "cf_clearance" in prefix or "datadome" in prefix
 
-        return "cf_clearance" in html_content
+        return False
 
     @staticmethod
-    def is_login_required(url: str, html_content: str) -> bool:  # noqa: ARG004
+    def is_login_required(html_content: str) -> bool:
         """
         Checks if the response HTML title indicates an authentication wall.
+
+        Scans a bounded prefix so large authenticated pages are not silently
+        skipped by the old >50 000 byte short-circuit.
         """
         if not html_content:
             return False
 
-        if len(html_content) > 50000:
-            return False
+        prefix = html_content[: settings.CHALLENGE_DETECTION_MAX_BYTES]
 
-        title_matches = re.finditer(r"<title[^>]*>(.*?)</title>", html_content, re.IGNORECASE | re.DOTALL)
+        title_matches = re.finditer(r"<title[^>]*>(.*?)</title>", prefix, re.IGNORECASE | re.DOTALL)
         for match in title_matches:
             title_text = match.group(1).strip().lower()
             for pattern in _BOT_DICT.get("login_title_patterns", []):
-                if pattern in title_text:
+                if _contains_whole_word(title_text, pattern):
                     return True
 
         return False
@@ -72,6 +87,5 @@ class ChallengeDetector:
             return False
 
         url_lower = url.lower()
-        redirect_indicators = ["?login", "continue=", "signin", "login=", "auth?"]
 
-        return any(indicator in url_lower for indicator in redirect_indicators)
+        return any(indicator in url_lower for indicator in _LOGIN_REDIRECT_INDICATORS)

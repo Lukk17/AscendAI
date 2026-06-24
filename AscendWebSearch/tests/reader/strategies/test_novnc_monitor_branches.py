@@ -11,7 +11,7 @@ def _factory(page_url: str, *, goto_ok: bool = True):
     page.goto = AsyncMock() if goto_ok else AsyncMock(side_effect=RuntimeError("nav"))
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
-    context.cookies = AsyncMock(return_value=[{"name": "k", "value": "v"}])
+    context.storage_state = AsyncMock(return_value={"cookies": [{"name": "k", "value": "v"}], "origins": []})
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)
@@ -52,7 +52,7 @@ async def test_monitor_continues_loop_when_url_did_not_change():
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
-            "src.reader.strategies.novnc_strategy.cookie_manager.save_session_data",
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
             new=AsyncMock(),
         ),
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),

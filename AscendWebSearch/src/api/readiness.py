@@ -6,6 +6,7 @@ import redis.asyncio as redis
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
+from src.circuit_breaker.breaker import BreakerState, flaresolverr_breaker, searxng_breaker
 from src.config.config import settings
 
 logger = logging.getLogger(__name__)
@@ -74,13 +75,30 @@ async def _probe_flaresolverr() -> dict[str, str]:
         return {"status": "error"}
 
 
+def _breaker_check(breaker_state: BreakerState) -> dict[str, str]:
+    """Translate circuit-breaker state to a readiness check dict."""
+    if breaker_state is BreakerState.OPEN:
+        return {"status": "degraded", "breaker": "open"}
+    if breaker_state is BreakerState.HALF_OPEN:
+        return {"status": "degraded", "breaker": "half_open"}
+    return {"status": "ok", "breaker": "closed"}
+
+
 @readiness_router.get("/ready")
 async def ready() -> JSONResponse:
     """Readiness probe. /health is liveness; this is readiness."""
+    searxng_probe = await _probe_searxng()
+    flaresolverr_probe = await _probe_flaresolverr()
+
+    searxng_breaker_check = _breaker_check(searxng_breaker.state)
+    flaresolverr_breaker_check = _breaker_check(flaresolverr_breaker.state)
+
     checks = {
         "redis": await _probe_redis(),
-        "searxng": await _probe_searxng(),
-        "flaresolverr": await _probe_flaresolverr(),
+        "searxng": searxng_probe,
+        "searxng_breaker": searxng_breaker_check,
+        "flaresolverr": flaresolverr_probe,
+        "flaresolverr_breaker": flaresolverr_breaker_check,
     }
     ok = all(c.get("status") in ("ok", "skipped") for c in checks.values())
     body = {"status": "ready" if ok else "degraded", "checks": checks}

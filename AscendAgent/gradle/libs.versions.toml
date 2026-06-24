@@ -67,6 +67,11 @@ spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-
 # Actuator — exposes /actuator/health for liveness probes and the e2e prereq check.
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 
+# Observability: Prometheus metrics registry + OTel tracing bridge/exporter
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
+micrometer-tracing-bridge-otel = { module = "io.micrometer:micrometer-tracing-bridge-otel" }
+opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
+
 # Lombok (version managed by Spring Boot BOM)
 lombok = { module = "org.projectlombok:lombok" }
 

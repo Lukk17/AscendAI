@@ -3,6 +3,7 @@ import com.lukk.ascend.ai.agent.service.provider.VectorStoreResolver;
 
 import com.lukk.ascend.ai.agent.config.properties.RagProperties;
 import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,7 +46,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
 
     @BeforeEach
     void setUp() {
-        service = new RagRetrievalService(vectorStoreResolver, ragProperties, DEFAULT_BUCKET);
+        service = new RagRetrievalService(vectorStoreResolver, ragProperties, DEFAULT_BUCKET, new SimpleMeterRegistry());
     }
 
     @Test

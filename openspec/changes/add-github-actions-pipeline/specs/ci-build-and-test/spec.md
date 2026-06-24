@@ -22,7 +22,7 @@
 
 ### Requirement: Path-filtered matrix per service
 
-`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-agent` → `AscendAgent/**`, `weather-mcp` → `WeatherMCP/**`, `audio-scribe` → `AudioScribe/**`, `ascend-web-search` → `AscendWebSearch/**`, `ascend-memory` → `AscendMemory/**`, `paddle-ocr` → `PaddleOCR/**`.
+`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-agent` → `AscendAgent/**`, `weather-mcp` → `WeatherMCP/**`, `audio-scribe` → `AudioScribe/**`, `ascend-web-search` → `AscendWebSearch/**`, `ascend-memory` → `AscendMemory/**`, `ascend-paddle-ocr` → `PaddleOCR/**`.
 
 #### Scenario: Docs-only PR runs zero matrix entries
 

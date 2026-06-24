@@ -1,11 +1,12 @@
 import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Response, status
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.exception_handlers import global_exception_handler, value_error_handler
 from src.api.mcp.mcp_server import mcp
@@ -19,6 +20,32 @@ from src.service.memory_client import get_memory_client
 
 setup_logging()
 logger = logging.getLogger("uvicorn")
+
+
+def _configure_otel() -> None:
+    """Activate OTel auto-instrumentation when OTEL_EXPORTER_OTLP_ENDPOINT is set.
+
+    A no-op when the env var is absent so local development is unaffected.
+    """
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not endpoint:
+        return
+
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    service_name = os.getenv("OTEL_SERVICE_NAME", "ascend-memory")
+    resource = Resource.create({"service.name": service_name})
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+    trace.set_tracer_provider(provider)
+    FastAPIInstrumentor().instrument()
+    logger.info("[AscendMemory] OTel tracing enabled → %s", endpoint)
+
 
 is_ready = False
 
@@ -72,6 +99,8 @@ async def warmup_client() -> None:
 
 
 def create_app() -> FastAPI:
+    _configure_otel()
+
     mcp_asgi_app = mcp.http_app()
 
     @asynccontextmanager
@@ -98,6 +127,11 @@ def create_app() -> FastAPI:
     app.include_router(rest_router)
     app.include_router(readiness_router)
 
+    Instrumentator(
+        should_group_status_codes=False,
+        excluded_handlers=["/metrics", "/health", "/health/legacy", "/ready"],
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, str]:
         """Liveness probe. Always returns 200 when the process is alive so
@@ -118,10 +152,6 @@ def create_app() -> FastAPI:
             return {"status": "starting", "detail": "Memory client initializing"}
 
         return {"status": "ok"}
-
-    @app.get("/metrics", tags=["observability"])
-    def metrics() -> Response:
-        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     # Mount must be last to avoid capturing specific routes
     app.mount("/", mcp_asgi_app)

@@ -1,0 +1,39 @@
+info:
+  name: realworld-e-quotes-toscrape-js
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://quotes.toscrape.com/js/",
+        "include_links": false,
+        "heavy_mode": true
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is success", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("JS tier: content contains JS-rendered canary quote (case-sensitive)", function () {
+            const b = res.getBody();
+            const content = b.content || b.text || b.markdown || "";
+            expect(content).to.include("The world as we have created it");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

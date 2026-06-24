@@ -4,6 +4,7 @@ import com.lukk.ascend.ai.agent.service.provider.VectorStoreResolver;
 import com.lukk.ascend.ai.agent.config.properties.RagProperties;
 import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class RagRetrievalServiceTest {
 
     @BeforeEach
     void setUp() {
-        ragRetrievalService = new RagRetrievalService(vectorStoreResolver, ragProperties, DEFAULT_BUCKET);
+        ragRetrievalService = new RagRetrievalService(vectorStoreResolver, ragProperties, DEFAULT_BUCKET, new SimpleMeterRegistry());
     }
 
     @Test

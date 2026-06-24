@@ -27,9 +27,6 @@ class VectorStoreConfigIT {
     })
     static class WhenLmStudioProviderIT extends TestcontainersBase {
 
-        @org.springframework.test.context.bean.override.mockito.MockitoBean
-        org.springframework.ai.mcp.SyncMcpToolCallbackProvider toolCallbackProvider;
-
         @Autowired
         EmbeddingProviderProperties embeddingProviderProperties;
 
@@ -73,9 +70,6 @@ class VectorStoreConfigIT {
             "app.embedding.default-provider=openai"
     })
     static class WhenOpenAiProviderIT extends TestcontainersBase {
-
-        @org.springframework.test.context.bean.override.mockito.MockitoBean
-        org.springframework.ai.mcp.SyncMcpToolCallbackProvider toolCallbackProvider;
 
         @Autowired
         EmbeddingProviderProperties embeddingProviderProperties;

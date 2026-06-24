@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -18,7 +19,7 @@ import static org.mockito.Mockito.when;
 
 class AnthropicPromptCacheStrategyTest {
 
-    private final AnthropicPromptCacheStrategy strategy = new AnthropicPromptCacheStrategy();
+    private final AnthropicPromptCacheStrategy strategy = new AnthropicPromptCacheStrategy(new SimpleMeterRegistry());
 
     @Test
     @DisplayName("buildOptions produces AnthropicChatOptions with SYSTEM_ONLY multi-block caching")

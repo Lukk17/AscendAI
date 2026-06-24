@@ -80,11 +80,14 @@ class StartupLogConfigTest {
         // given
         stubAcceptingEnv();
         when(env.getProperty("server.ssl.key-store")).thenReturn("/etc/ssl/server.keystore");
-        stubToolProvider(buildToolProvider("weather.current"));
-        StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
+        stubToolProvider(buildToolProvider("weather_current"));
+        StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
+
+        // when
+        String log = spy.buildStartupLog();
 
         // then
-        assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
+        assertThat(log).contains("https://");
     }
 
     @Test
@@ -93,11 +96,14 @@ class StartupLogConfigTest {
         // given
         stubAcceptingEnv();
         when(env.getActiveProfiles()).thenReturn(new String[0]);
-        stubToolProvider(buildToolProvider("weather.current"));
-        StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
+        stubToolProvider(buildToolProvider("weather_current"));
+        StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
+
+        // when
+        String log = spy.buildStartupLog();
 
         // then
-        assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
+        assertThat(log).contains("default");
     }
 
     @Test
@@ -105,14 +111,14 @@ class StartupLogConfigTest {
     void onReadinessChange_unknownHostException_fallsBackToLocalhost() {
         // given
         stubAcceptingEnv();
-        stubToolProvider(buildToolProvider("weather.current"));
-        StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
+        stubToolProvider(buildToolProvider("weather_current"));
+        StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
 
-        // then
+        // when / then
         try (MockedStatic<InetAddress> inetMock = mockStatic(InetAddress.class)) {
             inetMock.when(InetAddress::getLocalHost).thenThrow(new UnknownHostException("no host"));
-            assertThatNoException().isThrownBy(() ->
-                    config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
+            String log = spy.buildStartupLog();
+            assertThat(log).contains("localhost");
         }
     }
 
@@ -122,10 +128,13 @@ class StartupLogConfigTest {
         // given
         stubAcceptingEnv();
         when(toolCallbackProvider.getIfAvailable()).thenReturn(null);
-        StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
+        StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
+
+        // when
+        String log = spy.buildStartupLog();
 
         // then
-        assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
+        assertThat(log).contains("[Warning (no ToolCallbackProvider)]");
     }
 
     @Test
@@ -136,10 +145,13 @@ class StartupLogConfigTest {
         ToolCallbackProvider emptyProvider = mock(ToolCallbackProvider.class);
         when(emptyProvider.getToolCallbacks()).thenReturn(new ToolCallback[0]);
         when(toolCallbackProvider.getIfAvailable()).thenReturn(emptyProvider);
-        StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
+        StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
+
+        // when
+        String log = spy.buildStartupLog();
 
         // then
-        assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
+        assertThat(log).contains("no tools registered");
     }
 
     @Test
@@ -150,10 +162,13 @@ class StartupLogConfigTest {
         ToolCallbackProvider faultyProvider = mock(ToolCallbackProvider.class);
         when(faultyProvider.getToolCallbacks()).thenThrow(new RuntimeException("tool listing exploded"));
         when(toolCallbackProvider.getIfAvailable()).thenReturn(faultyProvider);
-        StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
+        StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
+
+        // when
+        String log = spy.buildStartupLog();
 
         // then
-        assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
+        assertThat(log).contains("[FAILED]");
     }
 
     @Test
@@ -161,11 +176,15 @@ class StartupLogConfigTest {
     void onReadinessChange_toolProviderReturnsTwoTools_logsToolNames() {
         // given
         stubAcceptingEnv();
-        stubToolProvider(buildToolProvider("weather.current", "weather.forecast"));
-        StartupLogConfig config = new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER);
+        stubToolProvider(buildToolProvider("weather_current", "weather_forecast"));
+        StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
+
+        // when
+        String log = spy.buildStartupLog();
 
         // then
-        assertThatNoException().isThrownBy(() -> config.onReadinessChange(mockEvent(ReadinessState.ACCEPTING_TRAFFIC)));
+        assertThat(log).contains("weather_current");
+        assertThat(log).contains("weather_forecast");
     }
 
     @Test
@@ -238,6 +257,12 @@ class StartupLogConfigTest {
 
     private void stubToolProvider(ToolCallbackProvider provider) {
         when(toolCallbackProvider.getIfAvailable()).thenReturn(provider);
+    }
+
+    private static StartupLogConfig spyWithProbeStubbedOk(StartupLogConfig config) {
+        StartupLogConfig s = spy(config);
+        doReturn(200).when(s).executeProbe(anyString());
+        return s;
     }
 
     private static ToolCallbackProvider buildToolProvider(String... toolNames) {

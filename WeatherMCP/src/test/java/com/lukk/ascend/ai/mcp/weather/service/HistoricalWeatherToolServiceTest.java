@@ -4,11 +4,14 @@ import com.lukk.ascend.ai.mcp.weather.dto.ForecastUpstream;
 import com.lukk.ascend.ai.mcp.weather.dto.GeoResult;
 import com.lukk.ascend.ai.mcp.weather.dto.HistoricalWeatherResult;
 import com.lukk.ascend.ai.mcp.weather.dto.WeatherToolStatus;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClientException;
 
@@ -44,6 +47,9 @@ class HistoricalWeatherToolServiceTest {
 
     @Mock
     private OpenMeteoClient client;
+
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @InjectMocks
     private WeatherToolService service;

@@ -7,12 +7,14 @@ import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -22,7 +24,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -46,7 +48,7 @@ class ChatExecutorBranchCoverageTest {
     private ChatModelResolver chatModelResolver;
 
     @Mock
-    private SyncMcpToolCallbackProvider toolCallbackProvider;
+    private ToolCallbackProvider toolCallbackProvider;
 
     @Mock
     private ChatResponseContentResolver chatResponseContentResolver;
@@ -57,12 +59,15 @@ class ChatExecutorBranchCoverageTest {
     @Mock
     private ChatModel chatModel;
 
+    @Spy
+    private io.micrometer.core.instrument.MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     @InjectMocks
     private ChatExecutor chatExecutor;
 
     @BeforeEach
     void setUpDefaults() {
-        PromptCacheStrategy noop = new NoopPromptCacheStrategy(PROVIDER);
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy(PROVIDER, new SimpleMeterRegistry());
         when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);

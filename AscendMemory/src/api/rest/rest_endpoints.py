@@ -1,11 +1,18 @@
 import asyncio
+import time
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from src.config.config import settings
-from src.service.memory_client import get_memory_client, resolve_provider
+from src.observability.metrics import (
+    MEMORY_INSERT_DURATION_SECONDS,
+    MEMORY_INSERT_TOTAL,
+    MEMORY_SEARCH_DURATION_SECONDS,
+    MEMORY_SEARCH_TOTAL,
+)
+from src.service.memory_client import get_memory_client, resolve_provider, wipe_user_all_collections
 
 rest_router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
 
@@ -18,6 +25,7 @@ USER_ID_PATTERN = r"^[A-Za-z0-9._\-@:+]{1,128}$"
 class SearchResponseItem(BaseModel):
     id: str
     memory: str
+    user_id: str | None = None
     score: float | None = None
     metadata: dict[str, Any] | None = None
     created_at: str | None = None
@@ -55,20 +63,32 @@ async def search_memory(
     resolved_provider = resolve_provider(provider)
     client = get_memory_client(resolved_provider)
 
-    return await asyncio.to_thread(
-        client.search,
-        query=query,
-        user_id=effective_user_id,
-        limit=limit,
-    )
+    started = time.monotonic()
+    outcome = "success"
+    try:
+        result = await asyncio.to_thread(
+            client.search,
+            query=query,
+            user_id=effective_user_id,
+            limit=limit,
+        )
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        MEMORY_SEARCH_DURATION_SECONDS.labels(provider=resolved_provider).observe(
+            time.monotonic() - started
+        )
+        MEMORY_SEARCH_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
+    return result
 
 
 class InsertRequest(BaseModel):
-    user_id: str | None = Field(
-        default=None,
+    user_id: str = Field(
+        min_length=1,
         max_length=settings.MAX_USER_ID_LENGTH,
         pattern=USER_ID_PATTERN,
-        description="Caller user_id; defaults to DEFAULT_USER_ID when omitted",
+        description="Caller user_id identifying the memory partition to write to",
     )
     text: str | None = Field(
         default=None,
@@ -91,17 +111,28 @@ async def insert_memory(request: InsertRequest) -> list[dict[str, Any]]:
     if request.text is None and not request.messages:
         raise ValueError("Either 'messages' or 'text' must be provided.")
 
-    effective_user_id = request.user_id or settings.DEFAULT_USER_ID
     resolved_provider = resolve_provider(request.provider)
     client = get_memory_client(resolved_provider)
 
-    return await asyncio.to_thread(
-        client.add,
-        user_id=effective_user_id,
-        messages=request.messages,
-        text=request.text,
-        metadata=request.metadata,
-    )
+    started = time.monotonic()
+    outcome = "success"
+    try:
+        result = await asyncio.to_thread(
+            client.add,
+            user_id=request.user_id,
+            messages=request.messages,
+            text=request.text,
+            metadata=request.metadata,
+        )
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        MEMORY_INSERT_DURATION_SECONDS.labels(provider=resolved_provider).observe(
+            time.monotonic() - started
+        )
+        MEMORY_INSERT_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
+    return result
 
 
 @rest_router.post("/wipe")
@@ -109,13 +140,16 @@ async def wipe_memory(
     user_id: UserIdQuery = None,
     provider: ProviderQuery = None,
 ) -> dict[str, str]:
-    """Wipe all memories for a user."""
+    """Wipe a user's memories. With no provider, clears every provider collection."""
 
     effective_user_id = user_id or settings.DEFAULT_USER_ID
-    resolved_provider = resolve_provider(provider)
-    client = get_memory_client(resolved_provider)
 
-    await asyncio.to_thread(client.wipe_user, user_id=effective_user_id)
+    if provider is None or not provider.strip():
+        await asyncio.to_thread(wipe_user_all_collections, user_id=effective_user_id)
+    else:
+        client = get_memory_client(resolve_provider(provider))
+
+        await asyncio.to_thread(client.wipe_user, user_id=effective_user_id)
 
     return {"status": "success", "message": f"All memories wiped for user {effective_user_id}"}
 

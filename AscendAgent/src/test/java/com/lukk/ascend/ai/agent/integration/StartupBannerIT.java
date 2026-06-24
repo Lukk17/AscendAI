@@ -4,6 +4,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.lukk.ascend.ai.agent.config.StartupLogConfig;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientEntry;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientStatus;
+import com.lukk.ascend.ai.agent.config.mcp.McpClientStatusRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +18,10 @@ import org.springframework.boot.availability.ReadinessState;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 /**
  * Verifies the startup banner emitted by {@link StartupLogConfig} on the
@@ -29,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StartupBannerIT extends TestcontainersBase {
 
     @MockitoBean
-    org.springframework.ai.mcp.SyncMcpToolCallbackProvider toolCallbackProvider;
+    McpClientStatusRegistry mcpClientStatusRegistry;
 
     @Autowired
     ApplicationContext applicationContext;
@@ -43,6 +49,11 @@ class StartupBannerIT extends TestcontainersBase {
         appender = new ListAppender<>();
         appender.start();
         startupLogger.addAppender(appender);
+
+        when(mcpClientStatusRegistry.entries()).thenReturn(List.of(
+                new McpClientEntry("audioscribe", "http://localhost:7017", McpClientStatus.CONNECTED),
+                new McpClientEntry("weather", "http://localhost:9998", McpClientStatus.FAILED)
+        ));
     }
 
     @AfterEach
@@ -66,10 +77,13 @@ class StartupBannerIT extends TestcontainersBase {
         assertThat(banner).contains("Postgres:");
         assertThat(banner).contains("Redis:");
         assertThat(banner).contains("Qdrant:");
-        assertThat(banner).contains("S3 Ingested:");
+        assertThat(banner).contains("S3 (MinIO):");
         assertThat(banner).contains("AscendMemory:");
-        assertThat(banner).contains("Chat History:");
-        assertThat(banner).contains("MCP Tools:");
+        assertThat(banner).contains("Chat history:");
+        assertThat(banner).contains("MCP servers:");
+        assertThat(banner).contains("[Connected]");
+        assertThat(banner).contains("[FAILED]");
+        assertThat(banner).contains("Aggregate:");
 
         // Each backing-service line carries one of the status markers — this guards against
         // an accidental refactor that drops the [Connected]/[FAILED]/[Warning]/[Disabled] tag.

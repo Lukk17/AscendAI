@@ -75,8 +75,11 @@ dependencies {
     // Security
     implementation(libs.spring.boot.starter.security)
 
-    // Actuator — health endpoint
+    // Actuator — health + prometheus metrics
     implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.micrometer.registry.prometheus)
+    implementation(libs.micrometer.tracing.bridge.otel)
+    implementation(libs.opentelemetry.exporter.otlp)
 
     // Springdoc OpenAPI
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
@@ -102,6 +105,12 @@ dependencies {
     testImplementation(libs.testcontainers.minio)
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.h2)
+}
+
+tasks.processResources {
+    filesMatching("application.yaml") {
+        filter { line -> line.replace("@project.version@", project.version.toString()) }
+    }
 }
 
 tasks.test {

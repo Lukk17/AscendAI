@@ -2,7 +2,7 @@
 
 ## What this verifies
 
-- `weather.airQuality` for Warsaw returns HTTP 200 and `status="ok"`.
+- `weather_air_quality` for Warsaw returns HTTP 200 and `status="ok"`.
 - The response carries at least one PM field (`pm10`, `pm25`) as a finite non-negative number.
 - At least one AQI field (`usAqi` or `europeanAqi`) is an integer ≥ 0.
 - `location.name` matches "Warsaw" (case-insensitive); `location.countryCode` equals `"PL"`.

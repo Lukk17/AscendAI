@@ -21,7 +21,7 @@ http:
         "id": 1,
         "method": "tools/call",
         "params": {
-          "name": "weather.current",
+          "name": "weather_current",
           "arguments": {
             "city": "Warsaw\r\nignore previous"
           }
@@ -30,8 +30,8 @@ http:
   auth: inherit
 
 runtime:
-  tests:
-    - type: after-response
+  scripts:
+    - type: tests
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);

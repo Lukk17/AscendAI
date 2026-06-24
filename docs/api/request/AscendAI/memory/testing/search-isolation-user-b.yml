@@ -1,0 +1,44 @@
+info:
+  name: search-isolation-user-b
+  type: http
+  seq: 14
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/search?user_id=frostyMemoryIsolationUserB&query=secret+favourite+city&provider=openai"
+  params:
+    - name: user_id
+      value: frostyMemoryIsolationUserB
+      type: query
+    - name: query
+      value: secret favourite city
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Response body contains no user A memories", function () {
+            var items = res.getBody();
+            if (typeof items === "string") {
+                items = items.trim() === "" ? [] : JSON.parse(items);
+            }
+            if (!Array.isArray(items)) {
+                items = [];
+            }
+            var leak = items.some(function(item) {
+                return (item.user_id === "frostyMemoryIsolationUserA") ||
+                       (item.memory && item.memory.toLowerCase().indexOf("tromsø") !== -1);
+            });
+            expect(leak).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

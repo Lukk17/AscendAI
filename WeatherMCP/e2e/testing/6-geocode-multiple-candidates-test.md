@@ -2,7 +2,7 @@
 
 ## What this verifies
 
-- `weather.geocode` for `query="Springfield"` with `limit=5` returns HTTP 200 and `status="ok"`.
+- `weather_geocode` for `query="Springfield"` with `limit=5` returns HTTP 200 and `status="ok"`.
 - The `candidates` array contains at least 3 entries with distinct `(latitude, longitude)` tuples.
 - At least one candidate has `countryCode="US"` (Springfield, MO / IL / MA / OH / VA all exist — the US dominates
   this query).

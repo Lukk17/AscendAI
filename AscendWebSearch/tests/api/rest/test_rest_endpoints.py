@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
+from src.session.session_manager import SessionInfo, SessionManager
+
 
 @pytest.mark.asyncio
 async def test_search_get_success(client: AsyncClient):
@@ -85,7 +87,7 @@ async def test_read_post_with_include_links(client: AsyncClient):
             json={"url": "http://unit.com/", "include_links": True, "link_filter": "/a"},
         )
     assert resp.status_code == 200
-    mock_read.assert_awaited_once_with("http://unit.com/", "/a", heavy_mode=False)
+    mock_read.assert_awaited_once_with("http://unit.com/", "/a", heavy_mode=False, profile=None)
 
 
 @pytest.mark.asyncio
@@ -104,4 +106,61 @@ async def test_read_post_heavy_mode_forwarded(client: AsyncClient):
             json={"url": "http://unit.com/", "heavy_mode": True},
         )
     assert resp.status_code == 200
-    mock_read.assert_awaited_once_with("http://unit.com/", heavy_mode=True)
+    mock_read.assert_awaited_once_with("http://unit.com/", heavy_mode=True, profile=None)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v2/web/session/establish
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_establish_session_returns_vnc_url(client: AsyncClient):
+    with (
+        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch.object(
+            SessionManager,
+            "establish",
+            new=AsyncMock(return_value="http://vnc:7900"),
+        ),
+    ):
+        resp = await client.post(
+            "/api/v2/web/session/establish",
+            json={"url": "http://example.com/"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "login_required"
+    assert body["vnc_url"] == "http://vnc:7900"
+    assert "example.com" in body["target"]
+
+
+@pytest.mark.asyncio
+async def test_establish_session_unsafe_url_returns_400(client: AsyncClient):
+    with patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=False):
+        resp = await client.post(
+            "/api/v2/web/session/establish",
+            json={"url": "http://192.168.1.1/"},
+        )
+    assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v2/web/session/status
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_session_status_returns_info(client: AsyncClient):
+    info = SessionInfo(
+        status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default"
+    )
+    with patch.object(SessionManager, "status", new=AsyncMock(return_value=info)):
+        resp = await client.post(
+            "/api/v2/web/session/status",
+            json={"url": "http://example.com/"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "active"
+    assert body["auth_ttl_remaining_seconds"] == 3600.0

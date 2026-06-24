@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect path changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ascend-agent:
+              - 'AscendAgent/**'
+            weather-mcp:
+              - 'WeatherMCP/**'
+            audio-scribe:
+              - 'AudioScribe/**'
+            ascend-web-search:
+              - 'AscendWebSearch/**'
+            ascend-memory:
+              - 'AscendMemory/**'
+            ascend-paddle-ocr:
+              - 'PaddleOCR/**'
+            workflows:
+              - '.github/workflows/**'
+
+      - name: Build dynamic matrix
+        id: build-matrix
+        run: |
+          ALL_SERVICES='[
+            {"service":"ascend-agent",    "language":"java",   "path":"AscendAgent",    "python_version":""},
+            {"service":"weather-mcp",     "language":"java",   "path":"WeatherMCP",     "python_version":""},
+            {"service":"audio-scribe",    "language":"python", "path":"AudioScribe",    "python_version":"3.11"},
+            {"service":"ascend-web-search","language":"python","path":"AscendWebSearch","python_version":"3.12"},
+            {"service":"ascend-memory",   "language":"python", "path":"AscendMemory",   "python_version":"3.11"},
+            {"service":"ascend-paddle-ocr",      "language":"python", "path":"PaddleOCR",      "python_version":"3.11"}
+          ]'
+
+          WORKFLOWS_CHANGED="${{ steps.filter.outputs.workflows }}"
+          ASCEND_AGENT="${{ steps.filter.outputs.ascend-agent }}"
+          WEATHER_MCP="${{ steps.filter.outputs.weather-mcp }}"
+          AUDIO_SCRIBE="${{ steps.filter.outputs.audio-scribe }}"
+          ASCEND_WEB_SEARCH="${{ steps.filter.outputs.ascend-web-search }}"
+          ASCEND_MEMORY="${{ steps.filter.outputs.ascend-memory }}"
+          PADDLE_OCR="${{ steps.filter.outputs.ascend-paddle-ocr }}"
+
+          if [ "$WORKFLOWS_CHANGED" = "true" ]; then
+            MATRIX="{\"include\":$(echo "$ALL_SERVICES" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')}"
+          else
+            INCLUDE="[]"
+            if [ "$ASCEND_AGENT"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-agent","language":"java","path":"AscendAgent","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"weather-mcp","language":"java","path":"WeatherMCP","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"audio-scribe","language":"python","path":"AudioScribe","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_WEB_SEARCH" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-search","language":"python","path":"AscendWebSearch","python_version":"3.12"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_MEMORY"    = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-memory","language":"python","path":"AscendMemory","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$PADDLE_OCR"       = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-paddle-ocr","language":"python","path":"PaddleOCR","python_version":"3.11"}); print(json.dumps(a))'); fi
+            MATRIX="{\"include\":$INCLUDE}"
+          fi
+
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build & test ${{ matrix.service }}
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.matrix).include[0] != null }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Java steps ────────────────────────────────────────────────────────
+      - name: Set up Java (Temurin 21)
+        if: matrix.language == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        if: matrix.language == 'java'
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Gradle build & test
+        if: matrix.language == 'java'
+        working-directory: ${{ matrix.path }}
+        run: ./gradlew --no-daemon build test
+
+      # ── Python steps ───────────────────────────────────────────────────────
+      - name: Set up Python ${{ matrix.python_version }}
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+          cache: pip
+
+      - name: Install service with dev extras
+        if: matrix.language == 'python'
+        working-directory: ${{ matrix.path }}
+        run: pip install -e .[dev]
+
+      - name: Run pytest
+        if: matrix.language == 'python'
+        working-directory: ${{ matrix.path }}
+        run: pytest
+
+      # ── Artifact upload (always) ────────────────────────────────────────────
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.service }}
+          path: |
+            ${{ matrix.path }}/build/test-results/**/*.xml
+            ${{ matrix.path }}/.pytest_cache
+            ${{ matrix.path }}/test-results
+          if-no-files-found: ignore

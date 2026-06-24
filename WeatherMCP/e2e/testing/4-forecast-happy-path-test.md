@@ -2,7 +2,7 @@
 
 ## What this verifies
 
-- `weather.forecast` for Warsaw with `days=3` returns HTTP 200 and `status="ok"`.
+- `weather_forecast` for Warsaw with `days=3` returns HTTP 200 and `status="ok"`.
 - The `forecast` array has length exactly 3.
 - Each element has a `date` field (ISO `yyyy-MM-dd`), numeric `temperatureMax`, numeric `temperatureMin`, optional
   numeric `precipitationSum`, integer `weatherCode`.

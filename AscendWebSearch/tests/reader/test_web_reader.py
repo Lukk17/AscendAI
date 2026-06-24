@@ -6,6 +6,16 @@ from src.api.exceptions import ChallengeDetectedException, HumanInterventionRequ
 from src.reader.web_reader import WebReader
 
 
+@pytest.fixture(autouse=True)
+def _default_no_stored_session():
+    """Keep read() tests hermetic: no stored session unless a test overrides it."""
+    with patch(
+        "src.reader.web_reader.cookie_manager.get_storage_state",
+        new=AsyncMock(return_value=None),
+    ):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_read_succeeds_on_first_strategy():
     with (
@@ -28,7 +38,7 @@ async def test_read_all_strategies_fail_returns_failure_response():
     ):
         result = await WebReader().read("http://fail.com")
     assert result["status"] == "error"
-    assert result["reason"] in ("budget_exhausted", "all_tiers_failed")
+    assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
@@ -58,6 +68,30 @@ async def test_read_heavy_mode_skips_lightweight():
 
 
 @pytest.mark.asyncio
+async def test_read_routes_browser_first_when_stored_session_exists():
+    """A stored session (e.g. a captured cf_clearance) forces the browser tier first
+    even without heavy_mode, so a curl tier can't trip the challenge and bypass the
+    Playwright tier that replays the clearance with its matching user-agent."""
+    with (
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
+            new=AsyncMock(return_value="curl tier content that must be skipped"),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
+            new=AsyncMock(return_value="PW Content"),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+    ):
+        result = await WebReader().read("http://test.com")
+    assert result["mode"] == "4-playwright_stealth"
+
+
+@pytest.mark.asyncio
 async def test_read_propagates_human_intervention():
     exc = HumanInterventionRequiredException("http://vnc", "captcha")
     with patch(
@@ -69,25 +103,48 @@ async def test_read_propagates_human_intervention():
 
 
 @pytest.mark.asyncio
-async def test_read_escalates_to_novnc_on_challenge_detected():
+async def test_read_falls_through_to_novnc_when_challenge_unsolved():
+    """A curl-tier challenge no longer short-circuits to NoVNC; it falls through the
+    ladder so the auto-solving tiers get a chance. When none resolve it, NoVNC (the
+    last tier) handles it."""
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
-            new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login")),
+            new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha")),
+        ),
+        patch(
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.extract",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.extract",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.extract",
+            new=AsyncMock(return_value=""),
         ),
         patch(
             "src.reader.strategies.novnc_strategy.NoVNCStrategy.extract",
             new=AsyncMock(return_value="NoVNC out"),
         ),
-        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+        patch(
+            "src.validator.content_validator.ContentValidator.validate",
+            side_effect=lambda c: bool(c and c.strip()),
+        ),
     ):
         result = await WebReader().read("http://test.com")
     assert result["mode"] == "6-novnc"
 
 
 @pytest.mark.asyncio
-async def test_read_does_not_recurse_when_novnc_itself_raises_challenge():
-    """The escalating=True guard short-circuits the second recursive dispatch."""
+async def test_read_returns_failure_when_all_tiers_including_novnc_fail():
+    """Every tier falls through on its challenge (NoVNC included); read ends in a
+    failure response rather than looping."""
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
@@ -116,10 +173,7 @@ async def test_read_does_not_recurse_when_novnc_itself_raises_challenge():
     ):
         result = await WebReader().read("http://test.com")
     assert result["status"] == "error"
-    assert result["reason"] in (
-        "budget_exhausted",
-        "all_tiers_failed",
-    )  # all strategies including NoVNC failed without recursion
+    assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
@@ -207,11 +261,11 @@ async def test_read_with_links_all_strategies_fail():
     ):
         result = await WebReader().read_with_links("http://test.com")
     assert result["status"] == "error"
-    assert result["reason"] in ("budget_exhausted", "all_tiers_failed")
+    assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_escalates_html_to_novnc_on_challenge():
+async def test_read_with_links_falls_through_to_novnc_on_challenge():
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job</a></body></html>"
@@ -220,6 +274,22 @@ async def test_read_with_links_escalates_html_to_novnc_on_challenge():
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
             new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login")),
+        ),
+        patch(
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.get_html",
+            new=AsyncMock(return_value=""),
         ),
         patch(
             "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
@@ -268,9 +338,15 @@ async def test_execute_html_strategy_returns_empty_string_when_html_blank():
 
 @pytest.mark.asyncio
 async def test_read_bails_when_budget_exceeded():
-    """READ_TOTAL_BUDGET shortcut path."""
+    """READ_TOTAL_BUDGET shortcut path: NoVNC rescue also fails, so reason stays budget_exhausted."""
     reader = WebReader()
-    with patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0):
+    with (
+        patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.extract",
+            new=AsyncMock(return_value=""),
+        ),
+    ):
         result = await reader.read("http://test.com")
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"
@@ -279,7 +355,13 @@ async def test_read_bails_when_budget_exceeded():
 @pytest.mark.asyncio
 async def test_read_with_links_bails_when_budget_exceeded():
     reader = WebReader()
-    with patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0):
+    with (
+        patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+    ):
         result = await reader.read_with_links("http://test.com")
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"
@@ -362,11 +444,20 @@ def test_get_random_user_agent_returns_string():
 
 
 @pytest.mark.asyncio
-async def test_execute_html_strategy_aborts_on_recursive_challenge():
-    """When the NoVNC escalation itself raises ChallengeDetectedException,
-    the escalating=True guard must short-circuit and return ''."""
+async def test_execute_html_strategy_falls_through_on_challenge():
+    """A challenge on the get_html path yields '' so the ladder advances to the next tier."""
     reader = WebReader()
     strategy = MagicMock()
     strategy.get_html = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login"))
-    result = await reader._execute_html_strategy("6-novnc", strategy, "http://test.com", escalating=True)
+    result = await reader._execute_html_strategy("1-beautifulsoup", strategy, "http://test.com")
     assert result == ""
+
+
+@pytest.mark.asyncio
+async def test_execute_strategy_falls_through_on_challenge():
+    """A challenge on the extract path yields None so the ladder advances to the next tier."""
+    reader = WebReader()
+    strategy = MagicMock()
+    strategy.extract = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha"))
+    result = await reader._execute_strategy("1-beautifulsoup", strategy, "http://test.com")
+    assert result is None

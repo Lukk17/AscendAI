@@ -2,7 +2,7 @@
 
 ## What this verifies
 
-- `weather.current` with an impossible city name (`"Zzyxxqq"`) returns HTTP 200 (the JSON-RPC envelope is success; the
+- `weather_current` with an impossible city name (`"Zzyxxqq"`) returns HTTP 200 (the JSON-RPC envelope is success; the
   tool-level failure is signalled inside `result.content`).
 - `status` equals `"city_not_found"`.
 - `message` is the fixed string `"Location not found"` — it does NOT echo the verbatim input (per the post-audit

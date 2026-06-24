@@ -41,7 +41,7 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
-            "src.reader.strategies.flaresolverr_strategy.cookie_manager.save_session_data",
+            "src.reader.strategies.flaresolverr_strategy.cookie_manager.save_flat_cookies",
             new=AsyncMock(),
         ) as mock_save,
         patch(
@@ -55,7 +55,9 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_skips_cookie_save_when_cf_clearance_missing():
+async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empty():
+    """After removing the cf_clearance gate, cookies are saved unconditionally
+    when the set is non-empty — even if no cf_clearance is present."""
     session = _make_session(
         {
             "status": "ok",
@@ -69,13 +71,13 @@ async def test_flaresolverr_skips_cookie_save_when_cf_clearance_missing():
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
-            "src.reader.strategies.flaresolverr_strategy.cookie_manager.save_session_data",
+            "src.reader.strategies.flaresolverr_strategy.cookie_manager.save_flat_cookies",
             new=AsyncMock(),
         ) as mock_save,
         patch("src.reader.strategies.flaresolverr_strategy.trafilatura.extract", return_value="x"),
     ):
         await FlareSolverrStrategy().extract("http://test.com")
-    mock_save.assert_not_called()
+    mock_save.assert_awaited_once()
 
 
 @pytest.mark.asyncio

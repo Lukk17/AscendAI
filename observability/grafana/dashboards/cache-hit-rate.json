@@ -1,0 +1,180 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "L3 Cache Hit Rate — validates that prompt-caching is firing. A flat line at 0% for any provider signals a regression.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Cache Hit Rate by Provider",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Prompt cache hit rate per provider — cached tokens read / total prompt tokens. Metric: prompt_cache_tokens_read_total and prompt_cache_tokens_total. A flat line at 0% for a given provider means caching is not activating (regression). Emitted from AnthropicPromptCacheStrategy.recordOutcome() and OpenAiPromptCacheStrategy.recordOutcome().",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "green", "value": 0.3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 1 },
+      "id": 2,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(prompt_cache_tokens_read_total{provider=\"anthropic\"}[5m]) / (rate(prompt_cache_tokens_total{provider=\"anthropic\"}[5m]) > 0)",
+          "legendFormat": "anthropic hit rate",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(prompt_cache_tokens_read_total{provider=\"openai\"}[5m]) / (rate(prompt_cache_tokens_total{provider=\"openai\"}[5m]) > 0)",
+          "legendFormat": "openai hit rate",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(prompt_cache_tokens_read_total{provider=\"gemini\"}[5m]) / (rate(prompt_cache_tokens_total{provider=\"gemini\"}[5m]) > 0)",
+          "legendFormat": "gemini hit rate",
+          "refId": "C"
+        }
+      ],
+      "title": "Prompt Cache Hit Rate per Provider",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Current cache hit rate snapshot per provider. A gauge below 10% for any cloud provider while that provider is receiving traffic warrants investigation.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "green", "value": 0.3 }
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 1 },
+      "id": 3,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(prompt_cache_tokens_read_total{provider=\"anthropic\"}[10m]) / (rate(prompt_cache_tokens_total{provider=\"anthropic\"}[10m]) > 0)",
+          "legendFormat": "anthropic",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(prompt_cache_tokens_read_total{provider=\"openai\"}[10m]) / (rate(prompt_cache_tokens_total{provider=\"openai\"}[10m]) > 0)",
+          "legendFormat": "openai",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(prompt_cache_tokens_read_total{provider=\"gemini\"}[10m]) / (rate(prompt_cache_tokens_total{provider=\"gemini\"}[10m]) > 0)",
+          "legendFormat": "gemini",
+          "refId": "C"
+        }
+      ],
+      "title": "Current Hit Rate (last 10m)",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 4,
+      "title": "Saved Tokens",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Absolute cache-read tokens saved per provider per hour — the denominator for cost savings. Metric: prompt_cache_tokens_read_total. Multiply by per-provider input rate to get USD/hour saved.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 5,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (provider) (rate(prompt_cache_tokens_read_total[1h])) * 3600",
+          "legendFormat": "{{provider}} cached tokens/hr",
+          "refId": "A"
+        }
+      ],
+      "title": "Cached Tokens Served per Hour (Saved)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Anthropic cache-creation tokens written per hour. These tokens are charged at 1.25x input rate but are needed to populate the cache. Metric: prompt_cache_tokens_creation_total (Anthropic only; OpenAI/Gemini cache writes are implicit).",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 6,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (provider) (rate(prompt_cache_tokens_creation_total[1h])) * 3600",
+          "legendFormat": "{{provider}} creation tokens/hr",
+          "refId": "A"
+        }
+      ],
+      "title": "Cache Creation Tokens per Hour (Anthropic)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ascend-ai", "cache", "L3"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "L3 — Cache Hit Rate",
+  "uid": "ascend-cache-hit-rate",
+  "version": 1
+}

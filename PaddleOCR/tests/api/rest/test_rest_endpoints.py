@@ -71,7 +71,11 @@ class TestMetricsEndpoint:
 
         # Then
         assert response.status_code == 200
-        assert "paddleocr_ocr_requests_total" in response.text or "# HELP" in response.text
+        body = response.text
+        # prometheus_client emits process_* on Linux and python_* on Windows/macOS;
+        # either prefix confirms the default collector is active.
+        assert "process_" in body or "python_" in body
+        assert "paddleocr_ocr_requests_total" in body
 
 
 class TestSecurityHeaders:

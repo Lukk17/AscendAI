@@ -53,7 +53,21 @@ async def test_get_domain_strips_subdomain_and_port():
 async def test_redis_get_returns_parsed_payload():
     manager = _fresh_manager()
     mock_redis = AsyncMock()
-    mock_redis.get = AsyncMock(return_value='{"cookies": {"cf_clearance": "z"}, "user_agent": "UA"}')
+    # New record format: auth/waf sub-records
+    import json
+    import time
+
+    record = {
+        "auth": {
+            "storage_state": {
+                "cookies": [{"name": "cf_clearance", "value": "z", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
+            "user_agent": "UA",
+            "saved_at": time.time(),
+        }
+    }
+    mock_redis.get = AsyncMock(return_value=json.dumps(record))
     manager.redis_client = mock_redis
 
     data = await manager.get_session_data("https://example.com")
@@ -67,7 +81,19 @@ async def test_redis_get_miss_falls_through_to_memory():
     mock_redis = AsyncMock()
     mock_redis.get = AsyncMock(return_value=None)
     manager.redis_client = mock_redis
-    manager._memory_store["example.com"] = {"cookies": {"k": "m"}, "user_agent": "UA"}
+
+    import time
+
+    manager._memory_store["example.com:default"] = {
+        "auth": {
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "m", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
+            "user_agent": "UA",
+            "saved_at": time.time(),
+        }
+    }
 
     data = await manager.get_session_data("https://example.com")
     assert data is not None
@@ -80,7 +106,19 @@ async def test_redis_get_error_falls_back_to_memory():
     mock_redis = AsyncMock()
     mock_redis.get = AsyncMock(side_effect=RuntimeError("down"))
     manager.redis_client = mock_redis
-    manager._memory_store["example.com"] = {"cookies": {"k": "m"}, "user_agent": "UA"}
+
+    import time
+
+    manager._memory_store["example.com:default"] = {
+        "auth": {
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "m", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
+            "user_agent": "UA",
+            "saved_at": time.time(),
+        }
+    }
 
     data = await manager.get_session_data("https://example.com")
     assert data is not None
@@ -106,7 +144,10 @@ async def test_save_via_redis_error_falls_back_to_memory():
     manager.redis_client = mock_redis
 
     await manager.save_session_data("https://example.com", {"k": "v"}, "UA")
-    assert manager._memory_store["example.com"]["cookies"]["k"] == "v"
+    # Memory key is now "{domain}:default"
+    record = manager._memory_store["example.com:default"]
+    auth_cookies = {c["name"]: c["value"] for c in record["auth"]["storage_state"]["cookies"]}
+    assert auth_cookies["k"] == "v"
 
 
 @pytest.mark.asyncio
@@ -137,8 +178,19 @@ async def test_init_reentry_returns_existing_singleton():
 
 @pytest.mark.asyncio
 async def test_get_domain_handles_bare_host_without_scheme():
+    import time
+
     manager = _fresh_manager()
-    manager._memory_store["example.com"] = {"cookies": {"k": "v"}, "user_agent": "UA"}
+    manager._memory_store["example.com:default"] = {
+        "auth": {
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "v", "domain": "example.com", "path": "/"}],
+                "origins": [],
+            },
+            "user_agent": "UA",
+            "saved_at": time.time(),
+        }
+    }
     data = await manager.get_session_data("example.com/path")
     assert data is not None
     assert data["cookies"]["k"] == "v"
@@ -146,8 +198,19 @@ async def test_get_domain_handles_bare_host_without_scheme():
 
 @pytest.mark.asyncio
 async def test_get_domain_returns_empty_for_empty_url():
+    import time
+
     manager = _fresh_manager()
-    manager._memory_store[""] = {"cookies": {"k": "v"}, "user_agent": "UA"}
+    manager._memory_store[":default"] = {
+        "auth": {
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "v", "domain": "", "path": "/"}],
+                "origins": [],
+            },
+            "user_agent": "UA",
+            "saved_at": time.time(),
+        }
+    }
     data = await manager.get_session_data("")
     assert data is not None
     assert data["cookies"]["k"] == "v"
@@ -157,8 +220,19 @@ async def test_get_domain_returns_empty_for_empty_url():
 async def test_get_domain_returns_host_when_no_psl_suffix():
     """tldextract cannot recognise non-PSL hosts (intranet, localhost). The fallback
     is to keep the host as-is so internal addresses still get a unique key."""
+    import time
+
     manager = _fresh_manager()
-    manager._memory_store["intranet-host"] = {"cookies": {"k": "v"}, "user_agent": "UA"}
+    manager._memory_store["intranet-host:default"] = {
+        "auth": {
+            "storage_state": {
+                "cookies": [{"name": "k", "value": "v", "domain": "intranet-host", "path": "/"}],
+                "origins": [],
+            },
+            "user_agent": "UA",
+            "saved_at": time.time(),
+        }
+    }
     data = await manager.get_session_data("http://intranet-host/path")
     assert data is not None
     assert data["cookies"]["k"] == "v"

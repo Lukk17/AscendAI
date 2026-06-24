@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
 import com.lukk.ascend.ai.agent.config.properties.PromptCacheProperties;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -103,7 +104,7 @@ class PromptCacheStrategyResolverTest {
             map.put(k, pc);
         });
         props.setProviders(map);
-        PromptCacheStrategyResolver resolver = new PromptCacheStrategyResolver(props);
+        PromptCacheStrategyResolver resolver = new PromptCacheStrategyResolver(props, new SimpleMeterRegistry());
         resolver.init();
 
         return resolver;

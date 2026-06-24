@@ -8,12 +8,14 @@ import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
@@ -21,7 +23,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
@@ -49,7 +51,7 @@ class ChatExecutorTest {
     private ChatModelResolver chatModelResolver;
 
     @Mock
-    private SyncMcpToolCallbackProvider toolCallbackProvider;
+    private ToolCallbackProvider toolCallbackProvider;
 
     @Mock
     private ChatResponseContentResolver chatResponseContentResolver;
@@ -60,12 +62,15 @@ class ChatExecutorTest {
     @Mock
     private PromptCacheStrategyResolver cacheStrategyResolver;
 
+    @Spy
+    private io.micrometer.core.instrument.MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     @InjectMocks
     private ChatExecutor chatExecutor;
 
     @BeforeEach
     void setupGlobalFields() {
-        PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio");
+        PromptCacheStrategy noop = new NoopPromptCacheStrategy("lmstudio", new SimpleMeterRegistry());
         org.mockito.Mockito.lenient().when(cacheStrategyResolver.resolve(any())).thenReturn(noop);
     }
 

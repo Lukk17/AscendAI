@@ -55,6 +55,15 @@ class Settings(BaseSettings):
     DEFAULT_TIMEOUT: float = Field(default=30.0, description="Default HTTP request timeout in seconds")
     SEARCH_TIMEOUT: float = Field(default=10.0, description="Timeout for search requests")
     EXTRACT_TIMEOUT: float = Field(default=30.0, description="Timeout for web extraction")
+    CHALLENGE_CLEAR_WAIT_SECONDS: float = Field(
+        default=12.0,
+        description=(
+            "How long the headful Playwright tier waits for a Cloudflare JS/managed challenge "
+            "to auto-clear before escalating to NoVNC. JS challenges resolve in ~5-10s in a real "
+            "browser; a true interactive Turnstile never auto-clears and escalates after this window. "
+            "Bounded by EXTRACT_TIMEOUT."
+        ),
+    )
     READ_TOTAL_BUDGET: float = Field(
         default=90.0,
         description=(
@@ -66,6 +75,10 @@ class Settings(BaseSettings):
     NOVNC_TIMEOUT_SECONDS: int = Field(
         default=600,
         description="Timeout in seconds for NoVNC manual intervention (default 10 mins)",
+    )
+    NOVNC_COOKIE_SYNC_POLL_SECONDS: float = Field(
+        default=5.0,
+        description="Poll interval in seconds for the NoVNC cookie-sync background monitor",
     )
     PLAYWRIGHT_HEADLESS: bool = Field(
         default=False,
@@ -123,6 +136,88 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(
         default="redis://localhost:6379/0",
         description="Redis connection URL for cookie storage",
+    )
+
+    # Session TTLs
+    SESSION_AUTH_TTL_SECONDS: int = Field(
+        default=1_209_600,
+        description="Sliding TTL for auth cookies (long-lived; default 14 days)",
+    )
+    SESSION_WAF_TTL_SECONDS: int = Field(
+        default=1800,
+        description="TTL for WAF-clearance cookies (short-lived; default 30 min)",
+    )
+    SESSION_DEFAULT_PROFILE: str = Field(
+        default="default",
+        description="Profile label used when no profile is specified per-request",
+    )
+
+    # Challenge detection
+    CHALLENGE_DETECTION_MAX_BYTES: int = Field(
+        default=50_000,
+        description=(
+            "Prefix length scanned by ChallengeDetector. Pages larger than this "
+            "were previously skipped entirely; now we scan only the prefix."
+        ),
+    )
+    CHALLENGE_WALL_MAX_BYTES: int = Field(
+        default=50_000,
+        description=(
+            "Max page size for a weak marker (an embedded Turnstile widget or a "
+            "cf_clearance token) to count as a block. A real page can host a Turnstile "
+            "widget while serving full content (e.g. nowsecure.nl), so these only signal "
+            "a challenge wall on an interstitial-sized page. Strong markers (Ray ID, "
+            "interstitial phrases, third-party captcha scripts) fire regardless of size."
+        ),
+    )
+
+    # Crawlee storage root (outside src/ to avoid committing runtime state)
+    CRAWLEE_STORAGE_DIR: str = Field(
+        default=".crawlee_storage",
+        description="Out-of-tree directory for Crawlee request queues and key-value stores",
+    )
+
+    # Group 4 — Anti-bot evasion: proxy seam (off by default)
+    PROXY_URL: str = Field(
+        default="",
+        description=(
+            "Optional outbound proxy URL for all fetch tiers (e.g. socks5://user:pass@host:port). "
+            "Empty string (the default) disables proxy egress entirely."
+        ),
+    )
+
+    # Group 5 — Extraction quality: readability fallback threshold
+    READABILITY_FALLBACK_MIN_CHARS: int = Field(
+        default=200,
+        description=(
+            "Minimum character count of trafilatura output below which the readability-lxml "
+            "fallback is attempted.  The higher-scoring result (by character count) is returned."
+        ),
+    )
+
+    # Group 7 — Caching: read-result cache TTL
+    READ_CACHE_TTL_SECONDS: int = Field(
+        default=300,
+        description="TTL in seconds for the read-result cache-aside entries (default 5 min).",
+    )
+
+    # Group 7 — Observability: per-domain metric label cardinality cap
+    DOMAIN_METRIC_CARDINALITY_CAP: int = Field(
+        default=50,
+        description=(
+            "Maximum number of distinct registrable-domain label values tracked in "
+            "STRATEGY_ATTEMPTS_TOTAL.  Domains beyond this cap are bucketed under 'other'."
+        ),
+    )
+
+    # Group 7 — Circuit breaker thresholds
+    BREAKER_FAILURE_THRESHOLD: int = Field(
+        default=3,
+        description="Consecutive failures before a circuit breaker opens.",
+    )
+    BREAKER_RECOVERY_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        description="Seconds after which an open breaker moves to half-open and allows one probe.",
     )
 
 

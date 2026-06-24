@@ -23,13 +23,15 @@ AscendMemory/e2e/
     ├── 3-wipe-user-scope-test.md
     ├── 4-mcp-tools-list-test.md
     ├── 5-mcp-insert-and-search-test.md
+    ├── 6-user-isolation-test.md
     ├── templates/                       # run-record templates (immutable), one per spec
     │   ├── README.md
     │   ├── 1-invalid-input-tasks.template.md
     │   ├── 2-insert-and-search-tasks.template.md
     │   ├── 3-wipe-user-scope-tasks.template.md
     │   ├── 4-mcp-tools-list-tasks.template.md
-    │   └── 5-mcp-insert-and-search-tasks.template.md
+    │   ├── 5-mcp-insert-and-search-tasks.template.md
+    │   └── 6-user-isolation-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<capability>-tasks.md   # one per executed test (gitignored)
@@ -87,7 +89,7 @@ it, and wipes it. Two tests with disjoint `user_id` lists can run side by side. 
 | Constraint | Tests | Why |
 | :--- | :--- | :--- |
 | **No persistence** | 1 | Test 1 hits FastAPI's request validator (422) before mem0 is invoked. No Qdrant writes. Runs in any order. |
-| **Disjoint user IDs** | 2, 3, 5 | Each test owns its own dedicated user IDs (`frostyMemoryInsertSearchTest`, `frostyMemoryWipeAlpha`/`Beta`, `frostyMemoryMcpInsertSearchTest`). No overlap, so they can run in parallel. |
+| **Disjoint user IDs** | 2, 3, 5, 6 | Each test owns its own dedicated user IDs (`frostyMemoryInsertSearchTest`, `frostyMemoryWipeAlpha`/`Beta`, `frostyMemoryMcpInsertSearchTest`, `frostyMemoryIsolationUserA`/`B`). No overlap, so they can run in parallel. |
 | **Read-only protocol probe** | 4 | `tools/list` is a pure read against the MCP server. No state writes. |
 
 Recommended layout: run test 1 first (offline-equivalent, fail-fast on validator behaviour), then tests 2-5 in
@@ -140,6 +142,7 @@ Numbered by setup cost. Easiest first.
 | 3  | [testing/3-wipe-user-scope-test.md](testing/3-wipe-user-scope-test.md) | `POST /api/v1/memory/wipe?user_id=Alpha` removes Alpha's memories but leaves Beta's intact, proving wipe is scoped to the supplied `user_id` and never bleeds across users. |
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | `tools/list` against `:7020/mcp` (after the `initialize` handshake) advertises memory tools whose names include `insert` and `search`. |
 | 5  | [testing/5-mcp-insert-and-search-test.md](testing/5-mcp-insert-and-search-test.md) | The MCP layer is wired to the same memory client as REST: an insert via the MCP `memory_insert` tool is retrievable via the MCP `memory_search` tool for the same `user_id`. |
+| 6  | [testing/6-user-isolation-test.md](testing/6-user-isolation-test.md) | A memory inserted for user A is not visible when searching as user B; mem0's user-scope filter prevents cross-user memory leakage. |
 
 ## Adding a new test
 

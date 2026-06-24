@@ -391,8 +391,22 @@ the actual transport AscendAgent uses today. The other surface is available for 
 | :---------------------- | :------ | :------------------ | :---------------------------------------------------------- |
 | **SearXNG**             | `9020`  | (none)              | Privacy-respecting meta-search; backend for AscendWebSearch.|
 | **FlareSolverr**        | `8191`  | (none)              | Cloudflare bypass proxy used by AscendWebSearch.            |
+| **ngrok (web-search)**  | (none)  | `NGROK_AUTHTOKEN`   | Public tunnel to AscendWebSearch's NoVNC for remote CAPTCHA intervention. |
 | **Docling Serve**       | `5001`  | (none)              | PDF / DOCX to structured JSON (used by ingestion pipeline). |
 | **Unstructured API**    | `9080`  | (none)              | Generic document parsing fallback for ingestion.            |
+
+#### Observability stack (in-stack, deployed via compose)
+
+Full setup and usage in [observability/README.md](observability/README.md).
+
+| Service             | Port            | Exposed       | Role                                                                 |
+| :------------------ | :-------------- | :------------ | :------------------------------------------------------------------ |
+| **Grafana**         | `7078` → `3000` | Browser UI    | Dashboards + Explore. Anonymous `Viewer`; `admin` / `admin` to edit.|
+| **Prometheus**      | `7077` → `9090` | Browser UI    | Scrapes metrics from the 6 services, Qdrant, and MinIO.             |
+| **Loki**            | `3100`          | Internal only | Log store; receives logs from Vector.                              |
+| **Tempo**           | (none)          | Internal only | Trace store; receives traces from the OTel Collector.              |
+| **Vector**          | (none)          | Internal only | Tails the 6 app containers' Docker logs and ships them to Loki.    |
+| **OTel Collector**  | (none)          | Internal only | Receives OTLP traces from the services and exports them to Tempo.  |
 
 #### External prerequisites (not in compose, managed / cloud in production)
 
@@ -417,11 +431,14 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / MinIO / PostgreSQL / Redis reset recipes.                    |
+| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)                                                                        | Metrics, logs, traces — what is collected, dashboards, how to instrument. |
+| [observability/README.md](observability/README.md)                                                                   | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
 | [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |
 | [AscendAgent/e2e/README.md](AscendAgent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
 | [AGENTS.md](AGENTS.md)                                                                                                | Shared instructions for any AI coding agent operating in this repo.   |
+| [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and Release workflow operator notes: secrets, bump convention, how to cut a release. |
 
 ---
 

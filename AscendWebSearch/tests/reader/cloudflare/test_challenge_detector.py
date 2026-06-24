@@ -40,59 +40,63 @@ def test_not_blocked():
 
 
 def test_is_login_required():
-    # Only tests <title> tags now
     assert (
         ChallengeDetector.is_login_required(
-            "https://example.com/auth",
             "<html><head><title>Sign In | Indeed Accounts</title></head><body></body></html>",
         )
         is True
     )
     assert (
         ChallengeDetector.is_login_required(
-            "https://example.com/login",
             "<html><head><title>Log In | Example</title></head><body></body></html>",
         )
         is True
     )
     assert (
         ChallengeDetector.is_login_required(
-            "https://example.com/signin",
-            "<html><head><title>Welcome to the home page</title></head><body>Sign in to continue</body></html>",
+            "<html><head><title>Welcome to the home page</title></head>"
+            "<body>Sign in to continue</body></html>",
         )
         is False
     )
     assert (
         ChallengeDetector.is_login_required(
-            "https://example.com",
             "<html><head><title>Login - Portal</title></head><body>Enter your password</body></html>",
         )
         is True
     )
+    assert ChallengeDetector.is_login_required("<html><body>Sign in to continue</body></html>") is False
+    assert ChallengeDetector.is_login_required("<html><body>Enter your password</body></html>") is False
+    assert (
+        ChallengeDetector.is_login_required("<html><head><title>Welcome</title></head><body></body></html>")
+        is False
+    )
+
+
+def test_is_login_required_ignores_login_substring_within_words():
+    """Word-boundary match: 'sign in' must not fire on 'design industry'."""
     assert (
         ChallengeDetector.is_login_required(
-            "https://example.com", "<html><body>Sign in to continue</body></html>"
+            "<html><head><title>Web Design Industry News</title></head><body></body></html>",
         )
         is False
     )
     assert (
         ChallengeDetector.is_login_required(
-            "https://example.com", "<html><body>Enter your password</body></html>"
+            "<html><head><title>Sign in to your account</title></head><body></body></html>",
         )
-        is False
-    )
-    assert (
-        ChallengeDetector.is_login_required(
-            "https://example.com", "<html><head><title>Welcome</title></head><body></body></html>"
-        )
-        is False
+        is True
     )
 
 
 def test_is_login_required_svg_bypass():
-    # Proves the finditer logic prevents <svg> title tags from masking the real <title>
-    dirty_html = "<html><body><svg><title id='logo'>Indeed Logo</title></svg><title dir='ltr'>Sign In | Indeed Accounts</title></body></html>"
-    assert ChallengeDetector.is_login_required("https://indeed.com/auth", dirty_html) is True
+    dirty_html = (
+        "<html><body>"
+        "<svg><title id='logo'>Indeed Logo</title></svg>"
+        "<title dir='ltr'>Sign In | Indeed Accounts</title>"
+        "</body></html>"
+    )
+    assert ChallengeDetector.is_login_required(dirty_html) is True
 
 
 def test_is_blocked_returns_true_for_waf_script_signature():
@@ -128,7 +132,7 @@ def test_is_blocked_returns_false_on_huge_content():
 
 def test_is_login_required_returns_false_on_huge_content():
     huge = "a" * 50001
-    assert ChallengeDetector.is_login_required("https://example.com", huge) is False
+    assert ChallengeDetector.is_login_required(huge) is False
 
 
 def test_is_login_redirect_url_empty_string_returns_false():
@@ -141,7 +145,6 @@ def test_is_login_redirect_url_none_returns_false():
 
 
 def test_is_login_redirect_url_matches_known_patterns():
-    # Proves URL parameter stripping works for preemptive exits
     assert (
         ChallengeDetector.is_login_redirect_url(
             "https://secure.indeed.com/auth?continue=http://indeed.com/jobs"

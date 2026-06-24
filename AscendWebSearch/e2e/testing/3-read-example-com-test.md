@@ -46,7 +46,7 @@ Optionally flush the Redis session-cache key for `example.com` to force a cold e
 the response shape is identical for cache hits and misses — but a cold run exercises the full tiered fallback.
 
 ```powershell
-docker exec ascend-redis redis-cli --scan --pattern "*example.com*" | ForEach-Object { docker exec ascend-redis redis-cli DEL $_ }
+docker exec redis redis-cli --scan --pattern "*example.com*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
 
 If you choose not to reset, document the choice under **Additional tasks I did** in the run record.

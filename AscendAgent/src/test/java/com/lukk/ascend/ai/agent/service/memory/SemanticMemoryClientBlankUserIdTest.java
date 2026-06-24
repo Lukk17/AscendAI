@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service.memory;
 
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class SemanticMemoryClientBlankUserIdTest {
         properties = new SemanticMemoryProperties();
         properties.setEnabled(true);
         properties.setBaseUrl("http://localhost:7020");
-        client = new SemanticMemoryClient(restClientBuilder, properties);
+        client = new SemanticMemoryClient(restClientBuilder, properties, new SimpleMeterRegistry());
     }
 
 

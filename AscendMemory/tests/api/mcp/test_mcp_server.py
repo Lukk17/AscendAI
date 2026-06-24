@@ -106,26 +106,31 @@ def test_memory_delete_rejects_empty_id():
     assert memory_delete(memory_id="")["code"] == "validation_error"
 
 
-@patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_wipe_returns_success(mock_get_client):
-    mock_service = MagicMock()
-    mock_get_client.return_value = mock_service
-
+@patch("src.api.mcp.mcp_server.wipe_user_all_collections")
+def test_memory_wipe_without_provider_wipes_all_collections(mock_wipe_all):
     result = memory_wipe(user_id="u1")
 
     assert result["status"] == "success"
     assert "u1" in result["message"]
-    mock_service.wipe_user.assert_called_once_with(user_id="u1")
+    mock_wipe_all.assert_called_once_with(user_id="u1")
+
+
+@patch("src.api.mcp.mcp_server.wipe_user_all_collections")
+def test_memory_wipe_uses_default_user_id(mock_wipe_all):
+    memory_wipe()
+
+    mock_wipe_all.assert_called_once_with(user_id="default_user")
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_wipe_uses_default_user_id(mock_get_client):
+def test_memory_wipe_with_explicit_provider_wipes_that_provider_only(mock_get_client):
     mock_service = MagicMock()
     mock_get_client.return_value = mock_service
 
-    memory_wipe()
+    result = memory_wipe(user_id="u1", provider="openai")
 
-    mock_service.wipe_user.assert_called_once_with(user_id="default_user")
+    assert result["status"] == "success"
+    mock_service.wipe_user.assert_called_once_with(user_id="u1")
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")

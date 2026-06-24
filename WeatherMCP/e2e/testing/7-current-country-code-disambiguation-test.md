@@ -2,9 +2,9 @@
 
 ## What this verifies
 
-- `weather.current` for `city="Warsaw"` with no `countryCode` returns `location.countryCode="PL"` and a latitude band
+- `weather_current` for `city="Warsaw"` with no `countryCode` returns `location.countryCode="PL"` and a latitude band
   consistent with Warsaw, Poland (~52.23°N).
-- `weather.current` for the same `city="Warsaw"` with `countryCode="US"` returns `location.countryCode="US"` and a
+- `weather_current` for the same `city="Warsaw"` with `countryCode="US"` returns `location.countryCode="US"` and a
   latitude band consistent with one of the US Warsaws (Warsaw, IN ~41.24°N; Warsaw, NY ~42.74°N; Warsaw, MO ~38.25°N
   — all in 38–43°N, distinct from PL's 52°N band).
 - Both calls return `status="ok"`.

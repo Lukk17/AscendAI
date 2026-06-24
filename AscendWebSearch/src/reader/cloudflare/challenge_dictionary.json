@@ -3,7 +3,6 @@
     "arkoselabs.com",
     "recaptcha/api.js",
     "hcaptcha.com/1/api.js",
-    "datadome.co/tags.js",
     "perimeterx.net"
   ],
   "waf_strict_phrases": [

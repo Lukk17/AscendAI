@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
@@ -32,16 +34,16 @@ async def test_insert_memory_with_provider(client: AsyncClient, override_depende
 
 
 @pytest.mark.asyncio
-async def test_insert_memory_defaults_user_id_when_omitted(
+async def test_insert_memory_rejects_missing_user_id(
     client: AsyncClient, override_dependencies
 ):
-    mock_service = override_dependencies
-    mock_service.add.return_value = []
-
     response = await client.post("/api/v1/memory/insert", json={"text": "x"})
 
-    assert response.status_code == 200
-    assert mock_service.add.call_args.kwargs["user_id"] == "default_user"
+    assert response.status_code == 422
+    body = response.json()
+    assert any(
+        "user_id" in str(e.get("loc", [])) for e in body.get("detail", [])
+    )
 
 
 @pytest.mark.asyncio
@@ -74,6 +76,25 @@ async def test_search_memory_success(client: AsyncClient, override_dependencies)
     assert response.status_code == 200
     assert response.json()[0]["id"] == "m1"
     mock_service.search.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_search_memory_response_includes_user_id(
+    client: AsyncClient, override_dependencies
+):
+    mock_service = override_dependencies
+    mock_service.search.return_value = [
+        {"id": "m1", "memory": "fact one", "score": 0.9, "user_id": "u1"}
+    ]
+
+    response = await client.get(
+        "/api/v1/memory/search",
+        params={"user_id": "u1", "query": "test"},
+    )
+
+    assert response.status_code == 200
+    item = response.json()[0]
+    assert item["user_id"] == "u1"
 
 
 @pytest.mark.asyncio
@@ -115,13 +136,12 @@ async def test_delete_memory_success(client: AsyncClient, override_dependencies)
 
 @pytest.mark.asyncio
 async def test_wipe_memory_success(client: AsyncClient, override_dependencies):
-    mock_service = override_dependencies
-
-    response = await client.post("/api/v1/memory/wipe", params={"user_id": "u1"})
+    with patch("src.api.rest.rest_endpoints.wipe_user_all_collections") as mock_wipe_all:
+        response = await client.post("/api/v1/memory/wipe", params={"user_id": "u1"})
 
     assert response.status_code == 200
     assert response.json()["status"] == "success"
-    mock_service.wipe_user.assert_called_once_with(user_id="u1")
+    mock_wipe_all.assert_called_once_with(user_id="u1")
 
 
 @pytest.mark.asyncio

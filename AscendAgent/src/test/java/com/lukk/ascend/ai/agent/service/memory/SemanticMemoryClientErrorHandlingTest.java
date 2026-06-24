@@ -1,12 +1,15 @@
 package com.lukk.ascend.ai.agent.service.memory;
 
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -38,6 +41,9 @@ class SemanticMemoryClientErrorHandlingTest {
 
     @Mock
     private SemanticMemoryProperties properties;
+
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @InjectMocks
     private SemanticMemoryClient client;

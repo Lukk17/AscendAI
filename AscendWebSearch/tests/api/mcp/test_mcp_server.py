@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.api.exceptions import HumanInterventionRequiredException
-from src.api.mcp.mcp_server import web_read, web_search
+from src.api.mcp.mcp_server import session_establish, session_status, web_read, web_search
+from src.session.session_manager import SessionInfo, SessionManager
 
 
 @pytest.mark.asyncio
@@ -57,7 +58,7 @@ async def test_mcp_web_read_calls_read_when_include_links_false():
         result = await web_read("http://mcp.com")
 
     assert result == mock_content
-    mock_read.assert_awaited_once_with("http://mcp.com", heavy_mode=False)
+    mock_read.assert_awaited_once_with("http://mcp.com", heavy_mode=False, profile=None)
 
 
 @pytest.mark.asyncio
@@ -78,7 +79,7 @@ async def test_mcp_web_read_calls_read_with_links_when_include_links_true():
         result = await web_read("http://mcp.com", include_links=True, link_filter="/job/")
 
     assert result["status"] == "success"
-    mock_read.assert_awaited_once_with("http://mcp.com", "/job/", heavy_mode=False)
+    mock_read.assert_awaited_once_with("http://mcp.com", "/job/", heavy_mode=False, profile=None)
 
 
 @pytest.mark.asyncio
@@ -114,3 +115,61 @@ async def test_mcp_web_read_human_intervention_on_links_branch():
         result = await web_read("http://mcp.com", include_links=True)
 
     assert result["intervention_type"] == "login"
+
+
+# ---------------------------------------------------------------------------
+# session_establish MCP tool
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_establish_returns_human_intervention_payload():
+    with (
+        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch.object(
+            SessionManager,
+            "establish",
+            new=AsyncMock(return_value="http://vnc:7900"),
+        ),
+    ):
+        result = await session_establish("http://example.com")
+
+    assert result["status"] == "human_intervention_required"
+    assert result["intervention_type"] == "login"
+    assert result["vnc_url"] == "http://vnc:7900"
+    assert "http://vnc:7900" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_establish_unsafe_url_raises():
+    with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
+        with pytest.raises(ValueError, match="non-routable"):
+            await session_establish("http://10.0.0.1")
+
+
+# ---------------------------------------------------------------------------
+# session_status MCP tool
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_status_returns_info():
+    info = SessionInfo(
+        status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default"
+    )
+    with (
+        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch.object(SessionManager, "status", new=AsyncMock(return_value=info)),
+    ):
+        result = await session_status("http://example.com")
+
+    assert result["url"] == "http://example.com"
+    assert result["status"] == "active"
+    assert result["auth_ttl_remaining_seconds"] == 3600.0
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_status_unsafe_url_raises():
+    with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
+        with pytest.raises(ValueError, match="non-routable"):
+            await session_status("http://10.0.0.1")

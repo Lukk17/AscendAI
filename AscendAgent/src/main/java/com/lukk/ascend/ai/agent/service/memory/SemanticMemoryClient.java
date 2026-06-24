@@ -1,11 +1,14 @@
 package com.lukk.ascend.ai.agent.service.memory;
 
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -13,14 +16,28 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SemanticMemoryClient {
 
+    private static final String METRIC_INSERT_FAILED = "memory.insert.failed";
+    private static final String METRIC_SEARCH_DURATION = "memory.search.duration";
+    private static final String OUTCOME_OK = "ok";
+    private static final String OUTCOME_ERROR = "error";
+
     private final RestClient.Builder restClientBuilder;
     private final SemanticMemoryProperties properties;
+    private final MeterRegistry meterRegistry;
+
+    public SemanticMemoryClient(RestClient.Builder restClientBuilder,
+                                SemanticMemoryProperties properties,
+                                MeterRegistry meterRegistry) {
+        this.restClientBuilder = restClientBuilder;
+        this.properties = properties;
+        this.meterRegistry = meterRegistry;
+    }
 
     public List<SemanticMemoryItem> search(String userId, String query, int limit, String embeddingProvider) {
         if (isMissingUserId(userId, "search")) {
@@ -34,10 +51,19 @@ public class SemanticMemoryClient {
 
     private List<SemanticMemoryItem> executeSearch(String userId, String query, int limit, String embeddingProvider) {
         log.info("Requesting semantic memory from AscendMemory (baseUrl={}) for user: '{}'", properties.getBaseUrl(), userId);
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
         try {
-            return performSearchCall(userId, query, limit, embeddingProvider);
+            List<SemanticMemoryItem> result = performSearchCall(userId, query, limit, embeddingProvider);
+            return result;
         } catch (Exception e) {
+            outcome = OUTCOME_ERROR;
             return handleSearchError(userId, e);
+        } finally {
+            sample.stop(Timer.builder(METRIC_SEARCH_DURATION)
+                    .tag("embedding_provider", embeddingProvider != null ? embeddingProvider : "unknown")
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
     }
 
@@ -81,13 +107,43 @@ public class SemanticMemoryClient {
         body.put("text", fact);
         body.put("provider", embeddingProvider);
 
-        restClientBuilder.build()
-                .post()
-                .uri(properties.getBaseUrl() + "/api/v1/memory/insert")
-                .body(body)
-                .retrieve()
-                .toBodilessEntity();
-        log.info("Successfully inserted memory fact for user: '{}'", userId);
+        try {
+            restClientBuilder.build()
+                    .post()
+                    .uri(properties.getBaseUrl() + "/api/v1/memory/insert")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully inserted memory fact for user: '{}'", userId);
+        } catch (Exception e) {
+            String reason = classifyInsertFailure(e);
+            Counter.builder(METRIC_INSERT_FAILED)
+                    .tag("embedding_provider", embeddingProvider != null ? embeddingProvider : "unknown")
+                    .tag("reason", reason)
+                    .register(meterRegistry)
+                    .increment();
+            throw e;
+        }
+    }
+
+    private static String classifyInsertFailure(Exception e) {
+        if (e instanceof RestClientResponseException rce) {
+            int status = rce.getStatusCode().value();
+            if (status >= 400 && status < 500) {
+                return "4xx";
+            }
+            if (status >= 500) {
+                return "5xx";
+            }
+        }
+        if (e instanceof ResourceAccessException rae) {
+            Throwable cause = rae.getCause();
+            if (cause instanceof TimeoutException) {
+                return "timeout";
+            }
+            return "connect_error";
+        }
+        return "error";
     }
 
     // Body is snake_case to match the FastAPI contract on the AscendMemory side.
