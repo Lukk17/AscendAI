@@ -3,9 +3,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      stack_version:
-        description: 'Stack version (e.g. 1.1.1). The monorepo release tag will be ascend-ai_<stack_version>.'
+      create_github_release:
+        description: 'Cut the git tag and GitHub Release. Untick to publish images only, consuming no stack version.'
         required: true
+        type: boolean
+        default: true
+      stack_version:
+        description: 'Stack version (e.g. 1.1.1). The monorepo release tag will be ascend-ai_<stack_version>. Ignored when create_github_release is unticked.'
+        required: false
+        default: ''
         type: string
       release_ascend_agent:
         description: 'Release ascend-agent (AscendAgent/build.gradle.kts version)'
@@ -42,7 +48,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ inputs.stack_version }}
+  group: release-${{ inputs.stack_version || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -63,6 +69,7 @@ jobs:
         id: emit
         env:
           STACK_VERSION: ${{ inputs.stack_version }}
+          CREATE_RELEASE: ${{ inputs.create_github_release }}
           SEL_ASCEND_AGENT:     ${{ inputs.release_ascend_agent }}
           SEL_WEATHER_MCP:      ${{ inputs.release_weather_mcp }}
           SEL_AUDIO_SCRIBE:     ${{ inputs.release_audio_scribe }}
@@ -71,8 +78,6 @@ jobs:
           SEL_PADDLE_OCR:       ${{ inputs.release_paddle_ocr }}
         run: |
           set -euo pipefail
-
-          TAG="ascend-ai_${STACK_VERSION}"
 
           # ── 1. Fail if zero apps selected ─────────────────────────────────
           SELECTED_COUNT=0
@@ -84,10 +89,21 @@ jobs:
             exit 1
           fi
 
-          # ── 2. Fail if tag already exists ─────────────────────────────────
-          if git tag -l "$TAG" | grep -q "^${TAG}$"; then
-            echo "::error::Tag '${TAG}' already exists. Stack versions are cut once. Use a different stack_version."
-            exit 1
+          # ── 2. Stack-version checks, only when a release is being cut ─────
+          if [ "$CREATE_RELEASE" = "true" ]; then
+            if [ -z "$STACK_VERSION" ]; then
+              echo "::error::stack_version is required when create_github_release is ticked."
+              exit 1
+            fi
+
+            TAG="ascend-ai_${STACK_VERSION}"
+
+            if git tag -l "$TAG" | grep -q "^${TAG}$"; then
+              echo "::error::Tag '${TAG}' already exists. Stack versions are cut once. Use a different stack_version."
+              exit 1
+            fi
+          else
+            echo "::notice::create_github_release is unticked. Images will be published with no git tag and no GitHub Release, and no stack version is consumed."
           fi
 
           # ── 3. Find previous stack tag ────────────────────────────────────
@@ -234,6 +250,7 @@ jobs:
   release:
     name: Create GitHub Release ascend-ai_${{ inputs.stack_version }}
     needs: build-and-push
+    if: ${{ inputs.create_github_release }}
     runs-on: ubuntu-latest
 
     steps:

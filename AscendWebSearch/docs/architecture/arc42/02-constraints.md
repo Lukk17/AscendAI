@@ -18,7 +18,7 @@
 
 | Constraint | Impact |
 | :--- | :--- |
-| No separate release cadence | Ships with the monorepo. No independent image versioning beyond `0.1.0` in `pyproject.toml`. |
+| No separate release cadence | Ships with the monorepo. No independent image versioning beyond `0.0.3` in `pyproject.toml`. |
 | External services required at runtime | SearXNG (port 9020), FlareSolverr (port 8191), and Redis (port 6379) must be running before the first search or read request. The service starts without them but fails on first use. |
 | Ngrok is optional | `PUBLIC_VNC_URL` defaults to `http://localhost:7900`. Ngrok is only needed when the container is behind NAT and the operator needs remote VNC access. |
 | Secrets handled by the host | No secrets manager integration. Configuration is injected as environment variables. |

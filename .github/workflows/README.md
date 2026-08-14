@@ -74,7 +74,8 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 
 | Input | Type | Required | Description |
 |---|---|---|---|
-| `stack_version` | string | yes | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. |
+| `create_github_release` | boolean | yes | Default `true`. Untick to publish images only: no Git tag, no GitHub Release, no stack version consumed. |
+| `stack_version` | string | no | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. Required when `create_github_release` is ticked, ignored otherwise. |
 | `release_ascend_agent` | boolean | yes | Ship `ascend-agent`. Default `false`. |
 | `release_weather_mcp` | boolean | yes | Ship `weather-mcp`. Default `false`. |
 | `release_audio_scribe` | boolean | yes | Ship `audio-scribe`. Default `false`. |
@@ -90,11 +91,19 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 4. Tick the checkboxes for each app you want to ship.
 5. Click **Run workflow**.
 
-The workflow runs three sequential jobs:
+### Publishing images without cutting a release
 
-- **`prepare`**: validates inputs, checks the tag does not already exist, reads manifest versions, runs the bump guard. If anything fails, no login or push occurs.
+Untick `create_github_release` and leave `stack_version` blank. The `prepare` and `build-and-push` jobs run normally, the `release` job is skipped, and you get published images with no Git tag and no GitHub Release.
+
+Use this to ship an image without spending a stack version, for example when only one service has changed and the platform is not at a release point.
+
+One consequence to be aware of. The bump guard compares each selected service against its version at the most recent `ascend-ai_*` tag. An image-only run cuts no tag, so it does not move that baseline. Two image-only runs at the same manifest version will therefore both pass the guard and the second one overwrites the first one's image. Bump the manifest between image-only runs if you care about the tag being immutable.
+
+### The three jobs
+
+- **`prepare`**: validates inputs, checks the tag does not already exist when one is being cut, reads manifest versions, runs the bump guard. If anything fails, no login or push occurs.
 - **`build-and-push`**: for each selected app, logs in to Docker Hub and to GitHub Container Registry, builds a multi-arch image (`linux/amd64,linux/arm64`) once, and pushes it to four tags: `v<version>` and `latest` on each registry. Jobs are `fail-fast: false` so a single app failure does not abort the others.
-- **`release`**: after all pushes succeed, reads the current version of all six apps, composes a release body listing every app and marking which were shipped, and creates the Git tag `ascend-ai_<stack_version>` plus a GitHub Release via `softprops/action-gh-release@v2`. `generate_release_notes: true` appends the PR-title changelog since the previous tag automatically.
+- **`release`**: skipped entirely when `create_github_release` is unticked. Otherwise, after all pushes succeed, it reads the current version of all six apps, composes a release body listing every app and marking which were shipped, and creates the Git tag `ascend-ai_<stack_version>` plus a GitHub Release via `softprops/action-gh-release@v2`. `generate_release_notes: true` appends the PR-title changelog since the previous tag automatically.
 
 ### Developer convention
 

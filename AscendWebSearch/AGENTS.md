@@ -8,7 +8,7 @@ AscendWebSearch is an MCP server and REST API for web search and content extract
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.1.0
+- **Version**: 0.0.3
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.58.0-noble`
 
 ## Build & Run Commands

@@ -114,7 +114,7 @@ services:
     build:
       context: ./AscendWebSearch
       dockerfile: Dockerfile
-    # image: lukk17/ascend-web-search:v0.1.0
+    # image: lukk17/ascend-web-search:v0.0.3
     container_name: ascend-web-search
     hostname: ascend-web-search
     restart: unless-stopped
@@ -146,7 +146,7 @@ services:
       - VNC_PASSWORD=${VNC_PASSWORD:-}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-web-search
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.3
     cap_add:
       - SYS_ADMIN
     shm_size: "2gb"
