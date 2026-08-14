@@ -1,8 +1,10 @@
 name: ascend-scrapper
 
-# Bounded container logs. Docker's json-file driver rotates at max-size and
-# deletes the oldest file past max-file, so each service is capped at 30 MB
-# regardless of uptime. Without this the log grows until the disk is full.
+# Standalone web-search stack for a single-host deployment (homelab, VPS).
+# This file is self-contained: it builds nothing and pulls every image from a
+# public registry. See README.md for prerequisites and how it differs from the
+# development stack in the repository root.
+
 x-logging: &default-logging
   driver: json-file
   options:
@@ -18,17 +20,9 @@ services:
     container_name: searxng
     restart: unless-stopped
     logging: *default-logging
-    ports:
-      # Bound to loopback: only this host reaches it. AscendWebSearch talks to
-      # it over the compose network by alias, so nothing outside needs the port.
-      # It stays published because config.py defaults to http://localhost:9020
-      # when the service runs natively instead of in a container.
-      - "127.0.0.1:9020:8080"
     environment:
       - "SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set in .env (at least 32 characters, unique to this deployment)}"
     volumes:
-      # use_default_settings: true overlay so engine-suspension windows are
-      # seconds-to-minutes (not days) and JSON format is exposed for /ready.
       # NOT mounted :ro because SearXNG's container init chowns the file at
       # boot; a read-only mount makes the container restart-loop.
       - ./searxng/settings.yml:/etc/searxng/settings.yml
@@ -56,11 +50,6 @@ services:
     container_name: flaresolverr
     restart: unless-stopped
     logging: *default-logging
-    ports:
-      # Loopback only. FlareSolverr fetches any URL handed to it, so an
-      # all-interfaces binding is a request-forwarding primitive for anything
-      # else on the network. Published for the same native-run reason as above.
-      - "127.0.0.1:8191:8191"
     environment:
       - LOG_LEVEL=info
       - LOG_HTML=false
@@ -93,7 +82,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+      - "NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:?NGROK_AUTHTOKEN must be set in .env (get one at https://dashboard.ngrok.com/get-started/your-authtoken)}"
     command: "http ascend-web-search:7900"
     depends_on:
       - ascend-web-search
@@ -111,10 +100,7 @@ services:
           - ngrok-ascend-web-search
 
   ascend-web-search:
-    build:
-      context: ./AscendWebSearch
-      dockerfile: Dockerfile
-    # image: lukk17/ascend-web-search:v0.1.0
+    image: lukk17/ascend-web-search:v0.1.0
     container_name: ascend-web-search
     hostname: ascend-web-search
     restart: unless-stopped
@@ -122,8 +108,8 @@ services:
     ports:
       - "7021:7021"
     extra_hosts:
-      # Docker Desktop injects this name; Docker Engine on Linux does not.
-      # REDIS_URL below depends on it resolving to the container host.
+      # Docker Engine on Linux does not define this name on its own.
+      # REDIS_URL below depends on it resolving to the Docker host.
       - "host.docker.internal:host-gateway"
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080
@@ -137,16 +123,12 @@ services:
       - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
-      # Redis must be running externally (port 6379)
+      # Redis runs on the Docker host, not in this stack. See README.md.
       - REDIS_URL=redis://host.docker.internal:6379/0
       - NOVNC_TIMEOUT_SECONDS=600
-      # Optional here: unset means the NoVNC desktop accepts any client and the
-      # container logs a warning at boot. Port 7900 is not published locally,
-      # so only the ngrok tunnel can reach it. The homelab bundle requires it.
-      - VNC_PASSWORD=${VNC_PASSWORD:-}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=ascend-web-search
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
+      # Required here. The ngrok tunnel puts the NoVNC desktop on the public
+      # internet, so an unauthenticated desktop is not an option.
+      - "VNC_PASSWORD=${VNC_PASSWORD:?VNC_PASSWORD must be set in .env (8 characters, the VNC protocol truncates anything longer)}"
     cap_add:
       - SYS_ADMIN
     shm_size: "2gb"

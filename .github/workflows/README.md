@@ -24,6 +24,8 @@ Secrets are configured at **Settings → Secrets and variables → Actions** on 
 | `DOCKERHUB_USERNAME` | `release.yaml` only | Docker Hub login username |
 | `DOCKERHUB_TOKEN` | `release.yaml` only | Docker Hub access token (not your password — create a token at hub.docker.com → Security) |
 
+GitHub Container Registry needs no configured secret. The `build-and-push` job authenticates with the automatically provided `GITHUB_TOKEN`, which is why that job declares `packages: write` in its own `permissions` block rather than at workflow level.
+
 `ci.yaml` consumes **no secrets**. Pull requests from forks therefore run CI safely with no privileged access.
 
 ---
@@ -91,7 +93,7 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 The workflow runs three sequential jobs:
 
 - **`prepare`**: validates inputs, checks the tag does not already exist, reads manifest versions, runs the bump guard. If anything fails, no login or push occurs.
-- **`build-and-push`**: for each selected app, logs in to Docker Hub, builds a multi-arch image (`linux/amd64,linux/arm64`), and pushes `lukk17/<service>:<version>` and `lukk17/<service>:latest`. Jobs are `fail-fast: false` so a single app failure does not abort the others.
+- **`build-and-push`**: for each selected app, logs in to Docker Hub and to GitHub Container Registry, builds a multi-arch image (`linux/amd64,linux/arm64`) once, and pushes it to four tags: `v<version>` and `latest` on each registry. Jobs are `fail-fast: false` so a single app failure does not abort the others.
 - **`release`**: after all pushes succeed, reads the current version of all six apps, composes a release body listing every app and marking which were shipped, and creates the Git tag `ascend-ai_<stack_version>` plus a GitHub Release via `softprops/action-gh-release@v2`. `generate_release_notes: true` appends the PR-title changelog since the previous tag automatically.
 
 ### Developer convention
@@ -146,18 +148,31 @@ No committed `CHANGELOG.md` is produced. The release workflow never edits files 
 
 ### Image naming
 
-Images are pushed to Docker Hub as `lukk17/<service>:<version>` and `lukk17/<service>:latest`.
+Each build is pushed to both registries under the same name, tagged `v<version>` and `latest`. The `v` prefix matches the tags already published by hand before this workflow existed (`v0.0.1`, `v0.0.2`), so the tag history on Docker Hub reads consistently.
 
-| Service key | Docker Hub image |
-|---|---|
-| `ascend-agent` | `lukk17/ascend-agent` |
-| `weather-mcp` | `lukk17/weather-mcp` |
-| `audio-scribe` | `lukk17/audio-scribe` |
-| `ascend-web-search` | `lukk17/ascend-web-search` |
-| `ascend-memory` | `lukk17/ascend-memory` |
-| `ascend-paddle-ocr` | `lukk17/ascend-paddle-ocr` |
+| Service key | Docker Hub image | GHCR image |
+|---|---|---|
+| `ascend-agent` | `lukk17/ascend-agent` | `ghcr.io/lukk17/ascend-agent` |
+| `weather-mcp` | `lukk17/weather-mcp` | `ghcr.io/lukk17/weather-mcp` |
+| `audio-scribe` | `lukk17/audio-scribe` | `ghcr.io/lukk17/audio-scribe` |
+| `ascend-web-search` | `lukk17/ascend-web-search` | `ghcr.io/lukk17/ascend-web-search` |
+| `ascend-memory` | `lukk17/ascend-memory` | `ghcr.io/lukk17/ascend-memory` |
+| `ascend-paddle-ocr` | `lukk17/ascend-paddle-ocr` | `ghcr.io/lukk17/ascend-paddle-ocr` |
 
-Note: the compose file refers to the PaddleOCR service as `ascend-paddle-ocr` (local build name), but its Docker Hub image is `lukk17/ascend-paddle-ocr` — consistent with the service filter key and the spec.
+The GHCR owner segment is hardcoded lowercase. `${{ github.repository_owner }}` would resolve to `Lukk17`, and GHCR rejects uppercase in image names.
+
+Note: the compose file refers to the PaddleOCR service as `ascend-paddle-ocr` (local build name), but its published image is `lukk17/ascend-paddle-ocr` — consistent with the service filter key and the spec.
+
+### GHCR package visibility
+
+Docker Hub repositories under `lukk17/` are already public, so anyone can pull without logging in.
+
+GHCR is the opposite. A package is **private** when first published, even from a public repository, and there is no API or workflow setting that changes this. After the first release pushes a new service, make it public by hand once:
+
+1. Go to the package page under github.com/Lukk17?tab=packages.
+2. Package settings → Danger Zone → Change visibility → Public.
+
+This is a one-time step per service. Until it is done, `docker pull ghcr.io/lukk17/<service>` fails with an authentication error for everyone except you.
 
 ### GHA cache budget
 

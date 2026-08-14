@@ -41,5 +41,10 @@ ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 # Expose ports (API and NoVNC)
 EXPOSE 7021 7900
 
-# Run Supervisor to manage background graphical processes and Uvicorn
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# The entrypoint resolves VNC authentication, then hands off to Supervisor,
+# which manages the background graphical processes and Uvicorn.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

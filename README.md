@@ -283,6 +283,9 @@ PowerShell:
 Copy-Item .env.example .env
 ```
 
+One value is not optional. `SEARXNG_SECRET` must be filled in or the stack refuses to start, naming the missing
+variable. It has to be at least 32 characters, unique to this deployment, and not the literal `ultrasecretkey`.
+
 **2. Bring up the stack.**
 
 The main compose file pulls in [ascend-scrapper.docker-compose.yaml](ascend-scrapper.docker-compose.yaml) via `include:`,
@@ -429,6 +432,8 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/architecture/arc42/01-introduction-and-goals.md](docs/architecture/arc42/01-introduction-and-goals.md)          | Arc42 entry point for the platform.                                   |
 | [AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
+| [AscendWebSearch/deploy-standalone/README.md](AscendWebSearch/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
+| [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and release workflows, image naming, registries, package visibility. |
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / MinIO / PostgreSQL / Redis reset recipes.                    |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)                                                                        | Metrics, logs, traces — what is collected, dashboards, how to instrument. |

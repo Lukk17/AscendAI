@@ -27,6 +27,9 @@ land in Redis so the next request to the same domain reuses them.
 The scrapper compose file is `include:`-d by the main `docker-compose.yaml` at the repo root, so every command runs
 against the main file (no `-f` flag).
 
+Set `SEARXNG_SECRET` in the repo-root `.env` first. Compose refuses to start without it, and SearXNG refuses to boot
+without it. It must be at least 32 characters, unique to this deployment, and not the literal `ultrasecretkey`.
+
 Bring up the full stack from the repo root:
 
 ```bash
@@ -152,6 +155,7 @@ captcha-solve-then-resume flow.
 | File | What's in it |
 | :--- | :--- |
 | [docs/running.md](docs/running.md) | Local Python and Docker run instructions, MCP client setup |
+| [deploy-standalone/README.md](deploy-standalone/README.md) | Copy-and-run bundle for deploying this stack to a host of its own |
 | [docs/api-examples.md](docs/api-examples.md) | REST and MCP request examples (curl + PowerShell) |
 | [docs/configuration.md](docs/configuration.md) | Every settings field with defaults and effect |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Reinstalling deps, common failure modes |

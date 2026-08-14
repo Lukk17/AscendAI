@@ -96,24 +96,23 @@ against a host-network SearXNG use `host.docker.internal`:
 docker run -d --name ascend-web-search -p 7021:7021 -e SEARXNG_BASE_URL="http://host.docker.internal:9020" ascend-web-search:latest
 ```
 
-Tag for the registry (optional):
+Publishing is done by the [Release workflow](../../.github/workflows/README.md) rather than by hand. It builds
+multi-arch and pushes `v<version>` and `latest` to both `lukk17/ascend-web-search` and
+`ghcr.io/lukk17/ascend-web-search`. The version comes from `[project].version` in `pyproject.toml`.
+
+The Compose-orchestrated path (recommended) brings up SearXNG, FlareSolverr and the Ngrok bridge in one shot. Run it
+from the repository root so it goes into the `ascend-ai` project rather than creating a second project that fights over
+the same container names:
 
 ```bash
-docker tag ascend-web-search:latest lukk17/ascend-web-search:v0.1.0
+docker compose up -d --build searxng flaresolverr ascend-web-search ngrok-ascend-web-search
 ```
 
-Push it (optional):
+Redis is not part of that stack. It has to be running separately on port 6379, which is what `REDIS_URL` points at.
+`SEARXNG_SECRET` must be set in the root `.env` or compose refuses to start.
 
-```bash
-docker push lukk17/ascend-web-search:v0.1.0
-```
-
-The Compose-orchestrated path (recommended) brings up SearXNG, FlareSolverr, Redis, and the Ngrok bridge in
-one shot:
-
-```bash
-docker compose -f ../ascend-scrapper.docker-compose.yaml up -d --build
-```
+To deploy this stack to a host of its own, use the ready-made bundle in [../deploy-standalone/](../deploy-standalone/README.md) instead. It
+pulls published images rather than building and needs no checkout of this repository.
 
 ---
 

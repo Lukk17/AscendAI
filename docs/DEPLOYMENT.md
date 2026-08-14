@@ -16,6 +16,25 @@ The stack is split across two project files:
   Web-scraping stack (`searxng`, `flaresolverr`, `ascend-web-search`, `ngrok-ascend-web-search`). Self-contained and
   runnable on its own; when run standalone it forms its own group in Docker Desktop.
 
+A third file exists for deploying the web-search stack to a machine of its own, without the rest of the platform:
+[AscendWebSearch/deploy-standalone/](../AscendWebSearch/deploy-standalone/README.md). It pulls published images rather than building, and
+targets Docker Engine on Linux. It is a separate artifact on purpose and is not included by either file above. See
+[Standalone web-search deployment](#standalone-web-search-deployment).
+
+#### Required environment variables
+
+`docker compose` reads [.env](../.env.example) from the repo root. Two variables in it are mandatory for the scrapper
+stack and compose will refuse to start without them, naming the one that is missing:
+
+- `SEARXNG_SECRET`. SearXNG's session-signing key. At least 32 characters, unique per deployment, never the literal
+  `ultrasecretkey`. It replaced a `secret_key` that used to be committed in
+  [searxng/settings.yml](../searxng/settings.yml), so that value must be treated as compromised and never reused.
+- `NGROK_AUTHTOKEN`. Only when running `ngrok-ascend-web-search`.
+
+`VNC_PASSWORD` is optional locally. Leaving it empty means the NoVNC desktop accepts any client and the container logs
+a warning at boot, which is acceptable because port 7900 is never published outside the compose network. It is
+mandatory in the standalone deployment, where ngrok puts that desktop on the public internet.
+
 #### Bring up the full stack
 
 Bash:
@@ -96,35 +115,41 @@ docker compose build --no-cache
 
 ### Publishing Docker images
 
-Bash:
+Images are published by the [Release workflow](../.github/workflows/README.md), not by hand. It is dispatched manually
+from Actions → Release → Run workflow, builds the selected services multi-arch (`linux/amd64,linux/arm64`), and pushes
+each to four tags: `v<version>` and `latest` on Docker Hub and on GitHub Container Registry.
 
-```bash
-docker login
-```
+| Registry | Image | Login needed to pull |
+|---|---|---|
+| Docker Hub | `lukk17/<service>` | No. The repositories are public. |
+| GHCR | `ghcr.io/lukk17/<service>` | No, once the package visibility is switched to public. |
 
-```bash
-docker push lukk17/ascend-ai:v1.0.0
-```
+The version comes from each service's own manifest (`build.gradle.kts` for Java, `pyproject.toml` for Python) and the
+workflow refuses to release a service whose version has not changed since the previous stack tag.
 
-```bash
-docker push lukk17/ascend-ai:latest
-```
+GHCR packages are private when first published, even from a public repository, and no workflow setting changes that.
+After a service's first release, switch it once by hand at Package settings → Danger Zone → Change visibility.
 
-PowerShell:
+---
 
-```powershell
-docker login
-```
+### Standalone web-search deployment
 
-```powershell
-docker push lukk17/ascend-ai:v1.0.0
-```
+[AscendWebSearch/deploy-standalone/](../AscendWebSearch/deploy-standalone/README.md) is a copy-and-run bundle for putting the web-search
+stack on its own host, a homelab box or a VPS, without the rest of AscendAI. It contains a compose file pinned to
+published image tags, an `.env.example`, a copy of the SearXNG settings overlay, and a README covering prerequisites,
+verification, resource sizing, and what is deliberately absent.
 
-```powershell
-docker push lukk17/ascend-ai:latest
-```
+Three things differ from the development stack in a way worth knowing before deploying:
 
-Tag and push individual module images the same way (e.g. `lukk17/ascend-agent:v1.0.0`).
+- It needs Redis on the Docker host. Redis is not part of the stack, and on Docker Engine for Linux the container only
+  resolves the host through the `host.docker.internal:host-gateway` mapping the file declares.
+- Telemetry is absent. The OpenTelemetry collector, Tempo, and Grafana live in the platform stack. With
+  `OTEL_EXPORTER_OTLP_ENDPOINT` unset the service never initialises OpenTelemetry, so this costs nothing at runtime.
+  Prometheus metrics on `/metrics` are unaffected and still exposed.
+- SearXNG and FlareSolverr publish no ports. They are reachable only from inside the stack.
+
+The bundle carries its own copy of [searxng/settings.yml](../searxng/settings.yml), kept byte-identical so a `diff` is
+the entire sync check. Changing one means changing the other in the same commit.
 
 ---
 
@@ -140,6 +165,8 @@ Tag and push individual module images the same way (e.g. `lukk17/ascend-agent:v1
 ### See also
 
 - [../README.md](../README.md). Monorepo overview, Quick Start, ports.
+- [../AscendWebSearch/deploy-standalone/README.md](../AscendWebSearch/deploy-standalone/README.md). Standalone web-search deployment.
+- [../.github/workflows/README.md](../.github/workflows/README.md). CI and release workflows, image naming, registries.
 - [INGESTION.md](INGESTION.md). Document ingestion lifecycle.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Reset recipes when state gets stuck.
 - [architecture/arc42/04-deployment.md](architecture/arc42/04-deployment.md). Arc42 deployment view.

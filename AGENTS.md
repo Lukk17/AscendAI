@@ -177,6 +177,10 @@ Compose is split into two project files so each forms its own group in Docker De
 - **`docker-compose.yaml`** (project `ascend-ai`) — main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
 - **`ascend-scrapper.docker-compose.yaml`** (project `ascend-scrapper`) — web-scraping stack. Self-contained; can be run on its own with `docker compose -f ascend-scrapper.docker-compose.yaml up`.
 
+`SEARXNG_SECRET` is mandatory in `.env` for either invocation. Compose names the missing variable and refuses to start without it, and SearXNG will not boot without it either. It must be at least 32 characters, unique per deployment, and never the literal `ultrasecretkey`.
+
+A third, separate artifact exists for deploying the web-search stack to a machine of its own: [`AscendWebSearch/deploy-standalone/`](AscendWebSearch/deploy-standalone/README.md). It pulls published images instead of building, targets Docker Engine on Linux, and is not `include:`-d by anything. It carries a byte-identical copy of `searxng/settings.yml` plus its own `.env.example`, and both must be updated in the same commit as their root counterparts. The intended differences between it and the development stack are listed in its README.
+
 ### `ascend-ai` (docker-compose.yaml)
 
 | Service | Port | Purpose |

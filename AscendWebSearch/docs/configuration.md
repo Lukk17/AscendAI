@@ -67,6 +67,21 @@ against environment variables and `.env`. The source of truth is
 
 ---
 
+### Container-only variables
+
+These are read by the image itself, not by `config.py`, so they have no entry in
+[src/config/config.py](../src/config/config.py) and only apply when the service runs in a container.
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `VNC_PASSWORD` | unset | Password for the NoVNC desktop. `docker-entrypoint.sh` turns it into an encrypted x11vnc password file at boot. Unset means x11vnc runs with `-nopw` and the container logs a warning. The VNC protocol truncates the value to 8 characters. |
+
+Two further variables belong to sibling containers in the scrapper compose stack rather than to this service, and both
+are mandatory there. `SEARXNG_SECRET` is SearXNG's session-signing key, which is why the settings overlay carries no
+`secret_key` entry, and `NGROK_AUTHTOKEN` authenticates the NoVNC tunnel.
+
+---
+
 ### Persistence
 
 | Variable | Default | Purpose |

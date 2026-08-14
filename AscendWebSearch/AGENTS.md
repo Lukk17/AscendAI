@@ -62,6 +62,34 @@ docker build -t ascend-web-search:latest .
 - `REDIS_URL` — Redis connection string
 - `BLOCKLIST_URL` — Ad blocklist URL
 - `VALIDATION_MIN_WORDS` — Minimum words for valid content
+- `VNC_PASSWORD` — Password for the NoVNC desktop. Consumed by `docker-entrypoint.sh`, not by `config.py`. Unset means
+  x11vnc runs with `-nopw` and the container logs a warning at boot. Required in the standalone deployment. The VNC
+  protocol truncates it to 8 characters.
+
+Two more are consumed by sibling containers rather than by this service, and both are mandatory for the scrapper stack:
+`SEARXNG_SECRET` (SearXNG's session key, which is why `searxng/settings.yml` carries no `secret_key`) and
+`NGROK_AUTHTOKEN`.
+
+The full reference, including every timeout and threshold, is [docs/configuration.md](docs/configuration.md).
+
+## Deployment
+
+Two compose files run this service and they are deliberately different:
+
+- `../ascend-scrapper.docker-compose.yaml` at the repo root. Development. Builds from source, publishes SearXNG and
+  FlareSolverr on loopback so the service can run natively against them, exports OTLP telemetry to the platform
+  collector.
+- [`deploy-standalone/docker-compose.yaml`](deploy-standalone/README.md). Standalone single-host deployment. Pulls published images pinned to
+  a version tag, publishes nothing but port 7021, no telemetry, requires `VNC_PASSWORD`.
+
+The full list of intended differences is in [deploy-standalone/README.md](deploy-standalone/README.md). Anything not on that list should be
+identical in both files.
+
+**Sync rule.** [`deploy-standalone/searxng/settings.yml`](deploy-standalone/searxng/settings.yml) is a byte-identical copy of
+`../searxng/settings.yml`, so `diff` between them is the whole check. When you change one, change the other in the same
+commit. The same applies to environment variables: a new variable in the scrapper stack goes into the root
+`.env.example`, into [`deploy-standalone/.env.example`](deploy-standalone/.env.example), and into the configuration table in
+[deploy-standalone/README.md](deploy-standalone/README.md).
 
 ## Code Conventions
 
