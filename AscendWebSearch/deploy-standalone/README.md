@@ -27,7 +27,8 @@ Four containers run:
 |---|---|
 | Docker Engine | 20.10 or newer, with the Compose plugin |
 | Redis | Reachable at port 6379. Not part of this stack. |
-| Free RAM | Roughly 7 GB, see [Resource footprint](#resource-footprint) |
+| Free RAM | Roughly 4.5 GB free, on top of whatever the host already uses. See [Resource footprint](#resource-footprint) |
+| CPU | 2 cores is enough. CPU contention costs scraping speed, not stability. |
 | Free port | 7021 on the host. Nothing else is published. |
 | Ngrok account | Free tier, for the CAPTCHA-intervention tunnel |
 
@@ -149,18 +150,26 @@ Metrics are a separate matter. The service exposes Prometheus metrics on its own
 
 Every container has a hard memory and CPU ceiling. Without one, a single hostile page can drive Chromium's memory up until the kernel starts killing processes, and the kernel does not necessarily kill the container that caused it. It might kill Redis, or the SSH daemon. With a ceiling the damage is confined to the offending container, which then restarts on its own.
 
+The shipped numbers are sized for an 8 GB host that is already running other things, which is the case this bundle was written for.
+
 | Container | CPU limit | Memory limit | CPU reserved | Memory reserved |
 |---|---|---|---|---|
-| ascend-web-search | 2.0 | 4G | 0.5 | 1G |
-| flaresolverr | 1.5 | 2G | 0.25 | 512M |
-| searxng | 0.5 | 512M | 0.1 | 128M |
-| ngrok-ascend-web-search | 0.25 | 128M | 0.05 | 64M |
+| ascend-web-search | 1.5 | 2560M | 0.25 | 512M |
+| flaresolverr | 1.0 | 1280M | 0.15 | 256M |
+| searxng | 0.5 | 384M | 0.1 | 128M |
+| ngrok-ascend-web-search | 0.25 | 96M | 0.05 | 32M |
 
-Limits are ceilings, not allocations. They add up to more than the machine has on purpose, because no realistic workload hits all four ceilings at once. Reservations are what the stack actually holds, and those total about 1 CPU and 1.7 GB.
+Memory ceilings total 4.2 GB. Reservations, which is what the stack actually holds at rest, total about 0.9 GB and 0.55 CPU.
 
-One interaction worth knowing. The ascend-web-search container gets a 2 GB `/dev/shm`, which Chromium needs to avoid crashing on heavy pages. Shared memory is charged against the container's memory limit, so of its 4 GB ceiling, up to 2 GB can end up as shared memory, leaving about 2 GB of working set. If you lower the memory limit, lower `shm_size` with it.
+Do the arithmetic before deploying. Take the host's total RAM, subtract what it already uses, and the remainder must exceed 4.2 GB with something left over for page cache. On an 8 GB host already using 2.3 GB, that leaves 5.7 GB free, the stack can claim at most 4.2 GB of it, and roughly 1.5 GB stays spare. On a 4 GB host these numbers do not fit and the stack will start killing containers under load.
 
-If the host is tight on memory, ascend-web-search down to 3G and flaresolverr down to 1.5G still works, with less headroom for large pages.
+Two things interact and are easy to miss.
+
+Shared memory counts against the limit. The ascend-web-search container gets a 1 GB `/dev/shm` because Chromium crashes on Docker's 64 MB default. Those pages are charged to the container's memory cgroup, so of its 2560M ceiling, up to 1 GB can be shared memory. Raise `shm_size` and you must raise the memory limit with it, or you have quietly halved the working set.
+
+CPU limits above the core count are meaningless. On a 2-core host a container cannot exceed 2.0 no matter what the file says. The numbers above assume 2 cores. On a larger machine you can raise them, but CPU is the benign constraint: contention makes scraping slower, it does not kill anything.
+
+To scale up on a bigger host, raise ascend-web-search first, since that is where Chromium runs, and raise `shm_size` alongside it.
 
 ---
 
@@ -221,6 +230,8 @@ The equivalent file in the repository root is `ascend-scrapper.docker-compose.ya
 | VNC_PASSWORD | Optional. Unset means an unauthenticated desktop and a warning at boot, which is acceptable because port 7900 is not published locally | Required. Compose refuses to start without it |
 | NGROK_AUTHTOKEN | Optional | Required |
 | host.docker.internal | Declared, though Docker Desktop would provide it anyway | Declared, and required, because Docker Engine on Linux does not provide it |
+| Resource limits | Sized for a development workstation, 4G for ascend-web-search | Sized for an 8 GB host with other workloads on it, 2560M for ascend-web-search |
+| shm_size | 2gb | 1gb, to fit inside the smaller memory ceiling |
 
 ---
 

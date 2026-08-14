@@ -36,7 +36,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 512M
+          memory: 384M
         reservations:
           cpus: "0.1"
           memory: 128M
@@ -63,12 +63,13 @@ services:
       retries: 5
     deploy:
       resources:
+        # Runs its own Chrome, which is why this is the second-largest budget.
         limits:
-          cpus: "1.5"
-          memory: 2G
+          cpus: "1.0"
+          memory: 1280M
         reservations:
-          cpus: "0.25"
-          memory: 512M
+          cpus: "0.15"
+          memory: 256M
     networks:
       default:
         aliases:
@@ -90,10 +91,10 @@ services:
       resources:
         limits:
           cpus: "0.25"
-          memory: 128M
+          memory: 96M
         reservations:
           cpus: "0.05"
-          memory: 64M
+          memory: 32M
     networks:
       default:
         aliases:
@@ -131,7 +132,10 @@ services:
       - "VNC_PASSWORD=${VNC_PASSWORD:?VNC_PASSWORD must be set in .env (8 characters, the VNC protocol truncates anything longer)}"
     cap_add:
       - SYS_ADMIN
-    shm_size: "2gb"
+    # 1gb rather than the development stack's 2gb. /dev/shm is charged to this
+    # container's memory cgroup, so shared memory eats the ceiling below.
+    # Docker's 64m default is what crashes Chromium; 1gb is ample for one browser.
+    shm_size: "1gb"
     depends_on:
       searxng:
         condition: service_healthy
@@ -144,15 +148,14 @@ services:
       retries: 3
     deploy:
       resources:
-        # /dev/shm is charged to this container's memory cgroup, so shm_size
-        # above consumes part of this ceiling. 4G leaves ~2G of working set
-        # for Chromium, Xvfb and the Python process once shm is full.
+        # Sized for an 8 GB host. See "Resource footprint" in README.md for the
+        # arithmetic and for what to change on a larger or smaller machine.
         limits:
-          cpus: "2.0"
-          memory: 4G
+          cpus: "1.5"
+          memory: 2560M
         reservations:
-          cpus: "0.5"
-          memory: 1G
+          cpus: "0.25"
+          memory: 512M
     networks:
       default:
         aliases:
