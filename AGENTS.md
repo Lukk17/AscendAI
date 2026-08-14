@@ -196,8 +196,8 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 
 | Service | Port | Purpose |
 |---|---|---|
-| SearXNG | 9020 | Privacy-respecting meta search engine |
-| FlareSolverr | 8191 | Cloudflare bypass proxy for web scraping |
+| SearXNG | 9020 (bound to 127.0.0.1) | Privacy-respecting meta search engine |
+| FlareSolverr | 8191 (bound to 127.0.0.1) | Cloudflare bypass proxy for web scraping |
 | AscendWebSearch | 7021 | Web search & scraping MCP |
 | ngrok-ascend-web-search | – | Ngrok tunnel for NoVNC CAPTCHA intervention |
 

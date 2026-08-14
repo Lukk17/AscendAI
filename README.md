@@ -392,8 +392,8 @@ the actual transport AscendAgent uses today. The other surface is available for 
 
 | Service                 | Port    | Default credentials | Role                                                        |
 | :---------------------- | :------ | :------------------ | :---------------------------------------------------------- |
-| **SearXNG**             | `9020`  | (none)              | Privacy-respecting meta-search; backend for AscendWebSearch.|
-| **FlareSolverr**        | `8191`  | (none)              | Cloudflare bypass proxy used by AscendWebSearch.            |
+| **SearXNG**             | `9020` (loopback) | `SEARXNG_SECRET`  | Privacy-respecting meta-search; backend for AscendWebSearch.|
+| **FlareSolverr**        | `8191` (loopback) | (none)            | Cloudflare bypass proxy used by AscendWebSearch.            |
 | **ngrok (web-search)**  | (none)  | `NGROK_AUTHTOKEN`   | Public tunnel to AscendWebSearch's NoVNC for remote CAPTCHA intervention. |
 | **Docling Serve**       | `5001`  | (none)              | PDF / DOCX to structured JSON (used by ingestion pipeline). |
 | **Unstructured API**    | `9080`  | (none)              | Generic document parsing fallback for ingestion.            |
