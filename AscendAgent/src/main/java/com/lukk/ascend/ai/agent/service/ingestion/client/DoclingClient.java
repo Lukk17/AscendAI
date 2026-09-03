@@ -41,11 +41,6 @@ public class DoclingClient {
     private static final String LEGACY_PATH = "/v1/convert";
     private static final String CORRECT_PATH = "/v1/convert/file";
 
-    // Docling Serve's uvicorn front end kills a worker process outright if it stays
-    // unresponsive to its internal health-check ping for 5 seconds, which measurably
-    // happens under concurrent CPU-bound conversions and surfaces here as a connection
-    // reset mid-request. The conversion call has no side effects on the server, so a
-    // short bounded retry recovers the page once the request lands on a healthy worker.
     private static final int MAX_ATTEMPTS = 3;
     private static final long RETRY_BACKOFF_MILLIS = 500L;
 
@@ -157,15 +152,6 @@ public class DoclingClient {
         return documents;
     }
 
-    /**
-     * Docling Serve's /v1/convert/file with to_formats=json returns
-     * { "status": "success", "document": { "md_content": "...", "text_content": "...",
-     * "json_content": {...}, "html_content": "..." }, ... }
-     * Earlier versions of the agent walked the tree for "text" keys, which matched an older
-     * (Docling Core) response shape where each text item was {"text": "..."}. The newer
-     * Docling Serve response stores the full rendering as a single string on document.md_content
-     * (or .text_content), so the old walker silently extracted nothing.
-     */
     private String extractDoclingContent(JsonNode rootNode) {
         JsonNode documentNode = rootNode.path(JSON_DOCUMENT);
         for (String field : DOCUMENT_CONTENT_FIELDS) {

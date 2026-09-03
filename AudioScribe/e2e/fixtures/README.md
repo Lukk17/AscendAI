@@ -6,7 +6,8 @@ knowledge.
 
 ## Conventions
 
-- Short WAV clips, mono, low sample rate fine for speech.
+- Short audio clips, mono, low sample rate fine for speech. The file extension doesn't need to match the actual
+  codec: providers transcode regardless.
 - One or two clearly enunciated phrases the test asserts against by substring (case-insensitive).
 - Keep fixtures small so upload completes in under 2 seconds.
 

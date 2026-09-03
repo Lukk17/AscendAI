@@ -320,6 +320,7 @@ The MCP server is integrated into the main application on the same port.
 - `transcribe_local(audio_uri, model, language, with_timestamps)`
 - `transcribe_openai(audio_uri, model, language)`
 - `transcribe_hf(audio_uri, model, hf_provider)`
+- `transcribe_audacity(audio_uri, provider, model, language, hf_provider)`
 
 #### How to use
 

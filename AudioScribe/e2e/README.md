@@ -112,8 +112,10 @@ transcribe call.
 1. Docker compose stack up: `docker compose up -d --build audio-scribe` (or include in the full `ascend-ai` stack).
 2. `curl -fsS http://localhost:7017/health` returns HTTP 200 with `{"status":"ok","service":"AudioScribe"}`.
 3. Bruno CLI installed: `bru --version` returns a version string. Install once with `npm install -g @usebruno/cli`.
-4. For tests 2 and 5: `docker exec audio-scribe printenv OPENAI_API_KEY | head -c 8` returns a non-empty prefix.
-5. For test 3: `docker exec audio-scribe printenv HF_TOKEN | head -c 8` returns a non-empty prefix.
+4. For tests 2 and 5: `docker exec audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'` prints
+   `present`. Never `printenv` the raw value. This check proves the variable is set without printing it.
+5. For test 3: `docker exec audio-scribe sh -c '[ -n "$HF_TOKEN" ] && echo present || echo missing'` prints `present`.
+   Never `printenv` the raw value. This check proves the variable is set without printing it.
 6. For test 5: the object store is reachable at `http://localhost:9070` — its spec's Reset state uploads the fixture
    to the `e2e-fixtures` bucket over a plain `PUT`, no container mount required.
 

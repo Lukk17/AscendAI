@@ -5,13 +5,13 @@ info:
 
 http:
   method: GET
-  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/search?user_id={{userId}}&query=dark%20mode"
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/search?user_id={{userId}}&query=dark mode"
   params:
     - name: user_id
       value: "{{userId}}"
       type: query
     - name: query
-      value: dark%20mode
+      value: dark mode
       type: query
 
 runtime:
@@ -31,14 +31,14 @@ settings:
 examples:
   - name: success
     request:
-      url: http://localhost:7020/api/v1/memory/search?user_id=testUser1&query=dark%20mode
+      url: http://localhost:7020/api/v1/memory/search?user_id=testUser1&query=dark mode
       method: GET
       params:
         - name: user_id
           value: testUser1
           type: query
         - name: query
-          value: dark%20mode
+          value: dark mode
           type: query
     response:
       status: 200

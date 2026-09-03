@@ -85,10 +85,11 @@ class DoclingClientTest {
         when(bodySpecMock.body(any(Object.class))).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenThrow(new RestClientException("Connection Refused"));
 
-        // then
+        // then: a non-connection RestClientException must fail fast, never retry
         assertThatThrownBy(() -> doclingClient.process(BYTES, FILENAME))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to process document with Docling");
+        verify(restClient, times(1)).post();
     }
 
     @Test
