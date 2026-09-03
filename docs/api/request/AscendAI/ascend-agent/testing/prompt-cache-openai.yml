@@ -32,6 +32,29 @@ http:
         type: text
         value: openai
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("usage block is present with a cacheable prompt size", function () {
+            const body = res.getBody();
+            expect(body.content).to.be.a("string").and.not.empty;
+            const usage = body.metadata.usage;
+            expect(usage).to.be.an("object");
+            expect(usage.promptTokens).to.be.a("number");
+            expect(usage.promptTokens).to.be.at.least(1024);
+            const cachedTokens = usage.nativeUsage && usage.nativeUsage.prompt_tokens_details
+                ? usage.nativeUsage.prompt_tokens_details.cached_tokens
+                : undefined;
+            if (cachedTokens !== undefined) {
+                expect(cachedTokens).to.be.a("number");
+                expect(cachedTokens).to.be.at.least(0);
+            }
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

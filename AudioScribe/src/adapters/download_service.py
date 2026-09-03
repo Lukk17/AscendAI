@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def _extract_audio_suffix_from_query(query: str) -> str:
     """Attempt to find a valid audio file extension in the query parameters.
-    Useful for URLs like MinIO presigned URLs where the filename is a
+    Useful for URLs like S3 presigned URLs where the filename is a
     parameter, e.g. `?file=foo.mp3&sig=...`."""
 
     extensions_pattern = "|".join(settings.SUPPORTED_AUDIO_EXTENSIONS)
@@ -60,7 +60,8 @@ def _is_safe_ip(addr: str) -> bool:
 def _validate_http_target(hostname: str | None) -> None:
     """SSRF guard. Rejects loopback, RFC1918, link-local, cloud metadata
     (169.254/16), and similar unless the hostname appears verbatim in
-    MCP_ALLOWED_HOSTS (intended for the docker-internal MinIO pattern)."""
+    MCP_ALLOWED_HOSTS (intended for reaching the S3-compatible object
+    store via host.docker.internal)."""
 
     if not hostname:
         raise ValueError("URI has no hostname")

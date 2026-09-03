@@ -27,6 +27,10 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 - [ ] That entry's `type` equals `"missing"`
 - [ ] Request latency < 200 ms (proxy for "validator short-circuited; mem0 / Qdrant never touched")
 
+### Post-run cleanup
+
+- [ ] None required (no `user_id` is ever touched)
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)

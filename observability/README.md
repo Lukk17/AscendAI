@@ -21,7 +21,6 @@ graph LR
 
     SVC -->|"/metrics scrape"| PROM["Prometheus"]
     QD["Qdrant"] -->|"/metrics scrape"| PROM
-    MIN["MinIO<br/>(cluster + bucket)"] -->|"/metrics scrape"| PROM
 
     SVC -->|"docker logs (tailed by Vector)"| VEC["Vector"]
     VEC -->|"push"| LOKI["Loki"]
@@ -39,7 +38,7 @@ graph LR
 | Service | Host port → container | Exposed | Role |
 | :--- | :--- | :--- | :--- |
 | **Grafana** | `7078` → `3000` | Browser UI | Dashboards and Explore. Anonymous viewing is enabled with the `Viewer` role; sign in as `admin` / `admin` to edit or save. |
-| **Prometheus** | `7077` → `9090` | Browser UI / API | Scrapes metrics from the 6 application services, plus Qdrant and MinIO. 72h retention. |
+| **Prometheus** | `7077` → `9090` | Browser UI / API | Scrapes metrics from the 6 application services, plus Qdrant. 72h retention. |
 | **Loki** | `3100` | Internal only | Log store. Receives logs pushed by Vector; queried through Grafana. |
 | **Tempo** | — | Internal only | Trace store. Receives traces forwarded by the OTel Collector; queried through Grafana. |
 | **Vector** | — | Internal only | Tails the 6 application containers' Docker logs and ships them to Loki. |
@@ -57,8 +56,10 @@ Prometheus ([`prometheus/prometheus.yaml`](prometheus/prometheus.yaml)) scrapes:
 - The four **Python** services (`ascend-memory`, `audio-scribe`, `ascend-web-search`, `ascend-paddle-ocr`) at
   `/metrics` (prometheus-fastapi-instrumentator).
 - **Qdrant** at `/metrics` (native, unprefixed metric names such as `collection_vectors` and `collections_total`).
-- **MinIO** at both `/minio/v2/metrics/cluster` and `/minio/v2/metrics/bucket` (the bucket endpoint provides the
-  per-bucket `minio_bucket_usage_object_total` and `minio_bucket_usage_total_bytes` gauges).
+
+The object store, on host port `9070`, publishes no Prometheus metrics on any path, so Prometheus does not
+scrape it. Its liveness signal is `GET http://localhost:9070/_floci/health`, checked directly rather than through this
+stack.
 
 Every scrape job sets a `service` label (e.g. `service="ascend-agent"`), which is what the dashboards filter on.
 
@@ -101,7 +102,7 @@ Grafana auto-loads six dashboards from [`grafana/dashboards/`](grafana/dashboard
 | File | Title | What it shows |
 | :--- | :--- | :--- |
 | [`platform-overview.json`](grafana/dashboards/platform-overview.json) | Platform Overview | Request rate, 5xx error rate, p95 latency, and memory (JVM heap / Python RSS) per service. |
-| [`infrastructure.json`](grafana/dashboards/infrastructure.json) | Infrastructure | Qdrant per-collection vector and point counts; MinIO objects and bytes per bucket. |
+| [`infrastructure.json`](grafana/dashboards/infrastructure.json) | Infrastructure | Qdrant per-collection vector and point counts. |
 | [`token-cost.json`](grafana/dashboards/token-cost.json) | L1 — Token Cost | LLM token usage and derived cost per provider. |
 | [`ai-pipeline.json`](grafana/dashboards/ai-pipeline.json) | AI Pipeline | MCP tool call latency and pipeline-stage timing. |
 | [`cache-hit-rate.json`](grafana/dashboards/cache-hit-rate.json) | L3 — Cache Hit Rate | Prompt-cache read / creation token rates per provider. |

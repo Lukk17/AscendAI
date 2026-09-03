@@ -1,59 +1,123 @@
 # Troubleshooting
 
-Operational recipes for resetting state, clearing caches, and recovering from common issues across MinIO, Qdrant,
-PostgreSQL, and Redis.
+Operational recipes for resetting state, clearing caches, and recovering from common issues across the object store,
+Qdrant, PostgreSQL, and Redis.
 
 ---
 
 ### Data and persistence
 
-MinIO, Qdrant, PostgreSQL, and Redis all run as external prerequisites. Data persistence depends on how you deployed
-them (native, `docker run`, managed cloud).
+The object store, Qdrant, PostgreSQL, and Redis all run as external prerequisites. Data persistence depends on how you
+deployed them (native, `docker run`, managed cloud).
 
 ---
 
-### 1. MinIO: "Bucket already exists" or "Access Denied"
+### 1. Object store: resetting the `knowledge-base` bucket
 
-If MinIO state is stuck, the Web UI in recent versions can't force-delete a bucket. Use the `mc` CLI inside the
-running container.
+The local object store runs on `http://localhost:9070`, an S3-compatible emulator with a web UI
+on `http://localhost:9071`. It answers the S3 REST API without authentication, so every recipe below is a plain `curl`.
+There is no client to install and no container to shell into.
 
-Find the container name (usually `minio`).
+One rule applies to everything in this section. Always name the bucket literally, and only ever name a bucket this
+repository owns, meaning `knowledge-base` or `e2e-fixtures`. The same object-store instance backs other projects on this
+machine, so a command that sweeps buckets instead of naming one destroys data AscendAI never created.
+
+Check the object store is up.
 
 Bash:
 
 ```bash
-docker ps
+curl -fsS http://localhost:9070/_floci/health
 ```
 
 PowerShell:
 
 ```powershell
-docker ps
+curl.exe -fsS http://localhost:9070/_floci/health
 ```
 
-Open a shell inside it.
+Expect HTTP 200 and a JSON body carrying `"s3":"running"`. This is the only liveness path the object store
+serves.
+
+List what the bucket currently holds. Every `<Key>` element in the returned `ListBucketResult` is one object you have to
+remove before the bucket itself will go.
 
 Bash:
 
 ```bash
-docker exec -it minio /bin/sh
+curl -fsS "http://localhost:9070/knowledge-base?list-type=2"
 ```
 
 PowerShell:
 
 ```powershell
-docker exec -it minio /bin/sh
+curl.exe -fsS "http://localhost:9070/knowledge-base?list-type=2"
 ```
 
-From inside the container, configure `mc` against your local MinIO, then force-delete the bucket.
+Narrow the listing to one folder prefix when the bucket is large. The response echoes the filter back in a `<Prefix>`
+element, so you can see the filter that produced the keys.
+
+Bash:
 
 ```bash
-mc alias set local http://localhost:9000 admin password
+curl -fsS "http://localhost:9070/knowledge-base?list-type=2&prefix=documents/"
 ```
 
-```bash
-mc rb --force local/knowledge-base
+PowerShell:
+
+```powershell
+curl.exe -fsS "http://localhost:9070/knowledge-base?list-type=2&prefix=documents/"
 ```
+
+Delete one object, using the key exactly as the listing printed it. Repeat once per key. A key that is already gone
+also returns HTTP 204, so re-running the step is safe.
+
+Bash:
+
+```bash
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"
+```
+
+Delete the emptied bucket. S3 refuses to drop a bucket that still holds objects, so HTTP 409 with
+`<Code>BucketNotEmpty</Code>` means the listing above had a key you missed.
+
+Bash:
+
+```bash
+curl -sS -X DELETE "http://localhost:9070/knowledge-base"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -sS -X DELETE "http://localhost:9070/knowledge-base"
+```
+
+Expect HTTP 204. Then restart AscendAgent: `BucketInitConfig` recreates `knowledge-base` empty during startup, so you
+never have to create it by hand.
+
+Confirm the bucket came back after the restart.
+
+Bash:
+
+```bash
+curl -fsS "http://localhost:9070/knowledge-base?list-type=2"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -fsS "http://localhost:9070/knowledge-base?list-type=2"
+```
+
+Expect a `ListBucketResult` with `<KeyCount>0</KeyCount>`. HTTP 404 with `<Code>NoSuchBucket</Code>` means the agent has
+not recreated it yet, which points at a failed startup rather than at the object store.
 
 ---
 

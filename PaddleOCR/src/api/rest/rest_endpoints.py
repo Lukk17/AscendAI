@@ -17,7 +17,8 @@ from src.observability.metrics import (
     OCR_DURATION_SECONDS,
     OCR_REQUESTS_TOTAL,
 )
-from src.service.ocr_service import ocr_service
+from src.observability.tracing import inject_trace_context
+from src.service.ocr_service import get_process_pool, ocr_service
 
 logger = get_logger(__name__)
 
@@ -44,10 +45,15 @@ async def process_ocr(
     filename: str = file.filename or "upload"
 
     start = time.monotonic()
+    # Captured from the auto-instrumented request span so the worker process, which
+    # executes _execute_ocr on a separate interpreter, can reattach its inference span
+    # as this request's child instead of starting an orphaned one.
+    trace_carrier = inject_trace_context()
 
     try:
+        loop = asyncio.get_running_loop()
         return await asyncio.wait_for(
-            asyncio.to_thread(_execute_ocr, file_bytes, filename, language),
+            loop.run_in_executor(get_process_pool(), _execute_ocr, file_bytes, filename, language, trace_carrier),
             timeout=settings.OCR_REQUEST_TIMEOUT,
         )
     finally:
@@ -64,9 +70,10 @@ def _execute_ocr(
     file_bytes: bytes,
     filename: str,
     language: str,
+    trace_carrier: dict[str, str] | None = None,
 ) -> OcrJsonResponse:
     try:
-        return ocr_service.process_file(file_bytes, filename, language)
+        return ocr_service.process_file(file_bytes, filename, language, trace_carrier)
     except (FileSizeExceededError, UnsupportedFileTypeError):
         raise
     except Exception as exc:

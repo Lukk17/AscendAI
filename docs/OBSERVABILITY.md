@@ -62,7 +62,6 @@ Prometheus scrapes every 15 seconds. Scrape targets are in `observability/promet
 - `postgres-exporter` at :9187 — `pg_stat_activity_count`, `pg_database_size_bytes`, `pg_stat_bgwriter_*`.
 - `redis-exporter` at :9121 — `redis_commands_processed_total`, `redis_memory_used_bytes`, `redis_connected_clients`.
 - Qdrant at host port :6333/metrics — `qdrant_collections_vectors_count`, `qdrant_collection_payload_storage_bytes`.
-- MinIO at host port :9070/minio/v2/metrics/cluster — `minio_bucket_objects`, `minio_bucket_usage_total_bytes`.
 
 ### Logs
 

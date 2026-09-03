@@ -19,7 +19,7 @@ graph TB
         Postgres["PostgreSQL :5432"]
         Redis["Redis :6379"]
         Qdrant["Qdrant :6333"]
-        MinIO["MinIO :9070"]
+        S3["S3-compatible storage :9070"]
     end
 
     subgraph "Support Services"
@@ -37,7 +37,7 @@ graph TB
     Agent --> Postgres
     Agent --> Redis
     Agent --> Qdrant
-    Agent --> MinIO
+    Agent --> S3
     Agent --> Docling
     Agent --> Unstructured
     WebSearch --> SearXNG
@@ -98,12 +98,12 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant MinIO as MinIO (S3)
+    participant S3 as S3-compatible storage
     participant Agent as AscendAgent
     participant Docling as Docling / Unstructured
     participant Qdrant
 
-    MinIO->>Agent: New document detected (polling)
+    S3->>Agent: New document detected (polling)
     Agent->>Docling: Parse document (PDF/DOCX)
     Docling-->>Agent: Extracted text
     Agent->>Agent: Token-aware chunking

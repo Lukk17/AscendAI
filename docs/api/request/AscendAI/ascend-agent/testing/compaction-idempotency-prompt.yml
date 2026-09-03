@@ -25,6 +25,18 @@ http:
         type: text
         value: openai
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Response is a normal chat completion", function () {
+            const content = res.getBody().content;
+            expect(content).to.be.a("string").and.not.empty;
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

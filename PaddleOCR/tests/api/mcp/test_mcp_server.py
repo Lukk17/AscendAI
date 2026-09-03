@@ -67,13 +67,19 @@ class _FakeSession:
 
 
 class TestOcrProcessHappyPaths:
-    @patch("src.api.mcp.mcp_server.ocr_service")
-    async def test_file_uri_resolves_within_jail(self, mock_service, tmp_path: Path, monkeypatch):
+    # ocr_process() dispatches OCR execution through get_process_pool() +
+    # run_ocr_in_worker(), the picklable entry point that runs inside the worker
+    # process. Patching get_process_pool() to return None makes run_in_executor fall
+    # back to the default in-process thread pool, so these tests stay fast and
+    # isolated without spawning a real subprocess.
+    @patch("src.api.mcp.mcp_server.get_process_pool", return_value=None)
+    @patch("src.api.mcp.mcp_server.run_ocr_in_worker")
+    async def test_file_uri_resolves_within_jail(self, mock_run_ocr, _pool_mock, tmp_path: Path, monkeypatch):
         # Given
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
         image_path = tmp_path / "scan.png"
         image_path.write_bytes(PNG_MAGIC_BYTES)
-        mock_service.process_file.return_value = OcrResponseFactory.with_single_line(filename="scan.png")
+        mock_run_ocr.return_value = OcrResponseFactory.with_single_line(filename="scan.png")
 
         # When
         result = await ocr_process(image_path.as_uri(), lang="en")
@@ -81,17 +87,39 @@ class TestOcrProcessHappyPaths:
         # Then
         assert result["filename"] == "scan.png"
         assert result["language"] == "en"
-        mock_service.process_file.assert_called_once()
-        passed = mock_service.process_file.call_args.args
+        mock_run_ocr.assert_called_once()
+        passed = mock_run_ocr.call_args.args
         assert passed[0] == PNG_MAGIC_BYTES
         assert passed[2] == "en"
 
+    @patch("src.api.mcp.mcp_server.inject_trace_context")
+    @patch("src.api.mcp.mcp_server.get_process_pool", return_value=None)
+    @patch("src.api.mcp.mcp_server.run_ocr_in_worker")
+    async def test_trace_context_is_forwarded_to_worker(
+        self, mock_run_ocr, _pool_mock, mock_inject, tmp_path: Path, monkeypatch
+    ):
+        # Given — the carrier is captured from the span wrapping the executor call, so
+        # the worker process can reattach its own span as that span's child
+        monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
+        image_path = tmp_path / "scan.png"
+        image_path.write_bytes(PNG_MAGIC_BYTES)
+        mock_run_ocr.return_value = OcrResponseFactory.with_single_line(filename="scan.png")
+        mock_inject.return_value = {"traceparent": "00-fake-01"}
+
+        # When
+        await ocr_process(image_path.as_uri(), lang="en")
+
+        # Then
+        mock_inject.assert_called_once()
+        assert mock_run_ocr.call_args.args[3] == {"traceparent": "00-fake-01"}
+
     @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    @patch("src.api.mcp.mcp_server.ocr_service")
-    async def test_http_uri_uses_module_session(self, mock_service, _validate_host_mock):
+    @patch("src.api.mcp.mcp_server.get_process_pool", return_value=None)
+    @patch("src.api.mcp.mcp_server.run_ocr_in_worker")
+    async def test_http_uri_uses_module_session(self, mock_run_ocr, _pool_mock, _validate_host_mock):
         # Given
         session = _FakeSession(_FakeResponse(status=200, body=PNG_MAGIC_BYTES))
-        mock_service.process_file.return_value = OcrResponseFactory.with_single_line(filename="remote.png")
+        mock_run_ocr.return_value = OcrResponseFactory.with_single_line(filename="remote.png")
 
         # When
         with patch.object(mcp_server, "_http_session", session):
@@ -100,15 +128,16 @@ class TestOcrProcessHappyPaths:
         # Then
         assert session.last_url == "http://host.docker.internal:9070/bucket/remote.png"
         assert session.last_kwargs == {"allow_redirects": False}
-        assert mock_service.process_file.call_args.args[0] == PNG_MAGIC_BYTES
+        assert mock_run_ocr.call_args.args[0] == PNG_MAGIC_BYTES
         assert result["filename"] == "remote.png"
 
     @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    @patch("src.api.mcp.mcp_server.ocr_service")
-    async def test_http_url_decodes_basename(self, mock_service, _validate_host_mock):
+    @patch("src.api.mcp.mcp_server.get_process_pool", return_value=None)
+    @patch("src.api.mcp.mcp_server.run_ocr_in_worker")
+    async def test_http_url_decodes_basename(self, mock_run_ocr, _pool_mock, _validate_host_mock):
         # Given
         session = _FakeSession(_FakeResponse(status=200, body=PNG_MAGIC_BYTES))
-        mock_service.process_file.return_value = OcrResponseFactory.with_single_line(filename="scan with space.png")
+        mock_run_ocr.return_value = OcrResponseFactory.with_single_line(filename="scan with space.png")
 
         # When
         with patch.object(mcp_server, "_http_session", session):
@@ -118,7 +147,7 @@ class TestOcrProcessHappyPaths:
             )
 
         # Then
-        passed_filename = mock_service.process_file.call_args.args[1]
+        passed_filename = mock_run_ocr.call_args.args[1]
         assert passed_filename == "scan with space.png"
 
 

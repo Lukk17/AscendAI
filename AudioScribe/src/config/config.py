@@ -78,7 +78,8 @@ class Settings(BaseSettings):
     )
     MCP_ALLOWED_HOSTS: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
-        description="Hostnames that bypass the SSRF private-IP check (e.g. docker-internal MinIO).",
+        description="Hostnames that bypass the SSRF private-IP check (e.g. host.docker.internal "
+        "for the S3-compatible object store).",
     )
     MCP_DOWNLOAD_TIMEOUT_SECONDS: int = Field(
         default=30, description="Total wall-clock budget for an MCP HTTP fetch"

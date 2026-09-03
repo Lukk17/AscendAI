@@ -205,7 +205,7 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
 
         when(s3Client.listObjects(ArgumentMatchers.<Consumer<ListObjectsRequest.Builder>>any()))
-                .thenThrow(new RuntimeException("MinIO unavailable"));
+                .thenThrow(new RuntimeException("S3 unavailable"));
 
 
         // when

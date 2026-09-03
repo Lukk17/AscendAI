@@ -51,7 +51,7 @@ Alternative considered: keep `/run` synchronous and add polling only for reindex
 
 `DELETE /api/v1/documents/{id}` executes: (1) set `status = DELETING`; (2) delete Qdrant points with `source == object_key` from every collection listed in `document_index_state` (delete-by-filter is idempotent); (3) delete the MinIO object (idempotent); (4) delete the `document_index_state` rows and the `documents` row. A failure at any step leaves the row in `DELETING`; repeating the DELETE re-executes the remaining steps. Order rationale: orphaned vectors are the harmful failure mode (retrieval would cite a document whose file is gone), so vectors go first; an orphaned MinIO object is inert. Returns `204 No Content` on completion, `404` for an unknown id, `409 Conflict` if the document is currently `INDEXING` (deleting under an active ingest would race chunk re-insertion).
 
-Mid-chat behavior: presigned source URLs already handed out (TTL `app.rag.sources.presign-ttl`, default PT15M) are not tracked or revoked — they stop resolving once the MinIO object is gone and expire on their own anyway. In-flight chat turns that already retrieved chunks complete normally; subsequent retrievals no longer see the document.
+Mid-chat behavior: presigned source URLs already handed out (TTL `app.rag.source-attachments.presign-ttl`, default PT15M) are not tracked or revoked — they stop resolving once the MinIO object is gone and expire on their own anyway. In-flight chat turns that already retrieved chunks complete normally; subsequent retrievals no longer see the document.
 
 ### D5. Reindex goes through `DocumentRouter`
 
@@ -66,6 +66,16 @@ Upload registers or updates the row immediately (`status = UPLOADED`). Bucket-sc
 ### D7. Pagination and response shape
 
 `GET /api/v1/documents` uses Spring Data `Pageable` (`page`, `size` with default 20 / max 100, `sort` defaulting to `updatedAt,desc`) and returns `{items, page, size, totalElements, totalPages}` following the module's DTO-at-the-boundary convention. Run history takes a `limit` query parameter (default 20, max 100), newest first.
+
+### D8. The presigned link stays mandatory, `contentPath` is added beside it (owner decision, 2026-09-03)
+
+The first draft of this change made `downloadUrl` and `expiresAt` optional on `SourceFile` and declared `contentPath` the canonical download path, on the reasoning that a public deployment should never have to expose the object store. That contradicted the `rag-source-attachments` baseline, which guarantees a non-blank `downloadUrl` and `expiresAt` on every source entry, and the contradiction had also broken archival: the delta modified a requirement titled `Caller sets `attachSources=true``, which is a scenario in the baseline rather than a requirement, so the merge aborted with a not-found error in every ordering while `openspec validate --strict` stayed silent (the validator skips a MODIFIED block whose target requirement is missing).
+
+The owner's decision is that the link stays. Every source entry always carries a non-blank `downloadUrl` and `expiresAt`, exactly as the baseline guarantees today, and this change adds `documentId` and `contentPath` alongside them as further mandatory fields. The reason is that a caller must never have to implement two different ways of fetching the same source: if the presigned link were sometimes absent, every client would need both code paths plus the logic to choose between them.
+
+What that costs is the deployment posture the first draft was reaching for. The object store still has to be reachable by clients wherever presigned links are handed out, so `harden-cloud-deployment` cannot treat the agent as the only public surface for source downloads. That is accepted deliberately, and it is the trade the decision makes.
+
+Two mechanical consequences follow. The delta now modifies the requirement that genuinely exists, `Opt-in `attachSources` parameter on prompt endpoint`, and carries all three of its baseline scenarios so the merge engine does not abort on a dropped scenario name. The delta's `SourceFile` modification is written on top of the post-Floci wording from `replace-minio-with-floci`, which is the text on the ground, rather than the older MinIO-specific phrasing still sitting in `openspec/specs/`.
 
 ## Risks / Trade-offs
 

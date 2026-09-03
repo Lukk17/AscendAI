@@ -31,6 +31,19 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("weather_current is advertised with the documented schema", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "weather_current"; });
+            expect(tool).to.be.ok;
+            const props = tool.inputSchema.properties;
+            expect(props).to.have.property("city");
+            expect(props).to.have.property("countryCode");
+            expect(props).to.have.property("unit");
+            expect(props).to.have.property("language");
+            expect(tool.inputSchema.required).to.include("city");
+        });
 
 settings:
   encodeUrl: true

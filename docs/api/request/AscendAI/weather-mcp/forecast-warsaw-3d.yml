@@ -37,6 +37,36 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("weather_forecast for Warsaw returns exactly 3 increasing days", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("ok");
+            expect(payload.message).to.be.null;
+            expect(payload.requestedQuery).to.be.null;
+            expect(payload.location.name.toLowerCase()).to.include("warsaw");
+            expect(payload.location.countryCode).to.equal("PL");
+            expect(payload.forecast).to.be.an("array");
+            expect(payload.forecast.length).to.equal(3);
+            payload.forecast.forEach(function (entry) {
+                expect(entry.date).to.match(/^\d{4}-\d{2}-\d{2}$/);
+                expect(entry.temperatureMax).to.be.a("number");
+                expect(isFinite(entry.temperatureMax)).to.be.true;
+                expect(entry.temperatureMin).to.be.a("number");
+                expect(isFinite(entry.temperatureMin)).to.be.true;
+                expect(entry.temperatureMin).to.be.at.most(entry.temperatureMax);
+                expect(Number.isInteger(entry.weatherCode)).to.be.true;
+                expect(entry.weatherCode).to.be.within(0, 99);
+            });
+            const dates = payload.forecast.map(function (entry) { return entry.date; });
+            for (let i = 1; i < dates.length; i++) {
+                expect(dates[i] > dates[i - 1]).to.be.true;
+            }
+            expect(payload.temperatureUnit).to.equal("celsius");
+            expect(payload.source).to.equal("open-meteo");
+            expect(isNaN(Date.parse(payload.fetchedAt))).to.be.false;
+        });
 
 settings:
   encodeUrl: true

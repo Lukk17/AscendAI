@@ -31,6 +31,22 @@ runtime:
         test("Language defaults to en when omitted", function () {
             expect(res.getBody().language).to.equal("en");
         });
+        test("Filename echoes back", function () {
+            expect(res.getBody().filename).to.equal("argent-saga-chronicles-page1.png");
+        });
+        test("At least one page with the canary substring", function () {
+            const body = res.getBody();
+            expect(body.pages.length).to.be.greaterThan(0);
+            const allText = body.pages.map(function (p) { return p.lines.map(function (l) { return l.text; }).join(" "); }).join(" ").toLowerCase();
+            const canaries = ["argent saga", "aenaria", "halen veyr"];
+            expect(canaries.some(function (c) { return allText.includes(c.toLowerCase()); })).to.be.true;
+        });
+        test("processing_time_seconds is finite and non-negative", function () {
+            const value = res.getBody().processing_time_seconds;
+            expect(value).to.be.a("number");
+            expect(isFinite(value)).to.be.true;
+            expect(value).to.be.at.least(0);
+        });
 
 settings:
   encodeUrl: true

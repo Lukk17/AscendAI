@@ -37,6 +37,16 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("weather_current for Warsaw,US resolves the US disambiguation", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("ok");
+            expect(payload.location.countryCode).to.equal("US");
+            expect(payload.location.latitude).to.be.within(38.0, 43.0);
+            expect(payload.location.longitude).to.be.within(-95.0, -75.0);
+        });
 
 settings:
   encodeUrl: true

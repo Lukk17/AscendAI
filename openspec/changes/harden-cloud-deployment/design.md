@@ -24,7 +24,7 @@ Sibling change `add-auth-and-identity` owns application-level identity (JWT reso
 
 - Application-level authentication and authorization (`add-auth-and-identity`), tenant isolation, metering, audit — sibling changes.
 - Kubernetes, Terraform, or any orchestration beyond docker compose on a VM.
-- Managing the four external data stores (Postgres, Redis, Qdrant, MinIO) as compose services — they remain external prerequisites; this change wires their credentials and documents their backup, nothing more.
+- Managing the four external data stores (Postgres, Redis, Qdrant, the S3-compatible object store) as compose services — they remain external prerequisites; this change wires their credentials and documents their backup, nothing more.
 - Multi-tenant deployments on one VM — the model is one VM per customer.
 
 ## Decisions
@@ -63,8 +63,8 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 - All credentials become compose env interpolations. Two classes:
   - **Always-required** (no sane default exists): `GRAFANA_ADMIN_PASSWORD`, `SEARXNG_SECRET`. These use compose's `${VAR:?message}` form — `docker compose up` fails immediately with a clear message if unset. `.env.example` ships them with placeholder guidance so local dev is a one-time copy-and-fill.
-  - **Dev-defaulted** (a local default is legitimate because the store runs on the developer's own machine): Postgres user/password, Redis password (empty = passwordless local Redis), MinIO access/secret keys, Qdrant API key (empty = unauthenticated local Qdrant). These use `${VAR:-devdefault}` in compose and `${VAR:devdefault}` in `application.yaml`.
-- **Production fail-fast for the dev-defaulted class**: AscendAgent gains a startup guard active only when the `production` Spring profile is present — it refuses to start if any datastore credential still equals its known dev default (`password`, `local`, empty Redis password, empty Qdrant key). This keeps local dev friction-free while making "forgot to set MinIO password" a startup error instead of a silent open door. The guard is a small `@Configuration` validator, not Spring Cloud Config or Vault.
+  - **Dev-defaulted** (a local default is legitimate because the store runs on the developer's own machine): Postgres user/password, Redis password (empty = passwordless local Redis), S3 access/secret keys, Qdrant API key (empty = unauthenticated local Qdrant). These use `${VAR:-devdefault}` in compose and `${VAR:devdefault}` in `application.yaml`.
+- **Production fail-fast for the dev-defaulted class**: AscendAgent gains a startup guard active only when the `production` Spring profile is present — it refuses to start if any datastore credential still equals its known dev default (`password`, `local`, empty Redis password, empty Qdrant key). This keeps local dev friction-free while making "forgot to set the S3 password" a startup error instead of a silent open door. The guard is a small `@Configuration` validator, not Spring Cloud Config or Vault.
 - **SearXNG secret**: removed from `searxng/settings.yml`, injected via the `SEARXNG_SECRET` env var (natively supported by SearXNG). The committed value is compromised by definition and the tasks include rotating it.
 - **Alternatives considered**: Docker secrets (`secrets:` top-level) — rejected: requires swarm mode or file-based secrets plumbing in every service, and the Python services read config from env vars; env + `.env` is the pattern the stack already uses. Vault/SOPS — rejected as YAGNI for single-VM single-tenant.
 
@@ -92,8 +92,8 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 ### D7 — SSRF allowlists: explicit, no loopback
 
-- `MCP_ALLOWED_HOSTS` on both `ascend-paddle-ocr` and `audio-scribe` becomes `${MCP_ALLOWED_HOSTS:-minio}`. The default allowlists only the in-network `minio` hostname used for RAG-document and presigned-URL fetches. Local dev, where MinIO runs on the host and is reached via `host.docker.internal`, sets `MCP_ALLOWED_HOSTS=host.docker.internal` in `.env` — a deliberate, documented, per-machine opt-in instead of a committed default that whitelists loopback everywhere.
-- The deployment guide covers the cloud topology: MinIO reachable at a private hostname, that hostname (and nothing else) in the allowlist.
+- `MCP_ALLOWED_HOSTS` on both `ascend-paddle-ocr` and `audio-scribe` becomes `${MCP_ALLOWED_HOSTS:-object-store}`. The default allowlists only the in-network `object-store` hostname used for RAG-document and presigned-URL fetches. Local dev, where the S3-compatible object store runs on the host and is reached via `host.docker.internal`, sets `MCP_ALLOWED_HOSTS=host.docker.internal` in `.env` — a deliberate, documented, per-machine opt-in instead of a committed default that whitelists loopback everywhere.
+- The deployment guide covers the cloud topology: the object store reachable at a private hostname, that hostname (and nothing else) in the allowlist.
 
 ### D8 — Observability exposure
 

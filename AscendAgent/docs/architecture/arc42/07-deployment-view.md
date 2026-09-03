@@ -10,7 +10,7 @@ graph TB
         Postgres["PostgreSQL<br/>:5432"]
         Redis["Redis<br/>:6379"]
         Qdrant["Qdrant<br/>:6333/6334"]
-        MinIO["MinIO<br/>:9070/9071"]
+        S3["S3-compatible storage<br/>:9070/9071"]
     end
 
     subgraph "Docker Compose Network"
@@ -39,7 +39,7 @@ graph TB
     AscendAgent --> Postgres
     AscendAgent --> Redis
     AscendAgent --> Qdrant
-    AscendAgent --> MinIO
+    AscendAgent --> S3
     WebSearch --> SearXNG
     WebSearch --> FlareSolverr
     Memory --> Qdrant
@@ -61,7 +61,7 @@ graph TB
 | PostgreSQL        | 5432                          | TCP           | Relational database (external prerequisite).            |
 | Redis             | 6379                          | TCP           | Cache (external prerequisite).                          |
 | Qdrant            | 6333 (HTTP), 6334 (gRPC)      | HTTP / gRPC   | Vector database (external prerequisite).                |
-| MinIO             | 9070 (API), 9071 (Console)    | HTTP          | S3-compatible object storage (external prerequisite).   |
+| S3-compatible storage | 9070 (API), 9071 (UI)      | HTTP          | Object storage (external prerequisite), provided locally by a self-hosted emulator and by Amazon S3 in production. |
 | SearXNG           | 9020                          | HTTP          | Meta search engine.                                     |
 | FlareSolverr      | 8191                          | HTTP          | Cloudflare bypass proxy.                                |
 
@@ -73,5 +73,5 @@ graph TB
 - **Java 21+** for AscendAgent and WeatherMCP (run outside Docker during dev).
 - **Python 3.11+** for AudioScribe, AscendWebSearch, AscendMemory.
 - **LM Studio** installed on host for local LLM inference.
-- **External prerequisites.** PostgreSQL, Redis, Qdrant, MinIO must be running before starting docker-compose. In
-  production these map to managed cloud services.
+- **External prerequisites.** PostgreSQL, Redis, Qdrant, and S3-compatible object storage must be running before
+  starting docker-compose. In production these map to managed cloud services.

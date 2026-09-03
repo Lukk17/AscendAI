@@ -69,6 +69,18 @@ bru run "memory/testing/insert-reykjavik.yml" --env ascend-local
 bru run "memory/testing/search-reykjavik.yml" --env ascend-local
 ```
 
+## Post-run cleanup
+
+Wipe the test user so its inserted memory does not survive into the next run. The section sits next to `Run`
+because that is where the state it names is created, but the runner executes it last, after the `Expected`
+assertions below have been checked against the live state.
+
+```powershell
+curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryInsertSearchTest"
+```
+
+Expect HTTP 200 with `{"status":"success", ...}`.
+
 ## Expected
 
 `insert-reykjavik.yml` returns HTTP 200. The response body is a JSON array (mem0's `add` return shape). The array

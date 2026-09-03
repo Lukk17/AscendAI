@@ -21,6 +21,20 @@ http:
         value:
           - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\dedup-pierogi-grandma.md
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Both dedup fixtures land under markdown/", function () {
+            const body = res.getBody();
+            expect(body.uploaded).to.be.an("array");
+            expect(body.uploaded).to.include("markdown/dedup-pierogi-helena.md");
+            expect(body.uploaded).to.include("markdown/dedup-pierogi-grandma.md");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

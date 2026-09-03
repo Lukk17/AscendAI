@@ -100,14 +100,14 @@
 - [x] 12.1 Add `redis_exporter` (`oliver006/redis_exporter:v1.65.x`) to docker-compose pointed at `redis:6379`; add scrape job
 - [x] 12.2 Add `postgres_exporter` (`prometheuscommunity/postgres-exporter:v0.16.x`) wired with `DATA_SOURCE_NAME` for the `ascend_ai` database; add scrape job
 - [x] 12.3 Confirm Qdrant `:6333/metrics` endpoint is reachable (it ships built-in); add scrape job
-- [x] 12.4 Confirm MinIO Prometheus output is reachable on `:9070/minio/v2/metrics/cluster` (built-in); add scrape job. Use docker-compose env interpolation if auth needed.
+- [x] 12.4 Object-store metrics: not applicable. The S3-compatible object store used locally (Floci) publishes no Prometheus endpoint, so no scrape job is added for it. See `replace-minio-with-floci`.
 - [ ] 12.5 Smoke test: every data-layer target reports `health=up` in `http://localhost:9090/api/v1/targets`
 
 ## 13. Provision dashboards (six total)
 
 - [x] 13.1 Build `observability/grafana/dashboards/platform-overview.json` with panels: request rate per service, error rate per service, p95 latency per service, JVM heap, Python RSS
 - [x] 13.2 Build `observability/grafana/dashboards/ai-pipeline.json` with panels: tokens per minute by provider/model, provider mix, RAG hit-rate, memory parse-failure rate, MCP tool call rate
-- [x] 13.3 Build `observability/grafana/dashboards/infrastructure.json` with panels: Qdrant collection point counts, Redis ops/sec + used memory, Postgres connections + db size, MinIO bucket sizes
+- [x] 13.3 Build `observability/grafana/dashboards/infrastructure.json` with panels: Qdrant collection point counts, Redis ops/sec + used memory, Postgres connections + db size
 - [x] 13.4 **L1 — Token Cost** (`observability/grafana/dashboards/token-cost.json`): per-provider $/day computed via `gen_ai.client.token.usage{provider="...",type="input"} × pricing_input + ... type="output" × pricing_output`. Pricing rates committed in `observability/grafana/dashboards/pricing.yaml` keyed by provider; loaded into the dashboard via JSON variable substitution at build time
 - [x] 13.5 **L2 — RAG Quality** (`observability/grafana/dashboards/rag-quality.json`): heatmap of `rag_top_score_bucket` over time, time-series of miss-rate (`rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)`), bar chart of ingestion-events-per-hour by `source_type`. Logs panel below querying Loki for `{service="ascend-agent"} |~ "Retrieval:"`
 - [x] 13.6 **L3 — Cache Hit Rate** (`observability/grafana/dashboards/cache-hit-rate.json`): primary panel `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider; side panel absolute saved-token count `rate(prompt_cache.tokens.read[1h]) * 3600` per provider; flat-line-at-zero alert annotation (UI only, no Alertmanager)

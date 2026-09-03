@@ -25,6 +25,23 @@ http:
         value:
           - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\pierogi-recipe.docx
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("All three fixtures land under the right folder prefix", function () {
+            const body = res.getBody();
+            expect(body.uploaded).to.be.an("array").with.lengthOf(3);
+            expect(body.failures === undefined || body.failures.length === 0).to.be.true;
+            const markdownKeys = body.uploaded.filter(function (k) { return k.startsWith("markdown/"); });
+            const documentKeys = body.uploaded.filter(function (k) { return k.startsWith("documents/"); });
+            expect(markdownKeys).to.have.lengthOf(1);
+            expect(documentKeys).to.have.lengthOf(2);
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

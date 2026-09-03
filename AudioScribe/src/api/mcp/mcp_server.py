@@ -5,7 +5,6 @@ and streaming size cap."""
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import shutil
 import tempfile
@@ -66,10 +65,6 @@ def _error_envelope(operation: str, exc: Exception) -> dict[str, Any]:
     }
 
 
-def _payload_text(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False)
-
-
 async def _collect_local_segments(temp_file_path: str, model: str, lang: str) -> list[dict[str, Any]]:
     """Materialise the local async-iterator into a concrete `list[dict]`.
     Returning a list (not the iterator) gives downstream comprehensions a
@@ -122,7 +117,7 @@ async def transcribe_local(
         transcription = _format_local_transcription(segments, with_timestamps)
 
         payload = {"source": "local", "model": model, "language": lang, "transcription": transcription}
-        return _success_envelope({"text": _payload_text(payload)})
+        return _success_envelope(payload)
     except Exception as exc:
         return _error_envelope("transcribe_local", exc)
     finally:
@@ -156,7 +151,7 @@ async def transcribe_openai(
             language=lang,
         )
         payload = {"source": "openai", "model": model, "language": lang, "transcription": response_text}
-        return _success_envelope({"text": _payload_text(payload)})
+        return _success_envelope(payload)
     except Exception as exc:
         return _error_envelope("transcribe_openai", exc)
     finally:
@@ -192,7 +187,7 @@ async def transcribe_hf(
             "provider": hf_provider,
             "transcription": response_text,
         }
-        return _success_envelope({"text": _payload_text(payload)})
+        return _success_envelope(payload)
     except Exception as exc:
         return _error_envelope("transcribe_hf", exc)
     finally:
@@ -237,7 +232,7 @@ async def transcribe_audacity(
             "language": lang,
             "transcription": transcription_text,
         }
-        return _success_envelope({"text": _payload_text(payload)})
+        return _success_envelope(payload)
     except Exception as exc:
         return _error_envelope("transcribe_audacity", exc)
     finally:

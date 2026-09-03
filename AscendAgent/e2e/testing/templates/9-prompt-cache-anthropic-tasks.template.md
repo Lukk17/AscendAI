@@ -1,6 +1,6 @@
 # Prompt cache: Anthropic: run tasks template
 
-Spec: [9-prompt-cache-anthropic-test.md](9-prompt-cache-anthropic-test.md)
+Spec: [../9-prompt-cache-anthropic-test.md](../9-prompt-cache-anthropic-test.md)
 
 Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting.
 
@@ -18,6 +18,7 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 
 - [ ] Truncated `chat_history` rows for user `frostyPromptCacheAnthropicTest`
 - [ ] Deleted Redis key `chat:frostyPromptCacheAnthropicTest`
+- [ ] Deleted Redis key `user:frostyPromptCacheAnthropicTest:instructions`
 
 ### Run
 
@@ -27,10 +28,19 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [ ] Step 1: HTTP 200
-- [ ] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache)
-- [ ] Step 1: `usage.cacheReadInputTokens == 0` (or absent)
+- [ ] Step 1: `usage.nativeUsage.cache_creation_input_tokens > 0` (write to ephemeral cache)
+- [ ] Step 1: `usage.nativeUsage.cache_read_input_tokens == 0` (or absent)
 - [ ] Step 2: HTTP 200
-- [ ] Step 2: `usage.cacheReadInputTokens > 0`
+- [ ] Step 2: `usage.nativeUsage.cache_read_input_tokens > 0`
+
+### Post-run cleanup
+
+Run regardless of Run-step verdict. Every command is idempotent.
+
+- [ ] Deleted Postgres `chat_history` rows where `user_id = 'frostyPromptCacheAnthropicTest'`
+- [ ] Deleted Redis key `chat:frostyPromptCacheAnthropicTest`
+- [ ] Deleted Redis key `user:frostyPromptCacheAnthropicTest:instructions`
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyPromptCacheAnthropicTest` returned `{"status":"success", ...}`
 
 ### Verdict
 

@@ -37,6 +37,35 @@ runtime:
         test("At least one page", function () {
             expect(res.getBody().pages.length).to.be.greaterThan(0);
         });
+        test("language is a non-empty string", function () {
+            expect(res.getBody().language).to.be.a("string").and.not.empty;
+        });
+        test("Extracted text carries the Polish canary substring", function () {
+            const body = res.getBody();
+            const allText = body.pages.map(function (p) { return p.lines.map(function (l) { return l.text; }).join(" "); }).join(" ").toLowerCase();
+            const canaries = ["saga świetlna", "aenaria", "eklipsą"];
+            expect(canaries.some(function (c) { return allText.includes(c.toLowerCase()); })).to.be.true;
+        });
+        test("Extracted text carries a Polish-specific accented character", function () {
+            const body = res.getBody();
+            const allText = body.pages.map(function (p) { return p.lines.map(function (l) { return l.text; }).join(" "); }).join(" ");
+            expect(/[śżąęćółń źŚŻĄĘĆÓŁŃŹ]/.test(allText)).to.be.true;
+        });
+        test("Every text line has a valid confidence", function () {
+            const body = res.getBody();
+            body.pages.forEach(function (page) {
+                page.lines.forEach(function (line) {
+                    expect(line.confidence).to.be.a("number");
+                    expect(line.confidence).to.be.within(0.0, 1.0);
+                });
+            });
+        });
+        test("processing_time_seconds is finite and non-negative", function () {
+            const value = res.getBody().processing_time_seconds;
+            expect(value).to.be.a("number");
+            expect(isFinite(value)).to.be.true;
+            expect(value).to.be.at.least(0);
+        });
 
 settings:
   encodeUrl: true

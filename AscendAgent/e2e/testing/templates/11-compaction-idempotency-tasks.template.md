@@ -1,6 +1,6 @@
 # Chat-history compaction: idempotency: run tasks template
 
-Spec: [11-compaction-idempotency-test.md](11-compaction-idempotency-test.md)
+Spec: [../11-compaction-idempotency-test.md](../11-compaction-idempotency-test.md)
 
 Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before starting.
 
@@ -21,6 +21,7 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 - [ ] Applied `seed-compaction-idempotency.redis` to Redis
 - [ ] Verified Postgres has 9 rows (1 summary + 8 raw) for `frostyCompactionIdempotencyTest`
 - [ ] Verified the summary row exists with `[Conversation summary]` prefix
+- [ ] Deleted Redis key `user:frostyCompactionIdempotencyTest:instructions` (seeds don't touch it)
 
 ### Run
 
@@ -33,6 +34,15 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 - [ ] Step 1: HTTP 200, response references seeded facts (Rex / Warsaw / TechCorp)
 - [ ] Step 3: `chat_history` row count equals exactly 11 (9 pre-seeded + 2 new)
 - [ ] Step 3: exactly 1 `[Conversation summary]` row exists (NO second summary written)
+
+### Post-run cleanup
+
+Run regardless of Run-step verdict. Every command is idempotent.
+
+- [ ] Deleted Postgres `chat_history` rows where `user_id = 'frostyCompactionIdempotencyTest'`
+- [ ] Deleted Redis key `chat:frostyCompactionIdempotencyTest`
+- [ ] Deleted Redis key `user:frostyCompactionIdempotencyTest:instructions`
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyCompactionIdempotencyTest` returned `{"status":"success", ...}`
 
 ### Verdict
 

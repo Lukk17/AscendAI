@@ -4,11 +4,11 @@
 
 When RAG retrieval pulls multiple chunks across two different source files, the response's `sources[]` array contains exactly one entry per unique source file (not one per chunk). Proves `RagRetrievalService.buildSourceRefs` collapses per-chunk duplicates by `(bucket, key)` while still surfacing every unique source.
 
-Hermetic: owns the two `dedup-pierogi-*.md` fixtures in MinIO + Qdrant + the `frostyRagDedupTest` chat-history rows.
+Hermetic: owns the two `dedup-pierogi-*.md` fixtures in the object store + Qdrant + the `frostyRagDedupTest` chat-history rows.
 
 ## Prerequisites
 
-Check Bruno CLI, AscendAgent `/actuator/health`, Qdrant `/healthz`, MinIO `/minio/health/live`, Postgres responds. Same set as `5-rag-test.md` and `6-attach-sources-test.md`.
+Check Bruno CLI, AscendAgent `/actuator/health`, Qdrant `/healthz`, the object store `/_floci/health`, and that Postgres responds. Same set as `5-rag-test.md` and `6-attach-sources-test.md`.
 
 Check the two dedup fixtures exist.
 
@@ -18,16 +18,16 @@ ls AscendAgent/e2e/fixtures/dedup-pierogi-helena.md AscendAgent/e2e/fixtures/ded
 
 ## Reset state
 
-Register MinIO alias.
+Drop the two dedup fixtures from the object store. Each command names the `knowledge-base` bucket literally and one key, and a key that is already gone also returns HTTP 204, so both deletes are safe to re-run.
+
+If one of these deletes returns HTTP 404 with `<Code>NoSuchBucket</Code>` rather than 204, `knowledge-base` does not exist, which means the agent never completed startup. That is a broken prerequisite, not a clean slate.
 
 ```bash
-docker exec minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"'
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-helena.md"
 ```
 
-Drop the two dedup fixtures from MinIO.
-
 ```bash
-docker exec minio mc rm --force local/knowledge-base/markdown/dedup-pierogi-helena.md local/knowledge-base/markdown/dedup-pierogi-grandma.md
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-grandma.md"
 ```
 
 Truncate the metadata store for the two fixtures so re-ingest is clean.
@@ -50,6 +50,12 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history 
 
 ```bash
 docker exec redis redis-cli DEL chat:frostyRagDedupTest
+```
+
+Drop the Redis instructions cache key so the pre-run reset and the Post-run cleanup stay symmetric.
+
+```bash
+docker exec redis redis-cli DEL user:frostyRagDedupTest:instructions
 ```
 
 Per the Group A hermetic contract, this spec only resets its own artifacts (`dedup-pierogi-*` + `frostyRagDedupTest`). Spec 5 and spec 6 are responsible for clearing `pierogi-recipe.docx` in their own `Post-run cleanup` sections; this spec must not reach across into their territory.
@@ -78,10 +84,14 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-dedup-prompt.y
 
 Every Group A spec self-cleans so the next sweep sees a hermetic RAG state without having to reach into another spec's artifacts. Run these regardless of whether the Run steps passed or failed; they are idempotent.
 
-Drop the two dedup fixtures from MinIO.
+Drop the two dedup fixtures from the object store.
 
 ```bash
-docker exec minio mc rm --force local/knowledge-base/markdown/dedup-pierogi-helena.md local/knowledge-base/markdown/dedup-pierogi-grandma.md
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-helena.md"
+```
+
+```bash
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-grandma.md"
 ```
 
 Drop their `int_metadata_store` rows.
@@ -106,6 +116,20 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history 
 docker exec redis redis-cli DEL chat:frostyRagDedupTest
 ```
 
+Drop the Redis instructions cache key. `UserInstructionService` writes it on every prompt (an `EMPTY` marker with a 24 hour TTL when the user has no stored instructions), so it outlives the run unless the spec deletes it.
+
+```bash
+docker exec redis redis-cli DEL user:frostyRagDedupTest:instructions
+```
+
+Wipe any semantic-memory points AscendMemory's background extractor stored for this user. The agent runs the extractor after every prompt, whether or not it concerns memory. With no `provider` query parameter the endpoint clears the user across every provider collection, which stays correct if the embedding provider changes.
+
+```bash
+curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyRagDedupTest"
+```
+
+Expect `{"status":"success","message":"All memories wiped for user frostyRagDedupTest"}`.
+
 ## Expected
 
 - After step 1: HTTP 200, `uploaded` field includes both `markdown/dedup-pierogi-helena.md` and `markdown/dedup-pierogi-grandma.md`.
@@ -120,7 +144,7 @@ docker exec redis redis-cli DEL chat:frostyRagDedupTest
 
 ## Concurrency
 
-- **Mutates:** MinIO bucket `knowledge-base` (`markdown/dedup-pierogi-helena.md`, `markdown/dedup-pierogi-grandma.md`); Qdrant collection `ascendai-1536` (dedup `source` filters); Postgres `int_metadata_store` (dedup keys); Postgres `chat_history` (user_id=`frostyRagDedupTest`); Redis key `chat:frostyRagDedupTest`
-- **Conflicts with:** `5-rag`, `6-attach-sources` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
+- **Mutates:** object-store bucket `knowledge-base` (`markdown/dedup-pierogi-helena.md`, `markdown/dedup-pierogi-grandma.md`); Qdrant collection `ascendai-1536` (dedup `source` filters); Qdrant collections `ascend_memory_*` (user-scoped: `frostyRagDedupTest`, written by the background memory extractor on any prompt); Postgres `int_metadata_store` (dedup keys); Postgres `chat_history` (user_id=`frostyRagDedupTest`); Redis keys `chat:frostyRagDedupTest` and `user:frostyRagDedupTest:instructions`
+- **Conflicts with:** `5-rag`, `6-attach-sources` (share Qdrant `ascendai-1536` and object-store bucket `knowledge-base`)
 - **Serial:** false
 - **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) only touch this spec's own fixtures + user-id; never reaches into other Group A specs' artifacts. Relies on specs 5 and 6 honouring their own post-run cleanup contracts.

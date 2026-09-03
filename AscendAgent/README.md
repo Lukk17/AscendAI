@@ -53,7 +53,7 @@ flowchart TD
     end
 
     subgraph Ingestion ["Ingestion Pipeline"]
-        MinIO["MinIO (S3)"] -- "Syncs Files" --> AscendAgent
+        ObjectStore["Object Store (S3)"] -- "Syncs Files" --> AscendAgent
         AscendAgent -- "Route: /obsidian" --> MarkdownParser["CommonMark Parser"]
         AscendAgent -- "Route: /documents" --> UnstructuredAPI["Unstructured API"]
         MarkdownParser -- "Chunks & Embeds" --> Qdrant
@@ -81,10 +81,10 @@ Full arc42 documentation, ADRs, and C4 diagrams live in [docs/architecture/](doc
 5. **Thinking model response resolution.** Providers using `type: anthropic` (LM Studio, Anthropic, MiniMax) may
    return multi-block responses where the first block is internal chain-of-thought and the last block is the
    answer. Standard `getResult()` returns the first block (thinking text), not the answer. Solution:
-   [ChatResponseContentResolver](src/main/java/com/lukk/ascend/ai/agent/service/ChatResponseContentResolver.java)
+   [ChatResponseContentResolver](src/main/java/com/lukk/ascend/ai/agent/service/provider/ChatResponseContentResolver.java)
    resolves the last non-blank `Generation` text from any `ChatResponse`. Works transparently for both
    single-generation (OpenAI-type) and multi-generation (Anthropic-type) responses. Affects both the user-facing
-   chat response ([ChatExecutor](src/main/java/com/lukk/ascend/ai/agent/service/ChatExecutor.java)) and the
+   chat response ([ChatExecutor](src/main/java/com/lukk/ascend/ai/agent/service/chat/ChatExecutor.java)) and the
    asynchronous memory extraction
    ([SemanticMemoryExtractor](src/main/java/com/lukk/ascend/ai/agent/service/memory/SemanticMemoryExtractor.java)).
 
@@ -116,7 +116,7 @@ For a larger tool set and ambiguous prompts, add a model-router step that return
 
 - **Direct ingestion.** Users can upload images or documents in the `/prompt` request (`multipart/form-data`).
   These are processed on the fly and added to the temporary context window for the current reply.
-- **Background ingestion (S3).** The system monitors a MinIO S3 bucket (`knowledge-base`). Ingestion is disabled by
+- **Background ingestion (S3).** The system monitors an S3 bucket (`knowledge-base`) in the object store. Ingestion is disabled by
   default to avoid startup latency and unexpected cloud embedding costs. Trigger ingestion explicitly via the REST
   endpoint.
 
@@ -142,9 +142,9 @@ Before running the application, ensure the support services are reachable.
 #### Docker environment
 
 The monorepo's [docker-compose.yaml](../docker-compose.yaml) brings up the in-stack services. External prerequisites
-(PostgreSQL, Redis, Qdrant, MinIO) are run on the host or in cloud.
+(PostgreSQL, Redis, Qdrant, object storage) are run on the host or in cloud.
 
-- **MinIO.** S3-compatible storage for file ingestion. Ports `9070` (API), `9071` (Console).
+- **Object storage** (locally: Floci). S3-compatible storage for file ingestion. Ports `9070` (API), `9071` (web UI).
 - **Qdrant.** Vector database for embeddings.
 - **Unstructured API.** Document parsing for PDFs / PPTX / etc.
 - **PostgreSQL.** Metadata store (schema `ascend_ai`).
@@ -165,12 +165,12 @@ separate embedding service. The default config points at LM Studio for both chat
 The agent includes an ingestion pipeline for processing S3 bucket files on demand. Full lifecycle in
 [docs/INGESTION.md](../docs/INGESTION.md).
 
-#### 1. S3 Storage (MinIO)
+#### 1. S3 Storage
 
 - **Bucket name.** `knowledge-base`. Created automatically on startup if missing.
-- **Console.** [http://localhost:9071](http://localhost:9071).
-- **User / password.** `admin` / `password`.
-- **Uploads.** Via the MinIO Console, or AWS CLI / MinIO Client (`mc`).
+- **UI.** [http://localhost:9071](http://localhost:9071).
+- **User / password.** `admin` / `password`. The object store does not validate credentials, so any value works; these match `application.yaml`.
+- **Uploads.** Via the object-store web UI, or a plain `curl -X PUT --data-binary "@file" http://localhost:9070/knowledge-base/<path>`. The object store needs no signing and no client.
 
 #### 2. File routing and supported types
 
@@ -190,7 +190,7 @@ The pipeline routes files based on folder name in the S3 bucket.
    which returns extracted text, then chunked.
 4. **Embedding and storage.** Text chunks are vectorised and stored in Qdrant.
 
-Ingestion is two-step by default. Upload writes to MinIO, then `POST /api/v1/ingestion/run` scans and embeds.
+Ingestion is two-step by default. Upload writes to the object store, then `POST /api/v1/ingestion/run` scans and embeds.
 Auto-polling exists (`app.ingestion.auto.enabled=true`) but ships off so the agent doesn't spend embedding tokens on
 every restart.
 
@@ -206,7 +206,7 @@ From the monorepo root.
 docker compose up -d --build
 ```
 
-External prerequisites (PostgreSQL, Redis, Qdrant, MinIO) must already be running on the host. They aren't part of
+External prerequisites (PostgreSQL, Redis, Qdrant, object storage) must already be running on the host. They aren't part of
 compose. Compose itself brings up the application services (ascend-memory, ascend-web-search, audio-scribe, etc.)
 plus the support stack (SearXNG, FlareSolverr, Docling, Unstructured).
 
@@ -260,7 +260,7 @@ Capability tests live under [e2e/](e2e/). Five numbered specs (`1-weather-mcp` t
 end-to-end via the Bruno collection at `../docs/api/request/AscendAI/`. Each spec has a paired tasks template; the
 runner copies it into `e2e/testing/runs/<UTC-timestamp>_<N>-<feature>-tasks.md`, ticks the checkbox list as it
 executes, and records token usage plus wall-clock time. Assertions are observable behaviour only: HTTP status,
-response body, persisted state in MinIO / Qdrant / Postgres. See [e2e/README.md](e2e/README.md) for the full contract,
+response body, persisted state in the object store / Qdrant / Postgres. See [e2e/README.md](e2e/README.md) for the full contract,
 fixture inventory, and capability matrix.
 
 Install the Bruno CLI once:
@@ -409,4 +409,4 @@ remaining providers and MCP servers.
 | [../README.md](../README.md)                                                                                                  | Monorepo overview, architecture, ports.                       |
 | [../docs/INGESTION.md](../docs/INGESTION.md)                                                                                  | RAG ingestion lifecycle.                                      |
 | [../docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md)                                                                                | Docker Compose recipes, image publishing.                     |
-| [../docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)                                                                      | Reset recipes for Qdrant / MinIO / Postgres / Redis.          |
+| [../docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)                                                                      | Reset recipes for Qdrant / object store / Postgres / Redis.   |

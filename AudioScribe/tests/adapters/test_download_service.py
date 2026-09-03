@@ -36,8 +36,8 @@ def test_validate_http_target_requires_hostname() -> None:
 
 
 def test_validate_http_target_allows_listed_host(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(download_service.settings, "MCP_ALLOWED_HOSTS", ["minio"])
-    download_service._validate_http_target("minio")
+    monkeypatch.setattr(download_service.settings, "MCP_ALLOWED_HOSTS", ["internal-store"])
+    download_service._validate_http_target("internal-store")
 
 
 def test_validate_http_target_resolves_to_safe_ip() -> None:

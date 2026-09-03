@@ -1,6 +1,6 @@
 # Chat-history compaction: fires + replaces prefix: run tasks template
 
-Spec: [10-compaction-fires-test.md](10-compaction-fires-test.md)
+Spec: [../10-compaction-fires-test.md](../10-compaction-fires-test.md)
 
 Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 
@@ -21,6 +21,7 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 - [ ] Applied `seed-compaction-fires.redis` to Redis
 - [ ] Verified Postgres has 21 rows for `frostyCompactionFiresTest`
 - [ ] Verified Redis list `chat:frostyCompactionFiresTest` has 21 entries
+- [ ] Deleted Redis key `user:frostyCompactionFiresTest:instructions` (seeds don't touch it)
 
 ### Run
 
@@ -35,6 +36,15 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 - [ ] Step 3: exactly 1 row has `role='system'` and content begins with `[Conversation summary]`
 - [ ] Step 3: exactly 8 rows have `role IN ('user', 'assistant')`
 - [ ] (Manual spot-check) summary content references Rex / Warsaw / TechCorp / Spring Boot
+
+### Post-run cleanup
+
+Run regardless of Run-step verdict. Every command is idempotent.
+
+- [ ] Deleted Postgres `chat_history` rows where `user_id = 'frostyCompactionFiresTest'`
+- [ ] Deleted Redis key `chat:frostyCompactionFiresTest`
+- [ ] Deleted Redis key `user:frostyCompactionFiresTest:instructions`
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyCompactionFiresTest` returned `{"status":"success", ...}`
 
 ### Verdict
 

@@ -55,6 +55,10 @@ the next step.
 bru run "memory/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 
+## Post-run cleanup
+
+None. `tools/list` is a pure protocol probe; no `user_id` is ever touched and there is nothing to remove.
+
 ## Expected
 
 The `initialize` call returns HTTP 200 with an `Mcp-Session-Id: <uuid>` response header.

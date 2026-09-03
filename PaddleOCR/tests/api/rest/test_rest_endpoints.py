@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from src.api.exception_handlers import FileSizeExceededError
 from src.config.config import settings
 from src.main import create_app
 from tests.conftest import PDF_MAGIC_BYTES, PNG_MAGIC_BYTES, OcrResponseFactory
@@ -23,6 +24,16 @@ async def client(app):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+@pytest.fixture(autouse=True)
+def _stub_process_pool():
+    # process_ocr() dispatches through get_process_pool(), which is only populated by
+    # main.py's lifespan (not driven in these tests). Returning None makes run_in_executor
+    # fall back to the default in-process thread pool, matching the pre-worker-pool
+    # dispatch these tests were written against, without spawning a real subprocess.
+    with patch("src.api.rest.rest_endpoints.get_process_pool", return_value=None):
+        yield
 
 
 class TestHealthEndpoint:
@@ -114,6 +125,25 @@ class TestOcrEndpoint:
         assert response.json()["filename"] == "test.png"
         assert response.json()["schema_version"] == "1"
 
+    @patch("src.api.rest.rest_endpoints.inject_trace_context")
+    @patch("src.api.rest.rest_endpoints.ocr_service")
+    async def test_trace_context_is_forwarded_to_worker(self, mock_service, mock_inject, client):
+        # Given — the carrier is captured from the auto-instrumented request span, so
+        # the worker process can reattach its own span as that span's child
+        mock_service.process_file.return_value = OcrResponseFactory.with_single_line()
+        mock_inject.return_value = {"traceparent": "00-fake-01"}
+
+        # When
+        response = await client.post(
+            "/v1/ocr",
+            files={"file": ("test.png", io.BytesIO(PNG_MAGIC_BYTES), "image/png")},
+        )
+
+        # Then
+        assert response.status_code == 200
+        mock_inject.assert_called_once()
+        assert mock_service.process_file.call_args.args[3] == {"traceparent": "00-fake-01"}
+
     @patch("src.api.rest.rest_endpoints.ocr_service")
     async def test_pdf_accepted(self, mock_service, client):
         # Given
@@ -150,7 +180,6 @@ class TestOcrEndpoint:
         # Given. The service layer can raise FileSizeExceededError too (e.g. during PDF
         # multi-page processing). The REST endpoint must re-raise it untouched so the
         # global handler returns 400 with code=FILE_TOO_LARGE, not 422 OCR_FAILED.
-        from src.api.exception_handlers import FileSizeExceededError
         mock_service.process_file.side_effect = FileSizeExceededError("page exceeds cap")
 
         # When

@@ -52,22 +52,22 @@ sequenceDiagram
 
 ---
 
-### MCP happy path via MinIO
+### MCP happy path via the S3-compatible object store
 
 ```mermaid
 sequenceDiagram
     participant Agent as AscendAgent
     participant MCP as ocr_process tool
     participant Guard as SSRF guard
-    participant MinIO as MinIO :9000
+    participant ObjectStore as Object store :9070 (host.docker.internal)
     participant OcrSvc as OcrService
     participant Thread as Thread pool
 
-    Agent->>MCP: tools/call ocr_process(file_uri="http://minio:9000/e2e-fixtures/img.png", lang="en")
-    MCP->>Guard: _validate_host("minio")
-    Guard->>Guard: "minio" in MCP_ALLOWED_HOSTS → allow
-    MCP->>MinIO: GET http://minio:9000/e2e-fixtures/img.png (allow_redirects=False)
-    MinIO-->>MCP: 200 image bytes (streamed, size checked)
+    Agent->>MCP: tools/call ocr_process(file_uri="http://host.docker.internal:9070/e2e-fixtures/img.png", lang="en")
+    MCP->>Guard: _validate_host("host.docker.internal")
+    Guard->>Guard: "host.docker.internal" in MCP_ALLOWED_HOSTS → allow
+    MCP->>ObjectStore: GET http://host.docker.internal:9070/e2e-fixtures/img.png (allow_redirects=False)
+    ObjectStore-->>MCP: 200 image bytes (streamed, size checked)
     MCP->>Thread: asyncio.to_thread(ocr_service.process_file, bytes, "img.png", "en")
     Thread->>OcrSvc: _get_engine("en") — cache hit (warm)
     OcrSvc->>OcrSvc: engine.predict
@@ -76,8 +76,8 @@ sequenceDiagram
     MCP-->>Agent: {"jsonrpc":"2.0","result":{"content":[{"type":"text","text":"{...}"}]}}
 ```
 
-The `minio` hostname resolves to a private RFC1918 address inside the docker-compose network. Without
-`MCP_ALLOWED_HOSTS=minio`, the SSRF guard would reject it. See
+The `host.docker.internal` hostname resolves to a private address inside the docker-compose network. Without
+`MCP_ALLOWED_HOSTS=host.docker.internal`, the SSRF guard would reject it. See
 [ADR-001](../decisions/ADR-001-mcp-file-transport-uri-only.md).
 
 ---

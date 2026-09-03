@@ -21,10 +21,10 @@
 | :--- | :--- | :--- |
 | 1 | [Introduction and goals](arc42/01-introduction-and-goals.md) | What the service does and who depends on it |
 | 2 | [Constraints](arc42/02-constraints.md) | Python 3.11, container-only, single-process, paddle wheel platform |
-| 3 | [Context and scope](arc42/03-context-and-scope.md) | AscendAgent caller, MinIO for MCP, no database |
+| 3 | [Context and scope](arc42/03-context-and-scope.md) | AscendAgent caller, S3-compatible object store for MCP, no database |
 | 4 | [Solution strategy](arc42/04-solution-strategy.md) | Dual surface, lifespan warm-up, thread-pool offload |
 | 5 | [Building block view](arc42/05-building-block-view.md) | Module map: rest, mcp, service, config, model |
-| 6 | [Runtime view](arc42/06-runtime-view.md) | Cold start, REST happy path, MCP via MinIO, error mapping |
+| 6 | [Runtime view](arc42/06-runtime-view.md) | Cold start, REST happy path, MCP via the object store, error mapping |
 | 7 | [Deployment view](arc42/07-deployment-view.md) | docker-compose role, healthcheck wiring, env-var surface |
 | 8 | [Crosscutting concepts](arc42/08-crosscutting-concepts.md) | Logging, error catalog, async hygiene, LRU engine cache |
 | 9 | [Architecture decisions](arc42/09-architecture-decisions.md) | Index linking to ADRs |

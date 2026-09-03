@@ -370,7 +370,7 @@
   "variable": [
     {
       "key": "audio_uri",
-      "value": "http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac"
+      "value": "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
     },
     {
       "key": "mcp_protocol_version",

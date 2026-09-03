@@ -75,6 +75,16 @@ The agent sends `{tenantId}:{userId}` as `user_id` on every insert/search/wipe/d
 
 One new changelog file: create `tenants`, insert the `default` row, add `tenant_id` columns with `defaultValue='default'` (backfilling existing rows in the same statement), then tighten to `NOT NULL` and swap indexes. Qdrant and MinIO backfills are not Liquibase's job — a one-shot migration task (admin-triggered) sets `tenant_id='default'` on existing Qdrant points and moves existing `markdown/`/`documents/` objects under `tenant/default/`. Until it runs, pre-existing vectors are invisible to search (fail-closed, decision 2) — visible degradation, not silent leakage.
 
+### 9. The presigned link stays mandatory under the tenant prefix check (owner decision, 2026-09-03)
+
+An earlier draft of this change framed the presigned link as conditional. Its `rag-source-attachments` delta spoke of "any in-network presigned URL (`AiResponse.sources[*].downloadUrl`, when populated)" and called `GET /api/v1/documents/{id}/content` from `add-document-management-api` the primary client-facing download path, and the proposal repeated that framing by saying the client-facing download path moves to the agent endpoint. Both readings contradict the `rag-source-attachments` baseline, which guarantees a non-blank `downloadUrl` and `expiresAt` on every source entry.
+
+The owner decided on 2026-09-03 that the link stays mandatory. Every source entry that is returned always carries a non-blank `downloadUrl` and `expiresAt`, `add-document-management-api` adds `documentId` and `contentPath` beside the link as further mandatory fields rather than instead of it, and neither download path is the primary one. The reason is that a caller must never have to implement two different ways of fetching the same source: a sometimes-absent link forces every client to carry both code paths plus the logic to choose between them. The same decision is recorded as D8 in `add-document-management-api/design.md`.
+
+Nothing this change actually enforces is weakened by that. The tenant prefix check still refuses to presign any key outside `tenant/{tenantId}/`, and a refused `SourceRef` is dropped from the response entirely rather than returned as an entry with a missing link, so the guarantee that every returned entry carries a working link holds alongside the guarantee that no entry ever points outside the caller's tenant. The agent endpoint enforces the identical per-tenant ownership on the resolved document id, so both paths carry the same check and neither is a fallback for the other.
+
+What that costs is the deployment posture: the object store has to stay reachable by clients wherever presigned links are handed out, so `harden-cloud-deployment` cannot treat the agent as the only public surface for source downloads. That cost is accepted deliberately and is not to be reopened here.
+
 ## Risks / Trade-offs
 
 - [Missed enforcement point — some future code path queries Qdrant/MinIO/Redis without the tenant discriminator] → centralize: one `TenantContext`, one metadata key constant, one key-builder per store; integration tests assert cross-tenant reads return zero results; `add-audit-and-gdpr-compliance` adds the second net later.

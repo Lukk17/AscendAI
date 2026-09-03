@@ -28,6 +28,9 @@ runtime:
         test("error code UNSUPPORTED_FILE_TYPE", function () {
             expect(res.getBody().code).to.equal("UNSUPPORTED_FILE_TYPE");
         });
+        test("detail is the generic message with no upstream leak", function () {
+            expect(res.getBody().detail).to.equal("Unsupported file type");
+        });
 
 settings:
   encodeUrl: true

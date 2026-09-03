@@ -28,6 +28,26 @@ http:
         type: text
         value: openai
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("sources dedups to exactly one entry per unique source file", function () {
+            const body = res.getBody();
+            expect(body.sources).to.be.an("array").with.lengthOf(2);
+            const urls = body.sources.map(function (s) { return s.downloadUrl; });
+            const hasHelena = urls.some(function (u) { return u.includes("markdown/dedup-pierogi-helena.md"); });
+            const hasGrandma = urls.some(function (u) { return u.includes("markdown/dedup-pierogi-grandma.md"); });
+            expect(hasHelena).to.be.true;
+            expect(hasGrandma).to.be.true;
+            const names = body.sources.map(function (s) { return s.name; });
+            expect(names).to.include("Babcia Helena's pierogi recipe (e2e dedup fixture)");
+            expect(names).to.include("Grandma Maria's pierogi recipe (e2e dedup fixture)");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

@@ -43,4 +43,4 @@ graph TB
 | Redis              | TCP                  | Outbound   | Chat history caching.                                                    |
 | PostgreSQL         | TCP                  | Outbound   | Persistent metadata and chat history.                                    |
 | Qdrant             | gRPC                 | Outbound   | Vector similarity search for RAG.                                        |
-| MinIO              | S3 API               | Outbound   | Document object storage.                                                 |
+| S3-compatible storage | S3 API             | Outbound   | Document object storage, provided locally by a self-hosted emulator and by Amazon S3 in production. |

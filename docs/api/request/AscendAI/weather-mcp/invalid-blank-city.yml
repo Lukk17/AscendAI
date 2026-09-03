@@ -36,6 +36,22 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("Blank city is rejected with the invalid_input envelope", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("invalid_input");
+            expect(payload.message).to.be.a("string").and.not.empty;
+            expect(payload.requestedQuery).to.equal("   ");
+            expect(payload.location).to.be.null;
+            expect(payload.temperature).to.be.null;
+            expect(payload.weatherCode).to.be.null;
+            expect(payload.wind).to.be.null;
+            expect(payload.observedAt).to.be.null;
+            expect(payload.source).to.equal("open-meteo");
+            expect(isNaN(Date.parse(payload.fetchedAt))).to.be.false;
+        });
 
 settings:
   encodeUrl: true

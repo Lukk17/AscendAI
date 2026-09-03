@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{protocol}}://{{baseUrl}}:7022/mcp/"
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp"
   headers:
     - name: Content-Type
       value: application/json
@@ -36,6 +36,23 @@ runtime:
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
+        });
+        test("ocr_process tool call returns the OcrJsonResponse with the canary substring", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const result = envelope.result;
+            expect(result.isError === undefined || result.isError === false).to.be.true;
+            const payload = JSON.parse(result.content[0].text);
+            expect(payload.language).to.equal("en");
+            expect(payload.filename).to.equal("argent-saga-chronicles-page1.png");
+            expect(payload.pages).to.be.an("array").that.is.not.empty;
+            const allText = payload.pages.map(function (p) { return p.lines.map(function (l) { return l.text; }).join(" "); }).join(" ").toLowerCase();
+            const canaries = ["argent saga", "aenaria", "halen veyr"];
+            expect(canaries.some(function (c) { return allText.includes(c.toLowerCase()); })).to.be.true;
+            expect(payload.processing_time_seconds).to.be.a("number");
+            expect(isFinite(payload.processing_time_seconds)).to.be.true;
+            expect(payload.processing_time_seconds).to.be.at.least(0);
         });
 
 settings:

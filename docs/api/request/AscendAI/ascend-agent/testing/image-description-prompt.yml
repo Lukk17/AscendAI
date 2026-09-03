@@ -58,6 +58,22 @@ http:
         value: qwen/qwen3-vl-4b
         disabled: true
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Image description is detailed and not a refusal", function () {
+            const content = res.getBody().content;
+            expect(content).to.be.a("string");
+            expect(content.length).to.be.at.least(200);
+            const lower = content.toLowerCase();
+            expect(lower).to.not.include("i don't see an image");
+            expect(lower).to.not.include("i'm unable to view images");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

@@ -24,6 +24,12 @@ runtime:
         test("Status code is 422", function () {
             expect(res.getStatus()).to.equal(422);
         });
+        test("detail is a non-empty array naming the missing file field", function () {
+            const body = res.getBody();
+            expect(body.detail).to.be.an("array").that.is.not.empty;
+            const fileError = body.detail.find(function (d) { return Array.isArray(d.loc) && d.loc.includes("file"); });
+            expect(fileError).to.be.ok;
+        });
 
 settings:
   encodeUrl: true

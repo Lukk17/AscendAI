@@ -17,7 +17,7 @@ Copy this file to `../runs/<UTC-timestamp>_9-mcp-bad-scheme-tasks.md` before sta
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp/ ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
 - [ ] Send `mcp-bad-scheme.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 
 ### Expected

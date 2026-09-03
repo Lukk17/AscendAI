@@ -29,6 +29,10 @@ Copy this file to `../runs/<UTC-timestamp>_2-insert-and-search-tasks.md` before 
 - [ ] That entry's `user_id` equals `"frostyMemoryInsertSearchTest"`
 - [ ] That entry's `score` is a finite number > 0
 
+### Post-run cleanup
+
+- [ ] `POST /api/v1/memory/wipe?user_id=frostyMemoryInsertSearchTest` returns HTTP 200 with `{"status":"success", ...}`
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)

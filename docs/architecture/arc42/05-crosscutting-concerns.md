@@ -78,10 +78,10 @@ search and insert always target the matching collection.
 ### Document ingestion pipeline
 
 ```text
-MinIO (S3) → Polling → Docling / Unstructured API → Token Splitter → Qdrant
+S3-compatible storage → Polling → Docling / Unstructured API → Token Splitter → Qdrant
 ```
 
-Documents uploaded to MinIO are detected, parsed into text, chunked with token-aware splitting, and stored as vector
+Documents uploaded to the S3-compatible object store (a self-hosted emulator locally, Amazon S3 in production) are detected, parsed into text, chunked with token-aware splitting, and stored as vector
 embeddings in Qdrant for RAG retrieval.
 
 ---

@@ -33,6 +33,34 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("tools/list advertises the transcribe tools with their schemas", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tools = envelope.result.tools;
+            expect(tools).to.be.an("array");
+            expect(tools.length).to.be.at.least(5);
+            const byName = {};
+            tools.forEach(function (t) { byName[t.name] = t; });
+            ["transcribe_local", "transcribe_openai", "transcribe_hf", "transcribe_audacity", "health"].forEach(function (name) {
+                expect(byName[name]).to.be.ok;
+            });
+            ["transcribe_local", "transcribe_openai", "transcribe_hf", "transcribe_audacity"].forEach(function (name) {
+                const tool = byName[name];
+                expect(tool.inputSchema.properties).to.have.property("audio_uri");
+                expect(tool.description).to.be.a("string").and.not.empty;
+            });
+            expect(byName.transcribe_openai.inputSchema.properties).to.have.property("model");
+            expect(byName.transcribe_openai.inputSchema.properties).to.have.property("language");
+            expect(byName.transcribe_hf.inputSchema.properties).to.have.property("model");
+            expect(byName.transcribe_hf.inputSchema.properties).to.have.property("hf_provider");
+            expect(byName.transcribe_local.inputSchema.properties).to.have.property("model");
+            expect(byName.transcribe_local.inputSchema.properties).to.have.property("language");
+            expect(byName.transcribe_local.inputSchema.properties).to.have.property("with_timestamps");
+            expect(byName.transcribe_audacity.inputSchema.properties).to.have.property("provider");
+            expect(byName.transcribe_audacity.inputSchema.properties).to.have.property("model");
+            expect(byName.transcribe_audacity.inputSchema.properties).to.have.property("language");
+        });
 
 settings:
   encodeUrl: true

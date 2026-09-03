@@ -28,6 +28,25 @@ http:
         type: text
         value: openai
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("sources carries a presigned host-reachable download URL", function () {
+            const body = res.getBody();
+            expect(body.sources).to.be.an("array").with.length.of.at.least(1);
+            const source = body.sources[0];
+            expect(source.name).to.be.a("string").and.not.empty;
+            expect(source.mimeType).to.be.a("string").and.not.empty;
+            expect(source.downloadUrl).to.be.a("string").and.not.empty;
+            expect(source.expiresAt).to.be.a("string").and.not.empty;
+            expect(source.downloadUrl).to.match(/^https?:\/\/localhost:9070\//);
+            expect(source.downloadUrl).to.not.include("host.docker.internal");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

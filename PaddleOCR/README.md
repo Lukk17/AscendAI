@@ -113,7 +113,7 @@ graph TB
 
     subgraph PaddleOCR[":7022 PaddleOCR"]
         REST["REST /v1/ocr"]
-        MCP["MCP /mcp/ tools/call"]
+        MCP["MCP /mcp tools/call"]
         Ready["/ready"]
         Health["/health"]
         Metrics["/metrics"]
@@ -122,14 +122,14 @@ graph TB
     end
 
     subgraph External
-        MinIO["MinIO :9070\nhost.docker.internal"]
+        ObjectStore["Object Store :9070\nhost.docker.internal"]
     end
 
     Agent -->|multipart| REST
     Agent -->|JSON-RPC| MCP
     Bruno --> REST
     Bruno --> MCP
-    MCP -->|aiohttp fetch| MinIO
+    MCP -->|aiohttp fetch| ObjectStore
     REST --> Service
     MCP --> Service
     Service --> Engine
@@ -150,7 +150,7 @@ MCP path has an SSRF guard on `http(s)://` URIs and a `realpath` jail on `file:/
 | GET    | /ready      | Readiness probe. 200 with `status=ready` once the default lang is warm. |
 | GET    | /metrics    | Prometheus exposition for the counters in [src/observability/metrics.py](src/observability/metrics.py). |
 | POST   | /v1/ocr     | Multipart upload, returns [OcrJsonResponse](src/model/ocr_models.py).   |
-| POST   | /mcp/       | FastMCP Streamable HTTP transport. Tool `ocr_process` takes `file_uri`. |
+| POST   | /mcp        | FastMCP Streamable HTTP transport. Tool `ocr_process` takes `file_uri`. |
 
 The error body shape across both surfaces is `{"code": "...", "detail": "..."}`. The six-code catalog is in
 [ADR-002](docs/architecture/decisions/ADR-002-mcp-error-catalog.md).

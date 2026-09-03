@@ -32,6 +32,20 @@ http:
   body:
     type: multipart-form
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Ingestion indexes the freshly uploaded fixtures with no failures", function () {
+            const body = res.getBody();
+            expect(body.indexed).to.be.a("number");
+            expect(body.indexed).to.be.at.least(1);
+            expect(body.failed).to.equal(0);
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

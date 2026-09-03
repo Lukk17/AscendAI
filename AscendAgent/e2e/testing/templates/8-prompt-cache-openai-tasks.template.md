@@ -1,6 +1,6 @@
 # Prompt cache: OpenAI: run tasks template
 
-Spec: [8-prompt-cache-openai-test.md](8-prompt-cache-openai-test.md)
+Spec: [../8-prompt-cache-openai-test.md](../8-prompt-cache-openai-test.md)
 
 Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 
@@ -18,6 +18,7 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 
 - [ ] Truncated `chat_history` rows for user `frostyPromptCacheOpenaiTest`
 - [ ] Deleted Redis key `chat:frostyPromptCacheOpenaiTest`
+- [ ] Deleted Redis key `user:frostyPromptCacheOpenaiTest:instructions`
 
 ### Run
 
@@ -31,6 +32,15 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 - [ ] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run)
 - [ ] Step 2: HTTP 200
 - [ ] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0`
+
+### Post-run cleanup
+
+Run regardless of Run-step verdict. Every command is idempotent.
+
+- [ ] Deleted Postgres `chat_history` rows where `user_id = 'frostyPromptCacheOpenaiTest'`
+- [ ] Deleted Redis key `chat:frostyPromptCacheOpenaiTest`
+- [ ] Deleted Redis key `user:frostyPromptCacheOpenaiTest:instructions`
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyPromptCacheOpenaiTest` returned `{"status":"success", ...}`
 
 ### Verdict
 

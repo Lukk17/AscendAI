@@ -1,6 +1,6 @@
 # Document Ingestion (RAG)
 
-AscendAI ingests Markdown, PDF, and DOCX into Qdrant via MinIO. Markdown takes a fast path; other formats route
+AscendAI ingests Markdown, PDF, and DOCX into Qdrant via the object store. Markdown takes a fast path; other formats route
 through Unstructured and Docling before embedding.
 
 ---
@@ -9,7 +9,7 @@ through Unstructured and Docling before embedding.
 
 Ingestion is split into two stages on purpose.
 
-1. **Upload.** Writes the file to MinIO under `obsidian/` (`.md`) or `documents/` (everything else). Nothing is
+1. **Upload.** Writes the file to the object store under `obsidian/` (`.md`) or `documents/` (everything else). Nothing is
    embedded yet.
 2. **Run.** Scans the bucket, embeds new or changed files into the matching Qdrant collection, and records state in
    `public.int_metadata_store` (PostgreSQL) so re-uploads are idempotent.
@@ -21,10 +21,10 @@ surprised by background ingestion costs. Set `app.ingestion.auto.enabled=true` i
 
 ---
 
-### Option 1: MinIO Console (Web UI)
+### Option 1: Object Store UI (Web UI)
 
 1. Open [http://localhost:9071](http://localhost:9071).
-2. Log in with default credentials: `admin` / `password`.
+2. Log in with `admin` / `password`. The object store does not validate credentials, so any value works.
 3. Click **Buckets** then select `knowledge-base`. If it doesn't exist, AscendAgent creates it on startup, or you can
    create it manually.
 4. Click **Object Browser** then **Upload** and pick file(s) or folder(s).

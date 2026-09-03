@@ -36,6 +36,11 @@ Copy this file to `../runs/<UTC-timestamp>_3-wipe-user-scope-tasks.md` before st
 - [ ] That entry's `user_id` equals `"frostyMemoryWipeBeta"`
 - [ ] That entry's `score` is a finite number > 0
 
+### Post-run cleanup
+
+- [ ] `POST /api/v1/memory/wipe?user_id=frostyMemoryWipeAlpha` returns HTTP 200 with `{"status":"success", ...}`
+- [ ] `POST /api/v1/memory/wipe?user_id=frostyMemoryWipeBeta` returns HTTP 200 with `{"status":"success", ...}`
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)

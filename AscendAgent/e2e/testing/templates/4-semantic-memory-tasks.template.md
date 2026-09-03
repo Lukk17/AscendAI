@@ -1,6 +1,6 @@
 # Semantic memory: run tasks template
 
-Spec: [4-semantic-memory-test.md](4-semantic-memory-test.md)
+Spec: [../4-semantic-memory-test.md](../4-semantic-memory-test.md)
 
 Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
@@ -36,6 +36,16 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 - [ ] After step 3: Response `content` contains `Luke`
 - [ ] After step 3: Response `content` contains `software engineer`
 - [ ] After step 3: Response `content` is NOT a refusal like "I don't know your name"
+
+### Post-run cleanup
+
+Run regardless of Run-step verdict. Every command is idempotent.
+
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostySemanticMemoryTest` returned `{"status":"success", ...}`
+- [ ] Qdrant scroll on `ascend_memory_1536` filtered by `user_id=frostySemanticMemoryTest` returned an empty `points` array
+- [ ] Deleted Postgres `chat_history` rows where `user_id = 'frostySemanticMemoryTest'`
+- [ ] Deleted Redis key `chat:frostySemanticMemoryTest`
+- [ ] Deleted Redis key `user:frostySemanticMemoryTest:instructions`
 
 ### Verdict
 

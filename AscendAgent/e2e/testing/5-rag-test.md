@@ -2,7 +2,7 @@
 
 ## What this verifies
 
-- Documents uploaded to the ingestion endpoint land in MinIO under the right folder prefix (`markdown/` for Markdown, `documents/` for others).
+- Documents uploaded to the ingestion endpoint land in the object store under the right folder prefix (`markdown/` for Markdown, `documents/` for others).
 - The manual ingestion run reads them, splits into chunks, embeds, and writes points to Qdrant.
 - A later prompt retrieves the relevant chunk and produces an answer grounded in the uploaded content.
 
@@ -50,13 +50,13 @@ curl -fsS http://localhost:6333/healthz
 
 Expect HTTP 200.
 
-Check MinIO is reachable.
+Check the object store is reachable. It serves the S3 API on port 9070 without authentication, so the runbook needs no client and no credentials.
 
 ```bash
-curl -fsS http://localhost:9070/minio/health/live
+curl -fsS http://localhost:9070/_floci/health
 ```
 
-Expect HTTP 200.
+Expect HTTP 200 with `"s3":"running"` in the JSON body.
 
 Check Postgres responds. Run inside the `postgres` container because `psql` is not on the host shell in this dev environment.
 
@@ -65,14 +65,6 @@ docker exec postgres psql -U postgres -d ascend_ai -c "SELECT 1"
 ```
 
 Expect a row with `1` in the output.
-
-Check the MinIO `mc` client is available inside the `minio` container (it ships with the image).
-
-```bash
-docker exec minio mc --version
-```
-
-Expect a version string.
 
 Check the three fixtures exist.
 
@@ -84,24 +76,20 @@ Expect all three paths to print.
 
 ## Reset state
 
-Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in `docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below runs through `sh -c` so the env vars expand *inside* the container. The host shell doesn't have them set.
+Drop only this test's three fixtures from the object store so re-upload is clean. Each command names the `knowledge-base` bucket literally and one key, so it never touches another test's fixtures sharing the same bucket, and never reaches a bucket this repository does not own. A key that is already gone also returns HTTP 204, so every delete is safe to re-run.
+
+If one of these deletes returns HTTP 404 with `<Code>NoSuchBucket</Code>` rather than 204, `knowledge-base` does not exist, which means the agent never completed startup. That is a broken prerequisite, not a clean slate.
 
 ```bash
-docker exec minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"'
-```
-
-Drop only this test's three fixtures from MinIO so re-upload is clean. Does NOT touch other tests' fixtures sharing the same bucket.
-
-```bash
-docker exec minio mc rm --force local/knowledge-base/markdown/markdown-canary.md
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"
 ```
 
 ```bash
-docker exec minio mc rm --force local/knowledge-base/documents/banana-price-poland.pdf
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"
 ```
 
 ```bash
-docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.docx
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"
 ```
 
 Delete only the `int_metadata_store` rows for these three fixtures so the run step does not classify them as already-ingested. Trailing `%` in each pattern matches the ETag suffix appended to the metadata key.
@@ -114,6 +102,22 @@ Wipe RAG points for the three fixtures from Qdrant.
 
 ```bash
 curl -X POST http://localhost:6333/collections/ascendai-1536/points/delete -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"source","match":{"any":["markdown/markdown-canary.md","documents/banana-price-poland.pdf","documents/pierogi-recipe.docx"]}}]}}'
+```
+
+Truncate this spec's chat-history rows + Redis key so the Post-run cleanup and the pre-run reset stay symmetric. A run that crashed before reaching Post-run cleanup would otherwise leave stale `chat_history` rows that change the prompt the model sees on the next run.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyRagTest';"
+```
+
+```bash
+docker exec redis redis-cli DEL chat:frostyRagTest
+```
+
+Drop the Redis instructions cache key.
+
+```bash
+docker exec redis redis-cli DEL user:frostyRagTest:instructions
 ```
 
 ## Run
@@ -145,18 +149,18 @@ The three prompts saved in the request:
 
 Every Group A spec self-cleans so the next spec in the chain sees a hermetic RAG state without having to reach into another spec's artifacts. Run these regardless of whether the Run steps passed or failed; they are idempotent and never touch state owned by tests 6 or 7.
 
-Drop this spec's three fixtures from MinIO.
+Drop this spec's three fixtures from the object store.
 
 ```bash
-docker exec minio mc rm --force local/knowledge-base/markdown/markdown-canary.md
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"
 ```
 
 ```bash
-docker exec minio mc rm --force local/knowledge-base/documents/banana-price-poland.pdf
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"
 ```
 
 ```bash
-docker exec minio mc rm --force local/knowledge-base/documents/pierogi-recipe.docx
+curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"
 ```
 
 Drop their `int_metadata_store` rows so subsequent re-ingestion is not skipped.
@@ -181,15 +185,29 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history 
 docker exec redis redis-cli DEL chat:frostyRagTest
 ```
 
+Drop the Redis instructions cache key. `UserInstructionService` writes it on every prompt (an `EMPTY` marker with a 24 hour TTL when the user has no stored instructions), so it outlives the run unless the spec deletes it.
+
+```bash
+docker exec redis redis-cli DEL user:frostyRagTest:instructions
+```
+
+Wipe any semantic-memory points AscendMemory's background extractor stored for this user. The agent runs the extractor after every prompt, including the three RAG prompts this spec sends, whether or not they concern memory. With no `provider` query parameter the endpoint clears the user across every provider collection, which stays correct if the embedding provider changes.
+
+```bash
+curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyRagTest"
+```
+
+Expect `{"status":"success","message":"All memories wiped for user frostyRagTest"}`.
+
 ## Expected
 
 After step 1 the Bruno output shows HTTP 200.
 
 After step 1 the response body's `uploaded` field lists exactly three keys: one under `markdown/` and two under `documents/`.
 
-After step 1 `docker exec minio mc ls local/knowledge-base/markdown/` lists `markdown-canary.md`.
+After step 1 `curl -fsS "http://localhost:9070/knowledge-base?list-type=2&prefix=markdown/"` returns a `ListBucketResult` whose `Contents` carry `<Key>markdown/markdown-canary.md</Key>`.
 
-After step 1 `docker exec minio mc ls local/knowledge-base/documents/` lists both `banana-price-poland.pdf` and `pierogi-recipe.docx`.
+After step 1 `curl -fsS "http://localhost:9070/knowledge-base?list-type=2&prefix=documents/"` returns a `ListBucketResult` whose `Contents` carry both `<Key>documents/banana-price-poland.pdf</Key>` and `<Key>documents/pierogi-recipe.docx</Key>`.
 
 After step 2 the Bruno output shows HTTP 200.
 
@@ -211,19 +229,23 @@ For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that 
 
 ## Concurrency
 
-- **Mutates:** MinIO bucket `knowledge-base` (`markdown/markdown-canary.md`, `documents/banana-price-poland.pdf`, `documents/pierogi-recipe.docx`); Qdrant collection `ascendai-1536` (filtered by these `source` values); Postgres `int_metadata_store` (rows for these object keys); Postgres `chat_history` (user_id=`frostyRagTest`); Redis key `chat:frostyRagTest`
-- **Conflicts with:** `6-attach-sources`, `7-rag-dedup` (share Qdrant `ascendai-1536` and MinIO `knowledge-base`)
+- **Mutates:** object-store bucket `knowledge-base` (`markdown/markdown-canary.md`, `documents/banana-price-poland.pdf`, `documents/pierogi-recipe.docx`); Qdrant collection `ascendai-1536` (filtered by these `source` values); Qdrant collections `ascend_memory_*` (user-scoped: `frostyRagTest`, written by the background memory extractor on any prompt); Postgres `int_metadata_store` (rows for these object keys); Postgres `chat_history` (user_id=`frostyRagTest`); Redis keys `chat:frostyRagTest` and `user:frostyRagTest:instructions`
+- **Conflicts with:** `6-attach-sources`, `7-rag-dedup` (share Qdrant `ascendai-1536` and object-store bucket `knowledge-base`)
 - **Serial:** false
-- **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) only touch this spec's own fixtures + user-id; never reaches into other Group A specs' artifacts.
+- **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) touch the same set: this spec's own fixtures, the `frostyRagTest` user-id's chat/Redis/memory state. Never reaches into other Group A specs' artifacts.
 
 ## Optional: attach source files
 
-The `attachSources=true` form field opts the response into a `sources` array of presigned MinIO URLs for the documents that grounded the answer. Default is `false` (response shape unchanged).
+The `attachSources=true` form field opts the response into a `sources` array of presigned object-store URLs for the documents that grounded the answer. Default is `false` (response shape unchanged).
+
+Run this section immediately after Run step 3, while the three fixtures are still ingested, and before the Post-run cleanup section above. Every call below sends this spec's own user id, `frostyRagTest`, so the Post-run cleanup commands already remove the chat-history rows and Redis keys the section writes. Nothing extra is needed afterwards, and the same cleanup stays correct when the section is skipped. Earlier revisions of this spec sent `user1` here, which no cleanup covered and which collides with the configured default user id, so those rows survived every run.
+
+The three flags after the prompt mirror the enabled rows in `rag-prompt.yml` and are not optional. Omitting `embeddingProvider` returns HTTP 400 with `Unknown embedding provider: 'null'`, and sending `embeddingProvider=openai` without `provider=minimax` returns HTTP 400 because the default chat provider expects 768-dim embeddings while the RAG collection is the 1536-dim `ascendai-1536`.
 
 Send a prompt with the flag set.
 
 ```bash
-curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -F "attachSources=true" -H "X-User-Id: user1"
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -F "attachSources=true" -F "provider=minimax" -F "model=MiniMax-M2.7" -F "embeddingProvider=openai" -H "X-User-Id: frostyRagTest"
 ```
 
 Expected response shape (truncated):
@@ -244,20 +266,20 @@ Expected response shape (truncated):
 }
 ```
 
-Verify the `downloadUrl` resolves to a 200 GET against MinIO from the host network.
+Verify the `downloadUrl` resolves to a 200 GET against the object store from the host network.
 
 ```bash
 curl -fsS -o /tmp/source.bin "<paste downloadUrl from previous response>"
 ```
 
-Re-run the same prompt without `attachSources=true`; assert the response JSON does NOT contain a `sources` key (byte-for-byte backward compat).
+Re-run the same prompt without `attachSources=true` and assert the response JSON does NOT contain a `sources` key (byte-for-byte backward compat).
 
 ```bash
-curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -H "X-User-Id: user1"
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the Ascend canary phrase?" -F "provider=minimax" -F "model=MiniMax-M2.7" -F "embeddingProvider=openai" -H "X-User-Id: frostyRagTest"
 ```
 
-Send a prompt that retrieves nothing with `attachSources=true`; expect `"sources": []`.
+Send a prompt that retrieves nothing with `attachSources=true` and expect `"sources": []`.
 
 ```bash
-curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the airspeed velocity of an unladen swallow?" -F "attachSources=true" -H "X-User-Id: user1"
+curl -s -X POST http://localhost:9917/api/v1/ai/prompt -F "prompt=What is the airspeed velocity of an unladen swallow?" -F "attachSources=true" -F "provider=minimax" -F "model=MiniMax-M2.7" -F "embeddingProvider=openai" -H "X-User-Id: frostyRagTest"
 ```

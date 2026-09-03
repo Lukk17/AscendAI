@@ -18,7 +18,7 @@ Copy this file to `../runs/<UTC-timestamp>_8-mcp-ssrf-rejection-tasks.md` before
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp/ ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
 - [ ] Send `mcp-ssrf-link-local.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 
 ### Expected

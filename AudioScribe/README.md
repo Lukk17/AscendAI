@@ -388,37 +388,39 @@ http-server -p 9999
 If your file lives at `./audio/audio.wav` relative to where you ran the command, the URI is
 `http://localhost:9999/audio/audio.wav` (or your LAN IP when accessing from a Docker container).
 
-**3. MinIO (S3-compatible)**
+**3. Object storage (S3-compatible)**
 
-If you're running the project with docker-compose, a MinIO instance is available. To make a bucket public so
-AudioScribe can download files without authentication:
+The AscendAI platform runs an S3-compatible object store locally, on host ports `9070` (API) and `9071`
+(UI). It answers unauthenticated on every verb, so there's no bucket policy to set and no client to install.
 
-Exec into the MinIO container.
-
-```bash
-docker exec -it minio /bin/sh
-```
-
-Configure the `mc` alias (default credentials are `admin` / `password`).
+Create the bucket and upload a file with a plain `curl`, or use the UI at `http://localhost:9071`.
 
 Bash:
 
 ```bash
-mc alias set myminio http://localhost:9000 admin password
+curl -X PUT http://localhost:9070/public-audio
 ```
 
 ```bash
-mc anonymous set public myminio/public-audio
+curl -X PUT --data-binary "@audio.wav" http://localhost:9070/public-audio/audio.wav
 ```
 
-Upload your file via the console at `http://localhost:9071` or via `mc cp`.
+PowerShell:
+
+```powershell
+curl.exe -X PUT http://localhost:9070/public-audio
+```
+
+```powershell
+curl.exe -X PUT --data-binary "@audio.wav" http://localhost:9070/public-audio/audio.wav
+```
 
 Use the URI:
 
-- Inside Docker network: `http://minio:9000/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
-- From localhost: `http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=audio.wav`
+- Inside the Docker network: `http://host.docker.internal:9070/public-audio/audio.wav`
+- From localhost: `http://localhost:9070/public-audio/audio.wav`
 
-Adjust the `prefix` parameter if the file lives in a subdirectory (e.g. `prefix=test%2Faudio.wav`).
+For a file in a subdirectory, extend the object key in the URI (e.g. `public-audio/test/audio.wav`).
 
 #### Example prompts
 
@@ -486,6 +488,14 @@ application/problem+json`.
 
 The MCP surface returns structured envelopes instead of HTTP status codes (MCP tool results are JSON):
 `{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+
+On success, the four `transcribe_*` tools return a flat envelope, single-encoded, with no nested JSON string to
+parse: `{"status": "success", "source": "...", "model": "...", "language": "...", "transcription": "..."}`. `source`
+is the provider that produced the result (`local`, `openai`, `huggingface`, or the `provider` argument for
+`transcribe_audacity`). `language` is only present for `transcribe_local`, `transcribe_openai`, and
+`transcribe_audacity`. `transcribe_hf` reports `provider` (the Hugging Face inference provider) in its place instead.
+`transcription` is a string, except for `transcribe_local` with `with_timestamps=true`, where it is a list of
+`{"text": "...", "timestamp": [start, end]}` objects.
 
 ### Startup readiness banner
 

@@ -34,6 +34,19 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("Content-Type starts with text/markdown", function () {
+            expect(res.getHeader("content-type")).to.match(/^text\/markdown/);
+        });
+        test("Content-Disposition names transcript_hf.md", function () {
+            expect(res.getHeader("content-disposition")).to.equal("attachment; filename=\"transcript_hf.md\"");
+        });
+        test("Transcript body carries the canary phrase", function () {
+            const body = String(res.getBody());
+            expect(body.length).to.be.at.least(5);
+            const lower = body.toLowerCase();
+            const canaries = ["q3", "acme", "adam", "friday", "migration"];
+            expect(canaries.some(function (c) { return lower.includes(c); })).to.be.true;
+        });
 
 settings:
   encodeUrl: true

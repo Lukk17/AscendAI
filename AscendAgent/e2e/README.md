@@ -1,8 +1,8 @@
 # AscendAgent: end-to-end test suite
 
 The manual / AI-runnable e2e suite for AscendAgent. Each test exercises one capability end-to-end against a live
-stack and asserts only **observable behaviour**. HTTP status codes, response-body content, persisted state in MinIO,
-Qdrant, and Postgres. Logs are diagnostic, not pass criteria.
+stack and asserts only **observable behaviour**. HTTP status codes, response-body content, persisted state in the
+object store, Qdrant, and Postgres. Logs are diagnostic, not pass criteria.
 
 ---
 
@@ -65,7 +65,7 @@ flowchart LR
     subgraph Backends
         AM[AscendMemory :7020]
         QD[(Qdrant :6333)]
-        S3[(MinIO :9070)]
+        S3[(Object store :9070)]
         MCP[MCP servers<br/>Audio · Web · Weather · OCR]
     end
 
@@ -75,7 +75,7 @@ flowchart LR
     Agent --> MCP
 
     Agent -->|response JSON| Verify{Behavior assertions}
-    Verify -->|HTTP status<br/>response content<br/>Qdrant scroll<br/>MinIO ls<br/>Postgres rows| Result[✅ / ❌]
+    Verify -->|HTTP status<br/>response content<br/>Qdrant scroll<br/>object listing<br/>Postgres rows| Result[✅ / ❌]
     Result --> Record
 ```
 
@@ -84,16 +84,21 @@ Every spec follows the same template:
 1. **What this verifies.** Bullet list of behaviours.
 2. **Prerequisites.** Concrete check commands (`curl`, `docker exec redis redis-cli ping`, etc.), each in its own
    code block with prose stating the success criterion.
-3. **Reset state.** One command per code block, in order, to wipe state so the run is reproducible. **Hermetic
-   contract: a spec's Reset only touches state owned by that spec** (its own fixtures, its own user-id). Reaching into
-   another test's territory trips the runner's auto-mode classifier and surfaces as "outside reset scope" denials.
+3. **Reset state.** One command per code block, in order, to wipe state so the run is reproducible. Every spec in
+   this directory has this section: a run that crashed before reaching `Post-run cleanup` leaves stale
+   `chat_history` rows, Redis keys, or Qdrant / object-store state behind, and that leftover changes what the next
+   run sees. **Hermetic contract: a spec's Reset only touches state owned by that spec** (its own fixtures, its own
+   user-id). Reaching into another test's territory trips the runner's auto-mode classifier and surfaces as "outside
+   reset scope" denials.
 4. **Run.** One or more numbered Bruno CLI invocations. Multi-step tests tell the runner to wait for HTTP 200 before
    continuing.
-5. **Post-run cleanup.** (Group A specs only — `5-rag`, `6-attach-sources`, `7-rag-dedup`.) Symmetric to Reset state:
-   each spec drops its own MinIO objects + Qdrant points + Postgres metadata + chat-history rows after the test
-   completes. Run regardless of Run-step verdict (idempotent). The serial chain relies on this — spec 6 must not have
-   to clean up spec 5's leftovers, spec 7 must not have to clean up spec 6's leftovers.
-6. **Expected.** Observable behaviour only: HTTP status, response content, MinIO listings, Qdrant scrolls, Postgres
+5. **Post-run cleanup.** Every spec in this directory has this section, symmetric to Reset state: each spec drops
+   every row, key, object and vector point the run created, including any semantic-memory points AscendMemory's
+   background extractor wrote for that user (the extractor runs after every prompt, whether or not the prompt
+   concerns memory). Run regardless of Run-step verdict (idempotent). Group A (`5-rag`, `6-attach-sources`,
+   `7-rag-dedup`) additionally relies on this for their serial chain — spec 6 must not have to clean up spec 5's
+   leftovers, spec 7 must not have to clean up spec 6's leftovers.
+6. **Expected.** Observable behaviour only: HTTP status, response content, object listings, Qdrant scrolls, Postgres
    rows. No log substrings.
 7. **Fixtures.** Paths to local files the test reads.
 
@@ -109,15 +114,16 @@ from [testing/templates/](testing/templates/) into [testing/runs/](testing/runs/
 
 Each test pins its own per-test `X-User-Id` (`frosty<TestName>Test`), so per-user state in Redis, Postgres
 `chat_history`, and Qdrant memory points is naturally isolated. The only state still shared across tests is the
-RAG layer: MinIO bucket `knowledge-base` and Qdrant collection `ascendai-1536`. That gives three execution groups.
+RAG layer: object-store bucket `knowledge-base` and Qdrant collection `ascendai-1536`. That gives three execution
+groups.
 
 | Group | Tests | Why this grouping | Parallelism within group |
 | :---- | :---- | :---------------- | :----------------------- |
-| **A — RAG suite** | 5, 6, 7 | Share the MinIO bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. Each spec is **symmetrically hermetic**: `Reset state` (pre) drops its own artifacts before running, `Post-run cleanup` (post) drops them again after. No spec reaches into another spec's state. | **Strict serial: 5 → 6 → 7.** |
-| **B — fast tests** | 1, 2, 3, 4 | Unique user-ids; no RAG / MinIO writes. Single-prompt or two-prompt flows. | Sequential within one agent, or parallel across multiple agents — either works. |
+| **A — RAG suite** | 5, 6, 7 | Share the object-store bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. Each spec is **symmetrically hermetic**: `Reset state` (pre) drops its own artifacts before running, `Post-run cleanup` (post) drops them again after. No spec reaches into another spec's state. | **Strict serial: 5 → 6 → 7.** |
+| **B — fast tests** | 1, 2, 3, 4 | Unique user-ids; no RAG / object-store writes. Single-prompt or two-prompt flows. | Sequential within one agent, or parallel across multiple agents — either works. |
 | **C — cache + compaction** | 8, 9, 10, 11 | Unique user-ids; isolated chat-history slots. Tests 10 / 11 apply their own seed scripts before running. | Sequential within one agent, or parallel — either works. |
 
-The three groups themselves are fully independent: no user-id overlap, no MinIO / Qdrant collision (groups B and C
+The three groups themselves are fully independent: no user-id overlap, no object-store / Qdrant collision (groups B and C
 don't touch the RAG layer at all). So the suggested execution layout is **three agents running in parallel**, one per
 group:
 
@@ -141,7 +147,7 @@ parallel layout only matters when you care about wall-clock.
 
 ### Prerequisites before any test
 
-1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, MinIO `:9070`.
+1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, S3-compatible object storage `:9070` (S3 API) / `:9071` (UI).
 2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, AscendWebSearch, AudioScribe, PaddleOCR,
    WeatherMCP, support services).
 3. AscendAgent running on the host: `cd AscendAgent && ./gradlew bootRun`.
@@ -154,10 +160,10 @@ individual spec also has explicit prereq checks the runner executes before start
 ### Claude Code permission allowlist (local-only setup)
 
 If you drive the suite via Claude Code's `e2e-runner` subagent, the sandbox classifier will block the spec-prescribed
-reset commands (`docker exec ... mc rm`, `docker exec postgres psql -c "DELETE ..."`, `curl -X POST
-http://localhost:6333/.../points/delete`) unless you allowlist them in your per-project local settings. Without the
-allowlist, the runner finishes but the test verdicts are environmental noise: leaked state from the previous wave
-contaminates the result, not the product behaviour.
+reset commands (`curl -fsS -X DELETE http://localhost:9070/knowledge-base/...`, `docker exec postgres psql -c
+"DELETE ..."`, `curl -X POST http://localhost:6333/.../points/delete`) unless you allowlist them in your per-project
+local settings. Without the allowlist, the runner finishes but the test verdicts are environmental noise: leaked state
+from the previous wave contaminates the result, not the product behaviour.
 
 The allowlist lives in [.claude/settings.local.json](../../.claude/settings.local.json), which is gitignored, so the
 list is *not* shared via the repo. Each developer adds the same shapes to their own local copy. The shapes the e2e
@@ -167,9 +173,6 @@ specs need:
 {
   "permissions": {
     "allow": [
-      "Bash(docker exec minio mc *)",
-      "Bash(docker exec minio sh -c *)",
-      "Bash(docker exec -i minio *)",
       "Bash(docker exec postgres psql *)",
       "Bash(docker exec -i postgres psql *)",
       "Bash(docker exec redis redis-cli *)",
@@ -179,6 +182,7 @@ specs need:
       "Bash(curl -fsS http://localhost:6333/*)",
       "Bash(curl -X POST http://localhost:6333/*)",
       "Bash(curl -fsS http://localhost:9070/*)",
+      "Bash(curl -fsS -X DELETE http://localhost:9070/*)",
       "Bash(curl -fsS http://localhost:9917/*)",
       "Bash(curl -X POST http://localhost:9917/*)",
       "Bash(curl -s -X POST http://localhost:9917/*)",
@@ -192,9 +196,11 @@ specs need:
 }
 ```
 
-Each entry is narrowed to a specific container (`minio`, `postgres`, `redis`, `ascend-agent`) or a specific localhost
-port (`:6333` Qdrant, `:9070` MinIO, `:9917` AscendAgent, `:9998` WeatherMCP, `:7020` AscendMemory). No blanket
-`docker exec *` or `curl *`. If you only run a subset of tests, you can prune.
+Each entry is narrowed to a specific container (`postgres`, `redis`, `ascend-agent`) or a specific localhost port
+(`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998` WeatherMCP, `:7020` AscendMemory). No blanket
+`docker exec *` or `curl *`. The object store needs no `docker exec` entry at all: it is published on the host by a
+compose project this repository does not own, so every step against it is a plain HTTP call. If you only run a subset
+of tests, you can prune.
 
 If you skip this setup, the suite still runs but environmental failures (leaked fixtures re-indexed as extra
 sources, partially-completed resets etc.) will look like product regressions in the runner reports. Always check the
@@ -292,7 +298,7 @@ Numbered by setup cost. Easiest first.
 | 3  | [testing/3-summarization-test.md](testing/3-summarization-test.md)                              | [testing/templates/3-summarization-tasks.template.md](testing/templates/3-summarization-tasks.template.md)                                | A PDF attached inline is parsed page by page through Docling and summarised from real content.                          |
 | 4  | [testing/4-semantic-memory-test.md](testing/4-semantic-memory-test.md)                          | [testing/templates/4-semantic-memory-tasks.template.md](testing/templates/4-semantic-memory-tasks.template.md)                            | A fact stated in turn 1 is recalled in turn 2 from Qdrant via AscendMemory, after chat history is wiped.                |
 | 5  | [testing/5-rag-test.md](testing/5-rag-test.md)                                                  | [testing/templates/5-rag-tasks.template.md](testing/templates/5-rag-tasks.template.md)                                                    | Uploaded `.md`, `.pdf`, `.docx` ingest into Qdrant and surface in a later prompt with grounded citations.               |
-| 6  | [testing/6-attach-sources-test.md](testing/6-attach-sources-test.md)                            | [testing/templates/6-attach-sources-tasks.template.md](testing/templates/6-attach-sources-tasks.template.md)                              | `attachSources=true` returns a presigned MinIO URL that resolves with HTTP 200 and uses `localhost:9070`.               |
+| 6  | [testing/6-attach-sources-test.md](testing/6-attach-sources-test.md)                            | [testing/templates/6-attach-sources-tasks.template.md](testing/templates/6-attach-sources-tasks.template.md)                              | `attachSources=true` returns a presigned object-store URL that resolves with HTTP 200 and uses `localhost:9070`.               |
 | 7  | [testing/7-rag-dedup-test.md](testing/7-rag-dedup-test.md)                                      | [testing/templates/7-rag-dedup-tasks.template.md](testing/templates/7-rag-dedup-tasks.template.md)                                        | Multiple chunks across 2 source files collapse into exactly 2 unique entries in `sources[]` (dedup by `(bucket, key)`). |
 | 8  | [testing/8-prompt-cache-openai-test.md](testing/8-prompt-cache-openai-test.md)                  | [testing/templates/8-prompt-cache-openai-tasks.template.md](testing/templates/8-prompt-cache-openai-tasks.template.md)                    | Two consecutive identical prompts on `provider=openai` produce a cache hit on call 2 (`cachedTokens > 0`).              |
 | 9  | [testing/9-prompt-cache-anthropic-test.md](testing/9-prompt-cache-anthropic-test.md)            | [testing/templates/9-prompt-cache-anthropic-tasks.template.md](testing/templates/9-prompt-cache-anthropic-tasks.template.md)              | Two consecutive identical prompts on `provider=anthropic` produce native `cache_control` cache write on call 1 and cache read on call 2. |
@@ -309,7 +315,8 @@ Numbered by setup cost. Easiest first.
    identifiable).
 3. Pick the next number prefix that matches the test's setup cost.
 4. Write `testing/<N>-<capability>-test.md` using the template structure (**What this verifies / Prerequisites /
-   Reset state / Run / Expected / Fixtures**). Assert behaviour, not logs.
+   Reset state / Run / Post-run cleanup / Expected / Fixtures**), including a semantic-memory wipe in `Post-run
+   cleanup` for the spec's own user id. Assert behaviour, not logs.
 5. Write `testing/templates/<N>-<capability>-tasks.template.md` mirroring the spec's checkboxes, with `## Result summary`
    containing the **Input tokens / Output tokens / Time** fields at the bottom.
 6. Add a row to the capability table above.

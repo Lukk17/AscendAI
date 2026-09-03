@@ -13,11 +13,11 @@ import aiohttp
 from fastmcp import FastMCP
 
 from src.api.exception_handlers import (
-    DownloadFailedError,
     ERROR_CODE_DOWNLOAD_FAILED,
     ERROR_CODE_FILE_TOO_LARGE,
     ERROR_CODE_UNSAFE_URI,
     ERROR_CODE_UNSUPPORTED_FILE_TYPE,
+    DownloadFailedError,
     FileSizeExceededError,
     UnsafeUriError,
     UnsupportedFileTypeError,
@@ -31,8 +31,8 @@ from src.observability.metrics import (
     OCR_DURATION_SECONDS,
     OCR_REQUESTS_TOTAL,
 )
-from src.observability.tracing import get_tracer
-from src.service.ocr_service import ocr_service
+from src.observability.tracing import get_tracer, inject_trace_context
+from src.service.ocr_service import get_process_pool, run_ocr_in_worker
 
 logger = get_logger(__name__)
 tracer = get_tracer()
@@ -109,8 +109,12 @@ async def ocr_process(file_uri: str, lang: str = "en") -> dict[str, object]:
 
     start = time.monotonic()
     with tracer.start_as_current_span("paddleocr.engine.predict", attributes={"language": lang}):
+        # Captured inside the span above so the carrier points at this span, which the
+        # worker process later reattaches to as the parent of its own inference span.
+        trace_carrier = inject_trace_context()
+        loop = asyncio.get_running_loop()
         result = await asyncio.wait_for(
-            asyncio.to_thread(ocr_service.process_file, file_bytes, filename, lang),
+            loop.run_in_executor(get_process_pool(), run_ocr_in_worker, file_bytes, filename, lang, trace_carrier),
             timeout=settings.OCR_REQUEST_TIMEOUT,
         )
     OCR_DURATION_SECONDS.labels(surface="mcp", language=lang).observe(time.monotonic() - start)
@@ -137,15 +141,13 @@ async def _read_jailed_file(url_path: str) -> tuple[bytes, str]:
         raise UnsafeUriError("file:// access is disabled (MCP_FILE_URI_ROOT is unset)")
 
     local_path = url2pathname(url_path)
-    # realpath + isfile are pure-string / cheap stat operations; the actual file
-    # read below is async via aiofiles. ASYNC240 is overly conservative here.
-    resolved = os.path.realpath(local_path)  # noqa: ASYNC240
-    resolved_root = os.path.realpath(root)  # noqa: ASYNC240
+    resolved = os.path.realpath(local_path)
+    resolved_root = os.path.realpath(root)
 
     if not _is_within(resolved, resolved_root):
         raise UnsafeUriError(f"Path escapes MCP_FILE_URI_ROOT: {url_path}")
 
-    if not os.path.isfile(resolved):  # noqa: ASYNC240
+    if not os.path.isfile(resolved):
         raise DownloadFailedError(f"File not found: {url_path}")
 
     async with aiofiles.open(resolved, "rb") as file_handle:

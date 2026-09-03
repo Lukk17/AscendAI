@@ -3,7 +3,7 @@
 Manual / AI-runnable e2e suite for the WeatherMCP standalone module. Each test exercises **one MCP tool** end-to-end
 against a live WeatherMCP container on port 9998. Assertions are observable behaviour only — HTTP status codes,
 JSON-RPC response body shape and content. The only persisted state WeatherMCP holds is the in-process Caffeine cache;
-it has no database, no Redis, no Qdrant, no MinIO. Where a test requires a cold cache, the reset step is to restart
+it has no database, no Redis, no Qdrant, no object store. Where a test requires a cold cache, the reset step is to restart
 the container.
 
 ## What's here

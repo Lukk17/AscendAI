@@ -62,6 +62,12 @@ docker exec redis redis-cli LLEN chat:frostyCompactionFiresTest
 
 Expect exactly `21`.
 
+The seed scripts only reset the two chat resources above; they never touch the Redis instructions-cache key. Drop it here so the pre-run reset and the Post-run cleanup stay symmetric, and a crashed prior run's stale marker cannot survive into this run.
+
+```bash
+docker exec redis redis-cli DEL user:frostyCompactionFiresTest:instructions
+```
+
 ## Run
 
 Step 1. Send one prompt as `frostyCompactionFiresTest`. This adds 2 rows (1 user + 1 assistant), bringing the chat history to 23 rows. The compaction trigger fires async after the `add(...)`.
@@ -102,6 +108,38 @@ docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat
 
 Expect exactly `8`.
 
+## Post-run cleanup
+
+The seed scripts write 21 rows into `chat_history` and the matching Redis list, the Run step adds the new turn pair, `UserInstructionService` writes a Redis instructions-cache entry on that prompt (an `EMPTY` marker with a 24 hour TTL when the user has no stored instructions), and the background memory extractor may write semantic-memory points for the same prompt. The seeds only reset the two chat resources, so the Reset state section above also clears the instructions key explicitly. Remove all four pieces of state here too so a run that crashed before Post-run cleanup, or a run whose Reset state was skipped, still leaves the system exactly as it found it. Run these regardless of whether the Run steps passed or failed. Every command is idempotent.
+
+Drop this spec's chat-history rows, the nine that survive compaction.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyCompactionFiresTest';"
+```
+
+Drop the Redis chat list the seed created.
+
+```bash
+docker exec redis redis-cli DEL chat:frostyCompactionFiresTest
+```
+
+Drop the Redis instructions cache key.
+
+```bash
+docker exec redis redis-cli DEL user:frostyCompactionFiresTest:instructions
+```
+
+Wipe any semantic-memory points AscendMemory's background extractor stored for this user. The agent runs the extractor after every prompt, whether or not it concerns memory. With no `provider` query parameter the endpoint clears the user across every provider collection, which stays correct if the embedding provider changes.
+
+```bash
+curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyCompactionFiresTest"
+```
+
+Expect `{"status":"success","message":"All memories wiped for user frostyCompactionFiresTest"}`.
+
+The seed file the Reset section copied into the `redis` container is already removed by that section's `docker exec redis rm` step, so nothing is left under `/tmp` in the container.
+
 ## Expected
 
 - Step 1: HTTP 200. The response is a normal chat completion (the user's turn doesn't wait for the async compaction).
@@ -118,6 +156,7 @@ Expect exactly `8`.
 
 ## Concurrency
 
-- **Mutates:** Postgres `chat_history` (user_id=`frostyCompactionFiresTest`); Redis key `chat:frostyCompactionFiresTest`
+- **Mutates:** Postgres `chat_history` (user_id=`frostyCompactionFiresTest`); Redis keys `chat:frostyCompactionFiresTest` and `user:frostyCompactionFiresTest:instructions`; Qdrant collections `ascend_memory_*` (user-scoped: `frostyCompactionFiresTest`, written by the background memory extractor on any prompt)
 - **Conflicts with:** none
 - **Serial:** false
+- **Hermetic contract:** Self-cleaning. `Post-run cleanup` removes the seeded rows, the rows the Run step added and every Redis key the run touched.

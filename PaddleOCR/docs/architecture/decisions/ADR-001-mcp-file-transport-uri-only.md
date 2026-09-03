@@ -24,7 +24,7 @@ Bare paths (no scheme), `ftp://`, `data:`, and every other scheme are rejected w
 For each request:
 
 1. The hostname is parsed from the URI.
-2. If the hostname is listed in `MCP_ALLOWED_HOSTS` (configured allowlist of trusted internal hostnames — typically the docker-internal `minio` hostname), the request is allowed without further checks.
+2. If the hostname is listed in `MCP_ALLOWED_HOSTS` (configured allowlist of trusted internal hostnames — typically `host.docker.internal`, used to reach the S3-compatible object store that runs as an external prerequisite, provided locally by a self-hosted emulator, outside this stack's compose network), the request is allowed without further checks.
 3. Otherwise, the hostname is resolved via `asyncio.get_running_loop().getaddrinfo(...)` and **every** resolved address is checked against `ipaddress.ip_address(...).is_private | is_loopback | is_link_local | is_multicast | is_reserved | is_unspecified`. Any match raises `UnsafeUriError`.
 4. URIs containing credentials in `userinfo` are rejected outright.
 5. `Content-Length` is checked against `MAX_FILE_SIZE_MB` before reading; the body is streamed with `iter_chunked` and a running byte-count, aborting if the cap is exceeded mid-stream.
@@ -32,31 +32,31 @@ For each request:
 
 ### Base64 deferred
 
-Inline base64 is **not** accepted today. If a future non-MinIO caller needs to push bytes without going through the URI path, a second optional argument (`inline_b64`) can be added with its own size cap (≤ `MAX_FILE_SIZE_MB / 2` to leave headroom for the surrounding JSON-RPC envelope). Adding it now would double the input surface for zero present demand.
+Inline base64 is **not** accepted today. If a future caller needs to push bytes without going through the URI path, a second optional argument (`inline_b64`) can be added with its own size cap (≤ `MAX_FILE_SIZE_MB / 2` to leave headroom for the surrounding JSON-RPC envelope). Adding it now would double the input surface for zero present demand.
 
 ## Consequences
 
 ### Why this shape
 
-- **Defense in depth.** The IP block alone is too coarse: in a docker network, `minio:9000` resolves to RFC1918 and would be blocked. The IP block alone is too narrow: a public hostname behind DNS rebinding can resolve to `127.0.0.1` between two calls. Combining a small explicit allowlist (`MCP_ALLOWED_HOSTS=minio`) with the IP block gives both predictable internal use and safe external fetches.
+- **Defense in depth.** The IP block alone is too coarse: the host-published S3-compatible object store is reached via `host.docker.internal`, which resolves to a loopback/private address and would be blocked by the IP check alone. The IP block alone is too narrow: a public hostname behind DNS rebinding can resolve to `127.0.0.1` between two calls. Combining a small explicit allowlist (`MCP_ALLOWED_HOSTS=host.docker.internal`) with the IP block gives both predictable internal use and safe external fetches.
 - **Default-safe `file://`.** `MCP_FILE_URI_ROOT` defaults to unset, so a fresh deployment cannot read arbitrary container files even if `file_uri="file:///etc/passwd"` is sent. Opting in requires an operator action.
 - **No new upload endpoint.** The REST `/v1/ocr` endpoint already accepts multipart uploads; agents that need direct upload semantics use that. `file://` exists for the case where the agent and PaddleOCR share a volume (e.g., a Kubernetes pod with an emptyDir).
 
 ### Trade-offs
 
-- **`MCP_ALLOWED_HOSTS=minio` is required to run the e2e tests** that fetch fixtures from the docker-internal MinIO. The e2e test 6 spec documents this explicitly under Prerequisites.
+- **`MCP_ALLOWED_HOSTS=host.docker.internal` is required to run the e2e tests** that fetch fixtures from the S3-compatible object store. The e2e test 6 spec documents this explicitly under Prerequisites.
 - **DNS TOCTOU.** Between `_validate_host` and aiohttp's own resolve, an attacker controlling the DNS answer can flip from a public IP to a private one. Acceptable trade-off for now; production hardening would add a custom aiohttp resolver that caches the validated address.
 - **No content sniffing yet.** A 200 OK with `Content-Type: image/png` and a body that is actually a zip bomb still reaches PaddleOCR. Future hardening: magic-byte sniffing via `python-magic` before invoking the OCR engine.
 
 ### Alternatives considered
 
-- **Strict host allowlist only (no IP block).** Rejected. Operationally fragile — every new MinIO bucket / new internal storage host requires a config push. Doesn't help when a host on the allowlist is itself compromised and pointed at an internal address.
-- **Block private IPs only (no allowlist).** Rejected for blocking the docker-internal MinIO use case which the rest of the stack already depends on.
+- **Strict host allowlist only (no IP block).** Rejected. Operationally fragile — every new object-store bucket / new internal storage host requires a config push. Doesn't help when a host on the allowlist is itself compromised and pointed at an internal address.
+- **Block private IPs only (no allowlist).** Rejected for blocking the host-published object-store use case which the rest of the stack already depends on.
 - **Drop `file://` entirely.** Rejected. There are legitimate operator workflows (shared volume between agent and PaddleOCR pods, manual debugging from a host shell into the container) where `file://` jailed to a known root is the simplest answer.
 
 ## Related
 
 - `PaddleOCR/src/api/mcp/mcp_server.py` — `ocr_process`, `_fetch_file`, `_read_jailed_file`, `_download_http`, `_validate_host`, `_is_blocked`, `_is_within`.
 - `PaddleOCR/src/config/config.py` — `MCP_FILE_URI_ROOT`, `MCP_ALLOWED_HOSTS`, `MCP_DOWNLOAD_TIMEOUT_SECONDS`.
-- `PaddleOCR/e2e/testing/6-mcp-ocr-test.md` — operator-facing test that exercises this path; requires `MCP_ALLOWED_HOSTS=minio`.
+- `PaddleOCR/e2e/testing/6-mcp-ocr-test.md` — operator-facing test that exercises this path; requires `host.docker.internal` in `MCP_ALLOWED_HOSTS`.
 - ADR-M002 (monorepo) — MCP as the standard tool-services protocol.

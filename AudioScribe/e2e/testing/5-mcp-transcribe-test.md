@@ -8,9 +8,10 @@
 - The JSON-RPC `result.content` array contains one entry of `type="text"`; the entry's `text` parses as JSON.
 - The parsed JSON payload has `source="openai"`, `model="whisper-1"`, `language="en"`, and a `transcription` string
   containing at least one of the canary substrings `Q3`, `Acme`, `Adam`, `Friday`, or `migration` (case-insensitive).
-- The MCP tool reaches the AudioScribe container, follows the docker-internal `http://minio:9000/...` URL to pull
-  the audio bytes via its `download_service`, then forwards them to the OpenAI Whisper API — proves the full
-  MCP → download_service → OpenAI path works end-to-end without any host-side file mount.
+- The MCP tool reaches the AudioScribe container, follows the `http://host.docker.internal:9070/...` URL back out to
+  the host-published object store to pull the audio bytes via its `download_service`, then forwards them to the
+  OpenAI Whisper API. Proves the full MCP to download_service to OpenAI path works end-to-end without any host-side
+  file mount.
 - The request consumes paid OpenAI quota.
 
 ## Prerequisites
@@ -47,69 +48,53 @@ Test-Path AudioScribe/e2e/fixtures/meeting-clip.wav
 
 Expect `True`.
 
-Check MinIO is reachable on the host.
+Check the object store is reachable on the host. It serves the S3 API on port 9070 without authentication, so
+this spec needs no client, no credentials, and no container name.
 
 ```powershell
-curl -fsS http://localhost:9070/minio/health/live
+curl.exe -fsS http://localhost:9070/_floci/health
 ```
 
-Expect HTTP 200.
-
-Check the MinIO `mc` client is available inside the `minio` container.
-
-```powershell
-docker exec minio mc --version
-```
-
-Expect a version string.
+Expect HTTP 200 with `"s3":"running"` in the JSON body.
 
 ## Reset state
 
-Register the MinIO alias inside the `minio` container (idempotent). Credentials are the single source of truth in
-`docker-compose.yaml` under the `minio` service env (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`). The command below
-runs through `sh -c` so the env vars expand *inside* the container.
+Every command below names the `e2e-fixtures` bucket literally. That bucket belongs to this repository. Never issue a
+command that sweeps buckets instead of naming one, because the same object store also backs other projects on this
+machine.
+
+Create the dedicated `e2e-fixtures` bucket. The call is idempotent: an existing bucket answers HTTP 200 exactly like a
+freshly created one.
 
 ```powershell
-docker exec minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"'
+curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"
 ```
 
-Create the dedicated `e2e-fixtures` bucket (idempotent).
+Expect `200`.
+
+Drop only this test's fixture so the re-upload is clean. A key that is already gone also returns HTTP 204, so the step
+is safe to re-run.
 
 ```powershell
-docker exec minio mc mb --ignore-existing local/e2e-fixtures
+curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
 ```
 
-Open the bucket for anonymous downloads so AudioScribe can fetch the URL without an auth header.
+Upload the fixture straight from the host. No client and no intermediate container copy: the S3 endpoint takes the
+bytes on a plain `PUT`.
 
 ```powershell
-docker exec minio mc anonymous set download local/e2e-fixtures
+curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: audio/wav" --data-binary "@AudioScribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
 ```
 
-Drop only this test's fixture from MinIO so re-upload is clean.
-
-```powershell
-docker exec minio mc rm --force local/e2e-fixtures/meeting-clip.wav
-```
-
-Copy the fixture from the host into the `minio` container.
-
-```powershell
-docker cp AudioScribe/e2e/fixtures/meeting-clip.wav minio:/tmp/meeting-clip.wav
-```
-
-Upload the fixture into the bucket.
-
-```powershell
-docker exec minio mc cp /tmp/meeting-clip.wav local/e2e-fixtures/meeting-clip.wav
-```
+Expect `200`.
 
 Verify the object lands in the bucket.
 
 ```powershell
-docker exec minio mc ls local/e2e-fixtures/meeting-clip.wav
+curl.exe -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=meeting-clip"
 ```
 
-Expect a single-line listing showing the object name.
+Expect a `ListBucketResult` carrying `<Key>meeting-clip.wav</Key>` with a `<Size>` of `56880`.
 
 Delete any stale `.md` cache entries from prior runs to keep `/tmp` clean inside the AudioScribe container.
 
@@ -137,6 +122,19 @@ Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of
 bru run "transcribe/testing/mcp-transcribe.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 
+## Post-run cleanup
+
+Drop the fixture this spec uploaded, so the bucket is left exactly as the spec found it. Run it regardless of whether
+the Run step passed or failed. The command names the `e2e-fixtures` bucket literally and one key, and a key that is
+already gone also returns HTTP 204, so the step is safe to re-run.
+
+```powershell
+curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
+```
+
+Leave the bucket itself in place. This spec creates it only if absent, and other specs seed their own fixtures into
+it, so deleting the bucket would break them.
+
 ## Expected
 
 Step 1 returns HTTP 200 with an `Mcp-Session-Id` header.
@@ -155,17 +153,19 @@ The parsed JSON object satisfies:
 - `transcription` is a non-empty string.
 - `transcription` lowercased contains at least one of: `Q3`, `Acme`, `Adam`, `Friday`, or `migration`.
 
-The JSON-RPC `result.is_error` is either absent or `false` (the AudioScribe MCP wrapper sets `is_error=true` only on
+The JSON-RPC `result.isError` is either absent or `false` (the AudioScribe MCP wrapper sets `isError=true` only on
 the error path).
 
 ## Fixtures
 
 - `AudioScribe/e2e/fixtures/meeting-clip.wav` — same fixture used by spec `2-transcribe-openai-test.md`. The MCP
-  test references it via the docker-internal URL `http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav`, which
-  AudioScribe's `download_service` resolves over HTTP using the docker-compose network.
+  test references it via `http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav`, which AudioScribe's
+  `download_service` resolves back out to the host-published object store.
 
 ## Concurrency
 
-- **Mutates:** MinIO bucket `e2e-fixtures` (object key `meeting-clip.wav`); MinIO anonymous-download policy on the
-  `e2e-fixtures` bucket; AudioScribe container `/tmp/transcript_*.md` cache entries.
+- **Mutates:** object-store bucket `e2e-fixtures` (object key `meeting-clip.wav`); AudioScribe container
+  `/tmp/transcript_*.md` cache entries. `Reset state` uploads the object key and `Post-run cleanup` deletes it again,
+  so the spec leaves no object behind. The bucket itself is created if absent and is never deleted, because other
+  specs seed their own fixtures into it.
 - **Conflicts with:** any future test that also writes `e2e-fixtures/meeting-clip.wav` — none currently exist.

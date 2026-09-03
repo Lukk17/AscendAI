@@ -28,6 +28,10 @@ Copy this file to `../runs/<UTC-timestamp>_6-user-isolation-tasks.md` before sta
 - [ ] No entry in the search result has `user_id` equal to `"frostyMemoryIsolationUserA"`
 - [ ] No entry in the search result has a `memory` field containing `"Tromsø"` (case-insensitive)
 
+### Post-run cleanup
+
+- [ ] `POST /api/v1/memory/wipe?user_id=frostyMemoryIsolationUserA` returns HTTP 200 with `{"status":"success", ...}`
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)

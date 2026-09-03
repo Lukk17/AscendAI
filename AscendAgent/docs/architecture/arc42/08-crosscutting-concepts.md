@@ -54,7 +54,7 @@ summary.
 
 ### RAG (Retrieval-Augmented Generation)
 
-Documents uploaded to MinIO are processed through an ingestion pipeline. The Unstructured API parses the document, a
+Documents uploaded to the S3-compatible object store are processed through an ingestion pipeline. The Unstructured API parses the document, a
 token splitter chunks it, and embeddings are stored in Qdrant. At prompt time, `RagService` performs a cosine
 similarity search and injects the top-k relevant fragments into the system prompt.
 

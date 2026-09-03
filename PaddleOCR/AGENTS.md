@@ -78,7 +78,7 @@ Architecture decisions live under [`docs/architecture/decisions/`](docs/architec
 - `OCR_REQUEST_TIMEOUT` — per-request engine timeout in seconds, enforced via `asyncio.wait_for` (default `120`).
 - `ENGINE_CACHE_MAX_SIZE` — max number of language engines kept resident; LRU eviction beyond this (default `8`).
 - `MCP_FILE_URI_ROOT` — when set, enables `file://` URI scheme jailed to this absolute path. Unset by default ⇒ `file://` rejected.
-- `MCP_ALLOWED_HOSTS` — comma-separated hostnames that bypass the SSRF private-IP check. Required for the docker-internal MinIO pattern (set to `minio`). Default empty ⇒ strict block.
+- `MCP_ALLOWED_HOSTS` — comma-separated hostnames that bypass the SSRF private-IP check. `host.docker.internal` reaches the object store on host ports 9070/9071 from inside the container. Default empty ⇒ strict block.
 - `MCP_DOWNLOAD_TIMEOUT_SECONDS` — total timeout for MCP HTTP fetch (default `30`).
 
 ## Code Conventions

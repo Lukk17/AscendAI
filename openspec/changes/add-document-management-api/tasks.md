@@ -51,10 +51,10 @@
 ## 6b. Authenticated content download and source-attachment rewiring (presign resolution)
 
 - [ ] 6b.1 Add `GET /api/v1/documents/{id}/content` to `DocumentController`: resolve the object key from the registry, fetch bytes via `StorageService.getObjectBytes`, stream the response with the stored `Content-Type` and a `Content-Disposition` naming the display name; 404 for unknown or deleted ids; no redirect to MinIO
-- [ ] 6b.2 Extend `SourceFile` DTO with `documentId` and `contentPath` (`/api/v1/documents/{id}/content`); make `downloadUrl`/`expiresAt` optional (`@JsonInclude(NON_NULL)`), populated only when in-network presigning is enabled
+- [ ] 6b.2 Extend `SourceFile` DTO with mandatory `documentId` and `contentPath` (`/api/v1/documents/{id}/content`), leaving `downloadUrl` and `expiresAt` mandatory and non-blank as they are today; keep `@JsonInclude(NON_NULL)` so only the unknown `sizeBytes` is ever omitted
 - [ ] 6b.3 In `RagRetrievalService.buildSourceRefs` (and the streaming source path), resolve the registry `documentId` from each source object key and emit `contentPath`; omit a source whose object key has no registry row with a single WARN referencing `s3://{bucket}/{key}`
-- [ ] 6b.4 Gate direct presigning behind an in-network flag (default off for the client-facing path); the content endpoint is the default download path
-- [ ] 6b.5 Integration test (Testcontainers MinIO/Postgres): `attachSources=true` returns sources carrying `documentId` + `contentPath`; a `GET` on `contentPath` streams the bytes through the agent (no redirect); a deleted document's `contentPath` returns 404
+- [ ] 6b.4 Keep presigning on the client-facing path unconditionally: no flag, no opt-out, and a source that cannot be presigned is dropped by the existing best-effort rule rather than returned without a link
+- [ ] 6b.5 Integration test (Testcontainers MinIO/Postgres): `attachSources=true` returns sources carrying non-blank `documentId`, `contentPath`, `downloadUrl`, and `expiresAt`; a `GET` on `contentPath` streams the bytes through the agent (no redirect) and a `GET` on `downloadUrl` returns the identical bytes; a deleted document's `contentPath` returns 404
 - [ ] 6b.6 Unit test: a retrieved chunk whose source object has no registry row is omitted from `sources` with a WARN, request still 200
 
 ## 7. Documentation and API collection

@@ -42,7 +42,7 @@ Every host-port publication in `docker-compose.yaml` and `ascend-scrapper.docker
 
 ### Requirement: Credentials flow from environment with production fail-fast
 
-All credentials consumed by the stack SHALL be sourced from environment variables backed by `.env`: Postgres user/password, Redis password, MinIO access/secret keys, Qdrant API key, Grafana admin user/password, and the SearXNG secret. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` required form so `docker compose up` fails immediately when they are unset. Datastore credentials MAY carry dev defaults in `application.yaml` (`${VAR:devdefault}`), but AscendAgent SHALL refuse to start under the `production` Spring profile while any datastore credential still equals its known dev default. The SearXNG `secret_key` SHALL be removed from `searxng/settings.yml` and injected via the `SEARXNG_SECRET` env var; the previously committed value SHALL be treated as compromised and rotated.
+All credentials consumed by the stack SHALL be sourced from environment variables backed by `.env`: Postgres user/password, Redis password, S3 access/secret keys, Qdrant API key, Grafana admin user/password, and the SearXNG secret. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` required form so `docker compose up` fails immediately when they are unset. Datastore credentials MAY carry dev defaults in `application.yaml` (`${VAR:devdefault}`), but AscendAgent SHALL refuse to start under the `production` Spring profile while any datastore credential still equals its known dev default. The SearXNG `secret_key` SHALL be removed from `searxng/settings.yml` and injected via the `SEARXNG_SECRET` env var; the previously committed value SHALL be treated as compromised and rotated.
 
 #### Scenario: Missing required secret fails compose up
 
@@ -51,7 +51,7 @@ All credentials consumed by the stack SHALL be sourced from environment variable
 
 #### Scenario: Production profile rejects dev-default credentials
 
-- **WHEN** AscendAgent starts with the `production` Spring profile active and `MINIO_SECRET_KEY` still resolving to the dev default `password`
+- **WHEN** AscendAgent starts with the `production` Spring profile active and `S3_SECRET_KEY` still resolving to the dev default `password`
 - **THEN** the application fails startup with an error naming the offending credential
 - **AND** with real values set for every datastore credential the application starts normally
 
@@ -95,16 +95,16 @@ The `ascend-web-search` service SHALL NOT declare `cap_add: SYS_ADMIN`. Chromium
 
 ### Requirement: SSRF allowlists exclude loopback by default
 
-`MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `audio-scribe` SHALL be env-driven with the default `minio` (`${MCP_ALLOWED_HOSTS:-minio}`). The committed compose files SHALL NOT list `localhost`, `127.0.0.1`, or `host.docker.internal` as allowlist defaults. Local-dev topologies where MinIO runs on the Docker host SHALL opt in per machine by setting `MCP_ALLOWED_HOSTS` in `.env`, and this opt-in SHALL be documented in `.env.example` and the deployment guide.
+`MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `audio-scribe` SHALL be env-driven with the default `object-store` (`${MCP_ALLOWED_HOSTS:-object-store}`). The committed compose files SHALL NOT list `localhost`, `127.0.0.1`, or `host.docker.internal` as allowlist defaults. Local-dev topologies where the S3-compatible object store runs on the Docker host SHALL opt in per machine by setting `MCP_ALLOWED_HOSTS` in `.env`, and this opt-in SHALL be documented in `.env.example` and the deployment guide.
 
 #### Scenario: Loopback fetch is blocked by default
 
 - **WHEN** the stack runs with `MCP_ALLOWED_HOSTS` unset and a caller asks PaddleOCR's MCP tool to fetch `http://127.0.0.1:9070/some-object`
 - **THEN** the request is rejected with `UNSAFE_URI`
 
-#### Scenario: In-network MinIO fetch succeeds
+#### Scenario: In-network object-store fetch succeeds
 
-- **WHEN** MinIO is reachable at hostname `minio` on the compose network and a caller supplies an `http://minio:...` presigned URL
+- **WHEN** the S3-compatible object store is reachable at hostname `object-store` on the compose network and a caller supplies an `http://object-store:...` presigned URL
 - **THEN** the fetch is permitted by the default allowlist and OCR/transcription proceeds
 
 ### Requirement: SearXNG runs with its limiter enabled and real client context
@@ -168,7 +168,7 @@ The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfac
 
 ### Requirement: The deployment guide covers single-tenant cloud VM deployment
 
-`docs/DEPLOYMENT.md` SHALL gain a cloud VM deployment section covering: DNS setup for `ASCEND_DOMAIN`, TLS issuance via the gateway (ACME) and the local internal-CA fallback, preparing `.env` from `.env.example` with every required secret, the production checklist (`SECURITY_ENABLED=true`, no dev-default credentials, external port scan), and backup/restore procedures for the four external data stores (Postgres, Redis, Qdrant, MinIO) for both co-located-container and managed-service topologies.
+`docs/DEPLOYMENT.md` SHALL gain a cloud VM deployment section covering: DNS setup for `ASCEND_DOMAIN`, TLS issuance via the gateway (ACME) and the local internal-CA fallback, preparing `.env` from `.env.example` with every required secret, the production checklist (`SECURITY_ENABLED=true`, no dev-default credentials, external port scan), and backup/restore procedures for the four external data stores (Postgres, Redis, Qdrant, the S3-compatible object store) for both co-located-container and managed-service topologies.
 
 #### Scenario: An operator can deploy from the guide alone
 
@@ -178,4 +178,4 @@ The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfac
 #### Scenario: Backups are documented per store
 
 - **WHEN** a reader opens the backup section
-- **THEN** it contains a concrete backup and restore procedure for each of Postgres, Redis, Qdrant, and MinIO
+- **THEN** it contains a concrete backup and restore procedure for each of Postgres, Redis, Qdrant, and the S3-compatible object store

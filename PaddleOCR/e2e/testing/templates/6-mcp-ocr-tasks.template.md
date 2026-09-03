@@ -11,23 +11,19 @@ Copy this file to `../runs/<UTC-timestamp>_6-mcp-ocr-tasks.md` before starting a
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] PaddleOCR `/health` returns HTTP 200 with `"status":"ok"`
 - [ ] `PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1.png` exists on the host
-- [ ] MinIO `/minio/health/live` returns HTTP 200
-- [ ] `docker exec minio mc --version` returns a version string
-- [ ] `docker exec paddle-ocr printenv MCP_ALLOWED_HOSTS` returns `minio` (or a list containing it)
+- [ ] Object store `curl.exe -fsS http://localhost:9070/_floci/health` returns HTTP 200 with `"s3":"running"`
+- [ ] `docker exec ascend-paddle-ocr printenv MCP_ALLOWED_HOSTS` returns a list containing `host.docker.internal`
 
 ### Reset state
 
-- [ ] `mc alias set local ...` (inside the minio container) succeeds
-- [ ] `mc mb --ignore-existing local/e2e-fixtures` succeeds
-- [ ] `mc anonymous set download local/e2e-fixtures` succeeds
-- [ ] `mc rm --force local/e2e-fixtures/argent-saga-chronicles-page1.png` succeeds (object cleared)
-- [ ] `docker cp PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1.png minio:/tmp/...` succeeds
-- [ ] `mc cp /tmp/argent-saga-chronicles-page1.png local/e2e-fixtures/argent-saga-chronicles-page1.png` succeeds
-- [ ] `mc ls local/e2e-fixtures/argent-saga-chronicles-page1.png` lists the object
+- [ ] `curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"` prints `200`
+- [ ] `curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"` returned HTTP 204 (object cleared)
+- [ ] `curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: image/png" --data-binary "@PaddleOCR/e2e/fixtures/argent-saga-chronicles-page1.png" "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"` prints `200`
+- [ ] `curl.exe -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=argent-saga"` carries `<Key>argent-saga-chronicles-page1.png</Key>` with `<Size>212563</Size>`
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp/ ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
 - [ ] Send `mcp-ocr.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 
 ### Expected
@@ -39,6 +35,13 @@ Copy this file to `../runs/<UTC-timestamp>_6-mcp-ocr-tasks.md` before starting a
 - [ ] `pages` is non-empty
 - [ ] Concatenated `pages[*].lines[*].text` (case-insensitive) contains `Argent Saga`, `Aenaria`, or `Halen Veyr`
 - [ ] `processing_time_seconds` is a finite non-negative number
+
+### Post-run cleanup
+
+Run regardless of the Run-step verdict; the delete is idempotent.
+
+- [ ] `curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"` returned HTTP 204
+- [ ] The `e2e-fixtures` bucket itself was left in place
 
 ### Verdict
 

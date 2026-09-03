@@ -49,6 +49,21 @@ http:
         value: gemini
         disabled: true
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Recall content carries both memorised facts and is not a refusal", function () {
+            const content = res.getBody().content;
+            expect(content).to.be.a("string").and.not.empty;
+            expect(content).to.include("Luke");
+            expect(content.toLowerCase()).to.include("software engineer");
+            expect(content.toLowerCase()).to.not.include("i don't know your name");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

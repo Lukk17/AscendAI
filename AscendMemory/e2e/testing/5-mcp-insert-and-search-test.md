@@ -76,6 +76,19 @@ bru run "memory/testing/mcp-insert.yml" --env ascend-local --env-var "mcp_sessio
 bru run "memory/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 
+## Post-run cleanup
+
+Wipe the test user so its inserted memory does not survive into the next run. The REST wipe endpoint is scoped
+by `user_id` in mem0 regardless of which channel (REST or MCP) wrote the memory, so it clears what this MCP-driven
+insert wrote. The section sits next to `Run` because that is where the state it names is created, but the runner
+executes it last, after the `Expected` assertions below have been checked against the live state.
+
+```powershell
+curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryMcpInsertSearchTest"
+```
+
+Expect HTTP 200 with `{"status":"success", ...}`.
+
 ## Expected
 
 The `initialize` call returns HTTP 200 with an `Mcp-Session-Id: <uuid>` response header.

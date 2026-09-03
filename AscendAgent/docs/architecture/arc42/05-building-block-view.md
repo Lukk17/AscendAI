@@ -18,7 +18,7 @@ graph TB
         Postgres["PostgreSQL"]
         Redis["Redis"]
         Qdrant["Qdrant"]
-        MinIO["MinIO"]
+        S3["S3-compatible storage"]
         SearXNG["SearXNG"]
         FlareSolverr["FlareSolverr"]
     end
@@ -30,7 +30,7 @@ graph TB
     AscendAgent --> Postgres
     AscendAgent --> Redis
     AscendAgent --> Qdrant
-    AscendAgent --> MinIO
+    AscendAgent --> S3
     WebSearch --> SearXNG
     WebSearch --> FlareSolverr
 ```

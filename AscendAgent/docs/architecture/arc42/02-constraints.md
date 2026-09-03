@@ -11,7 +11,7 @@
 | PostgreSQL                       | Persistent chat history, metadata store, Spring Integration JDBC.                        |
 | Redis                            | Distributed chat history cache with TTL-based eviction.                                  |
 | Qdrant                           | Vector store for RAG document embeddings.                                                |
-| MinIO (S3-compatible)            | Object storage for uploaded documents.                                                   |
+| S3-compatible object storage     | Storage for uploaded documents, provided locally by a self-hosted emulator and by Amazon S3 in production. |
 | Docker Compose                   | Local development and CI environment orchestration.                                      |
 
 ---

@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{protocol}}://{{baseUrl}}:7022/mcp/"
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp"
   headers:
     - name: Content-Type
       value: application/json
@@ -30,6 +30,16 @@ runtime:
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
+        });
+        test("tools/list advertises ocr_process with the documented schema", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "ocr_process"; });
+            expect(tool).to.be.ok;
+            expect(tool.inputSchema.properties).to.have.property("file_uri");
+            expect(tool.inputSchema.properties).to.have.property("lang");
+            expect(tool.inputSchema.required).to.include("file_uri");
         });
 
 settings:

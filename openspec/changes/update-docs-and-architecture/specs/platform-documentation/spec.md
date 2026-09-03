@@ -31,7 +31,7 @@ The documentation SHALL include current "path of one request" diagrams for the f
 #### Scenario: Streamed-chat request path is current
 
 - **WHEN** the streamed-chat request-path diagram is reviewed
-- **THEN** it shows the authenticated request through the gateway, streaming SSE, and source attachments referencing the content endpoint (not a presigned MinIO URL)
+- **THEN** it shows the authenticated request through the gateway, streaming SSE, and source attachments referencing the content endpoint (not a presigned object-store URL)
 
 ### Requirement: READMEs follow the standard and the documentation map is complete
 

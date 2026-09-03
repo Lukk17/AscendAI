@@ -23,7 +23,7 @@ The AscendAgent is the central Spring Boot API gateway for the AscendAI platform
 # Run unit tests
 ./gradlew test
 
-# Run integration tests (Testcontainers — Postgres/Redis/Qdrant/MinIO)
+# Run integration tests (Testcontainers — Postgres/Redis/Qdrant/object storage)
 ./gradlew integrationTest
 
 # Run a single test class
@@ -35,7 +35,7 @@ docker build -t ascend-agent:latest .
 
 ## End-to-end tests
 
-Capability-level e2e tests live in [`e2e/`](e2e/README.md). Five numbered specs (`1-weather-mcp` through `5-rag`) exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec asserts only observable behavior — HTTP status, response body, persisted state in MinIO / Qdrant / Postgres — never log substrings. Each spec has a sidecar `<N>-<feature>-tasks.template.md` the runner copies into `e2e/testing/runs/` per run.
+Capability-level e2e tests live in [`e2e/`](e2e/README.md). Five numbered specs (`1-weather-mcp` through `5-rag`) exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec asserts only observable behavior — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. Each spec has a sidecar `<N>-<feature>-tasks.template.md` the runner copies into `e2e/testing/runs/` per run.
 
 Quick invocation:
 
@@ -61,12 +61,12 @@ See [`e2e/README.md`](e2e/README.md) for the full contract, capability matrix, a
 | `model/` | Domain models |
 | `repository/` | Spring Data JPA repositories |
 | `service/` | Core business logic (chat, RAG, provider routing) |
-| `service/ingestion/` | Document ingestion pipeline (MinIO, Markdown, Unstructured) |
+| `service/ingestion/` | Document ingestion pipeline (object storage, Markdown, Unstructured) |
 | `service/ingestion/client/` | External service clients (Docling, Unstructured API) |
 | `service/memory/` | Memory service orchestration |
 | `util/` | Utility classes |
 
-**Configuration**: `src/main/resources/application.yaml` — all provider URLs, model names, Qdrant settings, MinIO credentials, Redis, PostgreSQL.
+**Configuration**: `src/main/resources/application.yaml` — all provider URLs, model names, Qdrant settings, object-storage credentials, Redis, PostgreSQL.
 
 **Database migrations**: Liquibase changelogs in `src/main/resources/db/changelog/`.
 
@@ -87,7 +87,7 @@ Defaults match `application.yaml`. Any other model the provider accepts works at
 - PostgreSQL (port 5432, database `ascend_ai`) — external prerequisite
 - Redis (port 6379) for chat history cache — external prerequisite
 - Qdrant (port 6333) for vector embeddings — external prerequisite
-- MinIO (port 9070) for document storage — external prerequisite
+- Object storage (locally: Floci, port 9070) for document storage — external prerequisite
 - AscendMemory (port 7020) for semantic memory REST API
 - MCP servers: AudioScribe (7017), WeatherMCP (9998), AscendWebSearch (7021)
 

@@ -155,8 +155,8 @@ the entire sync check. Changing one means changing the other in the same commit.
 
 ### Production notes
 
-- External prerequisites (PostgreSQL, Redis, Qdrant, MinIO) should be managed services in production. AWS
-  ElastiCache, Qdrant Cloud, S3, RDS, etc.
+- External prerequisites (PostgreSQL, Redis, Qdrant, object storage) should be managed services in production. AWS
+  ElastiCache, Qdrant Cloud, Amazon S3 in place of the local object store, RDS, etc.
 - All services expose `/health` for orchestrator probes.
 - See [docs/architecture/](architecture/) for the deployment view and ADRs.
 

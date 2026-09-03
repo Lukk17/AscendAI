@@ -83,12 +83,11 @@ spring-boot-configuration-processor = { module = "org.springframework.boot:sprin
 # Test
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 
-# Testcontainers — integration tests against real Postgres / Redis / Qdrant / MinIO
+# Testcontainers — integration tests against real Postgres / Redis / Qdrant / Floci
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
 testcontainers-qdrant = { module = "org.testcontainers:qdrant" }
-testcontainers-minio = { module = "org.testcontainers:minio" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 
 [plugins]

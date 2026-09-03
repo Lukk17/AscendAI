@@ -22,8 +22,9 @@ The MCP `audio_uri` parameter only accepts two schemes, each guarded:
 
 1. `http(s)://` — `_validate_http_target` resolves the hostname via `socket.getaddrinfo` and rejects any IP that
    matches `ipaddress.ip_address(...).is_private | is_loopback | is_link_local | is_multicast | is_reserved |
-   is_unspecified`. Hostnames listed in `MCP_ALLOWED_HOSTS` bypass the check (for the docker-internal MinIO pattern).
-   Unresolvable hostnames are rejected. The download path streams with `MAX_DOWNLOAD_BYTES` enforcement.
+   is_unspecified`. Hostnames listed in `MCP_ALLOWED_HOSTS` bypass the check (for the host-published S3-compatible
+   object store, reached via `host.docker.internal`). Unresolvable hostnames are rejected. The download path streams
+   with `MAX_DOWNLOAD_BYTES` enforcement.
 2. `file://` — disabled by default. Requires `MCP_FILE_URI_ROOT` to be set; URIs are resolved under the root via
    `pathlib.Path.resolve()` and rejected if `is_relative_to(root)` is False (catches `..` traversal even with
    symlinks).
@@ -59,8 +60,8 @@ an MCP `validation_error` envelope. (`src/adapters/download_service.py`)
 
 ### Negative
 
-- Adds two env vars (`MCP_FILE_URI_ROOT`, `MCP_ALLOWED_HOSTS`) operators must understand. Documented in
-  `docs/CONFIGURATION.md`.
+- Adds two env vars (`MCP_FILE_URI_ROOT`, `MCP_ALLOWED_HOSTS`) operators must understand, defined in
+  `src/config/config.py`.
 - DNS resolution adds latency to every HTTP MCP call; with 1-2 ms cache hits this is acceptable.
 
 ### Risks

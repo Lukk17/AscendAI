@@ -2,7 +2,7 @@
 
 ## What this verifies
 
-- The PaddleOCR MCP server (mounted at `POST /` via FastMCP and reachable on `POST /mcp/`) accepts the standard
+- The PaddleOCR MCP server (mounted at `POST /` via FastMCP and reachable on `POST /mcp`) accepts the standard
   `initialize` handshake and returns an `Mcp-Session-Id` header.
 - A follow-up `tools/list` JSON-RPC call returns HTTP 200 with a `result.tools` array.
 - That array contains an entry with `name="ocr_process"`.
@@ -39,7 +39,7 @@ cd docs/api/request/AscendAI
 **Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the response headers.
 
 ```powershell
-curl.exe -fsS -i -X POST http://localhost:7022/mcp/ -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+curl.exe -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
 ```
 
 Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in the next step.

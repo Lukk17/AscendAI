@@ -18,7 +18,7 @@ from src.config.logging_config import get_uvicorn_log_config, setup_logging
 from src.config.startup_banner import log_startup_banner
 from src.model.ocr_models import HealthResponse, ReadinessResponse
 from src.observability.tracing import configure_tracing
-from src.service.ocr_service import ocr_service
+from src.service.ocr_service import ocr_service, start_worker_pool, stop_worker_pool
 
 logger = logging.getLogger("uvicorn")
 
@@ -33,8 +33,10 @@ def create_app() -> FastAPI:
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.info("Starting PaddleOCR service")
         ocr_service.warm_up_engine(settings.DEFAULT_LANGUAGE)
+        start_worker_pool()
 
         async with AsyncExitStack() as stack:
+            stack.callback(stop_worker_pool)
             await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(_app))
             log_startup_banner()
 

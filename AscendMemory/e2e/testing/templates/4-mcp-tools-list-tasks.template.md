@@ -27,6 +27,10 @@ Copy this file to `../runs/<UTC-timestamp>_4-mcp-tools-list-tasks.md` before sta
 - [ ] At least one entry's `name` contains `"search"` (case-insensitive)
 - [ ] Each entry has a non-empty `inputSchema.properties`; `memory_insert`/`memory_search`/`memory_wipe` advertise `user_id`, `memory_delete` advertises `memory_id`
 
+### Post-run cleanup
+
+- [ ] None required (no `user_id` is ever touched)
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)

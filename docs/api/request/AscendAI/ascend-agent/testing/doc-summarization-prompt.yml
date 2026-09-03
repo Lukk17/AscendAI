@@ -46,6 +46,24 @@ http:
         value: claude-sonnet-4-6
         disabled: true
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Summary quotes at least 3 facts from the parsed PDF", function () {
+            const content = res.getBody().content;
+            expect(content).to.be.a("string").and.not.empty;
+            const facts = ["Aenaria Solveh", "Halen Veyr", "4317 P.E.", "Heron's Tooth", "thrall-burn", "57 seconds", "Concord of Mireth", "412 A.E.", "Vorsh-Ka the Quiet", "81 duels", "Iren Hask", "498 A.E."];
+            const hits = facts.filter(function (f) { return content.includes(f); });
+            expect(hits.length).to.be.at.least(3);
+            const lower = content.toLowerCase();
+            expect(lower).to.not.include("the document context block is empty");
+            expect(lower).to.not.include("i don't see a document attached");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

@@ -32,6 +32,12 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history 
 docker exec redis redis-cli DEL chat:frostyPromptCacheOpenaiTest
 ```
 
+Drop the Redis instructions cache key so the pre-run reset and the Post-run cleanup stay symmetric.
+
+```bash
+docker exec redis redis-cli DEL user:frostyPromptCacheOpenaiTest:instructions
+```
+
 ## Run
 
 Step 1. First prompt (cache miss expected; this seeds OpenAI's prefix cache).
@@ -50,6 +56,38 @@ cd docs/api/request/AscendAI && bru run "ascend-agent/testing/prompt-cache-opena
 
 Capture response 2's `metadata.usage`. Note `nativeUsage.prompt_tokens_details.cached_tokens` (expected: > 0).
 
+## Post-run cleanup
+
+The Reset section clears the `chat_history` rows and the Redis `chat:` key before the run, and the two prompt calls write both again. The run also leaves a Redis instructions-cache entry that `UserInstructionService` writes on every prompt (an `EMPTY` marker with a 24 hour TTL when the user has no stored instructions). Remove all three so the run leaves the system exactly as it found it. Run these regardless of whether the Run steps passed or failed. Every command is idempotent.
+
+Drop this spec's chat-history rows.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyPromptCacheOpenaiTest';"
+```
+
+Drop the Redis chat cache key.
+
+```bash
+docker exec redis redis-cli DEL chat:frostyPromptCacheOpenaiTest
+```
+
+Drop the Redis instructions cache key.
+
+```bash
+docker exec redis redis-cli DEL user:frostyPromptCacheOpenaiTest:instructions
+```
+
+Wipe any semantic-memory points AscendMemory's background extractor stored for this user. The agent runs the extractor after every prompt, whether or not it concerns memory. With no `provider` query parameter the endpoint clears the user across every provider collection, which stays correct if the embedding provider changes.
+
+```bash
+curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyPromptCacheOpenaiTest"
+```
+
+Expect `{"status":"success","message":"All memories wiped for user frostyPromptCacheOpenaiTest"}`.
+
+Nothing else survives the run. This spec sends no attachment, uploads no object and triggers no ingestion, so the object store, `int_metadata_store` and the RAG collection are untouched.
+
 ## Expected
 
 - After step 1: HTTP 200. Response `metadata.usage.promptTokens >= 1024` (otherwise OpenAI's auto cache won't fire on the next call; the test prompt is sized to clear this threshold). `metadata.usage.nativeUsage.prompt_tokens_details.cached_tokens` is 0 or absent on a fresh-cache run; non-zero is acceptable when OpenAI's server-side cache TTL hasn't expired from a prior local run (the local Reset cannot clear the server-side TTL — this is environmental, not a regression).
@@ -63,10 +101,11 @@ If `cached_tokens` is 0 on step 2 with promptTokens ≥ 1024:
 
 ## Fixtures
 
-(none. Uses no MinIO / Qdrant content; the prompt is self-contained.)
+(none. Uses no object-store / Qdrant content; the prompt is self-contained.)
 
 ## Concurrency
 
-- **Mutates:** Postgres `chat_history` (user_id=`frostyPromptCacheOpenaiTest`); Redis key `chat:frostyPromptCacheOpenaiTest`
+- **Mutates:** Postgres `chat_history` (user_id=`frostyPromptCacheOpenaiTest`); Redis keys `chat:frostyPromptCacheOpenaiTest` and `user:frostyPromptCacheOpenaiTest:instructions`; Qdrant collections `ascend_memory_*` (user-scoped: `frostyPromptCacheOpenaiTest`, written by the background memory extractor on any prompt)
 - **Conflicts with:** none
 - **Serial:** false
+- **Hermetic contract:** Self-cleaning. `Post-run cleanup` removes every row and key the Run steps wrote. OpenAI's server-side prefix cache is outside this stack and expires on its own after roughly five minutes.

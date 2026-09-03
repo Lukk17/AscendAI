@@ -42,7 +42,25 @@ Expect the file path to print.
 
 ## Reset state
 
-None. The document is sent inline with the prompt; nothing is persisted between runs.
+The PDF is sent inline with the prompt and never reaches the object store or `int_metadata_store`, so the only state a run leaves behind is the per-user chat history and Redis keys. Clear them before the run. Post-run cleanup removes the same three, but a run that crashed before reaching that section leaves them behind, and stale `chat_history` rows change the prompt the model sees on the next run. Every command is idempotent.
+
+Drop this spec's chat-history rows.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostySummarizationTest';"
+```
+
+Drop the Redis chat cache key.
+
+```bash
+docker exec redis redis-cli DEL chat:frostySummarizationTest
+```
+
+Drop the Redis instructions cache key.
+
+```bash
+docker exec redis redis-cli DEL user:frostySummarizationTest:instructions
+```
 
 ## Run
 
@@ -51,6 +69,36 @@ Send the Bruno request and wait for the response before moving to the Expected s
 ```bash
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/doc-summarization-prompt.yml" --env ascend-local
 ```
+
+## Post-run cleanup
+
+Every prompt this spec sends writes three pieces of per-user state: a `chat_history` row pair in Postgres, the same turns cached under the Redis `chat:` key, and a Redis instructions-cache entry that `UserInstructionService` writes on every prompt (an `EMPTY` marker with a 24 hour TTL when the user has no stored instructions). The agent also runs its semantic-memory extractor after every prompt, whether or not the prompt itself concerns memory, so a fourth cleanup step wipes any fact AscendMemory happened to extract from this prompt. Remove all four so the run leaves the system exactly as it found it. Run these regardless of whether the Run step passed or failed. Every command is idempotent.
+
+Drop this spec's chat-history rows.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostySummarizationTest';"
+```
+
+Drop the Redis chat cache key.
+
+```bash
+docker exec redis redis-cli DEL chat:frostySummarizationTest
+```
+
+Drop the Redis instructions cache key.
+
+```bash
+docker exec redis redis-cli DEL user:frostySummarizationTest:instructions
+```
+
+Wipe any semantic-memory points AscendMemory's background extractor stored for this user. With no `provider` query parameter the endpoint clears the user across every provider collection, which stays correct if the embedding provider changes.
+
+```bash
+curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostySummarizationTest"
+```
+
+Expect `{"status":"success","message":"All memories wiped for user frostySummarizationTest"}`.
 
 ## Expected
 
@@ -66,6 +114,7 @@ The response body's `content` field is NOT a refusal like "the document context 
 
 ## Concurrency
 
-- **Mutates:** Postgres `chat_history` (user_id=`frostySummarizationTest`); Redis key `chat:frostySummarizationTest`
+- **Mutates:** Postgres `chat_history` (user_id=`frostySummarizationTest`); Redis keys `chat:frostySummarizationTest` and `user:frostySummarizationTest:instructions`; Qdrant collections `ascend_memory_*` (user-scoped: `frostySummarizationTest`, written by the background memory extractor on any prompt)
 - **Conflicts with:** none
 - **Serial:** false
+- **Hermetic contract:** Self-cleaning. `Reset state` (pre) and `Post-run cleanup` (post) both remove every row, key and vector point this spec's user id could carry. The PDF travels inline on the prompt request, so no object-store key and no `int_metadata_store` row is created.

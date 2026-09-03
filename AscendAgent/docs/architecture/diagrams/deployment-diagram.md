@@ -12,7 +12,7 @@ graph TB
         Postgres["PostgreSQL<br/>:5432"]
         Redis["Redis<br/>:6379"]
         Qdrant["Qdrant<br/>:6333/:6334"]
-        MinIO["MinIO<br/>:9070/:9071"]
+        S3["S3-compatible storage<br/>:9070/:9071"]
     end
 
     subgraph "Docker Compose"
@@ -34,7 +34,7 @@ graph TB
     AscendAgent --> Postgres
     AscendAgent --> Redis
     AscendAgent --> Qdrant
-    AscendAgent --> MinIO
+    AscendAgent --> S3
     AscendAgent --> AudioScribe
     AscendAgent --> Weather
     AscendAgent --> WebSearch
@@ -48,8 +48,8 @@ graph TB
     Memory --> Qdrant
 ```
 
-In development, the AscendAgent and WeatherMCP run directly on the host JVM. PostgreSQL, Redis, Qdrant, and MinIO
-are external prerequisites that must be running before starting docker-compose (in production these map to managed
-cloud services). Application and support services (AudioScribe, AscendWebSearch, AscendMemory, SearXNG,
-FlareSolverr) run in Docker Compose. Cloud AI providers are optional (dashed lines), only accessed when their
-provider is enabled and selected.
+In development, the AscendAgent and WeatherMCP run directly on the host JVM. PostgreSQL, Redis, Qdrant, and
+S3-compatible object storage (provided locally by a self-hosted emulator) are external prerequisites that must be running before
+starting docker-compose (in production these map to managed cloud services, with Amazon S3 in its place).
+Application and support services (AudioScribe, AscendWebSearch, AscendMemory, SearXNG, FlareSolverr) run in Docker
+Compose. Cloud AI providers are optional (dashed lines), only accessed when their provider is enabled and selected.

@@ -101,7 +101,7 @@ public class AppConfig {
     public S3Client s3Client() {
         return S3Client.builder()
                 .endpointOverride(URI.create(s3Endpoint))
-                // MinIO requires a region, usually ignores it but needs one
+                // The S3 client requires a region; the local emulator (Floci) reports us-east-1
                 .region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider
                         .create(

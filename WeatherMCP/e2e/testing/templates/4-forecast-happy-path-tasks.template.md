@@ -27,7 +27,7 @@ Copy this file to `../runs/<UTC-timestamp>_4-forecast-happy-path-tasks.md` befor
 - [ ] `status="ok"`, `message` null, `requestedQuery` null
 - [ ] `location.name` contains "Warsaw"; `location.countryCode="PL"`
 - [ ] `forecast` array length equals 3
-- [ ] Each entry: `date` matches `yyyy-MM-dd`; `temperatureMax` and `temperatureMin` are finite numbers with `temperatureMin <= temperatureMax`; `weatherCode` is an integer in 0–99
+- [ ] Each entry: `date` matches `yyyy-MM-dd`; `maxTemp` and `minTemp` are finite numbers with `minTemp <= maxTemp`; `weatherCode` is an integer in 0–99
 - [ ] `forecast[*].date` values strictly increasing
 - [ ] `temperatureUnit="celsius"`
 - [ ] `source="open-meteo"`

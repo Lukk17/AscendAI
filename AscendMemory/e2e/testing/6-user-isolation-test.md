@@ -69,6 +69,18 @@ bru run "memory/testing/insert-isolation-user-a.yml" --env ascend-local
 bru run "memory/testing/search-isolation-user-b.yml" --env ascend-local
 ```
 
+## Post-run cleanup
+
+Wipe user A so its canary memory does not survive into the next run. User B is never written to by this test, so
+it needs no wipe. The section sits next to `Run` because that is where the state it names is created, but the
+runner executes it last, after the `Expected` assertions below have been checked against the live state.
+
+```powershell
+curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryIsolationUserA"
+```
+
+Expect HTTP 200 with `{"status":"success", ...}`.
+
 ## Expected
 
 `insert-isolation-user-a.yml` returns HTTP 200. The response body is a JSON array (mem0's `add`

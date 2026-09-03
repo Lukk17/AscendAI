@@ -32,6 +32,25 @@ http:
         type: text
         value: openai
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("cache_control was accepted (creation or read observed)", function () {
+            const body = res.getBody();
+            expect(body.content).to.be.a("string").and.not.empty;
+            const usage = body.metadata.usage;
+            expect(usage).to.be.an("object");
+            const nativeUsage = usage.nativeUsage;
+            expect(nativeUsage).to.be.an("object");
+            expect(nativeUsage.cache_creation_input_tokens).to.be.a("number");
+            expect(nativeUsage.cache_read_input_tokens).to.be.a("number");
+            expect(nativeUsage.cache_creation_input_tokens > 0 || nativeUsage.cache_read_input_tokens > 0).to.be.true;
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

@@ -12,18 +12,14 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-transcribe-tasks.md` before sta
 - [ ] AudioScribe `/health` returns HTTP 200 with `{"status":"ok","service":"AudioScribe"}`
 - [ ] `docker exec audio-scribe printenv OPENAI_API_KEY` returns a non-empty string
 - [ ] `AudioScribe/e2e/fixtures/meeting-clip.wav` exists on the host
-- [ ] MinIO `/minio/health/live` returns HTTP 200
-- [ ] `docker exec minio mc --version` returns a version string
+- [ ] Object store `curl.exe -fsS http://localhost:9070/_floci/health` returns HTTP 200 with `"s3":"running"`
 
 ### Reset state
 
-- [ ] `mc alias set local ...` (inside the minio container) succeeds
-- [ ] `mc mb --ignore-existing local/e2e-fixtures` succeeds
-- [ ] `mc anonymous set download local/e2e-fixtures` succeeds
-- [ ] `mc rm --force local/e2e-fixtures/meeting-clip.wav` succeeds (object cleared)
-- [ ] `docker cp AudioScribe/e2e/fixtures/meeting-clip.wav minio:/tmp/...` succeeds
-- [ ] `mc cp /tmp/meeting-clip.wav local/e2e-fixtures/meeting-clip.wav` succeeds
-- [ ] `mc ls local/e2e-fixtures/meeting-clip.wav` lists the object
+- [ ] `curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"` prints `200`
+- [ ] `curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"` returned HTTP 204 (object cleared)
+- [ ] `curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: audio/wav" --data-binary "@AudioScribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"` prints `200`
+- [ ] `curl.exe -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=meeting-clip"` carries `<Key>meeting-clip.wav</Key>` with `<Size>56880</Size>`
 - [ ] `docker exec audio-scribe sh -c "rm -f /tmp/transcript_*.md"` succeeds
 
 ### Run
@@ -43,7 +39,14 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-transcribe-tasks.md` before sta
 - [ ] Parsed JSON has `language="en"`
 - [ ] Parsed JSON `transcription` is a non-empty string
 - [ ] Parsed JSON `transcription` lowercased contains at least one of `Q3`, `Acme`, `Adam`, `Friday`, or `migration`
-- [ ] `result.is_error` is absent or `false`
+- [ ] `result.isError` is absent or `false`
+
+### Post-run cleanup
+
+Run regardless of the Run-step verdict; the delete is idempotent.
+
+- [ ] `curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"` returned HTTP 204
+- [ ] The `e2e-fixtures` bucket itself was left in place
 
 ### Verdict
 

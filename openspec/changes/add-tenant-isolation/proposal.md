@@ -28,7 +28,7 @@ The sibling `add-auth-and-identity` change is introducing authenticated identity
 ### Modified Capabilities
 
 - `rag-retrieval`: similarity search gains a mandatory tenant filter; retrieval without tenant context fails closed.
-- `rag-source-attachments`: presigned URLs are only issued for objects under the caller's tenant prefix. (After the presign-resolution amendment, the client-facing download path moves to the agent's `GET /api/v1/documents/{id}/content` endpoint in `add-document-management-api`, which lands later and enforces the same per-tenant ownership on the resolved document; this tenant-prefix presign check remains as in-network defense-in-depth.)
+- `rag-source-attachments`: presigned URLs are only issued for objects under the caller's tenant prefix. Every source entry that is returned still carries a non-blank `downloadUrl` and `expiresAt`, exactly as the baseline guarantees. `add-document-management-api` lands later and adds `documentId` and `contentPath` beside that link as further mandatory fields, and its `GET /api/v1/documents/{id}/content` endpoint enforces the same per-tenant ownership on the resolved document id, so both download paths carry the tenant check and neither of them is the primary one.
 - `ingestion-security`: storage keys gain the tenant prefix on top of filename sanitization; ingested chunks are stamped with tenant metadata.
 - `ingestion-correctness`: upload idempotency (replace-on-re-upload) becomes per-tenant; identical filenames in different tenants coexist.
 - `chat-history-persistence`: Redis key scheme and Postgres persistence become tenant+user scoped.

@@ -41,12 +41,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * End-to-end integration test for the ingestion pipeline. Drives multipart uploads through
- * the real {@code IngestionController} into MinIO and runs the manual ingestion through
- * {@link com.lukk.ascend.ai.agent.service.ingestion.ManualIngestionService} against a real Postgres
- * (for the {@code INT_METADATA_STORE}) while stubbing the embedding/vector store layer
- * because LM Studio / OpenAI are unreachable in CI.
+ * the real {@code IngestionController} into the S3-compatible object store and runs the manual
+ * ingestion through {@link com.lukk.ascend.ai.agent.service.ingestion.ManualIngestionService}
+ * against a real Postgres (for the {@code INT_METADATA_STORE}) while stubbing the
+ * embedding/vector store layer because LM Studio / OpenAI are unreachable in CI.
  *
- * <p>Why mock {@link VectorStoreResolver} but not MinIO/Postgres: the embedding HTTP call
+ * <p>Why mock {@link VectorStoreResolver} but not the object store/Postgres: the embedding HTTP call
  * happens inside Spring AI's {@code OpenAiEmbeddingModel}, which is constructed deep inside
  * {@code VectorStoreConfig#buildProviderVectorStore}. Stubbing the resolver keeps the
  * assertion surface simple — we still exercise the real S3 listing, the real Postgres-backed
@@ -90,13 +90,13 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
         jdbc = new JdbcTemplate(dataSource);
 
-        // Clean MinIO bucket and the metadata store between tests so each scenario is isolated.
+        // Clean the object-store bucket and the metadata store between tests so each scenario is isolated.
         clearBucket();
         jdbc.update("DELETE FROM INT_METADATA_STORE");
     }
 
     @Test
-    void upload_acceptsMarkdownPdfAndDocxInOneRequest_andStoresInMinio() throws Exception {
+    void upload_acceptsMarkdownPdfAndDocxInOneRequest_andStoresInObjectStore() throws Exception {
         MockMultipartFile mdFile = new MockMultipartFile(
                 "file", "notes.md", "text/markdown",
                 "# Title\n\nSome **bold** body text for the e2e ingestion test.".getBytes());
@@ -128,7 +128,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
         // or absent. We assert both possible accepted shapes.
         assertThat(keys).anyMatch(k -> k.equals("documents/doc.docx"));
 
-        // Real MinIO must have the objects we claim to have uploaded.
+        // The real object store must have the objects we claim to have uploaded.
         for (String key : keys) {
             HeadObjectResponse head = s3Client.headObject(HeadObjectRequest.builder()
                     .bucket(BUCKET).key(key).build());
@@ -137,7 +137,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
     }
 
     @Test
-    void upload_rejectsDisallowedPayload_with415_andLeavesMinioUntouched() throws Exception {
+    void upload_rejectsDisallowedPayload_with415_andLeavesObjectStoreUntouched() throws Exception {
         // SVG bytes — Tika detects as image/svg+xml, which is NOT in the allowlist
         // (only png/jpeg/webp/gif are). Reliable across Tika versions because the
         // <svg xmlns="http://www.w3.org/2000/svg"> root element is the canonical signature.
@@ -153,7 +153,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 .andExpect(jsonPath("$.error").value("unsupported_media_type"))
                 .andExpect(jsonPath("$.message").exists());
 
-        // Nothing should have landed in MinIO for this filename.
+        // Nothing should have landed in the object store for this filename.
         ListObjectsV2Response list = s3Client.listObjectsV2(ListObjectsV2Request.builder()
                 .bucket(BUCKET).build());
         assertThat(list.contents()).noneMatch(o -> o.key().endsWith("evil.svg"));
@@ -185,7 +185,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
         assertThat(filenameOnly).doesNotStartWith(".");
         assertThat(filenameOnly).endsWith(".md");
 
-        // And the sanitized object must actually be reachable in MinIO.
+        // And the sanitized object must actually be reachable in the object store.
         HeadObjectResponse head = s3Client.headObject(HeadObjectRequest.builder()
                 .bucket(BUCKET).key(key).build());
         assertThat(head.contentLength()).isPositive();

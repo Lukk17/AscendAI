@@ -1,6 +1,6 @@
 # Attach-sources: run tasks template
 
-Spec: [6-attach-sources-test.md](6-attach-sources-test.md)
+Spec: [../6-attach-sources-test.md](../6-attach-sources-test.md)
 
 Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
@@ -11,19 +11,22 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] AscendAgent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [ ] Qdrant `/healthz` returns HTTP 200
-- [ ] MinIO `/minio/health/live` returns HTTP 200
+- [ ] Object store `curl -fsS http://localhost:9070/_floci/health` returns HTTP 200 with `"s3":"running"`
 - [ ] Postgres responds to `SELECT 1` with a row
-- [ ] MinIO `mc` client present inside the `minio` container
 - [ ] Fixture `pierogi-recipe.docx` exists under `AscendAgent/e2e/fixtures/`
 
 ### Reset state
 
-- [ ] Registered MinIO alias `local` inside the container
-- [ ] Dropped `documents/pierogi-recipe.docx` from MinIO
-- [ ] Removed `int_metadata_store` rows for the pierogi fixture
-- [ ] Wiped Qdrant points for `documents/pierogi-recipe.docx`
+Step 1 uploads three objects, so the reset covers the same three keys as the Post-run cleanup.
+
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"` returned HTTP 204
+- [ ] Removed `int_metadata_store` rows for all three keys (pierogi, banana, markdown-canary)
+- [ ] Wiped Qdrant points for all three `source` values in collection `ascendai-1536`
 - [ ] Truncated `chat_history` rows for user `frostyAttachSourcesTest`
 - [ ] Deleted Redis key `chat:frostyAttachSourcesTest`
+- [ ] Deleted Redis key `user:frostyAttachSourcesTest:instructions`
 
 ### Run
 
@@ -43,12 +46,16 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 ### Post-run cleanup
 
-Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract).
+Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract). Step 1 writes three objects, so all three come out again here.
 
-- [ ] Dropped `documents/pierogi-recipe.docx` from MinIO
-- [ ] Deleted `int_metadata_store` row for the pierogi key
-- [ ] Wiped Qdrant points for `documents/pierogi-recipe.docx` in collection `ascendai-1536`
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"` returned HTTP 204
+- [ ] Deleted `int_metadata_store` rows for all three keys (pierogi, banana, markdown-canary)
+- [ ] Wiped Qdrant points for `documents/pierogi-recipe.docx`, `documents/banana-price-poland.pdf` and `markdown/markdown-canary.md` in collection `ascendai-1536`
 - [ ] Truncated `chat_history` rows for `frostyAttachSourcesTest` + deleted Redis key `chat:frostyAttachSourcesTest`
+- [ ] Deleted Redis key `user:frostyAttachSourcesTest:instructions`
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyAttachSourcesTest` returned `{"status":"success", ...}`
 
 ### Verdict
 

@@ -16,7 +16,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Smokes the Spring context end-to-end against real Postgres / Redis / Qdrant / MinIO
+ * Smokes the Spring context end-to-end against real Postgres / Redis / Qdrant / Floci
  * containers. Verifies that every {@code @Bean} factory in {@code AppConfig} (S3 client,
  * Qdrant client, RestClient builder, metadata store) actually produces a working bean
  * once the Testcontainers URLs are wired in.
@@ -70,7 +70,7 @@ class BackingServicesIT extends TestcontainersBase {
     }
 
     @Test
-    void minio_isReachableAndBucketCreated() throws Exception {
+    void objectStore_isReachableAndBucketCreated() throws Exception {
         // app.s3.bucket = knowledge-base; BucketInitConfig (a separate startup runner)
         // creates it at boot. If the runner ran successfully, the HeadBucket call returns 200.
         HeadBucketResponse response = s3Client.headBucket(

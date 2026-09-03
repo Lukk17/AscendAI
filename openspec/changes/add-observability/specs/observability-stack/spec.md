@@ -2,13 +2,13 @@
 
 ### Requirement: Prometheus runs in docker-compose with checked-in scrape config
 
-`docker-compose.yaml` SHALL define a `prometheus` service that uses a checked-in `observability/prometheus/prometheus.yaml` configuration (`.yaml` extension to match the repo's YAML convention). The Prometheus instance SHALL scrape every AscendAI application service plus the data-layer prerequisites (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`, MinIO native).
+`docker-compose.yaml` SHALL define a `prometheus` service that uses a checked-in `observability/prometheus/prometheus.yaml` configuration (`.yaml` extension to match the repo's YAML convention). The Prometheus instance SHALL scrape every AscendAI application service plus the data-layer prerequisites that publish metrics (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`). The S3-compatible object store publishes no Prometheus endpoint and is not scraped.
 
 #### Scenario: Prometheus targets are healthy after stack startup
 
 - **WHEN** `docker compose up -d` completes and 30 seconds elapse
 - **AND** `GET http://localhost:9090/api/v1/targets` is invoked
-- **THEN** every target with `job` ∈ {`ascend-agent`, `audio-scribe`, `ascend-web-search`, `ascend-memory`, `paddle-ocr`, `weather-mcp`, `qdrant`, `redis`, `postgres`, `minio`} reports `health="up"`
+- **THEN** every target with `job` ∈ {`ascend-agent`, `audio-scribe`, `ascend-web-search`, `ascend-memory`, `paddle-ocr`, `weather-mcp`, `qdrant`, `redis`, `postgres`} reports `health="up"`
 
 #### Scenario: Scrape interval is 15 seconds by default
 
@@ -96,7 +96,7 @@ Six Grafana dashboards SHALL be checked into `observability/grafana/dashboards/`
 |---|---|
 | Platform Overview | request rate per service, error rate per service, p95 latency per service, JVM heap (Java services), Python process memory (Python services) |
 | AI Pipeline | tokens per minute by model, provider mix (pie / bar), RAG hit-rate (above_threshold / total), memory parse-failure rate, MCP tool call rate by tool |
-| Infrastructure | Qdrant collection sizes, Redis ops/sec and memory, Postgres connection count, MinIO bucket sizes |
+| Infrastructure | Qdrant collection sizes, Redis ops/sec and memory, Postgres connection count |
 | Token Cost (L1) | Per-provider $/day computed via `gen_ai.client.token.usage` × per-provider pricing rates from `observability/grafana/dashboards/pricing.yaml` |
 | RAG Quality (L2) | Heatmap of `rag_top_score_bucket` over time; time-series of retrieval miss-rate; bar chart of ingestion-events-per-hour by source type; embedded Loki logs panel |
 | Cache Hit Rate (L3) | `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider; absolute saved-token panel; 0%-flatline annotation per provider |

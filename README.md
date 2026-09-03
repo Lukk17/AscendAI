@@ -19,7 +19,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
   <img src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white" alt="Redis">
   <img src="https://img.shields.io/badge/Qdrant-DC244C.svg" alt="Qdrant">
-  <img src="https://img.shields.io/badge/MinIO-C72E49?logo=minio&logoColor=white" alt="MinIO">
+  <img src="https://img.shields.io/badge/Object%20Storage-S3--compatible-FF9900.svg" alt="S3-compatible object storage">
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/Mem0-semantic%20memory-7B61FF.svg" alt="Mem0">
   <img src="https://img.shields.io/badge/SearXNG-meta%20search-3050FF.svg" alt="SearXNG">
@@ -52,7 +52,7 @@ graph TB
         PG["PostgreSQL<br/>Chat · Metadata"]
         RD["Redis<br/>Chat cache"]
         QD["Qdrant<br/>Vector DB"]
-        S3["MinIO<br/>Documents"]
+        S3["Object Store<br/>Documents"]
     end
 
     User -->|"REST"| Agent
@@ -107,7 +107,7 @@ conversations actually accumulate knowledge.
 - **MCP tool servers.** First-class integrations for audio transcription ([AudioScribe](AudioScribe/AGENTS.md)), web
   search ([AscendWebSearch](AscendWebSearch/AGENTS.md) + SearXNG), weather ([WeatherMCP](WeatherMCP/AGENTS.md)), and OCR
   ([PaddleOCR](PaddleOCR/AGENTS.md)).
-- **Document ingestion to MinIO.** Drop files (Markdown, PDF, DOCX) into a bucket and the pipeline parses them via
+- **Document ingestion to object storage.** Drop files (Markdown, PDF, DOCX) into a bucket and the pipeline parses them via
   Docling / Unstructured and indexes them automatically.
 - **Hybrid chat history.** Redis for the active context window, PostgreSQL for durable long-term archives and
   analytics.
@@ -262,7 +262,7 @@ sequenceDiagram
 
 - Docker Desktop
 - Java 21
-- PostgreSQL on `5432`, Redis on `6379`, Qdrant on `6333` / `6334`, MinIO on `9070` / `9071` (`admin` / `password`)
+- PostgreSQL on `5432`, Redis on `6379`, Qdrant on `6333` / `6334`, S3-compatible object storage on `9070` / `9071` (locally: Floci, `admin` / `password`)
 
 #### Run it
 
@@ -319,7 +319,7 @@ docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
 
 **3. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
 
-On first start the agent creates the MinIO `knowledge-base` bucket and initialises metadata tables. The API is then
+On first start the agent creates the `knowledge-base` bucket in the object store and initialises metadata tables. The API is then
 available at [http://localhost:9917](http://localhost:9917). Check the startup banner for live status of every
 dependency.
 
@@ -405,7 +405,7 @@ Full setup and usage in [observability/README.md](observability/README.md).
 | Service             | Port            | Exposed       | Role                                                                 |
 | :------------------ | :-------------- | :------------ | :------------------------------------------------------------------ |
 | **Grafana**         | `7078` → `3000` | Browser UI    | Dashboards + Explore. Anonymous `Viewer`; `admin` / `admin` to edit.|
-| **Prometheus**      | `7077` → `9090` | Browser UI    | Scrapes metrics from the 6 services, Qdrant, and MinIO.             |
+| **Prometheus**      | `7077` → `9090` | Browser UI    | Scrapes metrics from the 6 services and Qdrant.                     |
 | **Loki**            | `3100`          | Internal only | Log store; receives logs from Vector.                              |
 | **Tempo**           | (none)          | Internal only | Trace store; receives traces from the OTel Collector.              |
 | **Vector**          | (none)          | Internal only | Tails the 6 app containers' Docker logs and ships them to Loki.    |
@@ -418,7 +418,7 @@ Full setup and usage in [observability/README.md](observability/README.md).
 | **PostgreSQL**          | `5432`          | `postgres` / `local` | Chat-history archive, ingestion metadata, user instructions.|
 | **Redis**               | `6379`          | (none)               | Short-term chat-history cache, session state.               |
 | **Qdrant**              | `6333` / `6334` | (none)               | Vector DB for RAG (`ascendai-768/1536`) and Mem0 memory.    |
-| **MinIO**               | `9070` / `9071` | `admin` / `password` | S3-compatible object store for ingested documents.          |
+| **Object storage** (locally: Floci) | `9070` / `9071` | `admin` / `password` | S3-compatible object store for ingested documents. Port 9071 is the object-store web UI. |
 
 ---
 
@@ -435,7 +435,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [AscendWebSearch/deploy-standalone/README.md](AscendWebSearch/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
 | [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and release workflows, image naming, registries, package visibility. |
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / MinIO / PostgreSQL / Redis reset recipes.                    |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / object store / PostgreSQL / Redis reset recipes.             |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)                                                                        | Metrics, logs, traces — what is collected, dashboards, how to instrument. |
 | [observability/README.md](observability/README.md)                                                                   | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |

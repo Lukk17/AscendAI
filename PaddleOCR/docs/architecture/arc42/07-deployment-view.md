@@ -12,13 +12,19 @@ graph TB
     subgraph "docker-compose network (ascend-ai)"
         Agent["AscendAgent<br/>:9917"]
         PaddleOCR["ascend-paddle-ocr<br/>:7022"]
-        MinIO["MinIO<br/>:9070 / :9000 internal"]
+    end
+
+    subgraph "External prerequisite"
+        ObjectStore["S3-compatible object store<br/>:9070 (host.docker.internal)"]
     end
 
     Agent -->|"MCP POST /mcp"| PaddleOCR
     Agent -->|"REST POST /v1/ocr"| PaddleOCR
-    PaddleOCR -->|"HTTP GET file_uri"| MinIO
+    PaddleOCR -->|"HTTP GET file_uri"| ObjectStore
 ```
+
+The object store is not a compose service; it runs on the host and is reached via `host.docker.internal:9070`.
+Locally it is provided by a self-hosted S3-compatible emulator.
 
 The network alias `ascend-paddle-ocr` (and the hostname `ascend-paddle-ocr`) allows the AscendAgent to reach the
 service by name inside the compose network.
@@ -48,7 +54,7 @@ compose `healthcheck` stanza should be set). The operator should configure the l
 | `ENGINE_CACHE_MAX_SIZE` | `8` | Maximum number of `PaddleOCR` engines held in the LRU cache. |
 | `SUPPORTED_LANGUAGES` | `en,pl,de,fr,es,it,pt,nl,ru,ch,ja,ko` | Allowlist of valid language codes. Requests for any other code are rejected. |
 | `MCP_FILE_URI_ROOT` | _(unset)_ | Enables `file://` support; URIs must resolve inside this directory. Unset = `file://` disabled. |
-| `MCP_ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `minio` for the standard compose stack. |
+| `MCP_ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `host.docker.internal` for the standard compose stack, since the S3-compatible object store is reached over the host-published endpoint. |
 | `MCP_DOWNLOAD_TIMEOUT_SECONDS` | `30` | Total timeout for the `aiohttp` download session. |
 
 The `docker-compose.yaml` service block sets `API_PORT`, `API_HOST`, `LOG_LEVEL`, `DEFAULT_LANGUAGE`,

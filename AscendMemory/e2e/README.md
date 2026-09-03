@@ -37,9 +37,10 @@ AscendMemory/e2e/
         └── <UTC-timestamp>_<N>-<capability>-tasks.md   # one per executed test (gitignored)
 ```
 
-Tests are number-prefixed by setup cost. `1` runs without writing any persisted state (FastAPI validation rejects
-the request before mem0 is touched). `2`-`5` write to Qdrant via mem0ai; each is responsible for wiping its own
-user-scoped state at the start.
+Tests are number-prefixed by setup cost. `1` and `4` run without writing any persisted state (FastAPI validation
+rejects the request before mem0 is touched for `1`; `tools/list` is a pure protocol probe for `4`). `2`, `3`, `5`
+and `6` write to Qdrant via mem0ai; each is responsible for wiping its own user-scoped state both at the start
+(`Reset state`) and at the end (`Post-run cleanup`).
 
 The Bruno collection isn't here. It lives at the **repo root** under
 `docs/api/request/AscendAI/memory/testing/` so it stays a portable API client artifact. Each spec references the
@@ -70,9 +71,13 @@ Every spec follows the same template:
 4. **Run.** One or more numbered steps. Each step is a single Bruno CLI invocation (REST) or a paired curl +
    Bruno sequence (MCP, because the `initialize` handshake must run before any `tools/call`). Steps wait for HTTP
    200 before continuing.
-5. **Expected.** Observable behaviour only: HTTP status, response body fields, persisted state visible via a
+5. **Post-run cleanup.** One command per code block, wiping every `user_id` the run wrote so the test leaves the
+   system exactly as it found it. Sits next to `Run` in the spec (that's where the state is created) but the
+   runner executes it last, after `Expected` has been checked, since some assertions depend on state this section
+   would remove.
+6. **Expected.** Observable behaviour only: HTTP status, response body fields, persisted state visible via a
    subsequent search call. No log substrings.
-6. **Fixtures.** Paths to local files the test reads (none for the current suite — all payloads are inline text).
+7. **Fixtures.** Paths to local files the test reads (none for the current suite — all payloads are inline text).
 
 The paired `templates/<N>-<feature>-tasks.template.md` is the runner's checklist for one execution: prerequisites,
 reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**,
@@ -149,7 +154,8 @@ Numbered by setup cost. Easiest first.
 1. Add the Bruno request(s) under `docs/api/request/AscendAI/memory/testing/<request>.yml`.
 2. Pick the next number prefix that matches the test's setup cost.
 3. Write `testing/<N>-<capability>-test.md` using the template structure (**What this verifies / Prerequisites /
-   Reset state / Run / Expected / Fixtures**). Assert behaviour, not logs.
+   Reset state / Run / Post-run cleanup / Expected / Fixtures**), wiping every `user_id` the test writes in
+   `Post-run cleanup`. Assert behaviour, not logs.
 4. Write `testing/templates/<N>-<capability>-tasks.template.md` mirroring the spec's checkboxes, with
    `## Result summary` containing the **Input tokens / Output tokens / Start (UTC) / End (UTC) / Duration** fields
    at the bottom.

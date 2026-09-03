@@ -17,7 +17,7 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 - **AscendAgent (Spring Boot)**: add `spring-boot-starter-actuator` and `micrometer-registry-prometheus` dependencies. Expose `/actuator/health`, `/actuator/prometheus`, `/actuator/info`. Auto-pick-up Spring AI's `gen_ai.*` metrics. Add custom counters/timers/gauges for the failure modes we have already paid for once: memory extraction parse failures, memory insert failures, RAG retrieval thresholding outcomes, ingestion errors per source type, MCP tool latency. Add cache-token metrics emitted from the prompt-caching strategies so the L3 dashboard works.
 - **WeatherMCP (Spring Boot)**: same Actuator + Prometheus stack, expose `/actuator/prometheus`. Minimal custom metrics (tool-call counter is enough for an MCP server).
 - **Python services (AudioScribe, AscendWebSearch, AscendMemory, PaddleOCR)**: add `prometheus-fastapi-instrumentator` to FastAPI apps and expose `/metrics`. Add a small set of custom domain counters per service (transcription duration, search-result count, memory-search latency, OCR pages-processed).
-- **Prometheus**: new docker-compose service `prometheus` with a checked-in `observability/prometheus/prometheus.yaml` that scrapes all six AscendAI services on their `/metrics` (or `/actuator/prometheus`) endpoints every 15 s, plus the data-layer prerequisites (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`, MinIO native).
+- **Prometheus**: new docker-compose service `prometheus` with a checked-in `observability/prometheus/prometheus.yaml` that scrapes all six AscendAI services on their `/metrics` (or `/actuator/prometheus`) endpoints every 15 s, plus the data-layer prerequisites that publish metrics (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`). The S3-compatible object store publishes no Prometheus endpoint and is not scraped.
 - **Grafana**: new docker-compose service `grafana` with anonymous read-only access on a non-conflicting port (`7078` to avoid clashing with anything), provisioned with the Prometheus datasource, the Loki datasource (logs), the Tempo datasource (traces), and **six checked-in dashboards** (see below).
 
 **Logs layer (Vector + Loki):**
@@ -38,7 +38,7 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 
 1. **Platform Overview** — request rate, error rate, latency, JVM/Python memory per service.
 2. **AI Pipeline** — tokens per minute by provider/model, provider mix, RAG hit rate, memory parse-failure rate, MCP tool latency.
-3. **Infrastructure** — Qdrant collection sizes, Redis cache stats, Postgres connections, MinIO bucket sizes.
+3. **Infrastructure** — Qdrant collection sizes, Redis cache stats, Postgres connections.
 4. **L1 — Token Cost** — per-provider $/day panel; data = `gen_ai.client.token.usage{provider="..."}` × per-provider rate (rates committed in a YAML pricing table inside `observability/grafana/dashboards/`).
 5. **L2 — RAG Quality** — top-K similarity-score histogram, retrieval miss-rate over time, ingestion-events-per-hour by source type.
 6. **L3 — Cache Hit Rate** — `cached_tokens / prompt_tokens` per provider, plus absolute saved-token count. Validates the prompt-caching change is actually firing in production.

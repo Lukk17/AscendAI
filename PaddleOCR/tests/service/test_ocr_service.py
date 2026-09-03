@@ -4,7 +4,18 @@ import pytest
 
 from src.config.config import settings
 from src.model.ocr_models import OcrJsonResponse
-from src.service.ocr_service import OcrService, _convert_polygon, _safe_suffix
+from src.service import ocr_service as ocr_service_module
+from src.service.ocr_service import (
+    OcrService,
+    _convert_polygon,
+    _noop_task,
+    _safe_suffix,
+    _warm_worker_engine,
+    get_process_pool,
+    run_ocr_in_worker,
+    start_worker_pool,
+    stop_worker_pool,
+)
 
 
 def _create_mock_predict_result() -> list[dict[str, object]]:
@@ -190,6 +201,46 @@ class TestOcrServiceProcessFile:
         assert isinstance(result, OcrJsonResponse)
 
 
+class TestOcrServiceProcessFileTraceContext:
+    @patch("src.service.ocr_service.PaddleOCR")
+    def test_no_trace_carrier_starts_span_with_no_parent(self, mock_paddle_class):
+        # Given
+        mock_engine = MagicMock()
+        mock_engine.predict.return_value = _create_mock_predict_result()
+        mock_paddle_class.return_value = mock_engine
+        service = OcrService()
+
+        # When
+        with patch.object(ocr_service_module, "tracer") as mock_tracer:
+            service.process_file(b"x", "test.png", "en")
+
+        # Then
+        _, kwargs = mock_tracer.start_as_current_span.call_args
+        assert kwargs["context"] is None
+
+    @patch("src.service.ocr_service.extract_trace_context")
+    @patch("src.service.ocr_service.PaddleOCR")
+    def test_trace_carrier_is_extracted_into_parent_context(self, mock_paddle_class, mock_extract):
+        # Given — trace_carrier simulates a context injected by the process that
+        # submitted this call, since process_file runs inside a separate OCR worker
+        mock_engine = MagicMock()
+        mock_engine.predict.return_value = _create_mock_predict_result()
+        mock_paddle_class.return_value = mock_engine
+        sentinel_context = object()
+        mock_extract.return_value = sentinel_context
+        service = OcrService()
+        carrier = {"traceparent": "00-fake-01"}
+
+        # When
+        with patch.object(ocr_service_module, "tracer") as mock_tracer:
+            service.process_file(b"x", "test.png", "en", carrier)
+
+        # Then
+        mock_extract.assert_called_once_with(carrier)
+        _, kwargs = mock_tracer.start_as_current_span.call_args
+        assert kwargs["context"] is sentinel_context
+
+
 class TestOcrServiceWarmUp:
     @patch("src.service.ocr_service.PaddleOCR")
     def test_warm_up_creates_engine(self, mock_paddle_class):
@@ -281,3 +332,102 @@ class TestConvertPolygon:
 
         # Then
         assert result == [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+
+
+class TestWorkerPoolLifecycle:
+    @patch("src.service.ocr_service.multiprocessing")
+    @patch("src.service.ocr_service.ProcessPoolExecutor")
+    def test_start_worker_pool_creates_and_warms_pool(self, mock_executor_class, mock_multiprocessing):
+        # Given
+        mock_pool = MagicMock()
+        mock_executor_class.return_value = mock_pool
+        mock_context = MagicMock()
+        mock_multiprocessing.get_context.return_value = mock_context
+
+        # When
+        with patch.object(ocr_service_module, "_process_pool", None):
+            start_worker_pool()
+
+            # Then
+            mock_multiprocessing.get_context.assert_called_once_with("spawn")
+            mock_executor_class.assert_called_once_with(
+                max_workers=1,
+                mp_context=mock_context,
+                initializer=_warm_worker_engine,
+                initargs=(settings.DEFAULT_LANGUAGE,),
+            )
+            mock_pool.submit.assert_called_once_with(_noop_task)
+            mock_pool.submit.return_value.result.assert_called_once()
+            assert ocr_service_module._process_pool is mock_pool
+
+    def test_stop_worker_pool_shuts_down_existing_pool(self):
+        # Given
+        mock_pool = MagicMock()
+
+        # When
+        with patch.object(ocr_service_module, "_process_pool", mock_pool):
+            stop_worker_pool()
+
+            # Then
+            mock_pool.shutdown.assert_called_once_with(wait=True)
+            assert ocr_service_module._process_pool is None
+
+    def test_stop_worker_pool_no_op_when_not_started(self):
+        # When / Then — no raise, nothing to shut down
+        with patch.object(ocr_service_module, "_process_pool", None):
+            stop_worker_pool()
+            assert ocr_service_module._process_pool is None
+
+    def test_get_process_pool_raises_when_not_started(self):
+        # Then
+        with (
+            patch.object(ocr_service_module, "_process_pool", None),
+            pytest.raises(RuntimeError, match="not initialised"),
+        ):
+            get_process_pool()
+
+    def test_get_process_pool_returns_started_pool(self):
+        # Given
+        mock_pool = MagicMock()
+
+        # When / Then
+        with patch.object(ocr_service_module, "_process_pool", mock_pool):
+            assert get_process_pool() is mock_pool
+
+    @patch("src.service.ocr_service.ocr_service")
+    def test_run_ocr_in_worker_delegates_to_singleton(self, mock_service):
+        # Given
+        mock_service.process_file.return_value = "sentinel-response"
+        carrier = {"traceparent": "00-fake-01"}
+
+        # When
+        result = run_ocr_in_worker(b"bytes", "scan.png", "en", carrier)
+
+        # Then
+        mock_service.process_file.assert_called_once_with(b"bytes", "scan.png", "en", carrier)
+        assert result == "sentinel-response"
+
+    @patch("src.service.ocr_service.ocr_service")
+    def test_run_ocr_in_worker_trace_carrier_defaults_to_none(self, mock_service):
+        # Given
+        mock_service.process_file.return_value = "sentinel-response"
+
+        # When
+        run_ocr_in_worker(b"bytes", "scan.png", "en")
+
+        # Then
+        mock_service.process_file.assert_called_once_with(b"bytes", "scan.png", "en", None)
+
+    @patch("src.service.ocr_service.configure_worker_tracing")
+    @patch("src.service.ocr_service.ocr_service")
+    def test_warm_worker_engine_configures_tracing_before_warmup(self, mock_service, mock_configure_tracing):
+        # When
+        _warm_worker_engine("en")
+
+        # Then — tracing must be wired up before the warmup span is created
+        mock_configure_tracing.assert_called_once()
+        mock_service.warm_up_engine.assert_called_once_with("en")
+
+    def test_noop_task_returns_none(self):
+        # Then
+        assert _noop_task() is None

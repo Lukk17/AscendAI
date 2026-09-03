@@ -64,7 +64,7 @@ class S3PresignedUrlServiceTest {
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
                 HeadObjectResponse.builder().contentLength(2048L).contentType("application/pdf").build());
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
-        when(presigned.url()).thenReturn(URI.create("https://minio.example/bucket/manual.pdf?X-Amz-Signature=abc").toURL());
+        when(presigned.url()).thenReturn(URI.create("https://s3.example/bucket/manual.pdf?X-Amz-Signature=abc").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
         // when
@@ -111,7 +111,7 @@ class S3PresignedUrlServiceTest {
                     return HeadObjectResponse.builder().contentLength(100L).contentType("application/pdf").build();
                 });
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
-        when(presigned.url()).thenReturn(URI.create("https://minio.example/bucket/good.pdf?sig=abc").toURL());
+        when(presigned.url()).thenReturn(URI.create("https://s3.example/bucket/good.pdf?sig=abc").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
         // when
@@ -149,7 +149,7 @@ class S3PresignedUrlServiceTest {
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenReturn(HeadObjectResponse.builder().contentLength(10L).contentType("application/pdf").build());
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
-        when(presigned.url()).thenReturn(URI.create("https://minio.example/b/x?sig=1").toURL());
+        when(presigned.url()).thenReturn(URI.create("https://s3.example/b/x?sig=1").toURL());
         when(presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
         // when
@@ -196,7 +196,7 @@ class S3PresignedUrlServiceTest {
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
 
         try {
-            when(presigned.url()).thenReturn(URI.create("https://minio.example/b/a?sig=1").toURL());
+            when(presigned.url()).thenReturn(URI.create("https://s3.example/b/a?sig=1").toURL());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -225,7 +225,7 @@ class S3PresignedUrlServiceTest {
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
 
         try {
-            when(presigned.url()).thenReturn(URI.create("https://minio.example/b/a?sig=1").toURL());
+            when(presigned.url()).thenReturn(URI.create("https://s3.example/b/a?sig=1").toURL());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

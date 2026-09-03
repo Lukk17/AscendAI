@@ -29,7 +29,7 @@ graph TB
         Postgres["PostgreSQL"]
         Redis["Redis"]
         Qdrant["Qdrant"]
-        MinIO["MinIO"]
+        S3["S3-compatible storage"]
     end
 
     subgraph "Support Services (Docker)"
@@ -48,7 +48,7 @@ graph TB
     Agent --> Postgres
     Agent --> Redis
     Agent --> Qdrant
-    Agent --> MinIO
+    Agent --> S3
     Agent --> Docling
     Agent --> Unstructured
     Agent -.->|"per-request"| LMStudio
@@ -74,4 +74,4 @@ graph TB
 | PostgreSQL         | TCP (JDBC)                     | Outbound  | Persistent chat history, ingestion metadata.                         |
 | Redis              | TCP                            | Outbound  | Short-term chat history cache.                                       |
 | Qdrant             | HTTP / gRPC                    | Outbound  | Vector similarity search (RAG and memory).                           |
-| MinIO              | S3 API                         | Outbound  | Document object storage for ingestion.                               |
+| S3-compatible storage | S3 API                      | Outbound  | Document object storage for ingestion, provided locally by a self-hosted emulator and by Amazon S3 in production. |

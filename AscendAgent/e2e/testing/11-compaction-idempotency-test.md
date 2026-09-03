@@ -54,6 +54,12 @@ docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat
 
 Expect exactly `1`.
 
+The seed scripts only reset the two chat resources above; they never touch the Redis instructions-cache key. Drop it here so the pre-run reset and the Post-run cleanup stay symmetric, and a crashed prior run's stale marker cannot survive into this run.
+
+```bash
+docker exec redis redis-cli DEL user:frostyCompactionIdempotencyTest:instructions
+```
+
 ## Run
 
 Step 1. Send one prompt as `frostyCompactionIdempotencyTest`. The chat history grows from 9 → 11 rows (1 new user + 1 new assistant). The compaction trigger should NOT fire because turns past the existing summary (10) is less than the trigger (20).
@@ -82,6 +88,38 @@ docker exec postgres psql -U postgres -d ascend_ai -c "SELECT count(*) FROM chat
 
 Expect exactly `1` (still only the original seeded summary row, no new one).
 
+## Post-run cleanup
+
+The seed scripts write 9 rows into `chat_history` and the matching Redis list, the Run step adds the new turn pair, `UserInstructionService` writes a Redis instructions-cache entry on that prompt (an `EMPTY` marker with a 24 hour TTL when the user has no stored instructions), and the background memory extractor may write semantic-memory points for the same prompt. The seeds only reset the two chat resources, so the Reset state section above also clears the instructions key explicitly. Remove all four pieces of state here too so a run that crashed before Post-run cleanup, or a run whose Reset state was skipped, still leaves the system exactly as it found it. Run these regardless of whether the Run steps passed or failed. Every command is idempotent.
+
+Drop this spec's chat-history rows, the eleven left after the Run step.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostyCompactionIdempotencyTest';"
+```
+
+Drop the Redis chat list the seed created.
+
+```bash
+docker exec redis redis-cli DEL chat:frostyCompactionIdempotencyTest
+```
+
+Drop the Redis instructions cache key.
+
+```bash
+docker exec redis redis-cli DEL user:frostyCompactionIdempotencyTest:instructions
+```
+
+Wipe any semantic-memory points AscendMemory's background extractor stored for this user. The agent runs the extractor after every prompt, whether or not it concerns memory. With no `provider` query parameter the endpoint clears the user across every provider collection, which stays correct if the embedding provider changes.
+
+```bash
+curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyCompactionIdempotencyTest"
+```
+
+Expect `{"status":"success","message":"All memories wiped for user frostyCompactionIdempotencyTest"}`.
+
+The seed file the Reset section copied into the `redis` container is already removed by that section's `docker exec redis rm` step, so nothing is left under `/tmp` in the container.
+
 ## Expected
 
 - Step 1: HTTP 200. Normal chat completion. The model should reference the seeded facts (Rex the beagle, Warsaw, TechCorp, Spring Boot / Quarkus) since they're in the visible chat history (1 summary + 8 raw turns + the new user msg).
@@ -96,6 +134,7 @@ Expect exactly `1` (still only the original seeded summary row, no new one).
 
 ## Concurrency
 
-- **Mutates:** Postgres `chat_history` (user_id=`frostyCompactionIdempotencyTest`); Redis key `chat:frostyCompactionIdempotencyTest`
+- **Mutates:** Postgres `chat_history` (user_id=`frostyCompactionIdempotencyTest`); Redis keys `chat:frostyCompactionIdempotencyTest` and `user:frostyCompactionIdempotencyTest:instructions`; Qdrant collections `ascend_memory_*` (user-scoped: `frostyCompactionIdempotencyTest`, written by the background memory extractor on any prompt)
 - **Conflicts with:** none
 - **Serial:** false
+- **Hermetic contract:** Self-cleaning. `Post-run cleanup` removes the seeded rows, the rows the Run step added and every Redis key the run touched.

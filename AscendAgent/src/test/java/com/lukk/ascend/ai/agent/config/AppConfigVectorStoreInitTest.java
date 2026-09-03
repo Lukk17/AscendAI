@@ -131,8 +131,8 @@ class AppConfigVectorStoreInitTest {
         ReflectionTestUtils.setField(config, "readTimeout", 120_000);
         ReflectionTestUtils.setField(config, "s3Endpoint", "http://localhost:9070");
         ReflectionTestUtils.setField(config, "s3PublicEndpoint", "http://localhost:9070");
-        ReflectionTestUtils.setField(config, "s3AccessKey", "minioadmin");
-        ReflectionTestUtils.setField(config, "s3SecretKey", "minioadmin");
+        ReflectionTestUtils.setField(config, "s3AccessKey", "admin");
+        ReflectionTestUtils.setField(config, "s3SecretKey", "password");
 
         return config;
     }

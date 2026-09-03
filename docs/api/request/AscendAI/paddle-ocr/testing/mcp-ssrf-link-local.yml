@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{protocol}}://{{baseUrl}}:7022/mcp/"
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp"
   headers:
     - name: Content-Type
       value: application/json
@@ -38,9 +38,12 @@ runtime:
             expect(res.getStatus()).to.equal(200);
         });
         test("JSON-RPC error frame returned (UNSAFE_URI)", function () {
-            const body = res.getBody();
-            const hasError = body.error || (body.result && body.result.isError);
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const hasError = envelope.error || (envelope.result && envelope.result.isError);
             expect(hasError).to.be.ok;
+            expect(envelope.result.content[0].text).to.include("UNSAFE_URI");
         });
 
 settings:

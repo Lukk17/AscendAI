@@ -57,6 +57,23 @@ http:
         value: gemini-2.5-flash
         disabled: true
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Answer is grounded in the retrieved fixture, not a refusal", function () {
+            const content = res.getBody().content;
+            expect(content).to.be.a("string").and.not.empty;
+            const grounded = content.includes("PURPLE-MOOSE-42")
+                || content.includes("6.49")
+                || content.includes("30 minutes");
+            expect(grounded).to.be.true;
+            expect(content.toLowerCase()).to.not.include("i don't have that document");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

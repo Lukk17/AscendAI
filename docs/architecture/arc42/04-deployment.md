@@ -16,7 +16,7 @@ graph TB
         Postgres["PostgreSQL :5432"]
         Redis["Redis :6379"]
         Qdrant["Qdrant :6333/6334"]
-        MinIO["MinIO :9070/9071"]
+        S3["S3-compatible storage :9070/9071"]
     end
 
     subgraph "Compose project: ascend-ai (docker-compose.yaml)"
@@ -45,7 +45,7 @@ graph TB
     Agent --> Postgres
     Agent --> Redis
     Agent --> Qdrant
-    Agent --> MinIO
+    Agent --> S3
     Agent --> AudioScribe
     Agent --> Weather
     Agent --> WebSearch
@@ -82,7 +82,7 @@ graph TB
 | PostgreSQL        | 5432            | Database              | External prerequisite  |
 | Redis             | 6379            | Cache                 | External prerequisite  |
 | Qdrant            | 6333 / 6334     | Vector DB             | External prerequisite  |
-| MinIO             | 9070 / 9071     | Object storage        | External prerequisite  |
+| S3-compatible storage | 9070 / 9071 | Object storage        | External prerequisite  |
 
 ---
 
@@ -99,4 +99,4 @@ single command brings up the full stack. Running the scrapper file directly
 | PostgreSQL  | Metadata, chat history, ingestion state                | AWS RDS, Cloud SQL              |
 | Redis       | Chat history cache, session persistence                | AWS ElastiCache, Redis Cloud    |
 | Qdrant      | Vector embeddings for RAG and semantic memory          | Qdrant Cloud                    |
-| MinIO       | S3-compatible document storage                         | AWS S3, GCS                     |
+| S3-compatible storage | Document storage, provided locally by a self-hosted emulator | AWS S3, GCS      |

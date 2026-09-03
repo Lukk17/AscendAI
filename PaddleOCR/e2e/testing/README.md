@@ -59,19 +59,21 @@ rejected by the magic-byte sniffer. Each finishes in well under 2 seconds. Safe 
 the runner cap of 5 concurrent; the rest queue and pick up as slots free.
 
 **Engine-bound specs (2, 3, 4, 6).** These all invoke PaddleOCR's blocking `engine.predict` inside
-`asyncio.to_thread`. PaddleOCR inference is CPU-bound; on WSL2 / Docker Desktop with the documented `cpus: 4.0`
-budget, a single 212 KB image takes 5 to 15 seconds. Running two engine specs at the same time saturates every
-core, throughput per call drops 4 to 8 times, and `asyncio.wait_for` exhausts `OCR_REQUEST_TIMEOUT=300` before any
-of them returns: the entire engine batch fails with `HTTP 500 INTERNAL_ERROR` or, in the MCP case, with
+`asyncio.to_thread`. PaddleOCR inference on this deployment is CPU-only, capped to the container's documented
+`cpus: 4.0` budget; a single 212 KB image measured 65 to 72 seconds of `processing_time_seconds` across two live
+calls against this fixture (measured 2026-09-03), with the full round trip reaching up to 90 seconds wall-clock.
+Running two engine specs at the same time saturates every core and pushes individual calls further past that
+baseline, and `asyncio.wait_for` has far less headroom against `OCR_REQUEST_TIMEOUT=300` than the old 5-to-15-second
+assumption implied: the entire engine batch still risks `HTTP 500 INTERNAL_ERROR` or, in the MCP case,
 `result.isError=true`. **Engine specs run one at a time.** It is fine to interleave them with reject-fast specs.
 
 Canonical fan-out shape for the full suite from a fresh container:
 
 1. Dispatch all 8 reject-fast specs in parallel (runner default cap of 5; queue 3).
 2. Once those settle (usually under 90 seconds in aggregate), dispatch the 4 engine specs **sequentially**, one at
-   a time. Each will take 30 to 90 seconds against the documented hardware budget.
+   a time. Each takes roughly 65 to 90 seconds of CPU-only inference on the documented 4-core budget.
 
-Total wall-clock with this shape on a 4-vCPU, 12 GB WSL2 container: roughly 5 to 8 minutes for 12 specs.
+Total wall-clock with this shape on a 4-core, 12 GB container: roughly 6 to 8 minutes for 12 specs.
 
 The historical numbering reflects setup cost (lowest first). Run order within each class is free; the only hard
 constraint is "no two engine specs at the same time."
@@ -81,7 +83,7 @@ constraint is "no two engine specs at the same time."
 3. [3-ocr-polish-test.md](3-ocr-polish-test.md). Polish canary OCR.
 4. [4-ocr-default-language-test.md](4-ocr-default-language-test.md). Default-language fallback.
 5. [5-mcp-tools-list-test.md](5-mcp-tools-list-test.md). MCP `tools/list` advertises `ocr_process`.
-6. [6-mcp-ocr-test.md](6-mcp-ocr-test.md). MCP `ocr_process` happy path via MinIO URL.
+6. [6-mcp-ocr-test.md](6-mcp-ocr-test.md). MCP `ocr_process` happy path via an object-store URL.
 7. [7-ready-endpoint-test.md](7-ready-endpoint-test.md). `/ready` returns `status="ready"` post warm-up.
 8. [8-mcp-ssrf-rejection-test.md](8-mcp-ssrf-rejection-test.md). SSRF guard rejects link-local / private-IP targets.
 9. [9-mcp-bad-scheme-test.md](9-mcp-bad-scheme-test.md). Scheme guard rejects `ftp://`, `data:`, etc.

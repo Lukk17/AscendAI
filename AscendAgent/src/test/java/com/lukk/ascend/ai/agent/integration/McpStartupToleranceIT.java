@@ -22,10 +22,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * via {@code ./gradlew integrationTest}.
  *
  * <p>MCP is kept disabled at the {@code TestcontainersBase} layer to avoid interfering
- * with other ITs. This class overrides that flag and adds two fake MCP connections: one
- * pointing at port 1 (always refused) to exercise the FAILED path, leaving the broader
- * chat-model providers disabled as usual. There is no running MCP server, so both
- * entries end up FAILED — which is exactly what this test verifies: context still starts.
+ * with other ITs. This class overrides that flag and redirects every connection URL
+ * configured in {@code application.yaml} (audioscribe, weather, ascend-web-search) to
+ * an unreachable port, leaving the broader chat-model providers disabled as usual. Those
+ * connection keys are redirected rather than replaced with a fictional one because
+ * {@code Map<String, ConnectionParameters>} property binding merges by key across
+ * property sources, so a dynamically-added key would sit alongside, not instead of, the
+ * three real ones. Redirecting all three keeps the test deterministic regardless of
+ * whether the real AudioScribe/WeatherMCP/AscendWebSearch services happen to be reachable
+ * on the host running the test, which is exactly what this test verifies: every configured
+ * MCP client ends up FAILED and the context still starts.
  */
 class McpStartupToleranceIT extends TestcontainersBase {
 
@@ -34,7 +40,11 @@ class McpStartupToleranceIT extends TestcontainersBase {
         registry.add("spring.ai.mcp.client.enabled", () -> true);
         registry.add("spring.ai.mcp.client.initialized", () -> false);
         registry.add("app.mcp.startup.init-timeout", () -> "1s");
-        registry.add("spring.ai.mcp.client.streamable-http.connections.test-server.url",
+        registry.add("spring.ai.mcp.client.streamable-http.connections.audioscribe.url",
+                () -> "http://localhost:1");
+        registry.add("spring.ai.mcp.client.streamable-http.connections.weather.url",
+                () -> "http://localhost:1");
+        registry.add("spring.ai.mcp.client.streamable-http.connections.ascend-web-search.url",
                 () -> "http://localhost:1");
     }
 

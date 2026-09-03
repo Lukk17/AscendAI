@@ -104,6 +104,44 @@ Step 3. Recall turn. Send the request and wait for the response before moving to
 cd docs/api/request/AscendAI && bru run "ascend-agent/testing/memory-test-retrieve.yml" --env ascend-local
 ```
 
+## Post-run cleanup
+
+This spec writes four pieces of per-user state: `chat_history` rows in Postgres, the Redis `chat:` cache key, a Redis instructions-cache entry that `UserInstructionService` writes on every prompt (an `EMPTY` marker with a 24 hour TTL when the user has no stored instructions), and the extracted facts that AscendMemory stores as Qdrant points. Remove all four so the run leaves the system exactly as it found it. Run these regardless of whether the Run steps passed or failed. Every command is idempotent.
+
+Wipe the stored facts through AscendMemory rather than deleting from one Qdrant collection by hand. With no `provider` query parameter the endpoint clears the user across every provider collection (`ascend_memory`, `ascend_memory_768`, `ascend_memory_1536`), so it stays correct if the embedding provider changes.
+
+```bash
+curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostySemanticMemoryTest"
+```
+
+Expect `{"status":"success","message":"All memories wiped for user frostySemanticMemoryTest"}`.
+
+Confirm nothing survived in the collection the Run steps asserted against.
+
+```bash
+curl -sS -X POST "http://localhost:6333/collections/ascend_memory_1536/points/scroll" -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"user_id","match":{"value":"frostySemanticMemoryTest"}}]},"limit":10,"with_payload":true,"with_vector":false}'
+```
+
+Expect an empty `result.points` array.
+
+Drop this spec's chat-history rows.
+
+```bash
+docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history WHERE user_id = 'frostySemanticMemoryTest';"
+```
+
+Drop the Redis chat cache key.
+
+```bash
+docker exec redis redis-cli DEL chat:frostySemanticMemoryTest
+```
+
+Drop the Redis instructions cache key.
+
+```bash
+docker exec redis redis-cli DEL user:frostySemanticMemoryTest:instructions
+```
+
 ## Expected
 
 After step 1 the Bruno output shows HTTP 200.
@@ -134,6 +172,7 @@ None.
 
 ## Concurrency
 
-- **Mutates:** Qdrant collections `ascend_memory_*` (user-scoped: `frostySemanticMemoryTest`); Postgres `chat_history` (user_id=`frostySemanticMemoryTest`); Redis key `chat:frostySemanticMemoryTest`
+- **Mutates:** Qdrant collections `ascend_memory_*` (user-scoped: `frostySemanticMemoryTest`); Postgres `chat_history` (user_id=`frostySemanticMemoryTest`); Redis keys `chat:frostySemanticMemoryTest` and `user:frostySemanticMemoryTest:instructions`
 - **Conflicts with:** none
 - **Serial:** false
+- **Hermetic contract:** Self-cleaning. `Post-run cleanup` removes the stored facts through AscendMemory and drops every row and key the Run steps wrote.

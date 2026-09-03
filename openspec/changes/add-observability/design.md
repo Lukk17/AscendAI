@@ -1,6 +1,6 @@
 ## Context
 
-AscendAI runs six application services in two language stacks (Java 21 / Spring Boot, Python 3.11+ / FastAPI), four data-layer prerequisites (Postgres, Redis, Qdrant, MinIO), and four support services (SearXNG, FlareSolverr, Docling, Unstructured). Today, none of them export metrics, ship logs anywhere central, or emit traces. Operational state lives entirely in `docker logs` output streamed to stdout.
+AscendAI runs six application services in two language stacks (Java 21 / Spring Boot, Python 3.11+ / FastAPI), four data-layer prerequisites (Postgres, Redis, Qdrant, the S3-compatible object store), and four support services (SearXNG, FlareSolverr, Docling, Unstructured). Today, none of them export metrics, ship logs anywhere central, or emit traces. Operational state lives entirely in `docker logs` output streamed to stdout.
 
 This change wires three pillars of observability — metrics, logs, traces — in a single coordinated rollout, plus six dashboards including ones that validate the recent prompt-caching change is actually saving money.
 
@@ -20,7 +20,7 @@ This change wires three pillars of observability — metrics, logs, traces — i
 **Non-Goals:**
 
 - Alerting rules / Alertmanager. Once metrics exist, alerting rules are a follow-up. We will write the metrics in a way that lets alerts be added without further code changes.
-- Custom exporters for the data layer. We rely on official Prometheus exporters where they exist (`postgres_exporter`, `redis_exporter`, Qdrant native `/metrics`); MinIO ships built-in Prometheus output. No bespoke exporters.
+- Custom exporters for the data layer. We rely on official Prometheus exporters where they exist (`postgres_exporter`, `redis_exporter`, Qdrant native `/metrics`). The S3-compatible object store publishes no Prometheus endpoint, so it is not scraped and no bespoke exporter is written for it either.
 - APM-style profiling (e.g., Pyroscope). Out of scope.
 - Production-grade security on Grafana. Anonymous read-only viewer is fine for local dev; auth hardening is a follow-up if/when this stack runs in a shared environment.
 - Compose-profile opt-out. Earlier draft included `--profile no-observability`; user dropped it.
@@ -236,7 +236,7 @@ Strict additive change, executed in this order:
 5. Add OTel collector + Tempo containers + OTel config; enable Spring AI's auto-instrumentation pointing at the collector.
 6. Wire Python services for metrics (`prometheus-fastapi-instrumentator`).
 7. Wire Python services for traces (`opentelemetry-distro`).
-8. Add data-layer exporters (`postgres_exporter`, `redis_exporter`, Qdrant `/metrics`, MinIO native).
+8. Add data-layer exporters (`postgres_exporter`, `redis_exporter`, Qdrant `/metrics`).
 9. Author and provision the six dashboards.
 10. Write `docs/OBSERVABILITY.md`.
 11. Smoke-test: every dashboard renders something non-empty after running representative traffic.

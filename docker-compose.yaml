@@ -62,8 +62,8 @@ services:
       - MAX_FILE_SIZE_MB=50
       - OCR_REQUEST_TIMEOUT=300
       - ENGINE_CACHE_MAX_SIZE=8
-      # SSRF guard: docker-internal MinIO is reached via the host-bound
-      # localhost address (host.docker.internal:9070) per ADR-001.
+      # SSRF guard: the host-published object store (Floci) is reached via
+      # the host-bound localhost address (host.docker.internal:9070) per ADR-001.
       - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
       - MCP_DOWNLOAD_TIMEOUT_SECONDS=30
       # file:// is disabled by default; mount a writable dir and set
@@ -230,10 +230,10 @@ services:
       - HF_HOME=/hf-cache
       - HF_TOKEN=${HF_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      # SSRF guard: docker-internal MinIO is reached via the host-bound
-      # localhost address (host.docker.internal:9070); allow the loopback
-      # aliases plus the in-network MinIO hostname.
-      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1,minio
+      # SSRF guard: the host-published object store (Floci) is reached via
+      # the host-bound localhost address (host.docker.internal:9070); allow
+      # the loopback aliases.
+      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
       # Enables file:// URIs jailed to /audio (the host Desktop mount).
       - MCP_FILE_URI_ROOT=/audio
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317

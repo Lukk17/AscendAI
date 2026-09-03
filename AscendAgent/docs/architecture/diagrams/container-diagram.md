@@ -16,7 +16,7 @@ graph TB
         Postgres["PostgreSQL<br/>:5432"]
         Redis["Redis<br/>:6379"]
         Qdrant["Qdrant<br/>:6333"]
-        MinIO["MinIO<br/>:9070"]
+        S3["S3-compatible storage<br/>:9070"]
     end
 
     subgraph "Search Infrastructure"
@@ -37,7 +37,7 @@ graph TB
     AscendAgent --> Postgres
     AscendAgent --> Redis
     AscendAgent --> Qdrant
-    AscendAgent --> MinIO
+    AscendAgent --> S3
     AscendAgent --> LMStudio
     AscendAgent --> CloudAPIs
     WebSearch --> SearXNG
@@ -45,4 +45,4 @@ graph TB
     Memory --> Qdrant
 ```
 
-Each container represents a separately deployable unit. The AscendAgent communicates with MCP services via Streamable HTTP, with data stores via their native protocols, and with LLM providers via HTTP APIs. PostgreSQL, Redis, Qdrant, and MinIO are external prerequisites (in production these map to managed cloud services).
+Each container represents a separately deployable unit. The AscendAgent communicates with MCP services via Streamable HTTP, with data stores via their native protocols, and with LLM providers via HTTP APIs. PostgreSQL, Redis, Qdrant, and S3-compatible object storage (provided locally by a self-hosted emulator) are external prerequisites (in production these map to managed cloud services, with Amazon S3 in its place).

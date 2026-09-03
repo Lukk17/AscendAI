@@ -36,6 +36,31 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("weather_current for Warsaw matches the structured contract", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("ok");
+            expect(payload.message).to.be.null;
+            expect(payload.requestedQuery).to.be.null;
+            expect(payload.location.name.toLowerCase()).to.include("warsaw");
+            expect(payload.location.countryCode).to.equal("PL");
+            expect(payload.location.latitude).to.be.within(51.5, 53.0);
+            expect(payload.location.longitude).to.be.within(20.5, 22.0);
+            expect(payload.temperature.value).to.be.a("number");
+            expect(isFinite(payload.temperature.value)).to.be.true;
+            expect(payload.temperature.unit).to.equal("celsius");
+            expect(payload.weatherCode).to.be.a("number");
+            expect(Number.isInteger(payload.weatherCode)).to.be.true;
+            expect(payload.weatherCode).to.be.within(0, 99);
+            expect(payload.wind.speed).to.be.a("number");
+            expect(payload.wind.speed).to.be.at.least(0);
+            expect(payload.wind.unit).to.equal("km/h");
+            expect(payload.observedAt).to.be.a("string").and.not.empty;
+            expect(payload.source).to.equal("open-meteo");
+            expect(isNaN(Date.parse(payload.fetchedAt))).to.be.false;
+        });
 
 settings:
   encodeUrl: true

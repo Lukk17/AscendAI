@@ -113,15 +113,15 @@ Beyond providers, these YAML keys cover the rest of the agent's deployment surfa
 Boot env-var binding (uppercase, dots and dashes to underscores).
 
 - **`server.port`** (`9917`). Public REST port.
-- **`app.embedding.provider`**. Active embedding backend (mirrors `EMBEDDING_PROVIDER`).
-- **`app.s3.endpoint`** (`http://localhost:9070`). MinIO endpoint for ingestion.
-- **`app.s3.public-endpoint`**. Host-reachable MinIO URL used in presigned `sources[].downloadUrl` payloads. In
+- **`app.embedding.default-provider`**. Active embedding backend (mirrors `EMBEDDING_PROVIDER`).
+- **`app.s3.endpoint`** (`http://localhost:9070`). Object-store endpoint for ingestion.
+- **`app.s3.public-endpoint`**. Host-reachable object-store URL used in presigned `sources[].downloadUrl` payloads. In
   Docker, override to `http://host.docker.internal:9070`.
 - **`app.s3.bucket`** (`knowledge-base`). Ingestion bucket. Auto-created at startup if missing.
 - **`spring.datasource.url`**. Postgres connection for the metadata store.
 - **`app.rag.enabled`**. Toggle the retrieval-gated soft-RAG path.
 - **`app.rag.similarity-threshold`**. Lower bound for injecting retrieved context.
-- **`app.ingestion.auto.enabled`** (`false`). Auto-poll the MinIO bucket on a schedule. Off by default to avoid
+- **`app.ingestion.auto.enabled`** (`false`). Auto-poll the object-store bucket on a schedule. Off by default to avoid
   embedding-cost surprises.
 - **`spring.ai.mcp.client.*`**. MCP server URLs for Weather, AudioScribe, AscendWebSearch.
 

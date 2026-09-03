@@ -8,7 +8,7 @@
 | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------ | :------- |
 | [ADR-M001](ADR-M001-monorepo-structure.md)                              | Monorepo with polyglot services (Java + Python)                                 | Accepted |
 | [ADR-M002](ADR-M002-mcp-for-tool-services.md)                           | MCP as the standard protocol for tool services                                  | Accepted |
-| [ADR-M003](ADR-M003-external-infrastructure-prerequisites.md)           | Infrastructure services (Redis, Qdrant, MinIO) as external prerequisites        | Accepted |
+| [ADR-M003](ADR-M003-external-infrastructure-prerequisites.md)           | Infrastructure services (Redis, Qdrant, S3-compatible object storage) as external prerequisites | Accepted |
 
 ---
 

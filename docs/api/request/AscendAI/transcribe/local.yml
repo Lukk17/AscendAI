@@ -15,13 +15,13 @@ http:
       - name: file
         type: file
         value:
-          - /C:/Users/Lukk/My Drive/Projekty/IT/pharmacy/rec/15minRecording.flac
+          - D:\Development\projekty-IT\AscendAI\AudioScribe\e2e\fixtures\meeting-clip.wav
       - name: model
         type: text
         value: Systran/faster-whisper-large-v3
       - name: language
         type: text
-        value: pl
+        value: en
       - name: with_timestamps
         type: text
         value: "true"

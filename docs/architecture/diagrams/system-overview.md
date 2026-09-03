@@ -28,7 +28,7 @@ graph TB
         PG["PostgreSQL :5432<br/>Chat history · Metadata"]
         RD["Redis :6379<br/>Chat cache"]
         QD["Qdrant :6333<br/>Vector DB (RAG + Memory)"]
-        S3["MinIO :9070<br/>Document storage"]
+        S3["S3-compatible storage :9070<br/>Document storage"]
     end
 
     subgraph "Support (Docker)"
@@ -72,5 +72,5 @@ graph TB
 | RAG retrieval       | AscendAgent to Qdrant                                               | gRPC / HTTP                         |
 | Memory              | AscendAgent to AscendMemory to Qdrant                               | REST + Qdrant API                   |
 | Chat history        | AscendAgent to Redis (read / write), PostgreSQL (persist)           | TCP                                 |
-| Document ingestion  | MinIO to AscendAgent to Docling / Unstructured to Qdrant            | S3 + REST + Qdrant                  |
+| Document ingestion  | S3-compatible storage to AscendAgent to Docling / Unstructured to Qdrant | S3 + REST + Qdrant              |
 | Web search          | AscendAgent to AscendWebSearch to SearXNG to FlareSolverr           | MCP + HTTP                          |

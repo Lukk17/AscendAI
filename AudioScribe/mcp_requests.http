@@ -1,7 +1,7 @@
-# Served via MinIO
-@audio_uri = http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac
+# Served via Floci (S3-compatible object storage on port 9070)
+@audio_uri = http://localhost:9070/e2e-fixtures/meeting-clip.wav
 # If running in Docker (Container to Container communication)
-# @audio_uri = http://minio:9000/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac
+# @audio_uri = http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav
 
 # Served via local server
 # @audio_uri = http://localhost:9999/audio.wav

@@ -123,7 +123,7 @@ public class StartupLogConfig {
         lines.add("    External services:");
         lines.add("      Redis:        " + checkRedis());
         lines.add("      Qdrant:       " + checkQdrant());
-        lines.add("      S3 (MinIO):   " + checkS3());
+        lines.add("      S3 (Floci):   " + checkS3());
         lines.add("      AscendMemory: " + checkAscendMemory());
         lines.add("");
         lines.add("    Actuator:");

@@ -1,6 +1,6 @@
 # RAG dedup: run tasks template
 
-Spec: [7-rag-dedup-test.md](7-rag-dedup-test.md)
+Spec: [../7-rag-dedup-test.md](../7-rag-dedup-test.md)
 
 Copy this file to `runs/<UTC-timestamp>_7-rag-dedup-tasks.md` before starting a run. Tick boxes as you go.
 
@@ -11,19 +11,19 @@ Copy this file to `runs/<UTC-timestamp>_7-rag-dedup-tasks.md` before starting a 
 - [ ] Bruno CLI present
 - [ ] AscendAgent `/actuator/health` returns 200
 - [ ] Qdrant `/healthz` returns 200
-- [ ] MinIO `/minio/health/live` returns 200
+- [ ] Object store `curl -fsS http://localhost:9070/_floci/health` returns 200 with `"s3":"running"`
 - [ ] Postgres responds to `SELECT 1`
-- [ ] MinIO `mc` client present
 - [ ] Fixtures `dedup-pierogi-helena.md` and `dedup-pierogi-grandma.md` exist
 
 ### Reset state
 
-- [ ] Registered MinIO alias `local`
-- [ ] Dropped `markdown/dedup-pierogi-helena.md` and `markdown/dedup-pierogi-grandma.md` from MinIO
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-helena.md"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-grandma.md"` returned HTTP 204
 - [ ] Removed `int_metadata_store` rows for both fixtures
 - [ ] Wiped Qdrant points for both fixtures
 - [ ] Truncated `chat_history` rows for user `frostyRagDedupTest`
 - [ ] Deleted Redis key `chat:frostyRagDedupTest`
+- [ ] Deleted Redis key `user:frostyRagDedupTest:instructions`
 
 ### Run
 
@@ -44,10 +44,13 @@ Copy this file to `runs/<UTC-timestamp>_7-rag-dedup-tasks.md` before starting a 
 
 Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract).
 
-- [ ] Dropped both dedup fixtures from MinIO (`dedup-pierogi-helena.md`, `dedup-pierogi-grandma.md`)
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-helena.md"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-grandma.md"` returned HTTP 204
 - [ ] Deleted `int_metadata_store` rows for the two dedup keys
 - [ ] Wiped Qdrant points for both `source` values in collection `ascendai-1536`
 - [ ] Truncated `chat_history` rows for `frostyRagDedupTest` + deleted Redis key `chat:frostyRagDedupTest`
+- [ ] Deleted Redis key `user:frostyRagDedupTest:instructions`
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyRagDedupTest` returned `{"status":"success", ...}`
 
 ### Verdict
 

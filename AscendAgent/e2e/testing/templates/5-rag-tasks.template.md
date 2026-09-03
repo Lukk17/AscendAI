@@ -1,6 +1,6 @@
 # RAG: run tasks template
 
-Spec: [5-rag-test.md](5-rag-test.md)
+Spec: [../5-rag-test.md](../5-rag-test.md)
 
 Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
@@ -13,17 +13,19 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 - [ ] Docling Serve `/health` returns HTTP 200
 - [ ] Unstructured API `POST /general/v0/general` returns HTTP 4xx (service up, request rejected for missing body)
 - [ ] Qdrant `/healthz` returns HTTP 200
-- [ ] MinIO `/minio/health/live` returns HTTP 200
+- [ ] Object store `curl -fsS http://localhost:9070/_floci/health` returns HTTP 200 with `"s3":"running"`
 - [ ] Postgres responds to `SELECT 1` with a row
-- [ ] MinIO `mc` client present inside the `minio` container (`docker exec minio mc --version` returns a version)
 - [ ] Fixtures `markdown-canary.md`, `banana-price-poland.pdf`, `pierogi-recipe.docx` all exist under `AscendAgent/e2e/fixtures/`
 
 ### Reset state
 
-- [ ] Registered MinIO alias `local` inside the container (`docker exec minio sh -c 'mc alias set local ...'`)
-- [ ] Dropped all objects in MinIO `knowledge-base` bucket
-- [ ] Truncated Postgres `int_metadata_store` table
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"` returned HTTP 204
+- [ ] Deleted the Postgres `int_metadata_store` rows for the three fixtures
 - [ ] Wiped Qdrant `ascendai-*` points for the three fixture sources
+- [ ] Truncated `chat_history` rows for `frostyRagTest` + deleted Redis key `chat:frostyRagTest`
+- [ ] Deleted Redis key `user:frostyRagTest:instructions`
 
 ### Run
 
@@ -37,8 +39,8 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 
 - [ ] Step 1: HTTP 200
 - [ ] Step 1: response body's `uploaded` field lists exactly three keys (one under `markdown/`, two under `documents/`)
-- [ ] Step 1: `docker exec minio mc ls local/knowledge-base/markdown/` lists `markdown-canary.md`
-- [ ] Step 1: `docker exec minio mc ls local/knowledge-base/documents/` lists both `banana-price-poland.pdf` and `pierogi-recipe.docx`
+- [ ] Step 1: `curl -fsS "http://localhost:9070/knowledge-base?list-type=2&prefix=markdown/"` carries `<Key>markdown/markdown-canary.md</Key>`
+- [ ] Step 1: `curl -fsS "http://localhost:9070/knowledge-base?list-type=2&prefix=documents/"` carries both `<Key>documents/banana-price-poland.pdf</Key>` and `<Key>documents/pierogi-recipe.docx</Key>`
 - [ ] Step 2: HTTP 200
 - [ ] Step 2: response body has `indexed` ≥ 3 and `failed` = 0
 - [ ] Step 3a: response `content` contains the canary phrase from the markdown fixture (e.g. `PURPLE-MOOSE-42`)
@@ -48,12 +50,16 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 
 ### Post-run cleanup
 
-Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract).
+Run regardless of Run-step verdict (idempotent; honours Group A hermetic contract). If the spec's optional attach-sources section was exercised, it ran under the same `frostyRagTest` user id, so these commands cover it too.
 
-- [ ] Dropped this spec's three fixtures from MinIO (`markdown-canary.md`, `banana-price-poland.pdf`, `pierogi-recipe.docx`)
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"` returned HTTP 204
+- [ ] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"` returned HTTP 204
 - [ ] Deleted `int_metadata_store` rows for the three fixtures
 - [ ] Wiped Qdrant points for the three `source` values in collection `ascendai-1536`
 - [ ] Truncated `chat_history` rows for `frostyRagTest` + deleted Redis key `chat:frostyRagTest`
+- [ ] Deleted Redis key `user:frostyRagTest:instructions`
+- [ ] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyRagTest` returned `{"status":"success", ...}`
 
 ### Verdict
 

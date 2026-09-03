@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the contract that lets an AI agent (or a human) execute the AscendAgent's capability-level e2e suite end-to-end against a live stack, capture per-run evidence, and emit reviewable PASS/FAIL verdicts as committed markdown artifacts. Pass criteria are observable behavior — HTTP status, response-body content, persisted state in MinIO / Qdrant / Postgres — never log substrings.
+Defines the contract that lets an AI agent (or a human) execute the AscendAgent's capability-level e2e suite end-to-end against a live stack, capture per-run evidence, and emit reviewable PASS/FAIL verdicts as committed markdown artifacts. Pass criteria are observable behavior — HTTP status, response-body content, persisted state in Floci / Qdrant / Postgres — never log substrings.
 
 ## Requirements
 

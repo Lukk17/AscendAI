@@ -14,13 +14,19 @@ Every `<N>-<capability>-test.md` file is the **immutable spec** for one test and
    command is its own code block; the prose around it states what success looks like.
 3. **Reset state.** One command per code block, executed in order, to wipe state so the test is reproducible. For
    AscendMemory this means wiping the specific `user_id`(s) the test touches via
-   `POST /api/v1/memory/wipe?user_id=...`. Test 1 needs no reset (it never reaches mem0).
+   `POST /api/v1/memory/wipe?user_id=...`. Tests 1 and 4 need no reset (neither ever reaches mem0).
 4. **Run.** One or more numbered steps. Each step is a single Bruno CLI invocation. MCP tests have an additional
    first step: a `curl.exe` call to `/mcp` carrying the `initialize` JSON-RPC method, capturing the response's
    `Mcp-Session-Id` header so subsequent Bruno requests can inject it as `--env-var mcp_session_id=<uuid>`.
-5. **Expected.** Observable-behaviour assertions verified after each step: HTTP status codes, response body fields,
+5. **Post-run cleanup.** One command per code block, wiping every `user_id` the run wrote through
+   `POST /api/v1/memory/wipe?user_id=...`, so the test leaves the system exactly as it found it. Tests 1 and 4 write
+   nothing and so have nothing to clean up. The section sits next to `Run` in the spec because that is where the
+   state it names is created, but the runner executes it last, after the `Expected` assertions have been checked
+   against the live state, since some assertions (test 3's Beta search) depend on state this section would remove.
+   The tasks-template ordering is the execution order. Run the commands whether the Run steps passed or failed.
+6. **Expected.** Observable-behaviour assertions verified after each step: HTTP status codes, response body fields,
    user-scope isolation visible via cross-user search. NOT log substrings.
-6. **Fixtures.** Paths to local files the test reads (none for the current suite).
+7. **Fixtures.** Paths to local files the test reads (none for the current suite).
 
 Each spec has a matching `<N>-<capability>-tasks.template.md` in the [templates/](templates/) subdirectory — the
 **checkbox template** for a run. The runner never edits the spec or the template directly. Before starting a run, it
@@ -51,10 +57,16 @@ Numbered by setup cost (lowest first). Run earliest first when stepping through;
 be run on its own.
 
 1. [1-invalid-input-test.md](1-invalid-input-test.md). FastAPI validation rejection. **No state writes.**
-2. [2-insert-and-search-test.md](2-insert-and-search-test.md). REST insert → REST search round-trip.
-3. [3-wipe-user-scope-test.md](3-wipe-user-scope-test.md). Wipe one user, the other survives.
-4. [4-mcp-tools-list-test.md](4-mcp-tools-list-test.md). MCP `tools/list` advertises the memory tools.
+2. [2-insert-and-search-test.md](2-insert-and-search-test.md). REST insert → REST search round-trip. Resets/cleans
+   `frostyMemoryInsertSearchTest`.
+3. [3-wipe-user-scope-test.md](3-wipe-user-scope-test.md). Wipe one user, the other survives. Resets/cleans
+   `frostyMemoryWipeAlpha` and `frostyMemoryWipeBeta`.
+4. [4-mcp-tools-list-test.md](4-mcp-tools-list-test.md). MCP `tools/list` advertises the memory tools. **No state
+   writes.**
 5. [5-mcp-insert-and-search-test.md](5-mcp-insert-and-search-test.md). MCP `memory_insert` → MCP `memory_search`.
+   Resets/cleans `frostyMemoryMcpInsertSearchTest`.
+6. [6-user-isolation-test.md](6-user-isolation-test.md). A memory inserted for user A never surfaces in user B's
+   search. Resets/cleans `frostyMemoryIsolationUserA`; user B is never written to.
 
 ## Cross-cutting conventions
 

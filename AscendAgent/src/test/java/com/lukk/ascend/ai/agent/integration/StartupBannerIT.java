@@ -77,7 +77,7 @@ class StartupBannerIT extends TestcontainersBase {
         assertThat(banner).contains("Postgres:");
         assertThat(banner).contains("Redis:");
         assertThat(banner).contains("Qdrant:");
-        assertThat(banner).contains("S3 (MinIO):");
+        assertThat(banner).contains("S3 (Floci):");
         assertThat(banner).contains("AscendMemory:");
         assertThat(banner).contains("Chat history:");
         assertThat(banner).contains("MCP servers:");

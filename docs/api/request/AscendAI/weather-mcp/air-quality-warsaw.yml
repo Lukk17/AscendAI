@@ -36,6 +36,25 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("weather_air_quality for Warsaw matches the structured contract", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("ok");
+            expect(payload.message).to.be.null;
+            expect(payload.requestedQuery).to.be.null;
+            expect(payload.location.name.toLowerCase()).to.include("warsaw");
+            expect(payload.location.countryCode).to.equal("PL");
+            const hasPm = (typeof payload.pm10 === "number" && isFinite(payload.pm10) && payload.pm10 >= 0)
+                || (typeof payload.pm25 === "number" && isFinite(payload.pm25) && payload.pm25 >= 0);
+            expect(hasPm).to.be.true;
+            const hasAqi = (Number.isInteger(payload.usAqi) && payload.usAqi >= 0)
+                || (Number.isInteger(payload.europeanAqi) && payload.europeanAqi >= 0);
+            expect(hasAqi).to.be.true;
+            expect(payload.source).to.equal("open-meteo");
+            expect(isNaN(Date.parse(payload.fetchedAt))).to.be.false;
+        });
 
 settings:
   encodeUrl: true

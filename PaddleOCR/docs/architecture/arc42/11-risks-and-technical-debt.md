@@ -19,7 +19,7 @@
 | Item | File | Priority |
 | :--- | :--- | :--- |
 | No `HEALTHCHECK` instruction in Dockerfile | `PaddleOCR/Dockerfile` | Medium — Docker Desktop and compose mark the container healthy via process liveness only; operators must add a compose `healthcheck` stanza pointing at `/health` manually. |
-| `MCP_ALLOWED_HOSTS` absent from default compose block | `docker-compose.yaml` | Medium — the e2e MCP test (spec 6) fails without `MCP_ALLOWED_HOSTS=minio`, but nothing in the default compose configuration sets it, making the test silently non-runnable without a manual edit. |
+| `MCP_ALLOWED_HOSTS` absent from default compose block | `docker-compose.yaml` | Medium — the e2e MCP test (spec 6) fails without `MCP_ALLOWED_HOSTS=host.docker.internal`, but nothing in the default compose configuration sets it, making the test silently non-runnable without a manual edit. |
 | Module-level `_http_session` global in `mcp_server.py` | `src/api/mcp/mcp_server.py:24` | Low — works correctly with a single Uvicorn worker. Multi-worker deployments would require moving session state into a context variable or request-local holder. |
 | No `Sunset` header or deprecation window policy for REST | `src/api/rest/rest_endpoints.py` | Low — [ADR-003](../decisions/ADR-003-versioning-strategy.md) defers `Sunset` to when the client population grows. |
 | Pre-cached languages limited to `en` and `pl` in Dockerfile | `PaddleOCR/Dockerfile:23` | Low — other supported languages still trigger a download at first use inside the container (if `.paddlex` cache misses). Image rebuild is required to pre-cache additional languages. |

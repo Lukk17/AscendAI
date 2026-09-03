@@ -87,6 +87,24 @@ bru run "memory/testing/search-alpha.yml" --env ascend-local
 bru run "memory/testing/search-beta.yml" --env ascend-local
 ```
 
+## Post-run cleanup
+
+Step 3 above already wipes Alpha, but Beta is deliberately left populated at the end of the Run section so the
+Expected assertions below can prove Beta survived Alpha's wipe. The section sits next to `Run` because that is
+where the state it names is created, but the runner executes it last, after the `Expected` assertions have been
+checked against the live state. At that point, wipe Beta and re-wipe Alpha so neither user's memories carry over
+into the next run.
+
+```powershell
+curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryWipeAlpha"
+```
+
+```powershell
+curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryWipeBeta"
+```
+
+Each returns HTTP 200 with `{"status":"success", ...}`.
+
 ## Expected
 
 All five calls return HTTP 200.

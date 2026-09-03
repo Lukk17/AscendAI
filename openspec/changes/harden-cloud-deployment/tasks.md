@@ -22,10 +22,10 @@
 
 - [ ] 3.1 Remove `secret_key` from `searxng/settings.yml`; wire `SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set}` into the `searxng` service environment; document that the old committed value is compromised and every deployment generates a fresh one
 - [ ] 3.2 Grafana: set `GF_AUTH_ANONYMOUS_ENABLED=false`, drop `GF_AUTH_ANONYMOUS_ORG_ROLE`, add `GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}` and `GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}`
-- [ ] 3.3 Parameterize `AscendAgent/src/main/resources/application.yaml`: `app.s3.access-key`/`secret-key` → `${MINIO_ACCESS_KEY:admin}`/`${MINIO_SECRET_KEY:password}`, `spring.datasource.username`/`password` → `${POSTGRES_USER:postgres}`/`${POSTGRES_PASSWORD:local}`, `spring.data.redis.password` → `${REDIS_PASSWORD:}`, Qdrant API key → `${QDRANT_API_KEY:}`; mirror any docker-profile overrides in `application-docker.yaml`; pass the variables through the `ascend-agent` compose environment
+- [ ] 3.3 Parameterize `AscendAgent/src/main/resources/application.yaml`: `app.s3.access-key`/`secret-key` → `${S3_ACCESS_KEY:admin}`/`${S3_SECRET_KEY:password}`, `spring.datasource.username`/`password` → `${POSTGRES_USER:postgres}`/`${POSTGRES_PASSWORD:local}`, `spring.data.redis.password` → `${REDIS_PASSWORD:}`, Qdrant API key → `${QDRANT_API_KEY:}`; mirror any docker-profile overrides in `application-docker.yaml`; pass the variables through the `ascend-agent` compose environment
 - [ ] 3.4 Wire `QDRANT_API_KEY` into the `ascend-memory` compose environment and `REDIS_PASSWORD` into the `ascend-web-search` `REDIS_URL`, both defaulting to today's unauthenticated local behavior
 - [ ] 3.5 Implement the AscendAgent production-profile startup guard (design D3): a `@Configuration` validator active only under the `production` Spring profile that fails startup when any datastore credential equals its dev default, and logs a prominent warning when `SECURITY_ENABLED` is false; add a unit test asserting the guard's default-value constants match `application.yaml` and a test for the fail path
-- [ ] 3.6 Verify: `docker compose up` without `GRAFANA_ADMIN_PASSWORD` or `SEARXNG_SECRET` fails fast naming the variable; with them set the stack starts; `./gradlew test` passes; starting AscendAgent with `SPRING_PROFILES_ACTIVE=production` and dev-default MinIO credentials aborts startup
+- [ ] 3.6 Verify: `docker compose up` without `GRAFANA_ADMIN_PASSWORD` or `SEARXNG_SECRET` fails fast naming the variable; with them set the stack starts; `./gradlew test` passes; starting AscendAgent with `SPRING_PROFILES_ACTIVE=production` and dev-default S3 credentials aborts startup
 
 ## 4. Personal-machine artifacts
 
@@ -42,9 +42,9 @@
 
 ## 6. SSRF and SearXNG posture
 
-- [ ] 6.1 Change `MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `audio-scribe` to `${MCP_ALLOWED_HOSTS:-minio}`; remove the committed loopback entries
+- [ ] 6.1 Change `MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `audio-scribe` to `${MCP_ALLOWED_HOSTS:-object-store}`; remove the committed loopback entries
 - [ ] 6.2 Set `SEARXNG_LIMITER=true` and delete the `SEARXNG_X_FORWARDED_FOR` / `SEARXNG_X_REAL_IP` spoofed constants from `ascend-web-search`; forward the received client `X-Forwarded-For` on SearXNG requests instead
-- [ ] 6.3 Verify: with `MCP_ALLOWED_HOSTS` unset, a PaddleOCR MCP fetch of `http://127.0.0.1:9070/x` returns `UNSAFE_URI` while an `http://minio:...` fetch is permitted; SearXNG reports the limiter enabled and search still works through AscendWebSearch
+- [ ] 6.3 Verify: with `MCP_ALLOWED_HOSTS` unset, a PaddleOCR MCP fetch of `http://127.0.0.1:9070/x` returns `UNSAFE_URI` while an `http://object-store:...` fetch is permitted; SearXNG reports the limiter enabled and search still works through AscendWebSearch
 
 ## 7. Healthchecks and startup ordering
 
@@ -55,9 +55,9 @@
 
 ## 8. .env.example and documentation
 
-- [ ] 8.1 Extend `.env.example` with every new variable (`EXPOSE_BIND`, `ASCEND_DOMAIN`, `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`, `SEARXNG_SECRET`, `SECURITY_ENABLED`, `MCP_ALLOWED_HOSTS`, `HF_CACHE_ROOT`, `AUDIO_SCRIBE_MEDIA_ROOT`, `AUDIO_SCRIBE_FILE_URI_ROOT`, `COMPOSE_PROFILES`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `QDRANT_API_KEY`): one-line comment per variable naming purpose and consuming service, empty values for secrets, safe defaults shown for non-secrets, production-required variables flagged
+- [ ] 8.1 Extend `.env.example` with every new variable (`EXPOSE_BIND`, `ASCEND_DOMAIN`, `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`, `SEARXNG_SECRET`, `SECURITY_ENABLED`, `MCP_ALLOWED_HOSTS`, `HF_CACHE_ROOT`, `AUDIO_SCRIBE_MEDIA_ROOT`, `AUDIO_SCRIBE_FILE_URI_ROOT`, `COMPOSE_PROFILES`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `QDRANT_API_KEY`): one-line comment per variable naming purpose and consuming service, empty values for secrets, safe defaults shown for non-secrets, production-required variables flagged
 - [ ] 8.2 Add the cloud VM deployment section to `docs/DEPLOYMENT.md`: DNS for `ASCEND_DOMAIN`, ACME TLS via the gateway plus local internal-CA fallback, `.env` preparation, the production checklist (`SECURITY_ENABLED=true`, no dev-default credentials, external port scan), and the loopback-ports-on-VM caveat from design Risks
-- [ ] 8.3 Add backup/restore procedures for Postgres, Redis, Qdrant, and MinIO to the same section, covering both co-located-container and managed-service topologies
+- [ ] 8.3 Add backup/restore procedures for Postgres, Redis, Qdrant, and the S3-compatible object store to the same section, covering both co-located-container and managed-service topologies
 - [ ] 8.4 Update the root `README.md` ports/configuration prose and the `AGENTS.md` compose tables where exposure semantics changed (gateway on 80/443, loopback-bound service ports, ngrok profile)
 
 ## 9. End-to-end verification

@@ -37,6 +37,31 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("weather_geocode for Springfield returns multiple distinct candidates", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("ok");
+            expect(payload.message).to.be.null;
+            expect(payload.requestedQuery).to.be.null;
+            expect(payload.candidates).to.be.an("array");
+            expect(payload.candidates.length).to.be.at.least(3);
+            const tuples = payload.candidates.map(function (c) { return c.latitude + "," + c.longitude; });
+            expect(new Set(tuples).size).to.equal(tuples.length);
+            const hasUs = payload.candidates.some(function (c) { return c.countryCode === "US"; });
+            expect(hasUs).to.be.true;
+            payload.candidates.forEach(function (c) {
+                expect(c.name.toLowerCase()).to.include("springfield");
+                expect(c.latitude).to.be.a("number");
+                expect(isFinite(c.latitude)).to.be.true;
+                expect(c.longitude).to.be.a("number");
+                expect(isFinite(c.longitude)).to.be.true;
+                expect(c.countryCode).to.be.a("string").and.not.empty;
+            });
+            expect(payload.source).to.equal("open-meteo");
+            expect(isNaN(Date.parse(payload.fetchedAt))).to.be.false;
+        });
 
 settings:
   encodeUrl: true

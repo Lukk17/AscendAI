@@ -27,6 +27,24 @@ http:
         value: MiniMax-M2.7
         description: "default: MiniMax-M2.5 values: MiniMax-M2.5-highspeed ; MiniMax-M2.1 ; MiniMax-M2 ; MiniMax-M1"
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Weather content carries a real temperature and condition, not a refusal", function () {
+            const content = res.getBody().content;
+            expect(content).to.be.a("string").and.not.empty;
+            expect(content).to.match(/-?\d+(\.\d+)?\s*(°|degrees)?\s*(c|f|celsius|fahrenheit)?/i);
+            const conditionWords = ["cloud", "clear", "sunny", "rain", "snow", "overcast", "wind", "fog", "storm", "drizzle", "sun"];
+            const lower = content.toLowerCase();
+            expect(conditionWords.some(function (w) { return lower.includes(w); })).to.be.true;
+            expect(lower).to.not.include("i cannot access live data");
+            expect(lower).to.not.include("i don't have real-time data");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

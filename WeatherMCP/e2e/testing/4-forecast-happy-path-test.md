@@ -4,7 +4,7 @@
 
 - `weather_forecast` for Warsaw with `days=3` returns HTTP 200 and `status="ok"`.
 - The `forecast` array has length exactly 3.
-- Each element has a `date` field (ISO `yyyy-MM-dd`), numeric `temperatureMax`, numeric `temperatureMin`, optional
+- Each element has a `date` field (ISO `yyyy-MM-dd`), numeric `maxTemp`, numeric `minTemp`, optional
   numeric `precipitationSum`, integer `weatherCode`.
 - Dates are strictly increasing.
 - The first date equals today (UTC) or today+1 (depending on Open-Meteo's day cutover for the requesting region).
@@ -74,8 +74,8 @@ HTTP 200. The JSON-RPC `result` content matches:
 - `location.name` is non-empty and contains "Warsaw" (case-insensitive).
 - `location.countryCode` equals `"PL"`.
 - `forecast` is an array of exactly 3 entries.
-- For each entry: `date` matches `yyyy-MM-dd`; `temperatureMax` and `temperatureMin` are finite numbers with
-  `temperatureMin <= temperatureMax`; `weatherCode` is an integer in 0–99.
+- For each entry: `date` matches `yyyy-MM-dd`; `maxTemp` and `minTemp` are finite numbers with
+  `minTemp <= maxTemp`; `weatherCode` is an integer in 0–99.
 - The `date` values are strictly increasing.
 - `temperatureUnit` equals `"celsius"`.
 - `source` equals `"open-meteo"`.

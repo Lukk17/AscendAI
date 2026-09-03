@@ -201,24 +201,14 @@ async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch
     payload = _parse_mcp_response(resp)
     content = payload["result"]["content"][0]
     assert content["type"] == "text"
-    text_val = str(content.get("text", ""))
-    # Accept both embedded JSON string and plain text by substring check
-    if text_val.strip().startswith("{"):
-        # Try to parse and extract transcription field, else fallback to substring
-        try:
-            inner = json.loads(text_val)
-            trans_val = inner.get("transcription")
-            if isinstance(trans_val, str):
-                assert "to look like" in trans_val
-            elif isinstance(trans_val, list):
-                joined = " ".join(str(s.get("text", "")) for s in trans_val)
-                assert "to look like" in joined
-            else:
-                assert "to look like" in text_val
-        except Exception:
-            assert "to look like" in text_val
-    else:
-        assert "to look like" in text_val
+    inner = json.loads(content["text"])
+    assert inner == {
+        "status": "success",
+        "source": "local",
+        "model": "Systran/faster-whisper-large-v3",
+        "language": "en",
+        "transcription": "to look like just like a basket",
+    }
 
 
 async def test_streamable_http_health_tool(asgi_client: AsyncClient):
@@ -278,15 +268,14 @@ async def test_streamable_http_transcribe_openai_with_monkeypatch(monkeypatch, t
     payload = _parse_mcp_response(resp)
     content = payload["result"]["content"][0]
     assert content["type"] == "text"
-    text_val = str(content.get("text", ""))
-    if text_val.strip().startswith("{"):
-        try:
-            inner = json.loads(text_val)
-            assert inner.get("transcription") == "OPENAI OK"
-        except Exception:
-            assert "OPENAI OK" in text_val
-    else:
-        assert "OPENAI OK" in text_val
+    inner = json.loads(content["text"])
+    assert inner == {
+        "status": "success",
+        "source": "openai",
+        "model": "whisper-1",
+        "language": "en",
+        "transcription": "OPENAI OK",
+    }
 
 
 async def test_streamable_http_transcribe_hf_with_monkeypatch(monkeypatch, temp_audio_file, asgi_client: AsyncClient):
@@ -325,15 +314,14 @@ async def test_streamable_http_transcribe_hf_with_monkeypatch(monkeypatch, temp_
     payload = _parse_mcp_response(resp)
     content = payload["result"]["content"][0]
     assert content["type"] == "text"
-    text_val = str(content.get("text", ""))
-    if text_val.strip().startswith("{"):
-        try:
-            inner = json.loads(text_val)
-            assert inner.get("transcription") == "HF OK"
-        except Exception:
-            assert "HF OK" in text_val
-    else:
-        assert "HF OK" in text_val
+    inner = json.loads(content["text"])
+    assert inner == {
+        "status": "success",
+        "source": "huggingface",
+        "model": "openai/whisper-large-v3",
+        "provider": "hf-inference",
+        "transcription": "HF OK",
+    }
 
 
 async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch, temp_audio_file,
@@ -374,27 +362,17 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch
     payload = _parse_mcp_response(resp)
     content = payload["result"]["content"][0]
     assert content["type"] == "text"
-    text_val = str(content.get("text", "")).strip()
-    if text_val.startswith("{"):
-        try:
-            inner = json.loads(text_val)
-            trans = inner.get("transcription")
-            if isinstance(trans, list) and len(trans) == 2:
-                for item in trans:
-                    assert "text" in item
-                    assert "timestamp" in item
-                    ts = item["timestamp"]
-                    assert isinstance(ts, (list, tuple))
-                    assert len(ts) == 2
-            else:
-                assert "one" in text_val
-                assert "two" in text_val
-        except Exception:
-            assert "one" in text_val
-            assert "two" in text_val
-    else:
-        assert "one" in text_val
-        assert "two" in text_val
+    inner = json.loads(content["text"])
+    assert inner == {
+        "status": "success",
+        "source": "local",
+        "model": "Systran/faster-whisper-large-v3",
+        "language": "en",
+        "transcription": [
+            {"text": "one", "timestamp": [0.0, 0.5]},
+            {"text": "two", "timestamp": [0.5, 1.0]},
+        ],
+    }
 
 
 async def test_streamable_http_transcribe_local_file_not_found(monkeypatch, asgi_client: AsyncClient):
@@ -1062,8 +1040,14 @@ async def test_transcribe_audacity_success(
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
-    assert "success" in text
-    assert "merged transcript" in text
+    inner = json.loads(text)
+    assert inner == {
+        "status": "success",
+        "source": "local",
+        "model": "Systran/faster-whisper-large-v3",
+        "language": "en",
+        "transcription": "merged transcript",
+    }
 
 
 async def test_transcribe_audacity_propagates_runtime_error_as_internal_error(

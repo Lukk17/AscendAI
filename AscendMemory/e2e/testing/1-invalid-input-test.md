@@ -45,6 +45,11 @@ cd docs/api/request/AscendAI
 bru run "memory/testing/invalid-missing-user.yml" --env ascend-local
 ```
 
+## Post-run cleanup
+
+None. The request is rejected before it reaches mem0 / Qdrant, so no `user_id` is ever touched and there is nothing
+to remove.
+
 ## Expected
 
 The call returns HTTP 422.

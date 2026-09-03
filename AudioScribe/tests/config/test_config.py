@@ -28,9 +28,9 @@ def test_module_level_singleton_exists() -> None:
 
 
 def test_allowed_hosts_csv_env_var_splits_into_list() -> None:
-    with patch.dict(os.environ, {"MCP_ALLOWED_HOSTS": "host.docker.internal,localhost, minio"}):
+    with patch.dict(os.environ, {"MCP_ALLOWED_HOSTS": "host.docker.internal,localhost, internal-store"}):
         fresh = Settings()
-    assert fresh.MCP_ALLOWED_HOSTS == ["host.docker.internal", "localhost", "minio"]
+    assert fresh.MCP_ALLOWED_HOSTS == ["host.docker.internal", "localhost", "internal-store"]
 
 
 def test_allowed_hosts_native_list_form_passes_through() -> None:

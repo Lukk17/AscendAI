@@ -3,7 +3,7 @@
 Manual / AI-runnable e2e suite for the AudioScribe speech-to-text microservice. Each test exercises **one capability**
 end-to-end against a live AudioScribe container on port 7017. Assertions are observable behaviour only — HTTP status
 codes, response `.md` body content (canary phrase substring match), JSON-RPC tool-result shape. AudioScribe holds no
-persisted database, no Redis, no Qdrant, no MinIO; the only state it keeps is a TTL-bounded `/tmp` transcript-download
+persisted database, no Redis, no Qdrant, no object store; the only state it keeps is a TTL-bounded `/tmp` transcript-download
 cache. Where a test could be polluted by leftover `.md` files, the reset step is to delete `/tmp/transcript_*.md`
 inside the container.
 

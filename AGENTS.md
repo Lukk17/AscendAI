@@ -168,7 +168,7 @@ These services must be running before starting docker-compose. In production the
 | PostgreSQL | 5432 | Persistent metadata, chat history, ingestion state |
 | Redis | 6379 | Chat history cache and session persistence |
 | Qdrant | 6333 / 6334 | Vector database for RAG embeddings and semantic memory |
-| MinIO | 9070 / 9071 | S3-compatible object storage for RAG document ingestion |
+| Object storage (locally: Floci) | 9070 / 9071 | S3-compatible object storage for RAG document ingestion |
 
 ## Docker Compose Services
 
@@ -204,7 +204,7 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 ## How to Build and Run
 
 ```bash
-# 1. Ensure external prerequisites are running (PostgreSQL :5432, Redis :6379, Qdrant :6333, MinIO :9070)
+# 1. Ensure external prerequisites are running (PostgreSQL :5432, Redis :6379, Qdrant :6333, S3-compatible object storage :9070)
 
 # 2. Start application and support services (the main file pulls in ascend-scrapper via `include:`)
 docker compose up -d --build
@@ -230,7 +230,7 @@ cd AscendAgent && ./gradlew bootRun
 
 ## End-to-End Test Suite
 
-Capability-level e2e tests for the AscendAgent live in [`AscendAgent/e2e/`](AscendAgent/e2e/README.md). Five numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in MinIO / Qdrant / Postgres — never log substrings. See [`AscendAgent/e2e/README.md`](AscendAgent/e2e/README.md) for the full contract and capability matrix.
+Capability-level e2e tests for the AscendAgent live in [`AscendAgent/e2e/`](AscendAgent/e2e/README.md). Five numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`AscendAgent/e2e/README.md`](AscendAgent/e2e/README.md) for the full contract and capability matrix.
 
 ## IDE Compatibility
 
