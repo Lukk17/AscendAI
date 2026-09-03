@@ -3,14 +3,14 @@
   "instructions": [
     "AGENTS.md"
   ],
+  "plugin": [
+    "./.agents/plugin/hooks.js"
+  ],
   "mcp": {
     
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
-      "headers": {
-        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
-      },
       "enabled": true
     },
     
@@ -21,8 +21,7 @@
         "mcp-grafana"
       ],
       "environment": {
-        "GRAFANA_URL": "http://localhost:3000",
-        "GRAFANA_SERVICE_ACCOUNT_TOKEN": "{env:GRAFANA_SERVICE_ACCOUNT_TOKEN}"
+        "GRAFANA_URL": "http://localhost:3000"
       },
       "enabled": true
     },

@@ -88,7 +88,7 @@ I write like a tired senior engineer, not a marketing intern.
   - **Marketing adjectives without concrete payoff.** "comprehensive", "robust", "seamless", "leverage", "delve",
     "elevate", "unlock". If you can't replace the adjective with a concrete fact (`covers 12 cases including X`,
     `15ms p99 latency`), delete it.
-  - **"X — Y — Z" rhythm chains** (already banned via the em-dash rule, but the rhythm itself reads as AI even with
+  - **`"X — Y — Z"` rhythm chains** (already banned via the em-dash rule, but the rhythm itself reads as AI even with
     other punctuation: "fast, reliable, affordable; tested, scalable, secure"). Vary or split.
 - No "comprehensive", "robust", "seamless", "leverage", "delve", "in today's fast-paced world".
 - Contractions are fine. Casual is fine. Jargon is fine if the audience is technical.
@@ -111,14 +111,11 @@ I write like a tired senior engineer, not a marketing intern.
   digits (`1.`, `2.`, `3.`) for ordered lists. For sub-steps inside a numbered item, use lowercase letters with
   closing paren (`a)`, `b)`, `c)`) or just nest with another `1.` / `2.`; both render correctly in GFM. Reserve `I`,
   `V`, `X`, `L` only for actual proper nouns or version names that already contain them.
-- **Soft-wrap prose at ~120 characters.** Hard rule: 120 max for plain prose lines. Code blocks stay at the
-  language's own width (commonly 100-120). Tables stay on one line per row; don't break a table cell. Long URLs in a
-  link don't trigger a re-wrap; the surrounding text does. Reasons: side-by-side diffs stay readable, terminal
-  `less` / `view` doesn't horizontally scroll, code review comments anchor to a meaningful line. The 120 target gives
-  ~30 chars of headroom over code's typical 80-100 to keep prose flowing without making the file look like a
-  typewriter draft. Lists, headings, and `> ` blockquote prose all follow the same 120 cap. The exception is a
-  single-line lead under a heading where breaking would split a noun phrase awkwardly; keep it on one line and move
-  on. Re-wrap existing files when you touch a paragraph; don't reformat lines you didn't edit (it pollutes the diff).
+- **Never hard-wrap. No line-length cap.** Do not insert a line break to keep a line under any width. Write each
+  paragraph, each list item, each heading, and each blockquote line as one single physical line and let the editor or
+  the viewer soft-wrap it on screen. This applies with no exception inside a fenced code block: never break a command,
+  a path, a URL, or a line of code to make it narrower, because the reader copies it and a break corrupts it. Tables
+  stay on one line per row; don't break a table cell. Do not re-wrap existing files.
 - **Section headings in human-facing markdown start at `###` (H3), not `#` or `##`.** Reserve `#` (H1) for the
   document title; one per file. Skip `##` (H2) entirely in READMEs and human-facing docs. Reason: GitHub renders H1
   very large (used for the page header) and H2 large with an underline rule. Both look too heavy when used for every
@@ -205,7 +202,7 @@ When polishing an existing README I walk this list:
 - ❌ Code blocks with comments doing the teaching instead of prose
 - ❌ Roman-numeral list markers (`i.`, `ii.`, `iii.`, `(i)`, `(ii)`...); replace with Arabic digits or lowercase
   letters with `)`
-- ❌ Prose paragraphs as single multi-hundred-character lines (no soft-wraps); re-wrap at ~120
+- ❌ Hard-wrapped prose or code blocks, meaning a line broken early to fit a width. Join it back into one line
 - ❌ Counts duplicated in prose (skill / subagent / MCP / tool numbers); leave the count in the badge, drop it from
   the sentence
 - ❌ Missing `---` before any section heading, including the first; restore the dividers

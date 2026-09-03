@@ -41,9 +41,9 @@ Full catalogue: see the agent-standards README's "Subagents catalog" section, or
 
 ## MCP servers
 
-This project may expose MCP tools (Context7 docs, MongoDB introspection, Grafana, Playwright, Chrome DevTools, Redis,
-SonarQube, n8n). Check your tool list at startup and use them when they're a better fit than re-deriving the answer
-from local files. Human-side setup lives in [`docs/MCP_SETUP.md`](docs/MCP_SETUP.md).
+This project may expose MCP tools (Context7 docs, Grafana, Playwright, Chrome DevTools, Redis). Check your tool list at
+startup and use them when they're a better fit than re-deriving the answer from local files. Human-side setup lives in
+[`docs/MCP_SETUP.md`](docs/MCP_SETUP.md).
 
 ## Working With Agents
 

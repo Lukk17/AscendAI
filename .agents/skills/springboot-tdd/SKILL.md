@@ -6,22 +6,34 @@ origin: ECC
 
 # Spring Boot TDD Workflow
 
-TDD guidance for Spring Boot services with 80%+ coverage (unit + integration).
+TDD guidance for Spring Boot services with around 90% coverage of real logic (unit + integration), and
+100% where it genuinely adds value.
 
-## When to Use
+---
+
+### When to Use
 
 - New features or endpoints
 - Bug fixes or refactors
 - Adding data access logic or security rules
 
-## Workflow
+---
 
-1) Write tests first (they should fail)
+### Workflow
+
+1) Write a failing test first (they should fail)
 2) Implement minimal code to pass
 3) Refactor with tests green
 4) Enforce coverage (JaCoCo)
 
-## Unit Tests (JUnit 5 + Mockito)
+Every test must satisfy FIRST: Fast (runs in milliseconds), Isolated (no dependence on other tests or
+shared state), Repeatable (same result on every run and every machine), Self-validating (a single
+pass/fail with no manual inspection), and Timely (written alongside or before the code, not bolted on
+afterwards). FIRST is the governing principle for this workflow.
+
+---
+
+### Unit Tests (JUnit 5 + Mockito)
 
 ```java
 @ExtendWith(MockitoExtension.class)
@@ -39,15 +51,39 @@ class MarketServiceTest {
     assertThat(result.name()).isEqualTo("name");
     verify(repo).save(any());
   }
+
+  @Test
+  void create_whenRepositoryFails_propagatesException() {
+    CreateMarketRequest req = new CreateMarketRequest("name", "desc", Instant.now(), List.of("cat"));
+    when(repo.save(any())).thenThrow(new DataAccessResourceFailureException("db down"));
+
+    assertThatThrownBy(() -> service.create(req))
+        .isInstanceOf(DataAccessResourceFailureException.class);
+    verify(repo).save(any());
+  }
+
+  @Test
+  void create_withEmptyCategories_stillCreatesMarket() {
+    CreateMarketRequest req = new CreateMarketRequest("name", "desc", Instant.now(), List.of());
+    when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    Market result = service.create(req);
+
+    assertThat(result.categories()).isEmpty();
+  }
 }
 ```
 
 Patterns:
-- Arrange-Act-Assert
+- Setup, action, assertion in every test body, labelled per the project's convention if the project labels test
+  phases at all (see `coding-standards` -> Test Structure)
+- Cover the happy path plus error and edge cases (failures, empty inputs, boundaries)
 - Avoid partial mocks; prefer explicit stubbing
 - Use `@ParameterizedTest` for variants
 
-## Web Layer Tests (MockMvc)
+---
+
+### Web Layer Tests (MockMvc)
 
 ```java
 @WebMvcTest(MarketController.class)
@@ -66,7 +102,12 @@ class MarketControllerTest {
 }
 ```
 
-## Integration Tests (SpringBootTest)
+Use `@MockitoBean` for mocking Spring beans on Boot 3.4 and newer; the older `@MockBean` is deprecated. The
+sibling springboot-verification skill must use the same annotation, so keep the two in sync.
+
+---
+
+### Integration Tests (SpringBootTest)
 
 ```java
 @SpringBootTest
@@ -87,7 +128,9 @@ class MarketIntegrationTest {
 }
 ```
 
-## Persistence Tests (DataJpaTest)
+---
+
+### Persistence Tests (DataJpaTest)
 
 ```java
 @DataJpaTest
@@ -108,12 +151,16 @@ class MarketRepositoryTest {
 }
 ```
 
-## Testcontainers
+---
+
+### Testcontainers
 
 - Use reusable containers for Postgres/Redis to mirror production
 - Wire via `@DynamicPropertySource` to inject JDBC URLs into Spring context
 
-## Coverage (JaCoCo)
+---
+
+### Coverage (JaCoCo)
 
 Maven snippet:
 ```xml
@@ -134,13 +181,17 @@ Maven snippet:
 </plugin>
 ```
 
-## Assertions
+---
+
+### Assertions
 
 - Prefer AssertJ (`assertThat`) for readability
 - For JSON responses, use `jsonPath`
 - For exceptions: `assertThatThrownBy(...)`
 
-## Test Data Builders
+---
+
+### Test Data Builders
 
 ```java
 class MarketBuilder {
@@ -150,9 +201,11 @@ class MarketBuilder {
 }
 ```
 
-## CI Commands
+---
+
+### CI Commands
 
 - Maven: `mvn -T 4 test` or `mvn verify`
 - Gradle: `./gradlew test jacocoTestReport`
 
-**Remember**: Keep tests fast, isolated, and deterministic. Test behavior, not implementation details.
+Remember: Keep tests fast, isolated, and deterministic. Test behavior, not implementation details.
