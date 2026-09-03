@@ -1,45 +1,57 @@
 # End-to-end suite cost
 
-Prices recorded 2026-09-03, usage recorded 2026-09-03 against code at the current working tree (no commit SHA captured, git commands were out of scope for this document). The two halves below are independent on purpose. Provider prices go stale, spec structure and call counts do not. When a provider changes a rate, edit only the price table in [Prices](#prices) and the totals in [How to recalculate](#how-to-recalculate) follow by multiplication. Nothing in [Usage](#usage) needs to change for a price update.
+Usage recorded 2026-09-03 against code at the current working tree (no commit SHA captured, git commands were out of scope for this document). Prices first recorded 2026-09-03 and revised 2026-09-04, when the four gaps the first pass left open were closed. The two halves below are independent on purpose. Provider prices go stale, spec structure and call counts do not. When a provider changes a rate, edit only the price table in [Prices](#prices) and the totals in [How to recalculate](#how-to-recalculate) follow by multiplication. Nothing in [Usage](#usage) needs to change for a price update.
+
+MiniMax is deliberately absent from every dollar figure below. The account it runs on is a flat subscription rather than metered per-token billing, so the three specs routed through `MiniMax-M2.7` add nothing to the marginal cost of running the sweep again. Their token counts stay in [Usage](#usage), because those are structural facts about the suite, and they are simply never multiplied by a rate.
 
 ---
 
 ### Prices
 
-Snapshot only. Every row below was read from the providers' own pricing pages on 2026-09-03. Re-check the source URL before trusting an old copy of this table.
+Snapshot only. Every row below was read from the providers' own pricing pages, on the date the row's source line names. Re-check the source URL before trusting an old copy of this table.
 
 #### OpenAI
 
-Source: [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing), read 2026-09-03.
+Source: [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing), re-read 2026-09-04. The page carries no publication date of its own. The only dates it prints anywhere are 2026-03-05, against a data-residency eligibility note, and 2026-07-30, against a Fast-mode renaming announcement, neither of which stamps the price table.
 
-| Model | Input $ / million tokens | Output $ / million tokens | Notes |
-| :--- | ---: | ---: | :--- |
-| gpt-4o | 2.50 | 10.00 | Configured chat default for the openai provider. |
-| gpt-4o-mini | 0.15 | 0.60 | Configured memory-extraction and compaction model for the openai provider. |
-| gpt-5.1 | unknown | unknown | Not listed on the fetched pricing page. Used as the requested chat model in [AscendAgent e2e spec 2](../AscendAgent/e2e/testing/2-image-description-test.md), so that spec's chat cost cannot currently be priced. |
-| Whisper (transcription) | 0.006 $ / minute of audio | n/a | Not a per-token rate. Used by [AudioScribe e2e specs 2 and 5](../AudioScribe/e2e/testing/). |
-| text-embedding-3-small | 0.02 | n/a (embedding, input only) | Configured embedding model for the openai provider in AscendAgent. |
-| text-embedding-3-large | 0.13 | n/a (embedding, input only) | Priced for completeness. Not wired into any AscendAgent provider config today, see [application.yaml:237-257](../AscendAgent/src/main/resources/application.yaml#L237-L257). |
+| Model | Input $ / million tokens | Cached input $ / million tokens | Output $ / million tokens | Notes |
+| :--- | ---: | ---: | ---: | :--- |
+| gpt-5.1 | 1.25 | 0.125 | 10.00 | Confirmed 2026-09-04. The 2026-09-03 pass recorded this as unknown, which was wrong: the model is on the page. Requested chat model in [AscendAgent e2e spec 2](../AscendAgent/e2e/testing/2-image-description-test.md). |
+| gpt-4o | 2.50 | 1.25 | 10.00 | Configured chat default for the openai provider. The cached-input rate is confirmed at exactly half the standard input rate, closing the gap the 2026-09-03 pass left open on [spec 8](../AscendAgent/e2e/testing/8-prompt-cache-openai-test.md)'s 2,560 cached tokens. |
+| gpt-4o-mini | 0.15 | n/a (not separately checked) | 0.60 | Configured memory-extraction and compaction model for the openai provider. Never actually billed in this sweep, see [Findings](#findings). |
+| Whisper (transcription) | 0.006 $ / minute of audio | n/a | n/a | Not a per-token rate. Used by [AudioScribe e2e specs 2 and 5](../AudioScribe/e2e/testing/). The page prices "Whisper" without the `whisper-1` suffix the service actually sends. |
+| text-embedding-3-small | 0.02 | n/a | n/a (embedding, input only) | Configured embedding model for the openai provider in AscendAgent, and the model AscendMemory's own specs billed against. |
+| text-embedding-3-large | 0.13 | n/a | n/a (embedding, input only) | Priced for completeness. Not wired into any AscendAgent provider config today, see [application.yaml:237-257](../AscendAgent/src/main/resources/application.yaml#L237-L257). |
 
 #### Anthropic
 
-Source: [platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-09-03.
+Source: Anthropic's own model pricing table, cached 2026-06-24. Cache-read and cache-write rates for Sonnet 4.6 follow Anthropic's standard multipliers on the input rate, roughly one tenth for a read and 1.25 times for a five-minute write.
 
-| Model | Input $ / million tokens | Output $ / million tokens | Cache write (5 min) | Cache write (1 hour) | Cache read | Notes |
-| :--- | ---: | ---: | ---: | ---: | ---: | :--- |
-| Claude Sonnet 4.5 | 3.00 | 15.00 | 3.75 | 6.00 | 0.30 | Configured chat default for the anthropic provider (`claude-sonnet-4-5`). |
-| Claude Haiku 3.5 | 0.80 | 4.00 | 1.00 | 1.60 | 0.08 | Retired on the first-party Anthropic API per the same pricing page. Available only through Amazon Bedrock and Google Cloud. This is the exact model string configured as the anthropic memory-extraction model, see [Findings](#findings). |
+| Model | Input $ / million tokens | Output $ / million tokens | Cache write (5 min) | Cache read | Source and date | Notes |
+| :--- | ---: | ---: | ---: | ---: | :--- | :--- |
+| Claude Sonnet 4.6 | 3.00 | 15.00 | 3.75 | 0.30 | Anthropic model pricing table, cached 2026-06-24 | The model string actually sent by [AscendAgent e2e specs 9, 10, and 11](../AscendAgent/e2e/testing/). The 2026-09-03 pass could not price it. |
+| Claude Haiku 4.5 | 1.00 | 5.00 | 1.25 | 0.10 | Anthropic model pricing table, cached 2026-06-24 | Configured compaction model for the anthropic provider. Billed once in this sweep, by [spec 10](../AscendAgent/e2e/testing/10-compaction-fires-test.md)'s server-side compaction call. |
+| Claude Sonnet 4.5 | 3.00 | 15.00 | 3.75 | 0.30 | [platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-09-03 | Configured chat default for the anthropic provider (`claude-sonnet-4-5`). No spec actually requests it, because every spec sends an explicit `model` field. |
+| Claude Haiku 3.5 | 0.80 | 4.00 | 1.00 | 0.08 | [platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-09-03 | Retired on the first-party Anthropic API per that page. Available only through Amazon Bedrock and Google Cloud. This is the exact model string configured as the anthropic memory-extraction model, see [Findings](#findings). Never billed in this sweep. |
 
-`claude-sonnet-4-6` is not on this pricing page at all. It is the actual model string sent by [AscendAgent e2e specs 9, 10, and 11](../AscendAgent/e2e/testing/), which is neither the configured default (`claude-sonnet-4-5`) nor a model this snapshot can price. Treat its cost as unknown until Anthropic lists it or the specs are updated to a priced model.
+#### Hugging Face Inference
 
-#### Unpriced today
+Source: [huggingface.co/docs/inference-providers/pricing](https://huggingface.co/docs/inference-providers/pricing), read 2026-09-04. The page prints no publication date. Its only internal date marker is "As of July 2025", against a note that `hf-inference` focuses mostly on CPU inference.
+
+There is no flat rate for a speech-recognition call, and none for Whisper specifically. The page states the rule directly: past the free-tier credits "you get charged for every inference request based on the compute time x price of the underlying hardware", and Hugging Face "charges you the same rates as the provider, with no additional fees". The single concrete hardware rate the page publishes is inside its own worked example: a request that takes 10 seconds on a GPU machine costing 0.00012 $ per second bills 0.0012 $.
+
+That 0.00012 $ per GPU second is therefore the only anchor available, and every Hugging Face figure in this document is an approximation built on it. See [Cost of the 2026-09-03 sweep](#cost-of-the-2026-09-03-sweep) for how the 9.48-second clip is converted.
+
+#### Excluded from money on purpose
+
+| Item | Why | What it affects |
+| :--- | :--- | :--- |
+| MiniMax (`MiniMax-M2.7`) | The account is on a flat subscription, not metered per-token billing. Running these specs again costs nothing marginal, so multiplying their tokens by any rate would overstate the sweep. | [AscendAgent e2e specs 1, 3, 4](../AscendAgent/e2e/testing/), which all request `provider=minimax`. Their token counts stay in [Usage](#usage) and are simply never priced. This is also the configured chat, memory-extraction, and compaction model for the minimax provider, see [application.yaml:230-231](../AscendAgent/src/main/resources/application.yaml#L230-L231). |
+
+#### Still unpriced
 
 | Item | Why it is unknown | What it affects |
 | :--- | :--- | :--- |
-| gpt-5.1 | Not on the OpenAI pricing page fetched above. | [AscendAgent e2e spec 2](../AscendAgent/e2e/testing/2-image-description-test.md), the only spec that requests it. |
-| claude-sonnet-4-6 | Not on the Anthropic pricing page fetched above. Anthropic's priced Sonnet tier is 4.5, a different model string. | [AscendAgent e2e specs 9, 10, 11](../AscendAgent/e2e/testing/), all of which request it explicitly, plus the `/api/v1/ai/prompt` demo in the root [README.md](../README.md) which uses the same string. |
-| MiniMax (`MiniMax-M2.7`) | MiniMax publishes no retrievable per-token price. | [AscendAgent e2e specs 1, 3, 4](../AscendAgent/e2e/testing/), which all request `provider=minimax`. This is also the configured chat, memory-extraction, and compaction model for the minimax provider, see [application.yaml:230-231](../AscendAgent/src/main/resources/application.yaml#L230-L231). |
-| Hugging Face Inference (Whisper) | Hugging Face bills compute seconds at the underlying provider's rate rather than a flat per-call or per-minute price. | [AudioScribe e2e spec 3](../AudioScribe/e2e/testing/3-transcribe-hf-test.md). |
 | Gemini (chat and embedding) | Not fetched for this snapshot. | No AscendAgent e2e spec currently requests `provider=gemini`, so this gap does not block recalculating today's suite cost. It does block pricing a future Gemini-routed spec. |
 
 #### Models actually wired in per provider
@@ -78,25 +90,44 @@ The task that produced this document stated 43 specifications outside the storag
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: |
 | 1 | weather-mcp | minimax / MiniMax-M2.7 | 1 | 2 | 2 | 3,692 | 260 |
 | 2 | image-description | openai / gpt-5.1 | 1 | 2 | 2 | 3,098 | 644 |
-| 3 | summarization | minimax / MiniMax-M2.7 | 1 | 2 | 2 | 1,165 | 3,324 |
+| 3 | summarization | minimax / MiniMax-M2.7 | 5 | 10 | 10 | 1,165 | 3,324 |
 | 4 | semantic-memory | minimax / MiniMax-M2.7 | 2 | 4 | 4 | 3,545 | 137 |
 | 8 | prompt-cache-openai | openai / gpt-4o | 2 | 4 | 4 | 5,258 | 484 |
 | 9 | prompt-cache-anthropic | anthropic / claude-sonnet-4-6 | 2 | 4 | 4 | 1,328 | 740 |
-| 10 | compaction-fires | anthropic / claude-sonnet-4-6 + claude-haiku-4-5 | 1 | 2 | 2 | 733 | 159 |
+| 10 | compaction-fires | anthropic / claude-sonnet-4-6 + claude-haiku-4-5 | 1 | 3 | 2 | 733 | 159 |
 | 11 | compaction-idempotency | anthropic / claude-sonnet-4-6 | 1 | 2 | 2 | 531 | 26 |
 
 Every token figure above is the `metadata.usage` object of the one call in each spec that returns an HTTP response to the caller, the primary chat completion answering the documented prompt. Notes per row where the raw figure hides something:
 
-- Spec 3's row is the sum of five clean executions (233 input tokens each, 1,165 total), not one. The spec failed once with an intermittent 422 `Failed to route PDF page` error before the fix landed. That failed attempt is excluded, and its own retry (inside the fixed code) is not double-counted here either, since only the response actually returned to Bruno carries a `metadata.usage` block.
+- Spec 3 ran five times back to back, so its row carries 5 prompts, not 1. Its token figure is the sum of those five clean executions (233 input tokens each, 1,165 total). The 2026-09-03 pass recorded 1 prompt / 2 chat calls / 2 embedding calls on this row while summing five runs' tokens into it, which was internally inconsistent and understated the suite's call counts by eight chat calls and eight embedding calls. The spec also failed once with an intermittent 422 `Failed to route PDF page` error before the fix landed. That failed attempt is excluded from the token figure, and its own retry (inside the fixed code) is not double-counted either, since only the response actually returned to Bruno carries a `metadata.usage` block. It did still fire one embedding call before it failed, counted separately under [Embedding calls the run records never captured](#embedding-calls-the-run-records-never-captured).
+- Spec 3's 233 reported input tokens per run do not include the parsed PDF. The document travels inside the user message (see the embedding subsection below), and five pages of it measure roughly 3,000 tokens on their own, so MiniMax's reported `promptTokens` is clearly not counting the `<document_context>` block. Since MiniMax is excluded from money, this does not move any figure in this document, but it means the 1,165 is a report of what the provider chose to count, not a measurement of what was sent.
 - Spec 4's and spec 8's and spec 9's figures are each the sum of two calls (one per documented prompt), not one.
 - Spec 8's call 2 served 2,560 of its 2,796 input tokens from OpenAI's own prefix cache. Call 1 was a clean miss (0 cached).
 - Spec 9's call 1 wrote 3,744 tokens to Anthropic's ephemeral cache (`cache_creation_input_tokens`), and call 2 read that same 3,744-token block back (`cache_read_input_tokens`). The 1,328-token input figure above is the non-cached portion of both calls combined.
-- Spec 10's 733/159 figures cover only its call 1 (claude-sonnet-4-6, the documented prompt), which read the same 3,744-token cache entry spec 9 wrote. Its second, server-side call to claude-haiku-4-5 for the compaction summary billed a further 115 input tokens (recovered from a log line, not a response body, see [Findings](#findings)), and that call's output token count is not logged anywhere in this build and is excluded from the 159 above, not counted as zero.
+- Spec 10's 733 input figure is a sum across two different models, not one call. Its [run record](../AscendAgent/e2e/testing/runs/2026-09-03T19-16-18_10-compaction-fires-tasks.md) splits it as 618 for call 1 (claude-sonnet-4-6, the documented prompt, which also read the same 3,744-token cache entry spec 9 wrote) plus 115 for call 2 (claude-haiku-4-5, the server-side compaction summary, recovered from a log line rather than a response body, see [Findings](#findings)). The 2026-09-03 pass claimed the 733 covered call 1 alone, which contradicted both the run record and its own arithmetic further down the page. The 159 output figure is call 1 only. Call 2's output token count is not logged anywhere in this build and is not counted as zero, it is approximated in the cost section below.
 - Spec 11 read the same 3,744-token cache entry again and additionally wrote 4 new cache tokens, too small to move any total in this document by a full cent.
 
-None of the 22 embedding calls, none of the 11 async memory-extraction chat calls (one per documented prompt, fired unconditionally per [Findings](#findings)), and spec 10's compaction call return a usage object the sweep could observe. The [Cost of the 2026-09-03 sweep](#cost-of-the-2026-09-03-sweep) section below prices only what these numbers can price, and lists everything else as an open gap rather than a zero.
+None of the embedding calls, none of the 15 async memory-extraction chat calls (one per documented prompt, fired unconditionally per [Findings](#findings)), and spec 10's compaction call return a usage object the sweep could observe.
 
-Totals: 22 chat calls, 22 embedding calls, of which 11 chat calls (one per documented prompt) return the measurable token figures above: 19,350 input tokens and 5,774 output tokens summed across the eight rows.
+Totals: 15 documented prompts, 31 chat calls (15 primary plus 15 async extractors plus spec 10's compaction call), 31 embedding calls. Of those, 15 primary chat calls plus the one compaction call return the measurable token figures above: 19,350 input tokens and 5,774 output tokens summed across the eight rows, with the caveat that the spec 10 row mixes two models and the spec 3 row reports less than it sent.
+
+#### Embedding calls the run records never captured
+
+The 2026-09-03 pass counted only AscendMemory's own 18 embedding calls and treated the agent's embeddings as unobservable and therefore uncounted. They are unobservable, but they are not few, and the arithmetic below is derived from the code path rather than from a usage object. Every figure in this subsection is an estimate.
+
+[AscendChatService.prompt](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/chat/AscendChatService.java#L45-L79) fires two embeddings per documented prompt, unconditionally. The first is the semantic-memory search inside [ChatContextAssembler.fetchSemanticMemory](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/chat/ChatContextAssembler.java#L74-L81), whose query is the raw user prompt. The second is the Qdrant similarity search inside [RagRetrievalService.retrieve](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java#L59-L112), and that one is the expensive case: [ChatContextAssembler.buildUserMessage](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/chat/ChatContextAssembler.java#L55-L71) appends the parsed document to `userPrompt` before passing it as the retrieval query, so a prompt carrying an attached document embeds the prompt plus the entire parsed document, not the prompt alone.
+
+| Source | Calls | Query content | Estimated tokens per call | Estimated tokens |
+| :--- | ---: | :--- | ---: | ---: |
+| Semantic-memory search, 15 documented prompts | 15 | Raw user prompt, 7 to 20 words in every Bruno request file | ~15 | ~225 |
+| RAG retrieval, 10 prompts with no attached document | 10 | Same raw user prompt | ~15 | ~150 |
+| RAG retrieval, spec 3's 5 summarization prompts | 5 | Prompt plus the whole parsed `argent-saga-chronicle.pdf` | ~3,000 | ~15,000 |
+| Semantic-memory search, spec 3's one failed attempt | 1 | Raw user prompt. The 422 fired inside `processDocument`, which runs after the memory search and before RAG retrieval, so this attempt made one embedding call and not two | ~15 | ~15 |
+| AscendMemory's own specs | 18 | Six short fixture sentences, see the AscendMemory table below | 7 to 10 | 126 to 180 |
+
+The ~3,000-token figure for the parsed PDF is measured, not guessed: decompressing the file's five content streams and counting glyphs gives 11,513 characters of body text across 5 pages, which at four characters per token is roughly 2,880 tokens, rounded up to allow for the markdown structure Docling adds. The fixture is [`AscendAgent/e2e/fixtures/argent-saga-chronicle.pdf`](../AscendAgent/e2e/fixtures/argent-saga-chronicle.pdf).
+
+Estimated total: 49 embedding calls carrying roughly 15,600 tokens, of which one spec, run five times, accounts for about 96 percent of the volume.
 
 #### AudioScribe (3 of 5 specs)
 
@@ -112,7 +143,7 @@ Both duration figures come from `ffprobe` against the shared fixture, [`AudioScr
 
 The fixture itself carries a defect: it is documented in the AudioScribe e2e suite as a five-second mono WAV but is actually a 9.48-second LAME-encoded MP3 elementary stream wearing a `.wav` filename (see [Non-cost defects](#non-cost-defects-the-sweep-also-found)). The 0.158-minute duration used below is the real, measured one.
 
-Totals: 3 transcription calls structurally, 2 against OpenAI (priced at 0.006 $/minute) and 1 against Hugging Face (unpriced). The cost section below prices the 2 calls the final sweep actually measured.
+Totals: 3 transcription calls structurally, 2 against OpenAI (priced at 0.006 $/minute) and 1 against Hugging Face (priced by compute time, approximated in the cost section below). The cost section prices the 2 calls the final sweep actually measured, spec 2 against OpenAI and spec 3 against Hugging Face, and leaves spec 5 out because it was not part of that pass.
 
 #### AscendMemory (4 of 6 specs)
 
@@ -127,7 +158,7 @@ Every insert and every search issues one embedding call against mem0's configure
 
 Totals: 10 embedding calls in this first pass.
 
-The open question the original version of this document left unresolved is now settled: the sweep's calls billed against `text-embedding-3-small`, confirming [docker-compose.yaml:170](../docker-compose.yaml#L170)'s `openai` alternative, not the `lmstudio` default, was the active line at run time. `mem0/embeddings/openai.py`'s `OpenAIEmbedding.embed` discards the provider's `usage` object before it reaches AscendMemory's own response, confirmed by reading that file inside the running container during the [insert-and-search run](../AscendMemory/e2e/testing/runs/2026-09-03T19-19-53_2-insert-and-search-tasks.md#L44-L46), so none of the calls in the table above have a directly observed token count. Every embedded string is one of six short fixture sentences (for example "My favourite city is Reykjavik"), estimated at roughly seven to ten tokens each. This is an estimate, not a measurement, the only one in this document, and it is kept visually separate in the cost section below.
+The open question the original version of this document left unresolved is now settled: the sweep's calls billed against `text-embedding-3-small`, confirming [docker-compose.yaml:170](../docker-compose.yaml#L170)'s `openai` alternative, not the `lmstudio` default, was the active line at run time. `mem0/embeddings/openai.py`'s `OpenAIEmbedding.embed` discards the provider's `usage` object before it reaches AscendMemory's own response, confirmed by reading that file inside the running container during the [insert-and-search run](../AscendMemory/e2e/testing/runs/2026-09-03T19-19-53_2-insert-and-search-tasks.md#L44-L46), so none of the calls in the table above have a directly observed token count. Every embedded string is one of six short fixture sentences (for example "My favourite city is Reykjavik"), estimated at roughly seven to ten tokens each. This is an estimate, not a measurement, one of the three the cost section below isolates so the verifiable total stays recoverable.
 
 A fix for a double-encoded query-string defect (see [Non-cost defects](#non-cost-defects-the-sweep-also-found)) triggered a second pass: specs 1, 2, 3, and 6 were re-run against corrected request files at [`AscendMemory/e2e/testing/runs/2026-09-03T19-46-17_*`](../AscendMemory/e2e/testing/runs/). Spec 1 (invalid-input) makes no embedding call at all, validation rejects the request before mem0 is reached, so the four re-run specs actually add 8 embedding calls, not 4: 2 from spec 2, 4 from spec 3, 2 from spec 6, read directly from each re-run's own Result summary. Ten from the first pass plus eight from the re-run gives 18 embedding calls total against `text-embedding-3-small`, all in the same seven-to-ten-token band. This document uses 18 in the cost section below, not the smaller figure the day's own running total suggested, because the four re-run specs are not the same thing as four re-run calls.
 
@@ -141,84 +172,152 @@ Every spec in these three modules drives only local or self-hosted services (the
 
 1. Open [Prices](#prices) and replace any rate that changed, keeping the source URL and read date on the row.
 2. Leave every table in [Usage](#usage) untouched. Call counts do not change when a price changes.
-3. For each paid row, multiply its input and output token counts (once filled in from the matching run record) by the matching price-table rate, add cache-read or cache-write rates where the spec exercises prompt caching (specs 8 and 9), and sum across rows.
-4. For AudioScribe rows, multiply audio minutes by the $/minute rate instead of a token rate.
-5. Treat any row still marked unknown in [Prices](#prices) as an open cost, not a zero. gpt-5.1, claude-sonnet-4-6, MiniMax, and the Hugging Face transcription call together cover 6 of the 8 AscendAgent specs and 1 of the 3 AudioScribe specs, so most of this suite's real dollar cost is currently unrecalculable until those four gaps close.
+3. For each paid row, multiply its input and output token counts by the matching price-table rate, splitting cached from uncached input where the spec exercises prompt caching (specs 8, 9, 10, and 11), and sum across rows.
+4. For AudioScribe rows, multiply audio minutes by the $/minute rate instead of a token rate. The Hugging Face row is not a per-minute rate at all, see step 6.
+5. Skip every MiniMax row. The subscription makes them free at the margin, see the top of this document.
+6. Carry the three approximations separately so the verifiable figure stays recoverable: spec 10's unlogged compaction output, the Hugging Face compute-time conversion, and the embedding token estimate. The cost section below keeps them in their own subsection for exactly this reason.
+7. Treat Gemini as an open cost rather than a zero if a future spec routes to it. Nothing in today's suite does.
 
 ---
 
+
 ### Cost of the 2026-09-03 sweep
 
-This is the arithmetic from step 3 and step 4 of [How to recalculate](#how-to-recalculate) worked through against the measured [Usage](#usage) figures and the priced rows of [Prices](#prices) as they stood on 2026-09-03. Only three of the sweep's paid rows land on a priced model. Everything else is either flagged unpriceable or, where marked, an explicit illustration and not a real quote.
+This is [How to recalculate](#how-to-recalculate) worked all the way through against the measured [Usage](#usage) figures and the rates in [Prices](#prices) as they stood on 2026-09-04. Unlike the 2026-09-03 version of this section, nothing is left as an open gap and nothing is presented as an illustration standing in for a model it is not. Three figures rest on an approximation, and all three are isolated in their own subsection so the verifiable total stays recoverable by subtraction.
 
-#### What can be priced with certainty
+Every product below is written out in full so it can be redone by hand after a price change. Rates are dollars per million tokens unless the line says otherwise.
 
-AscendAgent spec 8, prompt-cache-openai, gpt-4o, 2.50 / 10.00 $ per million tokens:
+#### OpenAI
 
-- Call 1: 2,462 input x 2.50 / 1,000,000 = 0.0061550, plus 238 output x 10.00 / 1,000,000 = 0.0023800. Call 1 = 0.0085350.
-- Call 2: 2,796 input x 2.50 / 1,000,000 = 0.0069900, plus 246 output x 10.00 / 1,000,000 = 0.0024600. Call 2 = 0.0094500.
-- Spec 8 total = 0.0180 (rounded).
+gpt-5.1, AscendAgent spec 2, image-description. Rates 1.25 input, 10.00 output. No cached tokens were reported for this call.
 
-This figure is a ceiling, not the true call-2 price. 2,560 of call 2's 2,796 input tokens were served from OpenAI's own prefix cache, and OpenAI bills cached input below the standard rate. The [Prices](#prices) table has no confirmed cached-input rate for gpt-4o (only Anthropic's rows carry cache columns, because that snapshot came with them, and OpenAI's cached-input discount was not separately fetched). The 0.0180 above assumes no discount at all, so the true spec 8 cost is somewhere at or below it, by an amount this document cannot state.
+- Input: 3,098 x 1.25 / 1,000,000 = 0.0038725
+- Output: 644 x 10.00 / 1,000,000 = 0.0064400
+- Spec 2 total = 0.0103125
 
-AudioScribe transcribe-openai, Whisper `whisper-1`, 0.006 $ per minute:
+gpt-4o, AscendAgent spec 8, prompt-cache-openai, two calls. Rates 2.50 uncached input, 1.25 cached input, 10.00 output. Of the 5,258 input tokens across both calls, 2,560 were served from OpenAI's prefix cache on call 2, leaving 2,698 billed at the standard rate.
 
-- 0.158 min x 0.006 = 0.000948.
+- Uncached input: 2,698 x 2.50 / 1,000,000 = 0.0067450
+- Cached input: 2,560 x 1.25 / 1,000,000 = 0.0032000
+- Output: 484 x 10.00 / 1,000,000 = 0.0048400
+- Spec 8 total = 0.0147850
 
-AscendMemory, text-embedding-3-small, 0.02 $ per million input tokens, 18 calls at an estimated 7 to 10 tokens each (the only estimate in this document, per [Usage](#usage)):
+The 2026-09-03 pass carried this row at 0.0180 because it could not confirm a cached-input rate and so assumed no discount at all. The confirmed 1.25 rate takes 0.0032 off, and 0.0147850 is the real figure, not a ceiling.
 
-- Low: 18 x 7 = 126 tokens x 0.02 / 1,000,000 = 0.0000025.
-- High: 18 x 10 = 180 tokens x 0.02 / 1,000,000 = 0.0000036.
-- Effectively zero next to the other two rows, carried at 0.000003 in the subtotal below.
+Whisper `whisper-1`, AudioScribe spec 2, transcribe-openai. Rate 0.006 $ per minute of audio, against the measured 9.48-second fixture.
 
-Priced subtotal = 0.0180 + 0.000948 + 0.000003 = 0.018951, rounded to 0.02 $.
+- 0.158 min x 0.006 = 0.000948
 
-#### What cannot be priced at all
+AudioScribe spec 5, mcp-transcribe, is a structurally identical third Whisper call on the same fixture but was not part of the 19:27:52 pass, so it stays out of this total. Adding it would cost another 0.000948.
 
-| Item | Specs it covers | Measured volume | Why it has no price |
-| :--- | :--- | :--- | :--- |
-| MiniMax M2.7 | AscendAgent 1, 3, 4 | 8,402 input + 3,721 output tokens | MiniMax publishes no retrievable per-token rate. |
-| gpt-5.1 | AscendAgent 2 | 3,098 input + 644 output tokens | Not on the fetched OpenAI pricing page. |
-| claude-sonnet-4-6 | AscendAgent 9, 10 (call 1), 11 | 2,477 non-cached input + 925 output tokens, plus 3,748 cache-write and 11,232 cache-read tokens across the three specs | Not on the fetched Anthropic pricing page. The priced Sonnet tier is 4.5, a different model string. |
-| claude-haiku-4-5 | AscendAgent 10 (call 2) | 115 input tokens, output not logged by the service at all | Not on the fetched Anthropic pricing page. The priced Haiku tier (3.5) is retired on the first-party API. |
-| Hugging Face Inference | AudioScribe transcribe-hf | 0.158 minutes | Hugging Face bills compute seconds at the underlying provider's rate, not a flat published price. |
-| AudioScribe spec 5 (mcp-transcribe) | AudioScribe 5 | not re-measured in the final sweep | Structurally a third paid OpenAI Whisper call on the same fixture. Excluded from the priced subtotal because it wasn't part of the 19:27:52 pass, see [Usage](#usage). |
+text-embedding-3-small. Rate 0.02 input. Volume from [Embedding calls the run records never captured](#embedding-calls-the-run-records-never-captured), roughly 15,600 tokens across 49 calls. This is an estimate.
 
-#### Illustrative-only figures: not a real price, kept separate on purpose
+- 15,600 x 0.02 / 1,000,000 = 0.000312
 
-Everything below substitutes the nearest same-vendor model this snapshot could price, purely to give a sense of scale. None of these are what the sweep was actually billed. Do not add them to the priced subtotal above as if they were measured.
+OpenAI subtotal = 0.0103125 + 0.0147850 + 0.000948 + 0.000312 = 0.0263575
 
-gpt-5.1, illustrated at gpt-4o's rate (AscendAgent spec 2): 3,098 x 2.50 / 1,000,000 = 0.007745, plus 644 x 10.00 / 1,000,000 = 0.006440. Illustrative total = 0.014185.
+#### Anthropic
 
-claude-sonnet-4-6, illustrated at Claude Sonnet 4.5's rate (3.00 / 15.00 $ per million tokens, cache write 3.75, cache read 0.30):
+Claude Sonnet 4.6. Rates 3.00 input, 15.00 output, 3.75 cache write, 0.30 cache read.
 
-- Spec 9, call 1: 427 x 3.00 / 1e6 = 0.001281, 370 x 15.00 / 1e6 = 0.00555, cache write 3,744 x 3.75 / 1e6 = 0.01404. Call 1 = 0.020871.
-- Spec 9, call 2: 901 x 3.00 / 1e6 = 0.002703, 370 x 15.00 / 1e6 = 0.00555, cache read 3,744 x 0.30 / 1e6 = 0.0011232. Call 2 = 0.0093762.
-- Spec 10, call 1: 618 x 3.00 / 1e6 = 0.001854, 159 x 15.00 / 1e6 = 0.002385, cache read 3,744 x 0.30 / 1e6 = 0.0011232. Spec 10 total = 0.0053622.
-- Spec 11: 531 x 3.00 / 1e6 = 0.001593, 26 x 15.00 / 1e6 = 0.00039, cache read 3,744 x 0.30 / 1e6 = 0.0011232, cache write 4 x 3.75 / 1e6 = 0.000015. Spec 11 total = 0.0031212.
-- Illustrative Sonnet total = 0.0387306.
+Spec 9, prompt-cache-anthropic, call 1:
 
-claude-haiku-4-5, illustrated at Claude Haiku 3.5's rate (0.80 / 4.00 $ per million tokens), input only (spec 10's compaction output is unlogged): 115 x 0.80 / 1e6 = 0.000092.
+- Input: 427 x 3.00 / 1,000,000 = 0.001281
+- Output: 370 x 15.00 / 1,000,000 = 0.005550
+- Cache write: 3,744 x 3.75 / 1,000,000 = 0.014040
+- Call 1 = 0.020871
 
-Illustrative subtotal = 0.014185 + 0.0387306 + 0.000092 = 0.053008, rounded to 0.0530 $.
+Spec 9, call 2:
 
-#### Headline
+- Input: 901 x 3.00 / 1,000,000 = 0.002703
+- Output: 370 x 15.00 / 1,000,000 = 0.005550
+- Cache read: 3,744 x 0.30 / 1,000,000 = 0.0011232
+- Call 2 = 0.0093762
 
-The sweep of 2026-09-03 cost about 0.02 $ that this document can price with certainty. Extending that with the illustrative same-vendor stand-ins above for every unpriced OpenAI and Anthropic model brings it to about 0.07 $, more than three times the priced figure, and even that illustrative figure still excludes MiniMax entirely (over 12,000 measured tokens across three specs) and the Hugging Face transcription (0.158 minutes), because neither publishes anything this document can anchor an illustration to.
+Spec 10, compaction-fires, call 1 (the documented prompt, 618 of the row's 733 input tokens, the other 115 belonging to the Haiku call below):
 
-Call the honest range 0.02 $ to 0.07 $. Both ends carry real uncertainty: the low end undercounts by omission (it prices nothing that ran on MiniMax, gpt-5.1, claude-sonnet-4-6, or Hugging Face), and the high end is not a quote from any vendor for the model actually used, only a same-vendor stand-in a version behind. Whichever number a reader repeats, the gap between them, roughly 0.05 $, is entirely attributable to the four pricing gaps in [Prices](#prices), not to any uncertainty in the measured token counts themselves.
+- Input: 618 x 3.00 / 1,000,000 = 0.001854
+- Output: 159 x 15.00 / 1,000,000 = 0.002385
+- Cache read: 3,744 x 0.30 / 1,000,000 = 0.0011232
+- Spec 10 call 1 = 0.0053622
+
+Spec 11, compaction-idempotency:
+
+- Input: 531 x 3.00 / 1,000,000 = 0.001593
+- Output: 26 x 15.00 / 1,000,000 = 0.000390
+- Cache read: 3,744 x 0.30 / 1,000,000 = 0.0011232
+- Cache write: 4 x 3.75 / 1,000,000 = 0.000015
+- Spec 11 = 0.0031212
+
+Sonnet 4.6 total = 0.020871 + 0.0093762 + 0.0053622 + 0.0031212 = 0.0387306
+
+Claude Haiku 4.5, spec 10's server-side compaction call. Rates 1.00 input, 5.00 output.
+
+- Input: 115 x 1.00 / 1,000,000 = 0.000115
+- Output: not reported by the service at any point. `AnthropicPromptCacheStrategy` logs `prompt_tokens`, `cache_read_tokens` and `cache_creation_tokens` and nothing else, and the call never returns an HTTP response to the caller, so no run record in the sweep carries it. Approximated at the configured ceiling instead: [application.yaml:127](../AscendAgent/src/main/resources/application.yaml#L127) sets `max-summary-tokens: 800`, and the service rejects any summary above it, so 800 is the largest output this call could legally have produced. 800 x 5.00 / 1,000,000 = 0.004000
+- Haiku 4.5 total = 0.004115, of which 0.004000 is an approximated ceiling and only 0.000115 is measured
+
+Anthropic subtotal = 0.0387306 + 0.004115 = 0.0428456
+
+#### Hugging Face
+
+whisper-large-v3 via the `hf-inference` provider, AudioScribe spec 3, transcribe-hf. There is no per-minute rate and no flat rate, so the audio duration is not the billing unit. Compute time is, at the underlying hardware's per-second price.
+
+The only compute-time figure the sweep captured is the client-observed 3,078 ms round trip recorded in the [spec 3 run record](../AudioScribe/e2e/testing/runs/2026-09-03T19-27-52_3-transcribe-hf-tasks.md). That is wall clock through AudioScribe and the network, so the compute seconds Hugging Face actually billed are a subset of it. The only hardware rate the pricing page publishes is the 0.00012 $ per GPU second in its own worked example.
+
+- 3.078 s x 0.00012 = 0.000369
+
+Treat that as an upper bound rather than a quote. Two things push the real figure lower: billed compute excludes the network and AudioScribe's own overhead inside the 3,078 ms, and the pricing page notes `hf-inference` runs mostly on CPU, which is cheaper per second than the GPU rate the example uses. A 9.48-second clip decoded by a large ASR model in roughly three seconds of wall clock is not a workload that can plausibly cost more than a twentieth of a cent at any published rate.
+
+Hugging Face subtotal = 0.000369, entirely approximated.
+
+#### MiniMax
+
+Zero, on purpose. Specs 1, 3, and 4 measured 8,402 input and 3,721 output tokens across 8 documented prompts, and none of it is multiplied by anything. The account behind `MiniMax-M2.7` is a flat subscription rather than metered per-token billing, so re-running those three specs changes the bill by nothing. The tokens stay recorded in [Usage](#usage) because they are a fact about the suite, not because they are a cost.
+
+#### The two totals
+
+| Provider | Verifiable | Approximated | Total |
+| :--- | ---: | ---: | ---: |
+| OpenAI | 0.0260455 | 0.000312 | 0.0263575 |
+| Anthropic | 0.0388456 | 0.004000 | 0.0428456 |
+| Hugging Face | 0.000000 | 0.000369 | 0.000369 |
+| MiniMax | 0.000000 | 0.000000 | 0.000000 |
+| Sweep | 0.0648911 | 0.0046810 | 0.0695721 |
+
+Full total, approximations included: 0.0696 $, call it seven cents.
+
+Verifiable-only total: 0.0649 $, call it six and a half cents.
+
+The three approximations and what they are worth:
+
+| Approximation | Value | Why it cannot be measured | Direction of the error |
+| :--- | ---: | :--- | :--- |
+| Spec 10's Haiku 4.5 compaction output, priced at the 800-token configured cap | 0.004000 | The call never returns to the caller and this build logs no completion-token count for it | Ceiling. A real compaction summary of 20 turns will land well under 800 tokens, so the true figure is lower, plausibly by half or more |
+| Embedding tokens across 49 calls | 0.000312 | `OpenAIEmbedding.embed` inside mem0 discards the provider's usage object, and the agent's own two-per-prompt embeddings never surface one either | Two-sided, and dominated by the ~3,000-token estimate for the parsed PDF, which was measured from the file rather than guessed |
+| Hugging Face compute seconds | 0.000369 | No flat rate exists, and the billed compute time is not observable from outside | Ceiling. Wall clock overstates billed compute, and the GPU rate overstates a CPU-served call |
+
+So 93 percent of the sweep's cost is anchored to a published rate against a measured token count, and the whole approximated remainder is 0.0047 $, under half a cent. The single largest piece of that remainder is one unlogged output-token count on one compaction call, which a one-line logging change would convert into a measurement.
+
+#### Where the money actually went
+
+Anthropic is 62 percent of the total on 4 of the 15 documented prompts, and the largest single line item in the entire sweep is spec 9 call 1's 3,744-token cache write at 0.014040, which by itself is 20 percent of the sweep. That is the expected shape: a cache write costs 1.25 times the input rate and only pays for itself if enough later calls read it. Here three later calls did read it back (spec 9 call 2, spec 10, spec 11) at 0.0011232 each. Counting the write and the three reads together, the cached path cost 0.014040 + 0.0033696 = 0.0174096. Sending that same 3,744-token prefix as ordinary input on all four calls would have cost 4 x 3,744 x 3.00 / 1,000,000 = 0.044928. Caching paid for itself roughly two and a half times over, which is worth knowing before anyone reads the 0.014040 line as waste.
+
+The embedding line is worth noting for a different reason. At 0.000312 it is financially irrelevant, but it is roughly a hundred times what the 2026-09-03 pass recorded, because that pass counted only AscendMemory's own 18 calls and missed the 31 the agent fires on its own account. The reason the figure is still tiny is the rate, not the volume: 15,600 tokens is more than the entire sweep's measured Anthropic input, and it costs a third of a thousandth of a dollar.
 
 ---
 
 ### Findings
 
-Two defects surfaced while tracing how a single documented prompt turns into billed calls. Both change what the Usage table above actually means, so they are recorded here rather than left as a footnote.
+Three defects surfaced while tracing how a single documented prompt turns into billed calls. All three change what the Usage table above actually means, so they are recorded here rather than left as a footnote.
 
 #### Every documented prompt costs more than its spec's Run section suggests
 
 [AscendChatService.prompt](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/chat/AscendChatService.java#L45-L79) runs four external calls for what a spec's Run section shows as one prompt: `contextAssembler.buildSystemMessages` at line 58 calls [ChatContextAssembler.fetchSemanticMemory](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/chat/ChatContextAssembler.java#L74-L81), an unconditional AscendMemory search that embeds the query. `contextAssembler.buildUserMessage` at line 59 calls [RagRetrievalService.retrieve](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java#L59-L112), which runs a Qdrant similarity search (line 83) whenever RAG is enabled, which it is by default (`app.rag.enabled: true`, [application.yaml:271](../AscendAgent/src/main/resources/application.yaml#L271)), regardless of whether the prompt has anything to do with retrieval. `chatExecutor.execute` at line 63 is the main chat call. `semanticMemoryExtractor.extract` at line 69 fires a second, asynchronous chat call. One documented prompt is therefore two paid chat calls plus two paid embedding calls, which is exactly the multiplier applied throughout the AscendAgent table above.
 
-The 2026-09-03 sweep confirms this in practice, not only in code. The eleven documented prompts across the eight measured specs in [Usage](#usage) each produce a visible, priceable `metadata.usage` object for exactly one call, the primary chat completion. None of the eleven async extractor calls those same eleven prompts fire, none of the 22 embedding calls, and spec 10's compaction call return a usage object the e2e harness can see. Spec 10 is the sharpest case: its compaction call to claude-haiku-4-5 never returns an HTTP response to the caller at all, and its 115-token input count was only recoverable by reading `docker logs ascend-agent` for the `AnthropicPromptCacheStrategy` log line during [that run](../AscendAgent/e2e/testing/runs/2026-09-03T19-16-18_10-compaction-fires-tasks.md), with its output token count never surfacing anywhere in this build. A specification's Run section shows one HTTP request per documented prompt, and the sweep shows at least two billed calls behind every one of them, with the second, or the third for spec 10, invisible to anything the harness can observe directly.
+The second embedding is larger than it looks. `buildUserMessage` appends the parsed document to `userPrompt` before handing it to `RagRetrievalService.retrieve`, so when a prompt carries an attached file, the retrieval query embedded against Qdrant is the prompt plus the entire parsed document, not the prompt alone. On the summarization spec that turns a fifteen-token query into a roughly three-thousand-token one, and that spec ran five times in this sweep. It is cheap at today's embedding rate, see [Embedding calls the run records never captured](#embedding-calls-the-run-records-never-captured), but it is worth knowing that the retrieval query scales with document size, since a similarity search against the full text of the document is also unlikely to retrieve anything useful.
+
+The 2026-09-03 sweep confirms this in practice, not only in code. The fifteen documented prompts across the eight measured specs in [Usage](#usage) each produce a visible, priceable `metadata.usage` object for exactly one call, the primary chat completion. None of the fifteen async extractor calls those same fifteen prompts fire, none of the 31 embedding calls, and spec 10's compaction call return a usage object the e2e harness can see. Spec 10 is the sharpest case: its compaction call to claude-haiku-4-5 never returns an HTTP response to the caller at all, and its 115-token input count was only recoverable by reading `docker logs ascend-agent` for the `AnthropicPromptCacheStrategy` log line during [that run](../AscendAgent/e2e/testing/runs/2026-09-03T19-16-18_10-compaction-fires-tasks.md), with its output token count never surfacing anywhere in this build. A specification's Run section shows one HTTP request per documented prompt, and the sweep shows at least two billed calls behind every one of them, with the second, or the third for spec 10, invisible to anything the harness can observe directly.
 
 #### The memory extractor bills at the caller's model, not the configured cheap one
 
@@ -235,7 +334,7 @@ private String resolveExtractionModel(String provider, String requestedModel) {
 }
 ```
 
-[AscendChatService.java:69](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/chat/AscendChatService.java#L69) calls `semanticMemoryExtractor.extract(userId, prompt, provider, model, activeEmbeddingProvider)`, passing through the same `model` the caller requested for the main chat call. Since every AscendAgent e2e spec, and the `/api/v1/ai/prompt` demo in the root [README.md](../README.md), sends an explicit `model` field, the fallback to the cheap configured model essentially never fires in practice. The clearest priced example is spec 8: it requests `provider=openai`, `model=gpt-4o`, so its extraction call also runs on gpt-4o (2.50 / 10.00 $ per million tokens) instead of the configured gpt-4o-mini (0.15 / 0.60 $ per million tokens), roughly 16.7 times the rate on both input and output for a call whose entire job is picking short facts out of one message. Specs 9, 10, and 11 compound this with the unpriced `claude-sonnet-4-6` from the findings above. Specs 1, 3, and 4 are unaffected in dollar terms only because minimax has no separate cheap tier: [application.yaml:231](../AscendAgent/src/main/resources/application.yaml#L231) configures `MiniMax-M2.7` as both the chat default and the memory-extraction model for that provider, so the caller-supplied model and the fallback happen to be identical.
+[AscendChatService.java:69](../AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/chat/AscendChatService.java#L69) calls `semanticMemoryExtractor.extract(userId, prompt, provider, model, activeEmbeddingProvider)`, passing through the same `model` the caller requested for the main chat call. Since every AscendAgent e2e spec, and the `/api/v1/ai/prompt` demo in the root [README.md](../README.md), sends an explicit `model` field, the fallback to the cheap configured model essentially never fires in practice. The clearest priced example is spec 8: it requests `provider=openai`, `model=gpt-4o`, so its extraction call also runs on gpt-4o (2.50 / 10.00 $ per million tokens) instead of the configured gpt-4o-mini (0.15 / 0.60 $ per million tokens), roughly 16.7 times the rate on both input and output for a call whose entire job is picking short facts out of one message. Specs 9, 10, and 11 compound this with `claude-sonnet-4-6` at 3.00 / 15.00 $ per million tokens, five times the rate of the `claude-haiku-4-5` the same provider is configured to compact with. Specs 1, 3, and 4 are unaffected in dollar terms only because minimax has no separate cheap tier: [application.yaml:231](../AscendAgent/src/main/resources/application.yaml#L231) configures `MiniMax-M2.7` as both the chat default and the memory-extraction model for that provider, so the caller-supplied model and the fallback happen to be identical.
 
 #### The configured Anthropic extraction model is retired, and the first defect is the only reason nobody has hit it
 
