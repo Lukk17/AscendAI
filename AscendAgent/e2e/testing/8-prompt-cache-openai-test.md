@@ -15,10 +15,11 @@ Check Bruno CLI, AscendAgent `/actuator/health`, Postgres + Redis healthy.
 Check the `OPENAI_API_KEY` env var is configured for the running AscendAgent (from `.env` / docker-compose). Without it, OpenAI calls return an auth error and this test fails before it can assert anything about cache.
 
 ```bash
-docker exec ascend-agent printenv OPENAI_API_KEY | head -c 8
+docker exec ascend-agent sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'
 ```
 
-Should print the first few chars of the key.
+Should print `present`. Never `printenv` the raw value, even truncated. This check proves the variable is set
+without printing any of it.
 
 ## Reset state
 

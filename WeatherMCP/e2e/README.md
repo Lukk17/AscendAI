@@ -73,7 +73,8 @@ The paired `templates/<N>-<feature>-tasks.template.md` is the runner's checklist
 reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**, **Time**
 fields) and **Additional tasks I did** (anything done outside the spec). The runner copies the template from
 [testing/templates/](testing/templates/) into [testing/runs/](testing/runs/) as
-`<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in.
+`<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in. WeatherMCP specs make no paid call (Open-Meteo only), so
+[docs/E2E_COST.md](../../docs/E2E_COST.md) records this module as a zero-cost row rather than tracking tokens here.
 
 ## Parallelism and execution order
 

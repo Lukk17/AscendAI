@@ -10,7 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-transcribe-tasks.md` before sta
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] AudioScribe `/health` returns HTTP 200 with `{"status":"ok","service":"AudioScribe"}`
-- [ ] `docker exec audio-scribe printenv OPENAI_API_KEY` returns a non-empty string
+- [ ] `docker exec audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'` prints `present`
 - [ ] `AudioScribe/e2e/fixtures/meeting-clip.wav` exists on the host
 - [ ] Object store `curl.exe -fsS http://localhost:9070/_floci/health` returns HTTP 200 with `"s3":"running"`
 
@@ -18,7 +18,7 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-transcribe-tasks.md` before sta
 
 - [ ] `curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"` prints `200`
 - [ ] `curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"` returned HTTP 204 (object cleared)
-- [ ] `curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: audio/wav" --data-binary "@AudioScribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"` prints `200`
+- [ ] `curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: audio/mpeg" --data-binary "@AudioScribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"` prints `200`
 - [ ] `curl.exe -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=meeting-clip"` carries `<Key>meeting-clip.wav</Key>` with `<Size>56880</Size>`
 - [ ] `docker exec audio-scribe sh -c "rm -f /tmp/transcript_*.md"` succeeds
 

@@ -77,12 +77,20 @@ bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local
 
 This spec calls `ocr_service.process_file` which invokes PaddleOCR's blocking `engine.predict` inside
 `asyncio.to_thread`. PaddleOCR inference on this deployment is CPU-only, capped to the container's 4-core CPU
-allocation: a single 212 KB image measured 65 to 72 s of `processing_time_seconds` across two live calls against
-this fixture (measured 2026-09-03, REST path), with the full round trip (upload plus inference plus response)
-reaching up to 90 s wall-clock. Two or more engine specs running at the same time saturate all cores and push
-individual calls further past this baseline; the `asyncio.wait_for` window (`OCR_REQUEST_TIMEOUT=300`) has far less
-headroom than a 5–15 s baseline would suggest, so contention still risks `HTTP 500 INTERNAL_ERROR` instead of the
-expected 200.
+allocation, and the cost splits into two figures worth keeping apart.
+
+Engine time, the `processing_time_seconds` the service reports for itself, measured 57.1 s and 72.4 s on isolated
+calls against this 212 KB fixture on 2026-09-03.
+
+Full round trip (upload plus inference plus response) is longer and moves with host load. Isolated calls the same
+day came in at 60.7 s and 82.1 s. During the full 2026-09-03 sweep, with the AscendAgent, AscendWebSearch,
+AscendMemory and WeatherMCP suites hitting the same host at the same time, the three engine-bound specs measured
+84.3 s (spec 4), 99.9 s (spec 3) and 105.6 s (spec 2). Plan for 60 to 110 s per engine-bound call and read the
+upper end as normal under concurrent load, not as a hang.
+
+Two or more engine specs running at the same time saturate all cores and push individual calls past even that
+range. The `asyncio.wait_for` window (`OCR_REQUEST_TIMEOUT=300`) has far less headroom than a 5 to 15 s baseline
+would suggest, so contention still risks `HTTP 500 INTERNAL_ERROR` instead of the expected 200.
 
 Safe to run in parallel with: reject-fast specs that never reach the engine (specs 1, 5, 7, 8, 9, 10, 11, 12).
 Unsafe to run in parallel with: any of specs 2, 3, 4, 6.

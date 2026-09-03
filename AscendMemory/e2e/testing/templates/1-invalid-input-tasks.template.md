@@ -17,6 +17,7 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 ### Run
 
+- [ ] Record the baseline `result.points_count` for `ascend_memory_1536` via `curl` against Qdrant
 - [ ] Send `invalid-missing-user.yml` via `bru run` and wait for HTTP 422
 
 ### Expected
@@ -25,7 +26,9 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 - [ ] Response body is a JSON object with a `detail` array
 - [ ] At least one `detail` entry references `"user_id"` in its `loc` array
 - [ ] That entry's `type` equals `"missing"`
-- [ ] Request latency < 200 ms (proxy for "validator short-circuited; mem0 / Qdrant never touched")
+- [ ] Structural proof: `InsertRequest.user_id` has no default, so FastAPI/Pydantic validation rejects the body
+      before `insert_memory()`'s handler body runs, meaning mem0/Qdrant cannot be reached
+- [ ] Observable proof: `ascend_memory_1536`'s `result.points_count` after the run equals the baseline recorded above
 
 ### Post-run cleanup
 

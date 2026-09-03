@@ -10,8 +10,8 @@ Copy this file to `../runs/<UTC-timestamp>_3-transcribe-hf-tasks.md` before star
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] AudioScribe `/health` returns HTTP 200 with `{"status":"ok","service":"AudioScribe"}`
-- [ ] `docker exec audio-scribe printenv HF_TOKEN` returns a non-empty string
-- [ ] AudioScribe container can reach `https://api-inference.huggingface.co` (HTTP 200 or 401)
+- [ ] `docker exec audio-scribe sh -c '[ -n "$HF_TOKEN" ] && echo present || echo missing'` prints `present`
+- [ ] AudioScribe container can reach `https://router.huggingface.co/hf-inference` (HTTP 404, proves egress via Hugging Face's own headers)
 - [ ] `AudioScribe/e2e/fixtures/meeting-clip.wav` exists and is at least 1 KB
 
 ### Reset state

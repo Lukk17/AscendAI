@@ -5,13 +5,13 @@ info:
 
 http:
   method: GET
-  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/search?user_id=frostyMemoryWipeAlpha&query=Where+do+I+like+to+live%3F&provider=openai"
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/search?user_id=frostyMemoryWipeAlpha&query=Where do I like to live?&provider=openai"
   params:
     - name: user_id
       value: frostyMemoryWipeAlpha
       type: query
     - name: query
-      value: Where+do+I+like+to+live%3F
+      value: Where do I like to live?
       type: query
   auth: inherit
 

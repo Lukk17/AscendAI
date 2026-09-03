@@ -68,8 +68,10 @@ The `mcp-list-tools.yml` call returns HTTP 200. The JSON-RPC `result` object mat
 - `result.tools` is a non-empty array.
 - At least one entry's `name` contains the substring `"insert"` (case-insensitive).
 - At least one entry's `name` contains the substring `"search"` (case-insensitive).
-- Each entry has an `inputSchema` object whose `properties` advertises a `user_id` field (every memory tool is
-  user-scoped).
+- Each entry has an `inputSchema` object with a non-empty `properties` object. `memory_insert`, `memory_search`, and
+  `memory_wipe` each advertise a `user_id` field (those three are user-scoped). `memory_delete` advertises a
+  `memory_id` field instead, and no `user_id` field, because it addresses a single memory by its own ID rather than
+  by user partition.
 
 ## Fixtures
 

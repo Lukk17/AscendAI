@@ -442,6 +442,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |
 | [AscendAgent/e2e/README.md](AscendAgent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
+| [docs/E2E_COST.md](docs/E2E_COST.md)                                                                                  | Token usage and per-provider pricing for the e2e suite; recalculate dollar cost when prices change. |
 | [AGENTS.md](AGENTS.md)                                                                                                | Shared instructions for any AI coding agent operating in this repo.   |
 | [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and Release workflow operator notes: secrets, bump convention, how to cut a release. |
 

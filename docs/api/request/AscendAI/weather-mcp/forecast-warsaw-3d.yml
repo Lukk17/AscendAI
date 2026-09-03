@@ -51,11 +51,11 @@ runtime:
             expect(payload.forecast.length).to.equal(3);
             payload.forecast.forEach(function (entry) {
                 expect(entry.date).to.match(/^\d{4}-\d{2}-\d{2}$/);
-                expect(entry.temperatureMax).to.be.a("number");
-                expect(isFinite(entry.temperatureMax)).to.be.true;
-                expect(entry.temperatureMin).to.be.a("number");
-                expect(isFinite(entry.temperatureMin)).to.be.true;
-                expect(entry.temperatureMin).to.be.at.most(entry.temperatureMax);
+                expect(entry.maxTemp).to.be.a("number");
+                expect(isFinite(entry.maxTemp)).to.be.true;
+                expect(entry.minTemp).to.be.a("number");
+                expect(isFinite(entry.minTemp)).to.be.true;
+                expect(entry.minTemp).to.be.at.most(entry.maxTemp);
                 expect(Number.isInteger(entry.weatherCode)).to.be.true;
                 expect(entry.weatherCode).to.be.within(0, 99);
             });

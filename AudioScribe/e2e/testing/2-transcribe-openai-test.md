@@ -33,10 +33,11 @@ Expect HTTP 200 with `{"status":"ok","service":"AudioScribe"}`.
 Check the AudioScribe container has `OPENAI_API_KEY` configured.
 
 ```powershell
-docker exec audio-scribe printenv OPENAI_API_KEY
+docker exec audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'
 ```
 
-Expect a non-empty string. If empty, set `OPENAI_API_KEY` in the host environment / `.env` and recreate the container.
+Expect `present`. Never `printenv` the raw value. This check proves the variable is set without printing it. If
+`missing`, set `OPENAI_API_KEY` in the host environment / `.env` and recreate the container.
 
 Check outbound HTTPS to OpenAI works from the AudioScribe container.
 
@@ -91,5 +92,5 @@ The response matches:
 
 ## Fixtures
 
-- `AudioScribe/e2e/fixtures/meeting-clip.wav` — ≤ 5 s mono WAV at 16 kHz, spoken English line
-  *"I think we should defer the migration to Q3 because the contract with Acme renews then. Adam, can you confirm the renewal date by Friday?"*
+- `AudioScribe/e2e/fixtures/meeting-clip.wav`: 9.48 s mono audio at 24 kHz, spoken English line
+  *"I think we should defer the migration to Q3 because the contract with Acme renews then. Adam, can you confirm the renewal date by Friday?"* Despite the `.wav` extension, this is a LAME-encoded MP3 elementary stream, not a RIFF WAV file. See [../fixtures/README.md](../fixtures/README.md) for the full `ffprobe` breakdown.

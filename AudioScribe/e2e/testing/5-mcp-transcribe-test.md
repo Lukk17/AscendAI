@@ -35,10 +35,10 @@ Expect HTTP 200 with `{"status":"ok","service":"AudioScribe"}`.
 Check the AudioScribe container has `OPENAI_API_KEY` configured.
 
 ```powershell
-docker exec audio-scribe printenv OPENAI_API_KEY
+docker exec audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'
 ```
 
-Expect a non-empty string.
+Expect `present`. Never `printenv` the raw value. This check proves the variable is set without printing it.
 
 Check the fixture exists on the host.
 
@@ -83,7 +83,7 @@ Upload the fixture straight from the host. No client and no intermediate contain
 bytes on a plain `PUT`.
 
 ```powershell
-curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: audio/wav" --data-binary "@AudioScribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
+curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: audio/mpeg" --data-binary "@AudioScribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
 ```
 
 Expect `200`.

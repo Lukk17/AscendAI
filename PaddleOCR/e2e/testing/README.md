@@ -60,10 +60,15 @@ the runner cap of 5 concurrent; the rest queue and pick up as slots free.
 
 **Engine-bound specs (2, 3, 4, 6).** These all invoke PaddleOCR's blocking `engine.predict` inside
 `asyncio.to_thread`. PaddleOCR inference on this deployment is CPU-only, capped to the container's documented
-`cpus: 4.0` budget; a single 212 KB image measured 65 to 72 seconds of `processing_time_seconds` across two live
-calls against this fixture (measured 2026-09-03), with the full round trip reaching up to 90 seconds wall-clock.
-Running two engine specs at the same time saturates every core and pushes individual calls further past that
-baseline, and `asyncio.wait_for` has far less headroom against `OCR_REQUEST_TIMEOUT=300` than the old 5-to-15-second
+`cpus: 4.0` budget. Two numbers matter and they are not the same number. Engine time, the
+`processing_time_seconds` the service reports for itself, measured 57.1 and 72.4 seconds on isolated calls against
+the 212 KB English fixture on 2026-09-03. Full round trip is longer: 60.7 and 82.1 seconds on isolated calls the
+same day, and 84.3, 99.9 and 105.6 seconds for specs 4, 3 and 2 during the full 2026-09-03 sweep, when the
+AscendAgent, AscendWebSearch, AscendMemory and WeatherMCP suites were exercising the same host concurrently. Budget
+60 to 110 seconds per engine-bound call and treat the top of that band as the normal cost of a busy host.
+
+Running two engine specs at the same time saturates every core and pushes individual calls past even that band,
+and `asyncio.wait_for` has far less headroom against `OCR_REQUEST_TIMEOUT=300` than the old 5-to-15-second
 assumption implied: the entire engine batch still risks `HTTP 500 INTERNAL_ERROR` or, in the MCP case,
 `result.isError=true`. **Engine specs run one at a time.** It is fine to interleave them with reject-fast specs.
 
@@ -71,9 +76,10 @@ Canonical fan-out shape for the full suite from a fresh container:
 
 1. Dispatch all 8 reject-fast specs in parallel (runner default cap of 5; queue 3).
 2. Once those settle (usually under 90 seconds in aggregate), dispatch the 4 engine specs **sequentially**, one at
-   a time. Each takes roughly 65 to 90 seconds of CPU-only inference on the documented 4-core budget.
+   a time. Each takes roughly 60 to 110 seconds of round trip on the documented 4-core budget, the upper end when
+   other module suites are running against the same host.
 
-Total wall-clock with this shape on a 4-core, 12 GB container: roughly 6 to 8 minutes for 12 specs.
+Total wall-clock with this shape on a 4-core, 12 GB container: roughly 7 to 10 minutes for 12 specs, the upper end under a concurrent multi-module sweep.
 
 The historical numbering reflects setup cost (lowest first). Run order within each class is free; the only hard
 constraint is "no two engine specs at the same time."

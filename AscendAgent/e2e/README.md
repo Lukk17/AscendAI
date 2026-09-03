@@ -106,7 +106,8 @@ The paired `templates/<N>-<feature>-tasks.template.md` is the runner's checklist
 reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**,
 **Time** fields) and **Additional tasks I did** (anything done outside the spec). The runner copies the template
 from [testing/templates/](testing/templates/) into [testing/runs/](testing/runs/) as
-`<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in.
+`<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in. The **Input tokens** / **Output tokens** fields recorded
+there roll up into per-provider dollar cost in [docs/E2E_COST.md](../../docs/E2E_COST.md).
 
 ---
 
@@ -183,11 +184,14 @@ specs need:
       "Bash(curl -X POST http://localhost:6333/*)",
       "Bash(curl -fsS http://localhost:9070/*)",
       "Bash(curl -fsS -X DELETE http://localhost:9070/*)",
+      "Bash(curl.exe -sS -o NUL -w \"%{http_code}\\n\" -X PUT \"http://localhost:9070/*\")",
+      "Bash(curl.exe -sS -o NUL -w \"%{http_code}\\n\" -X PUT -H \"Content-Type:*\" --data-binary \"@*\" \"http://localhost:9070/*\")",
       "Bash(curl -fsS http://localhost:9917/*)",
       "Bash(curl -X POST http://localhost:9917/*)",
       "Bash(curl -s -X POST http://localhost:9917/*)",
       "Bash(curl -fsS http://localhost:9998/*)",
       "Bash(curl -fsS http://localhost:7020/*)",
+      "Bash(docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *)",
       "Bash(bru --version)",
       "Bash(bru run *)",
       "Bash(cd docs/api/request/AscendAI && bru run *)"
@@ -196,11 +200,20 @@ specs need:
 }
 ```
 
-Each entry is narrowed to a specific container (`postgres`, `redis`, `ascend-agent`) or a specific localhost port
-(`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998` WeatherMCP, `:7020` AscendMemory). No blanket
-`docker exec *` or `curl *`. The object store needs no `docker exec` entry at all: it is published on the host by a
-compose project this repository does not own, so every step against it is a plain HTTP call. If you only run a subset
-of tests, you can prune.
+Each entry is narrowed to a specific container (`postgres`, `redis`, `ascend-agent`, `ascend-web-search`) or a
+specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998` WeatherMCP, `:7020`
+AscendMemory). No blanket `docker exec *` or `curl *`. The object store needs no `docker exec` entry at all: it is
+published on the host by a compose project this repository does not own, so every step against it is a plain HTTP
+call. If you only run a subset of tests, you can prune.
+
+This list covers every e2e suite in the repository, not only AscendAgent's own five specs, because this is the one
+place the allowlist shapes are documented. Two entries are read-only against `:9070` (`curl -fsS ...`, the `GET`
+listing calls), one is a delete (`curl -fsS -X DELETE ...`), and two are writes used to seed fixtures directly into
+the object store: AudioScribe's test 5 and PaddleOCR's test 6 both `PUT` a bucket and then `PUT` a fixture file into
+it via `curl.exe` (PowerShell aliases plain `curl` to `Invoke-WebRequest`, so these specs call the real `curl.exe`
+binary). The `docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *` entry is unrelated to the object
+store: it runs the seeded harness script (`seed_authenticated_session.py`, copied in beforehand with `docker cp`,
+already covered by the existing `Bash(docker cp *)` entry) for AscendWebSearch's authenticated-scraping test.
 
 If you skip this setup, the suite still runs but environmental failures (leaked fixtures re-indexed as extra
 sources, partially-completed resets etc.) will look like product regressions in the runner reports. Always check the
@@ -281,7 +294,7 @@ document rather than memorised knowledge.
 | `dedup-pierogi-grandma.md`                                 | RAG dedup (test 7)                     | Grandma Maria's pierogi recipe (GRANDMA-DEDUP-CANARY).                    |
 | `argent-saga-chronicle.pdf`                                | Summarization (test 3)                 | Fictional saga with unique proper nouns.                                  |
 | `image.png`                                                | Image description (test 2)             | Recognisable subject the model can describe.                              |
-| `meeting-clip.wav`                                         | (future audio test)                    | Short meeting recording.                                                  |
+| `meeting-clip.wav`                                         | (future audio test)                    | Short meeting recording. Despite the `.wav` extension this is a LAME-encoded MP3 elementary stream (MPEG sync word `0xfff3`, no RIFF header): mono, 24 kHz, 9.48 seconds, 56880 bytes. Byte-identical to `AudioScribe/e2e/fixtures/meeting-clip.wav`. See [../../AudioScribe/e2e/fixtures/README.md](../../AudioScribe/e2e/fixtures/README.md) for the full `ffprobe` breakdown. |
 | `compaction-seeds/seed-compaction-fires.{sql,redis}`       | Compaction fires (test 10)             | 21-row deterministic chat history with sprinkled facts.                   |
 | `compaction-seeds/seed-compaction-idempotency.{sql,redis}` | Compaction idempotency (test 11)       | 1 summary row + 8 raw turns, mimicking post-compaction state.             |
 

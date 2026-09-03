@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -39,6 +40,14 @@ public class DoclingClient {
 
     private static final String LEGACY_PATH = "/v1/convert";
     private static final String CORRECT_PATH = "/v1/convert/file";
+
+    // Docling Serve's uvicorn front end kills a worker process outright if it stays
+    // unresponsive to its internal health-check ping for 5 seconds, which measurably
+    // happens under concurrent CPU-bound conversions and surfaces here as a connection
+    // reset mid-request. The conversion call has no side effects on the server, so a
+    // short bounded retry recovers the page once the request lands on a healthy worker.
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long RETRY_BACKOFF_MILLIS = 500L;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -86,16 +95,44 @@ public class DoclingClient {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add(PARAM_FILE, new NamedByteArrayResource(fileBytes, filename));
 
+        String response = postWithRetry(body, filename);
+        return parseResponse(response, filename);
+    }
+
+    private String postWithRetry(MultiValueMap<String, Object> body, String filename) {
+        ResourceAccessException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            if (attempt > 1) {
+                sleepBeforeRetry();
+            }
+            try {
+                return sendConversionRequest(body);
+            } catch (ResourceAccessException e) {
+                lastFailure = e;
+                log.warn("[DoclingClient] Transient failure calling Docling for {} (attempt {}/{}): {}",
+                        filename, attempt, MAX_ATTEMPTS, e.getMessage());
+            } catch (RestClientException e) {
+                throw new IngestionException("Failed to process document with Docling: " + filename, e);
+            }
+        }
+        throw new IngestionException("Failed to process document with Docling: " + filename, lastFailure);
+    }
+
+    private String sendConversionRequest(MultiValueMap<String, Object> body) {
+        return restClient.post()
+                .uri(doclingBaseUrl + doclingApiPath + "?to_formats=json")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body)
+                .retrieve()
+                .body(String.class);
+    }
+
+    private void sleepBeforeRetry() {
         try {
-            String response = restClient.post()
-                    .uri(doclingBaseUrl + doclingApiPath + "?to_formats=json")
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(body)
-                    .retrieve()
-                    .body(String.class);
-            return parseResponse(response, filename);
-        } catch (RestClientException e) {
-            throw new IngestionException("Failed to process document with Docling: " + filename, e);
+            Thread.sleep(RETRY_BACKOFF_MILLIS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IngestionException("Interrupted while retrying Docling call", ie);
         }
     }
 

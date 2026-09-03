@@ -60,8 +60,9 @@ be run on its own.
    API.
 4. [4-mcp-tools-list-test.md](4-mcp-tools-list-test.md). MCP `tools/list` advertises the documented transcribe tool
    set.
-5. [5-mcp-transcribe-test.md](5-mcp-transcribe-test.md). MCP `tools/call` `transcribe_openai` against a `file://`
-   URI. **Requires a fixtures bind-mount.**
+5. [5-mcp-transcribe-test.md](5-mcp-transcribe-test.md). MCP `tools/call` `transcribe_openai` against an
+   object-store URL. **Requires the fixture uploaded to the `e2e-fixtures` bucket during Reset state, no container
+   mount.**
 
 ## Cross-cutting conventions
 

@@ -15,8 +15,11 @@ Check Bruno CLI, AscendAgent `/actuator/health`, Postgres + Redis healthy.
 Check the `ASCEND_ANTHROPIC_API_KEY` env var is configured for the running AscendAgent.
 
 ```bash
-docker exec ascend-agent printenv ASCEND_ANTHROPIC_API_KEY | head -c 8
+docker exec ascend-agent sh -c '[ -n "$ASCEND_ANTHROPIC_API_KEY" ] && echo present || echo missing'
 ```
+
+Should print `present`. Never `printenv` the raw value, even truncated. This check proves the variable is set
+without printing any of it.
 
 ## Reset state
 

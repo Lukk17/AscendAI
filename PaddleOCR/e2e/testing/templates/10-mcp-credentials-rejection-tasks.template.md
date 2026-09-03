@@ -18,13 +18,14 @@ Copy this file to `../runs/<UTC-timestamp>_10-mcp-credentials-rejection-tasks.md
 ### Run
 
 - [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
-- [ ] Send `mcp-credentials-in-uri.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
+- [ ] Step 2: send `mcp-credentials-in-uri.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` plus `-o "$env:TEMP\paddle-creds-run.json" -f json`, and wait for HTTP 200
+- [ ] Step 3: print the captured response frame with the `Get-Content` / `ConvertFrom-Json` one-liner from the spec
 
 ### Expected
 
 - [ ] Step 1 returns HTTP 200 and the `Mcp-Session-Id` header value is non-empty
 - [ ] Step 2 returns HTTP 200 carrying a JSON-RPC error envelope referencing `UNSAFE_URI` (credentials in URI rejected before DNS / fetch)
-- [ ] `docker logs ascend-paddle-ocr` does NOT contain `user:pass`
+- [ ] The frame printed by step 3 does NOT contain `user:pass`, `pass@`, or the offending URI in any form
 
 ### Verdict
 

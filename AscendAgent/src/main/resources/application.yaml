@@ -87,6 +87,7 @@ app:
 
   document-router:
     pdf-min-text-threshold-per-page: 50
+    pdf-parallel-pages: 4
 
   s3:
     bucket: knowledge-base

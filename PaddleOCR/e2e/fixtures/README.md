@@ -14,14 +14,21 @@ proves the text came from the OCR pipeline rather than memorised knowledge.
 | File | Used by | Distinctive content |
 | :--- | :--- | :--- |
 | `argent-saga-chronicles-page1.png` | `2-ocr-english-test.md`, `4-ocr-default-language-test.md`, `6-mcp-ocr-test.md` | Screenshot of page 1 of `AscendAgent/e2e/fixtures/argent-saga-chronicle.pdf`. Tests assert the extracted text contains `Argent Saga`, `Aenaria`, `Halen Veyr` (case-insensitive). |
-| `argent-saga-chronicles-page1-polish.png` | `3-ocr-polish-test.md` | Polish translation of page 1, screenshotted from a text editor. Tests assert the extracted text contains `Saga Swietlna` / `Saga Swietlna`, `Aenaria`, and at least one Polish-specific accented character. |
+| `argent-saga-chronicles-page1-polish.png` | `3-ocr-polish-test.md` | Polish translation of page 1, screenshotted from a text editor. Tests assert the extracted text contains `Saga Świetlna`, `Aenaria`, `Eklipsą`, and at least one Polish-specific accented character. |
+| `not-an-image.txt` | `12-ocr-unsupported-mime-test.md` | Plain-text file with no image/PDF magic bytes. Proves the magic-byte sniffer (`src/api/mime_sniffer.py`) rejects the upload even when the client lies about `Content-Type`. |
 
-## MCP fixture mount
+## MCP fixture delivery
 
-Test 6 (the MCP `ocr_process` call) takes a server-side `file_path` rather than a multipart upload. The fixture must
-be visible inside the PaddleOCR container. Document the mount in a `docker-compose.override.yaml` that bind-mounts
-`./PaddleOCR/e2e/fixtures` to `/e2e-fixtures:ro` (do NOT edit the committed `docker-compose.yaml`); test 6's Bruno
-request references `/e2e-fixtures/argent-saga-chronicles-page1.png`.
+Test 6 (the MCP `ocr_process` call) takes a `file_uri` argument rather than a multipart upload or a container-visible
+path. It uses no bind mount. The runner uploads the fixture from the host during the spec's Reset state, with a plain
+`PUT` against the object store's S3 endpoint on port 9070, into the `e2e-fixtures` bucket under the key
+`argent-saga-chronicles-page1.png`. The bucket is created by the same step and is never deleted by the spec.
+
+Test 6's Bruno request then passes `file_uri="http://host.docker.internal:9070/e2e-fixtures/argent-saga-chronicles-page1.png"`.
+PaddleOCR's MCP tool follows that URL back out to the host-published object store and pulls the bytes itself over
+HTTP, so the fixture never has to be visible on the container filesystem. This requires the PaddleOCR container's
+`MCP_ALLOWED_HOSTS` to include `host.docker.internal`, since the MCP SSRF guard blocks RFC1918 destinations by
+default (see [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md)).
 
 ## How to regenerate
 

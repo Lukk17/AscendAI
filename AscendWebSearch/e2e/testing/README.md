@@ -59,6 +59,11 @@ be run on its own.
 3. [3-read-example-com-test.md](3-read-example-com-test.md). `POST /api/v2/web/read` against `example.com`.
 4. [4-mcp-tools-list-test.md](4-mcp-tools-list-test.md). MCP `tools/list` advertises `web_search` and `web_read`.
 5. [5-mcp-search-test.md](5-mcp-search-test.md). MCP `tools/call` for `web_search` returns structured results.
+6. [6-tiered-scraping-test.md](6-tiered-scraping-test.md). Per-tier regression sweep (`curl_cffi` static,
+   FlareSolverr Cloudflare, Playwright JS-rendered) against real sites.
+7. [7-authenticated-realworld-scraping-test.md](7-authenticated-realworld-scraping-test.md). Real-world URL matrix
+   plus automated saucedemo login-reuse plus human-solved reCAPTCHA capture. **Runs last; Part 3 needs a human on
+   the main session.**
 
 ## Cross-cutting conventions
 

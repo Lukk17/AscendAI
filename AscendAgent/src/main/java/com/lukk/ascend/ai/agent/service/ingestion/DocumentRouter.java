@@ -37,7 +37,11 @@ public class DocumentRouter {
     @Value("${app.document-router.pdf-min-text-threshold-per-page:50}")
     private int pdfMinTextThresholdPerPage;
 
-    @Value("${app.document-router.pdf-parallel-pages:8}")
+    // Docling Serve runs 2 uvicorn worker processes, each running its own 2-slot
+    // conversion queue (eng_loc_num_workers=2), giving it a real capacity of 4 concurrent
+    // CPU-bound conversions. Dispatching more than that measurably increases the chance
+    // that a worker misses its internal 5s health-check heartbeat and gets killed mid-request.
+    @Value("${app.document-router.pdf-parallel-pages:4}")
     private int pdfParallelPages;
 
     public List<Document> routeAndProcess(byte[] fileBytes, String filename, String contentType) {

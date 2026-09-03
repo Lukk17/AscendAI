@@ -80,11 +80,13 @@ bru run "paddle-ocr/testing/ocr-polish.yml" --env ascend-local
 
 **Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
 
-Same constraint as spec 2 (roughly 65 to 90 s per call on this deployment's 4-core CPU allocation; see spec 2's
-Concurrency section for the measured baseline) plus a one-time cost: the Polish engine is NOT pre-warmed at container
-startup (only `DEFAULT_LANGUAGE`, currently `en`, warms during the lifespan). The first `lang=pl` request triggers an
-in-request model load that adds further latency on top of that baseline (not separately measured for this
-correction). Combined with concurrent calls on other engine specs the timeout window is exhausted before the first
+Same constraint as spec 2, roughly 60 to 110 s of full round trip per call on this deployment's 4-core CPU
+allocation. See spec 2's Concurrency section for the measured baseline and how engine time separates from round
+trip. On top of that there is a one-time cost: the Polish engine is NOT pre-warmed at container startup (only
+`DEFAULT_LANGUAGE`, currently `en`, warms during the lifespan). The first `lang=pl` request triggers an in-request
+model load that adds further latency, which is part of why this spec measured 99.9 s of round trip during the
+2026-09-03 sweep while four other module suites were hitting the same host. That model load has never been timed on
+its own. Combined with concurrent calls on other engine specs the timeout window is exhausted before the first
 response is produced. Run sequentially.
 
 Safe to run in parallel with: reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12). Unsafe with: 2, 3, 4, 6.

@@ -10,7 +10,7 @@ rotate WAFs and go down, so refine it as real targets are discovered.
 | :-- | :-------------- | :-- | :--------------- | :---------------- |
 | 1 | `curl_cffi` — static article | `https://en.wikipedia.org/wiki/Web_scraping` | content (lowercased) contains `"web scraping"` | yes |
 | 2 | FlareSolverr — Cloudflare WAF | `https://www.scrapingcourse.com/cloudflare-challenge` | `status="success"`, content contains `"cloudflare challenge"` (FlareSolverr bypassed the challenge) | yes |
-| 3 | Playwright — JS-rendered | `https://quotes.toscrape.com/js/` | content contains `"The world as we have created it"`, which is **absent** from the raw (non-JS) HTML | yes |
+| 3 | Playwright — JS-rendered | `https://quotes.toscrape.com/js/` | content contains `"The world as we have created it"`, and the serving `mode` is a browser tier | yes |
 | 4 | NoVNC — hard CAPTCHA | *TBD* | human solves CAPTCHA, content returned | **no — manual / best-effort** |
 | 5–8 | real-world categories | *TBD* (job board, news article, product page, docs page) | per-site, defined when added | no — added later |
 
@@ -19,9 +19,10 @@ rotate WAFs and go down, so refine it as real targets are discovered.
 - **Row 1 (static):** the content field, lowercased, contains `"web scraping"`.
 - **Row 2 (Cloudflare):** `status="success"` and a content field of length ≥ 50 — proves the Cloudflare challenge
   was solved rather than the bot-block interstitial being returned.
-- **Row 3 (JavaScript):** the content field contains `"The world as we have created it"`; a direct host-side
-  `curl` of the same URL does **not** contain that phrase — proving JS execution rendered the DOM.
-- The response shape is identical across all three rows; the caller never learns which tier served the request.
+- **Row 3 (JavaScript):** the content field contains `"The world as we have created it"` and the response's `mode`
+  names a browser-executing tier. The phrase is absent from the page's raw markup once inline `<script>` blocks are
+  stripped, so its presence in extracted prose means a browser ran the page's JavaScript.
+- The response shape is identical across all three rows (`url`, `content`, `status`, `mode`). Only the `mode` value differs, naming the tier that succeeded.
 - **Row 4 (CAPTCHA):** documented here but excluded from the pass/fail verdict; it requires human interaction via
   the NoVNC/Ngrok path and cannot be asserted unattended.
 
@@ -61,14 +62,26 @@ curl -fsS https://en.wikipedia.org/wiki/Web_scraping
 Expect HTTP 200 with article HTML. If this fails, the host cannot reach the public internet and the test cannot
 pass.
 
-Capture the raw (non-JS) HTML of the JavaScript target, to later prove JS rendering added content.
+Confirm the JavaScript target's canary phrase is not already present in its raw markup, so row 3's assertion
+means something. Strip inline `<script>` blocks first, then look for the phrase.
 
 ```powershell
-curl -fsS https://quotes.toscrape.com/js/
+((Invoke-WebRequest -Uri "https://quotes.toscrape.com/js/" -UseBasicParsing).Content -replace '(?s)<script.*?</script>', '') -match 'The world as we have created it'
 ```
 
-Expect HTTP 200. The returned HTML should NOT contain the plain phrase `The world as we have created it` (the
-quotes are injected by client-side JavaScript), confirming row 3's assertion is meaningful.
+Expect `False`.
+
+The strip is the whole point of this check. The page ships its ten quotes as a JavaScript array literal inside an
+inline `<script>` block and calls `document.write()` to build the visible DOM from it, so the canary phrase sits in
+the raw response as literal source text whether or not any JavaScript ever runs. A plain `curl` piped to a grep
+matches it and proves nothing. Dropping `<script>` contents leaves only the markup a non-executing client would
+see, and there the phrase is genuinely absent.
+
+To see the difference for yourself, run the same expression without the strip and expect `True`.
+
+```powershell
+(Invoke-WebRequest -Uri "https://quotes.toscrape.com/js/" -UseBasicParsing).Content -match 'The world as we have created it'
+```
 
 ## Reset state
 
@@ -111,7 +124,14 @@ bru run "web-search/testing/extract-tier-cloudflare.yml" --env ascend-local
 Step 3 — JavaScript tier (row 3). Send the request and wait for HTTP 200 before continuing.
 
 ```powershell
-bru run "web-search/testing/extract-tier-js-quotes.yml" --env ascend-local
+bru run "web-search/testing/extract-tier-js-quotes.yml" --env ascend-local -o "$env:TEMP\js-quotes-run.json" -f json
+```
+
+Step 4. Read back which tier served row 3. Bruno's console output never prints the response body, so this is what
+makes the `mode` assertion checkable.
+
+```powershell
+(Get-Content "$env:TEMP\js-quotes-run.json" -Raw | ConvertFrom-Json)[0].results[0].response.data.mode
 ```
 
 ## Expected
@@ -130,9 +150,12 @@ Per-row canary assertions:
 - **Row 2:** `status` equals `"success"` and the content field length is ≥ 50 (the Cloudflare challenge was
   solved; the bot-block page is short and would fail this bound). A duration in the tens of seconds is normal for
   the FlareSolverr tier — log it but do not fail on duration alone.
-- **Row 3:** the populated content field contains the substring `"The world as we have created it"`. The raw HTML
-  captured in Prerequisites does NOT contain that phrase, so its presence proves the Playwright tier executed the
-  page's JavaScript.
+- **Row 3:** the populated content field contains the substring `"The world as we have created it"`, and the
+  `mode` printed by Run step 4 is one of `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive`, or the
+  NoVNC tier. It is never `1-beautifulsoup` or `2-trafilatura`. Those two lightweight tiers do not execute
+  JavaScript, so a browser-tier `mode` plus the canary phrase in extracted prose is the proof that the DOM was
+  rendered. The tier that serves this row varies between runs (both `3-flaresolverr` and `4-playwright_stealth`
+  have served it), so assert the set, not one value.
 
 A gated row that returns HTTP 200 but `status != "success"`, or an empty/short content field, or a missing canary
 phrase, fails the test. Row 4 (CAPTCHA) is recorded under **Additional tasks I did**, never in the verdict.

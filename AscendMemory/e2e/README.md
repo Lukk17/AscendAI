@@ -83,7 +83,9 @@ The paired `templates/<N>-<feature>-tasks.template.md` is the runner's checklist
 reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**,
 **Start (UTC)**, **End (UTC)**, **Duration** fields) and **Additional tasks I did** (anything done outside the
 spec). The runner copies the template from [testing/templates/](testing/templates/) into
-[testing/runs/](testing/runs/) as `<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in.
+[testing/runs/](testing/runs/) as `<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in. The **Input tokens** /
+**Output tokens** fields recorded there roll up into per-provider dollar cost in
+[docs/E2E_COST.md](../../docs/E2E_COST.md).
 
 ## Parallelism and execution order
 

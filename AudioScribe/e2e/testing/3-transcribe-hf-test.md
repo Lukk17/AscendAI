@@ -33,10 +33,11 @@ Expect HTTP 200 with `{"status":"ok","service":"AudioScribe"}`.
 Check the AudioScribe container has `HF_TOKEN` configured.
 
 ```powershell
-docker exec audio-scribe printenv HF_TOKEN
+docker exec audio-scribe sh -c '[ -n "$HF_TOKEN" ] && echo present || echo missing'
 ```
 
-Expect a non-empty string. If empty, set `HF_TOKEN` in the host environment / `.env` and recreate the container.
+Expect `present`. Never `printenv` the raw value. This check proves the variable is set without printing it. If
+`missing`, set `HF_TOKEN` in the host environment / `.env` and recreate the container.
 
 Check outbound HTTPS to the Hugging Face Inference API works from the AudioScribe container.
 
@@ -44,8 +45,10 @@ Check outbound HTTPS to the Hugging Face Inference API works from the AudioScrib
 docker exec audio-scribe curl -fsS -o NUL -w "%{http_code}\n" https://router.huggingface.co/hf-inference
 ```
 
-Expect HTTP 200 (root marketing page) or HTTP 401 (depending on the endpoint Hugging Face is currently serving on
-the root — confirms egress works).
+Expect HTTP 404. The router has no route registered at that exact path: an inference call needs a model path
+appended after `/hf-inference/`. The 404 still proves egress works, because the response carries headers unique to
+Hugging Face's own application server (`X-Powered-By: huggingface-moon`, served behind their CloudFront), which a
+DNS failure, a timeout, or a blocked connection would not produce.
 
 Check the canary fixture is present.
 
@@ -90,5 +93,5 @@ The response matches:
 
 ## Fixtures
 
-- `AudioScribe/e2e/fixtures/meeting-clip.wav` — ≤ 5 s mono WAV at 16 kHz, spoken English line
-  *"I think we should defer the migration to Q3 because the contract with Acme renews then. Adam, can you confirm the renewal date by Friday?"*
+- `AudioScribe/e2e/fixtures/meeting-clip.wav`: 9.48 s mono audio at 24 kHz, spoken English line
+  *"I think we should defer the migration to Q3 because the contract with Acme renews then. Adam, can you confirm the renewal date by Friday?"* Despite the `.wav` extension, this is a LAME-encoded MP3 elementary stream, not a RIFF WAV file. See [../fixtures/README.md](../fixtures/README.md) for the full `ffprobe` breakdown.

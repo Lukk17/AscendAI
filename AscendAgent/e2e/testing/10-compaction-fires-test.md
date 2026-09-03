@@ -44,8 +44,13 @@ docker cp AscendAgent/e2e/fixtures/compaction-seeds/seed-compaction-fires.redis 
 docker exec redis sh -c "redis-cli < /tmp/seed-compaction-fires.redis"
 ```
 
+The cleanup also wraps the container-side path in `sh -c` rather than passing it as a bare argument. Reason: on
+Windows, Git Bash's MSYS layer rewrites a bare `/tmp/...` argument into a host path before `docker` ever sees it
+(`rm: can't remove 'C:/Users/.../Temp/seed-compaction-fires.redis'`), while a path embedded inside a quoted `sh -c`
+string is left alone. PowerShell has no such rewriting, so the same form works unchanged there too.
+
 ```bash
-docker exec redis rm /tmp/seed-compaction-fires.redis
+docker exec redis sh -c "rm /tmp/seed-compaction-fires.redis"
 ```
 
 Verify the seed worked.
@@ -138,7 +143,7 @@ curl -sS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyCompact
 
 Expect `{"status":"success","message":"All memories wiped for user frostyCompactionFiresTest"}`.
 
-The seed file the Reset section copied into the `redis` container is already removed by that section's `docker exec redis rm` step, so nothing is left under `/tmp` in the container.
+The seed file the Reset section copied into the `redis` container is already removed by that section's `docker exec redis sh -c "rm ..."` step, so nothing is left under `/tmp` in the container.
 
 ## Expected
 

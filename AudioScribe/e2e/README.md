@@ -35,8 +35,10 @@ AudioScribe/e2e/
 
 Tests are number-prefixed by setup cost. `1` runs offline (no external API egress). `2`-`3` need `OPENAI_API_KEY` /
 `HF_TOKEN` on the AudioScribe container and outbound HTTPS to `api.openai.com` / `api-inference.huggingface.co`. `4`
-is a pure MCP-protocol probe (`tools/list`). `5` exercises the MCP `transcribe_openai` tool against a `file://` URI
-served from a fixture volume-mounted into the container, so it requires the same `OPENAI_API_KEY` as test 2.
+is a pure MCP-protocol probe (`tools/list`). `5` exercises the MCP `transcribe_openai` tool against an object-store
+URL: the fixture is uploaded to the object store's `e2e-fixtures` bucket during the spec's Reset state, not
+volume-mounted into the container, so it requires the same `OPENAI_API_KEY` as test 2 plus the object store reachable
+on `:9070`.
 
 The Bruno collection isn't here. It lives at the **repo root** under
 `docs/api/request/AscendAI/transcribe/testing/` so it stays a portable API client artifact. Each spec references the
@@ -74,7 +76,9 @@ Every spec follows the same template:
 2. **Prerequisites.** Concrete check commands the runner executes before starting. Each command is its own code
    block; the prose around it states what success looks like.
 3. **Reset state.** One command per code block, executed in order, to wipe state so the test is reproducible. Tests
-   that write to the `/tmp` transcript cache delete those files before starting; the MCP tests document no reset.
+   that write to the `/tmp` transcript cache delete those files before starting. Test 4 (`tools/list`) documents no
+   reset, being a read-only protocol probe; test 5 creates the object store's `e2e-fixtures` bucket and uploads its
+   fixture there in addition to clearing the `/tmp` cache.
 4. **Run.** One or more numbered steps. Each step is a single Bruno CLI invocation (REST tests) or a `curl`
    `initialize` handshake followed by a `bru run` `tools/call` (MCP tests). Steps wait for HTTP 200 before continuing.
 5. **Expected.** Observable behaviour only: HTTP status, `.md` body contains the canary phrase substring, JSON-RPC
@@ -85,7 +89,8 @@ The paired `templates/<N>-<feature>-tasks.template.md` is the runner's checklist
 reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**, **Start
 (UTC)**, **End (UTC)**, **Duration** fields) and **Additional tasks I did** (anything done outside the spec). The
 runner copies the template from [testing/templates/](testing/templates/) into [testing/runs/](testing/runs/) as
-`<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in.
+`<UTC-timestamp>_<N>-<feature>-tasks.md` and fills it in. The **Input tokens** / **Output tokens** fields recorded
+there roll up into per-provider dollar cost in [docs/E2E_COST.md](../../docs/E2E_COST.md).
 
 ## Parallelism and execution order
 
@@ -109,8 +114,8 @@ transcribe call.
 3. Bruno CLI installed: `bru --version` returns a version string. Install once with `npm install -g @usebruno/cli`.
 4. For tests 2 and 5: `docker exec audio-scribe printenv OPENAI_API_KEY | head -c 8` returns a non-empty prefix.
 5. For test 3: `docker exec audio-scribe printenv HF_TOKEN | head -c 8` returns a non-empty prefix.
-6. For test 5: the fixtures directory is volume-mounted into the container — see the spec's Prerequisites for the
-   exact mount instruction.
+6. For test 5: the object store is reachable at `http://localhost:9070` — its spec's Reset state uploads the fixture
+   to the `e2e-fixtures` bucket over a plain `PUT`, no container mount required.
 
 ## Running tests
 
@@ -147,10 +152,10 @@ Numbered by setup cost. Easiest first.
 | #  | Spec | What it proves |
 | :- | :--- | :--- |
 | 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /api/v1/transcribe/openai` with the `file` form field missing returns HTTP 422 with a FastAPI validation-error body that names `file` as the missing field. No external API egress required. |
-| 2  | [testing/2-transcribe-openai-test.md](testing/2-transcribe-openai-test.md) | Upload `canary-openai.wav` to `POST /api/v1/transcribe/openai` with `stream=false`; HTTP 200, `Content-Type: text/markdown`, body contains the canary phrase substring. Requires `OPENAI_API_KEY`. |
-| 3  | [testing/3-transcribe-hf-test.md](testing/3-transcribe-hf-test.md) | Same as test 2 for `POST /api/v1/transcribe/hf` with `canary-hf.wav`. Requires `HF_TOKEN`. |
+| 2  | [testing/2-transcribe-openai-test.md](testing/2-transcribe-openai-test.md) | Upload `meeting-clip.wav` to `POST /api/v1/transcribe/openai` with `stream=false`; HTTP 200, `Content-Type: text/markdown`, body contains the canary phrase substring. Requires `OPENAI_API_KEY`. |
+| 3  | [testing/3-transcribe-hf-test.md](testing/3-transcribe-hf-test.md) | Same as test 2 for `POST /api/v1/transcribe/hf` with `meeting-clip.wav`. Requires `HF_TOKEN`. |
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | MCP `tools/list` over Streamable HTTP at `POST /mcp` advertises the four transcribe tools (`transcribe_local`, `transcribe_openai`, `transcribe_hf`, `transcribe_audacity`) plus `health`, each with the documented argument schema. |
-| 5  | [testing/5-mcp-transcribe-test.md](testing/5-mcp-transcribe-test.md) | MCP `tools/call` for `transcribe_openai` with `audio_uri="file:///fixtures/canary-openai.wav"` returns a JSON-RPC `result.content[0].text` whose parsed JSON body has `source="openai"`, the canary phrase substring in `transcription`. Requires `OPENAI_API_KEY` and a fixtures bind-mount. |
+| 5  | [testing/5-mcp-transcribe-test.md](testing/5-mcp-transcribe-test.md) | MCP `tools/call` for `transcribe_openai` with `audio_uri="http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav"` returns a JSON-RPC `result.content[0].text` whose parsed JSON body has `source="openai"`, the canary phrase substring in `transcription`. Requires `OPENAI_API_KEY` and the object store's `e2e-fixtures` bucket seeded during Reset state. |
 
 ## Adding a new test
 

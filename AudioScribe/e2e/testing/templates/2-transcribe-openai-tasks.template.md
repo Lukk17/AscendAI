@@ -10,7 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_2-transcribe-openai-tasks.md` before 
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] AudioScribe `/health` returns HTTP 200 with `{"status":"ok","service":"AudioScribe"}`
-- [ ] `docker exec audio-scribe printenv OPENAI_API_KEY` returns a non-empty string
+- [ ] `docker exec audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'` prints `present`
 - [ ] AudioScribe container can reach `https://api.openai.com/v1/models` (HTTP 200 or 401)
 - [ ] `AudioScribe/e2e/fixtures/meeting-clip.wav` exists and is at least 1 KB
 

@@ -33,13 +33,22 @@ None. This test does not reach mem0; no `user_id` is touched in Qdrant.
 
 ## Run
 
-One Bruno request.
+Capture a Qdrant baseline, then send one Bruno request.
 
 ```powershell
 cd docs/api/request/AscendAI
 ```
 
-**Step 1.** Send the malformed insert request.
+**Step 1.** Record the current point count of the `ascend_memory_1536` collection (the collection the default
+provider chain would eventually write to if this request ever reached mem0).
+
+```powershell
+curl -fsS http://localhost:6333/collections/ascend_memory_1536
+```
+
+Note the `result.points_count` value as the baseline.
+
+**Step 2.** Send the malformed insert request.
 
 ```powershell
 bru run "memory/testing/invalid-missing-user.yml" --env ascend-local
@@ -61,8 +70,16 @@ The response body matches:
   envelope).
 - The element's `type` is `"missing"` (Pydantic v2 missing-field code).
 
-A response latency over ~200 ms suggests the request actually reached mem0 / Qdrant; investigate before declaring
-PASS.
+No backend call occurred. This is proven two ways, not by wall-clock latency. Container overhead on this stack sits
+around 200-220 ms for any request, including a bodyless `/health` liveness probe. A latency threshold cannot
+distinguish "validator short-circuited" from "reached mem0" and produces false alarms on every run:
+
+- Structurally: `InsertRequest.user_id` in `src/api/rest/rest_endpoints.py` is a required Pydantic field with no
+  default. FastAPI validates the request body against this model before the `insert_memory` handler function body
+  ever executes, so a 422 response for a missing `user_id` is only reachable through a code path that never calls
+  `get_memory_client` or `client.add`. mem0 and Qdrant cannot have been touched.
+- Observably: `curl -fsS http://localhost:6333/collections/ascend_memory_1536` taken after the run reports the same
+  `result.points_count` as the baseline captured in Run Step 1.
 
 ## Fixtures
 
