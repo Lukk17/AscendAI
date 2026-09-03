@@ -178,7 +178,21 @@ specs need:
       "Bash(docker exec -i postgres psql *)",
       "Bash(docker exec redis redis-cli *)",
       "Bash(docker exec -i redis redis-cli *)",
+      "Bash(docker exec redis sh -c *)",
+      "Bash(docker exec redis rm /tmp/*)",
+      "Bash(docker exec redis ls *)",
+      "Bash(docker exec ascend-agent sh -c *)",
+      "Bash(docker exec ascend-agent printenv *)",
       "Bash(docker exec ascend-agent ls *)",
+      "Bash(docker exec audio-scribe sh -c *)",
+      "Bash(docker exec audio-scribe printenv *)",
+      "Bash(docker exec audio-scribe curl *)",
+      "Bash(docker exec ascend-paddle-ocr sh -c *)",
+      "Bash(docker exec ascend-paddle-ocr printenv *)",
+      "Bash(docker exec ascend-paddle-ocr curl *)",
+      "Bash(docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *)",
+      "Bash(docker cp AscendAgent/e2e/fixtures/compaction-seeds/* redis:/tmp/*)",
+      "Bash(docker cp AscendWebSearch/e2e/harness/* ascend-web-search:/tmp/*)",
       "Bash(curl -fsS http://localhost:6333/*)",
       "Bash(curl -X POST http://localhost:6333/*)",
       "Bash(curl -fsS http://localhost:9070/*)",
@@ -190,7 +204,6 @@ specs need:
       "Bash(curl -s -X POST http://localhost:9917/*)",
       "Bash(curl -fsS http://localhost:9998/*)",
       "Bash(curl -fsS http://localhost:7020/*)",
-      "Bash(docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *)",
       "Bash(bru --version)",
       "Bash(bru run *)",
       "Bash(cd docs/api/request/AscendAI && bru run *)"
@@ -199,20 +212,34 @@ specs need:
 }
 ```
 
-Each entry is narrowed to a specific container (`postgres`, `redis`, `ascend-agent`, `ascend-web-search`) or a
-specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998` WeatherMCP, `:7020`
-AscendMemory). No blanket `docker exec *` or `curl *`. The object store needs no `docker exec` entry at all: it is
-published on the host by a compose project this repository does not own, so every step against it is a plain HTTP
-call. If you only run a subset of tests, you can prune.
+Every entry names a specific container (`postgres`, `redis`, `ascend-agent`, `audio-scribe`, `ascend-paddle-ocr`,
+`ascend-web-search`) or a specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998`
+WeatherMCP, `:7020` AscendMemory). No blanket `docker exec *`, `docker cp *` or `curl *`, and no entry for a container
+no spec touches: `searxng`, `flaresolverr`, `ngrok-ascend-web-search`, `weather-mcp`, `ascend-memory`, `docling-serve`,
+`unstructured-api` and the observability containers get nothing. Because the container name is pinned as the first
+token after `docker exec`, no entry can be used to smuggle in a different container or a flag such as `-u 0`. The
+object store needs no `docker exec` entry at all: it is published on the host by a compose project this repository
+does not own, so every step against it is a plain HTTP call. If you only run a subset of tests, you can prune.
 
-This list covers every e2e suite in the repository, not only AscendAgent's own five specs, because this is the one
+This list covers every e2e suite in the repository, not only AscendAgent's own eleven specs, because this is the one
 place the allowlist shapes are documented. Two entries are read-only against `:9070` (`curl -fsS ...`, the `GET`
 listing calls), one is a delete (`curl -fsS -X DELETE ...`), and two are writes used to seed fixtures directly into
 the object store: AudioScribe's test 5 and PaddleOCR's test 6 both `PUT` a bucket and then `PUT` a fixture file into
 it via `curl.exe` (PowerShell aliases plain `curl` to `Invoke-WebRequest`, so these specs call the real `curl.exe`
-binary). The `docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *` entry is unrelated to the object
-store: it runs the seeded harness script (`seed_authenticated_session.py`, copied in beforehand with `docker cp`,
-already covered by the existing `Bash(docker cp *)` entry) for AscendWebSearch's authenticated-scraping test.
+binary).
+
+The two `docker cp` entries are the only copies the suite needs, and both go one way, from a fixed fixture directory
+in the repository into `/tmp` of one named container. AscendAgent's tests 10 and 11 copy a Redis seed file in before
+loading it with `docker exec redis sh -c "redis-cli < /tmp/..."`, and AscendWebSearch's test 7 copies
+`seed_authenticated_session.py` in before running it with
+`docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *`. Nothing in the suite copies anything out of a
+container, so no entry permits that direction.
+
+The `sh -c` entries exist because several specs need a shell inside the container: key-presence checks that print
+`present` or `missing` rather than the secret itself (AscendAgent tests 8 and 9, AudioScribe tests 2, 3 and 5),
+transcript cleanup (`rm -f /tmp/transcript_*.md`), and the Redis seed load. On Windows the `sh -c` wrapper is also
+what stops Git Bash rewriting a leading-slash container path such as `/tmp/...` into a Windows path before `docker`
+sees it.
 
 If you skip this setup, the suite still runs but environmental failures (leaked fixtures re-indexed as extra
 sources, partially-completed resets etc.) will look like product regressions in the runner reports. Always check the

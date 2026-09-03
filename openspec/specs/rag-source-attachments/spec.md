@@ -27,7 +27,7 @@ TBD - created by archiving change add-rag-source-attachments. Update Purpose aft
 
 ### Requirement: `SourceFile` DTO shape
 
-The `SourceFile` DTO SHALL be a JSON object with these fields: `name` (string, the human-readable filename), `mimeType` (string, e.g. `application/pdf`), `downloadUrl` (string, a presigned MinIO/S3 GET URL), `expiresAt` (ISO-8601 instant), and optional `sizeBytes` (integer; omitted when unknown). The DTO SHALL use `@JsonInclude(NON_NULL)` so unknown size is omitted rather than serialized as `null`.
+The `SourceFile` DTO SHALL be a JSON object with these fields: `name` (string, the human-readable filename), `mimeType` (string, e.g. `application/pdf`), `downloadUrl` (string, a presigned S3 GET URL), `expiresAt` (ISO-8601 instant), and optional `sizeBytes` (integer, omitted when unknown). The DTO SHALL use `@JsonInclude(NON_NULL)` so unknown size is omitted rather than serialized as `null`.
 
 #### Scenario: SourceFile JSON shape
 
@@ -60,7 +60,7 @@ When `attachSources=true` is set but `RagRetrievalService` returns zero chunks a
 
 ### Requirement: De-duplication by source object identity
 
-When multiple retrieved chunks point to the same underlying source document (same MinIO bucket and key), the response `sources` array SHALL contain that document exactly once. The first occurrence (in similarity-rank order) SHALL determine the position in the result list.
+When multiple retrieved chunks point to the same underlying source document (same S3 bucket and key), the response `sources` array SHALL contain that document exactly once. The first occurrence (in similarity-rank order) SHALL determine the position in the result list.
 
 #### Scenario: Five chunks across two unique source documents
 
@@ -75,7 +75,9 @@ When multiple retrieved chunks point to the same underlying source document (sam
 
 ### Requirement: Presigned URLs for source documents
 
-`AiResponse.sources[*].downloadUrl` SHALL be a presigned `GET` URL signed using the agent's MinIO credentials and scoped to a single object. The URL SHALL be reachable from the caller's network (signed against `app.s3.public-endpoint`, which defaults to `app.s3.endpoint` but may be overridden so containerised callers and host callers both succeed). The TTL SHALL default to 15 minutes and be configurable via `app.rag.source-attachments.presign-ttl` within the bounds `[1 minute, 1 hour]`. Values outside the bounds SHALL be clamped at startup with a WARN log.
+`AiResponse.sources[*].downloadUrl` SHALL be a presigned `GET` URL signed using the agent's configured S3 credentials (`app.s3.access-key` and `app.s3.secret-key`) and scoped to a single object. The URL SHALL be reachable from the caller's network (signed against `app.s3.public-endpoint`, which defaults to `app.s3.endpoint` but may be overridden so containerised callers and host callers both succeed). The TTL SHALL default to 15 minutes and be configurable via `app.rag.source-attachments.presign-ttl` within the bounds `[1 minute, 1 hour]`. Values outside the bounds SHALL be clamped at startup with a WARN log.
+
+The requirement is object-store-neutral. It SHALL hold against any S3-compatible endpoint the agent is pointed at, including one that does not validate the signature it receives. Where the endpoint ignores credentials, the URL SHALL still carry a well-formed `X-Amz-Signature` query parameter, because presence of that parameter is what the no-leakage requirement below is asserted against.
 
 #### Scenario: Default TTL
 
@@ -95,10 +97,17 @@ When multiple retrieved chunks point to the same underlying source document (sam
 
 #### Scenario: URL fetchable from caller's network
 
-- **GIVEN** the agent runs in docker-compose with `app.s3.endpoint=http://minio:9000` and `app.s3.public-endpoint=http://localhost:9070`
+- **GIVEN** the agent runs in docker-compose with `app.s3.endpoint=http://host.docker.internal:9070` and `app.s3.public-endpoint=http://localhost:9070`, both reaching the same external Floci instance
 - **WHEN** a caller on the host receives a `downloadUrl` and issues a GET against it
 - **THEN** the GET returns 200 with the file bytes
-- **AND** the URL's host portion is `localhost:9070`, NOT `minio:9000`
+- **AND** the URL's host portion is `localhost:9070`, NOT `host.docker.internal:9070`
+
+#### Scenario: URL resolves against an endpoint that does not validate credentials
+
+- **GIVEN** the object store is Floci, which accepts any credential value
+- **WHEN** a caller issues a GET against a `downloadUrl` returned by the agent
+- **THEN** the GET returns 200 with the file bytes
+- **AND** the response is byte-identical to a direct unauthenticated `GET http://localhost:9070/{bucket}/{key}`
 
 ### Requirement: Size cap for attached sources
 
@@ -119,7 +128,7 @@ Source documents larger than `app.rag.source-attachments.max-file-size` (defined
 
 ### Requirement: Best-effort presigning never fails the request
 
-If presigning a single source document fails (HEAD error, SDK exception, MinIO unreachable for that key), the affected source SHALL be omitted from the response array, a single WARN line SHALL be logged, and the request SHALL still return HTTP 200 with the textual answer and any successfully presigned siblings.
+If presigning a single source document fails (HEAD error, SDK exception, the object store unreachable for that key), the affected source SHALL be omitted from the response array, a single WARN line SHALL be logged, and the request SHALL still return HTTP 200 with the textual answer and any successfully presigned siblings.
 
 #### Scenario: HEAD fails for one source
 
@@ -134,6 +143,11 @@ If presigning a single source document fails (HEAD error, SDK exception, MinIO u
 - **THEN** `response.sources` contains the two successfully presigned entries
 - **AND** the request status is 200
 
+#### Scenario: Object store is entirely unreachable
+
+- **WHEN** the endpoint at `app.s3.endpoint` refuses every connection while a prompt with `attachSources=true` is answered
+- **THEN** the response status is 200 with the textual answer
+- **AND** `response.sources` is `[]`
 ### Requirement: No leakage of presigned URLs through logs or chat history
 
 The agent SHALL NOT log the body of any presigned URL (the `?X-Amz-Signature=…` portion). Logs SHALL reference sources by `s3://{bucket}/{key}` only. The agent SHALL NOT persist presigned URLs to chat history (Redis or PostgreSQL). The textual answer that goes into chat history SHALL be unchanged from today's behavior.

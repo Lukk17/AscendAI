@@ -5,7 +5,9 @@ TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after ar
 ## Requirements
 ### Requirement: README documents the RAG ingestion lifecycle
 
-`AscendAgent/README.md` SHALL include a section titled "RAG ingestion lifecycle" that explains, in order: (1) how to put files into the `knowledge-base` MinIO bucket (folders `obsidian/` for `.md`, `documents/` for PDFs/DOCX); (2) that `app.ingestion.auto.enabled` defaults to `false` and the user must call `POST /api/ingestion/run` to index files dropped into MinIO; (3) how to switch on the auto-poller (`app.ingestion.auto.enabled: true`) and the trade-offs; (4) the embedding-dimension/collection coupling (`ascendai-{dims}`) and what to do when changing embedding providers (re-index required); (5) the distinction between RAG corpus, semantic memory, and short-term chat history.
+`AscendAgent/README.md` SHALL include a section titled "RAG ingestion lifecycle" that explains, in order: (1) how to put files into the `knowledge-base` bucket on the S3-compatible object store (folders `obsidian/` for `.md`, `documents/` for PDFs/DOCX), naming Floci as the local implementation and the Floci UI on port `9071` as the way to browse it; (2) that `app.ingestion.auto.enabled` defaults to `false` and the user must call `POST /api/ingestion/run` to index files dropped into the bucket; (3) how to switch on the auto-poller (`app.ingestion.auto.enabled: true`) and the trade-offs; (4) the embedding-dimension/collection coupling (`ascendai-{dims}`) and what to do when changing embedding providers (re-index required); (5) the distinction between RAG corpus, semantic memory, and short-term chat history.
+
+The section SHALL NOT instruct the reader to install or use the `mc` client, and SHALL NOT reference a container named `minio`.
 
 #### Scenario: Section present and discoverable
 
@@ -18,6 +20,11 @@ TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after ar
 - **WHEN** a user wants to know "why doesn't my freshly-uploaded `.md` show up in answers?"
 - **THEN** the README explicitly states that `POST /api/ingestion/run` is required unless auto-ingestion is enabled
 
+#### Scenario: Upload instructions work on the current stack
+
+- **WHEN** a developer follows the upload instructions verbatim against a running Floci on port 9070
+- **THEN** the file lands in the `knowledge-base` bucket under the documented prefix
+- **AND** a subsequent `POST /api/ingestion/run` indexes it
 ### Requirement: ADR documents the auto-ingestion default
 
 `AscendAgent/docs/architecture/decisions/` SHALL contain an ADR explaining why `app.ingestion.auto.enabled` defaults to `false`, listing the considered alternatives and the trade-offs (cost, accidental indexing, predictable startup).

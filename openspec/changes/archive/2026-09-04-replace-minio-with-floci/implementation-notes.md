@@ -42,9 +42,17 @@ Cleanup is complete. `floci-contract-probe` and both of its objects no longer ex
 
 ---
 
-### Task 3.10: the before-and-after timing comparison cannot be reconstructed
+### Task 3.10: closed as not measurable
 
-No wall-clock baseline of `./gradlew integrationTest` was captured against the MinIO Testcontainer before the swap landed, and the MinIO container is gone from the machine, so the comparison the task asks for has no "before" half and cannot be recovered. The task stays unticked rather than being marked done on half the evidence.
+No wall-clock baseline of `./gradlew integrationTest` was captured against the MinIO Testcontainer before the swap landed, and the MinIO container is gone from the machine, so the comparison the task asks for has no "before" half. The task is closed as not measurable on 2026-09-04, at archive time. It stays unticked, because it was never satisfied and no number was invented to make it look satisfied.
+
+Reconstructing the missing half was considered and rejected. The old code is in git history, so a run at the commit before the migration is technically available, but the number it produces would be misleading rather than merely approximate, for two independent reasons.
+
+The first is that the pre-migration code was not a valid measurement subject. It carried the test-isolation defect described under "Task 10.2" below: `TestcontainersBase` annotated its four `static final` container fields with `@Container` inside a `@Testcontainers` class, so Testcontainers stopped and restarted every backing container between test classes while Spring's test-context cache kept reusing the first subclass's `ApplicationContext`, its beans still wired to ports that were by then dead. Five of the seven full runs recorded in the next section failed on connection timeouts under that defect, and which class failed varied from run to run. A failing run's wall clock measures how long a client waits before giving up on a dead port, not what the suite costs. The defect is also storage-agnostic: Postgres, Redis and Qdrant timed out the same way, and none of the three is touched by this change, so the noise it injects is not something a MinIO-versus-Floci comparison could subtract out.
+
+The second is that even a run that happened to come back green at that commit would not isolate the variable the task cares about. Pre-fix code starts a fresh set of four containers per test class, six to seven sets per run as measured by the `docker ps` sampling recorded below. Post-fix code starts one set for the whole JVM. That difference is worth several container startups across four services, which swamps the difference between one MinIO start and one Floci start. Comparing any pre-migration number against the post-swap numbers below would therefore credit the container-lifecycle fix to the storage swap, and a Floci startup regression could hide inside that gap in either direction.
+
+The comparison that would actually answer the question behind 3.10 is a different one from the one it asks for: hold the fixed `TestcontainersBase` constant and swap only the image, `minio/minio` against `floci/floci:2.0.1`, so the container lifecycle is identical on both sides. That is the measurement to run if a Floci startup cost is ever genuinely suspected. It was not run here: it needs a source edit under `AscendAgent/src/test/` and a MinIO image pull, both outside the scope of the archive pass, and it is not what the task is worded to require.
 
 What was measured instead is the post-swap cost, from two clean timing runs of the full `integrationTest` task against `floci/floci:2.0.1`:
 
@@ -53,7 +61,7 @@ What was measured instead is the post-swap cost, from two clean timing runs of t
 | 1 | 175 seconds |
 | 2 | 167 seconds |
 
-Those two numbers are the baseline a future Floci upgrade should be compared against.
+Those two numbers, together with the three post-fix runs recorded under "Task 10.2" below (1m 50s, 2m 1s, 2m 8s), are the forward baseline a future Floci upgrade should be compared against. That forward baseline is what the task was reaching for, and it exists; only the backward half is gone.
 
 ---
 
@@ -148,7 +156,7 @@ Ten tasks were unticked when this table was first written. Six of them, 1.2, 1.4
 | 1.2 | The agent started with `./gradlew bootRun` against a Floci with no `knowledge-base` bucket | Closed on 2026-09-03. See "Tasks 1.2, 1.4, 5.5 and 10.6" below. |
 | 1.3 | A running agent plus a full upload, ingest and prompt round trip | Closed on 2026-09-03, proven during the RAG e2e sweep. See "Task 1.3 and tasks 10.4-10.5" below. |
 | 1.4 | The objects from 1.3 present in `knowledge-base` | Closed on 2026-09-03 against task 1.1's scratch-bucket record rather than against 1.3's objects, since 1.3 had not run yet at that point. Independently reconfirmed by the 1.3 sweep itself, see "Task 1.3 and tasks 10.4-10.5" below. See also "Tasks 1.2, 1.4, 5.5 and 10.6" below. |
-| 3.10 | A pre-swap MinIO baseline | Unrecoverable. See the task 3.10 section above for the post-swap numbers recorded in its place. |
+| 3.10 | A pre-swap MinIO baseline | Closed as not measurable on 2026-09-04, and archived unticked. The evidence never existed and reconstructing it would measure the pre-existing test-isolation defect rather than the storage swap. See the task 3.10 section above for the reasoning and for the post-swap numbers recorded in its place. |
 | 4.3, live half | The `public-audio` bucket seeded in Floci | Closed on 2026-09-03. See the section below. The rewritten URL resolves and the MCP tool returns HTTP 200, with one caveat about the key the file names. |
 | 5.5 | The `prometheus` container running | Closed on 2026-09-03. See "Tasks 1.2, 1.4, 5.5 and 10.6" below. |
 | 6.4 | The `ascend-paddle-ocr` container running | Closed on 2026-09-03. See the section below. `ocr_process` fetched the fixture from Floci and returned extracted text. |
