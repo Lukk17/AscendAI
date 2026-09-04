@@ -26,6 +26,14 @@ and Architecture Decision Records (ADRs).
 
 ---
 
+### Design documents
+
+| Document                                                            | Description                                                                                      |
+| :------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------- |
+| [Permission-aware retrieval](permission-aware-retrieval.md)         | How access lists reach chunks, how the filter runs inside the vector search, and what goes stale. |
+
+---
+
 ### Architecture Decision Records
 
 | Index                                  | Description                                              |
