@@ -9,19 +9,23 @@ AscendWebSearch is an MCP server and REST API for web search and content extract
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
 - **Version**: 0.0.3
-- **Docker Base**: `mcr.microsoft.com/playwright/python:v1.58.0-noble`
+- **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands
 
+Every command below runs through this module's own virtual environment at `.venv/` (created via
+`python -m venv .venv`, see docs/running.md) — never the system Python or pip. Windows interpreter:
+`.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
+
 ```bash
 # Install dependencies
-pip install -e .[dev]
+.venv/Scripts/pip.exe install -e .[dev]
 
 # Run the server (port 7021)
-uvicorn src.main:app --host 0.0.0.0 --port 7021 --reload
+.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7021 --reload
 
-# Run tests
-pytest
+# Run tests with the configured 100% branch-coverage gate
+.venv/Scripts/pytest.exe --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 
 # Docker
 docker build -t ascend-web-search:latest .

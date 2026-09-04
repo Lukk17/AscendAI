@@ -108,6 +108,50 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
 
 
 @pytest.mark.asyncio
+async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_session():
+    """The reported bug: an Allegro-style DataDome block page (no cf_clearance,
+    no literal 'datadome' string) must never be declared cleared, and no
+    session may be written for it."""
+    from src.reader.strategies import novnc_strategy as ns
+
+    page = MagicMock()
+    page.goto = AsyncMock()
+    page.evaluate = AsyncMock(return_value="Mozilla/5.0")
+    page.url = "https://allegro.pl/oferta/example"
+    page.content = AsyncMock(
+        return_value=(
+            "<html><body><p id='cmsg'>Please enable JS and disable any ad blocker</p>"
+            "<script>var dd={'host':'geo.captcha-delivery.com'}</script></body></html>"
+        )
+    )
+
+    context = MagicMock()
+    context.new_page = AsyncMock(return_value=page)
+    context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
+
+    browser = MagicMock()
+    browser.new_context = AsyncMock(return_value=context)
+    browser.close = AsyncMock()
+
+    mock_p = MagicMock()
+    mock_p.__aenter__ = AsyncMock(return_value=mock_p)
+    mock_p.__aexit__ = AsyncMock(return_value=False)
+    mock_p.chromium.launch = AsyncMock(return_value=browser)
+
+    with (
+        patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=mock_p),
+        patch(
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
+            new=AsyncMock(),
+        ) as mock_save,
+        patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 0),
+    ):
+        await ns._monitor_for_cookies("https://allegro.pl/oferta/example", "captcha")
+
+    mock_save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance():
     """For non-Cloudflare captchas (e.g. DataDome) there is no cf_clearance cookie; the
     monitor must capture once the challenge wall is gone."""

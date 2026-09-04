@@ -14,28 +14,32 @@ PaddleOCR is an OCR (Optical Character Recognition) service that wraps the Paddl
 
 ## Build & Run Commands
 
+Every command below runs through this module's own virtual environment at `.venv/` (created via
+`python -m venv .venv`, see README.md) — never the system Python or pip. Windows interpreter:
+`.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
+
 ```bash
-pip install -e .[dev]
+.venv/Scripts/pip.exe install -e .[dev]
 ```
 
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 7022 --reload
+.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7022 --reload
 ```
 
 ```bash
-pytest
+.venv/Scripts/pytest.exe
 ```
 
 ```bash
-pytest --cov=src --cov-report=term-missing
+.venv/Scripts/pytest.exe --cov=src --cov-report=term-missing
 ```
 
 ```bash
-ruff check .
+.venv/Scripts/ruff.exe check .
 ```
 
 ```bash
-mypy src
+.venv/Scripts/mypy.exe src
 ```
 
 ```bash

@@ -133,3 +133,4 @@ MANIFEST
 # artifacts produced at scrape time. They contain scraped URLs and responses
 # and must not be committed.
 AscendWebSearch/src/storage/
+AscendWebSearch/.crawlee_storage/

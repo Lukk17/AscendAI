@@ -239,6 +239,54 @@ async def test_get_domain_returns_host_when_no_psl_suffix():
 
 
 @pytest.mark.asyncio
+async def test_clear_session_removes_memory_record_and_reports_existed():
+    manager = _fresh_manager()
+    await manager.save_session_data("https://example.com", {"k": "v"}, "UA")
+
+    existed = await manager.clear_session("https://example.com")
+
+    assert existed is True
+    assert manager._memory_store.get("example.com:default") is None
+    data = await manager.get_session_data("https://example.com")
+    assert data is None
+
+
+@pytest.mark.asyncio
+async def test_clear_session_is_idempotent_when_nothing_stored():
+    manager = _fresh_manager()
+
+    existed = await manager.clear_session("https://never-stored.example.com")
+
+    assert existed is False
+
+
+@pytest.mark.asyncio
+async def test_clear_session_deletes_via_redis():
+    manager = _fresh_manager()
+    mock_redis = AsyncMock()
+    mock_redis.delete = AsyncMock(return_value=1)
+    manager.redis_client = mock_redis
+
+    existed = await manager.clear_session("https://example.com")
+
+    assert existed is True
+    mock_redis.delete.assert_awaited_once_with("session:example.com:default")
+
+
+@pytest.mark.asyncio
+async def test_clear_session_redis_error_falls_back_to_memory_result():
+    manager = _fresh_manager()
+    await manager.save_session_data("https://example.com", {"k": "v"}, "UA")
+    mock_redis = AsyncMock()
+    mock_redis.delete = AsyncMock(side_effect=RuntimeError("down"))
+    manager.redis_client = mock_redis
+
+    existed = await manager.clear_session("https://example.com")
+
+    assert existed is True
+
+
+@pytest.mark.asyncio
 async def test_schemeless_url_resolves_to_same_apex_as_scheme_qualified():
     """Security: `evil.com/path` (no scheme) must produce the same key as
     `https://evil.com/path` — otherwise an attacker can poison a parallel bucket

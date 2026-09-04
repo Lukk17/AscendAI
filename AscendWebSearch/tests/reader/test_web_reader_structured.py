@@ -41,8 +41,8 @@ async def test_read_default_output_unchanged() -> None:
     """Default (no output_format) response must keep the original flat shape."""
     with (
         patch(
-            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
-            new=AsyncMock(return_value="Enough content to pass the validator easily here"),
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=AsyncMock(return_value=_GOOD_HTML),
         ),
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
@@ -95,8 +95,8 @@ async def test_read_text_output_unchanged() -> None:
     """output_format='text' must produce same flat shape as the default."""
     with (
         patch(
-            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
-            new=AsyncMock(return_value="Enough content to pass the validator easily here"),
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=AsyncMock(return_value=_GOOD_HTML),
         ),
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):

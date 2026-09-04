@@ -17,7 +17,7 @@ from src.observability.metrics import (
 )
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
-from src.reader.extraction import extract_structured
+from src.reader.extraction import extract_structured, extract_text_with_fallback
 from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
@@ -173,6 +173,23 @@ class WebReader:
     def _cache_put(self, key: str, result: dict[str, Any]) -> None:
         self._memory_cache[key] = (result, time.monotonic())
 
+    def clear_cache_for_domain(self, domain: str) -> int:
+        """Purge in-process read-result cache entries whose URL belongs to *domain*.
+
+        Used when a stored session for that domain is cleared, so a stale
+        cached read captured before the session was known-bad is not served
+        for the remainder of its TTL. Returns the number of entries removed.
+        """
+        stale_keys = [
+            key
+            for key in self._memory_cache
+            if cookie_manager._get_domain(key.split("|", 1)[0]) == domain  # noqa: SLF001
+        ]
+        for key in stale_keys:
+            del self._memory_cache[key]
+
+        return len(stale_keys)
+
     # ------------------------------------------------------------------
     # Public read methods
     # ------------------------------------------------------------------
@@ -297,14 +314,17 @@ class WebReader:
         try:
             logger.info("--- Strategy %s STARTED ---", name)
 
+            html = await strategy.get_html(url)
+            if not html:
+                self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
+                logger.info("Strategy %s returned empty HTML.", name)
+
+                return None
+
+            if not ChallengeDetector.is_content_accepted(200, html):
+                raise ChallengeDetectedException(intervention_type="captcha")
+
             if output_format == "structured":
-                html = await strategy.get_html(url)
-                if not html:
-                    self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
-                    logger.info("Strategy %s returned empty HTML for structured extraction.", name)
-
-                    return None
-
                 structured = extract_structured(html)
                 content = structured.get("content", "")
                 if self.validator.validate(content):
@@ -318,7 +338,7 @@ class WebReader:
 
                 return None
 
-            content = await strategy.extract(url)
+            content = extract_text_with_fallback(html)
             if self.validator.validate(content):
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
 
@@ -358,6 +378,9 @@ class WebReader:
             logger.info("--- Strategy %s STARTED ---", name)
             html = await strategy.get_html(url)
             if html:
+                if not ChallengeDetector.is_content_accepted(200, html):
+                    raise ChallengeDetectedException(intervention_type="captcha")
+
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
 
                 return html

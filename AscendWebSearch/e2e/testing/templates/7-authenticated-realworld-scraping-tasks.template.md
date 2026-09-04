@@ -53,6 +53,15 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 - [ ] s `linkedin.com/jobs/...` → valid terminal verdict recorded.
 - [ ] t `secure.indeed.com/auth?...` → valid terminal verdict recorded.
 
+### Part 1 — retail anti-bot rows (content-gated: a success MUST be the requested product page)
+
+- [ ] u `{{scrap_url_allegro}}` (Allegro offer) → valid terminal verdict recorded; any success contains `er-cbn1` and no block-page marker.
+- [ ] v `{{scrap_url_amazon}}` (amazon.pl) → valid terminal verdict recorded; any success contains `B09D14YFR9` and no interstitial marker.
+- [ ] w `{{scrap_url_amazon_com}}` (amazon.com) → valid terminal verdict recorded; any success contains `9780132350884` and no interstitial marker.
+- [ ] x `{{scrap_url_amazon_uk}}` (amazon.co.uk) → valid terminal verdict recorded; any success contains `9780132350884` and no interstitial marker.
+- [ ] y `{{scrap_url_amazon_se}}` (amazon.se) → valid terminal verdict recorded; any success contains `9780132350884` and no interstitial marker.
+- [ ] Row u's `vnc_url` (if it returned `428`) recorded below; monitor left to time out, no human solve requested.
+
 ### Verdict
 
 - [ ] Verdict: PASS / FAIL (delete the wrong one)
@@ -74,4 +83,6 @@ Duration:
 ## Additional tasks I did
 
 <!-- Record each best-effort row's actual verdict + serving tier, how long the Part 3 human solve took, and any
-tier the pipeline escalated to unexpectedly. -->
+tier the pipeline escalated to unexpectedly. For the retail anti-bot rows (u, v, w, x, y) also record which branch
+fired per row, and for any FAIL whether the cause was a missing product canary, a tripped interstitial marker, or
+both — a success carrying an interstitial is the defect these rows exist to catch, not a flaky site. -->

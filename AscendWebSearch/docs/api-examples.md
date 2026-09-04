@@ -124,6 +124,54 @@ Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -Conte
 
 ---
 
+### Session clear (REST)
+
+`POST /api/v2/web/session/clear`. Deletes the stored session for a `url` + optional `profile`, plus any
+in-process cached read results for that domain. Idempotent: always returns HTTP 200, whether or not a session
+existed. Use this to recover from a poisoned session (stale cookies, a captcha solve that went wrong) without
+restarting the service.
+
+Bash:
+
+```bash
+curl -X POST http://localhost:7021/api/v2/web/session/clear -H "Content-Type: application/json" -d '{"url":"https://example.com"}'
+```
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/session/clear -Method Post -ContentType "application/json" -Body '{"url":"https://example.com"}'
+```
+
+With a named profile (multi-account sites):
+
+Bash:
+
+```bash
+curl -X POST http://localhost:7021/api/v2/web/session/clear -H "Content-Type: application/json" -d '{"url":"https://example.com","profile":"work"}'
+```
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/session/clear -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","profile":"work"}'
+```
+
+Response:
+
+```json
+{
+  "status": "cleared",
+  "url": "https://example.com/",
+  "existed": true,
+  "cleared_cache_entries": 0
+}
+```
+
+`existed` is `false` when no session was stored for that `url` + `profile`. The call still returns HTTP 200.
+
+---
+
 ### MCP tools over HTTP
 
 The MCP server accepts JSON-RPC `tools/call` requests on `/mcp`.
@@ -154,6 +202,21 @@ PowerShell:
 
 ```powershell
 Invoke-RestMethod -Uri http://localhost:7021/mcp -Method Post -ContentType "application/json" -Body '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_read","arguments":{"url":"https://example.com"}},"id":2}'
+```
+
+`session_clear`. Same contract as the REST endpoint above: idempotent, always succeeds, `existed` tells the
+caller whether a session was actually removed.
+
+Bash:
+
+```bash
+curl -X POST http://localhost:7021/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"session_clear","arguments":{"url":"https://example.com"}},"id":3}'
+```
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:7021/mcp -Method Post -ContentType "application/json" -Body '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"session_clear","arguments":{"url":"https://example.com"}},"id":3}'
 ```
 
 ---

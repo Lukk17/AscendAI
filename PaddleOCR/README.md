@@ -37,7 +37,7 @@ Runtime pins live in [pyproject.toml](pyproject.toml). The shape is:
 - python-json-logger 4.1.0 for structured logs
 - Pydantic 2.13.4 with pydantic-settings 2.14.1 for typed configuration
 
-Dev tooling: pytest 9.0.3, pytest-asyncio 1.4.0, pytest-cov 6.0.0, ruff 0.13.0, mypy 1.18.2, mutmut 3.5.0,
+Dev tooling: pytest 9.0.3, pytest-asyncio 1.4.0, pytest-cov 7.1.0, ruff 0.15.15, mypy 2.1.0, mutmut 3.5.0,
 pact-python 3.4.0.
 
 ---
@@ -168,7 +168,7 @@ the docker-compose service at [docker-compose.yaml](../docker-compose.yaml) carr
 ### Build, test, and lint
 
 All four commands run cleanly today and are gated in CI at
-[.github/workflows/paddle-ocr-ci.yml](../.github/workflows/paddle-ocr-ci.yml).
+[.github/workflows/ci.yaml](../.github/workflows/ci.yaml).
 
 Run the full pytest suite. The configured gate is 100 percent branch coverage:
 

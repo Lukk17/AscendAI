@@ -1,3 +1,6 @@
+import tempfile
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,6 +38,14 @@ class Settings(BaseSettings):
     BLOCKLIST_URL: str = Field(
         default="https://secure.fanboy.co.nz/fanboy-annoyance.txt",
         description="URL for adblock list",
+    )
+    BLOCKLIST_CACHE_DIR: str = Field(
+        default_factory=lambda: str(Path(tempfile.gettempdir()) / "ascend-web-search" / "blocklist"),
+        description=(
+            "Writable directory the downloaded ad blocklist is cached in, kept outside the source tree. "
+            "Defaults to the OS temp directory, which is writable on a developer machine, in the container "
+            "(no volume needed since the file is re-downloaded on every startup), and in a test run."
+        ),
     )
     VALIDATION_MIN_WORDS: int = Field(
         default=10,
@@ -175,6 +186,14 @@ class Settings(BaseSettings):
     CRAWLEE_STORAGE_DIR: str = Field(
         default=".crawlee_storage",
         description="Out-of-tree directory for Crawlee request queues and key-value stores",
+    )
+    CRAWLEE_MEMORY_MBYTES: int | None = Field(
+        default=None,
+        description=(
+            "Explicit memory budget in MB for Crawlee's autoscaler, propagated to the "
+            "CRAWLEE_MEMORY_MBYTES environment variable Crawlee itself reads. When unset, "
+            "Crawlee infers a budget as a ratio of total system memory instead."
+        ),
     )
 
     # Group 4 — Anti-bot evasion: proxy seam (off by default)

@@ -4,6 +4,7 @@ from fastmcp import FastMCP
 
 from src.api.exceptions import HumanInterventionRequiredException
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL
+from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.web_reader import WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
@@ -110,3 +111,28 @@ async def session_status(url: str, profile: str | None = None) -> dict[str, Any]
 
     info = await session_manager.status(url, profile)
     return {"url": url, **info.to_dict()}
+
+
+@mcp.tool()
+async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
+    """
+    Delete the stored session for a site, including any cached read results
+    for that domain. Idempotent: always succeeds, whether or not a session
+    existed.
+    Args:
+        url: The site URL whose session should be cleared.
+        profile: Optional profile label (e.g. 'work', 'personal').
+    """
+    if not is_safe_external_url(url):
+        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+
+    existed = await session_manager.clear(url, profile)
+    domain = cookie_manager._get_domain(url)  # noqa: SLF001
+    cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
+
+    return {
+        "status": "cleared",
+        "url": url,
+        "existed": existed,
+        "cleared_cache_entries": cleared_cache_entries,
+    }

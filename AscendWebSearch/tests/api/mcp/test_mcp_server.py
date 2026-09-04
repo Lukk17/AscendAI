@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.api.exceptions import HumanInterventionRequiredException
-from src.api.mcp.mcp_server import session_establish, session_status, web_read, web_search
+from src.api.mcp.mcp_server import session_clear, session_establish, session_status, web_read, web_search
 from src.session.session_manager import SessionInfo, SessionManager
 
 
@@ -173,3 +173,41 @@ async def test_mcp_session_status_unsafe_url_raises():
     with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
         with pytest.raises(ValueError, match="non-routable"):
             await session_status("http://10.0.0.1")
+
+
+# ---------------------------------------------------------------------------
+# session_clear MCP tool
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_clear_returns_cleared_status():
+    with (
+        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch.object(SessionManager, "clear", new=AsyncMock(return_value=True)),
+        patch("src.api.mcp.mcp_server.web_reader.clear_cache_for_domain", return_value=1),
+    ):
+        result = await session_clear("http://example.com")
+
+    assert result["status"] == "cleared"
+    assert result["existed"] is True
+    assert result["cleared_cache_entries"] == 1
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_clear_is_idempotent_when_nothing_stored():
+    with (
+        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch.object(SessionManager, "clear", new=AsyncMock(return_value=False)),
+        patch("src.api.mcp.mcp_server.web_reader.clear_cache_for_domain", return_value=0),
+    ):
+        result = await session_clear("http://never-stored.example.com")
+
+    assert result["existed"] is False
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_clear_unsafe_url_raises():
+    with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
+        with pytest.raises(ValueError, match="non-routable"):
+            await session_clear("http://10.0.0.1")

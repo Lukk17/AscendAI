@@ -65,15 +65,12 @@ http:
       disabled: true
   body:
     type: json
-    data: "{\r
-
-      \    \"url\": \"{{scrap_url_linkedin}}\",\r
-
-      \    \"include_links\": true,\r
-
-      \    \"heavy_mode\": true\r
-
-      }"
+    data: |-
+      {
+          "url": "{{scrap_url_allegro}}",
+          "include_links": true,
+          "heavy_mode": true
+      }
 
 runtime:
   scripts:
@@ -88,6 +85,7 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true
 
 examples:
   - name: login required

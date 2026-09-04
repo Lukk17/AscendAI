@@ -2,6 +2,8 @@ import json
 import re
 from pathlib import Path
 
+import trafilatura
+
 from src.config.config import settings
 
 
@@ -18,6 +20,7 @@ except (OSError, json.JSONDecodeError):
     _BOT_DICT = {
         "waf_script_signatures": [],
         "waf_strict_phrases": [],
+        "waf_structural_markers": [],
         "login_title_patterns": [],
     }
 
@@ -33,19 +36,20 @@ class ChallengeDetector:
         Pages larger than CHALLENGE_DETECTION_MAX_BYTES are now scanned on a bounded
         prefix rather than skipped entirely, preventing large authenticated pages from
         being misidentified as clean when they actually contain a challenge wall.
+        Signature matching covers vendor script URLs, human-readable phrases, and
+        locale-independent structural markers (e.g. a vendor's fixed internal form
+        action or endpoint path), since a translated phrase alone misses the same
+        interstitial served in another language.
         """
         if not html_content:
             return status_code in (403, 429, 503)
 
         prefix = html_content[: settings.CHALLENGE_DETECTION_MAX_BYTES]
 
-        for signature in _BOT_DICT.get("waf_script_signatures", []):
-            if signature in prefix:
-                return True
-
-        for phrase in _BOT_DICT.get("waf_strict_phrases", []):
-            if phrase in prefix:
-                return True
+        for key in ("waf_script_signatures", "waf_strict_phrases", "waf_structural_markers"):
+            for signature in _BOT_DICT.get(key, []):
+                if signature in prefix:
+                    return True
 
         if re.search(r"Ray ID: \w+", prefix, re.IGNORECASE):
             return True
@@ -76,6 +80,41 @@ class ChallengeDetector:
                     return True
 
         return False
+
+    @staticmethod
+    def has_real_content(html_content: str) -> bool:
+        """
+        Positive evidence that html_content is genuine content rather than a
+        block/interstitial page: the article extractor must find a non-trivial
+        amount of text once boilerplate is stripped. Only pages within
+        CHALLENGE_WALL_MAX_BYTES are scored this way; a genuine interstitial is
+        small, so a larger page passes automatically without paying the cost
+        (or the false-positive risk) of running extraction against it.
+        """
+        if not html_content:
+            return False
+
+        if len(html_content) >= settings.CHALLENGE_WALL_MAX_BYTES:
+            return True
+
+        extracted = trafilatura.extract(html_content) or ""
+
+        return len(extracted.split()) >= settings.VALIDATION_MIN_WORDS
+
+    @staticmethod
+    def is_content_accepted(status_code: int, html_content: str) -> bool:
+        """
+        Single shared decision point for whether html_content is acceptable as
+        real content. Used both by the read pipeline before accepting a tier's
+        output as success and by the NoVNC monitor before declaring a challenge
+        cleared, so the two can never disagree about the same page. Requires
+        both the absence of a known block signature and positive evidence of
+        real content, never the mere absence of a signature.
+        """
+        if ChallengeDetector.is_blocked(status_code, html_content):
+            return False
+
+        return ChallengeDetector.has_real_content(html_content)
 
     @staticmethod
     def is_login_redirect_url(url: str) -> bool:

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +66,17 @@ class CrawleeStrategy(BaseStrategy):
             "browser_new_context_options": browser_new_context_options,
             "use_incognito_pages": True,
         }
+
+        # Crawlee's service locator lazily builds and caches its Configuration singleton
+        # the first time any crawler is constructed in this process, and never re-reads
+        # the environment afterwards, so both the memory budget and the storage dir must
+        # be set before that first construction to have any effect.
+        if settings.CRAWLEE_MEMORY_MBYTES is not None:
+            os.environ["CRAWLEE_MEMORY_MBYTES"] = str(settings.CRAWLEE_MEMORY_MBYTES)
+
+        storage_dir = await asyncio.to_thread(self._prepare_storage_dir, settings.CRAWLEE_STORAGE_DIR)
+        os.environ["CRAWLEE_STORAGE_DIR"] = storage_dir
+
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
             max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
             playwright_crawler_specific_kwargs=playwright_kwargs,
@@ -78,10 +90,7 @@ class CrawleeStrategy(BaseStrategy):
         async def enable_adblock(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
             await context.page.route("**/*", self.url_validator.route_handler)
 
-        storage_dir = await asyncio.to_thread(self._prepare_storage_dir, settings.CRAWLEE_STORAGE_DIR)
-        os.environ["CRAWLEE_STORAGE_DIR"] = storage_dir
-
-        await crawler.run([url])
+        await self._run_crawler_bounded(crawler, url)
         html = result_container.get("html", "")
 
         if ChallengeDetector.is_login_required(html):
@@ -103,6 +112,36 @@ class CrawleeStrategy(BaseStrategy):
         p.mkdir(parents=True, exist_ok=True)
 
         return str(p)
+
+    @staticmethod
+    async def _run_crawler_bounded(crawler: AdaptivePlaywrightCrawler, url: str) -> None:
+        """Run the crawler with a hard wall-clock bound so this tier can never hang forever.
+
+        Crawlee's autoscaler blocks all work indefinitely whenever it considers the
+        system memory-overloaded (no request is ever dequeued), and BasicCrawler.run()
+        catches CancelledError internally for graceful shutdown, which also swallows the
+        cancellation asyncio.wait_for issues on timeout: per the asyncio docs, "if the
+        task suppresses the cancellation and returns a value instead, that value is
+        returned". Elapsed time is therefore checked explicitly after the call returns,
+        so a permanently-overloaded autoscaler still fails this tier instead of silently
+        returning empty content after burning the whole read budget.
+        """
+        crawl_timeout = settings.EXTRACT_TIMEOUT * 2
+        started = time.perf_counter()
+        try:
+            await asyncio.wait_for(crawler.run([url]), timeout=crawl_timeout)
+        except TimeoutError as exc:
+            raise TimeoutError(
+                f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {url}"
+            ) from exc
+
+        elapsed = time.perf_counter() - started
+        if elapsed > crawl_timeout:
+            raise TimeoutError(
+                f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {url} "
+                f"(ran {elapsed:.1f}s; Crawlee's autoscaler likely reports the system as "
+                "permanently memory-overloaded)"
+            )
 
     @staticmethod
     async def _handle_crawlee_request(

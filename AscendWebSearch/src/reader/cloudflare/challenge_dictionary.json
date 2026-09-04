@@ -11,7 +11,14 @@
     "Please verify you are a human",
     "Checking if the site connection is secure",
     "Just a moment...",
-    "Attention Required!"
+    "Attention Required!",
+    "DataDome CAPTCHA",
+    "Please enable JS and disable any ad blocker",
+    "Sorry, we just need to make sure you're not a robot",
+    "Potwierdź, że nie jesteś robotem"
+  ],
+  "waf_structural_markers": [
+    "/errors_page/validateCaptcha"
   ],
   "login_title_patterns": [
     "sign in",

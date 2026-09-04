@@ -5,6 +5,14 @@ import pytest
 from src.api.exceptions import ChallengeDetectedException, HumanInterventionRequiredException
 from src.reader.web_reader import WebReader
 
+_ARTICLE_HTML = (
+    "<html><head><title>Article</title></head>"
+    "<body><article><p>"
+    "This is a genuine paragraph of article content with more than ten words in it. "
+    "It continues with a second sentence so the extractor has plenty of real prose to work with."
+    "</p></article></body></html>"
+)
+
 
 @pytest.fixture(autouse=True)
 def _default_no_stored_session():
@@ -20,8 +28,8 @@ def _default_no_stored_session():
 async def test_read_succeeds_on_first_strategy():
     with (
         patch(
-            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
-            new=AsyncMock(return_value="Extracted Content"),
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
         ),
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
@@ -45,8 +53,8 @@ async def test_read_all_strategies_fail_returns_failure_response():
 async def test_read_preempts_to_novnc_on_login_redirect_url():
     with (
         patch(
-            "src.reader.strategies.novnc_strategy.NoVNCStrategy.extract",
-            new=AsyncMock(return_value="NoVNC out"),
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
         ),
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
@@ -58,8 +66,8 @@ async def test_read_preempts_to_novnc_on_login_redirect_url():
 async def test_read_heavy_mode_skips_lightweight():
     with (
         patch(
-            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
-            new=AsyncMock(return_value="PW Content"),
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
         ),
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
@@ -78,12 +86,12 @@ async def test_read_routes_browser_first_when_stored_session_exists():
             new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
         ),
         patch(
-            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
             new=AsyncMock(return_value="curl tier content that must be skipped"),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
-            new=AsyncMock(return_value="PW Content"),
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
         ),
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
@@ -95,7 +103,7 @@ async def test_read_routes_browser_first_when_stored_session_exists():
 async def test_read_propagates_human_intervention():
     exc = HumanInterventionRequiredException("http://vnc", "captcha")
     with patch(
-        "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
+        "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
         new=AsyncMock(side_effect=exc),
     ):
         with pytest.raises(HumanInterventionRequiredException):
@@ -109,28 +117,28 @@ async def test_read_falls_through_to_novnc_when_challenge_unsolved():
     last tier) handles it."""
     with (
         patch(
-            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
             new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha")),
         ),
         patch(
-            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.extract",
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.extract",
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.extract",
+            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.novnc_strategy.NoVNCStrategy.extract",
-            new=AsyncMock(return_value="NoVNC out"),
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
         ),
         patch(
             "src.validator.content_validator.ContentValidator.validate",
@@ -147,27 +155,27 @@ async def test_read_returns_failure_when_all_tiers_including_novnc_fail():
     failure response rather than looping."""
     with (
         patch(
-            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
             new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login")),
         ),
         patch(
-            "src.reader.strategies.novnc_strategy.NoVNCStrategy.extract",
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
             new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha")),
         ),
         patch(
-            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.extract",
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.extract",
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.extract",
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.extract",
+            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
     ):
@@ -304,7 +312,7 @@ async def test_read_with_links_falls_through_to_novnc_on_challenge():
 async def test_execute_strategy_returns_none_on_exception():
     reader = WebReader()
     fail_strategy = MagicMock()
-    fail_strategy.extract = AsyncMock(side_effect=RuntimeError("boom"))
+    fail_strategy.get_html = AsyncMock(side_effect=RuntimeError("boom"))
     result = await reader._execute_strategy("dummy", fail_strategy, "http://test.com")
     assert result is None
 
@@ -313,8 +321,9 @@ async def test_execute_strategy_returns_none_on_exception():
 async def test_execute_strategy_returns_none_on_validation_fail():
     reader = WebReader()
     strategy = MagicMock()
-    strategy.extract = AsyncMock(return_value="too short")
-    result = await reader._execute_strategy("dummy", strategy, "http://test.com")
+    strategy.get_html = AsyncMock(return_value=_ARTICLE_HTML)
+    with patch("src.validator.content_validator.ContentValidator.validate", return_value=False):
+        result = await reader._execute_strategy("dummy", strategy, "http://test.com")
     assert result is None
 
 
@@ -343,13 +352,31 @@ async def test_read_bails_when_budget_exceeded():
     with (
         patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
         patch(
-            "src.reader.strategies.novnc_strategy.NoVNCStrategy.extract",
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
     ):
         result = await reader.read("http://test.com")
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"
+
+
+@pytest.mark.asyncio
+async def test_read_bails_but_novnc_rescue_succeeds():
+    """READ_TOTAL_BUDGET shortcut path: NoVNC is exempt from the budget check
+    and, when it returns usable content, its result is the successful read."""
+    reader = WebReader()
+    with (
+        patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+    ):
+        result = await reader.read("http://test.com")
+    assert result["status"] == "success"
+    assert result["mode"] == "6-novnc"
 
 
 @pytest.mark.asyncio
@@ -361,6 +388,50 @@ async def test_read_with_links_bails_when_budget_exceeded():
             "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
+    ):
+        result = await reader.read_with_links("http://test.com")
+    assert result["status"] == "error"
+    assert result["reason"] == "budget_exhausted"
+
+
+@pytest.mark.asyncio
+async def test_read_with_links_bails_but_novnc_rescue_succeeds():
+    """NoVNC is exempt from the budget check on the links path too: when it
+    returns usable content, its result is the successful read."""
+    reader = WebReader()
+    raw_html = (
+        "<html><body>This is filler text to pass the ten word minimum validation limit "
+        "<a href='https://example.com/job1'>Job One</a></body></html>"
+    )
+    with (
+        patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(return_value=raw_html),
+        ),
+    ):
+        result = await reader.read_with_links("http://test.com")
+    assert result["status"] == "success"
+    assert result["mode"] == "6-novnc"
+
+
+@pytest.mark.asyncio
+async def test_read_with_links_bails_and_novnc_rescue_fails_validation():
+    """NoVNC's rescue HTML can clear the interstitial gate yet still fail the
+    annotated-content validator; that must end in a failure response, not a
+    false success."""
+    reader = WebReader()
+    raw_html = (
+        "<html><body>This is filler text to pass the ten word minimum validation limit "
+        "<a href='https://example.com/job1'>Job One</a></body></html>"
+    )
+    with (
+        patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(return_value=raw_html),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=False),
     ):
         result = await reader.read_with_links("http://test.com")
     assert result["status"] == "error"
@@ -382,12 +453,12 @@ async def test_read_falls_through_when_validation_fails_then_succeeds():
     """Validation-fail on tier 1 should not stop the chain."""
     with (
         patch(
-            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.extract",
-            new=AsyncMock(return_value="short"),
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
         ),
         patch(
-            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.extract",
-            new=AsyncMock(return_value="Long enough validated content here"),
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
         ),
         patch(
             "src.validator.content_validator.ContentValidator.validate",
@@ -413,6 +484,34 @@ async def test_read_with_links_validation_fail_then_next_tier_succeeds():
         patch(
             "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
             new=AsyncMock(return_value=long_html),
+        ),
+    ):
+        result = await WebReader().read_with_links("http://test.com")
+    assert result["status"] == "success"
+    assert result["mode"] == "2-trafilatura"
+
+
+@pytest.mark.asyncio
+async def test_read_with_links_falls_through_when_annotated_content_fails_validation():
+    """Raw HTML that clears the interstitial gate (real, article-shaped content)
+    can still fail ContentValidator on the annotated text; that must fall
+    through to the next tier rather than stopping the chain."""
+    raw_html = (
+        "<html><body>This is filler text to pass the ten word minimum validation limit "
+        "<a href='https://example.com/job1'>Job One</a></body></html>"
+    )
+    with (
+        patch(
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=AsyncMock(return_value=raw_html),
+        ),
+        patch(
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
+            new=AsyncMock(return_value=raw_html),
+        ),
+        patch(
+            "src.validator.content_validator.ContentValidator.validate",
+            side_effect=[False, True],
         ),
     ):
         result = await WebReader().read_with_links("http://test.com")
@@ -455,9 +554,89 @@ async def test_execute_html_strategy_falls_through_on_challenge():
 
 @pytest.mark.asyncio
 async def test_execute_strategy_falls_through_on_challenge():
-    """A challenge on the extract path yields None so the ladder advances to the next tier."""
+    """A challenge on the get_html path yields None so the ladder advances to the next tier."""
     reader = WebReader()
     strategy = MagicMock()
-    strategy.extract = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha"))
+    strategy.get_html = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha"))
     result = await reader._execute_strategy("1-beautifulsoup", strategy, "http://test.com")
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_execute_strategy_rejects_interstitial_before_validating():
+    """A tier that returns a small page with no article-shaped content (an
+    interstitial that clears ContentValidator's shallow checks) must be
+    rejected before ever reaching content validation, not reported as success."""
+    reader = WebReader()
+    strategy = MagicMock()
+    interstitial_html = "<html><body><p>Continue shopping</p></body></html>"
+    strategy.get_html = AsyncMock(return_value=interstitial_html)
+    with patch("src.validator.content_validator.ContentValidator.validate", return_value=True):
+        result = await reader._execute_strategy("1-beautifulsoup", strategy, "http://test.com")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_execute_html_strategy_rejects_interstitial_before_returning():
+    """The links path must reject a tier's raw HTML when the article extractor
+    finds nothing, even though annotate_links would otherwise accept it."""
+    reader = WebReader()
+    strategy = MagicMock()
+    interstitial_html = "<html><body><p>Continue shopping</p></body></html>"
+    strategy.get_html = AsyncMock(return_value=interstitial_html)
+    result = await reader._execute_html_strategy("1-beautifulsoup", strategy, "http://test.com")
+    assert result == ""
+
+
+@pytest.mark.asyncio
+async def test_read_rejects_amazon_style_interstitial_and_escalates():
+    """End-to-end regression test for the reported bug: a 200 response whose
+    entire body is Amazon's own captcha interstitial must not be reported as a
+    successful scrape. This is a trimmed faithful copy of the real page fetched
+    from amazon.pl on 2026-09-04: it carries no phrase from the dictionary, and
+    its footer boilerplate (terms/privacy links, copyright line) alone clears
+    has_real_content's word count, so only the locale-independent structural
+    marker (the fixed internal form action Amazon uses for this page) catches
+    it. A fixture built from a dictionary phrase would pass for the wrong
+    reason and miss a regression in the structural check."""
+    interstitial_html = (
+        "<html lang='pl'><head><title>Amazon.pl</title></head><body>"
+        "<div class='a-box a-alert a-alert-info'>"
+        "<h4>Kliknij poniższy przycisk, aby kontynuować zakupy</h4></div>"
+        "<form method='get' action='/errors_page/validateCaptcha' name=''>"
+        "<button type='submit'>Kontynuuj zakupy</button>"
+        "<button type='submit'>Kontynuuj zakupy</button>"
+        "</form>"
+        "<a href='/gp/help/customer/display.html?nodeId=508088'>Warunki użytkowania i sprzedaży</a>"
+        "<a href='/gp/help/customer/display.html?nodeId=468496'>Zasady ochrony prywatności</a>"
+        "<div>© 1996-2025 Amazon.com, Inc. lub podmioty stowarzyszone</div>"
+        "</body></html>"
+    )
+    with (
+        patch(
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=AsyncMock(return_value=interstitial_html),
+        ),
+        patch(
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(side_effect=HumanInterventionRequiredException("http://vnc", "captcha")),
+        ),
+    ):
+        with pytest.raises(HumanInterventionRequiredException):
+            await WebReader().read("https://www.amazon.pl/dp/B09D14YFR9")

@@ -136,6 +136,42 @@ async def test_read_with_links_cache_hit_skips_strategy_chain() -> None:
     assert not execute_called, "cache hit must not invoke the strategy chain"
 
 
+def test_clear_cache_for_domain_removes_matching_entries_only() -> None:
+    reader = WebReader()
+    reader._memory_cache["https://allegro.pl/oferta/x|heavy=False|links=False|profile=|fmt=text"] = (
+        {"content": "stale allegro", "status": "success", "mode": "1"},
+        0.0,
+    )
+    reader._memory_cache["https://allegro.pl/oferta/y|heavy=True|links=True|profile=work|fmt=text"] = (
+        {"content": "stale allegro 2", "status": "success", "mode": "1"},
+        0.0,
+    )
+    reader._memory_cache["https://example.com/z|heavy=False|links=False|profile=|fmt=text"] = (
+        {"content": "unrelated", "status": "success", "mode": "1"},
+        0.0,
+    )
+
+    removed = reader.clear_cache_for_domain("allegro.pl")
+
+    assert removed == 2
+    assert len(reader._memory_cache) == 1
+    remaining_key = next(iter(reader._memory_cache))
+    assert remaining_key.startswith("https://example.com/z")
+
+
+def test_clear_cache_for_domain_returns_zero_when_nothing_matches() -> None:
+    reader = WebReader()
+    reader._memory_cache["https://example.com/z|heavy=False|links=False|profile=|fmt=text"] = (
+        {"content": "unrelated", "status": "success", "mode": "1"},
+        0.0,
+    )
+
+    removed = reader.clear_cache_for_domain("never-cached.example.org")
+
+    assert removed == 0
+    assert len(reader._memory_cache) == 1
+
+
 @pytest.mark.asyncio
 async def test_cache_is_isolated_per_reader_instance() -> None:
     """Each WebReader instance has its own in-process cache — they do not share state."""

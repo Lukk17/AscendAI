@@ -494,6 +494,61 @@ async def test_playwright_raises_late_login_wall(monkeypatch):
     assert exc.value.intervention_type == "login"
 
 
+@pytest.mark.asyncio
+async def test_playwright_retries_after_transient_content_read_error(monkeypatch):
+    """A transient PlaywrightError while reading page.content() during polling must be
+    swallowed and retried rather than propagated to the caller."""
+    html = "<html><body>content</body></html>"
+    page = _build_playwright_page_mock(html)
+    page.content = AsyncMock(side_effect=[PlaywrightError("frame detached"), html, html])
+    page.wait_for_load_state = AsyncMock(return_value=None)
+    _wire_browser_pool(monkeypatch, page)
+    with (
+        patch(
+            "src.reader.strategies.playwright_strategy.Stealth",
+            return_value=MagicMock(apply_stealth_async=AsyncMock()),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.trafilatura.extract",
+            return_value="Extracted",
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            return_value=0.0,
+        ),
+    ):
+        strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
+        result = await strategy.extract("http://test.com")
+    assert result == "Extracted"
+    assert page.wait_for_timeout.await_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_playwright_retries_after_transient_networkidle_wait_error(monkeypatch):
+    """A transient PlaywrightError while waiting for the networkidle load state during
+    polling must be swallowed and retried rather than propagated to the caller."""
+    page = _build_playwright_page_mock("<html><body>content</body></html>")
+    page.wait_for_load_state = AsyncMock(side_effect=[PlaywrightError("networkidle timeout"), None])
+    _wire_browser_pool(monkeypatch, page)
+    with (
+        patch(
+            "src.reader.strategies.playwright_strategy.Stealth",
+            return_value=MagicMock(apply_stealth_async=AsyncMock()),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.trafilatura.extract",
+            return_value="Extracted",
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            return_value=0.0,
+        ),
+    ):
+        strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
+        result = await strategy.extract("http://test.com")
+    assert result == "Extracted"
+
+
 # Crawlee strategy
 
 

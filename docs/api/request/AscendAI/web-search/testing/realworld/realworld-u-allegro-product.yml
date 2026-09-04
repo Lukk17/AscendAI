@@ -1,0 +1,69 @@
+info:
+  name: realworld-u-allegro-product
+  type: http
+  seq: 21
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "{{scrap_url_allegro}}",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns a valid terminal verdict (success or human-intervention)", function () {
+            const st = res.getStatus();
+            const b = res.getBody() || {};
+            if (st === 200) {
+                expect(b.status).to.equal("success");
+                const content = b.content || b.text || b.markdown || "";
+                expect(content.length, "success must carry content").to.be.at.least(1);
+            } else {
+                expect(st).to.equal(428);
+                expect(b.status).to.equal("human_intervention_required");
+                expect(b.vnc_url).to.be.a("string").and.not.empty;
+            }
+        });
+        test("a success must be the requested offer page, never a block page", function () {
+            if (res.getStatus() !== 200) {
+                return;
+            }
+            const b = res.getBody() || {};
+            const content = b.content || b.text || b.markdown || "";
+            const lower = content.toLowerCase();
+
+            expect(lower, "offer-identity canary missing: the model code from the requested offer URL").to.include("er-cbn1");
+
+            const blockMarkers = [
+                "Please enable JS",
+                "disable any ad blocker",
+                "Prove your humanity",
+                "Please verify you are a human",
+                "Checking if the site connection is secure",
+                "Just a moment...",
+                "Attention Required!",
+                "Pardon Our Interruption",
+                "Access Denied",
+                "403 Forbidden",
+                "Additional Verification Required",
+                "Ray ID"
+            ];
+            blockMarkers.forEach(function (marker) {
+                expect(content, "block-page marker reported as a successful scrape: " + marker).to.not.include(marker);
+            });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

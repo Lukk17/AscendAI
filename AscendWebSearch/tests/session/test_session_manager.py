@@ -147,6 +147,29 @@ async def test_validate_slides_ttl_on_success(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
+async def test_clear_delegates_to_cookie_manager_and_returns_existed(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.clear_session",
+        new=AsyncMock(return_value=True),
+    ) as mock_clear:
+        result = await mgr.clear("https://example.com", "work")
+
+    assert result is True
+    mock_clear.assert_awaited_once_with("https://example.com", "work")
+
+
+@pytest.mark.asyncio
+async def test_clear_is_idempotent_when_nothing_stored(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.clear_session",
+        new=AsyncMock(return_value=False),
+    ):
+        result = await mgr.clear("https://never-stored.example.com")
+
+    assert result is False
+
+
+@pytest.mark.asyncio
 async def test_establish_returns_vnc_url(mgr: SessionManager):
     exc = HumanInterventionRequiredException("http://vnc:7900", "login")
     with patch(

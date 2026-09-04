@@ -1,0 +1,41 @@
+info:
+  name: session-clear
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/clear"
+  body:
+    type: json
+    # Idempotent by contract: always 200, whether or not a session existed.
+    # www.example.com never carries a stored session in a clean environment,
+    # so this documents the no-op path; existed reflects whatever the store
+    # actually held for this url+profile at call time.
+    data: |-
+      {
+        "url": "https://www.example.com/",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: cleared status, echoed url, existed + cleared_cache_entries typed", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("cleared");
+            expect(b.url).to.equal("https://www.example.com/");
+            expect(b.existed).to.be.a("boolean");
+            expect(b.cleared_cache_entries).to.be.a("number");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

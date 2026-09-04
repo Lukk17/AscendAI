@@ -1,0 +1,39 @@
+info:
+  name: session-clear-existing
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/clear"
+  body:
+    type: json
+    # example.net is IANA-reserved for documentation/testing and touched by no
+    # other spec in this suite. The e2e reset step seeds a session record for
+    # it directly in Redis before this call runs.
+    data: |-
+      {
+        "url": "https://example.net",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("cleared an existing session", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("cleared");
+            expect(b.url).to.equal("https://example.net/");
+            expect(b.existed).to.equal(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

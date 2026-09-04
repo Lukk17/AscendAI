@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
 
+from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.web_reader import WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
@@ -31,6 +32,11 @@ class SessionEstablishRequest(BaseModel):
 
 
 class SessionStatusRequest(BaseModel):
+    url: HttpUrl
+    profile: str | None = None
+
+
+class SessionClearRequest(BaseModel):
     url: HttpUrl
     profile: str | None = None
 
@@ -143,3 +149,30 @@ async def session_status(request: SessionStatusRequest) -> dict[str, Any]:
     url_str = str(request.url)
     info = await session_manager.status(url_str, request.profile)
     return {"url": url_str, **info.to_dict()}
+
+
+@rest_router_v2.post("/session/clear")
+async def clear_session(request: SessionClearRequest) -> dict[str, Any]:
+    """
+    Delete the stored session for a URL + profile, including any cached read
+    results for that domain.
+
+    Idempotent: always returns 200, whether or not a session existed.
+    """
+    url_str = str(request.url)
+    if not is_safe_external_url(url_str):
+        raise HTTPException(
+            status_code=400,
+            detail="URL resolves to a private, loopback, link-local, or otherwise non-routable address",
+        )
+
+    existed = await session_manager.clear(url_str, request.profile)
+    domain = cookie_manager._get_domain(url_str)  # noqa: SLF001
+    cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
+
+    return {
+        "status": "cleared",
+        "url": url_str,
+        "existed": existed,
+        "cleared_cache_entries": cleared_cache_entries,
+    }

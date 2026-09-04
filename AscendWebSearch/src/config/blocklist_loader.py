@@ -10,18 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 class BlocklistLoader:
-    def __init__(self, assets_dir: str | None = None):
-        if assets_dir:
-            self.assets_dir = Path(assets_dir)
-        else:
-            self.assets_dir = Path(__file__).parent.parent / "assets"
+    def __init__(self, cache_dir: str | None = None):
+        self.cache_dir = Path(cache_dir) if cache_dir else Path(settings.BLOCKLIST_CACHE_DIR)
+        self.blocklist_path = self.cache_dir / "fanboy-annoyance.txt"
+        self._ensure_cache_dir()
 
-        self.blocklist_path = self.assets_dir / "fanboy-annoyance.txt"
-        self._ensure_assets_dir()
-
-    def _ensure_assets_dir(self) -> None:
-        if not self.assets_dir.exists():
-            self.assets_dir.mkdir(parents=True, exist_ok=True)
+    def _ensure_cache_dir(self) -> None:
+        if not self.cache_dir.exists():
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def load_rules(self) -> AdblockRules:
         self._download_blocklist()

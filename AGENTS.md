@@ -224,6 +224,7 @@ cd AscendAgent && ./gradlew bootRun
 
 - **Java modules** (AscendAgent, WeatherMCP): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.5.
 - **Python modules** (AudioScribe, AscendWebSearch, AscendMemory, PaddleOCR): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
+- **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) — never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
 - All services expose a `/health` endpoint for Docker healthchecks.
 - All services are containerized with Dockerfiles and wired through `docker-compose.yaml` (with `ascend-scrapper.docker-compose.yaml` included for the web-scraping stack).
 - MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the AscendAgent.

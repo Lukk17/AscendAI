@@ -8,22 +8,26 @@ AudioScribe is a speech-to-text microservice that dynamically selects transcript
 
 ## Build & Run Commands
 
+Every command below runs through this module's own virtual environment at `.venv/` (created via
+`python -m venv .venv`, see README.md) — never the system Python or pip. Windows interpreter:
+`.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
+
 ```bash
 # Install dependencies (pytorch first, then the project)
-pip install -r pytorch-requirements.txt
-pip install -e .[dev]
+.venv/Scripts/pip.exe install -r pytorch-requirements.txt
+.venv/Scripts/pip.exe install -e .[dev]
 
 # Run the server (port 7017)
-uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
+.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7017 --reload
 
 # Run all tests
-pytest
+.venv/Scripts/pytest.exe
 
 # Run a single test file
-pytest tests/transcription/test_openai_api_speach_to_text.py
+.venv/Scripts/pytest.exe tests/transcription/test_openai_api_speach_to_text.py
 
 # Run a single test
-pytest tests/transcription/test_openai_api_speach_to_text.py::test_name -v
+.venv/Scripts/pytest.exe tests/transcription/test_openai_api_speach_to_text.py::test_name -v
 
 # Docker
 docker build -t audio-scribe:latest .

@@ -13,15 +13,19 @@ AscendMemory is a semantic memory service that provides REST API and MCP server 
 
 ## Build & Run Commands
 
+Every command below runs through this module's own virtual environment at `.venv/` (created via
+`python -m venv .venv`, see README.md) — never the system Python or pip. Windows interpreter:
+`.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
+
 ```bash
 # Install dependencies
-pip install -e .[dev]
+.venv/Scripts/pip.exe install -e .[dev]
 
 # Run the server (port 7020)
-uvicorn src.main:app --host 0.0.0.0 --port 7020 --reload
+.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7020 --reload
 
-# Run tests
-pytest
+# Run tests with the configured 100% branch-coverage gate
+.venv/Scripts/pytest.exe --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 
 # Docker
 docker build -t ascend-memory:latest .
@@ -40,7 +44,7 @@ docker build -t ascend-memory:latest .
 - `POST /api/v1/memory/wipe` — Wipe all memories for a user
 
 **Core Dependencies**:
-- mem0ai (1.0.3) — Memory management library
+- mem0ai (2.0.4) — Memory management library
 - Qdrant (port 6333) — Vector database backend
 - OpenAI-compatible API for embeddings (LM Studio or OpenAI)
 

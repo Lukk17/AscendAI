@@ -164,3 +164,57 @@ async def test_session_status_returns_info(client: AsyncClient):
     body = resp.json()
     assert body["status"] == "active"
     assert body["auth_ttl_remaining_seconds"] == 3600.0
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v2/web/session/clear
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_session_clear_returns_cleared_status(client: AsyncClient):
+    with (
+        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch.object(SessionManager, "clear", new=AsyncMock(return_value=True)),
+        patch(
+            "src.api.rest.rest_endpoints.web_reader.clear_cache_for_domain",
+            return_value=2,
+        ),
+    ):
+        resp = await client.post(
+            "/api/v2/web/session/clear",
+            json={"url": "http://example.com/"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "cleared"
+    assert body["existed"] is True
+    assert body["cleared_cache_entries"] == 2
+
+
+@pytest.mark.asyncio
+async def test_session_clear_is_idempotent_when_nothing_stored(client: AsyncClient):
+    with (
+        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch.object(SessionManager, "clear", new=AsyncMock(return_value=False)),
+        patch(
+            "src.api.rest.rest_endpoints.web_reader.clear_cache_for_domain",
+            return_value=0,
+        ),
+    ):
+        resp = await client.post(
+            "/api/v2/web/session/clear",
+            json={"url": "http://never-stored.example.com/"},
+        )
+    assert resp.status_code == 200
+    assert resp.json()["existed"] is False
+
+
+@pytest.mark.asyncio
+async def test_session_clear_unsafe_url_returns_400(client: AsyncClient):
+    with patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=False):
+        resp = await client.post(
+            "/api/v2/web/session/clear",
+            json={"url": "http://192.168.1.1/"},
+        )
+    assert resp.status_code == 400

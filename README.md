@@ -431,6 +431,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/architecture/README.md](docs/architecture/README.md)                                                            | Monorepo architecture: system view, ADRs, deployment topology.        |
 | [docs/architecture/arc42/01-introduction-and-goals.md](docs/architecture/arc42/01-introduction-and-goals.md)          | Arc42 entry point for the platform.                                   |
 | [AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
+| [docs/architecture/permission-aware-retrieval.md](docs/architecture/permission-aware-retrieval.md)                     | How document access lists reach chunks and get enforced inside the vector search. |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
 | [AscendWebSearch/deploy-standalone/README.md](AscendWebSearch/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
 | [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and release workflows, image naming, registries, package visibility. |

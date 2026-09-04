@@ -305,6 +305,33 @@ class CookieManager:
         """Legacy: accept flat cookie dict and persist via save_flat_cookies."""
         await self.save_flat_cookies(url, cookies, user_agent, profile)
 
+    async def clear_session(
+        self,
+        url: str,
+        profile: str | None = None,
+    ) -> bool:
+        """Delete the stored session record for *url* + *profile*, from Redis
+        and the in-memory fallback. Idempotent: returns whether a record
+        existed, but deleting an absent record is not an error.
+        """
+        domain = self._get_domain(url)
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        memory_key = self._memory_key(domain, effective_profile)
+        existed = self._memory_store.pop(memory_key, None) is not None
+
+        if self.redis_client:
+            try:
+                deleted = await self.redis_client.delete(self._redis_key(domain, effective_profile))
+                existed = existed or bool(deleted)
+                REDIS_OPS_TOTAL.labels(op="delete", result="success").inc()
+            except Exception as e:
+                REDIS_OPS_TOTAL.labels(op="delete", result="error").inc()
+                self._handle_error("Failed to delete session from Redis", e)
+
+        logger.info("[CookieManager] Cleared session for %s (profile=%s)", domain, effective_profile)
+
+        return existed
+
     # ---------------------------------------------------------------------------
     # Internal storage helpers
     # ---------------------------------------------------------------------------

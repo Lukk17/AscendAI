@@ -6,7 +6,8 @@ Three things, all against **real sites** (no mocks):
 
 1. **A categorized real-world URL matrix** — each URL asserts its **expected verdict** (`success` / `intervention` /
    `hard-fail`). Stable canaries are **gated** (must match); live sites are **best-effort** (the response must be a
-   valid terminal verdict, but which one is recorded, not gated).
+   valid terminal verdict, but which one is recorded, not gated). The retail anti-bot rows add a content gate on the
+   success branch: a success must carry the requested product page, never an anti-bot interstitial or a block page.
 2. **Login → session reuse** (automated, saucedemo) — a **2-call before/after**: read the page **(1) blocked** (no
    session) returns no logged-in content, then **(2) after** a scripted login + session seed returns logged-in
    content. Proves the auth session is **stored and reused**.
@@ -61,12 +62,68 @@ human-intervention path works. (Contrast Part 2: an app session cookie is not fi
 | **Login wall — intervention-only (not solved here)** | | | | |
 | s | `https://www.linkedin.com/jobs/search/?keywords=Java%20Developer&location=United%20States&f_AL=true` | login wall → NoVNC | success or intervention | best-effort |
 | t | `https://secure.indeed.com/auth?co=US&hl=en_US&branding=page-two-signin` | login wall → NoVNC | success or intervention | best-effort |
+| **Retail anti-bot — content-gated (a success must be the requested product page)** | | | | |
+| u | `{{scrap_url_allegro}}` (Allegro offer) | hard block page, no solvable challenge | success or intervention | best-effort + content-gated |
+| v | `{{scrap_url_amazon}}` (amazon.pl product) | click-through interstitial | success or intervention | best-effort + content-gated |
+| w | `{{scrap_url_amazon_com}}` (amazon.com product) | click-through interstitial | success or intervention | best-effort + content-gated |
+| x | `{{scrap_url_amazon_uk}}` (amazon.co.uk product) | click-through interstitial | success or intervention | best-effort + content-gated |
+| y | `{{scrap_url_amazon_se}}` (amazon.se product) | click-through interstitial | success or intervention | best-effort + content-gated |
 
 > **Gated rows** (a, b, c, d, e, q) hard-assert their verdict. **Best-effort rows** assert only that the response is a
 > *valid terminal verdict* — either (`200` + `success` + content) **or** (`428` + `human_intervention_required` +
 > `vnc_url`) — never gated on which; a malformed/5xx/empty response fails them. The login behavior is fully covered by
 > Part 2 (saucedemo, a real login + real session); LinkedIn/indeed stay here as best-effort rows (real scripted login
 > to them violates ToS / risks bans).
+>
+> **Content-gated rows** (u, v, w, x, y) are best-effort on *which* branch fires and hard-gated on *what a success
+> contains*. A `200` + `status="success"` that carries an anti-bot interstitial instead of the requested page fails
+> the row — it does not get recorded as "a valid verdict". See "Retail anti-bot rows" below.
+
+### Retail anti-bot rows (u, v, w, x, y)
+
+These five rows exist to catch one specific defect: the service reporting an anti-bot interstitial or a block page as
+a successful scrape. A row that only checks for HTTP `200` is worse than useless against that bug, because HTTP `200`
+is exactly what the bug produces. Each row therefore adds a second assertion that runs only on the success branch:
+
+- **Product-identity canary (must be present).** A real product page carries a stable identifier of *that product*
+  that no interstitial can carry: the ISBN-13 `9780132350884` for the three Clean Code listings (w, x, y), the ASIN
+  `B09D14YFR9` for the amazon.pl listing (v), and the model code `er-cbn1` (case-insensitive) for the Allegro offer
+  (u). This half is wording-independent, so it survives Amazon rotating its interstitial copy or switching between
+  the click-through and character-entry variants.
+- **Interstitial markers (must be absent).** The measured text of each locale's interstitial, plus the service's own
+  `waf_strict_phrases` and `ERROR_KEYWORDS` — the exact strings a sibling row would treat as needing intervention.
+  Naming them turns a failure into a diagnosis rather than a bare "canary missing".
+
+Both halves were verified against captured responses: the four Amazon interstitials (fetched from each locale's
+`/errors/validateCaptcha`) carry none of the canaries and trip the locale markers, and the four real product pages
+carry their canary and trip no marker. The Allegro block page (`Please enable JS and disable any ad blocker`, served
+as HTTP `403` on a direct fetch) likewise carries no `er-cbn1` and trips two markers.
+
+**Why best-effort and not gated.** Retail anti-bot behaviour varies by day and by egress address. Gating u to
+`intervention` would fail on a day the scraper legitimately gets through; gating v/w/x/y to `success` would flake the
+moment Amazon decides this address looks automated. Both are real, correct outcomes for the service, so neither can
+be the hard-asserted one. What is *never* correct is a success carrying an interstitial, and that is what the rows
+gate on.
+
+**Why the accept-set is `{success, intervention}` and excludes hard-fail.** Both sites resolve and are reachable, so
+`400` (the SSRF / host guard's fail-closed code, row q's verdict) is not a legitimate outcome here. The service's
+documented honest answer to an unsolvable challenge is the `428` intervention contract in
+`api/exception_handlers.py`, which is what row u already produces today. These rows are written against that
+behaviour. If a pending fix chooses a different shape for an honest failure, these rows will fail and that failure
+is the signal to reconcile the contract — not a licence to widen the accept-set.
+
+**Intervention handling on these rows.** Row u returns `428` on most runs, and each `428` spawns a NoVNC monitor that
+holds a headful browser for `NOVNC_TIMEOUT_SECONDS` (600 s by default). Because u is best-effort, an intervention is a
+valid recorded verdict and **no human is expected to solve it**: record the `vnc_url` in the run record, leave the
+monitor to time out, and do not stall the sweep waiting on a human. The mandatory
+"print the `vnc_url` and wait" rule applies to Part 3, whose whole point is the human solve.
+
+**Dependency on the pending anti-bot fix.** Rows v, w, x and y assert behaviour the currently deployed build does not
+have on the interstitial path: a live probe of each locale's `/errors/validateCaptcha` through
+`POST /api/v2/web/read` returns HTTP `200` with `status="success"` and the interstitial as `content`. Whenever a run
+of v/w/x/y lands on an interstitial rather than the real product page, the row will FAIL until the fix that converts
+that case into an honest `428` is deployed. Row u needs no fix — Allegro's block page already escalates to
+intervention.
 
 ### Part 2 — Login → session reuse (saucedemo, AUTOMATED, 2 calls)
 
@@ -214,6 +271,10 @@ bru run "web-search/testing/realworld" --env ascend-local
 - **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly — a–e are `200`/`success` (+ canary where
   noted), q is the `400` hard-fail. Best-effort rows each return a valid terminal verdict (`200`/`success`/content
   **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed.
+- **Part 1, retail anti-bot rows (u, v, w, x, y):** a valid terminal verdict as above, and on the success branch the
+  `content` contains the row's product-identity canary (`er-cbn1` for u, `B09D14YFR9` for v, `9780132350884` for
+  w/x/y) and none of the row's interstitial / block-page markers. A `200`/`success` carrying an interstitial fails
+  the row.
 - **Part 2 — login reuse:** Call 1 (anon) content has **no** auth-only inventory markers; Call 2 (after login)
   returns `status="success"` with an auth-only product description.
 - **Part 3 — human-solve capture:** Call 1 returns HTTP `428`, `status="human_intervention_required"` + a `vnc_url`;
@@ -223,13 +284,17 @@ bru run "web-search/testing/realworld" --env ascend-local
 
 None — and **no secrets**: saucedemo's credentials are its public demo values, hardcoded in the harness; the captcha
 is human-solved (no credentials); LinkedIn/indeed are intervention-only. URLs, selectors, and markers are hardcoded
-in the harness and Bruno requests. (A future real-secret login would read from the environment, never commit creds.)
+in the harness and Bruno requests, except the five retail anti-bot rows (u, v, w, x, y), whose target URLs come from
+the collection variables `scrap_url_allegro`, `scrap_url_amazon`, `scrap_url_amazon_com`, `scrap_url_amazon_uk` and
+`scrap_url_amazon_se` in `docs/api/request/AscendAI/web-search/folder.yml`. Swapping a listing that goes out of stock
+is then a one-line variable edit, and the row's product-identity canary is the only other thing to update with it. (A future real-secret login would read from the environment, never commit creds.)
 The login-and-seed harness is a Playwright script under `e2e/harness/`.
 
 ## Concurrency
 
-- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains, `saucedemo.com` (`e2e` profile),
-  and `google.com` (`default` profile, the reCAPTCHA demo).
+- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains (including `allegro.pl`,
+  `amazon.pl`, `amazon.com`, `amazon.co.uk` and `amazon.se` from the retail anti-bot rows), `saucedemo.com`
+  (`e2e` profile), and `google.com` (`default` profile, the reCAPTCHA demo).
 - **Conflicts with:** test 6 and any test sharing a target domain's session key. Part 3 targets `google.com`, which no
   matrix row touches, so there is no overlap. Within this test, Part 2's sequence (anon → seed → authed) is **strictly
   ordered**, and Part 3's human solve runs first on the main session.

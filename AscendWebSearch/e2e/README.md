@@ -12,8 +12,9 @@ the appropriate Redis key wipe.
 ```text
 AscendWebSearch/e2e/
 ├── README.md                            # this file
-├── fixtures/                            # canary inputs (none today; AscendWebSearch tools take string args, not files)
-│   └── README.md
+├── fixtures/                            # canary inputs and seed data
+│   ├── README.md
+│   └── session-clear-seed.json          # synthetic session record seeded by test 8
 ├── harness/                             # scripted-login helper for test 7
 │   └── seed_authenticated_session.py
 └── testing/                             # numbered specs + templates/ + runs/
@@ -25,6 +26,7 @@ AscendWebSearch/e2e/
     ├── 5-mcp-search-test.md
     ├── 6-tiered-scraping-test.md
     ├── 7-authenticated-realworld-scraping-test.md
+    ├── 8-session-clear-test.md
     ├── templates/                       # run-record templates (immutable), one per spec
     │   ├── README.md
     │   ├── 1-invalid-input-tasks.template.md
@@ -33,7 +35,8 @@ AscendWebSearch/e2e/
     │   ├── 4-mcp-tools-list-tasks.template.md
     │   ├── 5-mcp-search-tasks.template.md
     │   ├── 6-tiered-scraping-tasks.template.md
-    │   └── 7-authenticated-realworld-scraping-tasks.template.md
+    │   ├── 7-authenticated-realworld-scraping-tasks.template.md
+    │   └── 8-session-clear-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<capability>-tasks.md   # one per executed test (gitignored)
@@ -44,7 +47,8 @@ SearXNG reachable; `3` needs outbound HTTPS to `example.com` via the tiered extr
 sufficient); `4` only needs the AscendWebSearch process itself; `5` needs SearXNG again via the MCP path; `6` needs
 FlareSolverr plus outbound HTTPS to real sites for a per-tier regression sweep (curl_cffi, FlareSolverr, Playwright);
 `7` needs FlareSolverr, a real-world URL matrix, the saucedemo login-seed harness under
-[harness/](harness/seed_authenticated_session.py), and a human to solve a reCAPTCHA challenge through NoVNC.
+[harness/](harness/seed_authenticated_session.py), and a human to solve a reCAPTCHA challenge through NoVNC; `8`
+only needs the AscendWebSearch process and Redis reachable via `docker exec` — no outbound egress at all.
 
 The Bruno collection isn't here. It lives at the **repo root** under
 `docs/api/request/AscendAI/web-search/testing/` so it stays a portable API client artifact. Each spec references
@@ -97,10 +101,12 @@ pipeline plus an in-process blocklist. The execution constraints:
 | **No cross-test interference** | 1, 2, 4, 5 | Search calls write only to ephemeral SearXNG cache (out of process). MCP-list and invalid-input tests touch no upstream service. |
 | **Domain-scoped Redis session/cookie cache** | 6 | Mutates Redis session keys for its own target domains (`en.wikipedia.org`, `scrapingcourse.com`, `quotes.toscrape.com`). No overlap with test 3's `example.com` key. Safe in parallel with 1, 2, 4, 5. |
 | **Human-in-the-loop, must run on the main session** | 7 | Part 3 (reCAPTCHA human-solve) surfaces a `vnc_url` a human must open; it cannot be delegated to a fanned-out subagent whose output is never shown to the user. Part 1 (matrix) and Part 2 (automated saucedemo login) may still fan out across parallel runners while Part 3 runs on the main session. Mutates Redis session keys for the matrix domains, `saucedemo.com`, and `google.com`; no overlap with test 6's domains. |
+| **Domain-scoped Redis session key, no egress** | 8 | Mutates only `session:example.net:default`, seeded and removed by the test itself. No overlap with any other test's domains. Safe in parallel with 1, 2, 4, 5. |
 
 Recommended layout: run test 1 first (offline, fail-fast on validator bugs without burning egress), then tests
-2, 4, 5 in parallel or sequential against the SearXNG / MCP path, then test 6 (highest egress cost, needs
-FlareSolverr and Playwright), then test 7 last (its Part 3 needs a human at the keyboard on the main session).
+2, 4, 5, 8 in parallel or sequential (none needs FlareSolverr or Playwright), then test 6 (highest egress cost,
+needs FlareSolverr and Playwright), then test 7 last (its Part 3 needs a human at the keyboard on the main
+session).
 
 ## Prerequisites before any test
 
@@ -154,7 +160,8 @@ Numbered by setup cost. Easiest first.
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | MCP `tools/list` returns an entry with `name="web_search"` and one with `name="web_read"`, each carrying a `query` (or `url`) parameter in its input schema. |
 | 5  | [testing/5-mcp-search-test.md](testing/5-mcp-search-test.md) | MCP `tools/call` for `web_search` with a stable query returns a structured result containing ≥ 1 entry with `title`, `url`, `content`. |
 | 6  | [testing/6-tiered-scraping-test.md](testing/6-tiered-scraping-test.md) | `POST /api/v2/web/read` against a tier-mapped list (Wikipedia static, `scrapingcourse.com` Cloudflare, `quotes.toscrape.com/js/` JS-rendered) returns HTTP 200 `status="success"` with the per-tier canary content. Highest egress cost — needs FlareSolverr + Playwright, runs last. |
-| 7  | [testing/7-authenticated-realworld-scraping-test.md](testing/7-authenticated-realworld-scraping-test.md) | Difficulty-graded real-world URL matrix (easy/medium/hard/very-hard static+JS+WAF → `success`; dead domain → `hard-fail` HTTP 400; LinkedIn/indeed-auth login walls → `intervention` HTTP 428) — gated canaries hard-assert, live sites assert a valid terminal verdict (success or intervention). Plus a 2-call login-reuse behavior — a scripted login on a stable SPA (`saucedemo.com`, public demo creds hardcoded — no secrets) seeds `storage_state` and proves **browser-tier** authenticated capture→replay — and a human-solved reCAPTCHA v2 (Google reCAPTCHA demo) that proves session **capture** (the `_GRECAPTCHA` cookie) into the store — the widget can't be auto-passed, so capture proves a human acted (cross-request reuse is not asserted — the token is single-use). reCAPTCHA is the reliable human-solve target because the scraper now auto-passes Cloudflare/DataDome. LinkedIn is intervention-only. |
+| 7  | [testing/7-authenticated-realworld-scraping-test.md](testing/7-authenticated-realworld-scraping-test.md) | Difficulty-graded real-world URL matrix (easy/medium/hard/very-hard static+JS+WAF → `success`; dead domain → `hard-fail` HTTP 400; LinkedIn/indeed-auth login walls → `intervention` HTTP 428) — gated canaries hard-assert, live sites assert a valid terminal verdict (success or intervention). Plus a 2-call login-reuse behavior — a scripted login on a stable SPA (`saucedemo.com`, public demo creds hardcoded — no secrets) seeds `storage_state` and proves **browser-tier** authenticated capture→replay — and a human-solved reCAPTCHA v2 (Google reCAPTCHA demo) that proves session **capture** (the `_GRECAPTCHA` cookie) into the store — the widget can't be auto-passed, so capture proves a human acted (cross-request reuse is not asserted — the token is single-use). reCAPTCHA is the reliable human-solve target because the scraper now auto-passes Cloudflare/DataDome. LinkedIn is intervention-only. Five retail anti-bot rows (Allegro plus Amazon PL/US/UK/SE product pages) are best-effort on which branch fires and **content-gated** on the success branch: a `200`/`success` must carry the requested product page's identity canary (ISBN-13 / ASIN / model code) and none of the measured interstitial or block-page markers, so an anti-bot interstitial can never be recorded as a successful scrape. |
+| 8  | [testing/8-session-clear-test.md](testing/8-session-clear-test.md) | `POST /api/v2/web/session/clear` — the operator-recovery path for a poisoned session. A session seeded directly in Redis for `example.net` is removed (`existed=true`, key gone from Redis afterward); a call against `example.com`, which never carried one, is a documented no-op (HTTP 200, `existed=false`, not a 404 or 500). No FlareSolverr, Playwright, or human needed — cheapest test in the suite alongside 1 and 4. |
 
 ## Adding a new test
 

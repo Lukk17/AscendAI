@@ -101,6 +101,23 @@ class SessionManager:
             profile=effective_profile,
         )
 
+    async def clear(self, url: str, profile: str | None = None) -> bool:
+        """Delete the stored session for *url* + *profile*.
+
+        Idempotent: returns whether a record existed, but clearing an absent
+        session is not an error and always succeeds.
+        """
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        existed = await cookie_manager.clear_session(url, effective_profile)
+        logger.info(
+            "[SessionManager] Cleared session for %s (profile=%s, existed=%s)",
+            url,
+            effective_profile,
+            existed,
+        )
+
+        return existed
+
     async def validate(self, url: str, profile: str | None = None) -> bool:
         """Check whether the stored session is still live.
 
