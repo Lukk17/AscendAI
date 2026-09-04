@@ -3,6 +3,8 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
+from src.observability.metrics import MEMORY_SEARCH_TOTAL
+
 
 @pytest.mark.asyncio
 async def test_insert_memory_success(client: AsyncClient, override_dependencies):
@@ -124,6 +126,35 @@ async def test_search_memory_rejects_user_id_with_unsafe_chars(
 
 
 @pytest.mark.asyncio
+async def test_search_memory_upstream_failure_maps_to_500_and_records_error_outcome(
+    client: AsyncClient, override_dependencies
+):
+    """When the memory client's search call fails (e.g. Qdrant is down or
+    the embedder times out), the caller must see a 500 rather than a
+    silently empty result, and the search outcome metric must record
+    "error" so the failure is visible in Grafana instead of being lumped
+    in with successful searches."""
+
+    mock_service = override_dependencies
+    mock_service.search.side_effect = RuntimeError("qdrant connection refused")
+
+    before = MEMORY_SEARCH_TOTAL.labels(provider="lmstudio", outcome="error")._value.get()
+
+    response = await client.get(
+        "/api/v1/memory/search",
+        params={"user_id": "u1", "query": "test"},
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["status"] == 500
+    assert body["type"].endswith("/internal")
+
+    after = MEMORY_SEARCH_TOTAL.labels(provider="lmstudio", outcome="error")._value.get()
+    assert after == before + 1
+
+
+@pytest.mark.asyncio
 async def test_delete_memory_success(client: AsyncClient, override_dependencies):
     mock_service = override_dependencies
 
@@ -142,6 +173,29 @@ async def test_wipe_memory_success(client: AsyncClient, override_dependencies):
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     mock_wipe_all.assert_called_once_with(user_id="u1")
+
+
+@pytest.mark.asyncio
+async def test_wipe_memory_with_explicit_provider_wipes_only_that_provider(
+    client: AsyncClient, override_dependencies
+):
+    """A caller who names a provider (e.g. resetting a single user's
+    LM Studio-embedded memories without touching their OpenAI-embedded
+    ones) must only wipe that provider's collection, not every provider
+    collection the user has data in."""
+
+    mock_service = override_dependencies
+
+    with patch("src.api.rest.rest_endpoints.wipe_user_all_collections") as mock_wipe_all:
+        response = await client.post(
+            "/api/v1/memory/wipe",
+            params={"user_id": "u1", "provider": "openai"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    mock_service.wipe_user.assert_called_once_with(user_id="u1")
+    mock_wipe_all.assert_not_called()
 
 
 @pytest.mark.asyncio

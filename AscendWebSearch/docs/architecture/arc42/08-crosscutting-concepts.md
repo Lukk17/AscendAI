@@ -79,7 +79,14 @@ domain already specifies which User-Agent was used to acquire the clearance cook
 
 ### Compat patches
 
-`src/config/compat.py:apply_compatibility_patches()` is called at the very top of `src/main.py` before any
-heavy imports (specifically before `crawlee`). This handles any Python stdlib compatibility shims needed by
-the Crawlee library on the runtime Python version or platform. The call must precede all other imports to avoid
-import-time side effects from `crawlee` setting up its event loop policy before the patch runs.
+Earlier revisions carried a runtime patch, `src/config/compat.py:apply_compatibility_patches()`, called at the
+very top of `src/main.py` before any heavy imports. It injected a `DATA_FILES` attribute onto
+`browserforge.download` when the attribute was missing, guarding against a version mismatch: `crawlee` (1.3.1)
+expects `browserforge` to expose `DATA_FILES`, and `browserforge` releases from 1.2.4 onward removed it.
+
+The pinned dependency in `pyproject.toml`, `browserforge==1.2.3`, already carries `DATA_FILES`, so the patch's
+guard condition was always false and the shim never ran. The patch and its test were removed.
+
+The incompatibility itself has not gone away. It is now handled entirely by the version pin. `browserforge`
+must stay at 1.2.3 until `crawlee` is upgraded to a version that no longer expects `DATA_FILES`. Bumping
+`browserforge` past 1.2.3 on its own breaks the crawler.

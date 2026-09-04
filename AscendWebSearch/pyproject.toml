@@ -49,6 +49,7 @@ pythonpath = [".", "src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
 branch = true
@@ -100,7 +101,7 @@ ignore = [
     "S104",    # binding 0.0.0.0 is the deliberate posture for a container service
     "S311",    # random for viewport jitter / UA rotation is not security-sensitive
     "PLR0911", # too-many-returns; happy on guard-clause heavy functions
-    "PLC0415", # import-not-at-top is required for the compat shim load order
+    "PLC0415", # import-not-at-top is required for OTel/asyncio lazy imports guarded by env checks
     "G004",    # f-strings in logger.x — readable and perf-equivalent at our log levels
     "TRY003",  # raise with message — forcing per-message Exception subclasses is overkill
     "TRY300",  # try/else split — often hurts readability for short happy paths

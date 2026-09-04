@@ -2,36 +2,28 @@ import logging
 import os
 from contextlib import AsyncExitStack, asynccontextmanager
 
-# Apply compatibility patches BEFORE other heavy imports (especially crawlee).
-# The shim must execute before `crawlee` is imported anywhere in the process,
-# so the apply_compatibility_patches import lives above the rest of the imports
-# by design - the E402 / I001 rules are silenced for this block in pyproject.toml.
-from src.config.compat import apply_compatibility_patches
+import httpx
+import uvicorn
+from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
-apply_compatibility_patches()
-
-import httpx  # noqa: E402
-import uvicorn  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
-
-from src.api.exception_handlers import (  # noqa: E402
+from src.api.exception_handlers import (
     global_exception_handler,
     httpx_exception_handler,
     human_intervention_exception_handler,
 )
-from src.api.exceptions import HumanInterventionRequiredException  # noqa: E402
-from src.api.mcp.mcp_server import mcp  # noqa: E402
-from src.api.mcp.mcp_server import search_client as mcp_search_client  # noqa: E402
-from src.api.readiness import readiness_router  # noqa: E402
-from src.api.rest.rest_endpoints import rest_router, rest_router_v2  # noqa: E402
-from src.api.rest.rest_endpoints import search_client as rest_search_client  # noqa: E402
-from src.config.blocklist_loader import BlocklistLoader  # noqa: E402
-from src.config.config import settings  # noqa: E402
-from src.config.logging_config import get_uvicorn_log_config, setup_logging  # noqa: E402
-from src.config.startup_banner import log_startup_banner  # noqa: E402
-from src.observability.request_context import RequestIdMiddleware  # noqa: E402
-from src.runtime.browser_pool import browser_pool  # noqa: E402
+from src.api.exceptions import HumanInterventionRequiredException
+from src.api.mcp.mcp_server import mcp
+from src.api.mcp.mcp_server import search_client as mcp_search_client
+from src.api.readiness import readiness_router
+from src.api.rest.rest_endpoints import rest_router, rest_router_v2
+from src.api.rest.rest_endpoints import search_client as rest_search_client
+from src.config.blocklist_loader import BlocklistLoader
+from src.config.config import settings
+from src.config.logging_config import get_uvicorn_log_config, setup_logging
+from src.config.startup_banner import log_startup_banner
+from src.observability.request_context import RequestIdMiddleware
+from src.runtime.browser_pool import browser_pool
 
 setup_logging()
 logger = logging.getLogger("uvicorn")
