@@ -1,63 +1,88 @@
-## 1. Tenant model and Liquibase migration
+Tasks are ordered so that everything which changes stored data lands before anything that reads it: context plumbing, then the Postgres schema, then the write path that stamps payloads and keys, then the backfill of existing data, and only then the retrieval filter and the presign guard that depend on those payloads existing. Tasks that rewrite stored data carry `[BACKFILL]`, and tasks that rebuild Qdrant index structures carry `[REINDEX]`. Every task states the observable check that proves it is done. None of them is satisfied by a log line.
 
-- [ ] 1.1 Create `AscendAgent/src/main/resources/db/changelog/02-tenant-isolation.xml`: `tenants` table (`id VARCHAR(64) PK`, `display_name`, `created_at`), insert reserved `default` row, register in `db.changelog-master.yaml`
-- [ ] 1.2 Same changelog: add `tenant_id VARCHAR(64)` to `chat_history` and `user_instructions` with `defaultValue='default'` (backfills existing rows), then add NOT NULL constraints
-- [ ] 1.3 Same changelog: change `user_instructions` primary key to composite `(tenant_id, user_id)`; create index `idx_chat_history_tenant_user` on `chat_history(tenant_id, user_id)` and drop `idx_chat_history_user_id`
-- [ ] 1.4 Add `Tenant` JPA entity + `TenantRepository` under `model/` and `repository/`; add `tenant_id` to the `ChatHistory` entity and `UserInstruction` composite id
-- [ ] 1.5 Test (Testcontainers `integrationTest`): boot against a Postgres seeded with pre-tenant rows, assert Liquibase backfills `tenant_id='default'` and the composite index exists
+## 1. Tenant context and principal set plumbing (consumes add-auth-and-identity)
 
-## 2. Tenant context plumbing (consumes add-auth-and-identity)
+- [ ] 1.1 Add the `TenantContext` accessor (request-scoped holder) returning the tenant id resolved from the JWT `tenant` claim by the `add-auth-and-identity` filter, aligning the exact hook once that change's design is final. Verify: a request with `tenant=acme` in its token yields `acme` from the accessor inside a controller-level test, and a second request with `tenant=globex` yields `globex` on the same thread pool.
+- [ ] 1.2 Consume the principal set accessor from `add-auth-and-identity` behind a local `PrincipalContext` returning an `Optional` of the principal set, so an unresolved set and a legitimately empty set stay distinguishable at the type level. Verify: a unit test asserts the accessor returns empty `Optional` when resolution did not run, and a present `Optional` wrapping an empty set when resolution ran and found only `tenant:everyone:acme`.
+- [ ] 1.3 Validate the tenant id against `[a-z0-9-]{1,64}` at the boundary and reject malformed values with a client error. Verify: a request whose token claims `Acme Corp!` returns 4xx and no Qdrant, MinIO, Redis, or Postgres call is recorded by the test doubles.
+- [ ] 1.4 Fail-closed guard: `TenantContext.currentTenantId()` throws when unresolved, the principal accessor throws for search and presign when unresolved, and the global exception handler maps both to 401/403. Verify: two controller tests, one with no tenant and one with tenant but no principal set, each returning 401/403 with an empty body of results.
+- [ ] 1.5 Test: request whose form field claims a different tenant than the JWT. Verify: all store access recorded for that request carries the JWT tenant, and none carries the form value.
+- [ ] 1.6 Test: request whose body, form field, or header names a group principal the caller does not hold. Verify: the composed filter expression contains only resolved principals, and a chunk granted solely by the claimed principal is not returned.
+- [ ] 1.7 Test: tenant-scoped service call with an unresolved context throws and performs no store access. Verify: the mocked vector store, S3 client, Redis template, and repository receive zero invocations.
+- [ ] 1.8 Test: a resolved-but-empty principal set is not treated as a failure. Verify: the search executes, the filter carries an empty-intersection access conjunct, and the call returns zero results rather than throwing.
 
-- [ ] 2.1 Add `TenantContext` accessor (request-scoped holder) that returns the tenant id resolved from the JWT `tenant` claim by the `add-auth-and-identity` filter; align the exact hook once that change's design is final
-- [ ] 2.2 Validate the tenant id against `[a-z0-9-]{1,64}` at the boundary; reject malformed values with a client error
-- [ ] 2.3 Fail-closed guard: `TenantContext.currentTenantId()` throws when unresolved; map the exception to 401/403 in the global exception handler
-- [ ] 2.4 Test: request whose form field claims a different tenant than the JWT — assert all operations use the JWT tenant (forged tenant rejected)
-- [ ] 2.5 Test: tenant-scoped service call with empty context throws and performs no store access
+## 2. Tenant model and Liquibase migration [BACKFILL]
 
-## 3. Qdrant isolation
+- [ ] 2.1 Create `AscendAgent/src/main/resources/db/changelog/02-tenant-isolation.xml`: `tenants` table (`id VARCHAR(64) PK`, `display_name`, `created_at`), insert the reserved `default` row, register in `db.changelog-master.yaml`. Verify: booting against a fresh Postgres yields a `tenants` table containing exactly one row with `id = 'default'`.
+- [ ] 2.2 [BACKFILL] Same changelog: add `tenant_id VARCHAR(64)` to `chat_history` and `user_instructions` with `defaultValue='default'` (backfilling existing rows in the same statement), then add the NOT NULL constraints. Verify: against a database seeded with pre-tenant rows, every row reads `tenant_id = 'default'` and an insert omitting `tenant_id` is rejected by the constraint.
+- [ ] 2.3 Same changelog: change the `user_instructions` primary key to composite `(tenant_id, user_id)`, create index `idx_chat_history_tenant_user` on `chat_history(tenant_id, user_id)` and drop `idx_chat_history_user_id`. Verify: `pg_indexes` lists the composite index and no longer lists the single-column one, and two rows with the same `user_id` under different tenants both insert successfully.
+- [ ] 2.4 Add the `Tenant` JPA entity and `TenantRepository` under `model/` and `repository/`, and add `tenant_id` to the `ChatHistory` entity and the `UserInstruction` composite id. Verify: a repository integration test saves and reads back the same `user_id` under two tenants as two distinct rows.
+- [ ] 2.5 Test (Testcontainers `integrationTest`): boot against a Postgres seeded with pre-tenant rows. Verify: Liquibase completes, the backfilled values and the composite index are both present, and a second boot is a no-op with no changeset re-run.
 
-- [ ] 3.1 Add `TENANT_ID` constant to `service/ingestion/IngestionMetadataKeys.java`
-- [ ] 3.2 Stamp `tenant_id` metadata on every `Document` in all ingestion producers (Markdown, Docling, PaddleOCR, Unstructured paths); fail ingestion when tenant context is unresolved
-- [ ] 3.3 In `service/rag/RagRetrievalService.java`, build the `SearchRequest` with a `FilterExpressionBuilder`-based `tenant_id == currentTenant` filter; throw before searching when tenant context is unresolved
-- [ ] 3.4 Scope `documentService.removeOldDocuments(...)` dedup deletes by `tenant_id` in addition to `source`
-- [ ] 3.5 Test (`RagRetrievalServiceTenantTest`): verify the outgoing `SearchRequest` carries the tenant filter expression, and that a missing tenant context throws without invoking the vector store
-- [ ] 3.6 Integration test (Testcontainers Qdrant): ingest a document as tenant `acme`, search as tenant `globex` — assert zero hits; search as `acme` — assert hits returned
-- [ ] 3.7 Integration test: re-upload the same filename as tenant `acme` — assert `globex` points with the same `source` are untouched
+## 3. Write path: metadata contract, storage keys, and dedup scope
 
-## 4. MinIO isolation
+- [ ] 3.1 Add `TENANT_ID`, `ACL`, `ACL_SOURCE`, `ACL_VERSION`, and `ACL_SYNCED_AT` constants to `service/ingestion/IngestionMetadataKeys.java`. Verify: a unit test asserts the constant values are exactly `tenant_id`, `acl`, `acl_source`, `acl_version`, and `acl_synced_at`, so the payload contract cannot drift from the spec by a rename.
+- [ ] 3.2 Add the access-list helper that builds `tenant:everyone:{tenantId}`, validates each principal against the `namespace:type:id` format and 128-character cap, enforces the 64-principal list cap by failing the source, and computes `acl_version` as a stable hash of the sorted list. Verify: unit tests assert the same list in two different orders hashes identically, a 65-principal list throws with a cap reason, and a malformed principal is rejected.
+- [ ] 3.3 Stamp `tenant_id` and the four access-list fields on every `Document` in all ingestion producers (Markdown, Docling, PaddleOCR, Unstructured paths), with `acl = ["tenant:everyone:{tenantId}"]` and `acl_source = tenant-default` for direct uploads, and fail ingestion when tenant context is unresolved. Verify: ingest one document per producer against a Testcontainers Qdrant and assert every resulting point payload carries all five fields with the expected values, and that an ingest with no tenant context writes zero points.
+- [ ] 3.4 In `controller/IngestionController.java`, build upload keys as `tenant/{tenantId}/{folder}/{safeName}` from `TenantContext`, never from user input. Verify: an upload of `notes.md` as tenant `acme` lands at exactly `tenant/acme/markdown/notes.md`, and an upload named `../../etc/passwd.txt` lands under `tenant/acme/` with no `/` surviving in the filename segment.
+- [ ] 3.5 In `ManualIngestionService`, resolve the effective scan prefix as `tenant/{tenantId}/` plus the caller-supplied `prefix`, rejecting or neutralizing values that would escape it. Verify: `POST /api/v1/ingestion/run` with `prefix=tenant/globex/` as tenant `acme` reports zero objects scanned and leaves `globex` points untouched.
+- [ ] 3.6 Scope `documentService.removeOldDocuments(...)` dedup deletes by `tenant_id` in addition to `source`. Verify: with both tenants holding `handbook.pdf`, a re-upload by `acme` leaves the `globex` point count for that source unchanged.
+- [ ] 3.7 Integration test (Testcontainers MinIO): uploads from two tenants with identical filenames. Verify: both objects exist at distinct keys and both are byte-intact after the second upload.
+- [ ] 3.8 Integration test: freshly ingested document is immediately retrievable by its own tenant. Verify: upload as `acme`, prompt as `acme`, and the matching chunk is in the retrieved context with no migration step in between.
 
-- [ ] 4.1 In `controller/IngestionController.java`, build upload keys as `tenant/{tenantId}/{folder}/{safeName}` from `TenantContext` (never from user input)
-- [ ] 4.2 In `ManualIngestionService`, resolve the effective scan prefix as `tenant/{tenantId}/` + caller-supplied `prefix`; reject or neutralize values that would escape the tenant prefix
-- [ ] 4.3 In `service/rag/S3PresignedUrlService.java`, refuse to presign any key not starting with `tenant/{tenantId}/` for the caller's tenant; omit the source and log one WARN with `s3://{bucket}/{key}`
-- [ ] 4.4 Test (`S3PresignedUrlServiceTenantTest`): presign request for `tenant/acme/...` as tenant `globex` — assert refused, WARN logged, request still returns 200 with remaining sources
-- [ ] 4.5 Integration test (Testcontainers MinIO): uploads from two tenants with identical filenames land at distinct keys and neither overwrites the other
-- [ ] 4.6 Integration test: `POST /api/v1/ingestion/run` with `prefix=tenant/globex/` as tenant `acme` ingests nothing outside `tenant/acme/`
+## 4. Backfill of existing data [BACKFILL] [REINDEX]
 
-## 5. Chat history and user instructions scoping
+- [ ] 4.1 [BACKFILL] Implement the one-shot migration task (Spring Boot CLI runner, per the design open question) stamping `tenant_id = 'default'`, `acl = ["tenant:everyone:default"]`, `acl_source = 'tenant-default'`, the matching `acl_version`, and `acl_synced_at` on all points in `ascendai-768` and `ascendai-1536`, in a single pass. Verify: after the run, a scroll over each collection returns zero points that carry a `tenant_id` with an absent or empty `acl`.
+- [ ] 4.2 [REINDEX] Same task: create the keyword payload index on `tenant_id` and on `acl` in each collection, and report a collection that was missing either as having been incomplete. Verify: the Qdrant collection info reports both payload indexes afterwards, and a run against a collection with only the `tenant_id` index creates the `acl` index and reports it.
+- [ ] 4.3 [BACKFILL] Same task: move MinIO objects from `markdown/` and `documents/` to `tenant/default/markdown/` and `tenant/default/documents/` (copy plus delete, idempotent, skipping already-moved keys, supporting `--direction=down`). Verify: after the run every pre-existing object is readable at its new key and absent at the old one, and a down run restores the original layout byte-for-byte.
+- [ ] 4.4 [BACKFILL] Same task, behind an optional flag: re-key existing AscendMemory entries from `{userId}` to `default:{userId}`. Verify: a search as `default:frosty` returns a memory inserted before the migration, and the same search as bare `frosty` returns nothing.
+- [ ] 4.5 Test: run the task twice against seeded stores. Verify: the second run reports zero points stamped and zero objects moved, and the end state is identical to a single run.
+- [ ] 4.6 Test: the two stamps are one step. Verify: a run that stamps `tenant_id` without the access list leaves a `default`-tenant prompt returning zero chunks, while the full run returns the pre-migration document, which is the observable reason the access-list stamp is mandatory.
 
-- [ ] 5.1 In `memory/PersistentChatMemory.java`, change key construction to `chat:{tenantId}:{userId}` (single key-builder helper; tenant segment first for future `conversationId` compatibility)
-- [ ] 5.2 In `service/user/UserInstructionService.java`, change key construction to `user:{tenantId}:{userId}:instructions`
-- [ ] 5.3 Add `tenant_id` to `ChatHistoryRepository` queries (`findRecentHistory` and writes in `persistToDb`) and to `UserInstructionService` Postgres access
-- [ ] 5.4 Test (`PersistentChatMemoryTenantTest`): same userId under two tenants — writes land on distinct Redis keys and Postgres rows; loads never mix
-- [ ] 5.5 Test: history read/write with empty tenant context throws and creates no legacy-format `chat:{userId}` key
+## 5. Read path: the composed retrieval filter
 
-## 6. AscendMemory scoping
+- [ ] 5.1 In `service/rag/RagRetrievalService.java`, build the `SearchRequest` filter as a single `FilterExpressionBuilder` expression carrying `tenant_id == currentTenant AND acl IN principalSet`, composed at the one place the request is constructed. Verify: a unit test captures the outgoing `SearchRequest` and asserts the expression contains both conjuncts, and that no code path produces an expression with only one.
+- [ ] 5.2 Throw before searching when either the tenant context or the principal set is unresolved, without degrading to a tenant-only filter. Verify: two unit tests assert the throw and assert `vectorStore.similaritySearch` received zero invocations in each case.
+- [ ] 5.3 Leave the Java-side threshold filtering and score logging untouched, so they operate on an already-permitted candidate list. Verify: the existing `rag-retrieval` threshold scenarios still pass unmodified.
+- [ ] 5.4 Add the architecture test (ArchUnit, test-scope dependency) asserting that `RagRetrievalService.performSimilaritySearch` is the only production call site of `VectorStore.similaritySearch(...)`. Verify: the test passes on the current tree, and a throwaway second call site added locally makes it fail naming that class.
+- [ ] 5.5 Integration test (Testcontainers Qdrant): cross-tenant retrieval. Verify: a `globex` prompt matching an `acme` document returns zero candidates, and the same prompt as `acme` returns them.
+- [ ] 5.6 Integration test: within-tenant refusal. Verify: a chunk of tenant `acme` with `acl = ["entra:group:finance"]` is returned to an `acme` caller holding that principal and not returned to an `acme` caller holding only `tenant:everyone:acme`.
+- [ ] 5.7 Integration test, the defining test of the model: ten chunks match the query, `topK` is 5, and the caller may read only the chunk ranked eighth. Verify: the retrieved context contains that eighth-ranked chunk. A post-filter implementation returns an empty context here, so this is the single test that tells the two designs apart.
+- [ ] 5.8 Integration test: deny by default. Verify: a chunk written with no `acl` field is returned to no caller in its tenant, including one holding every group in that tenant, and including one holding role `ADMIN`. The filter expression built for the `ADMIN` caller is identical to the one built for a caller with no roles and the same principals.
+- [ ] 5.9 Integration test pinning the library behaviour: Spring AI's `IN` operator against the keyword-array `acl` field maps to Qdrant match-any. Verify: run against a real Qdrant, not a mocked `VectorStore`, and assert a chunk whose list holds one of the caller's several principals is returned.
 
-- [ ] 6.1 In `SemanticMemoryClient`, compose outbound `user_id` as `{tenantId}:{userId}` from `TenantContext` in one private helper used by search, insert, wipe, and delete
-- [ ] 6.2 Fail closed: unresolved tenant context throws for search/wipe/delete and short-circuits with one WARN for fire-and-forget insert
-- [ ] 6.3 Test (`SemanticMemoryClientTenantTest`): assert outgoing search URL contains `user_id=acme:frosty`, insert body contains `"user_id":"acme:frosty"`, wipe body likewise; assert no request ever carries the bare userId
-- [ ] 6.4 Integration test: insert a fact as `acme:frosty`, search as `globex:frosty` — assert zero items returned
+## 6. Read path: the presign re-check
 
-## 7. Data migration for existing deployments
+- [ ] 6.1 Carry the chunk's `acl` onto `SourceRef` in `RagRetrievalService.buildSourceRefs`, so the presigner can re-check without a second Qdrant read. Verify: a unit test asserts the `SourceRef` built from a document carries the same list as the document metadata.
+- [ ] 6.2 Capture the tenant id and principal set on the request thread and pass them into the `presignAll` task-executor fan-out. Verify: an integration test issuing a request with several sources returns presigned links for all permitted ones, proving the async workers hold the context rather than throwing on it.
+- [ ] 6.3 In `service/rag/S3PresignedUrlService.java`, refuse to presign a key outside `tenant/{tenantId}/` and refuse a reference whose access list does not intersect the caller's principal set, dropping the refused reference from the result and logging one WARN with `s3://{bucket}/{key}`. Verify: the response contains no entry for the refused source at all, and every entry it does contain has a non-blank `downloadUrl` and `expiresAt`.
+- [ ] 6.4 Test (`S3PresignedUrlServiceTenantTest`): presign request for `tenant/acme/...` as tenant `globex`. Verify: refused, absent from the response, and the request still returns 200 with the remaining sources presigned.
+- [ ] 6.5 Test: within-tenant refusal. Verify: a key under `tenant/acme/` whose access list is `["entra:group:finance"]` is absent from the response for an `acme` caller holding only `tenant:everyone:acme`, and present for one holding `entra:group:finance`.
+- [ ] 6.6 Test: the presigner does not trust its caller. Verify: handing `presignAll` a reference list that never passed the retrieval filter produces the same refusals, so the check holds on a path where retrieval did not run.
+- [ ] 6.7 Test: a reference with an absent or empty access list is refused even inside the caller's own tenant prefix. Verify: no entry for it in the response.
 
-- [ ] 7.1 Implement the one-shot migration task (Spring Boot CLI runner, per design open question): stamp `tenant_id='default'` on all points in `ascendai-768` and `ascendai-1536`, create keyword payload index on `tenant_id` per collection
-- [ ] 7.2 Same task: move MinIO objects from `markdown/` and `documents/` to `tenant/default/markdown/` and `tenant/default/documents/` (copy + delete, idempotent, skips already-moved keys, supports `--direction=down`)
-- [ ] 7.3 Same task (optional flag): re-key existing AscendMemory entries from `{userId}` to `default:{userId}`
-- [ ] 7.4 Test: run the task twice against seeded stores — assert idempotence (second run is a no-op) and that a `default`-tenant search retrieves pre-migration documents
+## 7. Chat history and user instructions scoping
 
-## 8. Verification and documentation
+- [ ] 7.1 In `memory/PersistentChatMemory.java`, change key construction to `chat:{tenantId}:{userId}` through a single key-builder helper, tenant segment first for future `conversationId` compatibility. Verify: after a turn as `acme/frosty`, Redis holds `chat:acme:frosty` and holds no key of the form `chat:frosty`.
+- [ ] 7.2 In `service/user/UserInstructionService.java`, change key construction to `user:{tenantId}:{userId}:instructions`. Verify: saving instructions as `acme/frosty` writes that key, and a load as `globex/frosty` returns nothing.
+- [ ] 7.3 Add `tenant_id` to `ChatHistoryRepository` queries (`findRecentHistory` and the writes in `persistToDb`) and to `UserInstructionService` Postgres access. Verify: with rows for the same `user_id` under two tenants, a hydration for one tenant returns only that tenant's rows.
+- [ ] 7.4 Test (`PersistentChatMemoryTenantTest`): the same userId under two tenants. Verify: distinct Redis keys, distinct Postgres rows, and neither load returns the other's messages.
+- [ ] 7.5 Test: history read or write with an unresolved tenant context. Verify: the call throws and Redis contains no key of the legacy `chat:{userId}` form afterwards.
 
-- [ ] 8.1 End-to-end check against a live stack: ingest as tenant A, prompt as tenant B with `attachSources=true` — assert zero RAG hits, `sources: []`, no presigned URL for tenant A's objects, and separate chat histories
-- [ ] 8.2 Run `./gradlew build test integrationTest` clean
-- [ ] 8.3 Update `AscendAgent/AGENTS.md` (key dependencies / conventions) and `docs/architecture/` with an ADR for logical tenant isolation via mandatory discriminators
-- [ ] 8.4 Update `docs/api/request/AscendAI/` Bruno collection examples where object keys or identifiers changed shape
+## 8. AscendMemory scoping
+
+- [ ] 8.1 In `SemanticMemoryClient`, compose the outbound `user_id` as `{tenantId}:{userId}` in one private helper used by search, insert, wipe, and delete. Verify: a captured request from each of the four methods carries the composite id.
+- [ ] 8.2 Fail closed: an unresolved tenant context throws for search, wipe, and delete, and short-circuits with one WARN for the fire-and-forget insert. Verify: no HTTP request leaves the client in any of the four cases.
+- [ ] 8.3 Test (`SemanticMemoryClientTenantTest`). Verify: the search URL contains `user_id=acme:frosty`, the insert body contains `"user_id":"acme:frosty"`, the wipe body likewise, and no captured request anywhere carries the bare `frosty`.
+- [ ] 8.4 Integration test: insert a fact as `acme:frosty` and search as `globex:frosty`. Verify: zero items returned.
+
+## 9. Decision records and documentation
+
+- [ ] 9.1 Move the three drafted records from `openspec/changes/add-tenant-isolation/decisions/` into `AscendAgent/docs/architecture/decisions/` as `ADR-010`, `ADR-011`, and `ADR-012`, keeping the numbering contiguous with the existing `ADR-001` through `ADR-009`. Verify: the three files exist at their new path, the numbers do not collide, and the design's decision-records table links resolve.
+- [ ] 9.2 Update `AscendAgent/AGENTS.md` (key dependencies, code conventions) with the two-axis filter, the single search call site, and the payload contract. Verify: a reader who has only that file can name both filter conjuncts and the class that owns the search.
+- [ ] 9.3 Update the `docs/api/request/AscendAI/` Bruno collection where object keys or identifiers changed shape. Verify: every request in the collection runs green against a live stack with an `acme`-tenant token.
+
+## 10. Verification
+
+- [ ] 10.1 End-to-end check against a live stack, both axes. Verify: ingest as tenant `acme` and prompt as tenant `globex` with `attachSources=true` gives zero RAG hits, `sources: []`, and no presigned URL for any `acme` object. Then, inside `acme`, a caller outside a document's access list gets zero hits for a prompt that a caller inside it answers from that document, and the two callers' chat histories are separate.
+- [ ] 10.2 Run `./gradlew build test integrationTest` clean. Verify: green, including the architecture test from 5.4 and the pre-filter test from 5.7.

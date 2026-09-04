@@ -38,6 +38,31 @@ Every ingestion producer (Markdown, Docling, PaddleOCR, Unstructured) SHALL stam
 - **THEN** the operation fails with an error
 - **AND** no points are written to Qdrant
 
+### Requirement: Access-list metadata stamped on every ingested chunk
+
+Every ingestion producer SHALL stamp `acl`, `acl_source`, `acl_version`, and `acl_synced_at` (declared in `IngestionMetadataKeys`, contract in the `tenant-isolation` capability) on every `Document` it writes, in the same place it stamps `tenant_id`, so the two axes cannot diverge. The list SHALL be explicit: a producer SHALL NOT write a chunk with an absent or empty `acl` and rely on any later step to fill it in, because under deny-by-default that chunk is retrievable by nobody and costs storage while doing nothing.
+
+For a direct upload, where no source system holds a permission list, the producer SHALL stamp `acl` as `["tenant:everyone:{tenantId}"]` with `acl_source` of `tenant-default`. That reproduces the pre-change behaviour of a single-company deployment deliberately, as a grant visible in the payload. Narrower lists on direct uploads come from the administrator assignment surface, whose ownership is an open question in `docs/architecture/permission-aware-retrieval.md` and which is out of scope here; connector-captured lists (`sharepoint`, `google-drive`) are owned by `add-document-connectors`. Ingestion without a resolved tenant context SHALL fail before any access list is composed.
+
+#### Scenario: Uploaded document's chunks carry an explicit tenant-wide list
+
+- **WHEN** a user of tenant `acme` uploads and ingests `notes.md`
+- **THEN** every Qdrant point created for that document has `metadata.acl` equal to `["tenant:everyone:acme"]`
+- **AND** `metadata.acl_source` is `tenant-default`
+- **AND** `metadata.acl_version` is the hash of that sorted list and `metadata.acl_synced_at` is the ingest time
+
+#### Scenario: No chunk is written without an access list
+
+- **WHEN** any ingestion producer completes a run
+- **THEN** no point written by that run has an absent or empty `acl`
+- **AND** a producer that cannot compose a list fails the source rather than writing the chunk without one
+
+#### Scenario: Ingested chunk is immediately retrievable by its own tenant
+
+- **WHEN** a user of tenant `acme` uploads `notes.md` and then prompts with a query matching it
+- **THEN** retrieval returns chunks from `notes.md`
+- **AND** no migration or backfill step is required for a freshly ingested document to be retrievable
+
 ### Requirement: Manual ingestion scan scoped to the caller's tenant prefix
 
 `POST /api/v1/ingestion/run` SHALL interpret the optional `prefix` parameter relative to the caller's tenant prefix, so the effective S3 scan prefix is always `tenant/{tenantId}/` plus the supplied value. A caller SHALL NOT be able to scan or ingest objects outside its own tenant prefix, regardless of the `prefix` value supplied.

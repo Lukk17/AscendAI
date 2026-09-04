@@ -40,6 +40,20 @@ AscendAgent SHALL enforce role-based authorization in the security filter chain.
 - **WHEN** a token carrying the `ADMIN` role calls `POST /api/v1/ingestion/run`
 - **THEN** the request is authorized and the ingestion run starts
 
+### Requirement: Administrative endpoints require the ADMIN role
+
+The identity-link administration endpoints under `/api/v1/admin/**` SHALL require the `ADMIN` role. A caller holding a valid token with only the `USER` role SHALL receive HTTP 403 on every path beneath that prefix, and an unauthenticated caller SHALL receive HTTP 401.
+
+#### Scenario: USER is refused the admin surface
+
+- **WHEN** a token carrying only the `USER` role calls any path under `/api/v1/admin/`
+- **THEN** the response status is 403
+
+#### Scenario: Unauthenticated callers are refused before authorization
+
+- **WHEN** any path under `/api/v1/admin/` is called with no `Authorization` header in the secured posture
+- **THEN** the response status is 401
+
 ### Requirement: Public infrastructure and documentation endpoints under the secured posture
 
 Under the secured posture, AscendAgent SHALL permit unauthenticated access ONLY to: `/actuator/health`, `/actuator/prometheus`, `/v3/api-docs/**`, `/swagger-ui/**`, and `/swagger-ui.html`. All other actuator endpoints SHALL remain unavailable to unauthenticated callers. Swagger UI pages SHALL load without a token, but API calls issued from Swagger's "Try it out" SHALL be subject to the same 401/403 rules as any other client.
@@ -57,13 +71,19 @@ Under the secured posture, AscendAgent SHALL permit unauthenticated access ONLY 
 
 ### Requirement: Dev profile preserves the open local workflow
 
-When the Spring profile `dev` is active, AscendAgent SHALL permit all requests without a token and SHALL synthesize an identity from `app.user.default-id` carrying both `USER` and `ADMIN` roles, so local single-user runs and the Bruno collection work without an identity provider. The agent SHALL log a WARN at startup stating that authentication is disabled. The default and `docker` postures SHALL require JWTs. The legacy `app.security.enabled` flag and the `app.security.user` HTTP Basic block SHALL be removed.
+When the Spring profile `dev` is active, AscendAgent SHALL permit all requests without a token and SHALL synthesize an identity from `app.user.default-id` carrying both `USER` and `ADMIN` roles and a principal set of `tenant:everyone:default` and `local:group:dev-all`, so local single-user runs and the Bruno collection work without an identity provider and a locally-ingested corpus is actually retrievable. The agent SHALL log a WARN at startup stating that authentication is disabled. The default and `docker` postures SHALL require JWTs. The legacy `app.security.enabled` flag and the `app.security.user` HTTP Basic block SHALL be removed.
 
 #### Scenario: Dev profile accepts tokenless requests
 
 - **WHEN** the agent starts with profile `dev` and `POST /api/v1/ai/prompt` is called with no `Authorization` header
 - **THEN** the request succeeds and is processed under the `app.user.default-id` identity
 - **AND** the startup log contains a WARN that security is disabled
+
+#### Scenario: The dev identity carries a usable principal set
+
+- **WHEN** the agent starts with profile `dev` and a request is processed
+- **THEN** the synthesized identity's principal set contains `tenant:everyone:default` and `local:group:dev-all`
+- **AND** it is not empty
 
 #### Scenario: HTTP Basic path is gone
 
