@@ -135,9 +135,11 @@ graph TB
     Service --> Engine
 ```
 
-The REST handler and the MCP tool both delegate to one `OcrService` singleton. Sync engine calls run in
-`asyncio.to_thread`, so the event loop stays free for `/health`, `/ready`, `/metrics`, and concurrent requests. The
-MCP path has an SSRF guard on `http(s)://` URIs and a `realpath` jail on `file://` URIs; see
+The REST handler and the MCP tool both delegate to one `OcrService` singleton. Engine calls run in a single-worker
+`ProcessPoolExecutor` (`start_worker_pool` in [src/service/ocr_service.py](src/service/ocr_service.py)), not a
+thread, because `PaddleOCR.predict()` holds the interpreter lock long enough to stall the event loop if it ran there
+instead. That keeps `/health`, `/ready`, `/metrics`, and concurrent requests responsive while inference is in flight.
+The MCP path has an SSRF guard on `http(s)://` URIs and a `realpath` jail on `file://` URIs; see
 [ADR-001](docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md) for the policy.
 
 ---

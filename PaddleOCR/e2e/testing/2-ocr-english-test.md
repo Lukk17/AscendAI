@@ -76,7 +76,7 @@ bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local
 **Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
 
 This spec calls `ocr_service.process_file` which invokes PaddleOCR's blocking `engine.predict` inside
-`asyncio.to_thread`. PaddleOCR inference on this deployment is CPU-only, capped to the container's 4-core CPU
+the OCR worker process. PaddleOCR inference on this deployment is CPU-only, capped to the container's 4-core CPU
 allocation, and the cost splits into two figures worth keeping apart.
 
 Engine time, the `processing_time_seconds` the service reports for itself, measured 57.1 s and 72.4 s on isolated

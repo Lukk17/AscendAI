@@ -152,7 +152,7 @@ it, so deleting the bucket would break them.
 **Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
 
 The MCP path mirrors the REST path once the URL is resolved: `ocr_service.process_file` invokes PaddleOCR's
-blocking `engine.predict` inside `asyncio.to_thread`. CPU contention with another engine spec running at the same
+blocking `engine.predict` inside the OCR worker process. CPU contention with another engine spec running at the same
 moment exhausts `OCR_REQUEST_TIMEOUT=300` and the JSON-RPC envelope returns `result.isError=true` instead of the
 expected `result.content[0]` payload.
 

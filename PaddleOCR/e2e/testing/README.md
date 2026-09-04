@@ -59,7 +59,7 @@ rejected by the magic-byte sniffer. Each finishes in well under 2 seconds. Safe 
 the runner cap of 5 concurrent; the rest queue and pick up as slots free.
 
 **Engine-bound specs (2, 3, 4, 6).** These all invoke PaddleOCR's blocking `engine.predict` inside
-`asyncio.to_thread`. PaddleOCR inference on this deployment is CPU-only, capped to the container's documented
+the OCR worker process. PaddleOCR inference on this deployment is CPU-only, capped to the container's documented
 `cpus: 4.0` budget. Two numbers matter and they are not the same number. Engine time, the
 `processing_time_seconds` the service reports for itself, measured 57.1 and 72.4 seconds on isolated calls against
 the 212 KB English fixture on 2026-09-03. Full round trip is longer: 60.7 and 82.1 seconds on isolated calls the

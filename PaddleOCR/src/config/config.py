@@ -32,12 +32,18 @@ class Settings(BaseSettings):
     API_PORT: int = Field(default=7022)
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
     LOG_FORMAT: Literal["json", "color"] = Field(default="json")
-    DEFAULT_LANGUAGE: str = Field(default="en", pattern=r"^[a-z]{2,5}$")
+    # Upper bound of 6 accommodates "korean", the longest code PaddleOCR's own model
+    # resolution table (paddleocr._pipelines.ocr.PaddleOCR._get_ocr_model_names) accepts
+    # among the codes this service declares supported.
+    DEFAULT_LANGUAGE: str = Field(default="en", pattern=r"^[a-z]{2,6}$")
     MAX_FILE_SIZE_MB: int = Field(default=50, ge=1, le=1024)
     OCR_REQUEST_TIMEOUT: float = Field(default=120.0, gt=0)
     ENGINE_CACHE_MAX_SIZE: int = Field(default=8, ge=1)
+    # "japan" and "korean" are PaddleOCR's own codes for those two languages, not the
+    # ISO two-letter "ja"/"ko": the engine's model resolution table (see comment on
+    # DEFAULT_LANGUAGE above) returns no model for "ja"/"ko" and raises immediately.
     SUPPORTED_LANGUAGES: CsvTuple = Field(
-        default=("en", "pl", "de", "fr", "es", "it", "pt", "nl", "ru", "ch", "ja", "ko")
+        default=("en", "pl", "de", "fr", "es", "it", "pt", "nl", "ru", "ch", "japan", "korean")
     )
 
     MCP_FILE_URI_ROOT: str | None = Field(default=None)

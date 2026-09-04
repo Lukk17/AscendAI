@@ -53,7 +53,7 @@ sequenceDiagram
     participant MCP as ocr_process (mcp_server.py)
     participant Guard as _validate_host
     participant ObjectStore as Object store :9070 (host.docker.internal)
-    participant Thread as Thread pool (asyncio.to_thread)
+    participant Pool as OCR worker process (ProcessPoolExecutor)
     participant Engine as PaddleOCR engine (OcrService)
 
     Agent->>MCP: tools/call ocr_process(file_uri="http://host.docker.internal:9070/bucket/img.png", lang="en")
@@ -61,11 +61,11 @@ sequenceDiagram
     Guard->>Guard: "host.docker.internal" in MCP_ALLOWED_HOSTS → skip IP check
     MCP->>ObjectStore: GET http://host.docker.internal:9070/bucket/img.png (allow_redirects=False)
     ObjectStore-->>MCP: 200 image bytes (streamed in 64 KB chunks, size checked)
-    MCP->>Thread: asyncio.to_thread(ocr_service.process_file, bytes, "img.png", "en")
-    Thread->>Engine: _get_engine("en") → LRU hit (warm since lifespan)
+    MCP->>Pool: run_in_executor(get_process_pool(), run_ocr_in_worker, bytes, "img.png", "en")
+    Pool->>Engine: _get_engine("en") → LRU hit (warm since lifespan)
     Engine->>Engine: write tempfile → engine.predict → delete tempfile
-    Engine-->>Thread: OcrJsonResponse(schema_version="1", pages=[...])
-    Thread-->>MCP: OcrJsonResponse
+    Engine-->>Pool: OcrJsonResponse(schema_version="1", pages=[...])
+    Pool-->>MCP: OcrJsonResponse
     MCP-->>Agent: JSON-RPC result {content:[{type:"text",text:"{...}"}]}
 ```
 

@@ -21,8 +21,8 @@
 
 | Variable                          | Default                                       | Purpose                                                                                  |
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| DEFAULT_LANGUAGE                  | `en`                                          | Engine warmed during lifespan. Pattern `[a-z]{2,5}`.                                     |
-| SUPPORTED_LANGUAGES               | `en,pl,de,fr,es,it,pt,nl,ru,ch,ja,ko`         | Allowlist enforced by `OcrService._get_engine`.                                          |
+| DEFAULT_LANGUAGE                  | `en`                                          | Engine warmed during lifespan. Pattern `[a-z]{2,6}`.                                     |
+| SUPPORTED_LANGUAGES               | `en,pl,de,fr,es,it,pt,nl,ru,ch,japan,korean`  | Allowlist enforced by `OcrService._get_engine`.                                          |
 | ENGINE_CACHE_MAX_SIZE             | `8`                                           | LRU eviction kicks in past this language count.                                          |
 | MAX_FILE_SIZE_MB                  | `50`                                          | Caps REST upload and MCP download.                                                       |
 

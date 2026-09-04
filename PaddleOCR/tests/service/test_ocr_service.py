@@ -1,3 +1,4 @@
+from concurrent.futures.process import BrokenProcessPool
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -358,6 +359,25 @@ class TestWorkerPoolLifecycle:
             )
             mock_pool.submit.assert_called_once_with(_noop_task)
             mock_pool.submit.return_value.result.assert_called_once()
+            assert ocr_service_module._process_pool is mock_pool
+
+    @patch("src.service.ocr_service.multiprocessing")
+    @patch("src.service.ocr_service.ProcessPoolExecutor")
+    def test_start_worker_pool_survives_broken_initializer(self, mock_executor_class, mock_multiprocessing):
+        # Given. A warm-up failure inside _warm_worker_engine (the pool initializer)
+        # surfaces here as BrokenProcessPool when the blocking .result() call is
+        # awaited, not as the original exception.
+        mock_pool = MagicMock()
+        mock_pool.submit.return_value.result.side_effect = BrokenProcessPool("initializer failed")
+        mock_executor_class.return_value = mock_pool
+        mock_multiprocessing.get_context.return_value = MagicMock()
+
+        # When / Then — must not propagate: a startup exception here would kill the
+        # FastAPI lifespan and crash the container instead of leaving /ready to report
+        # not-ready.
+        with patch.object(ocr_service_module, "_process_pool", None):
+            start_worker_pool()
+
             assert ocr_service_module._process_pool is mock_pool
 
     def test_stop_worker_pool_shuts_down_existing_pool(self):

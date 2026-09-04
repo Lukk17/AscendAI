@@ -19,7 +19,9 @@ class OcrPageResult(BaseModel):
 class OcrJsonResponse(BaseModel):
     schema_version: Literal["1"] = SCHEMA_VERSION
     filename: str = Field(max_length=512)
-    language: str = Field(pattern=r"^[a-z]{2,5}$")
+    # Upper bound of 6 accommodates "korean", the longest PaddleOCR-native language
+    # code this service declares supported (see config.SUPPORTED_LANGUAGES).
+    language: str = Field(pattern=r"^[a-z]{2,6}$")
     pages: list[OcrPageResult]
     processing_time_seconds: float = Field(ge=0.0)
 

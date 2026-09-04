@@ -1,6 +1,6 @@
 # PaddleOCR load profiles
 
-Driven by the api-tester audit recommendation: find the breaking point of the `asyncio.to_thread` boundary
+Driven by the api-tester audit recommendation: find the breaking point of the OCR worker process boundary
 introduced when `process_ocr` was switched off the event loop.
 
 ## k6 ramp
@@ -24,5 +24,5 @@ Override fixture path with `FIXTURE_PATH`.
 - p95 `http_req_duration` < 30s at the 20-VU plateau (well under `OCR_REQUEST_TIMEOUT=120s`).
 - 5xx rate < 1% at the 20-VU plateau.
 
-A run that fails either threshold means the event-loop / thread-pool fix has regressed. Compare against the
+A run that fails either threshold means the event-loop offload fix has regressed. Compare against the
 last green run baseline.

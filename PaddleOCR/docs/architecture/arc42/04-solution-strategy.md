@@ -16,22 +16,29 @@ FastAPI's own routes fall through to the MCP ASGI app, so the two surfaces co-ex
 
 ---
 
-### Model warm-up in lifespan
+### Model warm-up in the OCR worker process
 
 PaddleOCR's first OCR call per language triggers model loading, which takes 5-15 seconds on CPU. Doing that during
-the first real request would make it appear to hang. Instead, `ocr_service.warm_up_engine(settings.DEFAULT_LANGUAGE)`
-runs inside the FastAPI lifespan at startup (`src/main.py:29`). The `/ready` endpoint reflects `engine_warm` as soon
-as the load completes. Until then, `/ready` returns `{"status": "not-ready"}` and a load balancer can hold traffic.
-See [ADR-004](../decisions/ADR-004-liveness-readiness-split.md).
+the first real request would make it appear to hang, and doing it in the main process would hold a second, unused
+copy of the model (~316 MiB) for the container's whole life, since inference always runs in the separate OCR worker
+process (see the next section). Instead, `ocr_service.warm_up_engine(settings.DEFAULT_LANGUAGE)` runs as the worker
+pool's initializer, inside that worker process, and `start_worker_pool()` (`src/main.py`'s lifespan) blocks at
+startup until it completes. The `/ready` endpoint reflects `engine_warm` by reading the worker's own warm-up signal
+across the process boundary, not by warming anything itself. Until the worker reports warm, `/ready` returns
+`{"status": "not-ready"}` and a load balancer can hold traffic. See
+[ADR-004](../decisions/ADR-004-liveness-readiness-split.md).
 
 ---
 
-### OCR offloaded to a thread pool
+### OCR offloaded to a worker process pool
 
-`PaddleOCR.predict()` is CPU-bound and synchronous. Running it directly on the async event loop would block all
-other in-flight requests. Both the REST endpoint and the MCP tool wrap the call in `asyncio.to_thread(...)` with a
-configurable timeout (`OCR_REQUEST_TIMEOUT`, default 120 s). This keeps the event loop free for health probes and
-concurrent HTTP sessions during a long OCR job.
+`PaddleOCR.predict()` is CPU-bound, synchronous, and holds the GIL almost continuously for the entire call. Running it
+directly on the async event loop, or even via `asyncio.to_thread`, would freeze that event loop for the call's whole
+duration. Both the REST endpoint and the MCP tool instead submit the call to a single-worker `ProcessPoolExecutor`
+(`start_worker_pool` in `src/service/ocr_service.py`) via `loop.run_in_executor(get_process_pool(), ...)`, wrapped in
+`asyncio.wait_for` with a configurable timeout (`OCR_REQUEST_TIMEOUT`, default 120 s). Running inference in a
+separate OS process, with its own GIL, keeps the event loop free for health probes and concurrent HTTP sessions
+during a long OCR job.
 
 ---
 

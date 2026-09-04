@@ -32,6 +32,15 @@ class TestSettingsDefaults:
         # Then
         assert Settings().ENGINE_CACHE_MAX_SIZE == 8
 
+    def test_default_supported_languages_uses_paddleocr_native_codes(self):
+        # Then. "japan"/"korean" are PaddleOCR's own codes for those languages. The
+        # ISO two-letter "ja"/"ko" resolve to no model in the engine's own lookup table.
+        languages = Settings().SUPPORTED_LANGUAGES
+        assert "japan" in languages
+        assert "korean" in languages
+        assert "ja" not in languages
+        assert "ko" not in languages
+
     def test_default_mcp_file_uri_root_unset(self):
         # Then
         assert Settings().MCP_FILE_URI_ROOT is None
@@ -115,6 +124,21 @@ class TestSettingsValidation:
     def test_invalid_language_pattern_rejected(self, monkeypatch):
         # Given
         monkeypatch.setenv("DEFAULT_LANGUAGE", "../etc")
+
+        # Then
+        with pytest.raises(ValueError):
+            Settings()
+
+    def test_six_letter_default_language_accepted(self, monkeypatch):
+        # Given. "korean" is the longest PaddleOCR-native code this service supports.
+        monkeypatch.setenv("DEFAULT_LANGUAGE", "korean")
+
+        # Then
+        assert Settings().DEFAULT_LANGUAGE == "korean"
+
+    def test_seven_letter_default_language_rejected(self, monkeypatch):
+        # Given
+        monkeypatch.setenv("DEFAULT_LANGUAGE", "abcdefg")
 
         # Then
         with pytest.raises(ValueError):

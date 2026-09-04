@@ -20,7 +20,7 @@ if they become a source of debate or migration planning.
 
 | Decision | Where it lives | Why not an ADR yet |
 | :--- | :--- | :--- |
-| `asyncio.to_thread` for OCR offload | `rest_endpoints.py:34`, `mcp_server.py:66` | Uncontroversial for a CPU-bound library; no alternative was seriously evaluated. |
+| Single-worker `ProcessPoolExecutor` for OCR offload | `ocr_service.py:180-224` (`start_worker_pool`), `rest_endpoints.py:55-57`, `mcp_server.py:116-118` | Replaced an earlier `asyncio.to_thread` offload after that approach held the interpreter lock long enough to stall `/health` and `/ready` under load. Worth an ADR if the worker count or start method ever needs to change. |
 | `OrderedDict` as the LRU structure | `ocr_service.py:20` | Standard Python idiom; no external cache dependency considered. |
 | Two-stage Docker build with pre-cached models | `Dockerfile:1-59` | Build-time model baking is common for ML services; no alternative was proposed. |
 | Non-root container user (`appuser`) | `Dockerfile:41-53` | Standard hardening; no decision moment. |

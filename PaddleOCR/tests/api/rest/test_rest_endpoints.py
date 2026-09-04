@@ -1,5 +1,6 @@
 import io
-from unittest.mock import MagicMock, patch
+from concurrent.futures.process import BrokenProcessPool
+from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -10,13 +11,24 @@ from src.main import create_app
 from tests.conftest import PDF_MAGIC_BYTES, PNG_MAGIC_BYTES, OcrResponseFactory
 
 
+class _BrokenExecutor:
+    """Stands in for a real ProcessPoolExecutor whose pool initializer failed.
+
+    concurrent.futures marks the whole pool broken in that case, so every subsequent
+    submission raises BrokenProcessPool synchronously, which is what loop.run_in_executor
+    calls under the hood.
+    """
+
+    def submit(self, *_args: object, **_kwargs: object) -> None:
+        raise BrokenProcessPool("worker pool is broken")
+
+
 @pytest.fixture
 def app():
-    with patch("src.main.ocr_service") as mock_service:
-        mock_service.warm_up_engine = MagicMock()
-        test_app = create_app()
-
-        yield test_app
+    # create_app() never touches ocr_service at call time: the engine warm-up only
+    # runs inside the OCR worker process, once the ASGI lifespan actually starts it,
+    # which none of these tests drive (see _stub_process_pool below).
+    return create_app()
 
 
 @pytest.fixture
@@ -49,11 +61,8 @@ class TestHealthEndpoint:
 
 
 class TestReadyEndpoint:
-    @patch("src.main.ocr_service")
-    async def test_ready_returns_not_ready_when_engine_cold(self, mock_service, client):
-        # Given
-        mock_service._engines = {}
-
+    @patch("src.main.is_engine_warm", return_value=False)
+    async def test_ready_returns_not_ready_when_engine_cold(self, mock_is_warm, client):
         # When
         response = await client.get("/ready")
 
@@ -61,18 +70,17 @@ class TestReadyEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "not-ready"
         assert response.json()["engine_warm"] is False
+        mock_is_warm.assert_called_once_with(settings.DEFAULT_LANGUAGE)
 
-    @patch("src.main.ocr_service")
-    async def test_ready_returns_ready_when_engine_warm(self, mock_service, client):
-        # Given
-        mock_service._engines = {settings.DEFAULT_LANGUAGE: object()}
-
+    @patch("src.main.is_engine_warm", return_value=True)
+    async def test_ready_returns_ready_when_engine_warm(self, mock_is_warm, client):
         # When
         response = await client.get("/ready")
 
         # Then
         assert response.json()["status"] == "ready"
         assert response.json()["engine_warm"] is True
+        mock_is_warm.assert_called_once_with(settings.DEFAULT_LANGUAGE)
 
 
 class TestMetricsEndpoint:
@@ -83,10 +91,16 @@ class TestMetricsEndpoint:
         # Then
         assert response.status_code == 200
         body = response.text
-        # prometheus_client emits process_* on Linux and python_* on Windows/macOS;
-        # either prefix confirms the default collector is active.
-        assert "process_" in body or "python_" in body
+        # PROMETHEUS_MULTIPROC_DIR (set in src/__init__.py) makes prometheus-fastapi-
+        # instrumentator serve this endpoint through prometheus_client's
+        # MultiProcessCollector, which merges every process's own file so that
+        # counters incremented in the OCR worker process reach this response too.
+        # That collector only reads the value files backing user-defined Counter /
+        # Histogram / Summary metrics, so the built-in process_*/python_* collectors,
+        # which compute their values live and were never written to a file, are
+        # correctly absent here rather than a sign the endpoint is broken.
         assert "paddleocr_ocr_requests_total" in body
+        assert "http_" in body
 
 
 class TestSecurityHeaders:
@@ -191,6 +205,26 @@ class TestOcrEndpoint:
         # Then
         assert response.status_code == 400
         assert response.json()["code"] == "FILE_TOO_LARGE"
+
+    async def test_broken_worker_pool_returns_500_not_a_crash(self, app):
+        # Given. Simulates get_process_pool() returning a pool whose initializer failed
+        # at startup (see start_worker_pool's BrokenProcessPool handling in
+        # ocr_service.py): the whole pool is broken, so a real request against it must
+        # surface as a handled 500 through the global exception handler, not propagate
+        # unhandled. raise_app_exceptions=False mirrors how a real ASGI server behaves:
+        # it hands the already-generated response to the caller instead of re-raising
+        # for local traceback visibility, which is httpx's own test-only default.
+        transport = ASGITransport(app=app, raise_app_exceptions=False)
+        async with AsyncClient(transport=transport, base_url="http://test") as broken_pool_client:
+            with patch("src.api.rest.rest_endpoints.get_process_pool", return_value=_BrokenExecutor()):
+                response = await broken_pool_client.post(
+                    "/v1/ocr",
+                    files={"file": ("test.png", io.BytesIO(PNG_MAGIC_BYTES), "image/png")},
+                )
+
+        # Then
+        assert response.status_code == 500
+        assert response.json()["code"] == "INTERNAL_ERROR"
 
     async def test_missing_file_returns_422(self, client):
         # When

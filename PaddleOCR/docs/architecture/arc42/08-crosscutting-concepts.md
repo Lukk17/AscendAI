@@ -33,14 +33,16 @@ The service follows a consistent pattern for CPU-bound work:
 
 ```
 asyncio.wait_for(
-    asyncio.to_thread(blocking_call, ...),
+    loop.run_in_executor(get_process_pool(), blocking_call, ...),
     timeout=settings.OCR_REQUEST_TIMEOUT,
 )
 ```
 
-Both `rest_endpoints.py:34-37` and `mcp_server.py:66-69` use this pattern. The event loop stays free during OCR.
-The `aiohttp.ClientSession` in the MCP module is created once in `mcp_lifespan` and reused across all calls, avoiding
-the per-request connection overhead that comes from creating a new session per tool call.
+Both `rest_endpoints.py:55-57` and `mcp_server.py:116-118` use this pattern. `PaddleOCR.predict()` holds the
+interpreter lock for the whole call, so the blocking work runs in the single-worker `ProcessPoolExecutor` started by
+`start_worker_pool` (`src/service/ocr_service.py`), not in a thread. The main process's event loop stays free during
+OCR. The `aiohttp.ClientSession` in the MCP module is created once in `mcp_lifespan` and reused across all calls,
+avoiding the per-request connection overhead that comes from creating a new session per tool call.
 
 ---
 

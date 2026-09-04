@@ -17,8 +17,9 @@ from src.config.config import settings
 from src.config.logging_config import get_uvicorn_log_config, setup_logging
 from src.config.startup_banner import log_startup_banner
 from src.model.ocr_models import HealthResponse, ReadinessResponse
+from src.observability.metrics import is_engine_warm
 from src.observability.tracing import configure_tracing
-from src.service.ocr_service import ocr_service, start_worker_pool, stop_worker_pool
+from src.service.ocr_service import start_worker_pool, stop_worker_pool
 
 logger = logging.getLogger("uvicorn")
 
@@ -32,7 +33,9 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.info("Starting PaddleOCR service")
-        ocr_service.warm_up_engine(settings.DEFAULT_LANGUAGE)
+        # The engine warms inside the OCR worker process, the one that actually serves
+        # inference (see start_worker_pool). Warming a second engine here, in the main
+        # process, would just hold ~316 MiB it never uses for the life of the container.
         start_worker_pool()
 
         async with AsyncExitStack() as stack:
@@ -61,7 +64,10 @@ def create_app() -> FastAPI:
 
     @fastapi_app.get("/ready")
     def readiness_check() -> ReadinessResponse:
-        engine_warm = settings.DEFAULT_LANGUAGE in ocr_service._engines
+        # Reads the worker process's own warm-up signal (see is_engine_warm) rather
+        # than triggering one: an orchestrator polling /ready must never itself cause
+        # a warm-up, or it would keep the service permanently busy.
+        engine_warm = is_engine_warm(settings.DEFAULT_LANGUAGE)
         status: Literal["ready", "not-ready"] = "ready" if engine_warm else "not-ready"
 
         return ReadinessResponse(status=status, version=SERVICE_VERSION, engine_warm=engine_warm)

@@ -120,6 +120,18 @@ class TestOcrJsonResponse:
                 processing_time_seconds=1.0,
             )
 
+    def test_six_letter_korean_language_accepted(self):
+        # When. "korean" is PaddleOCR's own code, the longest one this service supports.
+        response = OcrJsonResponse(
+            filename="x.png",
+            language="korean",
+            pages=[],
+            processing_time_seconds=1.0,
+        )
+
+        # Then
+        assert response.language == "korean"
+
 
 class TestHealthResponse:
     def test_creation(self):

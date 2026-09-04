@@ -6,13 +6,14 @@ import time
 from collections import OrderedDict
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from typing import Any, cast
 
 from paddleocr import PaddleOCR
 
 from src.config.config import settings
 from src.config.cpu_limits import apply_cpu_thread_limit
-from src.config.logging_config import get_logger
+from src.config.logging_config import get_logger, setup_logging
 from src.model.ocr_models import OcrJsonResponse, OcrPageResult, OcrTextLine
 from src.observability.metrics import (
     ENGINE_CACHE_EVICTIONS_TOTAL,
@@ -23,8 +24,16 @@ from src.observability.tracing import configure_worker_tracing, extract_trace_co
 logger = get_logger(__name__)
 tracer = get_tracer()
 # Runs once per process (main process and each spawned worker re-import this module
-# fresh) and before _get_engine() ever constructs a PaddleOCR instance, so the cap is
-# in place before any thread pool it configures gets created.
+# fresh). setup_logging() must run first, because a spawned worker is a fresh
+# interpreter that never executes create_app()'s own setup_logging() call. Without this,
+# its root logger has no handler, so every log call the worker makes is silently
+# dropped instead of reaching the container's log stream, including
+# apply_cpu_thread_limit()'s own line, since that call happens right here at import
+# time, before the pool initializer (_warm_worker_engine) ever runs.
+# apply_cpu_thread_limit() must then run before _get_engine() ever constructs a
+# PaddleOCR instance, so the cap is in place before any thread pool it configures gets
+# created.
+setup_logging()
 apply_cpu_thread_limit()
 
 _SAFE_EXT_PATTERN = re.compile(r"^\.[A-Za-z0-9]{1,8}$")
@@ -187,7 +196,18 @@ def start_worker_pool() -> None:
     # ProcessPoolExecutor only starts its worker(s) lazily on the first submitted
     # task, so force that here and block until the initializer above has finished
     # warming the default-language engine, matching today's synchronous startup cost.
-    _process_pool.submit(_noop_task).result()
+    try:
+        _process_pool.submit(_noop_task).result()
+    except BrokenProcessPool:
+        # The initializer (_warm_worker_engine) raised, so the pool considers itself
+        # broken and every future submission will raise this same exception. Log and
+        # return instead of letting it propagate: this runs from the FastAPI lifespan,
+        # and a startup exception there kills the whole container before /health or
+        # /ready can ever answer. Leaving it unwarm here is enough — is_engine_warm()
+        # never observed a successful warm-up, so /ready honestly reports not-ready,
+        # and a real OCR request against the broken pool surfaces as a handled 500
+        # via the global exception handler rather than a crash.
+        logger.exception("OCR worker pool failed to warm up; the pool is unusable until the process restarts")
 
 
 def stop_worker_pool() -> None:

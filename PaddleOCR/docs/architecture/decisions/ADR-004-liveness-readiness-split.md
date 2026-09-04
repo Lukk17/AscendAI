@@ -22,17 +22,21 @@ The only failure mode is "the process is wedged so badly it can't respond at all
 
 ### `/ready` — readiness
 
-Returns `{"status": "ready" | "not-ready", "version": "...", "engine_warm": bool}`. The `engine_warm` flag is `true` iff `ocr_service._engines` contains the default language. Returns 200 OK in both cases; consumers decide whether to route traffic based on `status`.
+Returns `{"status": "ready" | "not-ready", "version": "...", "engine_warm": bool}`. The `engine_warm` flag is `true` iff `is_engine_warm(settings.DEFAULT_LANGUAGE)` (`src/observability/metrics.py`) finds a recorded `ENGINE_WARMUP_DURATION_SECONDS` observation for that language. Returns 200 OK in both cases; consumers decide whether to route traffic based on `status`.
 
-This is what a Kubernetes `readinessProbe` should hit. While `engine_warm=false`, the load balancer removes the pod from the rotation. Once the warm-up completes (during the lifespan `warm_up_engine` call), the next probe sees `ready` and the pod gets traffic.
+This is what a Kubernetes `readinessProbe` should hit. While `engine_warm=false`, the load balancer removes the pod from the rotation. Once the warm-up completes, the next probe sees `ready` and the pod gets traffic.
+
+The engine actually warms inside the OCR worker process (a separate `ProcessPoolExecutor` process, see `start_worker_pool` in `src/service/ocr_service.py`), not in the main process that answers `/ready`. `/ready` cannot read that worker's in-memory state directly, so it crosses the process boundary the same way the engine-cache eviction counter already does: the worker's `warm_up_engine` call observes `ENGINE_WARMUP_DURATION_SECONDS` into its own file under `PROMETHEUS_MULTIPROC_DIR`, and `is_engine_warm` reads that file back via `MultiProcessCollector` instead of polling the worker or triggering a warm-up itself. `observe()` only runs after the engine builds successfully, so a warm-up that is still pending or that failed both read back as `engine_warm=false`, with no separate failure flag needed.
 
 ### Why not a synthetic OCR probe in `/ready`
 
 The first considered option was to do a tiny synthetic OCR run on a 1×1 bundled PNG in `/ready`. Rejected because:
 
 - It costs ~50–100 ms per probe. Kubernetes default probe interval is 10 s; that's a real CPU hit for a probe.
-- It doesn't add signal beyond `engine_warm`. The engine either loaded successfully (predict will work) or it didn't (the warm-up call would have raised, lifespan would have failed, the container would be in restart loop, `/health` would be unreachable).
+- It doesn't add signal beyond `engine_warm`. The engine either loaded successfully (predict will work) or it didn't.
 - It introduces a subtle race: `/ready` could pass while a different language's engine is mid-load. The flag-based check avoids that.
+
+A warm-up failure inside the worker's pool initializer surfaces to the main process as `concurrent.futures.process.BrokenProcessPool` when `start_worker_pool` waits on the initializing task's result. The main process catches that specific exception, logs it, and continues starting instead of letting it propagate out of the FastAPI lifespan, which would otherwise kill the container before `/health` or `/ready` ever answered. `/ready` then reports `not-ready` forever for that process (no observation was ever recorded), and a real OCR request against the now-broken pool surfaces as a handled `500 INTERNAL_ERROR` through the existing global exception handler rather than an unhandled crash.
 
 ## Consequences
 
@@ -58,6 +62,9 @@ The first considered option was to do a tiny synthetic OCR run on a 1×1 bundled
 
 - `PaddleOCR/src/main.py` — `health_check`, `readiness_check`.
 - `PaddleOCR/src/model/ocr_models.py` — `HealthResponse`, `ReadinessResponse`.
+- `PaddleOCR/src/observability/metrics.py` — `is_engine_warm`, the multiprocess-file readiness check.
+- `PaddleOCR/src/service/ocr_service.py` — `start_worker_pool`, `_warm_worker_engine`, the `BrokenProcessPool` handling.
 - `PaddleOCR/src/config/startup_banner.py` — emits both URLs at startup.
-- `PaddleOCR/tests/api/rest/test_rest_endpoints.py` — `TestReadyEndpoint`.
+- `PaddleOCR/tests/api/rest/test_rest_endpoints.py` — `TestReadyEndpoint`, `test_broken_worker_pool_returns_500_not_a_crash`.
+- `PaddleOCR/tests/observability/test_metrics.py` — `TestIsEngineWarm`.
 - `PaddleOCR/Dockerfile` — `HEALTHCHECK` points at `/health`, not `/ready`.
