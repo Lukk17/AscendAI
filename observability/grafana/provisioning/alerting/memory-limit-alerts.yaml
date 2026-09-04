@@ -1,0 +1,50 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: container-memory-limits
+    folder: AscendAI Alerts
+    interval: 1m
+    rules:
+      - uid: container-memory-near-limit
+        title: Container memory near limit
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: container_memory_used_bytes{name!=""} / container_memory_limit_bytes{name!=""}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0.85
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: last
+                  type: query
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: Container {{ $labels.name }} is above 85% of its configured memory limit
+          description: Container {{ $labels.name }} has stayed above 85% of its deploy.resources.limits.memory ceiling for 5 minutes. It is at risk of being OOM-killed by the container runtime. Compare against the limit set in docker-compose.yaml and check docker stats for the container.

@@ -172,6 +172,72 @@
       ],
       "title": "Python RSS Memory",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Per-container memory used as a fraction of its deploy.resources.limits.memory ceiling, from the container metrics exporter (container_memory_used_bytes / container_memory_limit_bytes). This is the container's total memory footprint, unlike the JVM heap and Python RSS panels above which only see part of the process. Containers without a configured limit report a value near zero here, not 100%. Yellow crosses at 70%, red at 90%, ahead of the runtime killing the container for exceeding its limit.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "percentunit",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.7 },
+              { "color": "red", "value": 0.9 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+      "id": 9,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "container_memory_used_bytes{name!=\"\"} / container_memory_limit_bytes{name!=\"\"}",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Container Memory Used vs Limit",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Number of times each container's start timestamp changed in the last 15 minutes (the container metrics exporter's container_start_time_seconds), i.e. it restarted. A restart alone does not confirm an out-of-memory kill. Cross-check with `docker inspect <container> --format '{{.State.ExitCode}} {{.State.OOMKilled}}'`: exit 137 with OOMKilled=true means the container runtime killed it for exceeding deploy.resources.limits.memory; exit 3 with OOMKilled=false on a JVM service means the JVM itself terminated via -XX:+ExitOnOutOfMemoryError before the cgroup limit was hit.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {},
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 35 },
+      "id": 10,
+      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "changes(container_start_time_seconds{name!=\"\"}[15m])",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Container Restarts (15m)",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",

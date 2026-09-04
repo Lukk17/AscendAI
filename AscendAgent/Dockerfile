@@ -24,6 +24,8 @@ USER app
 
 EXPOSE 9917
 
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
+
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:9917/actuator/health || exit 1
 

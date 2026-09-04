@@ -36,6 +36,12 @@ services:
     restart: unless-stopped
     ports:
       - "9080:8000"
+    # Memory sized from measured usage: all-time peak observed at 2.23 GiB
+    # (docker stats, 2026-09-04). 3G keeps roughly 35% headroom over that peak.
+    deploy:
+      resources:
+        limits:
+          memory: 3G
     networks:
       default:
         aliases:
@@ -142,6 +148,17 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    # Memory sized from measured usage: peak observed at 831 MiB over 14h
+    # (docker stats, 2026-09-04). 3G is deliberately generous headroom above
+    # that steady state for a large document ingest, since the multipart
+    # ceiling is 100 MB and the PDF path materialises every page as a
+    # separate byte array held simultaneously. The Dockerfile's
+    # JAVA_TOOL_OPTIONS pins heap to 70% of this limit, so raising or
+    # lowering this value moves the heap ceiling with it.
+    deploy:
+      resources:
+        limits:
+          memory: 3G
 
   ascend-memory:
     build:
@@ -181,14 +198,18 @@ services:
       timeout: 5s
       start_period: 300s
       retries: 3
+    # Memory sized from measured usage: this container is a thin REST/MCP
+    # proxy to external Qdrant and embedding APIs, no local model loading,
+    # observed at ~85M steady state (docker stats, 2026-09-04). 512M/128M
+    # keeps roughly 4-6x headroom over that baseline.
     deploy:
       resources:
         limits:
           cpus: "1.5"
-          memory: 1024M
+          memory: 512M
         reservations:
           cpus: "0.25"
-          memory: 256M
+          memory: 128M
     security_opt:
       - no-new-privileges:true
     read_only: false
@@ -211,6 +232,14 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=weather-mcp
       - OTEL_RESOURCE_ATTRIBUTES=service.version=1.0.0
+    # Memory sized from measured usage: peak observed at 374 MiB over 24h
+    # (docker stats, 2026-09-04). The Dockerfile already pins heap to 70% of
+    # this limit via JAVA_TOOL_OPTIONS, so this value and that heap setting
+    # move together.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       default:
         aliases:
@@ -268,6 +297,36 @@ services:
           - audio-scribe
 
   # ─── Observability stack ───
+
+  # Exposes per-container memory used vs. the deploy.resources.limits.memory
+  # ceiling (container_memory_used_bytes / container_memory_limit_bytes) to
+  # Prometheus, since neither JVM heap metrics nor Python RSS metrics see the
+  # container's cgroup limit or its own non-heap overhead. First-party
+  # exporter (source in observability/container-metrics-exporter/): cAdvisor
+  # was tried first and rejected because Docker Desktop's containerd-backed
+  # image store never populates the legacy overlayfs layerdb metadata
+  # cAdvisor's docker handler requires, so it silently reports only the host
+  # root cgroup. This exporter reads only the Docker Engine API stats
+  # endpoint over the socket, so it needs no /sys or /var/lib/docker mount
+  # and no privileged mode, only group-read access to the socket.
+  container-metrics-exporter:
+    build:
+      context: ./observability/container-metrics-exporter
+    container_name: container-metrics-exporter
+    hostname: container-metrics-exporter
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/metrics', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      default:
+        aliases:
+          - container-metrics-exporter
 
   prometheus:
     image: prom/prometheus:v2.55.1

@@ -62,6 +62,14 @@ scrape_configs:
       - target_label: service
         replacement: ascend-paddle-ocr
 
+  # ─── Container runtime (cgroup memory vs. limit) ───
+
+  - job_name: container-metrics-exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - container-metrics-exporter:8080
+
   # ─── Data stores (native metrics) ───
 
   - job_name: qdrant
