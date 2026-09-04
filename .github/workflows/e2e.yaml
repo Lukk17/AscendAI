@@ -1,0 +1,318 @@
+name: E2E (free specs)
+
+# Never on pull_request: every job here boots a live docker-compose stack,
+# which a PR from an untrusted fork should not be able to trigger. Runs on
+# merges to master, on a nightly schedule, and on demand.
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  weather-mcp:
+    name: e2e / weather-mcp (7 of 7 free specs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start weather-mcp
+        run: docker compose up -d --build weather-mcp
+
+      # weather-mcp has no compose healthcheck (confirmed absent from
+      # docker-compose.yaml), so wait on the actuator endpoint directly.
+      - name: Wait for weather-mcp health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:9998/actuator/health | grep -q '"status":"UP"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::weather-mcp did not become healthy in time"
+          docker logs weather-mcp
+          exit 1
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      - name: Run free e2e specs
+        working-directory: docs/api/request/AscendAI
+        run: |
+          set -euo pipefail
+
+          open_session() {
+            curl -fsS -i -X POST "http://localhost:9998/mcp" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}' \
+              | grep -i '^Mcp-Session-Id:' | tr -d '\r' | awk '{print $2}'
+          }
+
+          # Spec 1: invalid-input
+          SID=$(open_session)
+          bru run "weather-mcp/invalid-blank-city.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "weather-mcp/invalid-crlf-city.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "weather-mcp/invalid-country-code.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 2: current-structured-contract
+          SID=$(open_session)
+          bru run "weather-mcp/list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "weather-mcp/current-warsaw.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 3: current-city-not-found
+          SID=$(open_session)
+          bru run "weather-mcp/current-not-found.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 4: forecast-happy-path
+          SID=$(open_session)
+          bru run "weather-mcp/forecast-warsaw-3d.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 5: air-quality-happy-path
+          SID=$(open_session)
+          bru run "weather-mcp/air-quality-warsaw.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 6: geocode-multiple-candidates
+          SID=$(open_session)
+          bru run "weather-mcp/geocode-springfield.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 7: current-country-code-disambiguation. The spec's own Reset
+          # state requires a cold geocoding cache, so restart the container
+          # between the previous specs and this one.
+          docker restart weather-mcp
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:9998/actuator/health | grep -q '"status":"UP"' && break
+            sleep 5
+          done
+          SID=$(open_session)
+          bru run "weather-mcp/current-warsaw.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "weather-mcp/current-warsaw-us.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+      - name: Dump weather-mcp logs on failure
+        if: failure()
+        run: docker logs weather-mcp
+
+  ascend-paddle-ocr:
+    name: e2e / ascend-paddle-ocr (12 of 12 free specs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # First build is 5-15 minutes: the PaddlePaddle wheels are heavy and
+      # the model cache is prefetched in the builder stage (see PaddleOCR
+      # README). Acceptable here: this workflow is nightly/manual, not a
+      # pull-request gate with a fast-feedback SLA.
+      - name: Build and start ascend-paddle-ocr
+        run: docker compose up -d --build --wait ascend-paddle-ocr
+
+      # The compose healthcheck only proves the process is alive (/health).
+      # The OCR specs need the default-language engine warm, which is /ready.
+      - name: Wait for OCR engine warm-up
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:7022/ready | grep -q '"status":"ready"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::ascend-paddle-ocr did not warm up in time"
+          docker logs ascend-paddle-ocr
+          exit 1
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      # Engine-bound specs (2, 3, 4, 6) invoke the blocking OCR engine and
+      # must run one at a time per the module's own e2e README; this script
+      # already runs every step sequentially.
+      - name: Run free e2e specs
+        working-directory: docs/api/request/AscendAI
+        run: |
+          set -euo pipefail
+
+          open_session() {
+            curl -fsS -i -X POST "http://localhost:7022/mcp" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}' \
+              | grep -i '^Mcp-Session-Id:' | tr -d '\r' | awk '{print $2}'
+          }
+
+          # Spec 1: invalid-input
+          bru run "paddle-ocr/testing/ocr-invalid-no-file.yml" --env ascend-local
+
+          # Spec 2: ocr-english
+          bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local
+
+          # Spec 3: ocr-polish
+          bru run "paddle-ocr/testing/ocr-polish.yml" --env ascend-local
+
+          # Spec 4: ocr-default-language
+          bru run "paddle-ocr/testing/ocr-default-lang.yml" --env ascend-local
+
+          # Spec 5: mcp-tools-list
+          SID=$(open_session)
+          bru run "paddle-ocr/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 6: mcp-ocr
+          SID=$(open_session)
+          bru run "paddle-ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 7: ready-endpoint
+          bru run "paddle-ocr/testing/ready.yml" --env ascend-local
+
+          # Spec 8: mcp-ssrf-rejection
+          SID=$(open_session)
+          bru run "paddle-ocr/testing/mcp-ssrf-link-local.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 9: mcp-bad-scheme
+          SID=$(open_session)
+          bru run "paddle-ocr/testing/mcp-bad-scheme.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 10: mcp-credentials-rejection
+          SID=$(open_session)
+          bru run "paddle-ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 11: mcp-file-uri-jail
+          SID=$(open_session)
+          bru run "paddle-ocr/testing/mcp-file-uri-disabled.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 12: ocr-unsupported-mime
+          bru run "paddle-ocr/testing/ocr-unsupported-mime.yml" --env ascend-local
+
+      - name: Dump ascend-paddle-ocr logs on failure
+        if: failure()
+        run: docker logs ascend-paddle-ocr
+
+  ascend-web-search:
+    name: e2e / ascend-web-search (7 of 8 free specs)
+    runs-on: ubuntu-latest
+    services:
+      # Redis is an external prerequisite in every AscendAI environment, not
+      # a docker-compose service. Provide it as a job-level service container
+      # instead; ascend-web-search already reaches host-bound services via
+      # host.docker.internal (extra_hosts: host-gateway is already set in the
+      # compose file), so no compose edit is needed to wire it up.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      # SEARXNG_SECRET is mandatory (compose refuses to start SearXNG
+      # without it) but only needs to be a unique 32+ char value for this
+      # ephemeral run; nothing reads it back afterwards.
+      - name: Generate ephemeral SEARXNG_SECRET
+        run: echo "SEARXNG_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Build and start searxng, flaresolverr, ascend-web-search
+        run: docker compose up -d --build --wait searxng flaresolverr ascend-web-search
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      # Spec 7 (authenticated-realworld-scraping) is excluded: it requires a
+      # human to solve a reCAPTCHA challenge through NoVNC and cannot run
+      # unattended on a hosted runner.
+      - name: Run free e2e specs
+        working-directory: docs/api/request/AscendAI
+        run: |
+          set -euo pipefail
+
+          open_session() {
+            curl -fsS -i -X POST "http://localhost:7021/mcp" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}' \
+              | grep -i '^Mcp-Session-Id:' | tr -d '\r' | awk '{print $2}'
+          }
+
+          # Spec 1: invalid-input
+          bru run "web-search/testing/search-blank-query.yml" --env ascend-local
+          bru run "web-search/testing/search-missing-query.yml" --env ascend-local
+          bru run "web-search/testing/search-overlong-query.yml" --env ascend-local
+
+          # Spec 2: search-happy-path
+          bru run "web-search/testing/search-stable-query.yml" --env ascend-local
+
+          # Spec 3: read-example-com
+          bru run "web-search/testing/extract-example-com.yml" --env ascend-local
+
+          # Spec 4: mcp-tools-list
+          SID=$(open_session)
+          bru run "web-search/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 5: mcp-search
+          SID=$(open_session)
+          bru run "web-search/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+          # Spec 6: tiered-scraping. Hits live third-party sites (Wikipedia,
+          # a Cloudflare-protected target, a JS-rendered page); this step can
+          # flake on upstream rate-limiting or bot-blocking outside our
+          # control, independent of AscendWebSearch's own correctness.
+          bru run "web-search/testing/extract-tier-static-wikipedia.yml" --env ascend-local
+          bru run "web-search/testing/extract-tier-cloudflare.yml" --env ascend-local
+          bru run "web-search/testing/extract-tier-js-quotes.yml" --env ascend-local
+
+          # Spec 8: session-clear
+          bru run "web-search/testing/session-clear-existing.yml" --env ascend-local
+          bru run "web-search/testing/session-clear-idempotent.yml" --env ascend-local
+
+      - name: Dump ascend-web-search logs on failure
+        if: failure()
+        run: docker logs ascend-web-search
+
+  ascend-memory:
+    name: e2e / ascend-memory (2 of 6 free specs)
+    runs-on: ubuntu-latest
+    services:
+      # Qdrant is an external prerequisite in every AscendAI environment, not
+      # a docker-compose service. Version pinned to match the Testcontainers
+      # image AscendAgent's own integration tests already use
+      # (AscendAgent/src/test/java/.../integration/TestcontainersBase.java).
+      qdrant:
+        image: qdrant/qdrant:v1.13.0
+        ports:
+          - 6333:6333
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start ascend-memory
+        run: docker compose up -d --build --wait ascend-memory
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      # Specs 2, 3, 5, 6 each issue a real embedding call against OpenAI's
+      # text-embedding-3-small and are excluded as paid. Specs 1 and 4 never
+      # reach the embedding client: spec 1 is rejected by FastAPI validation
+      # before mem0 is touched, spec 4 is a pure MCP protocol probe.
+      - name: Run free e2e specs
+        working-directory: docs/api/request/AscendAI
+        run: |
+          set -euo pipefail
+
+          # Spec 1: invalid-input
+          bru run "memory/testing/invalid-missing-user.yml" --env ascend-local
+
+          # Spec 4: mcp-tools-list
+          SID=$(curl -fsS -i -X POST "http://localhost:7020/mcp" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/event-stream" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}' \
+            | grep -i '^Mcp-Session-Id:' | tr -d '\r' | awk '{print $2}')
+          bru run "memory/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+
+      - name: Dump ascend-memory logs on failure
+        if: failure()
+        run: docker logs ascend-memory

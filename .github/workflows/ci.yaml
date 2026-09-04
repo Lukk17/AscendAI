@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
+      ascend_agent: ${{ steps.filter.outputs.ascend-agent == 'true' || steps.filter.outputs.workflows == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -107,6 +108,14 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: ./gradlew --no-daemon build test
 
+      # ascend-agent is the only Gradle module with a configured coverage
+      # floor (jacocoTestCoverageVerification, 80% instruction coverage).
+      # weather-mcp has no such task, so nothing runs for it here.
+      - name: Enforce Jacoco coverage gate (ascend-agent)
+        if: matrix.service == 'ascend-agent'
+        working-directory: ${{ matrix.path }}
+        run: ./gradlew --no-daemon jacocoTestCoverageVerification
+
       # ── Python steps ───────────────────────────────────────────────────────
       - name: Set up Python ${{ matrix.python_version }}
         if: matrix.language == 'python'
@@ -120,10 +129,30 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: pip install -e .[dev]
 
-      - name: Run pytest
+      - name: Ruff lint
         if: matrix.language == 'python'
         working-directory: ${{ matrix.path }}
+        run: ruff check .
+
+      - name: Mypy type check
+        if: matrix.language == 'python'
+        working-directory: ${{ matrix.path }}
+        run: mypy src
+
+      # audio-scribe and ascend-paddle-ocr already bake --cov-fail-under=100
+      # into their own pytest addopts, so plain `pytest` enforces it.
+      - name: Run pytest
+        if: matrix.language == 'python' && matrix.service != 'ascend-web-search' && matrix.service != 'ascend-memory'
+        working-directory: ${{ matrix.path }}
         run: pytest
+
+      # ascend-web-search and ascend-memory declare fail_under=100 in
+      # [tool.coverage.report] but do not bake it into pytest addopts, so the
+      # coverage flags must be passed explicitly to actually enforce it.
+      - name: Run pytest with coverage gate
+        if: matrix.service == 'ascend-web-search' || matrix.service == 'ascend-memory'
+        working-directory: ${{ matrix.path }}
+        run: pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 
       # ── Artifact upload (always) ────────────────────────────────────────────
       - name: Upload test results
@@ -135,4 +164,38 @@ jobs:
             ${{ matrix.path }}/build/test-results/**/*.xml
             ${{ matrix.path }}/.pytest_cache
             ${{ matrix.path }}/test-results
+          if-no-files-found: ignore
+
+  integration-test:
+    name: Integration test (Testcontainers) ascend-agent
+    needs: changes
+    if: ${{ needs.changes.outputs.ascend_agent == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java (Temurin 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Runs in a separate job, in parallel with the fast unit-test matrix
+      # above, rather than as an extra step in it: Testcontainers pulls and
+      # boots Postgres, Redis and Qdrant images, which is slow and would
+      # delay the fast unit-test signal for every other module. ubuntu-latest
+      # ships a working Docker daemon, so no extra setup is needed here.
+      - name: Gradle integration test (Testcontainers)
+        working-directory: AscendAgent
+        run: ./gradlew --no-daemon integrationTest
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-ascend-agent
+          path: AscendAgent/build/test-results/**/*.xml
           if-no-files-found: ignore
