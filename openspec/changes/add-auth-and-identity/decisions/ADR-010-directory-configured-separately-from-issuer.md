@@ -2,7 +2,17 @@
 
 ## Status
 
-Proposed, 2026-09-04. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 14.3 installs into `AscendAgent/docs/architecture/decisions/`, taking the next free number at that time.
+Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `AscendAgent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
+
+## Deferral, 2026-09-04
+
+Group membership now comes from Keycloak realm groups alone. No directory is called, so there is no second configuration axis to separate from the issuer, and `app.identity.directories` does not exist in the shipped configuration.
+
+Nothing below was found to be wrong. The record is kept rather than deleted because the moment a directory lookup returns, the split-provider customer, the two-axis configuration, the adapter interface, and the reason a generic configuration-driven directory abstraction is the wrong answer all come back exactly as written. Re-deriving them would cost more than reading them.
+
+What has to happen for this record to become active: a decision on how a customer's directory groups relate to Keycloak's, which the change deliberately does not take, then the adapter list, the adapters themselves, and the `entra` and `google` principal namespaces added to the closed set the factory validates against.
+
+The consequence of leaving it deferred is stated as a named limitation in the change's design document: no principal minted in this version matches a directory group identifier, so an access list captured from a customer's storage matches nobody, and connector-synced documents are visible tenant-wide instead.
 
 ## Context
 
@@ -20,7 +30,9 @@ The token issuer and the directory are two independent configuration axes.
 
 - `spring.security.oauth2.resourceserver.jwt.issuer-uri` stays exactly what it is and keeps its current meaning: the single issuer whose tokens are validated.
 - `app.identity.claims` maps that issuer's claim names onto the resolved identity's fields: which claim is the directory subject, which is the group claim, which is the email. Entra ID is `oid`, `groups`, `email`. Google is `sub`, no group claim, `email`. Keycloak is `sub`, `groups`, `email`.
-- `app.identity.directories` is a list of directory adapters. Each entry names a provider kind (`microsoft-graph` or `google-directory`), the principal namespace its groups mint into, and its own credentials. An empty list is valid and means the token's group claim is the only source of groups.
+- `app.identity.directories` is a list of directory adapters. Each entry names a provider kind (`microsoft-graph` or `google-directory`), the brokered identity provider alias it serves, the principal namespace its groups mint into, and its own credentials. An empty list is valid and means the token's group claim is the only source of groups.
+
+ADR-013 later fixed the issuer axis to a single value, our own Keycloak realm, with each customer's provider brokered behind it. That confirms this record rather than disturbing it: the two axes are still independent, and the alias on each adapter entry is what binds a directory to the customer it serves. ADR-014 then decided which of the two axes is the primary source of membership, and the answer is the directory.
 
 Two adapters ship: Microsoft Graph and Google Directory, behind one interface with one method, transitive group membership for a directory subject. A third vendor is new code, and the documentation says so rather than implying a property change would cover it.
 
@@ -49,4 +61,5 @@ Two adapters ship: Microsoft Graph and Google Directory, behind one interface wi
 - `docs/architecture/permission-aware-retrieval.md`, sections "Resolving group membership" and "Three deployment shapes, one mechanism"
 - `docs/architecture/decisions/ADR-M007-group-principals-membership-at-login.md`
 - `docs/architecture/decisions/ADR-M008-email-join-with-provider-identifiers.md`
-- OpenSpec change `add-auth-and-identity`, decisions D9 and D13, capability `identity-provider`
+- OpenSpec change `add-auth-and-identity`, decisions D9, D13 and D15, capabilities `identity-provider` and `identity-brokering`
+- ADR-013, which fixes the issuer axis to one brokering realm, and ADR-014, which makes the directory the primary membership path

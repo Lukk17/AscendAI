@@ -2,12 +2,14 @@
 
 ### Requirement: Principals use one namespaced format produced by a typed factory
 
-Every principal SHALL be a string of the form `namespace:type:id`, at most 128 characters long, restricted to lowercase letters, digits, and the characters `.`, `-`, `_`, `@`. The namespace SHALL come from the closed set `entra`, `google`, `local`, `tenant`, and the type SHALL come from the closed set `group`, `everyone`. Principals SHALL be produced only by a single typed factory that validates length, character set, namespace, and type; the factory SHALL reject an invalid value by throwing rather than by returning a truncated or best-effort one. Filter expressions carrying principals SHALL be built through Spring AI's `FilterExpressionBuilder` and never by string concatenation. Groups originating from Keycloak SHALL mint into the `local` namespace, because Keycloak is the application's own identity provider and not a corporate directory.
+Every principal SHALL be a string of the form `namespace:type:id`, at most 128 characters long, restricted to lowercase letters, digits, and the characters `.`, `-`, `_`, `@`. In this version the namespace SHALL come from the closed set `local`, `tenant`, and the type SHALL come from the closed set `group`, `everyone`. Principals SHALL be produced only by a single typed factory that validates length, character set, namespace, and type; the factory SHALL reject an invalid value by throwing rather than by returning a truncated or best-effort one. Filter expressions carrying principals SHALL be built through Spring AI's `FilterExpressionBuilder` and never by string concatenation.
+
+Every group in this version is a Keycloak realm group and SHALL mint into `local:group:<group name>`. The namespace set SHALL be closed, so that adding a namespace for directory-sourced groups later is a deliberate change rather than an accident of string handling.
 
 #### Scenario: Well-formed principals are produced for each namespace
 
-- **WHEN** the factory is asked for an Entra ID group with object id `8f4a1b2c-3d5e-4f60-9a1b-2c3d4e5f6071`, a Google group with address `engineering@acme.example`, a local group with slug `policy-readers`, and the tenant pseudo-group for tenant `acme`
-- **THEN** the produced values are exactly `entra:group:8f4a1b2c-3d5e-4f60-9a1b-2c3d4e5f6071`, `google:group:engineering@acme.example`, `local:group:policy-readers`, and `tenant:everyone:acme`
+- **WHEN** the factory is asked for a local group with slug `policy-readers` and for the tenant pseudo-group for tenant `acme`
+- **THEN** the produced values are exactly `local:group:policy-readers` and `tenant:everyone:acme`
 
 #### Scenario: An unrecognised namespace fails rather than being stored
 
@@ -15,57 +17,68 @@ Every principal SHALL be a string of the form `namespace:type:id`, at most 128 c
 - **THEN** the call fails with an error naming the offending constraint
 - **AND** no principal value is produced and nothing is written to the vector store or to the principal set
 
-#### Scenario: Keycloak groups mint into the local namespace
+#### Scenario: A realm group mints into the local namespace
 
-- **WHEN** a token issued by the local Keycloak realm carries group `policy-readers`
+- **WHEN** a Keycloak token carries the group `policy-readers`
 - **THEN** the resolved principal is `local:group:policy-readers`
 
-### Requirement: Group membership resolves from a complete token claim, otherwise from the provider's transitive endpoint
+### Requirement: Group membership is resolved from the Keycloak group claim
 
-AscendAgent SHALL resolve the caller's group identifiers per token in this order: read the configured group claim and use it only when it is complete; otherwise call the configured directory provider's transitive membership endpoint against the caller's directory subject. A group claim SHALL be treated as complete only when the claim is present AND neither `_claim_names` nor `_claim_sources` appears on the token. An absent group claim SHALL mean fall through to the directory call and SHALL NEVER be treated as an empty group set. Nested groups SHALL be flattened by the provider's transitive endpoint and SHALL NOT be walked by AscendAgent.
+AscendAgent SHALL resolve the caller's group identifiers from the configured group claim on the validated token, and from no other source. It SHALL NOT call any external directory, and SHALL NOT read group membership from any store of its own. Each group name in the claim SHALL be minted into one principal through the typed factory. A token carrying no group claim, or an empty one, SHALL resolve to no group principals, which SHALL be understood as a true statement that an administrator has placed the caller in no groups.
 
-#### Scenario: A complete group claim avoids the directory call
+#### Scenario: Group names in the claim become principals
 
-- **WHEN** a valid token carries a `groups` claim listing two group identifiers and carries neither `_claim_names` nor `_claim_sources`
-- **THEN** the resolved principal set contains a principal for each of those two groups
-- **AND** no call is made to the directory provider
+- **WHEN** a valid token carries a group claim listing `policy-readers` and `dev-all`
+- **THEN** the resolved principal set contains `local:group:policy-readers` and `local:group:dev-all`
+- **AND** no call is made to any external directory
 
-#### Scenario: An overflow-marked token falls through to the directory
+#### Scenario: No group claim means no group principals
 
-- **WHEN** a valid token carries no `groups` claim and does carry `_claim_names` and `_claim_sources`
-- **THEN** the directory provider's transitive membership endpoint is called with the caller's directory subject
-- **AND** the resolved principal set contains a principal for every group that endpoint returned
+- **WHEN** a valid token carries no group claim
+- **THEN** the resolved principal set is exactly `tenant:everyone:{tenantId}`
+- **AND** the request is processed normally
 
-#### Scenario: Directory lookups use the directory subject, never the token subject
+#### Scenario: A group name that cannot be minted fails loudly
 
-- **WHEN** membership is resolved for a token whose `sub` and `oid` claims differ
-- **THEN** the value sent to the directory provider is the `oid` value
-- **AND** the `sub` value is not sent to the directory provider
+- **WHEN** a token carries a group name containing a character outside the permitted principal character set
+- **THEN** the factory throws and the request fails with an error naming the constraint
+- **AND** no partially-populated principal set reaches any filter
 
-### Requirement: Resolved principal sets are cached in Redis under issuer and subject
+### Requirement: A directory group identifier matches no principal in this version
 
-AscendAgent SHALL cache the resolved principal set in Redis under a key incorporating both a stable hash of the token issuer and the token subject, with a time to live equal to the shorter of the remaining token lifetime and five minutes. A cache hit SHALL skip both the directory call and principal construction. Redis being unavailable SHALL degrade latency only: the request SHALL proceed by resolving membership directly, and the resulting principal set SHALL be identical to the one a cache hit would have produced.
+AscendAgent SHALL NOT mint or match a principal naming a group in an external directory. An access list naming a group identifier from Microsoft Entra ID, Google Workspace, or any other external directory SHALL therefore match no caller, for every caller. Documents synced from a customer's own storage SHALL be made visible tenant-wide rather than left matching nobody, and this limitation SHALL be recorded as a product fact in `docs/SECURITY.md` rather than presented as a defect.
 
-#### Scenario: A second request inside the time to live makes no directory call
+#### Scenario: An access list naming a directory group matches nobody
 
-- **WHEN** two requests carrying the same token arrive within the cache time to live and the first one resolved membership through the directory
-- **THEN** the second request makes no directory call
-- **AND** both requests resolve the same principal set
+- **WHEN** a chunk carries an access list naming a Microsoft Entra ID security group by its directory object id, and any caller resolves a principal set
+- **THEN** that principal is absent from every resolved principal set
+- **AND** the chunk is retrieved by nobody on the strength of that entry
 
-#### Scenario: Tokens from different issuers do not share a cache entry
+#### Scenario: A synced document is reachable through the tenant pseudo-group
 
-- **WHEN** two tokens carrying the same `sub` value but issued by two different issuers are presented
-- **THEN** each resolves its own principal set
-- **AND** neither reads the other's cached entry
+- **WHEN** a document is synced from a customer's own storage and carries `tenant:everyone:{tenantId}` in its access list
+- **THEN** every caller in that tenant retrieves it
+- **AND** the coarser visibility is the documented behaviour for this version
 
-#### Scenario: A short-lived token expires the cache entry with it
+### Requirement: Membership is only as fresh as the token that carries it
 
-- **WHEN** a token with two minutes of remaining lifetime is presented
-- **THEN** the cache entry for that principal set expires no later than two minutes after it was written
+A change to a caller's group membership SHALL become visible to AscendAgent when that caller next obtains an access token, bounded by the realm's access token lifetime and, for continued use without signing in again, by the realm's SSO session lifetime. Both lifetimes SHALL be set explicitly in the realm export and documented in `docs/SECURITY.md` as a product disclosure. AscendAgent SHALL NOT introduce a second staleness window of its own by caching a resolved principal set.
+
+#### Scenario: A group removal takes effect at the next token
+
+- **WHEN** an administrator removes a caller from a realm group while that caller holds an unexpired access token
+- **THEN** the principal is still present for requests made with that token
+- **AND** it is absent from the principal set resolved for the next token they obtain
+
+#### Scenario: No resolved set is cached across requests
+
+- **WHEN** two requests carrying two different tokens for the same person arrive, and the caller's group membership changed between them
+- **THEN** each request resolves its principal set from the token it carries
+- **AND** the earlier result is not reused
 
 ### Requirement: The principal set is assembled once per request and is immutable
 
-AscendAgent SHALL assemble the caller's principal set during authentication, before any controller method executes, and SHALL attach it to the resolved identity. The set SHALL be immutable for the life of the request: no component SHALL add to it, remove from it, or replace it after resolution. The set SHALL contain `tenant:everyone:{tenantId}` for the caller's tenant, one principal per resolved group, and any application-local group assignments. Roles SHALL contribute no principals.
+AscendAgent SHALL assemble the caller's principal set during authentication, before any controller method executes, and SHALL attach it to the resolved identity. The set SHALL be immutable for the life of the request: no component SHALL add to it, remove from it, or replace it after resolution. The set SHALL contain `tenant:everyone:{tenantId}` for the caller's tenant and one principal per group the caller holds. Roles SHALL contribute no principals.
 
 #### Scenario: The set cannot be modified after resolution
 
@@ -92,17 +105,6 @@ The resolved principal set SHALL be subject to a configurable cap defaulting to 
 - **WHEN** membership resolution yields more principals than the configured cap
 - **THEN** the response status is 403 with an `application/problem+json` body stating the cap and the resolved size
 - **AND** no vector search is executed and no partially-populated principal set reaches any filter
-
-### Requirement: A failed directory resolution fails the request
-
-When group membership cannot be resolved because the directory provider is unreachable, throttling, or rejecting the agent's credentials, AscendAgent SHALL reject the request with HTTP 503 and a `Retry-After` header. It SHALL NOT fall back to a principal set containing only `tenant:everyone:{tenantId}`, and it SHALL NOT serve a cached principal set past its time to live.
-
-#### Scenario: A directory outage is a visible failure, not a quiet narrowing
-
-- **WHEN** the directory provider returns an error or times out during membership resolution on a cache miss
-- **THEN** the response status is 503 with a `Retry-After` header
-- **AND** no vector search is executed
-- **AND** the response is not a 200 carrying an answer produced from a reduced principal set
 
 ### Requirement: The dev profile synthesises a usable principal set
 

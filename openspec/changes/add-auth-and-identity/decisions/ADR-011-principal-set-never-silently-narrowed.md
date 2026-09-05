@@ -2,7 +2,19 @@
 
 ## Status
 
-Proposed, 2026-09-04. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 14.3 installs into `AscendAgent/docs/architecture/decisions/`, taking the next free number at that time.
+Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 12.8 installs into `AscendAgent/docs/architecture/decisions/`, taking the next free number at that time.
+
+## Amendment, 2026-09-04
+
+The rule stands unchanged: no path that cannot produce a caller's true principal set may produce a quietly small one. Its scope narrowed on the day it was written, because group membership now comes from Keycloak realm groups alone and there is no directory call to fail.
+
+Two of the three numbered decisions below are in scope for this change and unchanged. A resolved set over the cap fails with 403 and never truncates. The `dev` profile synthesises `tenant:everyone:default` and `local:group:dev-all` and never an empty set.
+
+The first, the 503 on a failed directory call, has nothing to apply to yet. It is deferred with the directory work, its reasoning is preserved below and in the change's design document, and it returns unchanged the moment a directory lookup does. Nothing about it was found to be wrong.
+
+One new path is worth naming, because it looks like a narrowing and is not. A token carrying no group claim now resolves to no group principals, and that is a true statement about an administrator having placed the caller in no groups rather than a silence to be suspicious of. Under the previous design an absent claim could mean an over-cap user whose groups were dropped, which is why it had to fall through to a directory rather than be believed. With Keycloak as the only source, the claim is authoritative and believing it is correct.
+
+The other silent-narrowing risk this change introduces in place of the old one is a group name an administrator chose that breaks the principal character set. The factory throws rather than mangling it, so it fails loudly, which is the same rule reaching a new surface.
 
 ## Context
 
@@ -51,4 +63,4 @@ Every path that cannot produce a caller's true principal set either fails loudly
 - `docs/architecture/permission-aware-retrieval.md`, sections "Resolving group membership", "Staleness", and "Observability, honestly"
 - `docs/architecture/decisions/ADR-M006-deny-by-default-on-missing-acl.md`
 - `docs/architecture/decisions/ADR-M007-group-principals-membership-at-login.md`
-- OpenSpec change `add-auth-and-identity`, decisions D5, D10 and D14, capability `principal-resolution`
+- OpenSpec change `add-auth-and-identity`, decisions D5, D9, D10 and D14, and the Deferred D14a entry that carries the directory-failure rule, capability `principal-resolution`

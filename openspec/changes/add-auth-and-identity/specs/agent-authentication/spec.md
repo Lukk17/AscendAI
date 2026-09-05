@@ -2,7 +2,7 @@
 
 ### Requirement: AscendAgent validates JWTs as an OAuth2 resource server
 
-AscendAgent SHALL act as an OAuth2 resource server: every request to a protected endpoint MUST carry an `Authorization: Bearer <JWT>` header, and the JWT SHALL be validated (signature via the issuer's JWKS, `iss`, `exp`, `nbf`) against the OIDC issuer configured at `spring.security.oauth2.resourceserver.jwt.issuer-uri`. Requests with a missing, expired, malformed, or wrongly-signed token SHALL be rejected with HTTP 401. The validation logic SHALL contain no issuer-specific code beyond the role-claim mapping, so that swapping Keycloak for any OIDC-compliant identity provider (Entra ID, Google, Auth0) requires only an issuer-uri configuration change.
+AscendAgent SHALL act as an OAuth2 resource server: every request to a protected endpoint MUST carry an `Authorization: Bearer <JWT>` header, and the JWT SHALL be validated (signature via the issuer's JWKS, `iss`, `exp`, `nbf`) against the OIDC issuer configured at `spring.security.oauth2.resourceserver.jwt.issuer-uri`. Requests with a missing, expired, malformed, or wrongly-signed token SHALL be rejected with HTTP 401. In the shipped deployment that issuer is the platform's own Keycloak realm, and it is the same issuer for every customer. Where a customer has opted into corporate sign-on, their own identity provider is brokered behind that realm rather than validated here. The validation logic SHALL contain no issuer-specific code beyond the role-claim mapping, so that a deployment choosing to validate a different OIDC-compliant issuer's tokens directly needs only an issuer-uri configuration change.
 
 #### Scenario: Request without a token is rejected
 
@@ -39,20 +39,6 @@ AscendAgent SHALL enforce role-based authorization in the security filter chain.
 
 - **WHEN** a token carrying the `ADMIN` role calls `POST /api/v1/ingestion/run`
 - **THEN** the request is authorized and the ingestion run starts
-
-### Requirement: Administrative endpoints require the ADMIN role
-
-The identity-link administration endpoints under `/api/v1/admin/**` SHALL require the `ADMIN` role. A caller holding a valid token with only the `USER` role SHALL receive HTTP 403 on every path beneath that prefix, and an unauthenticated caller SHALL receive HTTP 401.
-
-#### Scenario: USER is refused the admin surface
-
-- **WHEN** a token carrying only the `USER` role calls any path under `/api/v1/admin/`
-- **THEN** the response status is 403
-
-#### Scenario: Unauthenticated callers are refused before authorization
-
-- **WHEN** any path under `/api/v1/admin/` is called with no `Authorization` header in the secured posture
-- **THEN** the response status is 401
 
 ### Requirement: Public infrastructure and documentation endpoints under the secured posture
 
