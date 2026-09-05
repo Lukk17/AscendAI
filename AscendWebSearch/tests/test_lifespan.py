@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from asgi_lifespan import LifespanManager
@@ -6,22 +6,19 @@ from fastapi import FastAPI
 
 
 @pytest.mark.asyncio
-async def test_lifespan_raises_when_blocklist_load_fails():
-    """The lifespan must fail hard if BlocklistLoader cannot initialise."""
+async def test_lifespan_raises_when_blocklist_not_loaded():
+    """The lifespan must fail hard if the blocklist singleton was somehow never loaded."""
     from src import main as main_module
+    from src.config.blocklist_loader import blocklist_loader
 
-    with patch(
-        "src.main.BlocklistLoader",
-    ) as mock_loader_cls:
-        mock_loader = MagicMock()
-        mock_loader.load_rules.side_effect = RuntimeError("network down")
-        mock_loader_cls.return_value = mock_loader
-
+    original_state = blocklist_loader.state
+    with patch.object(blocklist_loader, "_state", None):
         # Build a fresh app so we exercise the new lifespan.
         app = main_module.create_app()
         with pytest.raises(RuntimeError):
             async with LifespanManager(app):
                 pass
+    assert blocklist_loader.state == original_state
 
 
 @pytest.mark.asyncio

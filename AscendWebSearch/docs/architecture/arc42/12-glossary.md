@@ -23,7 +23,7 @@
 | **SearxngClient** | Async HTTPX client (`src/search/search_client.py`) that sends `GET /search?format=html` to SearXNG and parses results from `article.result` DOM elements. |
 | **ContentValidator** | Validates extracted text using word count, error-keyword detection, Flesch reading ease, and type-token ratio checks (`src/validator/content_validator.py`). |
 | **URLValidator** | Wraps `AdblockRules` for Playwright/Crawlee route filtering; provides `is_safe_external_url` standalone SSRF check (`src/validator/url_validator.py`). |
-| **BlocklistLoader** | Fetches the Fanboy Annoyance adblock list at startup and returns `AdblockRules` (`src/config/blocklist_loader.py`). Failure halts the service. |
+| **BlocklistLoader** | Loads the vendored Fanboy Annoyance adblock list from `src/assets/fanboy-annoyance.txt` and returns `AdblockRules` (`src/config/blocklist_loader.py`). Never downloads automatically; a missing or corrupt file halts the service. `POST /api/v1/blocklist/refresh` downloads and swaps it on operator request. |
 | **NoVNC** | Web-based VNC client that exposes a browser window over WebSocket. Used to let a human operator interact with the Chromium session inside the container. |
 | **Ngrok** | Tunnelling service that exposes the NoVNC WebSocket port to the public internet when the container is behind NAT. The public URL is discovered dynamically from `api/tunnels`. See [ADR-003](../decisions/ADR-003-novnc-ngrok-captcha-intervention.md). |
 | **heavy_mode** | Request flag that skips strategies 1 and 2 and starts the extraction chain from `PlaywrightStrategy`. Used when the caller knows the target site requires JavaScript rendering. |

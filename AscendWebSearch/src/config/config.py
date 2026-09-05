@@ -1,6 +1,3 @@
-import tempfile
-from pathlib import Path
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -37,14 +34,21 @@ class Settings(BaseSettings):
 
     BLOCKLIST_URL: str = Field(
         default="https://secure.fanboy.co.nz/fanboy-annoyance.txt",
-        description="URL for adblock list",
+        description="URL the blocklist refresh endpoint downloads from. Never fetched at startup.",
     )
-    BLOCKLIST_CACHE_DIR: str = Field(
-        default_factory=lambda: str(Path(tempfile.gettempdir()) / "ascend-web-search" / "blocklist"),
+    BLOCKLIST_PATH: str = Field(
+        default="src/assets/fanboy-annoyance.txt",
         description=(
-            "Writable directory the downloaded ad blocklist is cached in, kept outside the source tree. "
-            "Defaults to the OS temp directory, which is writable on a developer machine, in the container "
-            "(no volume needed since the file is re-downloaded on every startup), and in a test run."
+            "Path to the vendored ad/annoyance blocklist file. Loaded from disk at startup and never "
+            "downloaded automatically. A successful POST /api/v1/blocklist/refresh overwrites this same "
+            "file in place, so the next load (and the next process restart) sees the refreshed list."
+        ),
+    )
+    BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS: float = Field(
+        default=60.0,
+        description=(
+            "Minimum seconds between accepted blocklist refresh attempts. A request inside the "
+            "window is rejected with 429 rather than hitting the network again."
         ),
     )
     VALIDATION_MIN_WORDS: int = Field(

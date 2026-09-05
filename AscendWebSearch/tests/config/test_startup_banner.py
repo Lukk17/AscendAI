@@ -2,12 +2,25 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.config.blocklist_loader import blocklist_loader
 from src.config.startup_banner import (
+    _blocklist_status,
     _probe_http_sync,
     _probe_tcp_sync,
     _resolve_host,
     log_startup_banner,
 )
+
+
+def test_blocklist_status_reports_rule_count_when_loaded():
+    result = _blocklist_status()
+    assert "rules)" in result
+
+
+def test_blocklist_status_reports_not_loaded_when_state_is_none():
+    with patch.object(blocklist_loader, "_state", None):
+        result = _blocklist_status()
+    assert "[not loaded]" in result
 
 
 def test_resolve_host_returns_hostname():

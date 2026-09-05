@@ -1,6 +1,4 @@
 import os
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 from src.config.config import Settings
@@ -28,22 +26,30 @@ def test_settings_env_override():
         assert settings.API_PORT == 9000
 
 
-def test_blocklist_cache_dir_defaults_outside_repo():
+def test_blocklist_path_defaults_to_vendored_asset():
     # given
     # When initializing settings without env vars
     settings = Settings()
 
     # then
-    expected = Path(tempfile.gettempdir()) / "ascend-web-search" / "blocklist"
-    assert Path(settings.BLOCKLIST_CACHE_DIR) == expected
+    assert settings.BLOCKLIST_PATH == "src/assets/fanboy-annoyance.txt"
 
 
-def test_blocklist_cache_dir_env_override(tmp_path):
+def test_blocklist_path_env_override(tmp_path):
     # given
     # Mocking environment variables
-    with patch.dict(os.environ, {"BLOCKLIST_CACHE_DIR": str(tmp_path)}):
+    override = str(tmp_path / "custom-blocklist.txt")
+    with patch.dict(os.environ, {"BLOCKLIST_PATH": override}):
         # when
         settings = Settings()
 
         # then
-        assert str(tmp_path) == settings.BLOCKLIST_CACHE_DIR
+        assert override == settings.BLOCKLIST_PATH
+
+
+def test_blocklist_refresh_min_interval_default():
+    # given
+    settings = Settings()
+
+    # then
+    assert settings.BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS == 60.0

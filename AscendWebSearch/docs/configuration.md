@@ -29,9 +29,17 @@ against environment variables and `.env`. The source of truth is
 
 ### Blocklist and content validation
 
+The blocklist is loaded from disk at startup and never downloaded automatically. `BLOCKLIST_PATH` points at the
+file vendored into the repository and the container image (`src/assets/fanboy-annoyance.txt`); a missing or
+corrupt file there is a packaging defect and the service refuses to start. `BLOCKLIST_URL` is only reached by
+`POST /api/v1/blocklist/refresh`, an explicit operator action — see
+[the architecture decision record](architecture/decisions/ADR-008-blocklist-vendored-not-fetched.md).
+
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
-| `BLOCKLIST_URL` | `https://secure.fanboy.co.nz/fanboy-annoyance.txt` | Ad blocklist fetched at startup; failure halts startup |
+| `BLOCKLIST_URL` | `https://secure.fanboy.co.nz/fanboy-annoyance.txt` | Source `POST /api/v1/blocklist/refresh` downloads from |
+| `BLOCKLIST_PATH` | `src/assets/fanboy-annoyance.txt` | Path to the vendored blocklist file; also where a refresh writes |
+| `BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS` | `60.0` | Minimum seconds between accepted refresh attempts; a call inside the window gets 429 |
 | `VALIDATION_MIN_WORDS` | `10` | Minimum word count for a tier's output to count as success |
 | `MIN_FLESCH_SCORE` | `20.0` | Combined-with-lexicon-count quality threshold |
 | `MIN_TTR` | `0.1` | Repetitive-text guard (Type-Token Ratio) |

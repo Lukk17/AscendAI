@@ -5,6 +5,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from src.config.blocklist_loader import blocklist_loader
 from src.config.config import settings
 
 logger = logging.getLogger("uvicorn")
@@ -58,6 +59,13 @@ def _probe_tcp_sync(url: str) -> str:
         return f"{display} [FAILED]"
 
 
+def _blocklist_status() -> str:
+    state = blocklist_loader.state
+    if state is None:
+        return f"{blocklist_loader.blocklist_path} [not loaded]"
+    return f"{blocklist_loader.blocklist_path} ({state.rule_count} rules)"
+
+
 async def log_startup_banner() -> None:
     host = _resolve_host()
     port = settings.API_PORT
@@ -90,7 +98,7 @@ async def log_startup_banner() -> None:
             f"      SearXNG:      {searxng_status}",
             f"      FlareSolverr: {flaresolverr_status}",
             f"      Redis:        {redis_status}",
-            f"      Blocklist:    {settings.BLOCKLIST_URL} [Loaded at startup]",
+            f"      Blocklist:    {_blocklist_status()}",
             "",
             "    Actuator:",
             f"      Health:    {local_url}/health",

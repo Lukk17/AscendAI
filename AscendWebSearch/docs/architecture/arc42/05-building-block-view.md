@@ -11,8 +11,9 @@ graph TB
 
         subgraph "api"
             rest["api/rest/rest_endpoints.py<br/>GET /api/v1/web/search<br/>POST /api/v2/web/read"]
+            blocklistapi["api/rest/blocklist_endpoints.py<br/>GET /api/v1/blocklist/status<br/>POST /api/v1/blocklist/refresh"]
             mcp["api/mcp/mcp_server.py<br/>web_search, web_read tools"]
-            exc["api/exception_handlers.py<br/>428, 503, 500 handlers"]
+            exc["api/exception_handlers.py<br/>428, 503, 502, 429, 500 handlers"]
             exceptions["api/exceptions.py<br/>HumanInterventionRequiredException<br/>ChallengeDetectedException"]
         end
 
@@ -50,12 +51,16 @@ graph TB
     end
 
     main --> rest
+    main --> blocklistapi
     main --> mcp
     main --> exc
     main --> blocklist
     rest --> webreader
     rest --> searxng
     rest --> url
+    blocklistapi --> blocklist
+    blocklistapi --> url
+    url --> blocklist
     mcp --> webreader
     mcp --> searxng
     mcp --> url
@@ -81,10 +86,11 @@ graph TB
 
 | Component | File | Responsibility |
 | :--- | :--- | :--- |
-| App factory | `src/main.py` | Creates FastAPI app, runs lifespan blocklist load, mounts MCP sub-app, registers `/health`. |
+| App factory | `src/main.py` | Creates FastAPI app, confirms the blocklist singleton loaded before yielding, mounts MCP sub-app, registers `/health`. |
 | `rest_endpoints.py` | `src/api/rest/rest_endpoints.py` | Two routers (`/api/v1`, `/api/v2`). Validates URL safety, delegates to `WebReader` or `SearxngClient`. |
+| `blocklist_endpoints.py` | `src/api/rest/blocklist_endpoints.py` | `/api/v1/blocklist` router. `GET /status` reports rule count and age; `POST /refresh` downloads, validates, and atomically swaps the blocklist. REST-only, not on the MCP surface. |
 | `mcp_server.py` | `src/api/mcp/mcp_server.py` | FastMCP instance. `web_search` and `web_read` tools. Same SSRF guard as REST. |
-| `exception_handlers.py` | `src/api/exception_handlers.py` | 428 for `HumanInterventionRequiredException`, 503 for `httpx.HTTPError`, 500 fallback. |
+| `exception_handlers.py` | `src/api/exception_handlers.py` | 428 for `HumanInterventionRequiredException`, 503 for `httpx.HTTPError`, 502 for `BlocklistValidationError`, 429 for `BlocklistRefreshThrottledError`, 500 fallback. |
 | `WebReader` | `src/reader/web_reader.py` | Ordered dict of six strategies. Iterates until `ContentValidator` passes or all strategies exhausted. |
 | `BeautifulSoupStrategy` | `src/reader/strategies/beautifulsoup_strategy.py` | `curl_cffi` Chrome120 impersonation + BeautifulSoup parse. Reads cached session from `CookieManager`. |
 | `TrafilaturaStrategy` | `src/reader/strategies/trafilatura_strategy.py` | Same `curl_cffi` transport; Trafilatura extraction pipeline instead of BeautifulSoup. |
@@ -96,5 +102,6 @@ graph TB
 | `CookieManager` | `src/reader/cloudflare/cookie_manager.py` | Singleton. Redis-backed session store with in-process fallback. Apex domain normalisation. |
 | `SearxngClient` | `src/search/search_client.py` | Async `httpx` client for SearXNG HTML search. BeautifulSoup `article.result` parser. |
 | `ContentValidator` | `src/validator/content_validator.py` | Word count, error-keyword check, Flesch reading ease, type-token ratio. |
-| `URLValidator` | `src/validator/url_validator.py` | Wraps adblock `AdblockRules` for route filtering; `is_safe_external_url` standalone SSRF guard. |
+| `URLValidator` | `src/validator/url_validator.py` | Wraps adblock `AdblockRules` for route filtering; `is_safe_external_url` standalone SSRF guard. The module-level `url_validator` singleton is shared by every `WebReader`; a refresh reassigns its `.rules` in place. |
+| `BlocklistLoader` | `src/config/blocklist_loader.py` | Loads the vendored blocklist from `BLOCKLIST_PATH`; `refresh()` downloads, validates, and atomically swaps the on-disk file and in-memory rules. |
 | `Settings` | `src/config/config.py` | Pydantic-settings class. Single `settings` singleton. Reads `.env` file or environment. |

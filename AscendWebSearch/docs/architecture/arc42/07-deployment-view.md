@@ -39,9 +39,10 @@ host bridge network or a shared Docker network depending on deployment configura
 ### Healthcheck wiring
 
 The `GET /health` endpoint (`src/main.py:56-58`) returns `{"status": "ok"}` as long as the process is alive.
-There is no separate readiness probe. The blocklist must load successfully before the lifespan yields; a failed
-load raises `RuntimeError` and prevents the service from starting, so a healthy `/health` implies the blocklist
-is loaded.
+There is no separate readiness probe. The blocklist loads from the vendored `src/assets/fanboy-annoyance.txt`
+eagerly at module import time, before the process can even reach the point of serving `/health`; a missing or
+corrupt vendored file is a packaging defect that prevents the process from starting at all, not something the
+health check needs to model. See [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).
 
 ---
 
@@ -56,7 +57,9 @@ is loaded.
 | `SEARXNG_USER_AGENT` | `AscendWebSearch/1.0` | User-Agent sent to SearXNG. |
 | `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr endpoint. |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for session cookie store. |
-| `BLOCKLIST_URL` | `https://secure.fanboy.co.nz/fanboy-annoyance.txt` | Ad/annoyance blocklist. |
+| `BLOCKLIST_URL` | `https://secure.fanboy.co.nz/fanboy-annoyance.txt` | Source `POST /api/v1/blocklist/refresh` downloads from. Never fetched automatically. |
+| `BLOCKLIST_PATH` | `src/assets/fanboy-annoyance.txt` | Path to the vendored blocklist file; also where a refresh writes. |
+| `BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS` | `60.0` | Minimum seconds between accepted refresh attempts. |
 | `VALIDATION_MIN_WORDS` | `10` | Minimum word count for extracted content to pass validation. |
 | `DEFAULT_TIMEOUT` | `30.0` | Default HTTP timeout in seconds. |
 | `SEARCH_TIMEOUT` | `10.0` | Timeout for SearXNG search requests. |
@@ -75,3 +78,9 @@ The service uses `mcr.microsoft.com/playwright/python:v1.58.0-noble` as its base
 Xvfb, and the full Playwright browser dependencies required by `PlaywrightStrategy`, `CrawleeStrategy`, and
 `NoVNCStrategy`. The image is significantly larger than a minimal Python image; browser dependencies are the
 dominant size contributor.
+
+`src/assets/fanboy-annoyance.txt` ships inside the image via the same `COPY src/ src/` that already carries
+`src/assets/user_agents.json`; no separate `COPY` step exists for it. A blocklist refreshed via
+`POST /api/v1/blocklist/refresh` writes back to that same in-container path, so it only persists across a
+container restart if that path is bind-mounted or volume-mounted to somewhere durable — this deployment does not
+mount one, so a restart reverts to whatever was last baked into the image.

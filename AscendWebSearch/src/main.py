@@ -8,6 +8,8 @@ from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.exception_handlers import (
+    blocklist_refresh_throttled_handler,
+    blocklist_validation_error_handler,
     global_exception_handler,
     httpx_exception_handler,
     human_intervention_exception_handler,
@@ -16,9 +18,14 @@ from src.api.exceptions import HumanInterventionRequiredException
 from src.api.mcp.mcp_server import mcp
 from src.api.mcp.mcp_server import search_client as mcp_search_client
 from src.api.readiness import readiness_router
+from src.api.rest.blocklist_endpoints import blocklist_router
 from src.api.rest.rest_endpoints import rest_router, rest_router_v2
 from src.api.rest.rest_endpoints import search_client as rest_search_client
-from src.config.blocklist_loader import BlocklistLoader
+from src.config.blocklist_loader import (
+    BlocklistRefreshThrottledError,
+    BlocklistValidationError,
+    blocklist_loader,
+)
 from src.config.config import settings
 from src.config.logging_config import get_uvicorn_log_config, setup_logging
 from src.config.startup_banner import log_startup_banner
@@ -62,12 +69,15 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         setup_logging()
-        try:
-            loader = BlocklistLoader()
-            loader.load_rules()
-        except Exception as e:
-            logger.critical(f"Startup Warning: Failed to initialize Blocklist: {e}")
-            raise RuntimeError("Failed to initialize Blocklist") from e
+        # The blocklist is already loaded by the time this runs: url_validator.py's
+        # module-level singleton loads it from disk at import time, well before
+        # create_app() is even called. This just confirms the invariant held and
+        # fails fast if it somehow did not.
+        if blocklist_loader.state is None:
+            logger.critical("Startup Warning: Blocklist was not loaded")
+            raise RuntimeError("Blocklist was not loaded before startup")
+        rule_count = blocklist_loader.state.rule_count
+        logger.info(f"Blocklist ready: {rule_count} rules from {blocklist_loader.blocklist_path}")
 
         await browser_pool.start()
 
@@ -98,10 +108,19 @@ def create_app() -> FastAPI:
         HumanInterventionRequiredException,
         human_intervention_exception_handler,  # type: ignore[arg-type]
     )
+    app.add_exception_handler(
+        BlocklistValidationError,
+        blocklist_validation_error_handler,  # type: ignore[arg-type]
+    )
+    app.add_exception_handler(
+        BlocklistRefreshThrottledError,
+        blocklist_refresh_throttled_handler,  # type: ignore[arg-type]
+    )
     app.add_exception_handler(Exception, global_exception_handler)
 
     app.include_router(rest_router)
     app.include_router(rest_router_v2)
+    app.include_router(blocklist_router)
     app.include_router(readiness_router)
 
     Instrumentator(

@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 
 from adblockparser import AdblockRules
 
+from src.config.blocklist_loader import blocklist_loader
+
 logger = logging.getLogger(__name__)
 
 _SAFE_SCHEMES = {"http", "https"}
@@ -26,6 +28,13 @@ class URLValidator:
             await route.abort()
         else:
             await route.continue_()
+
+
+# Process-wide singleton: every WebReader (REST and MCP) shares this one instance,
+# so a successful POST /api/v1/blocklist/refresh -- which reassigns `.rules` below --
+# is picked up by every consumer immediately, without needing to reach into each
+# WebReader individually.
+url_validator = URLValidator(blocklist_loader.load_rules())
 
 
 def is_safe_external_url(url: str) -> bool:

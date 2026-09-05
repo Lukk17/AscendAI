@@ -64,7 +64,9 @@ docker build -t ascend-web-search:latest .
 - `API_PORT` — Service port (default: 7021)
 - `FLARESOLVERR_URL` — FlareSolverr endpoint
 - `REDIS_URL` — Redis connection string
-- `BLOCKLIST_URL` — Ad blocklist URL
+- `BLOCKLIST_URL` — Ad blocklist source. Only reached by `POST /api/v1/blocklist/refresh`; never fetched at startup
+- `BLOCKLIST_PATH` — Path to the vendored blocklist file (default `src/assets/fanboy-annoyance.txt`), loaded at
+  startup and overwritten in place by a refresh
 - `VALIDATION_MIN_WORDS` — Minimum words for valid content
 - `VNC_PASSWORD` — Password for the NoVNC desktop. Consumed by `docker-entrypoint.sh`, not by `config.py`. Unset means
   x11vnc runs with `-nopw` and the container logs a warning at boot. Required in the standalone deployment. The VNC

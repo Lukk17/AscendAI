@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from src.api.exceptions import ChallengeDetectedException, HumanInterventionRequiredException
-from src.config.blocklist_loader import BlocklistLoader
 from src.config.config import settings
 from src.observability.domain_label import domain_label
 from src.observability.metrics import (
@@ -27,7 +26,7 @@ from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
 from src.validator.content_validator import ContentValidator
-from src.validator.url_validator import URLValidator
+from src.validator.url_validator import url_validator
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +57,7 @@ class WebReader:
     def __init__(self) -> None:
         self.validator = ContentValidator()
         self.user_agents = self._load_user_agents()
-
-        blocklist_loader = BlocklistLoader()
-        rules = blocklist_loader.load_rules()
-        self.url_validator = URLValidator(rules)
+        self.url_validator = url_validator
 
         self._memory_cache: dict[str, tuple[dict[str, Any], float]] = {}
 

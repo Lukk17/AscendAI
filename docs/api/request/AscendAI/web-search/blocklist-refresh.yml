@@ -1,0 +1,34 @@
+info:
+  name: blocklist-refresh
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  # Deliberate operator action: downloads BLOCKLIST_URL, validates it, and only
+  # swaps the running list in on success. A download/validation failure leaves
+  # the previously loaded blocklist serving requests unchanged. Throttled to one
+  # accepted attempt per BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS (default 60s);
+  # a call inside that window returns 429.
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/blocklist/refresh"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: refreshed status, rule_count, loaded_at typed", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("refreshed");
+            expect(b.rule_count).to.be.a("number");
+            expect(b.loaded_at).to.be.a("string");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
