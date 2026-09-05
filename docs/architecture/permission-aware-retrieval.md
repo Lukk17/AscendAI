@@ -33,12 +33,11 @@ Everything below is either a consequence of one of those rules or a place where 
 ```mermaid
 sequenceDiagram
     accTitle: Permission-filtered retrieval for a single question
-    accDescr: The caller logs in, the agent resolves their group principals, runs a filtered vector search, calls the model, and re-checks each source reference before presigning a download link.
+    accDescr: The caller logs in, the agent resolves their group principals directly from the validated token, runs a filtered vector search, calls the model, and re-checks each source reference before presigning a download link.
     actor User
     participant App as Client app
     participant IdP as Identity provider
     participant Agent as AscendAgent
-    participant Redis
     participant Qdrant
     participant LLM as Model provider
     participant S3 as Object store
@@ -48,12 +47,7 @@ sequenceDiagram
     IdP-->>App: id token + access token
     App->>Agent: POST /api/v1/ai/prompt (bearer token)
     Agent->>Agent: validate JWT, resolve subject and directory object id
-    Agent->>Redis: GET principals:{subject}
-    alt cache miss
-        Agent->>IdP: transitive group membership for the subject
-        IdP-->>Agent: flattened group ids
-        Agent->>Redis: SET principals:{subject} (TTL = min(token life, 5 min))
-    end
+    Agent->>Agent: read groups already on the validated token, mint principalSet
     Agent->>Agent: compose filter: tenant_id == T AND acl IN principalSet
     Agent->>Qdrant: similaritySearch(query, topK, filter)
     Qdrant-->>Agent: only chunks whose acl intersects principalSet
@@ -76,15 +70,13 @@ Identity and content are captured by different systems, at different times, from
 ```mermaid
 flowchart TB
     accTitle: Identity plane and content plane meeting only at query time
-    accDescr: Group membership is resolved at login and lives in Redis. Access lists are resolved at sync and live in Qdrant payloads. The only place they meet is the filter composed for a single search.
+    accDescr: Group membership is read from the already-validated token at login. Access lists are resolved at sync and live in Qdrant payloads. The only place they meet is the filter composed for a single search.
 
     subgraph identity["Identity plane, resolved at login"]
-        A1[Identity provider directory]
-        A2[Token: subject, directory object id, email]
-        A3[Transitive group membership]
+        A2[Token: subject, directory object id, email, groups]
         A4[Application-local group assignments]
-        A5[Principal set for this request<br/>cached in Redis]
-        A1 --> A2 --> A3 --> A5
+        A5[Principal set for this request]
+        A2 --> A5
         A4 --> A5
     end
 
@@ -137,7 +129,7 @@ One format everywhere: `namespace:type:id`.
 
 Rules on the format:
 
-- Total length capped at 128 characters. A principal is a keyword payload value and a Redis set member, and both get worse as values grow.
+- Total length capped at 128 characters. A principal is a keyword payload value in Qdrant, and that gets worse as values grow.
 - Character set restricted to lowercase letters, digits, and the characters `.`, `-`, `_`, `@`, so a principal is safe as a keyword value with no escaping layer, exactly the reasoning [add-tenant-isolation](../../openspec/changes/add-tenant-isolation/) applies to its tenant slug.
 - The namespace and type segments come from a closed set. An unrecognised namespace is a capture bug, and it fails rather than being stored.
 - Principals are produced by one typed factory and never by string concatenation at the point of use. Filters are built through Spring AI's `FilterExpressionBuilder`, which is the same rule [add-tenant-isolation](../../openspec/changes/add-tenant-isolation/) already states for the tenant predicate, applied here for the same reason: the moment anybody can hand-assemble a filter string, the format constraints above stop being enforceable.
@@ -292,17 +284,35 @@ The same shape exists at Google, where the `sub` claim is the Google account id 
 
 ### Resolving group membership
 
-Per token, in this order:
+For this version, membership resolves from Keycloak's own groups, and nowhere else. An administrator creates a group inside the realm and assigns people to it. Every token issued to a member of that group carries it, and each entry mints into a `local:group:<slug>` principal through the typed factory. There is no per-customer directory lookup, no claim-versus-lookup fallback, and no distinction between Microsoft Entra ID and Google Workspace, because neither provider's own group data is consulted at all.
 
-1. If the token carries a complete group claim, use it. Entra ID emits `groups` when the application registration asks for it, and for users under the emission limit it is the whole transitive set with no round trip.
-2. Otherwise, call the provider's transitive membership endpoint. For Entra ID that is Graph's transitive member-of call against `oid`. For Google Workspace it is the Directory API group listing for the account.
-3. Cache the resolved principal set in Redis under the subject, with a time to live of the shorter of the remaining token lifetime and five minutes.
-
-Nested groups are flattened by the provider. Both Microsoft and Google expose a transitive endpoint that returns the full closure, and walking the hierarchy ourselves would mean reimplementing their nesting semantics, their cycle handling, and their limits, in order to arrive at the same answer more slowly and more wrongly.
-
-Entra ID has a specific trap here. When a user belongs to more group objects than the token can carry, Entra omits the `groups` claim and substitutes `_claim_names` and `_claim_sources` pointing at a Graph endpoint. A resolver that reads `groups` and treats absence as "no groups" gives exactly the heavily-permissioned users the smallest access. Absence of the claim means fall through to step 2, never fall through to an empty set.
+Per token: read the group claim already on the validated JWT and mint each entry into a principal. There is no cache in front of this step. A cache exists to save the cost of something expensive, and reading a claim the framework has already decoded and minting a bounded set of principals from it is neither an external call nor slow enough to be worth a Redis round trip to avoid. Nothing here calls out to Keycloak, or to anywhere else, once the token has been validated.
 
 The principal set is capped. A caller whose resolved set exceeds the cap fails the request rather than proceeding on a truncated set, for the same reason a chunk's access list fails rather than truncating: a truncated principal set produces silent under-retrieval that looks exactly like a retrieval bug.
+
+This is a deliberate scope cut for this version, and it has a consequence that has to be written down rather than discovered later. A document synced from SharePoint or Google Drive arrives with an access list naming that source's own group identifiers, `entra:group:*` or `google:group:*`. Nothing mints a Keycloak group into either of those namespaces, and nothing maps a Keycloak group onto them. So permission filtering is correct and complete for a document uploaded directly into the product, where an administrator assigns Keycloak groups by hand, and it silently matches nobody for a document synced from a customer's own storage, until something maps that source's groups onto Keycloak groups. What that mapping mechanism is, and who builds it, is not decided here.
+
+---
+
+### Deferred: resolving membership from a customer's own directory
+
+The reasoning below predates the scope cut above. It described how membership would resolve once a customer's own Microsoft Entra ID or Google Workspace directory has to be consulted directly, whether brokered through Keycloak or not. It is not implemented against for this version. It is kept here, clearly marked, because it is the reasoning a later change will need the moment that consultation happens, and re-deriving it from scratch would mean re-checking the same primary sources a second time.
+
+Microsoft caps the groups claim at 200 group identifiers for the token protocols and 150 for SAML, counting nested groups. A user over that cap does not get a truncated list, Microsoft emits no groups claim at all and substitutes a pointer to a Graph endpoint instead. That lands on precisely the people who belong to the most groups, in a company of any size.
+
+Google Workspace never emits a groups claim, in any token, at any tenant size. For Google a directory call would not be a fallback, it would be the only path there is.
+
+So, per token, a future resolver would need this order:
+
+1. If a directory adapter is configured for the caller's provider, call it. Microsoft Graph's transitive member-of call against `oid` for Entra ID, the Google Workspace Directory API group listing for Google. This would be the primary path, correct at every tenant size.
+2. Only when no directory adapter is configured for that provider, read the configured group claim. This would be a fast path, valid only for a tenant comfortably under Microsoft's emission cap, with no equivalent for Google.
+3. Cache the resolved principal set in Redis under the subject, with a time to live of the shorter of the remaining token lifetime and five minutes.
+
+Nested groups are flattened by the provider. Both Microsoft and Google expose a transitive endpoint that returns the full closure, and walking the hierarchy ourselves would mean reimplementing their nesting semantics, their cycle handling, and their limits, in order to arrive at the same answer more slowly and more wrongly. The Microsoft cap counts nested groups too, which is a second reason a claim path would not be a size-of-company-independent option.
+
+Where a claim path would be used, a completeness test would still be needed. Entra ID has a specific trap. When a user belongs to more group objects than the token can carry, Entra omits the `groups` claim and substitutes `_claim_names` and `_claim_sources` pointing at a Graph endpoint. A resolver that reads `groups` and treats absence as "no groups" gives exactly the heavily-permissioned users the smallest access. Absence of the claim would have to mean fall through to the directory call, never fall through to an empty set.
+
+None of this is built or tested against for this version. It is recorded so the next person who picks it up does not have to start from nothing.
 
 ---
 
@@ -393,7 +403,7 @@ Every permission decision in this design is made against a copy, and every copy 
 
 | Event | Visible after | Bounded by |
 | :--- | :--- | :--- |
-| Group membership changes at the identity provider | the cached principal set expires and the client presents a token issued after the change | the shorter of token lifetime and 5 minutes for the cache, plus the remaining lifetime of a token already issued |
+| Group membership changes, edited directly in Keycloak | the person signs in again and is issued a token carrying the new groups | the realm's SSO session and access token lifetime, since membership is read fresh from the token on every request and nothing refreshes it between logins |
 | Sharing changes at the source | the next connector sync reads the item's permissions | the connector's sync interval |
 | Administrator revokes access inside AscendAI | the next request | immediate, the list is emptied in place |
 | A presigned link already handed out | never, it remains valid | the presign time to live, 15 minutes by default, one hour maximum |
@@ -414,8 +424,8 @@ A staleness sweep that empties access lists older than a maximum. If permission 
 | :--- | :--- |
 | Verified caller, JWT validation, resource-server posture | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
 | `oid` alongside `sub` on the resolved identity object | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
-| Group membership resolution, token claim then transitive endpoint | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
-| Redis principal-set cache and its time to live | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
+| Group membership resolution, from Keycloak's own groups at login | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
+| Redis principal-set cache and its time to live, deferred alongside directory resolution | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
 | Principal identifier format and the typed factory | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
 | Cross-provider identity link, reused-address detection, administrator API | [add-auth-and-identity](../../openspec/changes/add-auth-and-identity/) |
 | `tenant:everyone:{tenantId}` pseudo-group | [add-tenant-isolation](../../openspec/changes/add-tenant-isolation/) |
@@ -442,7 +452,7 @@ Every one of these asserts observable behaviour. None of them asserts a log line
 | Pre-filter, not post-filter | With `topK` of 5, a caller permitted only the chunks ranked sixth through eighth receives those three chunks in the retrieved context and a grounded answer. A post-filter implementation returns an empty context here, which is what makes this the single test that distinguishes the two designs. |
 | Deny by default | A chunk written with no `acl` field is retrieved by nobody, including a caller holding every group in the tenant. |
 | Deny by default applies to administrators | The same chunk is not retrieved by a caller holding `ADMIN` or `PLATFORM_ADMIN`. Role is not a principal, and an administrative role does not widen the filter. |
-| Membership revocation without a sync | Remove a caller from a group at the identity provider, wait out the cache time to live, present a token issued after the change: the chunks granted by that group only are gone from retrieval, and nothing was re-indexed. |
+| Membership revocation without a sync | Remove a caller from a group in Keycloak, have them sign in again so a token carrying the new groups is issued, present it: the chunks granted by that group only are gone from retrieval, and nothing was re-indexed. |
 | Sharing revocation with unchanged bytes | Revoke a group's access to a source file without editing it, run a sync: the chunk payloads carry a new `acl_version`, the file's outcome is `PERMISSIONS_UPDATED`, the point ids are unchanged, and a member of the revoked group no longer retrieves it. Point ids being unchanged is what proves no re-embed happened. |
 | Presign refusal | Hand the presigner a `SourceRef` whose chunk `acl` does not intersect the caller's principal set: no signed URL is produced and the entry is absent from `response.sources` entirely, rather than present with a blank link. |
 | Reused address detection | Present a token whose normalized email matches an existing link but whose provider identifier does not: the link is marked broken, the resolved principal set contains only `tenant:everyone:{tenantId}`, and no group from either provider appears. |
@@ -482,7 +492,7 @@ These are undecided, not overlooked.
 
 4. Whether a revoked presigned link must be actively invalidated. Doing it means proxying downloads through the agent so each fetch can be authorized, which collides with the settled decision in [add-tenant-isolation](../../openspec/changes/add-tenant-isolation/) and [add-document-management-api](../../openspec/changes/add-document-management-api/) that every source entry carries a presigned link. Reopening that is a bigger decision than this design should make on its own.
 
-5. Whether synchronous membership resolution is acceptable latency against a large directory. A Graph transitive membership call on a cache miss sits in the request path before the search. It is cached for at most five minutes, so a large directory means a meaningful share of requests pay it. The honest position is that nobody has measured this against a directory of the relevant size, and the measurement does not exist yet.
+5. Whether synchronous membership resolution is acceptable latency against a large directory. This question belongs to the deferred customer-directory design in [Deferred: resolving membership from a customer's own directory](#deferred-resolving-membership-from-a-customers-own-directory), not to the current Keycloak-only version, which reads groups already on the validated token and makes no external call at all. A Graph transitive membership call would sit in the request path before the search. Nobody has measured it against a directory of the relevant size, and the measurement does not exist yet.
 
 ---
 

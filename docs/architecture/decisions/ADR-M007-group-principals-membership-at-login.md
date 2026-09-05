@@ -6,6 +6,8 @@
 
 Accepted (2026-09-04)
 
+Amended (2026-09-04): scope narrowed to Keycloak-native groups only for this version, resolving membership from a customer's own directory deferred. See Amendment below.
+
 ---
 
 ### Context
@@ -22,7 +24,7 @@ Access lists name groups only. Membership is never copied into the vector store.
 
 Principals use one namespaced format everywhere, `namespace:type:id`, capped at 128 characters and restricted to lowercase letters, digits, and `.`, `-`, `_`, `@`, so they are safe as keyword payload values with no escaping layer. Examples: `entra:group:<object id>`, `google:group:<group address>`, `local:group:<slug>`, `tenant:everyone:<tenant id>`. Namespace and type come from a closed set, and principals are produced by one typed factory rather than assembled as strings at the point of use.
 
-Membership resolves per token: use the token's group claim when it is complete, otherwise call the provider's transitive membership endpoint, and cache the result in Redis under the subject for the shorter of the remaining token lifetime and five minutes. Nested groups are flattened by the provider, not by walking the hierarchy ourselves. The resolved principal set is capped, and a caller exceeding the cap fails the request rather than proceeding on a truncated set.
+For this version, membership resolves from Keycloak's own groups only. An administrator creates a group in the realm and assigns people to it, and every token issued to a member carries it. Per token: read the group claim already on the validated JWT and mint each entry into a principal. No cache sits in front of this: the claim is already decoded by the time it is read, minting a bounded set of principals from it costs nothing worth saving, and nothing here calls out anywhere else. The resolved principal set is capped, and a caller exceeding the cap fails the request rather than proceeding on a truncated set.
 
 ---
 
@@ -56,14 +58,28 @@ Membership resolves per token: use the token's group claim when it is complete, 
 
 ### Consequences
 
-- Positive: A membership change costs one directory edit and takes effect within the cache window. Nothing is re-indexed and nothing is re-embedded.
+- Positive: A membership change costs one directory edit and takes effect at the person's next sign-in. Nothing is re-indexed and nothing is re-embedded.
 - Positive: A sharing change costs a payload update on the affected document's chunks and nothing else.
 - Positive: The two staleness windows stay separate and separately bounded, which is what makes each of them explainable to a customer.
-- Negative: Membership resolution sits in the request path on a cache miss, and against a large directory that is a real cost nobody has measured yet.
+- Positive: There is no cache to keep consistent, no cache key to get wrong, and no dependency on Redis being up in order to resolve who somebody is. The whole membership answer comes from a token that was already being validated.
 - Negative: The filter is a set-intersection rather than an equality, so it is more expensive than the per-user alternative on every single query.
 - Negative: A person's effective access is now a function of two systems, so answering "why can this person see this" means looking at the chunk's list and at their resolved set.
+- Negative: A membership change is invisible until the person's session ends and they sign in again, and that window is the realm's SSO session and token lifetime, not something this decision can shorten on its own.
 
 #### Risks
 
-- Microsoft Entra ID omits the `groups` claim entirely when the user belongs to more groups than the token can carry, substituting `_claim_names` and `_claim_sources`. A resolver that reads `groups` and treats absence as "no groups" gives the most heavily-permissioned users the least access. Mitigated by treating an absent claim as fall-through to the transitive endpoint, never as an empty set, and by monitoring the distribution of principal set sizes so a population-wide collapse toward one is visible.
-- Redis unavailable means every request pays the directory call. Accepted, and it degrades latency rather than correctness.
+- A document synced from a customer's own SharePoint or Google Drive carries an access list naming that source's provider group identifiers, `entra:group:*` or `google:group:*`, and a Keycloak group mints only into `local:group:*`. Nothing maps one onto the other yet, so a synced document is retrievable by nobody until a mapping mechanism exists. Mitigated only by naming it here rather than letting it surface as a support ticket.
+
+See the Amendment below for the Microsoft and Google directory risks this decision carried before the scope cut, and why they are deferred rather than resolved.
+
+---
+
+### Amendment — 2026-09-04
+
+Scope was narrowed after this decision was first accepted. The original decision resolved membership by reading a provider's own group claim or by calling that provider's transitive membership endpoint, against a customer's own Microsoft Entra ID or Google Workspace directory. The owner has since decided that, for this version, group data lives in Keycloak and nowhere else: an administrator creates a group in the realm and assigns people to it, and the token carries those groups directly. Reading membership from a customer's own directory, whether brokered through Keycloak or looked up directly, is deferred, not abandoned.
+
+The core decision is unchanged. Membership still resolves at login into an immutable, capped principal set rather than being looked up per query, and access lists still name groups only. What changed is where the group data comes from.
+
+The reasoning behind the deferred approach is preserved because it will be needed again. Microsoft Entra ID stops emitting a groups claim once nested membership passes 200 groups for the token protocols, 150 for SAML, and substitutes a Graph pointer instead of a truncated list, which makes a claim-only read wrong for any tenant of real size. Google Workspace never emits a groups claim at all, in any token. Both facts mean that the moment a customer's own directory is consulted again, a directory lookup has to be the primary path and a claim can only ever be a small-tenant fast path for Microsoft, with no equivalent for Google. Neither fact applies to the current, Keycloak-only source, because a Keycloak-native group is not subject to either provider's emission limits and nothing here reads a provider's directory at all.
+
+One consequence of the narrowed scope has to be stated rather than discovered. A document synced from SharePoint or Google Drive carries an access list naming that source's own group identifiers, `entra:group:*` or `google:group:*`. A Keycloak group mints only into `local:group:*`. Nothing maps one onto the other. So permission filtering is correct and complete for a document uploaded directly into the product, where an administrator assigns Keycloak groups by hand, and it silently matches nobody for a document synced from a customer's own storage, until something maps that source's groups onto Keycloak groups. What that mapping mechanism is, and who builds it, is not decided by this amendment.
