@@ -2,7 +2,17 @@
 
 ## Status
 
-Proposed, 2026-09-04
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+
+## Deferral, 2026-09-05
+
+There are no permission-only changes in this version, because there is nothing per document to change, so the carve-out is not taken. The no-direct-vector-store-writes rule holds without exception, the framework interfaces expose no vector store and no embedding client, and the native Qdrant client is not referenced from the connector packages at all.
+
+This is a deferral and not a withdrawal, and the distinction matters more here than in the neighbouring records. The argument this record makes is that a narrow, written, reviewed exception is better than either an unstated one or a rule that forces an hour-long revocation. Marking it withdrawn would leave the next person who needs a payload write with a rule and no precedent, which is how an unstated exception gets invented. Marking it deferred leaves them a reviewed limit: four keys, four prohibitions, one tenant predicate.
+
+Nothing below was found to be wrong. The observable that proves no re-embed happened, unchanged point identifiers, is the one an implementation cannot fake, and it is asserted in this version too, on the re-enumeration path where an unchanged file must keep its points.
+
+What has to happen for this record to become active: a permission-only change has to be possible, which means ADR-010 and ADR-012 becoming active.
 
 ## Context
 

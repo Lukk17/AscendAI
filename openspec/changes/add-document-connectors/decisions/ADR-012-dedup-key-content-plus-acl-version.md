@@ -2,7 +2,17 @@
 
 ## Status
 
-Proposed, 2026-09-04
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+
+## Deferral, 2026-09-05
+
+A connector-landed document's access list in this version is `tenant:everyone:{tenantId}` and nothing else, stamped by the ingestion producer rather than captured from the source, so its version is a constant. Pairing a constant into the deduplication key would add a segment that never varies and a second marker format that never earns its keep. The connector-landed marker therefore stays `manual-ingestion:<key>:<etag>`, byte-identical to the manual upload path's, and this change requires that there be no second format anywhere in the connector packages.
+
+Nothing below was found to be wrong. Two of its findings survive the deferral and are worth reading before the pairing returns: that the sort is what makes the version mean "the permitted set changed" rather than "the response was ordered differently", and that a hash bug presents either as constant spurious updates or as missed revocations and therefore needs its own tests rather than trust.
+
+The paragraph in the Context section about the current spec writing the content-only bug into a requirement no longer applies as written. The scenario it named asserted that an unchanged file re-landed is a no-op, which under a captured list would have prescribed the bug and which under a company-wide list is simply correct. It becomes a defect again the day capture returns, which is why the paragraph stays.
+
+What has to happen for this record to become active: an access list whose value can differ between two runs of one connector, which means ADR-010 becoming active.
 
 ## Context
 

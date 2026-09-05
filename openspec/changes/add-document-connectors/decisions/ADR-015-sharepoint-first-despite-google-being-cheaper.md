@@ -2,7 +2,17 @@
 
 ## Status
 
-Proposed, 2026-09-04
+Proposed, 2026-09-04. Amended 2026-09-05, see Amendment below. Accepted when the OpenSpec change `add-document-connectors` lands. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive, taking the next free number at that time.
+
+## Amendment, 2026-09-05
+
+The decision stands. SharePoint is the first connector, Google Drive remains a named non-goal, and the reason is the one that always carried it: the customers this is being built for are on Microsoft.
+
+What changed is the counter-argument's status. Access-list capture is deferred under the current scope, so neither connector reads permissions and the permission-correctness comparison below has no input in this version. The two candidate sources are equally cheap here, and the ordering question has one argument rather than two.
+
+The comparison is not withdrawn, and it is the whole point of keeping this record. It becomes live again the day capture returns, and it will argue then exactly what it argues now. A future reader re-opening the ordering should find this analysis rather than rediscover it, and should not read the deferral as evidence that the difference between the two sources was overstated.
+
+One consequence of the amendment is worth naming, because it is the opposite of the trade-off recorded below. The complexity this record apologises for, ADR-011 and the separate permission budget existing to serve a constraint the second connector will not have, is not being paid in this version at all. It is deferred with the capture work. So the first connector is no longer the expensive one, and the argument that the harder capture path should shape the abstraction is an argument about a future version rather than about the code this change ships.
 
 ## Context
 

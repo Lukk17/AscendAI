@@ -2,7 +2,15 @@
 
 ## Status
 
-Proposed, 2026-09-04
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+
+## Deferral, 2026-09-05
+
+This record exists to make ADR-010's request cost affordable, and ADR-010 is deferred, so there is no cost to manage. No permission is read, no container list is captured, no `connector_item_acl` row is written, and the permission throttling budget is not split from the content budget.
+
+The analysis is kept whole and it is the part most worth keeping. That companies set sharing on team folders and inherit it downwards, that Graph exposes the distinction through `inheritedFrom`, that this turns one request per document into one per folder plus one per uniquely-shared item, and that the one real gap it opens is an item which stops inheriting between runs and is closed by the per-item confirmation schedule rather than eliminated, are all conclusions that took work and that return unchanged.
+
+What has to happen for this record to become active: ADR-010 becomes active, since this decision is only ever a way of paying for that one.
 
 ## Context
 

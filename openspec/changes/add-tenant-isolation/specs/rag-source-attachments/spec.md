@@ -28,7 +28,7 @@ The requirement is object-store-neutral. It SHALL hold against any S3-compatible
 
 #### Scenario: Presign refused inside the caller's tenant but outside the access list
 
-- **WHEN** a user of tenant `acme` whose principal set is `["tenant:everyone:acme"]` produces a `SourceRef` for `tenant/acme/documents/board-pack.pdf` whose access list is `["entra:group:finance"]`
+- **WHEN** a user of tenant `acme` whose principal set is `["tenant:everyone:acme"]` produces a `SourceRef` for `tenant/acme/documents/board-pack.pdf` whose access list is `["local:group:finance"]`
 - **THEN** no presigned URL is generated for that key
 - **AND** the entry is absent from `response.sources` entirely, rather than present with a blank link
 - **AND** the remaining sources for that request are still returned with working links

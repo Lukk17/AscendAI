@@ -22,9 +22,9 @@ When either the tenant context or the principal set is unresolved, retrieval SHA
 
 #### Scenario: Within-tenant retrieval refused for a caller outside the access list
 
-- **WHEN** a chunk of tenant `acme` carries `acl` of `["entra:group:finance"]` and a user of tenant `acme` whose principal set is `["tenant:everyone:acme", "entra:group:support"]` sends a prompt matching it
+- **WHEN** a chunk of tenant `acme` carries `acl` of `["local:group:finance"]` and a user of tenant `acme` whose principal set is `["tenant:everyone:acme", "local:group:support"]` sends a prompt matching it
 - **THEN** the similarity search returns zero candidates from that chunk
-- **AND** a user of tenant `acme` holding `entra:group:finance` retrieves the same chunk for the same prompt
+- **AND** a user of tenant `acme` holding `local:group:finance` retrieves the same chunk for the same prompt
 
 #### Scenario: Permitted chunk below the unfiltered cut is still returned
 

@@ -24,10 +24,10 @@ The tenant axis answers which company owns a chunk and is carried by the `tenant
 
 #### Scenario: Both axes required for a read
 
-- **WHEN** a chunk of tenant `acme` carries `acl` of `["entra:group:finance"]`
-- **THEN** a caller of tenant `globex` holding `entra:group:finance` retrieves nothing from it
+- **WHEN** a chunk of tenant `acme` carries `acl` of `["local:group:finance"]`
+- **THEN** a caller of tenant `globex` holding `local:group:finance` retrieves nothing from it
 - **AND** a caller of tenant `acme` holding only `tenant:everyone:acme` retrieves nothing from it
-- **AND** a caller of tenant `acme` holding `entra:group:finance` retrieves it
+- **AND** a caller of tenant `acme` holding `local:group:finance` retrieves it
 
 ### Requirement: Chunk access-list payload contract
 

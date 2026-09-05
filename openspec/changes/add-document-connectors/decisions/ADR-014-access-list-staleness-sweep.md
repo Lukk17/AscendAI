@@ -2,7 +2,19 @@
 
 ## Status
 
-Proposed, 2026-09-04
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. Superseded for the current scope by ADR-016, which keeps this record's instinct and drops its enforcement. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+
+## Deferral, 2026-09-05
+
+The sweep empties an access list to contain a stale authorization decision. Under the current scope a connector-landed document carries `tenant:everyone:{tenantId}` and nothing else, so there is no authorization decision on it that can go stale: the only grant is one every member of the company holds, and it was never going to be revoked by a change at the source that nobody reads. Emptying it would take documents away from people who were never restricted from them, in exchange for containing nothing.
+
+So the enforcement half is deferred, and the permissions-only trigger mode goes with it, because a permissions-only run would have nothing to confirm and nothing to write.
+
+The instinct is not deferred, and it is the part of this record worth arguing with rather than reading past. A control that keeps returning a plausible answer after it stopped being an answer is the worst failure shape available, and it has to be made visible by something that does not depend on the thing that failed. What can still fail silently in this version is the sync itself, so ADR-016 re-aims exactly that reasoning at the connector rather than at the access list, and makes the signal non-destructive because there is no enforcement left to trade availability for.
+
+Nothing below was found to be wrong. Two of its findings hold under ADR-016 and are inherited there rather than restated: that the control must not depend on the failed path, and that the maximum age sitting below the refresh interval is a misconfiguration which is silent right up until it fires on everything at once, and therefore has to be rejected at write time.
+
+What has to happen for this record to become active: per-document access lists that a source can change, which means ADR-010 becoming active. At that point the sweep returns alongside ADR-016's check rather than instead of it, because they detect two different outages.
 
 ## Context
 

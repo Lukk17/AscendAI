@@ -2,7 +2,17 @@
 
 ## Status
 
-Proposed, 2026-09-04
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+
+## Deferral, 2026-09-05
+
+Group membership now comes from Keycloak realm groups alone, so `add-auth-and-identity` mints principals only in the `local` and `tenant` namespaces. A SharePoint permission entry names an Entra ID directory object id, which no principal in this version can equal and which the typed factory rejects outright. Capture has nothing it can produce, so there is no capture trigger to separate from the content feed and no `permissions_confirmed_through` on the cursor.
+
+Nothing below was found to be wrong. It is kept whole because the reasoning is the expensive part: that a source may or may not report a sharing edit at all, that a folder-level revocation is reported once on the folder and never on its descendants, and that both failures are silent, are findings that a future reader would otherwise rediscover by shipping the bug.
+
+What has to happen for this record to become active: a principal namespace a source identifier can mint into, which is deferred on the identity side, and the owner's open decision about how a customer's directory groups relate to Keycloak's.
+
+The consequence of leaving it deferred is stated as a named limitation in this change's design document: a connector-synced document is visible to everyone in the company that owns it.
 
 ## Context
 
