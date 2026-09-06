@@ -142,11 +142,11 @@ Full settings reference in [docs/configuration.md](docs/configuration.md).
 
 ### Agent skill
 
-A drop-in skill ships at [skills/ascend-web-scrapper/SKILL.md](skills/ascend-web-scrapper/SKILL.md). Copy
-[skills/ascend-web-scrapper/](skills/ascend-web-scrapper/) into your agent's skills folder
+A drop-in skill ships at [skills/ascend-web-hunter/SKILL.md](skills/ascend-web-hunter/SKILL.md). Copy
+[skills/ascend-web-hunter/](skills/ascend-web-hunter/) into your agent's skills folder
 (`.claude/skills/`, `.agents/skills/`, `.opencode/skills/`) and the agent picks it up automatically. The
-skill covers both endpoints, the `human_intervention_required` response shape, and the
-captcha-solve-then-resume flow.
+skill covers search, read, and the session establish/status/clear endpoints, the
+`human_intervention_required` response shape, and the captcha-solve-then-resume flow.
 
 ---
 
