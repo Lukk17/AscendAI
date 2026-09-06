@@ -31,6 +31,7 @@ and Architecture Decision Records (ADRs).
 | Document                                                            | Description                                                                                      |
 | :------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------- |
 | [Permission-aware retrieval](permission-aware-retrieval.md)         | How access lists reach chunks, how the filter runs inside the vector search, and what goes stale. |
+| [Memory budget across the stack](memory-budget.md)                  | Idle and peak memory per service, the sum of configured limits against the host, and the realistic worst case. |
 
 ---
 
