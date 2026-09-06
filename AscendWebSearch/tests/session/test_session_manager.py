@@ -182,6 +182,43 @@ async def test_establish_returns_vnc_url(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
+async def test_establish_forwards_named_profile_to_novnc_strategy(mgr: SessionManager):
+    """The profile argument must reach the browser strategy, not be silently
+    discarded: establish() with profile="work" must construct NoVNCStrategy
+    with that profile."""
+    exc = HumanInterventionRequiredException("http://vnc:7900", "captcha")
+    with patch(
+        "src.reader.strategies.novnc_strategy.NoVNCStrategy.__init__",
+        return_value=None,
+    ) as mock_init:
+        with patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(side_effect=exc),
+        ):
+            result = await mgr.establish("https://example.com", "work")
+
+    assert result == "http://vnc:7900"
+    mock_init.assert_called_once_with("work")
+
+
+@pytest.mark.asyncio
+async def test_establish_defaults_profile_when_none_given(mgr: SessionManager):
+    """No profile given falls back to the configured default, matching status()/clear()."""
+    exc = HumanInterventionRequiredException("http://vnc:7900", "captcha")
+    with patch(
+        "src.reader.strategies.novnc_strategy.NoVNCStrategy.__init__",
+        return_value=None,
+    ) as mock_init:
+        with patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(side_effect=exc),
+        ):
+            await mgr.establish("https://example.com")
+
+    mock_init.assert_called_once_with("default")
+
+
+@pytest.mark.asyncio
 async def test_establish_raises_runtime_error_when_no_intervention(mgr: SessionManager):
     with patch(
         "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",

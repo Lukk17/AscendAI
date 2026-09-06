@@ -19,3 +19,21 @@ class ChallengeDetectedException(Exception):
         self.intervention_type = intervention_type
         self.message = f"Challenge detected: {intervention_type}"
         super().__init__(self.message)
+
+
+class NoVNCFlowBusyException(Exception):
+    """
+    Raised when a NoVNC intervention is requested while another one already
+    holds the single shared browser, VNC display and CDP port. Only one
+    flow -- manual `session/establish` or an automatic escalation from a
+    read -- can run at a time.
+    """
+
+    def __init__(self, holder_url: str, holder_profile: str):
+        self.holder_url = holder_url
+        self.holder_profile = holder_profile
+        self.message = (
+            f"A NoVNC intervention is already in progress for {holder_url} "
+            f"(profile={holder_profile}). Only one intervention can run at a time; try again shortly."
+        )
+        super().__init__(self.message)

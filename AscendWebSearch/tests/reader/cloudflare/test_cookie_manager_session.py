@@ -25,8 +25,12 @@ def _state(cookies: list[dict[str, Any]], origins: list[dict] | None = None) -> 
     return {"cookies": cookies, "origins": origins or []}
 
 
-def _cookie(name: str, value: str = "v") -> dict[str, Any]:
-    return {"name": name, "value": value, "domain": "example.com", "path": "/"}
+def _cookie(name: str, value: str = "v", expires: float | None = None) -> dict[str, Any]:
+    cookie: dict[str, Any] = {"name": name, "value": value, "domain": "example.com", "path": "/"}
+    if expires is not None:
+        cookie["expires"] = expires
+
+    return cookie
 
 
 _AUTH_COOKIE_NAME = "auth_token"
@@ -191,6 +195,107 @@ async def test_get_auth_ttl_remaining_returns_zero_when_absent():
     m = _fresh()
     ttl = await m.get_auth_ttl_remaining("https://nothere.com")
     assert ttl == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Cookie-expiry-aware auth TTL (session:saucedemo.com:e2e regression)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_auth_ttl_remaining_reports_zero_once_the_only_hard_cookie_expired():
+    """A cookie that hard-expired minutes after being saved must report as
+    expired immediately, not ride the 14-day sliding ceiling to "active"."""
+    m = _fresh()
+    saved_at = time.time() - 3600
+    expired_at = saved_at + 600  # expired 55 minutes ago, ceiling still has ~14 days left
+    state = _state([_cookie("session-username", expires=expired_at)])
+    await m.save_storage_state("https://saucedemo.com", state, "UA", profile="e2e")
+
+    domain = m._get_domain("https://saucedemo.com")
+    m._memory_store[f"{domain}:e2e"]["auth"]["saved_at"] = saved_at
+
+    ttl = await m.get_auth_ttl_remaining("https://saucedemo.com", "e2e")
+
+    assert ttl == 0.0
+
+
+@pytest.mark.asyncio
+async def test_get_storage_state_hides_auth_once_the_only_hard_cookie_expired():
+    m = _fresh()
+    saved_at = time.time() - 3600
+    expired_at = saved_at + 600
+    state = _state([_cookie("session-username", expires=expired_at)])
+    await m.save_storage_state("https://saucedemo.com", state, "UA", profile="e2e")
+
+    domain = m._get_domain("https://saucedemo.com")
+    m._memory_store[f"{domain}:e2e"]["auth"]["saved_at"] = saved_at
+
+    result = await m.get_storage_state("https://saucedemo.com", "e2e")
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_auth_ttl_remaining_uses_earliest_hard_cookie_expiry():
+    """Governed by the shortest-lived hard-expiring cookie, not the longest."""
+    m = _fresh()
+    now = time.time()
+    state = _state(
+        [
+            _cookie("short", expires=now + 100),
+            _cookie("long", expires=now + 10_000),
+        ]
+    )
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    ttl = await m.get_auth_ttl_remaining("https://example.com")
+
+    assert 0 < ttl <= 100
+
+
+@pytest.mark.asyncio
+async def test_get_auth_ttl_remaining_caps_at_configured_ceiling_despite_long_cookie():
+    """A cookie the site marked good for a year is still capped by
+    SESSION_AUTH_TTL_SECONDS: the ceiling still earns its place as an
+    independent trust boundary, not just a fallback for session cookies."""
+    m = _fresh()
+    now = time.time()
+    one_year_seconds = 365 * 24 * 3600
+    state = _state([_cookie("remember_me", expires=now + one_year_seconds)])
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    with patch("src.config.config.settings.SESSION_AUTH_TTL_SECONDS", 100):
+        ttl = await m.get_auth_ttl_remaining("https://example.com")
+
+    assert 0 < ttl <= 100
+
+
+@pytest.mark.asyncio
+async def test_get_auth_ttl_remaining_falls_back_to_ceiling_for_session_only_cookies():
+    """Cookies with no hard expiry (Playwright's expires=-1 or absent) carry
+    no expiry signal of their own, so the configured ceiling alone governs."""
+    m = _fresh()
+    state = _state([_cookie("session_cookie", expires=-1)])
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    ttl = await m.get_auth_ttl_remaining("https://example.com")
+
+    assert ttl > 0
+
+
+@pytest.mark.asyncio
+async def test_get_auth_ttl_remaining_reports_positive_for_a_genuinely_live_session():
+    """A session with time left on both the cookie and the ceiling reports
+    the smaller of the two, never zero."""
+    m = _fresh()
+    now = time.time()
+    state = _state([_cookie("session-username", expires=now + 3600)])
+    await m.save_storage_state("https://saucedemo.com", state, "UA", profile="e2e")
+
+    ttl = await m.get_auth_ttl_remaining("https://saucedemo.com", "e2e")
+
+    assert 0 < ttl <= 3600
 
 
 # ---------------------------------------------------------------------------

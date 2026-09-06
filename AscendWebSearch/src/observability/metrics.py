@@ -61,3 +61,8 @@ CIRCUIT_BREAKER_OPEN_TOTAL = Counter(
     "Number of times a circuit breaker transitioned to OPEN state",
     ["dependency"],
 )
+
+NOVNC_FLOW_BUSY_TOTAL = Counter(
+    "novnc_flow_busy_total",
+    "Requests rejected because a NoVNC intervention was already holding the shared browser/display",
+)

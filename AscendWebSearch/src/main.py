@@ -13,8 +13,9 @@ from src.api.exception_handlers import (
     global_exception_handler,
     httpx_exception_handler,
     human_intervention_exception_handler,
+    novnc_flow_busy_exception_handler,
 )
-from src.api.exceptions import HumanInterventionRequiredException
+from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.api.mcp.mcp_server import mcp
 from src.api.mcp.mcp_server import search_client as mcp_search_client
 from src.api.readiness import readiness_router
@@ -107,6 +108,10 @@ def create_app() -> FastAPI:
     app.add_exception_handler(
         HumanInterventionRequiredException,
         human_intervention_exception_handler,  # type: ignore[arg-type]
+    )
+    app.add_exception_handler(
+        NoVNCFlowBusyException,
+        novnc_flow_busy_exception_handler,  # type: ignore[arg-type]
     )
     app.add_exception_handler(
         BlocklistValidationError,

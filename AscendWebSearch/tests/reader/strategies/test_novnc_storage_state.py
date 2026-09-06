@@ -152,6 +152,49 @@ async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_se
 
 
 @pytest.mark.asyncio
+async def test_novnc_captcha_monitor_never_writes_session_for_never_challenged_page():
+    """The reported bug: establish() against an ordinary page that already shows
+    real content on the very first poll, with no prior blocked state, must
+    never capture a session — nobody solved anything."""
+    from src.reader.strategies import novnc_strategy as ns
+
+    page = MagicMock()
+    page.goto = AsyncMock()
+    page.evaluate = AsyncMock(return_value="Mozilla/5.0")
+    page.url = "https://ordinary-site.example/"
+    page.content = AsyncMock(return_value="<html><body>" + "genuine article text " * 50 + "</body></html>")
+
+    context = MagicMock()
+    context.new_page = AsyncMock(return_value=page)
+    context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
+
+    browser = MagicMock()
+    browser.new_context = AsyncMock(return_value=context)
+    browser.close = AsyncMock()
+
+    mock_p = MagicMock()
+    mock_p.__aenter__ = AsyncMock(return_value=mock_p)
+    mock_p.__aexit__ = AsyncMock(return_value=False)
+    mock_p.chromium.launch = AsyncMock(return_value=browser)
+
+    async def fake_sleep(seconds):
+        raise RuntimeError("abort loop after one iteration")
+
+    with (
+        patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=mock_p),
+        patch(
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
+            new=AsyncMock(),
+        ) as mock_save,
+        patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch("src.reader.strategies.novnc_strategy.asyncio.sleep", side_effect=fake_sleep),
+    ):
+        await ns._monitor_for_cookies("https://ordinary-site.example/", "captcha")
+
+    mock_save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance():
     """For non-Cloudflare captchas (e.g. DataDome) there is no cf_clearance cookie; the
     monitor must capture once the challenge wall is gone."""

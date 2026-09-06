@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.api.exceptions import HumanInterventionRequiredException
+from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.reader.web_reader import WebReader
 
 
@@ -62,4 +62,57 @@ async def test_read_with_links_direct_428_propagates():
         new=AsyncMock(side_effect=exc),
     ):
         with pytest.raises(HumanInterventionRequiredException):
+            await WebReader().read_with_links("http://test.com")
+
+
+@pytest.mark.asyncio
+async def test_read_propagates_novnc_busy_instead_of_swallowing_it():
+    """
+    A read that escalates all the way to NoVNC while another intervention
+    already holds the shared browser/display must surface that conflict to
+    the caller, not report a generic 'all_tiers_failed'.
+    """
+    exc = NoVNCFlowBusyException("http://other-site.example", "default")
+
+    with (
+        patch(
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.CrawleeStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(side_effect=exc),
+        ),
+    ):
+        with pytest.raises(NoVNCFlowBusyException) as exc_info:
+            await WebReader().read("http://test.com")
+
+    assert exc_info.value.holder_url == "http://other-site.example"
+
+
+@pytest.mark.asyncio
+async def test_read_with_links_propagates_novnc_busy_instead_of_swallowing_it():
+    exc = NoVNCFlowBusyException("http://other-site.example", "default")
+
+    with patch(
+        "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+        new=AsyncMock(side_effect=exc),
+    ):
+        with pytest.raises(NoVNCFlowBusyException):
             await WebReader().read_with_links("http://test.com")

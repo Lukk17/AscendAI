@@ -4,15 +4,20 @@ import httpx
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
-from src.api.exceptions import HumanInterventionRequiredException
+from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
-from src.observability.metrics import HUMAN_INTERVENTION_TOTAL
+from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
 
 logger = logging.getLogger(__name__)
 
 
 PROBLEM_JSON = "application/problem+json"
 _PROBLEM_TYPE_BASE = "https://ascend.ai/errors"
+
+# Suggested wait before a caller retries a busy NoVNC flow. Not the flow's own
+# timeout (up to 10 minutes): a short, fixed poll interval so a rejected caller
+# gets a fast, actionable answer instead of an opaque long wait.
+_NOVNC_BUSY_RETRY_AFTER_SECONDS = 30
 
 
 async def httpx_exception_handler(request: Request, exc: httpx.HTTPError) -> JSONResponse:
@@ -80,6 +85,29 @@ async def human_intervention_exception_handler(
             "intervention_type": exc.intervention_type,
             "vnc_url": exc.vnc_url,
             "message": exc.message,
+        },
+    )
+
+
+async def novnc_flow_busy_exception_handler(request: Request, exc: NoVNCFlowBusyException) -> JSONResponse:
+    """
+    Returns 409 Conflict when a NoVNC intervention is requested while another
+    one already holds the single shared browser/display/CDP port.
+    """
+    NOVNC_FLOW_BUSY_TOTAL.inc()
+    logger.info(
+        f"409 Conflict on {request.method} {request.url}: NoVNC busy with "
+        f"{exc.holder_url} (profile={exc.holder_profile})"
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        headers={"Retry-After": str(_NOVNC_BUSY_RETRY_AFTER_SECONDS)},
+        content={
+            "status": "novnc_busy",
+            "message": exc.message,
+            "holder_url": exc.holder_url,
+            "holder_profile": exc.holder_profile,
         },
     )
 

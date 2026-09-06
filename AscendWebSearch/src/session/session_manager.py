@@ -55,16 +55,17 @@ class SessionManager:
     establish/status/validate API on top.
     """
 
-    async def establish(self, url: str, _profile: str | None = None) -> str:
-        """Open the NoVNC flow for *url* and return the VNC URL.
+    async def establish(self, url: str, profile: str | None = None) -> str:
+        """Open the NoVNC flow for *url* + *profile* and return the VNC URL.
 
         The browser monitor will capture and persist the session once the
-        human completes the login/CAPTCHA.
+        human completes the login/CAPTCHA, under the requested profile.
         """
         from src.api.exceptions import HumanInterventionRequiredException
         from src.reader.strategies.novnc_strategy import NoVNCStrategy
 
-        strategy = NoVNCStrategy()
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        strategy = NoVNCStrategy(effective_profile)
         try:
             await strategy.get_html(url)
         except HumanInterventionRequiredException as exc:

@@ -60,6 +60,18 @@ def _extract_flat_cookies(storage_state: dict[str, Any]) -> dict[str, str]:
     return {c["name"]: c["value"] for c in storage_state.get("cookies", []) if "name" in c and "value" in c}
 
 
+def _hard_cookie_expiries(cookies: list[dict[str, Any]]) -> list[float]:
+    """Return the epoch-second expiries of cookies that carry a real one.
+
+    Playwright represents a session cookie (no persistent expiry) with
+    `expires` absent or set to -1; those tell us nothing about when a real
+    browser would drop them, so they are excluded here.
+    """
+    return [
+        float(c["expires"]) for c in cookies if isinstance(c.get("expires"), int | float) and c["expires"] > 0
+    ]
+
+
 class CookieManager:
     _instance: "CookieManager | None" = None
     _initialized: bool
@@ -115,6 +127,40 @@ class CookieManager:
         return f"session:{domain}:{profile}"
 
     @staticmethod
+    def _auth_ttl_remaining_from_entry(auth_entry: dict[str, Any]) -> float:
+        """Seconds remaining before *auth_entry* stops authenticating.
+
+        Governed by whichever runs out first: the sliding SESSION_AUTH_TTL_SECONDS
+        ceiling since the entry was last saved/validated, or the earliest hard
+        cookie expiry in its storage_state. The ceiling still matters even once a
+        real expiry is known, since it also caps how long we trust a session that
+        a site marked as absurdly long-lived (a "remember me" cookie good for a
+        year); the two compose via whichever is smaller.
+
+        An entry made up entirely of session cookies (no hard expiry at all)
+        falls back to the ceiling alone. This is deliberately conservative in
+        the safe direction: a site may keep a user logged in past one
+        short-lived, non-essential cookie's expiry using a different cookie
+        that outlives it, in which case this reports "expired" earlier than
+        the site actually would. That costs one wasted NoVNC re-establish; the
+        alternative -- trusting the longest-lived cookie present -- risks the
+        opposite failure this fix exists to close: reporting a dead session
+        as active.
+        """
+        saved_at = float(auth_entry.get("saved_at", 0) or 0)
+        now = time.time()
+        ceiling_remaining = settings.SESSION_AUTH_TTL_SECONDS - (now - saved_at)
+
+        cookies = auth_entry.get("storage_state", {}).get("cookies", [])
+        hard_expiries = _hard_cookie_expiries(cookies)
+        if not hard_expiries:
+            return max(ceiling_remaining, 0.0)
+
+        cookie_remaining = min(hard_expiries) - now
+
+        return max(min(ceiling_remaining, cookie_remaining), 0.0)
+
+    @staticmethod
     def _memory_key(domain: str, profile: str) -> str:
         return f"{domain}:{profile}"
 
@@ -137,7 +183,7 @@ class CookieManager:
         auth_state: dict[str, Any] | None = None
         waf_state: dict[str, Any] | None = None
 
-        if auth_entry and (now - auth_entry.get("saved_at", 0)) < settings.SESSION_AUTH_TTL_SECONDS:
+        if auth_entry and self._auth_ttl_remaining_from_entry(auth_entry) > 0:
             auth_state = auth_entry.get("storage_state")
         if waf_entry and (now - waf_entry.get("saved_at", 0)) < settings.SESSION_WAF_TTL_SECONDS:
             waf_state = waf_entry.get("storage_state")
@@ -230,18 +276,18 @@ class CookieManager:
         url: str,
         profile: str | None = None,
     ) -> float:
-        """Return seconds remaining on the auth TTL, or 0 if expired/absent."""
+        """Return seconds remaining before the stored auth cookies stop
+        authenticating, or 0 if expired/absent. See
+        `_auth_ttl_remaining_from_entry` for how cookie expiry and the
+        configured ceiling combine.
+        """
         domain = self._get_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         record = await self._load_record(domain, effective_profile)
         if record is None or "auth" not in record:
             return 0.0
-        auth_entry = record["auth"]
-        saved_at = float(auth_entry.get("saved_at", 0) or 0)
-        elapsed = time.time() - saved_at
-        remaining = settings.SESSION_AUTH_TTL_SECONDS - elapsed
 
-        return max(remaining, 0.0)
+        return self._auth_ttl_remaining_from_entry(record["auth"])
 
     # ---------------------------------------------------------------------------
     # Legacy compatibility: still used by FlareSolverrStrategy which receives a

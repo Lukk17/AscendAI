@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.api.exceptions import HumanInterventionRequiredException
+from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.api.mcp.mcp_server import session_clear, session_establish, session_status, web_read, web_search
 from src.session.session_manager import SessionInfo, SessionManager
 
@@ -117,6 +117,24 @@ async def test_mcp_web_read_human_intervention_on_links_branch():
     assert result["intervention_type"] == "login"
 
 
+@pytest.mark.asyncio
+async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload():
+    exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+    with (
+        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch(
+            "src.api.mcp.mcp_server.web_reader.read",
+            new_callable=AsyncMock,
+            side_effect=exc,
+        ),
+    ):
+        result = await web_read("http://mcp.com")
+
+    assert result["status"] == "novnc_busy"
+    assert result["holder_url"] == "http://in-flight.example"
+    assert result["holder_profile"] == "default"
+
+
 # ---------------------------------------------------------------------------
 # session_establish MCP tool
 # ---------------------------------------------------------------------------
@@ -145,6 +163,20 @@ async def test_mcp_session_establish_unsafe_url_raises():
     with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
         with pytest.raises(ValueError, match="non-routable"):
             await session_establish("http://10.0.0.1")
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_establish_returns_novnc_busy_payload():
+    exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+    with (
+        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch.object(SessionManager, "establish", new=AsyncMock(side_effect=exc)),
+    ):
+        result = await session_establish("http://example.com")
+
+    assert result["status"] == "novnc_busy"
+    assert result["holder_url"] == "http://in-flight.example"
+    assert result["holder_profile"] == "default"
 
 
 # ---------------------------------------------------------------------------

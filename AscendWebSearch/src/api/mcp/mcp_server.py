@@ -2,8 +2,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from src.api.exceptions import HumanInterventionRequiredException
-from src.observability.metrics import HUMAN_INTERVENTION_TOTAL
+from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.web_reader import WebReader
 from src.search.search_client import SearxngClient
@@ -71,6 +71,15 @@ async def web_read(
             "vnc_url": exc.vnc_url,
             "message": exc.message,
         }
+    except NoVNCFlowBusyException as exc:
+        NOVNC_FLOW_BUSY_TOTAL.inc()
+
+        return {
+            "status": "novnc_busy",
+            "message": exc.message,
+            "holder_url": exc.holder_url,
+            "holder_profile": exc.holder_profile,
+        }
 
 
 @mcp.tool()
@@ -86,7 +95,18 @@ async def session_establish(url: str, profile: str | None = None) -> dict[str, A
     if not is_safe_external_url(url):
         raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
 
-    vnc_url = await session_manager.establish(url, profile)
+    try:
+        vnc_url = await session_manager.establish(url, profile)
+    except NoVNCFlowBusyException as exc:
+        NOVNC_FLOW_BUSY_TOTAL.inc()
+
+        return {
+            "status": "novnc_busy",
+            "message": exc.message,
+            "holder_url": exc.holder_url,
+            "holder_profile": exc.holder_profile,
+        }
+
     HUMAN_INTERVENTION_TOTAL.labels(intervention_type="login").inc()
     return {
         "status": "human_intervention_required",

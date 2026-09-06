@@ -1,11 +1,12 @@
 import asyncio
 import logging
+import time
 from typing import Any, cast
 
 import httpx
 from playwright.async_api import async_playwright
 
-from src.api.exceptions import HumanInterventionRequiredException
+from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.config.config import settings
 from src.observability.domain_label import domain_label
 from src.observability.metrics import STRATEGY_ATTEMPTS_TOTAL
@@ -22,9 +23,72 @@ _VNC_WINDOW_HEIGHT_PX = 1080
 _INITIAL_NAV_TIMEOUT_MS = 120_000
 _NGROK_API_TIMEOUT_SECONDS = 5.0
 
+# Grace period added on top of NOVNC_TIMEOUT_SECONDS before a held lock is
+# treated as stale and reclaimed. Covers the gap between the monitor's own
+# timeout firing and its `finally` block actually running (browser.close()
+# and the outer async-with teardown), not a second full timeout window.
+_NOVNC_LOCK_LEASE_GRACE_SECONDS = 30.0
+
 _active_monitor_tasks: set[asyncio.Task[None]] = set()
 
 _MONITOR_STRATEGY_LABEL = "6-novnc-monitor"
+
+
+class _NoVNCFlowLock:
+    """Serializes access to the single shared NoVNC browser, VNC display and
+    CDP port (see docker-entrypoint.sh: one Xvfb display, one dbus session
+    bus). Both the manual `session/establish` endpoint and WebReader's
+    automatic escalation to this tier go through the same `get_html()`, so
+    the lock is acquired there regardless of caller.
+
+    The lock is global, not per (url, profile): only one physical browser
+    window exists for a human to interact with, so a second flow for a
+    *different* site genuinely cannot run concurrently, and a second flow
+    for the *same* site is not safely joinable either -- the human already
+    driving the first window has no way to know a second, unrelated caller
+    is now also expecting that window's outcome.
+
+    A lease timestamp bounds how long the lock can be held. If the flow that
+    acquired it dies without releasing (a wedged browser subprocess, a hang
+    with no exception), the lock self-heals once the lease expires rather
+    than making the endpoint permanently unavailable.
+    """
+
+    def __init__(self) -> None:
+        self._holder_url: str | None = None
+        self._holder_profile: str | None = None
+        self._acquired_at: float = 0.0
+
+    def _lease_expired(self, now: float) -> bool:
+        lease_seconds = settings.NOVNC_TIMEOUT_SECONDS + _NOVNC_LOCK_LEASE_GRACE_SECONDS
+
+        return now - self._acquired_at >= lease_seconds
+
+    def try_acquire(self, url: str, profile: str) -> None:
+        """Raise NoVNCFlowBusyException if another flow currently holds the lock."""
+        now = time.monotonic()
+        if self._holder_url is not None and self._holder_profile is not None and not self._lease_expired(now):
+            raise NoVNCFlowBusyException(self._holder_url, self._holder_profile)
+
+        if self._holder_url is not None:
+            logger.warning(
+                "NoVNC Strategy: lock held by %s (profile=%s) exceeded its lease, reclaiming",
+                self._holder_url,
+                self._holder_profile,
+            )
+
+        self._holder_url = url
+        self._holder_profile = profile
+        self._acquired_at = now
+
+    def release(self, url: str, profile: str) -> None:
+        if self._holder_url == url and self._holder_profile == profile:
+            self._holder_url = None
+            self._holder_profile = None
+            self._acquired_at = 0.0
+
+
+_novnc_flow_lock = _NoVNCFlowLock()
 
 
 def _has_clearance_cookie(storage_state: dict[str, Any]) -> bool:
@@ -38,26 +102,43 @@ def _timeout_outcome(intervention_type: str, last_page_blocked: bool) -> str:
     return "rejected" if intervention_type == "captcha" and last_page_blocked else "timeout"
 
 
-async def _poll_captcha(page: Any, url: str, storage_state: dict[str, Any]) -> tuple[bool, bool]:
-    """Run one captcha-branch poll. Returns (resolved, page_blocked)."""
+async def _poll_captcha(
+    page: Any,
+    url: str,
+    storage_state: dict[str, Any],
+    profile: str | None,
+    ever_blocked: bool,
+) -> tuple[bool, bool, bool]:
+    """Run one captcha-branch poll. Returns (resolved, page_blocked, ever_blocked).
+
+    A session is only captured on a genuine transition: the page must have
+    shown a known block signature at some earlier poll in this same monitor
+    run (`ever_blocked`) before it is treated as cleared now. An ordinary page
+    that is already showing real content on the very first poll never sets
+    `ever_blocked`, so establish() against a page nobody had to solve records
+    nothing. A Cloudflare clearance cookie is independent evidence a real
+    challenge was solved, so it still short-circuits the transition
+    requirement.
+    """
     page_content = await page.content()
     page_blocked = ChallengeDetector.is_blocked(200, page_content)
-    cleared = ChallengeDetector.is_content_accepted(200, page_content)
+    ever_blocked = ever_blocked or page_blocked
+    cleared = ever_blocked and ChallengeDetector.is_content_accepted(200, page_content)
     if cleared or _has_clearance_cookie(storage_state):
         user_agent = await page.evaluate("navigator.userAgent")
-        await cookie_manager.save_storage_state(url, storage_state, user_agent)
+        await cookie_manager.save_storage_state(url, storage_state, user_agent, profile)
         logger.info("NoVNC Strategy: captcha solved for %s, captured session and stopping", url)
 
-        return True, page_blocked
+        return True, page_blocked, ever_blocked
 
-    return False, page_blocked
+    return False, page_blocked, ever_blocked
 
 
-async def _poll_login(page: Any, url: str, storage_state: dict[str, Any]) -> bool:
+async def _poll_login(page: Any, url: str, storage_state: dict[str, Any], profile: str | None) -> bool:
     """Run one login-branch poll. Returns whether the login has resolved."""
     current_url = page.url or ""
     user_agent = await page.evaluate("navigator.userAgent")
-    await cookie_manager.save_storage_state(url, storage_state, user_agent)
+    await cookie_manager.save_storage_state(url, storage_state, user_agent, profile)
     if not ChallengeDetector.is_login_redirect_url(current_url) and current_url != url:
         logger.info("NoVNC Strategy: login resolved (now at %s), stopping monitor", current_url)
 
@@ -66,28 +147,41 @@ async def _poll_login(page: Any, url: str, storage_state: dict[str, Any]) -> boo
     return False
 
 
-async def _poll_once(page: Any, context: Any, url: str, intervention_type: str) -> tuple[bool, bool]:
-    """Run a single monitor poll. Returns (resolved, page_blocked); page_blocked
-    is only meaningful for the captcha branch and defaults to True on a
-    transient error so an all-errors timeout is labeled 'rejected'-safe."""
+async def _poll_once(
+    page: Any,
+    context: Any,
+    url: str,
+    intervention_type: str,
+    profile: str | None,
+    ever_blocked: bool,
+) -> tuple[bool, bool, bool]:
+    """Run a single monitor poll. Returns (resolved, page_blocked, ever_blocked);
+    page_blocked and ever_blocked are only meaningful for the captcha branch and
+    default to True/unchanged on a transient error so an all-errors timeout is
+    labeled 'rejected'-safe."""
     try:
         storage_state = cast("dict[str, Any]", await context.storage_state())
         if intervention_type == "captcha":
-            return await _poll_captcha(page, url, storage_state)
+            return await _poll_captcha(page, url, storage_state, profile, ever_blocked)
 
-        return await _poll_login(page, url, storage_state), True
+        return await _poll_login(page, url, storage_state, profile), True, ever_blocked
     except Exception as e:
         logger.debug("NoVNC Strategy: Transient error syncing session cookies: %s", e)
 
-        return False, True
+        return False, True, ever_blocked
 
 
-async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> None:
+async def _monitor_for_cookies(
+    url: str,
+    intervention_type: str = "captcha",
+    profile: str | None = None,
+) -> None:
     logger.info("Background task started to monitor session for %s (%s)", url, intervention_type)
     browser = None
     fp = get_default_fingerprint()
     dlabel = domain_label(url)
     outcome = "timeout"
+    effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
 
     try:
         async with async_playwright() as p:
@@ -119,8 +213,11 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
             loop = asyncio.get_running_loop()
             start_time = loop.time()
             last_page_blocked = True
+            ever_blocked = False
             while loop.time() - start_time < settings.NOVNC_TIMEOUT_SECONDS:
-                resolved, last_page_blocked = await _poll_once(page, context, url, intervention_type)
+                resolved, last_page_blocked, ever_blocked = await _poll_once(
+                    page, context, url, intervention_type, profile, ever_blocked
+                )
                 if resolved:
                     outcome = "resolved"
 
@@ -148,18 +245,29 @@ async def _monitor_for_cookies(url: str, intervention_type: str = "captcha") -> 
                 await browser.close()
             except Exception as e:
                 logger.debug("NoVNC Strategy: browser close failed during cleanup: %s", e)
+        _novnc_flow_lock.release(url, effective_profile)
         STRATEGY_ATTEMPTS_TOTAL.labels(strategy=_MONITOR_STRATEGY_LABEL, outcome=outcome, domain=dlabel).inc()
 
 
 class NoVNCStrategy(BaseStrategy):
+    def __init__(self, profile: str | None = None) -> None:
+        self.profile = profile
+
     async def extract(self, url: str) -> str:
         return await self.get_html(url)
 
     async def get_html(self, url: str) -> str:
         intervention_type = "login" if ChallengeDetector.is_login_redirect_url(url) else "captcha"
-        final_vnc_url = await self._resolve_public_vnc_url()
+        effective_profile = self.profile or settings.SESSION_DEFAULT_PROFILE
 
-        task = asyncio.create_task(_monitor_for_cookies(url, intervention_type))
+        _novnc_flow_lock.try_acquire(url, effective_profile)
+        try:
+            final_vnc_url = await self._resolve_public_vnc_url()
+        except Exception:
+            _novnc_flow_lock.release(url, effective_profile)
+            raise
+
+        task = asyncio.create_task(_monitor_for_cookies(url, intervention_type, self.profile))
         _active_monitor_tasks.add(task)
         task.add_done_callback(_active_monitor_tasks.discard)
 

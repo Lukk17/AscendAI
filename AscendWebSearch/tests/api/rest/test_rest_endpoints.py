@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
+from src.api.exceptions import NoVNCFlowBusyException
 from src.session.session_manager import SessionInfo, SessionManager
 
 
@@ -133,6 +134,24 @@ async def test_establish_session_returns_vnc_url(client: AsyncClient):
     assert body["status"] == "login_required"
     assert body["vnc_url"] == "http://vnc:7900"
     assert "example.com" in body["target"]
+
+
+@pytest.mark.asyncio
+async def test_establish_session_returns_409_when_another_flow_is_in_flight(client: AsyncClient):
+    exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+    with (
+        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch.object(SessionManager, "establish", new=AsyncMock(side_effect=exc)),
+    ):
+        resp = await client.post(
+            "/api/v2/web/session/establish",
+            json={"url": "http://example.com/"},
+        )
+    assert resp.status_code == 409
+    assert resp.headers["Retry-After"] == "30"
+    body = resp.json()
+    assert body["status"] == "novnc_busy"
+    assert body["holder_url"] == "http://in-flight.example"
 
 
 @pytest.mark.asyncio

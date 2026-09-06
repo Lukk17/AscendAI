@@ -127,8 +127,10 @@ async def establish_session(request: SessionEstablishRequest) -> dict[str, Any]:
     """
     Proactively open the NoVNC login flow for a URL.
 
-    Always returns a 200 with the VNC URL so the caller can direct the user
-    to complete the login in their browser.
+    Returns a 200 with the VNC URL so the caller can direct the user to
+    complete the login in their browser. Returns 409 with `status: novnc_busy`
+    when another NoVNC intervention already holds the shared browser/display;
+    only one can run at a time.
     """
     url_str = str(request.url)
     if not is_safe_external_url(url_str):

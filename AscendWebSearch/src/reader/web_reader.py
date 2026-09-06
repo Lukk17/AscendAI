@@ -5,7 +5,11 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.api.exceptions import ChallengeDetectedException, HumanInterventionRequiredException
+from src.api.exceptions import (
+    ChallengeDetectedException,
+    HumanInterventionRequiredException,
+    NoVNCFlowBusyException,
+)
 from src.config.config import settings
 from src.observability.domain_label import domain_label
 from src.observability.metrics import (
@@ -70,7 +74,7 @@ class WebReader:
                 self._get_random_user_agent, self.url_validator, profile
             ),
             "5-crawlee_adaptive": CrawleeStrategy(self.url_validator, profile),
-            NOVNC_STRATEGY_NAME: NoVNCStrategy(),
+            NOVNC_STRATEGY_NAME: NoVNCStrategy(profile),
         }
 
     def _load_user_agents(self) -> list[str]:
@@ -355,6 +359,10 @@ class WebReader:
             self._record_strategy_outcome(name, "human_intervention", dlabel, time.perf_counter() - started)
 
             raise
+        except NoVNCFlowBusyException:
+            self._record_strategy_outcome(name, "novnc_busy", dlabel, time.perf_counter() - started)
+
+            raise
         except Exception as e:
             self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
             logger.warning("Strategy %s failed for %s: %s", name, url, e)
@@ -385,6 +393,10 @@ class WebReader:
             logger.info("Strategy %s returned empty HTML.", name)
         except HumanInterventionRequiredException:
             self._record_strategy_outcome(name, "human_intervention", dlabel, time.perf_counter() - started)
+
+            raise
+        except NoVNCFlowBusyException:
+            self._record_strategy_outcome(name, "novnc_busy", dlabel, time.perf_counter() - started)
 
             raise
         except ChallengeDetectedException:
