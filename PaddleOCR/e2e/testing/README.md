@@ -31,15 +31,16 @@ fills in `Result summary` and `Verdict`, and logs anything done outside the spec
 
 ## Bruno is the source of truth
 
-Every test runs the matching Bruno request file under `docs/api/request/AscendAI/paddle-ocr/testing/` via the Bruno
-CLI.
+Every test runs the matching Bruno request file under `docs/api/request/AscendAI/paddle-ocr/` via the Bruno CLI. The
+canonical single-endpoint demonstrations (`ocr.yml`, `health.yml`, `ready.yml`) live at that top level; every other
+variation, including all MCP requests, lives under `testing/`.
 
 ```powershell
 cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "paddle-ocr/testing/<request>.yml" --env ascend-local
+bru run "paddle-ocr/<request-path>.yml" --env ascend-local
 ```
 
 The request's saved default rows are what gets sent. To test an alternative payload, edit the disabled rows in the

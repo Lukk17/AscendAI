@@ -1,7 +1,7 @@
 info:
   name: mcp-file-uri-disabled
   type: http
-  seq: 13
+  seq: 10
 
 http:
   method: POST

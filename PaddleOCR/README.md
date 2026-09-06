@@ -244,7 +244,7 @@ and the run contract; [e2e/load/README.md](e2e/load/README.md) covers the k6 ram
 Run one Bruno request from the repo root:
 
 ```bash
-bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local --root docs/api/request/AscendAI
+bru run "paddle-ocr/ocr.yml" --env ascend-local --root docs/api/request/AscendAI
 ```
 
 ---

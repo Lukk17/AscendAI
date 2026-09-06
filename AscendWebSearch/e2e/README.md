@@ -14,7 +14,8 @@ AscendWebSearch/e2e/
 ├── README.md                            # this file
 ├── fixtures/                            # canary inputs and seed data
 │   ├── README.md
-│   └── session-clear-seed.json          # synthetic session record seeded by test 8
+│   ├── session-clear-seed.json          # synthetic session record seeded by test 8
+│   └── session-status-expired-seed.json # synthetic session record seeded by test 9
 ├── harness/                             # scripted-login helper for test 7
 │   └── seed_authenticated_session.py
 └── testing/                             # numbered specs + templates/ + runs/
@@ -27,6 +28,8 @@ AscendWebSearch/e2e/
     ├── 6-tiered-scraping-test.md
     ├── 7-authenticated-realworld-scraping-test.md
     ├── 8-session-clear-test.md
+    ├── 9-session-status-test.md
+    ├── 10-session-establish-test.md
     ├── templates/                       # run-record templates (immutable), one per spec
     │   ├── README.md
     │   ├── 1-invalid-input-tasks.template.md
@@ -36,7 +39,9 @@ AscendWebSearch/e2e/
     │   ├── 5-mcp-search-tasks.template.md
     │   ├── 6-tiered-scraping-tasks.template.md
     │   ├── 7-authenticated-realworld-scraping-tasks.template.md
-    │   └── 8-session-clear-tasks.template.md
+    │   ├── 8-session-clear-tasks.template.md
+    │   ├── 9-session-status-tasks.template.md
+    │   └── 10-session-establish-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<capability>-tasks.md   # one per executed test (gitignored)
@@ -47,8 +52,11 @@ SearXNG reachable; `3` needs outbound HTTPS to `example.com` via the tiered extr
 sufficient); `4` only needs the AscendWebSearch process itself; `5` needs SearXNG again via the MCP path; `6` needs
 FlareSolverr plus outbound HTTPS to real sites for a per-tier regression sweep (curl_cffi, FlareSolverr, Playwright);
 `7` needs FlareSolverr, a real-world URL matrix, the saucedemo login-seed harness under
-[harness/](harness/seed_authenticated_session.py), and a human to solve a reCAPTCHA challenge through NoVNC; `8`
-only needs the AscendWebSearch process and Redis reachable via `docker exec` — no outbound egress at all.
+[harness/](harness/seed_authenticated_session.py), and a human to solve a reCAPTCHA challenge through NoVNC; `8` and
+`9` only need the AscendWebSearch process and Redis reachable via `docker exec` — no outbound egress at all; `10`
+needs no egress either but launches a real headful Playwright browser held by a background monitor for up to 10
+minutes — see its own spec for why that keeps it out of the cheap tier despite not touching SearXNG, FlareSolverr,
+or any external site.
 
 The Bruno collection isn't here. It lives at the **repo root** under
 `docs/api/request/AscendAI/web-search/testing/` so it stays a portable API client artifact. Each spec references
@@ -101,12 +109,16 @@ pipeline plus an in-process blocklist. The execution constraints:
 | **No cross-test interference** | 1, 2, 4, 5 | Search calls write only to ephemeral SearXNG cache (out of process). MCP-list and invalid-input tests touch no upstream service. |
 | **Domain-scoped Redis session/cookie cache** | 6 | Mutates Redis session keys for its own target domains (`en.wikipedia.org`, `scrapingcourse.com`, `quotes.toscrape.com`). No overlap with test 3's `example.com` key. Safe in parallel with 1, 2, 4, 5. |
 | **Human-in-the-loop, must run on the main session** | 7 | Part 3 (reCAPTCHA human-solve) surfaces a `vnc_url` a human must open; it cannot be delegated to a fanned-out subagent whose output is never shown to the user. Part 1 (matrix) and Part 2 (automated saucedemo login) may still fan out across parallel runners while Part 3 runs on the main session. Mutates Redis session keys for the matrix domains, `saucedemo.com`, and `google.com`; no overlap with test 6's domains. |
-| **Domain-scoped Redis session key, no egress** | 8 | Mutates only `session:example.net:default`, seeded and removed by the test itself. No overlap with any other test's domains. Safe in parallel with 1, 2, 4, 5. |
+| **Domain-scoped Redis session key, no egress** | 8 | Mutates only `session:example.net:default`, seeded and removed by the test itself. Conflicts with test 10, which mutates the same key as an undocumented side effect of `session/establish` (see test 10's own spec). Safe in parallel with 1, 2, 4, 5, 9. |
+| **Domain-scoped Redis session key, no egress** | 9 | Mutates only `session:example.org:default`, seeded twice and removed by the test itself. No overlap with test 8's or test 10's `example.net` key or any other test's domains. Safe in parallel with 1, 2, 4, 5, 8, 10. |
+| **`session:example.net:default` again, plus a long-lived background browser** | 10 | `session/establish` was assumed to write no session record until this spec was run live against port 7021, which showed otherwise within 15 seconds: the monitor's "cleared" check accepts any unchallenged page, so it captures an (often empty) session under the *default* profile regardless of which profile was requested — see the spec's "Two behaviours this spec found live, not assumed" section. This test targets `example.net` and cleans the key up itself, which puts it in direct conflict with test 8 on the same key. It also leaves a real headful Playwright browser + NoVNC monitor running in the `ascend-web-search` container for up to 10 minutes after its own assertions pass if the monitor does not resolve within one poll cycle. Avoid running it back to back with itself for the same reason. |
 
 Recommended layout: run test 1 first (offline, fail-fast on validator bugs without burning egress), then tests
-2, 4, 5, 8 in parallel or sequential (none needs FlareSolverr or Playwright), then test 6 (highest egress cost,
-needs FlareSolverr and Playwright), then test 7 last (its Part 3 needs a human at the keyboard on the main
-session).
+2, 4, 5, 9 in parallel or sequential (none needs FlareSolverr or Playwright), then test 6 (highest egress cost,
+needs FlareSolverr and Playwright), then test 7 (its Part 3 needs a human at the keyboard on the main session),
+then tests 8 and 10 one at a time (never together — both mutate `session:example.net:default`) — test 10 last of
+the two, since its assertions finish in seconds but the background browser it can leave running should not overlap
+with a repeat of itself either.
 
 ## Prerequisites before any test
 
@@ -161,7 +173,9 @@ Numbered by setup cost. Easiest first.
 | 5  | [testing/5-mcp-search-test.md](testing/5-mcp-search-test.md) | MCP `tools/call` for `web_search` with a stable query returns a structured result containing ≥ 1 entry with `title`, `url`, `content`. |
 | 6  | [testing/6-tiered-scraping-test.md](testing/6-tiered-scraping-test.md) | `POST /api/v2/web/read` against a tier-mapped list (Wikipedia static, `scrapingcourse.com` Cloudflare, `quotes.toscrape.com/js/` JS-rendered) returns HTTP 200 `status="success"` with the per-tier canary content. Highest egress cost — needs FlareSolverr + Playwright, runs last. |
 | 7  | [testing/7-authenticated-realworld-scraping-test.md](testing/7-authenticated-realworld-scraping-test.md) | Difficulty-graded real-world URL matrix (easy/medium/hard/very-hard static+JS+WAF → `success`; dead domain → `hard-fail` HTTP 400; LinkedIn/indeed-auth login walls → `intervention` HTTP 428) — gated canaries hard-assert, live sites assert a valid terminal verdict (success or intervention). Plus a 2-call login-reuse behavior — a scripted login on a stable SPA (`saucedemo.com`, public demo creds hardcoded — no secrets) seeds `storage_state` and proves **browser-tier** authenticated capture→replay — and a human-solved reCAPTCHA v2 (Google reCAPTCHA demo) that proves session **capture** (the `_GRECAPTCHA` cookie) into the store — the widget can't be auto-passed, so capture proves a human acted (cross-request reuse is not asserted — the token is single-use). reCAPTCHA is the reliable human-solve target because the scraper now auto-passes Cloudflare/DataDome. LinkedIn is intervention-only. Five retail anti-bot rows (Allegro plus Amazon PL/US/UK/SE product pages) are best-effort on which branch fires and **content-gated** on the success branch: a `200`/`success` must carry the requested product page's identity canary (ISBN-13 / ASIN / model code) and none of the measured interstitial or block-page markers, so an anti-bot interstitial can never be recorded as a successful scrape. |
-| 8  | [testing/8-session-clear-test.md](testing/8-session-clear-test.md) | `POST /api/v2/web/session/clear` — the operator-recovery path for a poisoned session. A session seeded directly in Redis for `example.net` is removed (`existed=true`, key gone from Redis afterward); a call against `example.com`, which never carried one, is a documented no-op (HTTP 200, `existed=false`, not a 404 or 500). No FlareSolverr, Playwright, or human needed — cheapest test in the suite alongside 1 and 4. |
+| 8  | [testing/8-session-clear-test.md](testing/8-session-clear-test.md) | `POST /api/v2/web/session/clear` — the operator-recovery path for a poisoned session. A session seeded directly in Redis for `example.net` is removed (`existed=true`, key gone from Redis afterward); a call against `example.com`, which never carried one, is a documented no-op (HTTP 200, `existed=false`, not a 404 or 500). No FlareSolverr, Playwright, or human needed — cheapest test in the suite alongside 1 and 4. Do not run in parallel with test 10 — both mutate `session:example.net:default`. |
+| 9  | [testing/9-session-status-test.md](testing/9-session-status-test.md) | `POST /api/v2/web/session/status` across all three states its own type declares: `none` for a URL that never carried a session, `expired` for one seeded with a `saved_at` outside the 14-day auth TTL, and `active` for the same key re-seeded with a fresh `saved_at`. Redis-only, no egress — same cost tier as 1, 4, and 8. |
+| 10 | [testing/10-session-establish-test.md](testing/10-session-establish-test.md) | `POST /api/v2/web/session/establish` — the proactive counterpart to passive NoVNC capture. Asserts the immediate response (`status="login_required"`, echoed `target`, non-empty `vnc_url`), plus a live-verified finding this spec documents rather than assumes: the background monitor captures an (often empty) session under the *default* profile within about 15 seconds regardless of the profile requested, because `SessionManager.establish` never forwards its `profile` argument and the "cleared" check accepts any unchallenged page. Makes no priced call and needs no human, but launches a real headful Playwright browser that can be held by a background monitor for up to 10 minutes — the highest per-run resource cost in this module's suite. Do not run in parallel with test 8 or with itself; see the spec's own cost note. |
 
 ## Adding a new test
 

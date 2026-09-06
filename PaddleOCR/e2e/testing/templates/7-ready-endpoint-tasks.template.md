@@ -17,7 +17,7 @@ Copy this file to `../runs/<UTC-timestamp>_7-ready-endpoint-tasks.md` before sta
 
 ### Run
 
-- [ ] `bru run "paddle-ocr/testing/ready.yml" --env ascend-local` returns HTTP 200
+- [ ] `bru run "paddle-ocr/ready.yml" --env ascend-local` returns HTTP 200
 
 ### Expected
 

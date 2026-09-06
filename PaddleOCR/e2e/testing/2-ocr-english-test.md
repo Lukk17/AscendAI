@@ -51,7 +51,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local
+bru run "paddle-ocr/ocr.yml" --env ascend-local
 ```
 
 ## Expected

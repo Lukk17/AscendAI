@@ -64,6 +64,16 @@ be run on its own.
 7. [7-authenticated-realworld-scraping-test.md](7-authenticated-realworld-scraping-test.md). Real-world URL matrix
    plus automated saucedemo login-reuse plus human-solved reCAPTCHA capture. **Runs last; Part 3 needs a human on
    the main session.**
+8. [8-session-clear-test.md](8-session-clear-test.md). `POST /api/v2/web/session/clear` against a seeded and an
+   unseeded session. Redis-only, no egress — cheapest test in the suite alongside 1 and 4. Do not run in parallel
+   with test 10.
+9. [9-session-status-test.md](9-session-status-test.md). `POST /api/v2/web/session/status` across its `none`,
+   `expired`, and `active` states. Redis-only, no egress — same cost tier as 1, 4, and 8.
+10. [10-session-establish-test.md](10-session-establish-test.md). `POST /api/v2/web/session/establish` — asserts
+    the immediate response, plus a live-verified finding: the background monitor captures a session under the
+    *default* profile within seconds regardless of the profile requested. Launches a real headful Playwright
+    browser that can be held by a background monitor for up to 10 minutes. Highest per-run resource cost in this
+    module's suite; do not run in parallel with test 8 or with itself; see the spec's own cost note.
 
 ## Cross-cutting conventions
 

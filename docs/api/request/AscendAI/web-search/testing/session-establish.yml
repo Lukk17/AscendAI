@@ -1,0 +1,42 @@
+info:
+  name: session-establish
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/establish"
+  body:
+    type: json
+    # example.net is IANA-reserved for documentation/testing; test 8 is the only
+    # other spec that touches its default-profile key, and only transiently. The
+    # "e2e-establish" profile is sent to match the endpoint's documented request
+    # shape, but SessionManager.establish never forwards it to the capture path
+    # (see the spec's "Two behaviours this spec found live, not assumed" section),
+    # so any resulting capture lands under the default profile regardless.
+    data: |-
+      {
+        "url": "https://example.net",
+        "profile": "e2e-establish"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: login_required, echoed target, non-empty vnc_url", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("login_required");
+            expect(b.target).to.equal("https://example.net/");
+            expect(b.vnc_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

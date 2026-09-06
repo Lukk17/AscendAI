@@ -151,7 +151,7 @@ jobs:
           bru run "paddle-ocr/testing/ocr-invalid-no-file.yml" --env ascend-local
 
           # Spec 2: ocr-english
-          bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local
+          bru run "paddle-ocr/ocr.yml" --env ascend-local
 
           # Spec 3: ocr-polish
           bru run "paddle-ocr/testing/ocr-polish.yml" --env ascend-local
@@ -168,7 +168,7 @@ jobs:
           bru run "paddle-ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 7: ready-endpoint
-          bru run "paddle-ocr/testing/ready.yml" --env ascend-local
+          bru run "paddle-ocr/ready.yml" --env ascend-local
 
           # Spec 8: mcp-ssrf-rejection
           SID=$(open_session)

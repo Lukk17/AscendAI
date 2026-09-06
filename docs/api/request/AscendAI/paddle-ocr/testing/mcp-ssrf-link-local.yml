@@ -1,7 +1,7 @@
 info:
   name: mcp-ssrf-link-local
   type: http
-  seq: 10
+  seq: 7
 
 http:
   method: POST

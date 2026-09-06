@@ -1,0 +1,30 @@
+info:
+  name: ready
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/ready"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: status and dependency checks present", function () {
+            const b = res.getBody();
+            expect(b.status).to.be.a("string");
+            expect(b.checks).to.be.an("object");
+            expect(b.checks.redis).to.have.property("status");
+            expect(b.checks.searxng).to.have.property("status");
+            expect(b.checks.flaresolverr).to.have.property("status");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

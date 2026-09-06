@@ -1,7 +1,7 @@
 info:
   name: session-clear-idempotent
   type: http
-  seq: 16
+  seq: 15
 
 http:
   method: POST

@@ -18,7 +18,7 @@ Copy this file to `../runs/<UTC-timestamp>_2-ocr-english-tasks.md` before starti
 
 ### Run
 
-- [ ] Send `ocr-english.yml` via `bru run` and wait for HTTP 200
+- [ ] Send `ocr.yml` via `bru run` and wait for HTTP 200
 
 ### Expected
 

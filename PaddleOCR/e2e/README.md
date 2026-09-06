@@ -136,7 +136,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "paddle-ocr/testing/ocr-english.yml" --env ascend-local
+bru run "paddle-ocr/ocr.yml" --env ascend-local
 ```
 
 Run the whole suite (Bruno's directory mode).
@@ -146,7 +146,7 @@ cd docs/api/request/AscendAI
 ```
 
 ```powershell
-bru run "paddle-ocr/testing" --env ascend-local
+bru run "paddle-ocr" --env ascend-local
 ```
 
 ## Capability tests

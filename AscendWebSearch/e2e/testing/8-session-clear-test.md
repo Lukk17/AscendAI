@@ -12,6 +12,12 @@ idempotent — it always returns HTTP 200 whether or not a session existed. Two 
 
 Both calls are asserted on response body plus persisted Redis state, never on log output.
 
+## Concurrency
+
+Do not run this test in parallel with test 10
+([10-session-establish-test.md](10-session-establish-test.md)) — both mutate `session:example.net:default`. Safe to
+run in parallel with everything else in the suite.
+
 ## Prerequisites
 
 Check Bruno CLI is installed.

@@ -1,7 +1,7 @@
 info:
   name: mcp-bad-scheme
   type: http
-  seq: 11
+  seq: 8
 
 http:
   method: POST

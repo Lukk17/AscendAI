@@ -1,7 +1,7 @@
 info:
   name: ocr-unsupported-mime
   type: http
-  seq: 14
+  seq: 4
 
 http:
   method: POST
