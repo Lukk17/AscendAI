@@ -10,7 +10,7 @@ The AscendAI repository runs this stack as part of a larger platform. That devel
 
 This directory is the deployment counterpart. It pulls published images instead of building, drops everything that depends on services which are not here, and is written for Docker Engine on Linux. The two are kept deliberately different, and every difference is listed under [Differences from the development stack](#differences-from-the-development-stack) below.
 
-Four containers run:
+Four containers run by default, plus an optional fifth:
 
 | Container | Purpose | Reachable from |
 |---|---|---|
@@ -18,6 +18,7 @@ Four containers run:
 | searxng | Meta-search engine the service queries. | Inside the stack only |
 | flaresolverr | Cloudflare challenge solver, runs its own Chrome. | Inside the stack only |
 | ngrok-ascend-web-search | Public tunnel to the NoVNC desktop for CAPTCHA solving. | Outbound only |
+| redis (optional, profile `redis`) | Session/cookie cache, so a solved Cloudflare challenge stays solved across requests. Off by default. | Inside the stack only |
 
 ---
 
@@ -26,7 +27,7 @@ Four containers run:
 | Requirement | Detail |
 |---|---|
 | Docker Engine | 20.10 or newer, with the Compose plugin |
-| Redis | Reachable at port 6379. Not part of this stack. |
+| Redis | Bundled. Enable with the `redis` Compose profile, or point at your own; see below. |
 | Free RAM | Roughly 4.5 GB free, on top of whatever the host already uses. See [Resource footprint](#resource-footprint) |
 | CPU | 2 cores is enough. CPU contention costs scraping speed, not stability. |
 | Free port | 7021 on the host. Nothing else is published. |
@@ -34,13 +35,19 @@ Four containers run:
 
 Redis holds authentication cookies and Cloudflare clearance tokens between requests, so that a challenge solved once keeps working afterwards. Without it the service still runs, but every request starts from a cold session and `/ready` reports degraded.
 
-Where Redis lives determines what `REDIS_URL` must be. The compose file ships with the first option below.
+This bundle ships its own Redis as a fifth container, off by default and gated behind the `redis` Compose profile, so the bundle stays self-contained without requiring you to run one yourself. Enable it and start the stack in the same command:
+
+```bash
+docker compose --profile redis up -d
+```
+
+`REDIS_URL` already defaults to this bundled instance, so nothing else needs setting. Where Redis actually lives determines what `REDIS_URL` must be if you want something other than the bundled default:
 
 | Redis location | REDIS_URL | Note |
 |---|---|---|
-| On the Docker host | `redis://host.docker.internal:6379/0` | Works because the file declares `host.docker.internal:host-gateway`. Redis must listen on an address other than loopback, since the container arrives through the bridge gateway rather than through 127.0.0.1. |
-| A container on this compose network | `redis://<service-name>:6379/0` | Add the service to this file and drop the `extra_hosts` entry. |
-| Another machine | `redis://<host>:6379/0` | Add a password to the URL if that Redis has one. |
+| Bundled in this stack (default) | `redis://redis:6379/0` | The compose file's own default. Requires `--profile redis` at startup, or the hostname won't resolve. |
+| On the Docker host | `redis://host.docker.internal:6379/0` | Works because the file declares `host.docker.internal:host-gateway`. Redis must listen on an address other than loopback, since the container arrives through the bridge gateway rather than through 127.0.0.1. Leave the `redis` profile off. |
+| Another machine | `redis://<host>:6379/0` | Add a password to the URL if that Redis has one. Leave the `redis` profile off. |
 
 ---
 
@@ -102,13 +109,14 @@ The interactive API documentation at [http://localhost:7021/docs](http://localho
 
 ### Configuration
 
-Three secrets live in `.env` and nothing else should. Everything else is set directly in `docker-compose.yaml`, because it is configuration rather than credentials and belongs in version control where changes are visible.
+Three secrets live in `.env` and nothing else should, plus one optional connection override. Everything else is set directly in `docker-compose.yaml`, because it is configuration rather than credentials and belongs in version control where changes are visible.
 
 | Variable | Required | What it does |
 |---|---|---|
 | SEARXNG_SECRET | Yes | SearXNG session-signing key. Read by SearXNG from the environment, which is why `searxng/settings.yml` has no `secret_key` entry. Generate a fresh one per deployment. |
 | VNC_PASSWORD | Yes | Password for the NoVNC desktop. Turned into an encrypted x11vnc password file at container start. |
 | NGROK_AUTHTOKEN | Yes | Authenticates the ngrok tunnel. |
+| REDIS_URL | No | Where ascend-web-search's cookie/session cache lives. Defaults to the bundled Redis (`redis://redis:6379/0`); override to point at an external Redis instead. See [Prerequisites](#prerequisites). |
 
 The full list of tunable settings, timeouts, extraction thresholds, circuit-breaker values and so on, lives in [../docs/configuration.md](../docs/configuration.md). Every one of them can be added to the `environment:` block of the ascend-web-search service.
 
@@ -158,10 +166,11 @@ The shipped numbers are sized for an 8 GB host that is already running other thi
 | flaresolverr | 1.0 | 1280M | 0.15 | 256M |
 | searxng | 0.5 | 384M | 0.1 | 128M |
 | ngrok-ascend-web-search | 0.25 | 96M | 0.05 | 32M |
+| redis (optional, profile `redis`) | 0.25 | 256M | 0.05 | 64M |
 
-Memory ceilings total 4.2 GB. Reservations, which is what the stack actually holds at rest, total about 0.9 GB and 0.55 CPU.
+Memory ceilings total 4.2 GB without the optional Redis, 4.5 GB with it enabled. Reservations, which is what the stack actually holds at rest, total about 0.9 GB and 0.55 CPU without Redis, or about 1.0 GB and 0.6 CPU with it. Redis's own 256M ceiling is sized against its measured 46 MiB peak elsewhere on the platform (`docs/architecture/memory-budget.md`), with headroom for session growth.
 
-Do the arithmetic before deploying. Take the host's total RAM, subtract what it already uses, and the remainder must exceed 4.2 GB with something left over for page cache. On an 8 GB host already using 2.3 GB, that leaves 5.7 GB free, the stack can claim at most 4.2 GB of it, and roughly 1.5 GB stays spare. On a 4 GB host these numbers do not fit and the stack will start killing containers under load.
+Do the arithmetic before deploying. Take the host's total RAM, subtract what it already uses, and the remainder must exceed 4.5 GB (with the bundled Redis enabled) or 4.2 GB (without it) with something left over for page cache. On an 8 GB host already using 2.3 GB, that leaves 5.7 GB free, the stack can claim at most 4.5 GB of it, and a little over 1 GB stays spare. On a 4 GB host these numbers do not fit and the stack will start killing containers under load.
 
 Two things interact and are easy to miss.
 
@@ -203,7 +212,7 @@ docker compose up -d ascend-web-search
 
 Published tags are listed at [hub.docker.com/r/lukk17/ascend-web-search/tags](https://hub.docker.com/r/lukk17/ascend-web-search/tags). The same images are published to `ghcr.io/lukk17/ascend-web-search` if you prefer GitHub's registry. Both are public and neither needs a login to pull.
 
-Upstream images, SearXNG and FlareSolverr, are pinned too. SearXNG ships a new build most days and its search engines break as the sites they scrape change, so it is worth bumping every few months even when nothing appears wrong.
+Upstream images, SearXNG, FlareSolverr, and the bundled Redis, are pinned too. SearXNG ships a new build most days and its search engines break as the sites they scrape change, so it is worth bumping every few months even when nothing appears wrong.
 
 ---
 
@@ -232,6 +241,9 @@ The equivalent file in the repository root is `ascend-scrapper.docker-compose.ya
 | host.docker.internal | Declared, though Docker Desktop would provide it anyway | Declared, and required, because Docker Engine on Linux does not provide it |
 | Resource limits | Sized for a development workstation, 4G for ascend-web-search | Sized for an 8 GB host with other workloads on it, 2560M for ascend-web-search |
 | shm_size | 2gb | 1gb, to fit inside the smaller memory ceiling |
+| REDIS_URL default | `redis://host.docker.internal:6379/0`, the development machine's own external-prerequisite Redis | `redis://redis:6379/0`, the bundled Redis below, since this bundle is meant to be self-contained |
+| redis service `container_name` | `ascend-scrapper-redis`, to avoid colliding with the development machine's own pre-existing `redis` container | `redis`, matching every other service in this file; no such collision exists on this bundle's target host |
+| redis service volume | None. The profile is meant for occasional local testing of this bundle, and the development machine's own Redis already persists its own data | `redisdata`, since a lost session here means a human re-solving every Cloudflare challenge by hand |
 
 ---
 

@@ -85,6 +85,62 @@ services:
         aliases:
           - flaresolverr
 
+  # ─── Optional bundled Redis (profile: redis) ───
+
+  # Off by default: this machine already runs its own Redis as an external
+  # prerequisite (docs/architecture/memory-budget.md), reachable via
+  # host.docker.internal, which is what ascend-web-search's REDIS_URL
+  # default below still points at. This service exists so the standalone
+  # deploy-standalone bundle can ship the same definition and be
+  # self-contained on a host with no Redis of its own. Activate here only to
+  # test that bundle locally: `docker compose --profile redis up`, and set
+  # REDIS_URL=redis://redis:6379/0 to actually use it once it's running.
+  #
+  # container_name is NOT "redis" here, unlike every other service in this
+  # file: this host already runs a container by that exact name (the
+  # external prerequisite above), and Docker container names must be unique
+  # host-wide. The Compose service name and network alias stay "redis" so
+  # the internal DNS name in REDIS_URL still resolves.
+  #
+  # No depends_on from ascend-web-search onto this service: Compose refuses
+  # to resolve a depends_on that crosses a profile boundary (a service with
+  # no profile depending on one gated by a profile) unless the profile is
+  # active, which would break every default, profile-less run. Verified
+  # with `docker compose config` before writing this. ascend-web-search's
+  # own Redis client already tolerates Redis being absent or unreachable
+  # (src/reader/cloudflare/cookie_manager.py falls back to an in-memory
+  # cache, and GET /ready reports "degraded" rather than failing), so no
+  # explicit wait is needed either way.
+  redis:
+    image: redis:8.10.1-alpine
+    container_name: ascend-scrapper-redis
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    deploy:
+      resources:
+        # This host's own external-prerequisite Redis peaks at 46 MiB
+        # (docs/architecture/memory-budget.md, memory.peak, 2026-09-06). 256M
+        # leaves headroom for session growth without touching the host's
+        # wider memory budget.
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    networks:
+      default:
+        aliases:
+          - redis
+
   # ─── Web search service ───
 
   ngrok-ascend-web-search:
@@ -136,8 +192,10 @@ services:
       - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
-      # Redis must be running externally (port 6379)
-      - REDIS_URL=redis://host.docker.internal:6379/0
+      # Defaults to this machine's own external-prerequisite Redis. Override
+      # to redis://redis:6379/0 to point at the optional bundled instance
+      # above once it's running (`docker compose --profile redis up`).
+      - REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
       - NOVNC_TIMEOUT_SECONDS=600
       # Optional here: unset means the NoVNC desktop accepts any client and the
       # container logs a warning at boot. Port 7900 is not published locally,

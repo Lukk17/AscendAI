@@ -75,6 +75,56 @@ services:
         aliases:
           - flaresolverr
 
+  # ─── Optional bundled Redis (profile: redis) ───
+
+  # Off by default, so this bundle keeps its documented behaviour against an
+  # operator-supplied external Redis unchanged. Activate to make the bundle
+  # fully self-contained: `docker compose --profile redis up -d`. REDIS_URL
+  # below already defaults to this service, so nothing else needs setting.
+  # See "Prerequisites" in README.md for every Redis option this bundle
+  # supports.
+  #
+  # No depends_on from ascend-web-search onto this service: Compose refuses
+  # to resolve a depends_on that crosses a profile boundary (a service with
+  # no profile depending on one gated by a profile) unless the profile is
+  # active, which would break every run that doesn't activate it. Verified
+  # with `docker compose config` before writing this. ascend-web-search's
+  # own Redis client already tolerates Redis being absent or unreachable
+  # (falls back to an in-memory cache, and GET /ready reports "degraded"
+  # rather than failing), so no explicit wait is needed either way.
+  redis:
+    image: redis:8.10.1-alpine
+    container_name: redis
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - redis
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    deploy:
+      resources:
+        # The platform's own Redis instance peaks at 46 MiB
+        # (../../docs/architecture/memory-budget.md, memory.peak,
+        # 2026-09-06). 256M leaves headroom for session growth on this 8 GB
+        # host without threatening its budget; see "Resource footprint"
+        # below for the full arithmetic.
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    networks:
+      default:
+        aliases:
+          - redis
+
   # ─── Web search service ───
 
   ngrok-ascend-web-search:
@@ -124,8 +174,10 @@ services:
       - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
-      # Redis runs on the Docker host, not in this stack. See README.md.
-      - REDIS_URL=redis://host.docker.internal:6379/0
+      # Defaults to the bundled Redis above (profile: redis). Override to
+      # redis://host.docker.internal:6379/0 to use an external Redis instead
+      # and leave the bundled service off. See README.md.
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - NOVNC_TIMEOUT_SECONDS=600
       # Required here. The ngrok tunnel puts the NoVNC desktop on the public
       # internet, so an unauthenticated desktop is not an option.
@@ -160,3 +212,10 @@ services:
       default:
         aliases:
           - ascend-web-search
+
+volumes:
+  # Holds the bundled Redis's solved-session data (Cloudflare clearance
+  # cookies, CAPTCHA outcomes) across container restarts. Without it, every
+  # restart of the redis service starts cold and a human has to re-solve
+  # every challenge by hand. Unused when the redis profile stays off.
+  redisdata:
