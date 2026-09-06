@@ -10,8 +10,9 @@ a deterministic error to the caller instead of an out-of-memory kill that destro
 The service SHALL refuse any submission whose input to a single inference would exceed a configured pixel ceiling.
 For a raw image that input is the image's own decoded dimensions. For a document that input is a page rendered at
 the fixed resolution the OCR library uses, which is derived from the page's physical size rather than from the
-resolution the caller scanned at. The ceiling SHALL be configurable and its default SHALL be derived from measured
-memory cost against the container's memory limit.
+resolution the caller scanned at. The ceiling SHALL be configurable and its default SHALL be derived from the
+measured memory cost of one inference against a stated memory budget, together with whatever bound is configured on
+the detector's input, since that bound decides how much memory a large input still costs.
 
 #### Scenario: Raw image above the pixel ceiling
 

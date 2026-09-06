@@ -94,8 +94,10 @@ has already been told it failed.
 
 The service SHALL process one OCR job at a time. The concurrency limit SHALL come from a single configured value
 that governs both the number of inference workers and the number of requests admitted for inference
-simultaneously, so the two cannot disagree. The documented memory ceiling of the service SHALL be stated as
-depending on that value.
+simultaneously, so the two cannot disagree. That value is a memory constraint and not only a throughput one,
+because one job's peak is already most of the memory the service is allowed, so the documented memory ceiling
+SHALL be stated as one job's cost multiplied by it, and the reason SHALL be recorded wherever the limit is
+described.
 
 #### Scenario: A second request arrives while one is running
 
@@ -132,3 +134,57 @@ replacement is in progress, and SHALL resume serving once the replacement is rea
 - **WHEN** the inference process observes its own expired budget and returns on its own
 - **THEN** no replacement occurs
 - **AND** the next queued request is served without waiting for a new process to warm up
+
+### Requirement: A worker pool that has broken is rebuilt rather than left broken
+
+When the inference process dies, the pool it belongs to becomes permanently unusable and every subsequent request
+would otherwise fail immediately for as long as the service runs. The service SHALL rebuild the pool when it finds
+it unusable, by the same path it uses to replace a worker that will not stop, and SHALL resume serving once the
+rebuild is ready, without needing the container to be restarted.
+
+#### Scenario: The only worker dies
+
+- **WHEN** the inference process is killed while serving a request
+- **THEN** that request fails with the service's existing OCR failure code
+- **AND** the service rebuilds the pool and serves the next request rather than failing every request from then on
+
+#### Scenario: The request that killed the worker is not retried
+
+- **WHEN** a request's inference process dies while serving it
+- **THEN** that request is not resubmitted for inference
+
+#### Scenario: A request arriving during a rebuild
+
+- **WHEN** a request arrives while a rebuild is in progress and the rebuild completes while the request still has
+  budget
+- **THEN** the request is dispatched with the budget it has left
+- **AND** a request whose budget expires before the rebuild completes fails without ever being dispatched
+
+#### Scenario: Repeated rebuild failures stop
+
+- **WHEN** rebuilds fail consecutively up to the configured limit
+- **THEN** the service stops rebuilding, reports that it cannot take work, and answers requests definitively
+  instead of rebuilding again
+- **AND** the count of consecutive failures resets once a request completes successfully
+
+#### Scenario: Rebuilds are visible
+
+- **WHEN** the pool is rebuilt for any reason
+- **THEN** the rebuild is recorded so that a service rebuilding repeatedly is observable
+
+### Requirement: Reclaiming a worker reclaims the files it was using
+
+A process that is killed does not run its own cleanup, so the temporary copy of the submission it was reading is
+left behind. The service SHALL remove temporary files left by a process that did not clean up after itself, within
+a bounded time, so that repeated failures cannot fill the container's storage.
+
+#### Scenario: A killed worker leaves its input behind
+
+- **WHEN** the inference process is killed while a submission's temporary copy exists
+- **THEN** that copy is removed once a fresh inference process is available
+- **AND** no temporary copy older than one request's maximum lifetime remains
+
+#### Scenario: Files left by a previous run of the service
+
+- **WHEN** the service starts and temporary copies from an earlier run are present
+- **THEN** they are removed at startup

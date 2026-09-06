@@ -22,6 +22,12 @@ the container and lose the warm engine and every queued request with it.
 - **WHEN** the inference worker is being replaced
 - **THEN** the liveness endpoint still reports the process as alive
 
+#### Scenario: Liveness while no worker exists at all
+
+- **WHEN** the inference process has died and has not yet been rebuilt
+- **THEN** the liveness endpoint still reports the process as alive
+- **AND** readiness is the endpoint that reports the condition
+
 ### Requirement: Readiness reports whether the service can take work
 
 The readiness endpoint SHALL report the service as ready only when it is both warmed up and able to take work. It
@@ -45,6 +51,17 @@ condition carried in the body, so existing consumers are unaffected.
 
 - **WHEN** the engine has not completed a warm-up
 - **THEN** readiness reports not-ready, as it does today
+
+#### Scenario: Pool unusable and recovering
+
+- **WHEN** the inference process has died and the pool is unusable
+- **THEN** readiness reports not-ready for as long as the service cannot take work
+- **AND** readiness reports ready again once the pool has been rebuilt, without the container being restarted
+
+#### Scenario: Rebuilding has given up
+
+- **WHEN** the service has stopped rebuilding after repeated failures
+- **THEN** readiness reports not-ready and continues to do so until the service is restarted
 
 #### Scenario: Response shape and status are unchanged
 
