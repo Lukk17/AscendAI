@@ -10,7 +10,7 @@ The AscendAI repository runs this stack as part of a larger platform. That devel
 
 This directory is the deployment counterpart. It pulls published images instead of building, drops everything that depends on services which are not here, and is written for Docker Engine on Linux. The two are kept deliberately different, and every difference is listed under [Differences from the development stack](#differences-from-the-development-stack) below.
 
-Four containers run by default, plus an optional fifth:
+Five containers run by default:
 
 | Container | Purpose | Reachable from |
 |---|---|---|
@@ -18,7 +18,7 @@ Four containers run by default, plus an optional fifth:
 | searxng | Meta-search engine the service queries. | Inside the stack only |
 | flaresolverr | Cloudflare challenge solver, runs its own Chrome. | Inside the stack only |
 | ngrok-ascend-web-hunter | Public tunnel to the NoVNC desktop for CAPTCHA solving. | Outbound only |
-| redis (optional, profile `redis`) | Session/cookie cache, so a solved Cloudflare challenge stays solved across requests. Off by default. | Inside the stack only |
+| redis | Session/cookie cache, so a solved Cloudflare challenge stays solved across requests. | Inside the stack only |
 
 ---
 
@@ -27,7 +27,7 @@ Four containers run by default, plus an optional fifth:
 | Requirement | Detail |
 |---|---|
 | Docker Engine | 20.10 or newer, with the Compose plugin |
-| Redis | Bundled. Enable with the `redis` Compose profile, or point at your own; see below. |
+| Redis | Bundled and starts automatically with the stack. Point at your own instead; see below. |
 | Free RAM | Roughly 4.5 GB free, on top of whatever the host already uses. See [Resource footprint](#resource-footprint) |
 | CPU | 2 cores is enough. CPU contention costs scraping speed, not stability. |
 | Free port | 7021 on the host. Nothing else is published. |
@@ -35,19 +35,13 @@ Four containers run by default, plus an optional fifth:
 
 Redis holds authentication cookies and Cloudflare clearance tokens between requests, so that a challenge solved once keeps working afterwards. Without it the service still runs, but every request starts from a cold session and `/ready` reports degraded.
 
-This bundle ships its own Redis as a fifth container, off by default and gated behind the `redis` Compose profile, so the bundle stays self-contained without requiring you to run one yourself. Enable it and start the stack in the same command:
-
-```bash
-docker compose --profile redis up -d
-```
-
-`REDIS_URL` already defaults to this bundled instance, so nothing else needs setting. Where Redis actually lives determines what `REDIS_URL` must be if you want something other than the bundled default:
+This bundle ships its own Redis as a fifth container, on by default, so the bundle stays self-contained without requiring you to run one yourself. `REDIS_URL` already defaults to this bundled instance, so nothing else needs setting: the plain quick-start command below is enough. Where Redis actually lives determines what `REDIS_URL` must be if you want something other than the bundled default:
 
 | Redis location | REDIS_URL | Note |
 |---|---|---|
-| Bundled in this stack (default) | `redis://redis:6379/0` | The compose file's own default. Requires `--profile redis` at startup, or the hostname won't resolve. |
-| On the Docker host | `redis://host.docker.internal:6379/0` | Works because the file declares `host.docker.internal:host-gateway`. Redis must listen on an address other than loopback, since the container arrives through the bridge gateway rather than through 127.0.0.1. Leave the `redis` profile off. |
-| Another machine | `redis://<host>:6379/0` | Add a password to the URL if that Redis has one. Leave the `redis` profile off. |
+| Bundled in this stack (default) | `redis://redis:6379/0` | The compose file's own default. Starts automatically with the stack, no flag needed. |
+| On the Docker host | `redis://host.docker.internal:6379/0` | Works because the file declares `host.docker.internal:host-gateway`. Redis must listen on an address other than loopback, since the container arrives through the bridge gateway rather than through 127.0.0.1. The bundled Redis still starts by default; scale it to zero if you don't want it running unused: `docker compose up -d --scale redis=0`. |
+| Another machine | `redis://<host>:6379/0` | Add a password to the URL if that Redis has one. Scale the bundled Redis to zero as above if you don't want it running unused. |
 
 ---
 
@@ -81,9 +75,9 @@ All three secrets are required. Compose refuses to start and names the missing v
 
 ### Verifying it works
 
-Containers come up in order. SearXNG and FlareSolverr must report healthy before ascend-web-hunter is allowed to start, which takes about 30 to 60 seconds from cold because FlareSolverr has to launch Chrome.
+Containers come up in order. SearXNG, FlareSolverr and Redis must report healthy before ascend-web-hunter is allowed to start. That takes about 30 to 60 seconds from cold, bounded by FlareSolverr launching Chrome; Redis reports healthy well before that.
 
-Watch the status until all four are up and the first three show healthy.
+Watch the status until all five are up and four show healthy (ngrok has no healthcheck).
 
 ```bash
 docker compose ps
@@ -95,7 +89,7 @@ Then ask the service itself. The readiness endpoint probes Redis, SearXNG and Fl
 curl -s http://localhost:7021/ready
 ```
 
-A healthy response has `"status": "ready"` and every check reading `ok`. Anything reading `error` names the dependency that is not working. Redis showing `error` is the usual first failure and means the container cannot reach Redis on the host, see [Prerequisites](#prerequisites).
+A healthy response has `"status": "ready"` and every check reading `ok`. Anything reading `error` names the dependency that is not working. Redis showing `error` with the defaults untouched should not happen, since ascend-web-hunter waits for the bundled Redis to report healthy before it starts; it usually means REDIS_URL was overridden to point somewhere unreachable, see [Prerequisites](#prerequisites).
 
 Run a real search to confirm the whole chain works end to end.
 
@@ -166,11 +160,11 @@ The shipped numbers are sized for an 8 GB host that is already running other thi
 | flaresolverr | 1.0 | 1280M | 0.15 | 256M |
 | searxng | 0.5 | 384M | 0.1 | 128M |
 | ngrok-ascend-web-hunter | 0.25 | 96M | 0.05 | 32M |
-| redis (optional, profile `redis`) | 0.25 | 256M | 0.05 | 64M |
+| redis | 0.25 | 256M | 0.05 | 64M |
 
-Memory ceilings total 4.2 GB without the optional Redis, 4.5 GB with it enabled. Reservations, which is what the stack actually holds at rest, total about 0.9 GB and 0.55 CPU without Redis, or about 1.0 GB and 0.6 CPU with it. Redis's own 256M ceiling is sized against its measured 46 MiB peak elsewhere on the platform (`docs/architecture/memory-budget.md`), with headroom for session growth.
+Memory ceilings total 4.5 GB, with the bundled Redis running as it does by default. Scale Redis to zero to use an external instance instead and the ceiling drops to 4.2 GB. Reservations, which is what the stack actually holds at rest, total about 1.0 GB and 0.6 CPU with the bundled Redis running, or about 0.9 GB and 0.55 CPU with it scaled to zero. Redis's own 256M ceiling is sized against its measured 46 MiB peak elsewhere on the platform (`docs/architecture/memory-budget.md`), with headroom for session growth.
 
-Do the arithmetic before deploying. Take the host's total RAM, subtract what it already uses, and the remainder must exceed 4.5 GB (with the bundled Redis enabled) or 4.2 GB (without it) with something left over for page cache. On an 8 GB host already using 2.3 GB, that leaves 5.7 GB free, the stack can claim at most 4.5 GB of it, and a little over 1 GB stays spare. On a 4 GB host these numbers do not fit and the stack will start killing containers under load.
+Do the arithmetic before deploying. Take the host's total RAM, subtract what it already uses, and the remainder must exceed 4.5 GB, the stack's default footprint, with something left over for page cache. Scaling the bundled Redis to zero to use an external instance instead brings that down to 4.2 GB. On an 8 GB host already using 2.3 GB, that leaves 5.7 GB free, the stack can claim at most 4.5 GB of it, and a little over 1 GB stays spare. On a 4 GB host these numbers do not fit and the stack will start killing containers under load.
 
 Two things interact and are easy to miss.
 
@@ -242,6 +236,8 @@ The equivalent file in the repository root is `ascend-scrapper.docker-compose.ya
 | Resource limits | Sized for a development workstation, 4G for ascend-web-hunter | Sized for an 8 GB host with other workloads on it, 2560M for ascend-web-hunter |
 | shm_size | 2gb | 1gb, to fit inside the smaller memory ceiling |
 | REDIS_URL default | `redis://host.docker.internal:6379/0`, the development machine's own external-prerequisite Redis | `redis://redis:6379/0`, the bundled Redis below, since this bundle is meant to be self-contained |
+| redis service activation | Gated behind the `redis` Compose profile: off by default, since this host already runs its own Redis as an external prerequisite and a second instance would split session data | Runs unconditionally: this bundle has no external Redis to fall back to, so it must always be present for the bundle to stay self-contained |
+| ascend-web-hunter `depends_on` redis | Absent. Compose refuses to resolve a `depends_on` that crosses a profile boundary, so a profiled `redis` cannot be a dependency here | Present, `condition: service_healthy`, now that the profile boundary is gone. Costs no measurable startup time, since Redis's health arrives well before searxng's or flaresolverr's |
 | redis service `container_name` | `ascend-scrapper-redis`, to avoid colliding with the development machine's own pre-existing `redis` container | `redis`, matching every other service in this file; no such collision exists on this bundle's target host |
 | redis service volume | None. The profile is meant for occasional local testing of this bundle, and the development machine's own Redis already persists its own data | `redisdata`, since a lost session here means a human re-solving every Cloudflare challenge by hand |
 

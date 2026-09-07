@@ -75,30 +75,31 @@ services:
         aliases:
           - flaresolverr
 
-  # ─── Optional bundled Redis (profile: redis) ───
+  # ─── Bundled Redis ───
 
-  # Off by default, so this bundle keeps its documented behaviour against an
-  # operator-supplied external Redis unchanged. Activate to make the bundle
-  # fully self-contained: `docker compose --profile redis up -d`. REDIS_URL
+  # Runs unconditionally: this bundle has no operator-supplied Redis to fall
+  # back to, so the stack must ship its own to be self-contained. REDIS_URL
   # below already defaults to this service, so nothing else needs setting.
-  # See "Prerequisites" in README.md for every Redis option this bundle
-  # supports.
+  # To use an external Redis instead, override REDIS_URL and scale this
+  # service to zero (`docker compose up -d --scale redis=0`); see
+  # "Prerequisites" in README.md for every Redis option this bundle supports.
   #
-  # No depends_on from ascend-web-hunter onto this service: Compose refuses
-  # to resolve a depends_on that crosses a profile boundary (a service with
-  # no profile depending on one gated by a profile) unless the profile is
-  # active, which would break every run that doesn't activate it. Verified
-  # with `docker compose config` before writing this. ascend-web-hunter's
-  # own Redis client already tolerates Redis being absent or unreachable
+  # ascend-web-hunter below waits for this container to report healthy
+  # before starting (depends_on, condition: service_healthy), the same way
+  # it already waits on searxng and flaresolverr. Redis's own start_period
+  # is 10s against searxng's 30s and flaresolverr's 60s, so this adds no
+  # measurable startup time; it only closes the race where the first request
+  # after a cold start would otherwise hit ascend-web-hunter before Redis is
+  # ready and get an avoidably degraded response. ascend-web-hunter's own
+  # Redis client still tolerates Redis being absent or unreachable later
   # (falls back to an in-memory cache, and GET /ready reports "degraded"
-  # rather than failing), so no explicit wait is needed either way.
+  # rather than failing), so this is a startup-ordering improvement, not a
+  # hard requirement.
   redis:
     image: redis:8.10.1-alpine
     container_name: redis
     restart: unless-stopped
     logging: *default-logging
-    profiles:
-      - redis
     volumes:
       - redisdata:/data
     healthcheck:
@@ -174,9 +175,10 @@ services:
       - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-hunter:4040/api/tunnels
-      # Defaults to the bundled Redis above (profile: redis). Override to
-      # redis://host.docker.internal:6379/0 to use an external Redis instead
-      # and leave the bundled service off. See README.md.
+      # Defaults to the bundled Redis above, which now starts unconditionally
+      # with the stack. Override to redis://host.docker.internal:6379/0 to
+      # use an external Redis instead; scale the bundled service to zero
+      # separately if you don't want it running unused. See README.md.
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - NOVNC_TIMEOUT_SECONDS=600
       # Required here. The ngrok tunnel puts the NoVNC desktop on the public
@@ -192,6 +194,8 @@ services:
       searxng:
         condition: service_healthy
       flaresolverr:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
@@ -217,5 +221,6 @@ volumes:
   # Holds the bundled Redis's solved-session data (Cloudflare clearance
   # cookies, CAPTCHA outcomes) across container restarts. Without it, every
   # restart of the redis service starts cold and a human has to re-solve
-  # every challenge by hand. Unused when the redis profile stays off.
+  # every challenge by hand. Unused only if you scale the redis service to
+  # zero to use an external Redis instead.
   redisdata:

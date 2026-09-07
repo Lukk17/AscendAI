@@ -54,7 +54,7 @@ docker build -t ascend-web-hunter:latest .
 
 - SearXNG (port 9020 via docker-compose)
 - FlareSolverr (port 8191) for Cloudflare bypass
-- Redis (port 6379) for session persistence. External prerequisite in the development stack; optionally bundled behind the `redis` Compose profile in `deploy-standalone/` (off by default, no published ports either way)
+- Redis (port 6379) for session persistence. External prerequisite in the development stack; bundled and runs unconditionally in `deploy-standalone/` (no published ports either way)
 - Ngrok for NoVNC tunnel (optional, for CAPTCHA intervention)
 - Playwright for browser automation
 
