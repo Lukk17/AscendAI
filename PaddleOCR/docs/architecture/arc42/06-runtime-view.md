@@ -23,14 +23,15 @@ sequenceDiagram
     Lifespan->>Lifespan: log_startup_banner()
     Lifespan-->>Uvicorn: yield (service ready)
     Docker->>Uvicorn: GET /ready
-    Uvicorn->>Uvicorn: is_engine_warm("en") — read the worker's metric file
-    Uvicorn-->>Docker: 200 {"status":"ready","engine_warm":true}
+    Uvicorn->>Uvicorn: is_engine_warm("en") and is_accepting_work()
+    Uvicorn-->>Docker: 200 {"status":"ready","engine_warm":true,"accepting_work":true,"queue_depth":0}
 ```
 
 The Docker `HEALTHCHECK` targets `/health`, which returns 200 immediately after the process starts. The readiness
-probe at `/ready` only returns `ready` once the OCR worker process has recorded a successful warm-up. During the
-warm-up window, and if the worker's pool initializer fails outright, `/ready` returns
-`{"status":"not-ready","engine_warm":false}` rather than crashing the container. See
+probe at `/ready` returns `ready` only once the OCR worker process has recorded a successful warm-up **and** the
+service is accepting work — see "Request budget, deadline stop, and worker reclamation" below for the four
+conditions that make `accepting_work` false. During the warm-up window, and if the worker's pool initializer fails
+outright, `/ready` returns `{"status":"not-ready", ...}` rather than crashing the container. See
 [ADR-004](../decisions/ADR-004-liveness-readiness-split.md).
 
 ---
@@ -41,18 +42,65 @@ warm-up window, and if the worker's pool initializer fails outright, `/ready` re
 sequenceDiagram
     participant Client
     participant REST as POST /v1/ocr
+    participant Limits as src/api/limits.py
+    participant Gate as admission gate (OCR_WORKER_COUNT permits)
     participant Pool as OCR worker process
     participant OcrSvc as OcrService
 
     Client->>REST: multipart upload (file, lang=pl)
     REST->>REST: validate content_type, size
-    REST->>Pool: loop.run_in_executor(get_process_pool(), _execute_ocr, bytes, filename, "pl")
+    REST->>Limits: inspect_input, enforce_pixel_ceiling, enforce_page_limit
+    Limits-->>REST: page count, largest-page pixel count (header only, no decode)
+    REST->>Gate: dispatch_ocr_request(..., effective_budget)
+    Gate->>Gate: acquire permit (waits, deadline counts against effective_budget)
+    Gate->>Pool: run_in_executor(pool, run_ocr_in_worker, ..., worker_budget)
     Pool->>OcrSvc: _get_engine("pl") — LRU lookup or new PaddleOCR
-    OcrSvc->>OcrSvc: write tempfile, engine.predict, delete tempfile
+    OcrSvc->>OcrSvc: write scratch file, predict_iter() page by page, delete scratch file
     OcrSvc-->>Pool: OcrJsonResponse
-    Pool-->>REST: OcrJsonResponse
+    Pool-->>Gate: OcrJsonResponse
+    Gate->>Gate: release permit
+    Gate-->>REST: OcrJsonResponse
     REST-->>Client: 200 OcrJsonResponse (schema_version="1")
 ```
+
+The MCP happy path below follows the identical `dispatch_ocr_request` path once past its own header-only guards; only
+the source of the bytes differs (a download instead of a multipart body).
+
+---
+
+### Request budget, deadline stop, and worker reclamation
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gate as dispatch_ocr_request (API process)
+    participant Pool as OCR worker process
+    participant NewPool as Replacement worker process
+
+    Client->>Gate: request arrives, effective_budget = min(pages * OCR_PAGE_TIMEOUT_SECONDS, OCR_REQUEST_TIMEOUT)
+    Gate->>Pool: dispatch with worker_budget = remaining - OCR_DISPATCH_MARGIN_SECONDS
+    loop each page, via predict_iter()
+        Pool->>Pool: check own deadline (time.monotonic() computed from the duration it was given)
+        alt budget exhausted
+            Pool-->>Gate: raises before the next page starts
+        else budget remains
+            Pool->>Pool: infer this page
+        end
+    end
+    Gate->>Gate: OCR_FAILED, no partial result returned
+
+    Note over Gate,Pool: If the worker does not return within OCR_RECLAMATION_GRACE_SECONDS<br/>past its own expired budget, or the pool is found broken:
+    Gate->>NewPool: rebuild (discard old pool, spawn + warm new one)
+    Gate->>Gate: /ready reports not-ready for the rebuild's duration
+    NewPool-->>Gate: warmed, ready to serve
+    Gate->>Client: next queued request served by NewPool — the killed request is never retried
+```
+
+A worker can only be asked to stop between pages, so a worker that overruns badly inside a single page keeps
+computing until that page finishes — the reclamation grace bounds the total exposure to roughly one page's worth of
+extra time, not the unbounded runaway this mechanism replaces. See the `ocr-request-deadlines`,
+`ocr-service-readiness`, `ocr-input-limits`, and `ocr-memory-bounds` capability specs under
+`openspec/changes/stop-ocr-getting-stuck-on-large-jobs/specs/` for the full requirement set.
 
 ---
 
@@ -72,9 +120,10 @@ sequenceDiagram
     Guard->>Guard: "host.docker.internal" in MCP_ALLOWED_HOSTS → allow
     MCP->>ObjectStore: GET http://host.docker.internal:9070/e2e-fixtures/img.png (allow_redirects=False)
     ObjectStore-->>MCP: 200 image bytes (streamed, size checked)
-    MCP->>Pool: loop.run_in_executor(get_process_pool(), run_ocr_in_worker, bytes, "img.png", "en")
+    MCP->>MCP: inspect_input, enforce_pixel_ceiling, enforce_page_limit (header only)
+    MCP->>Pool: dispatch_ocr_request(bytes, "img.png", "en", effective_budget, "mcp")
     Pool->>OcrSvc: _get_engine("en") — cache hit (warm)
-    OcrSvc->>OcrSvc: engine.predict
+    OcrSvc->>OcrSvc: predict_iter() page by page, deadline checked between pages
     OcrSvc-->>Pool: OcrJsonResponse
     Pool-->>MCP: OcrJsonResponse
     MCP-->>Agent: {"jsonrpc":"2.0","result":{"content":[{"type":"text","text":"{...}"}]}}

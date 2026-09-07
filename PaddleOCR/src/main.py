@@ -19,7 +19,13 @@ from src.config.startup_banner import log_startup_banner
 from src.model.ocr_models import HealthResponse, ReadinessResponse
 from src.observability.metrics import is_engine_warm
 from src.observability.tracing import configure_tracing
-from src.service.ocr_service import start_worker_pool, stop_worker_pool
+from src.service.ocr_service import (
+    get_queue_depth,
+    is_accepting_work,
+    start_worker_pool,
+    stop_worker_pool,
+    sweep_scratch_dir,
+)
 
 logger = logging.getLogger("uvicorn")
 
@@ -33,6 +39,9 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.info("Starting PaddleOCR service")
+        # Reclaims anything a previous container process left behind: a killed worker
+        # never runs its own cleanup (see sweep_scratch_dir).
+        sweep_scratch_dir()
         # The engine warms inside the OCR worker process, the one that actually serves
         # inference (see start_worker_pool). Warming a second engine here, in the main
         # process, would just hold ~316 MiB it never uses for the life of the container.
@@ -68,9 +77,19 @@ def create_app() -> FastAPI:
         # than triggering one: an orchestrator polling /ready must never itself cause
         # a warm-up, or it would keep the service permanently busy.
         engine_warm = is_engine_warm(settings.DEFAULT_LANGUAGE)
-        status: Literal["ready", "not-ready"] = "ready" if engine_warm else "not-ready"
+        # Distinguishes busy (still ready, a queued request will be served) from
+        # genuinely unable (pool unusable, a replacement or rebuild in progress, or the
+        # in-flight job past its own budget and not yet reclaimed).
+        accepting_work = is_accepting_work()
+        status: Literal["ready", "not-ready"] = "ready" if engine_warm and accepting_work else "not-ready"
 
-        return ReadinessResponse(status=status, version=SERVICE_VERSION, engine_warm=engine_warm)
+        return ReadinessResponse(
+            status=status,
+            version=SERVICE_VERSION,
+            engine_warm=engine_warm,
+            accepting_work=accepting_work,
+            queue_depth=get_queue_depth(),
+        )
 
     fastapi_app.mount("/", mcp_asgi_app)
 

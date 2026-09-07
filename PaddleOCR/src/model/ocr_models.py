@@ -35,3 +35,5 @@ class ReadinessResponse(BaseModel):
     status: Literal["ready", "not-ready"]
     version: str
     engine_warm: bool
+    accepting_work: bool
+    queue_depth: int = Field(ge=0)

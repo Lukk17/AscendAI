@@ -17,6 +17,38 @@ BANNER = (
 DIVIDER = "-" * 80
 APP_NAME = "paddle-ocr"
 
+# The measured memory model (see PaddleOCR/openspec/changes/stop-ocr-getting-stuck-on-
+# large-jobs/design.md, "the measured memory model"): a process holding one warm
+# engine plus every other cached language, detection scaled to at most the detector
+# bound, everything else scaling with the input's own full resolution, plus one
+# page's retained result.
+_BASE_PROCESS_AND_ENGINE_MIB: float = 635.0
+_PER_CACHED_LANGUAGE_MIB: float = 143.0
+_DETECTION_MIB_PER_MEGAPIXEL: float = 4984.0
+_OTHER_MIB_PER_MEGAPIXEL: float = 318.0
+_PER_PAGE_RETAINED_MIB: float = 11.5
+
+
+def _estimate_call_peak_mib() -> float:
+    """Predict one call's peak resident memory at the worst input this configuration admits."""
+    input_megapixels = settings.OCR_MAX_INFERENCE_PIXELS / 1_000_000
+    detector_bound = settings.OCR_DETECTOR_MAX_SIDE
+
+    if detector_bound is not None:
+        detector_megapixels = min(input_megapixels, (detector_bound * detector_bound) / 1_000_000)
+    else:
+        detector_megapixels = input_megapixels
+
+    cache_mib = _PER_CACHED_LANGUAGE_MIB * (settings.ENGINE_CACHE_MAX_SIZE - 1)
+
+    return (
+        _BASE_PROCESS_AND_ENGINE_MIB
+        + cache_mib
+        + _DETECTION_MIB_PER_MEGAPIXEL * detector_megapixels
+        + _OTHER_MIB_PER_MEGAPIXEL * input_megapixels
+        + _PER_PAGE_RETAINED_MIB
+    )
+
 
 def _resolve_host() -> str:
     try:
@@ -72,7 +104,14 @@ def log_startup_banner() -> None:
             f"      Language:  {settings.DEFAULT_LANGUAGE}",
             f"      Max upload: {settings.MAX_FILE_SIZE_MB} MB",
             f"      OCR timeout: {settings.OCR_REQUEST_TIMEOUT}s per request",
+            f"      Per-page allowance: {settings.OCR_PAGE_TIMEOUT_SECONDS}s, {settings.OCR_MAX_PAGES} page(s) max",
+            f"      Detector max side: {settings.OCR_DETECTOR_MAX_SIDE or '(unbounded)'}",
+            f"      Pixel ceiling per inference: {settings.OCR_MAX_INFERENCE_PIXELS}",
             f"      Engine cache cap: {settings.ENGINE_CACHE_MAX_SIZE} languages",
+            f"      Worker count: {settings.OCR_WORKER_COUNT}",
+            "    Memory ceiling (this configuration):",
+            f"      One call: ~{_estimate_call_peak_mib():.0f} MiB, x{settings.OCR_WORKER_COUNT} worker(s) "
+            f"= ~{_estimate_call_peak_mib() * settings.OCR_WORKER_COUNT:.0f} MiB service peak",
             DIVIDER,
         ]
     )

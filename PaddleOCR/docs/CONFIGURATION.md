@@ -13,7 +13,30 @@
 | API_PORT                          | `7022`                                        | Uvicorn port.                                                                            |
 | LOG_LEVEL                         | `INFO`                                        | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.                                         |
 | LOG_FORMAT                        | `json`                                        | `json` for production log sinks, `color` for local terminal output.                      |
-| OCR_REQUEST_TIMEOUT               | `120.0`                                       | Seconds. Applied via `asyncio.wait_for` around every engine call.                        |
+| OCR_REQUEST_TIMEOUT               | `120.0`                                       | Seconds. Absolute ceiling on one request; the effective budget is `min(pages * OCR_PAGE_TIMEOUT_SECONDS, OCR_REQUEST_TIMEOUT)`. |
+
+---
+
+### Request budgets, memory bounds, and worker recovery
+
+See [ADR-005](architecture/decisions/ADR-005-fixed-pdf-render-resolution.md) and
+[ADR-006](architecture/decisions/ADR-006-detector-input-bound.md) for the full derivation. Two values, `OCR_MAX_INFERENCE_PIXELS`
+and `OCR_DETECTOR_MAX_SIDE`, are one decision expressed as two settings — deploy them together.
+
+| Variable                          | Default                                       | Purpose                                                                                  |
+| :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
+| OCR_WORKER_COUNT                  | `1`                                           | Inference worker processes, and admission-gate permits — both read from this one setting. One call's peak is already most of the container's memory ceiling, so this is a memory constraint, not a throughput knob: `service_peak_MiB ~= per_call_peak_MiB * OCR_WORKER_COUNT`. |
+| OCR_PAGE_TIMEOUT_SECONDS          | `120.0`                                       | Per-page allowance the worker checks between pages (`predict_iter()`, not `predict()`).  |
+| OCR_DISPATCH_MARGIN_SECONDS       | `5.0`                                         | Headroom the worker's own budget subtracts, so it gives up slightly before the parent.   |
+| OCR_MAX_INFERENCE_PIXELS          | `2500000`                                     | Pixel ceiling on one inference, checked from the file header before decode. Refused with `FILE_TOO_LARGE`, naming the measured count and the ceiling. |
+| OCR_DETECTOR_MAX_SIDE             | `1536`                                        | Bounds text detection's longest input side (`text_det_limit_type="max"`), independent of the page's own resolution. Set to an empty value to restore the library's unbounded default. The owner's measured choice against 960 and 1280 — see ADR-006. |
+| OCR_POOL_REBUILD_MAX_CONSECUTIVE  | `3`                                           | Consecutive failed pool rebuilds before the service stops trying and stays not-ready. Resets on the first request that completes. |
+| OCR_SCRATCH_DIR                   | `<system temp>/paddle-ocr-scratch`            | Directory for the worker's temporary upload copy. Swept of anything older than `OCR_REQUEST_TIMEOUT + OCR_DISPATCH_MARGIN_SECONDS` by every fresh worker and at service startup. |
+
+Two further values are derived properties, not settings — they recompute from the inputs above and cannot be set
+from the environment: `OCR_MAX_PAGES = floor(OCR_REQUEST_TIMEOUT / OCR_PAGE_TIMEOUT_SECONDS)` refuses a document with
+more pages before any inference starts, and `OCR_RECLAMATION_GRACE_SECONDS = OCR_PAGE_TIMEOUT_SECONDS +
+OCR_DISPATCH_MARGIN_SECONDS` is how long a worker may run past its own expired budget before it is replaced.
 
 ---
 

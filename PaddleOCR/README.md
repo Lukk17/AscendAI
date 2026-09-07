@@ -135,12 +135,23 @@ graph TB
     Service --> Engine
 ```
 
-The REST handler and the MCP tool both delegate to one `OcrService` singleton. Engine calls run in a single-worker
-`ProcessPoolExecutor` (`start_worker_pool` in [src/service/ocr_service.py](src/service/ocr_service.py)), not a
-thread, because `PaddleOCR.predict()` holds the interpreter lock long enough to stall the event loop if it ran there
-instead. That keeps `/health`, `/ready`, `/metrics`, and concurrent requests responsive while inference is in flight.
-The MCP path has an SSRF guard on `http(s)://` URIs and a `realpath` jail on `file://` URIs; see
+The REST handler and the MCP tool both delegate to one shared `dispatch_ocr_request` in
+[src/service/ocr_service.py](src/service/ocr_service.py), which admits a request onto a gate sized to
+`OCR_WORKER_COUNT`, dispatches it to the process pool with the remaining budget, and replaces the pool if a worker
+does not stop in time. Engine calls run in that `ProcessPoolExecutor`, not a thread, because `PaddleOCR.predict()`
+holds the interpreter lock long enough to stall the event loop if it ran there instead. That keeps `/health`,
+`/ready`, `/metrics`, and concurrent requests responsive while inference is in flight. The MCP path has an SSRF guard
+on `http(s)://` URIs and a `realpath` jail on `file://` URIs; see
 [ADR-001](docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md) for the policy.
+
+**Request budgets and memory.** A request's time budget is `min(pages * OCR_PAGE_TIMEOUT_SECONDS,
+OCR_REQUEST_TIMEOUT)`; the worker checks it between pages and stops itself rather than being abandoned. Peak memory
+for one call is measured at `635 + 5302 * megapixels_of_the_largest_page + 11.5 * pages` MiB, with text detection
+responsible for 94 percent of the transient — which is why `OCR_WORKER_COUNT` is a memory constraint
+(`service_peak_MiB ~= per_call_peak_MiB * OCR_WORKER_COUNT`) and not only a throughput one, and why
+`OCR_DETECTOR_MAX_SIDE` and `OCR_MAX_INFERENCE_PIXELS` exist. See [ADR-005](docs/architecture/decisions/ADR-005-fixed-pdf-render-resolution.md)
+and [ADR-006](docs/architecture/decisions/ADR-006-detector-input-bound.md) for the full derivation and the accuracy
+trade the detector bound makes.
 
 ---
 
@@ -149,7 +160,7 @@ The MCP path has an SSRF guard on `http(s)://` URIs and a `realpath` jail on `fi
 | Method | Path        | Purpose                                                                 |
 | :----- | :---------- | :---------------------------------------------------------------------- |
 | GET    | /health     | Liveness probe. Always 200 when the process is up.                      |
-| GET    | /ready      | Readiness probe. 200 with `status=ready` once the default lang is warm. |
+| GET    | /ready      | Readiness probe. 200 with `status=ready` once the default lang is warm and the service is accepting work (`accepting_work`, `queue_depth` in the body — see [ADR-004](docs/architecture/decisions/ADR-004-liveness-readiness-split.md)). |
 | GET    | /metrics    | Prometheus exposition for the counters in [src/observability/metrics.py](src/observability/metrics.py). |
 | POST   | /v1/ocr     | Multipart upload, returns [OcrJsonResponse](src/model/ocr_models.py).   |
 | POST   | /mcp        | FastMCP Streamable HTTP transport. Tool `ocr_process` takes `file_uri`. |
@@ -161,7 +172,8 @@ The error body shape across both surfaces is `{"code": "...", "detail": "..."}`.
 
 ### Configuration
 
-The full env-var matrix (sixteen settings across service, OCR engine, MCP transport, rate limits, OpenTelemetry) is
+The full env-var matrix (twenty-three settings across service, OCR engine, request budgets and memory bounds, MCP
+transport, rate limits, OpenTelemetry) is
 documented in [docs/CONFIGURATION.md](docs/CONFIGURATION.md). The defaults are safe for a single-instance local run;
 the docker-compose service at [docker-compose.yaml](../docker-compose.yaml) carries the production overrides.
 
@@ -263,6 +275,8 @@ Everything below is shipped with the service.
 | [docs/architecture/decisions/ADR-002-mcp-error-catalog.md](docs/architecture/decisions/ADR-002-mcp-error-catalog.md) | Error code catalog                |
 | [docs/architecture/decisions/ADR-003-versioning-strategy.md](docs/architecture/decisions/ADR-003-versioning-strategy.md) | Versioning strategy           |
 | [docs/architecture/decisions/ADR-004-liveness-readiness-split.md](docs/architecture/decisions/ADR-004-liveness-readiness-split.md) | Liveness vs readiness split |
+| [docs/architecture/decisions/ADR-005-fixed-pdf-render-resolution.md](docs/architecture/decisions/ADR-005-fixed-pdf-render-resolution.md) | Fixed 144 dpi PDF rendering resolution |
+| [docs/architecture/decisions/ADR-006-detector-input-bound.md](docs/architecture/decisions/ADR-006-detector-input-bound.md) | Detector input bound and its accuracy trade |
 | [docs/architecture/arc42/](docs/architecture/arc42/)                                                     | Twelve-chapter arc42 walkthrough          |
 | [docs/architecture/diagrams/container-diagram.md](docs/architecture/diagrams/container-diagram.md)       | C4 container and runtime diagrams         |
 | [e2e/README.md](e2e/README.md)                                                                           | e2e contract and capability matrix        |

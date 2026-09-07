@@ -117,14 +117,16 @@ A bound on what the detector sees, which is the fix the measurement points at:
   0.901 megapixels, a 960 long-side bound cut peak from 5358 to 4242 MiB, and accuracy went from 29 of 29 lines to
   28 of 29 with mean confidence moving from 0.9869 to 0.9834. Applied to A4 the effect is far larger because the
   downscale is larger: about 4.1 GiB at 960, 6.8 GiB at 1280 and 9.2 GiB at 1536, against 11.0 GiB unbounded.
-- The change does not pick the deployed value. This is an accuracy trade against small text, which is what the
-  owner cares about, so the three candidates and their costs are stated and choosing between them is a task that
-  requires measuring against his own documents. Said plainly: a lower bound reads less small text, in the sense
-  that small lines stop being detected at all rather than being detected and misread.
-- The bound and the pixel ceiling are one decision in two settings, and the defaults are not neutral. The image
-  ships with today's detection behaviour and the pixel ceiling that behaviour actually survives, which refuses A4
-  until the chosen pair is deployed with it. That is deliberate and stated in the migration plan: a service that
-  refuses the page it has a measured history of dying on is more honest than one that accepts it.
+- The change itself does not pick the deployed value; that is left to task 1.5. This is an accuracy trade against
+  small text, which is what the owner cares about, so the three candidates and their costs are stated and choosing
+  between them is a task that requires measuring against his own documents. Said plainly: a lower bound reads less
+  small text, in the sense that small lines stop being detected at all rather than being detected and misread.
+  **Resolved**: the owner measured 960, 1280 and 1536 against five real documents and chose 1536 as near lossless —
+  see [ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md) for the full table.
+- The bound and the pixel ceiling are one decision in two settings. **Resolved**: they ship together as
+  `OCR_DETECTOR_MAX_SIDE=1536` and `OCR_MAX_INFERENCE_PIXELS=2,500,000`, so an image deployed with its shipped
+  defaults accepts A4 rather than refusing it. The paragraph below and the migration plan in `design.md` describe
+  the state before this resolution, kept for the reasoning it carries about why an unresolved pair is not neutral.
 - This is the only guard here that bounds memory for arbitrary caller input while still serving it. The caller
   controls the pixel count and nothing else does. The pixel ceiling bounds memory by refusing, the worker cap
   bounds how many such costs run at once, and neither reduces what one page costs.
@@ -172,10 +174,11 @@ A decision recorded:
 
 No contract here is BREAKING. Every response field is additive and no error code changes meaning. The behaviour a
 caller sees does change in one way worth naming rather than burying: with the shipped defaults, input above the
-pixel ceiling is refused, and that ceiling is below A4 until the detector bound is deployed with the ceiling the
-owner chooses for it. So a caller can lose the ability to submit a page that used to be accepted, in exchange for
-never again holding a connection open against a service that has killed itself reading it. The deploy that follows
-the owner's decision restores it and admits more than today.
+pixel ceiling is refused. With the resolved detector bound and pixel ceiling pair (1536 / 2,500,000) that ceiling
+covers A4 and the other standard page sizes, so this is not the loss of function it would have been had the pair
+shipped unresolved — see the two paragraphs above. What remains true regardless of the pair chosen: a caller
+submitting a genuinely oversized page gets a fast, named refusal in exchange for never again holding a connection
+open against a service that has killed itself reading it.
 
 ## Capabilities
 

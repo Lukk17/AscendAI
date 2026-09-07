@@ -144,10 +144,10 @@ a budget and an accuracy trade, both of which belong to the owner rather than to
 | Per-page allowance | 120 s | The one live observation: a twenty page document had consumed more than 2100 s of worker time without finishing, so the average page on that document cost at least 105 s. 120 s is the first round value above the observed floor. | Yes, task 1.2 |
 | Absolute request ceiling | 300 s, unchanged for now | Today's deployed `OCR_REQUEST_TIMEOUT` in `docker-compose.yaml`. Kept until measured, because changing it is a product decision about how long a caller holds a connection. | Yes, task 1.3 |
 | Dispatch margin | 5 s | The worker must give up before the parent does. Covers pickling the arguments, the spawn-context handoff, and the result trip back. | Yes, task 1.2 |
-| Detector long-side bound | none, which is today's behaviour | Decision 11. Three candidates are measured, 960, 1280 and 1536, with what each costs in memory and in detected lines. The deployed value trades small text against memory on the owner's own documents. | Owner decision, task 1.5 |
+| Detector long-side bound | 1536 (`text_det_limit_type="max"`) | Decision 11 and task 1.5, resolved. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near lossless: 1280 lost dotted separators on a form, 960 lost genuine footnotes from a legal opinion. Recorded with the full candidate table in [ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md). | No — owner decided |
 | Maximum pages | derived, not configured | `floor(ceiling / per-page allowance)`. At the provisional values that is 2. It is a deadline artifact and not a memory constraint, which the restatement below shows. | Follows its two inputs |
 | Reclamation grace | derived, not configured | `per-page allowance + dispatch margin`. The latest a healthy worker can legitimately return is one page's inference after its own budget expired, plus the trip back. | Follows its two inputs |
-| Pixel ceiling for one inference | 1,720,000, the unbounded row of the table below at 90 percent of the container limit | Derived from the fitted model with no detector bound, which is what the service survives today, at a budget that leaves headroom because the host measurement shows the container limit is not what the host can actually give. It replaces the provisional 2,500,000, which was bracketed between the one page size known to survive and the one known to die and is not survivable unbounded. The deployed value comes from the pair in tasks 1.4 and 1.5. | Owner decision on the budget, plus task 1.6 |
+| Pixel ceiling for one inference | 2,500,000, unchanged | Deployed together with the 1536 detector bound above, per this section's own concluding guidance: the defensible ceiling pending task 1.6 is the one that already covers the standard page sizes (A4 2.00 MP, Letter 1.94 MP, Legal 2.47 MP) with a bound deployed alongside it, which is where the change's original provisional value already sat. Not the 1,720,000 unbounded-case value computed further down, which assumes no detector bound and would needlessly refuse A4. Task 8.9 measured a real twenty-page A4 document against this pair and recorded the peak against the model's prediction. | Task 1.6 still open, for ceilings materially above the standard page sizes |
 | Consecutive pool rebuild attempts | 3 | Decision 12. Enough to survive a transient kill, few enough that a genuine crash loop stops and stays visibly not-ready instead of respawning forever. | No |
 
 Two numbers deliberately are not configuration. The maximum page count and the reclamation grace are computed from
@@ -531,14 +531,14 @@ are one decision in two settings and there is no comfortable pair to default to.
 ceiling under 2 MP, which refuses A4 and US Legal. Shipping unbounded with a ceiling above that admits jobs that can
 exhaust the container, which is today's behaviour and is the incident.
 
-The shipped defaults choose the first: the detector bound is unset, which is today's detection behaviour exactly,
-and the pixel ceiling is 1,720,000, the unbounded row at 90 percent of the container limit, which is what an
-unbounded service survives with headroom left for the host. So an image deployed
-on its own refuses A4, loudly, with the numbers in the error, instead of accepting a page it has a measured history
-of dying on. That is a real loss of function and it is meant to be visible, because it is the true statement of what
-the service can do today. The pair from tasks 1.4 and 1.5 removes it in the same deploy and leaves the service
-accepting more than it does now, not less. Decision 12 makes a kill survivable rather than terminal, which is not
-the same as making it acceptable.
+Task 1.5 has since reported. The owner measured 960, 1280 and 1536 against five of his own real documents and chose
+1536: near lossless, where 1280 lost dotted separators on a form and 960 lost genuine footnotes from a legal
+opinion. The full candidate table, what each costs in memory, and where the accuracy loss lands is recorded in
+[ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md). The shipped defaults are
+therefore `OCR_DETECTOR_MAX_SIDE=1536` paired with `OCR_MAX_INFERENCE_PIXELS=2,500,000` — this section's own
+concluding guidance for the defensible pixel ceiling pending task 1.6, not the 1,720,000 unbounded-case figure
+computed earlier in this section. An image deployed on its own therefore accepts A4 rather than refusing it, and
+Decision 12 makes a kill survivable rather than terminal, which is not the same as making it acceptable.
 
 Alternative considered: leaving the pipeline configuration alone and relying on the pixel ceiling. Rejected, because
 that ceiling then has to sit below the pages the service exists to read, so the service would be safe and useless.
@@ -621,6 +621,22 @@ The stop is only as fine-grained as one page. A worker that overruns badly insid
 until that page finishes. Mitigation: the reclamation grace bounds the total exposure and replaces the worker past
 it, and the exposure is one page rather than the thirty minutes and counting that was measured.
 
+A document whose real cost lands almost exactly on its budget can have its fully-completed result discarded rather
+than returned, found live while verifying this change. `predict_iter()` offers no way to ask "is there another page"
+without paying for it, so the worker's deadline check necessarily runs before it knows whether the next
+`next(iterator)` would yield a real page or `StopIteration`. If the deadline has expired by the time the *last* page
+finishes, the check at the top of the next loop iteration fires and raises before that `next()` call ever discovers
+there was nothing left to pull, discarding every page already computed even though the document was, in truth,
+completely and successfully processed. Reproduced live: a genuinely one-page document whose single page took longer
+than its own per-page allowance failed with `OCR_FAILED` despite having nothing left to infer. Not fixed, because
+every restructuring that avoids it either pays for the next page's inference just to learn there wasn't one
+(defeating the point of checking before starting unwanted work) or reintroduces the same problem one step later.
+Judged an acceptable trade of the interface `predict_iter()` offers, not a defect with a clean fix, and consistent
+with this change's own explicit requirement that an expired budget "SHALL NOT return a partial result" — the
+philosophy already treats "over budget" as a hard line regardless of how much of the true reason was "no more work
+left to do." Operators choosing the per-page allowance (task 1.2) should read this as a reason to keep real headroom
+above the measured per-page cost rather than sizing it exactly to the p95.
+
 Worker replacement costs a warm-up, five to fifteen seconds, during which the service is honestly not ready.
 Mitigation: it only happens after a job has already failed and refused to stop, the empty pool queue means nothing
 else is lost, and readiness says so rather than accepting work it cannot serve.
@@ -670,15 +686,18 @@ A normal image rebuild. No schema migration, no persisted state, no data migrati
 fields and every other response is untouched, so consumers that ignore unknown fields are unaffected.
 
 Configuration is the one ordered part. The new settings all have defaults, so the image starts without any compose
-change, but two pairs have to be deployed as pairs. `OCR_REQUEST_TIMEOUT` and the per-page allowance together decide
-the page limit, so ship the value task 1.3 derives in the same deploy as the image. The detector bound and the pixel
-ceiling together decide what one call can cost, so ship the pair tasks 1.4 and 1.5 produce in that same deploy.
+change, but the pixel ceiling and the detector bound are shipped as a pair by default: `OCR_DETECTOR_MAX_SIDE=1536`
+with `OCR_MAX_INFERENCE_PIXELS=2,500,000`, the owner's measured choice recorded in
+[ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md), so A4 and the other
+standard page sizes are accepted out of the box rather than refused pending a follow-up deploy. `OCR_REQUEST_TIMEOUT`
+and the per-page allowance still await task 1.3's measurement; until then they keep their provisional values and the
+derived page limit stays at 2, which is a disclosure of an existing limit rather than a regression this change
+introduces.
 
-Deploying the image alone is safe but not neutral, and this is the one thing to read before deploying. It keeps
-today's detection behaviour and applies the 1,720,000 pixel ceiling that behaviour actually survives, so an A4
-document is refused with `FILE_TOO_LARGE` until the pair is deployed. Everything else in the change is unconditional
-and arrives with the image: the deadline, the reclamation, the pool rebuild, the scratch sweep and the readiness
-answer.
+Deploying the image with its shipped defaults is not the unbounded-and-refusing state this plan originally warned
+about, because the detector bound and pixel ceiling pair now ships together. Everything else in the change is
+unconditional and arrives with the image regardless: the deadline, the reclamation, the pool rebuild, the scratch
+sweep and the readiness answer.
 
 Rollback is reverting the image. Nothing persists, and no caller has to change anything to go back, because no
 request parameter was added.
@@ -692,10 +711,11 @@ request parameter was added.
 2. Closed. Peak memory is flat across page count, at 11.5 MiB of retained result per page. The model, its fit and
    its two validations are in "The measured memory model", and Decision 9 records which branch of its own rule
    applies and why the answer turned out not to be the reassuring one.
-3. What detector long-side bound is deployed, and therefore what pixel ceiling goes with it? Task 1.5 measures 960,
-   1280 and 1536 against the owner's own documents and he chooses. It changes two defaults and no behaviour, since
-   the mechanism is the same at every value, but the pair must be decided before the change is called done because
-   there is no safe default for it.
+3. Closed. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near
+   lossless, deployed with the pixel ceiling held at 2,500,000. Recorded in
+   [ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md) with the full candidate
+   table. Task 1.6, confirming the residual memory model at ceilings materially above the standard page sizes, stays
+   open, but it bounds only how far the ceiling could later rise, not the pair actually deployed.
 4. Does the 318 MiB per megapixel residual hold at the top of the intended ceiling? Task 1.6 measures it. It bounds
    how far the ceiling can be raised and nothing else.
 5. If the measured per-page cost makes documents of a realistic size take longer than a caller can hold a

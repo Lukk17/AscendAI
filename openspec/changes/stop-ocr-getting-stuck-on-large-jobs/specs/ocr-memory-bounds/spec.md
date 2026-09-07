@@ -8,10 +8,13 @@ configuration rather than a property of whatever the caller happened to upload.
 ### Requirement: The input to one inference is bounded by configuration, not by the caller
 
 The service SHALL bound the input given to text detection to a configured longest-side limit, independently of the
-size of the page or image submitted. The bound SHALL be configurable, and its shipped default SHALL be the
-library's existing behaviour so that deploying the service without choosing a value changes nothing. Lowering the
-bound reduces memory and reduces the smallest text that can be detected, so the deployed value SHALL be chosen by
-measuring both against real documents rather than taken as a default.
+size of the page or image submitted. The bound SHALL be configurable, and it MAY be unset to restore the library's
+own unbounded behaviour. Lowering the bound reduces memory and reduces the smallest text that can be detected, so
+the deployed value SHALL be chosen by measuring both against real documents rather than taken as an unexamined
+default. The owner measured 960, 1280 and 1536 against his own documents and chose 1536 as near lossless; the
+shipped default is therefore 1536, not the library's unbounded behaviour, and the three candidates with what each
+costs in memory and in detected lines are recorded in
+[ADR-006](../../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md).
 
 #### Scenario: Input larger than the bound
 

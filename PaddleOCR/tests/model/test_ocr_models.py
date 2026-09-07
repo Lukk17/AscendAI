@@ -146,16 +146,27 @@ class TestHealthResponse:
 class TestReadinessResponse:
     def test_ready(self):
         # When
-        ready = ReadinessResponse(status="ready", version="0.1.0", engine_warm=True)
+        ready = ReadinessResponse(status="ready", version="0.1.0", engine_warm=True, accepting_work=True, queue_depth=0)
 
         # Then
         assert ready.status == "ready"
         assert ready.engine_warm is True
+        assert ready.accepting_work is True
+        assert ready.queue_depth == 0
 
     def test_not_ready(self):
         # When
-        not_ready = ReadinessResponse(status="not-ready", version="0.1.0", engine_warm=False)
+        not_ready = ReadinessResponse(
+            status="not-ready", version="0.1.0", engine_warm=False, accepting_work=False, queue_depth=2
+        )
 
         # Then
         assert not_ready.status == "not-ready"
         assert not_ready.engine_warm is False
+        assert not_ready.accepting_work is False
+        assert not_ready.queue_depth == 2
+
+    def test_negative_queue_depth_rejected(self):
+        # Then
+        with pytest.raises(ValueError):
+            ReadinessResponse(status="ready", version="0.1.0", engine_warm=True, accepting_work=True, queue_depth=-1)

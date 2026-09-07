@@ -17,6 +17,7 @@ dependencies = [
     "aiofiles==25.1.0",
     "aiohttp==3.13.5",
     "Pillow==12.2.0",
+    "pypdfium2==5.8.0",
     "slowapi==0.1.9",
     "prometheus-fastapi-instrumentator==8.0.0",
     "prometheus-client==0.25.0",
@@ -107,7 +108,7 @@ disallow_incomplete_defs = true
 warn_return_any = true
 
 [[tool.mypy.overrides]]
-module = ["paddleocr.*", "fastmcp.*", "slowapi.*", "prometheus_fastapi_instrumentator.*"]
+module = ["paddleocr.*", "fastmcp.*", "slowapi.*", "prometheus_fastapi_instrumentator.*", "pypdfium2.*"]
 ignore_missing_imports = true
 
 [tool.mutmut]

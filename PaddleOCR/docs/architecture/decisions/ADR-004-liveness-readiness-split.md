@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-05-31
+Accepted — 2026-05-31. Amended — 2026-09-07: readiness gains a second condition (see "Amendment" below).
 
 ## Context
 
@@ -38,6 +38,31 @@ The first considered option was to do a tiny synthetic OCR run on a 1×1 bundled
 
 A warm-up failure inside the worker's pool initializer surfaces to the main process as `concurrent.futures.process.BrokenProcessPool` when `start_worker_pool` waits on the initializing task's result. The main process catches that specific exception, logs it, and continues starting instead of letting it propagate out of the FastAPI lifespan, which would otherwise kill the container before `/health` or `/ready` ever answered. `/ready` then reports `not-ready` forever for that process (no observation was ever recorded), and a real OCR request against the now-broken pool surfaces as a handled `500 INTERNAL_ERROR` through the existing global exception handler rather than an unhandled crash.
 
+## Amendment (2026-09-07): readiness gains a second condition
+
+`stop-ocr-getting-stuck-on-large-jobs` gave the service ways to be alive but genuinely unable to take work that did
+not exist when this ADR was first accepted: a worker that has not stopped within its reclamation grace, a worker pool
+found broken, and a rebuild of either in progress. `engine_warm` alone cannot express any of those, so
+`ReadinessResponse` gains two additive fields, `accepting_work: bool` and `queue_depth: int`, and `status` is now
+`ready` only when **both** `engine_warm` and `accepting_work` are true.
+
+`accepting_work` is `false` in exactly four cases, all in `src/service/ocr_service.py`: the engine has never warmed
+(unchanged from the original decision above), the worker pool has failed consecutive rebuilds past
+`OCR_POOL_REBUILD_MAX_CONSECUTIVE` and stays unusable, a worker replacement or pool rebuild is in progress, or the
+in-flight job is past its own budget and has not yet been reclaimed. `queue_depth` reports how many requests are
+waiting on the admission gate, so an operator can tell a busy service (queue depth rising, `status=ready`) from a
+stuck one (`status=not-ready`) without inferring it from other signals.
+
+**Liveness is deliberately untouched.** None of the four conditions above make `/health` fail. A worker replacement
+or pool rebuild fixes the exact problem a container restart would fix, at the cost of an engine warm-up (5-15 s)
+instead of the whole container's, and without dropping every other request queued behind it. Making `/health`
+depend on worker state was already rejected once in this ADR's original decision (see "Why not a synthetic OCR
+probe"), and the same reasoning applies here with more force: `/health` would now flap during ordinary self-healing.
+
+**The endpoint's contract is unchanged.** `/ready` keeps answering 200 in both states, with the condition carried in
+the body, exactly as the original decision specifies — busy-but-in-budget stays `ready`, because a queued request
+will still be served, and consumers reading `status` are unaffected by the two new fields.
+
 ## Consequences
 
 ### Why this shape
@@ -61,10 +86,13 @@ A warm-up failure inside the worker's pool initializer surfaces to the main proc
 ## Related
 
 - `PaddleOCR/src/main.py` — `health_check`, `readiness_check`.
-- `PaddleOCR/src/model/ocr_models.py` — `HealthResponse`, `ReadinessResponse`.
+- `PaddleOCR/src/model/ocr_models.py` — `HealthResponse`, `ReadinessResponse` (`accepting_work`, `queue_depth`).
 - `PaddleOCR/src/observability/metrics.py` — `is_engine_warm`, the multiprocess-file readiness check.
-- `PaddleOCR/src/service/ocr_service.py` — `start_worker_pool`, `_warm_worker_engine`, the `BrokenProcessPool` handling.
+- `PaddleOCR/src/service/ocr_service.py` — `start_worker_pool`, `_warm_worker_engine`, `is_accepting_work`,
+  `is_pool_usable`, `is_rebuild_in_progress`, `is_job_overrunning`, `_rebuild_pool`, the `BrokenProcessPool` handling.
 - `PaddleOCR/src/config/startup_banner.py` — emits both URLs at startup.
-- `PaddleOCR/tests/api/rest/test_rest_endpoints.py` — `TestReadyEndpoint`, `test_broken_worker_pool_returns_500_not_a_crash`.
+- `PaddleOCR/tests/api/rest/test_rest_endpoints.py` — `TestReadyEndpoint`, `test_unexpected_dispatch_exception_returns_500_not_a_crash`.
+- `PaddleOCR/tests/service/test_ocr_service.py` — `TestPoolHealthSignals`, `TestRebuildPool`.
 - `PaddleOCR/tests/observability/test_metrics.py` — `TestIsEngineWarm`.
 - `PaddleOCR/Dockerfile` — `HEALTHCHECK` points at `/health`, not `/ready`.
+- `openspec/changes/stop-ocr-getting-stuck-on-large-jobs/` — the change that added the second readiness condition.

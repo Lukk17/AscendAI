@@ -1,4 +1,4 @@
-from prometheus_client import CollectorRegistry, Counter, Histogram
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 from prometheus_client.multiprocess import MultiProcessCollector
 
 _ENGINE_WARMUP_METRIC_NAME = "paddleocr_engine_warmup_duration_seconds"
@@ -41,6 +41,40 @@ MCP_DOWNLOAD_DURATION_SECONDS: Histogram = Histogram(
     "MCP file fetch duration in seconds, partitioned by outcome.",
     labelnames=("outcome",),
     buckets=(0.1, 0.5, 1.0, 5.0, 10.0, 30.0),
+)
+
+OCR_QUEUE_DEPTH: Gauge = Gauge(
+    "paddleocr_ocr_queue_depth",
+    "Requests currently waiting on the admission gate for a free worker.",
+)
+
+OCR_QUEUE_WAIT_SECONDS: Histogram = Histogram(
+    "paddleocr_ocr_queue_wait_seconds",
+    "Time a request spent waiting on the admission gate before being dispatched or refused.",
+    buckets=(0.1, 0.5, 1.0, 5.0, 15.0, 30.0, 60.0, 120.0),
+)
+
+OCR_PAGE_DURATION_SECONDS: Histogram = Histogram(
+    "paddleocr_ocr_page_duration_seconds",
+    "Inference duration of a single page inside the OCR worker process.",
+    buckets=(0.5, 1.0, 2.0, 5.0, 15.0, 30.0, 60.0, 120.0),
+)
+
+OCR_DEADLINE_STOPS_TOTAL: Counter = Counter(
+    "paddleocr_ocr_deadline_stops_total",
+    "Requests stopped because their own budget expired, by surface.",
+    labelnames=("surface",),
+)
+
+WORKER_REPLACEMENTS_TOTAL: Counter = Counter(
+    "paddleocr_worker_replacements_total",
+    "Worker processes replaced because they did not stop within their reclamation grace.",
+)
+
+POOL_REBUILDS_TOTAL: Counter = Counter(
+    "paddleocr_pool_rebuilds_total",
+    "Worker pool rebuilds, by trigger reason and outcome.",
+    labelnames=("reason", "outcome"),
 )
 
 

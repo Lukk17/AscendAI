@@ -56,11 +56,45 @@ compose `healthcheck` stanza should be set). The operator should configure the l
 | `MCP_FILE_URI_ROOT` | _(unset)_ | Enables `file://` support; URIs must resolve inside this directory. Unset = `file://` disabled. |
 | `MCP_ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `host.docker.internal` for the standard compose stack, since the S3-compatible object store is reached over the host-published endpoint. |
 | `MCP_DOWNLOAD_TIMEOUT_SECONDS` | `30` | Total timeout for the `aiohttp` download session. |
+| `OCR_WORKER_COUNT` | `1` | Inference workers and admission-gate permits, from one setting. See "Memory model and the single worker" below. |
+| `OCR_PAGE_TIMEOUT_SECONDS` | `120` | Per-page allowance, checked between pages inside the worker. |
+| `OCR_DISPATCH_MARGIN_SECONDS` | `5` | Headroom subtracted from the worker's own budget. |
+| `OCR_MAX_INFERENCE_PIXELS` | `2500000` | Pixel ceiling on one inference, checked from the file header before decode. |
+| `OCR_DETECTOR_MAX_SIDE` | `1536` | Bounds text detection's longest input side. See [ADR-006](../decisions/ADR-006-detector-input-bound.md). |
+| `OCR_POOL_REBUILD_MAX_CONSECUTIVE` | `3` | Consecutive failed pool rebuilds before the service gives up and stays not-ready. |
+| `OCR_SCRATCH_DIR` | `<system temp>/paddle-ocr-scratch` | Worker upload scratch directory, swept of stale files by every fresh worker and at startup. |
 
 The `docker-compose.yaml` service block sets `API_PORT`, `API_HOST`, `LOG_LEVEL`, `DEFAULT_LANGUAGE`,
 `MAX_FILE_SIZE_MB`, and `OCR_REQUEST_TIMEOUT` explicitly. `MCP_ALLOWED_HOSTS` is not set in the default compose
 configuration and must be added manually to run the MCP e2e tests. See
 [e2e/testing/6-mcp-ocr-test.md](../../../e2e/testing/6-mcp-ocr-test.md).
+
+---
+
+### Memory model and the single worker
+
+The container carries a 12 GiB memory limit and a 4.0 CPU limit (`docker-compose.yaml`). Peak resident memory for
+one OCR call is measured, not estimated:
+
+```text
+peak_MiB = 635 + 5302 x megapixels_of_the_largest_single_page + 11.5 x pages
+```
+
+fitted at a correlation of 0.9993 (see `openspec/changes/stop-ocr-getting-stuck-on-large-jobs/design.md`, "The
+measured memory model"). Text detection is 94 percent of that transient, which is why `OCR_DETECTOR_MAX_SIDE` exists
+— see [ADR-006](../decisions/ADR-006-detector-input-bound.md). An A4 page unbounded costs 11.0 GiB, 92 percent of the
+container limit before the per-language engine cache is even counted.
+
+**`OCR_WORKER_COUNT` is a memory constraint, not a throughput one.** Peak is flat across page count (a page retains
+only 11.5 MiB of result), so the whole concurrency story is `service_peak_MiB ~= per_call_peak_MiB *
+OCR_WORKER_COUNT`. Because one call's peak is already most of the container's memory ceiling, raising the worker
+count does not make the service faster at the same memory cost — it multiplies a ceiling that a single unbounded A4
+page already fills to most of its capacity. The setting deliberately governs both the `ProcessPoolExecutor`'s
+`max_workers` and the admission gate's permit count, so the two cannot drift apart and the memory argument stays
+true regardless of which one an operator thinks they are tuning.
+
+The startup banner (`src/config/startup_banner.py`) prints the per-call estimate and the resulting service-wide
+ceiling for the running configuration, naming the detector bound and the pixel ceiling it was computed from.
 
 ---
 

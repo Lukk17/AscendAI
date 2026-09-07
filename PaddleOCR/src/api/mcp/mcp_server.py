@@ -15,13 +15,16 @@ from fastmcp import FastMCP
 from src.api.exception_handlers import (
     ERROR_CODE_DOWNLOAD_FAILED,
     ERROR_CODE_FILE_TOO_LARGE,
+    ERROR_CODE_OCR_FAILED,
     ERROR_CODE_UNSAFE_URI,
     ERROR_CODE_UNSUPPORTED_FILE_TYPE,
     DownloadFailedError,
     FileSizeExceededError,
+    OcrProcessingError,
     UnsafeUriError,
     UnsupportedFileTypeError,
 )
+from src.api.limits import enforce_page_limit, enforce_pixel_ceiling, inspect_input
 from src.api.middleware.audit_log import emit_mcp_audit
 from src.api.mime_sniffer import sniff_mime
 from src.config.config import settings
@@ -32,7 +35,7 @@ from src.observability.metrics import (
     OCR_REQUESTS_TOTAL,
 )
 from src.observability.tracing import get_tracer, inject_trace_context
-from src.service.ocr_service import get_process_pool, run_ocr_in_worker
+from src.service.ocr_service import dispatch_ocr_request
 
 logger = get_logger(__name__)
 tracer = get_tracer()
@@ -40,6 +43,7 @@ tracer = get_tracer()
 _BYTES_PER_MB: int = 1024 * 1024
 _DOWNLOAD_CHUNK_BYTES: int = 64 * 1024
 _HTTP_OK: int = 200
+_SURFACE: str = "mcp"
 
 _http_session: aiohttp.ClientSession | None = None
 
@@ -83,7 +87,7 @@ async def ocr_process(file_uri: str, lang: str = "en") -> dict[str, object]:
     Returns:
         Serialised OcrJsonResponse as a dictionary.
     """
-    OCR_REQUESTS_TOTAL.labels(surface="mcp", language=lang).inc()
+    OCR_REQUESTS_TOTAL.labels(surface=_SURFACE, language=lang).inc()
     parsed = urlparse(file_uri)
     scheme = parsed.scheme.lower() or "(none)"
     host = parsed.hostname
@@ -95,7 +99,10 @@ async def ocr_process(file_uri: str, lang: str = "en") -> dict[str, object]:
         ):
             file_bytes, filename = await _fetch_file(file_uri)
 
-        sniff_mime(file_bytes)
+        mime = sniff_mime(file_bytes)
+        shape = inspect_input(file_bytes, mime)
+        enforce_pixel_ceiling(shape)
+        enforce_page_limit(shape)
     except UnsafeUriError as exc:
         raise UnsafeUriError(f"{ERROR_CODE_UNSAFE_URI}: {exc}") from exc
     except UnsupportedFileTypeError as exc:
@@ -107,17 +114,17 @@ async def ocr_process(file_uri: str, lang: str = "en") -> dict[str, object]:
 
     emit_mcp_audit("ocr_process", scheme, host, len(file_bytes), "ok")
 
+    effective_budget = min(shape.page_count * settings.OCR_PAGE_TIMEOUT_SECONDS, settings.OCR_REQUEST_TIMEOUT)
     start = time.monotonic()
     with tracer.start_as_current_span("paddleocr.engine.predict", attributes={"language": lang}):
         # Captured inside the span above so the carrier points at this span, which the
         # worker process later reattaches to as the parent of its own inference span.
         trace_carrier = inject_trace_context()
-        loop = asyncio.get_running_loop()
-        result = await asyncio.wait_for(
-            loop.run_in_executor(get_process_pool(), run_ocr_in_worker, file_bytes, filename, lang, trace_carrier),
-            timeout=settings.OCR_REQUEST_TIMEOUT,
-        )
-    OCR_DURATION_SECONDS.labels(surface="mcp", language=lang).observe(time.monotonic() - start)
+        try:
+            result = await dispatch_ocr_request(file_bytes, filename, lang, effective_budget, _SURFACE, trace_carrier)
+        except OcrProcessingError as exc:
+            raise OcrProcessingError(f"{ERROR_CODE_OCR_FAILED}: {exc}") from exc
+    OCR_DURATION_SECONDS.labels(surface=_SURFACE, language=lang).observe(time.monotonic() - start)
 
     return result.model_dump()
 
