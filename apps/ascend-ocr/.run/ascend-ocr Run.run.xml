@@ -1,0 +1,72 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ascend-ocr Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+    <deployment type="dockerfile">
+      <settings>
+        <option name="imageTag" value="ascend-ocr:latest" />
+        <option name="containerName" value="ascend-ocr" />
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="API_PORT" />
+              <option name="value" value="7022" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="API_HOST" />
+              <option name="value" value="0.0.0.0" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LOG_LEVEL" />
+              <option name="value" value="INFO" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LOG_FORMAT" />
+              <option name="value" value="json" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="DEFAULT_LANGUAGE" />
+              <option name="value" value="en" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MAX_FILE_SIZE_MB" />
+              <option name="value" value="50" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="OCR_REQUEST_TIMEOUT" />
+              <option name="value" value="300" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="ENGINE_CACHE_MAX_SIZE" />
+              <option name="value" value="8" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MCP_ALLOWED_HOSTS" />
+              <option name="value" value="host.docker.internal,localhost,127.0.0.1" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MCP_DOWNLOAD_TIMEOUT_SECONDS" />
+              <option name="value" value="30" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="RATE_LIMIT_DEFAULT" />
+              <option name="value" value="60/minute" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="RATE_LIMIT_OCR" />
+              <option name="value" value="20/minute" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="portBindings">
+          <list>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="7022" />
+              <option name="hostPort" value="7022" />
+            </DockerPortBindingImpl>
+          </list>
+        </option>
+        <option name="sourceFilePath" value="apps/ascend-ocr/Dockerfile" />
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

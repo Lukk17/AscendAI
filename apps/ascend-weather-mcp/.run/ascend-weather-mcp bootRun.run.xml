@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="ascend-ai-agent [bootRun]" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="ascend-weather-mcp bootRun" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
-      <option name="externalProjectPath" value="$PROJECT_DIR$/apps/ascend-ai-agent" />
+      <option name="externalProjectPath" value="$PROJECT_DIR$/apps/ascend-weather-mcp" />
       <option name="externalSystemIdString" value="GRADLE" />
       <option name="scriptParameters" value="" />
       <option name="taskDescriptions">

@@ -1,15 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="AscendMemory Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+  <configuration default="false" name="ascend-memory Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
     <deployment type="dockerfile">
       <settings>
         <option name="imageTag" value="ascend-memory:latest" />
         <option name="containerName" value="ascend-memory" />
         <option name="envVars">
           <list>
-            <DockerEnvVarImpl>
-              <option name="name" value="OPENAI_BASE_URL" />
-              <option name="value" value="http://host.docker.internal:1234/v1" />
-            </DockerEnvVarImpl>
             <DockerEnvVarImpl>
               <option name="name" value="API_PORT" />
               <option name="value" value="7020" />
@@ -20,23 +16,31 @@
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
               <option name="name" value="QDRANT_HOST" />
-              <option name="value" value="qdrant" />
+              <option name="value" value="host.docker.internal" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
               <option name="name" value="QDRANT_PORT" />
               <option name="value" value="6333" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
-              <option name="name" value="MEM0_EMBEDDING_MODEL" />
-              <option name="value" value="text-embedding-nomic-embed-text-v2-moe" />
+              <option name="name" value="LMSTUDIO_BASE_URL" />
+              <option name="value" value="http://host.docker.internal:1234/v1" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
-              <option name="name" value="MEM0_COLLECTION_NAME" />
-              <option name="value" value="ascend_memory" />
+              <option name="name" value="LMSTUDIO_API_KEY" />
+              <option name="value" value="sk_local" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
-              <option name="name" value="MEM0_EMBEDDING_DIMS" />
-              <option name="value" value="768" />
+              <option name="name" value="OPENAI_BASE_URL" />
+              <option name="value" value="https://api.openai.com/v1" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="GEMINI_BASE_URL" />
+              <option name="value" value="https://generativelanguage.googleapis.com/v1beta/openai/" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MEM0_DEFAULT_PROVIDER" />
+              <option name="value" value="lmstudio" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
               <option name="name" value="MEM0_INFER_MEMORY" />
@@ -56,6 +60,7 @@
             </DockerPortBindingImpl>
           </list>
         </option>
+        <option name="commandLineOptions" value="--env OPENAI_API_KEY --env GEMINI_API_KEY" />
         <option name="sourceFilePath" value="apps/ascend-memory/Dockerfile" />
       </settings>
     </deployment>
