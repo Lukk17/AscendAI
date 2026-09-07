@@ -5,7 +5,7 @@ Documents enter the RAG knowledge base through exactly two hand-driven paths tod
 1. `POST /api/v1/ingestion/upload` (`controller/IngestionController.java`): multipart upload, filename sanitization (`util/IngestionSecurity`), Tika MIME sniffing against `app.ingestion.upload.allowed-mime-types`, then a `StorageService` write into MinIO under `markdown/` or `documents/`.
 2. Out-of-band drops into the MinIO bucket followed by `POST /api/v1/ingestion/run`. `service/ingestion/ManualIngestionService.java` scans the bucket, dedupes on ETag via a `ConcurrentMetadataStore` (`manual-ingestion:<key>:<etag>` markers), and pushes content through `IngestionService` / `DocumentRouter` into Qdrant.
 
-A Spring Integration S3 poller exists (`config/IngestionPipelineConfig.java`) but is disabled by default (`app.ingestion.auto.enabled=false`). Downstream parsing is already rich: `DocumentRouter` routes to the markdown parser, Docling, PaddleOCR, or Unstructured, with per-page PDF classification. There is no connector or sync concept anywhere in the codebase.
+A Spring Integration S3 poller exists (`config/IngestionPipelineConfig.java`) but is disabled by default (`app.ingestion.auto.enabled=false`). Downstream parsing is already rich: `DocumentRouter` routes to the markdown parser, Docling, ascend-ocr, or Unstructured, with per-page PDF classification. There is no connector or sync concept anywhere in the codebase.
 
 This change layers automated source sync on top, without touching the parse path.
 

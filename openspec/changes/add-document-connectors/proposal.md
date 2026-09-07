@@ -15,7 +15,7 @@ This change adds a connector framework for automated document sync from corporat
   - Scheduled incremental sync jobs per enabled connector, plus an on-demand trigger.
   - Sync-run history: one record per run with status, timing, and per-file outcomes (added / updated / deleted / skipped / failed with reason).
   - Connector CRUD REST API under `/api/v1/connectors` (ADMIN role): create, list, get, update, disable, delete, trigger-sync-now, and get sync history.
-  - Explicit design principle: a connector's only job is to land bytes and trigger the existing ingestion pipeline. All parsing stays in the existing `DocumentRouter` path (markdown parser, Docling, PaddleOCR, Unstructured). No parallel parse path, and no write to the vector store from a connector by any route.
+  - Explicit design principle: a connector's only job is to land bytes and trigger the existing ingestion pipeline. All parsing stays in the existing `DocumentRouter` path (markdown parser, Docling, ascend-ocr, Unstructured). No parallel parse path, and no write to the vector store from a connector by any route.
 - Company-wide visibility for synced documents:
   - Every chunk of a connector-landed document carries `acl` of `["tenant:everyone:{tenantId}"]` with `acl_source` of `tenant-default`, stamped by the ingestion producer default that `add-tenant-isolation` owns. The connector composes no access list itself, so there is exactly one producer of that principal in the system.
   - Per-document permissions captured from the source are deferred whole, with their design, their decision records, and their failure analysis preserved.

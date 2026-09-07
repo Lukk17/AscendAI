@@ -36,13 +36,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-agent|weather-mcp\"}[2m]))",
+          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-agent|ascend-weather-mcp\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}[2m]))",
+          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-ocr\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "B"
         }
@@ -67,13 +67,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-agent|weather-mcp\",status=~\"5..\"}[2m]))",
+          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-agent|ascend-weather-mcp\",status=~\"5..\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\",status=~\"5..\"}[2m]))",
+          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-ocr\",status=~\"5..\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "B"
         }
@@ -104,13 +104,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_server_requests_seconds_bucket{service=~\"ascend-agent|weather-mcp\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_server_requests_seconds_bucket{service=~\"ascend-agent|ascend-weather-mcp\"}[5m])))",
           "legendFormat": "{{service}} p95",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-ocr\"}[5m])))",
           "legendFormat": "{{service}} p95",
           "refId": "B"
         }
@@ -165,7 +165,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "process_resident_memory_bytes{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}",
+          "expr": "process_resident_memory_bytes{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-ocr\"}",
           "legendFormat": "{{service}} RSS",
           "refId": "A"
         }

@@ -49,12 +49,12 @@ The agent SHALL expose `GET /api/v1/ingestion/runs` returning recent runs newest
 
 ### Requirement: Bucket-scan ingestion routes every object through DocumentRouter
 
-Every object an ingestion run ingests SHALL be parsed via `DocumentRouter.routeAndProcess` (extension-based routing to the Markdown parser, Docling, PaddleOCR, Unstructured, or per-page PDF dispatch), identical to the upload and single-document reindex paths. The bucket-scan path SHALL NOT fall back to a default or plain-text parser that bypasses `DocumentRouter`, so a connector-dropped or manually-dropped PDF, Office, image, or e-mail file receives the same parse quality as an uploaded one. This closes the pre-existing gap where `ManualIngestionService`'s scan path ingested objects without routing.
+Every object an ingestion run ingests SHALL be parsed via `DocumentRouter.routeAndProcess` (extension-based routing to the Markdown parser, Docling, ascend-ocr, Unstructured, or per-page PDF dispatch), identical to the upload and single-document reindex paths. The bucket-scan path SHALL NOT fall back to a default or plain-text parser that bypasses `DocumentRouter`, so a connector-dropped or manually-dropped PDF, Office, image, or e-mail file receives the same parse quality as an uploaded one. This closes the pre-existing gap where `ManualIngestionService`'s scan path ingested objects without routing.
 
 #### Scenario: Scanned PDF is routed, not plain-parsed
 
 - **WHEN** an ingestion run scans a scanned-image PDF dropped into the bucket out-of-band
-- **THEN** the object is dispatched through `DocumentRouter` (per-page text-vs-scan split to Docling / PaddleOCR)
+- **THEN** the object is dispatched through `DocumentRouter` (per-page text-vs-scan split to Docling / ascend-ocr)
 - **AND** it is not ingested as raw bytes or plain text
 
 #### Scenario: Office document dropped into the bucket

@@ -43,11 +43,11 @@ When `.github/workflows/**` itself changes, every service runs regardless of whe
 | Service | Language | Python version | Test command |
 |---|---|---|---|
 | `ascend-agent` | Java | — | `./gradlew --no-daemon build test` |
-| `weather-mcp` | Java | — | `./gradlew --no-daemon build test` |
+| `ascend-weather-mcp` | Java | — | `./gradlew --no-daemon build test` |
 | `ascend-audio-scribe` | Python | 3.11 | `pytest` |
 | `ascend-web-hunter` | Python | 3.12 | `pytest` |
 | `ascend-memory` | Python | 3.11 | `pytest` |
-| `ascend-paddle-ocr` | Python | 3.11 | `pytest` |
+| `ascend-ocr` | Python | 3.11 | `pytest` |
 
 Java services use Eclipse Temurin 21 via `actions/setup-java@v4` and Gradle dependency caching via `gradle/actions/setup-gradle@v3`. Python services use `actions/setup-python@v5` with `cache: pip` and install with `pip install -e .[dev]`.
 
@@ -77,11 +77,11 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 | `create_github_release` | boolean | yes | Default `true`. Untick to publish images only: no Git tag, no GitHub Release, no stack version consumed. |
 | `stack_version` | string | no | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. Required when `create_github_release` is ticked, ignored otherwise. |
 | `release_ascend_agent` | boolean | yes | Ship `ascend-agent`. Default `false`. |
-| `release_weather_mcp` | boolean | yes | Ship `weather-mcp`. Default `false`. |
+| `release_ascend_weather_mcp` | boolean | yes | Ship `ascend-weather-mcp`. Default `false`. |
 | `release_ascend_audio_scribe` | boolean | yes | Ship `ascend-audio-scribe`. Default `false`. |
 | `release_ascend_web_hunter` | boolean | yes | Ship `ascend-web-hunter`. Default `false`. |
 | `release_ascend_memory` | boolean | yes | Ship `ascend-memory`. Default `false`. |
-| `release_paddle_ocr` | boolean | yes | Ship `ascend-paddle-ocr`. Default `false`. |
+| `release_ascend_ocr` | boolean | yes | Ship `ascend-ocr`. Default `false`. |
 
 ### How to cut a release
 
@@ -109,8 +109,8 @@ One consequence to be aware of. The bump guard compares each selected service ag
 
 Bumping an app's `version` in its manifest within a PR is what makes that app eligible for the next release.
 
-- **Java services** (`AscendAgent`, `WeatherMCP`): edit the `version = "<x.y.z>"` line in `build.gradle.kts`.
-- **Python services** (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`): edit the `version = "<x.y.z>"` line in `[project]` section of `pyproject.toml`.
+- **Java services** (`AscendAgent`, `ascend-weather-mcp`): edit the `version = "<x.y.z>"` line in `build.gradle.kts`.
+- **Python services** (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`): edit the `version = "<x.y.z>"` line in `[project]` section of `pyproject.toml`.
 
 ### Manifest version extractors
 
@@ -162,15 +162,15 @@ Each build is pushed to both registries under the same name, tagged `v<version>`
 | Service key | Docker Hub image | GHCR image |
 |---|---|---|
 | `ascend-agent` | `lukk17/ascend-agent` | `ghcr.io/lukk17/ascend-agent` |
-| `weather-mcp` | `lukk17/weather-mcp` | `ghcr.io/lukk17/weather-mcp` |
+| `ascend-weather-mcp` | `lukk17/ascend-weather-mcp` | `ghcr.io/lukk17/ascend-weather-mcp` |
 | `ascend-audio-scribe` | `lukk17/ascend-audio-scribe` | `ghcr.io/lukk17/ascend-audio-scribe` |
 | `ascend-web-hunter` | `lukk17/ascend-web-hunter` | `ghcr.io/lukk17/ascend-web-hunter` |
 | `ascend-memory` | `lukk17/ascend-memory` | `ghcr.io/lukk17/ascend-memory` |
-| `ascend-paddle-ocr` | `lukk17/ascend-paddle-ocr` | `ghcr.io/lukk17/ascend-paddle-ocr` |
+| `ascend-ocr` | `lukk17/ascend-ocr` | `ghcr.io/lukk17/ascend-ocr` |
 
 The GHCR owner segment is hardcoded lowercase. `${{ github.repository_owner }}` would resolve to `Lukk17`, and GHCR rejects uppercase in image names.
 
-Note: the compose file refers to the PaddleOCR service as `ascend-paddle-ocr` (local build name), but its published image is `lukk17/ascend-paddle-ocr` — consistent with the service filter key and the spec.
+Note: the compose file refers to the OCR service as `ascend-ocr` (local build name), but its published image is `lukk17/ascend-ocr` — consistent with the service filter key and the spec.
 
 ### GHCR package visibility
 

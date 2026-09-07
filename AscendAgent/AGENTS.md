@@ -89,7 +89,7 @@ Defaults match `application.yaml`. Any other model the provider accepts works at
 - Qdrant (port 6333) for vector embeddings — external prerequisite
 - Object storage (locally: Floci, port 9070) for document storage — external prerequisite
 - AscendMemory (port 7020) for semantic memory REST API
-- MCP servers: ascend-audio-scribe (7017), WeatherMCP (9998), ascend-web-hunter (7021)
+- MCP servers: ascend-audio-scribe (7017), ascend-weather-mcp (9998), ascend-web-hunter (7021)
 
 ## Code Conventions
 

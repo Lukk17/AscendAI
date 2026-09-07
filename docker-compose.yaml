@@ -47,13 +47,13 @@ services:
         aliases:
           - unstructured-api
 
-  ascend-paddle-ocr:
+  ascend-ocr:
     build:
-      context: ./PaddleOCR
+      context: ./ascend-ocr
       dockerfile: Dockerfile
-    image: ascend-paddle-ocr:local
-    container_name: ascend-paddle-ocr
-    hostname: ascend-paddle-ocr
+    image: ascend-ocr:local
+    container_name: ascend-ocr
+    hostname: ascend-ocr
     restart: unless-stopped
     ports:
       - "7022:7022"
@@ -74,17 +74,17 @@ services:
       - MCP_DOWNLOAD_TIMEOUT_SECONDS=30
       # file:// is disabled by default; mount a writable dir and set
       # MCP_FILE_URI_ROOT to the in-container path to enable.
-      # - MCP_FILE_URI_ROOT=/var/lib/paddle-ocr/uploads
+      # - MCP_FILE_URI_ROOT=/var/lib/ascend-ocr/uploads
       - RATE_LIMIT_DEFAULT=60/minute
       - RATE_LIMIT_OCR=20/minute
       - OTEL_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=ascend-paddle-ocr
+      - OTEL_SERVICE_NAME=ascend-ocr
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
     networks:
       default:
         aliases:
-          - ascend-paddle-ocr
+          - ascend-ocr
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7022/health"]
       interval: 30s
@@ -218,19 +218,19 @@ services:
         aliases:
           - ascend-memory
 
-  weather-mcp:
+  ascend-weather-mcp:
     build:
-      context: ./WeatherMCP
+      context: ./ascend-weather-mcp
       dockerfile: Dockerfile
-    # image: lukk17/weather-mcp:latest
-    container_name: weather-mcp
-    hostname: weather-mcp
+    # image: lukk17/ascend-weather-mcp:latest
+    container_name: ascend-weather-mcp
+    hostname: ascend-weather-mcp
     restart: unless-stopped
     ports:
       - "9998:9998"
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=weather-mcp
+      - OTEL_SERVICE_NAME=ascend-weather-mcp
       - OTEL_RESOURCE_ATTRIBUTES=service.version=1.0.0
     # Memory sized from measured usage: peak observed at 374 MiB over 24h
     # (docker stats, 2026-09-04). The Dockerfile already pins heap to 70% of
@@ -243,7 +243,7 @@ services:
     networks:
       default:
         aliases:
-          - weather-mcp
+          - ascend-weather-mcp
 
   ascend-audio-scribe:
     build:

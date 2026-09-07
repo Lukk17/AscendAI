@@ -2,7 +2,7 @@
 
 ## 1. Port bindings and compose mechanics
 
-- [ ] 1.1 Rewrite every `ports:` entry in `docker-compose.yaml` (docling-serve, unstructured-api, ascend-paddle-ocr, ascend-agent, ascend-memory, weather-mcp, ascend-audio-scribe, prometheus, grafana) to the `"${EXPOSE_BIND:-127.0.0.1}:<host>:<container>"` form
+- [ ] 1.1 Rewrite every `ports:` entry in `docker-compose.yaml` (docling-serve, unstructured-api, ascend-ocr, ascend-agent, ascend-memory, ascend-weather-mcp, ascend-audio-scribe, prometheus, grafana) to the `"${EXPOSE_BIND:-127.0.0.1}:<host>:<container>"` form
 - [ ] 1.2 Rewrite every `ports:` entry in `ascend-scrapper.docker-compose.yaml` (searxng, flaresolverr, ascend-web-hunter) to the same form
 - [ ] 1.3 Add a top-level `x-logging: &default-logging` anchor (json-file, `max-size: 10m`, `max-file: 3`) and apply `logging: *default-logging` to every service in both files
 - [ ] 1.4 Pin `ngrok/ngrok:3` to an exact version tag and confirm every other `image:` line in both files is already exact-pinned
@@ -42,13 +42,13 @@
 
 ## 6. SSRF and SearXNG posture
 
-- [ ] 6.1 Change `MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `ascend-audio-scribe` to `${MCP_ALLOWED_HOSTS:-object-store}`; remove the committed loopback entries
+- [ ] 6.1 Change `MCP_ALLOWED_HOSTS` on `ascend-ocr` and `ascend-audio-scribe` to `${MCP_ALLOWED_HOSTS:-object-store}`; remove the committed loopback entries
 - [ ] 6.2 Set `SEARXNG_LIMITER=true` and delete the `SEARXNG_X_FORWARDED_FOR` / `SEARXNG_X_REAL_IP` spoofed constants from `ascend-web-hunter`; forward the received client `X-Forwarded-For` on SearXNG requests instead
-- [ ] 6.3 Verify: with `MCP_ALLOWED_HOSTS` unset, a PaddleOCR MCP fetch of `http://127.0.0.1:9070/x` returns `UNSAFE_URI` while an `http://object-store:...` fetch is permitted; SearXNG reports the limiter enabled and search still works through ascend-web-hunter
+- [ ] 6.3 Verify: with `MCP_ALLOWED_HOSTS` unset, an ascend-ocr MCP fetch of `http://127.0.0.1:9070/x` returns `UNSAFE_URI` while an `http://object-store:...` fetch is permitted; SearXNG reports the limiter enabled and search still works through ascend-web-hunter
 
 ## 7. Healthchecks and startup ordering
 
-- [ ] 7.1 Add healthchecks to `docling-serve`, `unstructured-api`, `weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`
+- [ ] 7.1 Add healthchecks to `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`
 - [ ] 7.2 Upgrade `depends_on` to long form with `condition: service_healthy`: `ascend-agent` → {ascend-memory, docling-serve, unstructured-api}; `ascend-web-hunter` → {searxng, flaresolverr}
 - [ ] 7.3 Drop `--web.enable-lifecycle` from the Prometheus command
 - [ ] 7.4 Verify: cold `docker compose up -d` starts `ascend-agent` only after its dependencies are healthy; `POST http://localhost:7077/-/reload` is rejected; all services reach `healthy`

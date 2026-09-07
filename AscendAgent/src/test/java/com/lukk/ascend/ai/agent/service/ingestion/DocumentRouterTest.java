@@ -2,8 +2,8 @@ package com.lukk.ascend.ai.agent.service.ingestion;
 
 import com.lukk.ascend.ai.agent.exception.DocumentRoutingException;
 import com.lukk.ascend.ai.agent.exception.UnsupportedFileTypeException;
+import com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClient;
 import com.lukk.ascend.ai.agent.service.ingestion.client.DoclingClient;
-import com.lukk.ascend.ai.agent.service.ingestion.client.PaddleOcrClient;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -47,14 +47,14 @@ class DocumentRouterTest {
     private DoclingClient doclingClient;
 
     @Mock
-    private PaddleOcrClient paddleOcrClient;
+    private AscendOcrClient ascendOcrClient;
 
     @InjectMocks
     private DocumentRouter documentRouter;
 
     @AfterEach
     void tearDown() {
-        verifyNoMoreInteractions(ingestionService, doclingClient, paddleOcrClient);
+        verifyNoMoreInteractions(ingestionService, doclingClient, ascendOcrClient);
     }
 
     @Test
@@ -91,16 +91,16 @@ class DocumentRouterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"png", "jpg", "jpeg", "tiff", "bmp", "webp"})
-    void routeAndProcess_WhenImageFile_ThenRouteToPaddleOcr(String extension) {
+    void routeAndProcess_WhenImageFile_ThenRouteToAscendOcr(String extension) {
         byte[] bytes = "image_bytes".getBytes();
         String filename = "scan." + extension;
         Document mockDoc = new Document("ocr text");
-        when(paddleOcrClient.process(bytes, filename, null)).thenReturn(List.of(mockDoc));
+        when(ascendOcrClient.process(bytes, filename, null)).thenReturn(List.of(mockDoc));
 
         List<Document> result = documentRouter.routeAndProcess(bytes, filename, "image/" + extension);
 
         assertThat(result).containsExactly(mockDoc);
-        verify(paddleOcrClient).process(bytes, filename, null);
+        verify(ascendOcrClient).process(bytes, filename, null);
     }
 
     @ParameterizedTest
@@ -162,14 +162,14 @@ class DocumentRouterTest {
     }
 
     @Test
-    @DisplayName("routeAndProcess routes scan (text-sparse) PDF pages to PaddleOCR")
-    void routeAndProcess_WhenScanPdf_ThenRouteToPaddleOcr() throws IOException {
+    @DisplayName("routeAndProcess routes scan (text-sparse) PDF pages to ascend-ocr")
+    void routeAndProcess_WhenScanPdf_ThenRouteToAscendOcr() throws IOException {
         // given
         setThreshold(TEXT_THRESHOLD);
         byte[] pdfBytes = createTextPdf("Short");
         String filename = "scan.pdf";
         Document mockDoc = new Document("ocr text");
-        when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
+        when(ascendOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
                 .thenReturn(List.of(mockDoc));
 
         // when
@@ -177,7 +177,7 @@ class DocumentRouterTest {
 
         // then
         assertThat(result).containsExactly(mockDoc);
-        verify(paddleOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
+        verify(ascendOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
     }
 
     @Test
@@ -191,7 +191,7 @@ class DocumentRouterTest {
         Document ocrDoc = new Document("image page");
         when(doclingClient.process(any(byte[].class), eq(filename + "_page1.pdf")))
                 .thenReturn(List.of(doclingDoc));
-        when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page2.pdf"), isNull()))
+        when(ascendOcrClient.process(any(byte[].class), eq(filename + "_page2.pdf"), isNull()))
                 .thenReturn(List.of(ocrDoc));
 
         // when
@@ -201,7 +201,7 @@ class DocumentRouterTest {
         assertThat(result).hasSize(2);
         assertThat(result).containsExactly(doclingDoc, ocrDoc);
         verify(doclingClient).process(any(byte[].class), eq(filename + "_page1.pdf"));
-        verify(paddleOcrClient).process(any(byte[].class), eq(filename + "_page2.pdf"), isNull());
+        verify(ascendOcrClient).process(any(byte[].class), eq(filename + "_page2.pdf"), isNull());
     }
 
     @Test
@@ -248,15 +248,15 @@ class DocumentRouterTest {
     }
 
     @Test
-    @DisplayName("routeAndProcess routes to PaddleOCR when text length is below the threshold")
-    void routeAndProcess_WhenTextLengthBelowThreshold_ThenRouteToPaddleOcr() throws IOException {
+    @DisplayName("routeAndProcess routes to ascend-ocr when text length is below the threshold")
+    void routeAndProcess_WhenTextLengthBelowThreshold_ThenRouteToAscendOcr() throws IOException {
         // given — below threshold: short text on page → treated as scanned → OCR
         int threshold = 80;
         setThreshold(threshold);
         byte[] pdfBytes = createTextPdf("Hi");
         String filename = "short.pdf";
         Document mockDoc = new Document("ocr result");
-        when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
+        when(ascendOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
                 .thenReturn(List.of(mockDoc));
 
         // when
@@ -264,7 +264,7 @@ class DocumentRouterTest {
 
         // then
         assertThat(result).containsExactly(mockDoc);
-        verify(paddleOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
+        verify(ascendOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
     }
 
     @Test
@@ -280,14 +280,14 @@ class DocumentRouterTest {
     }
 
     @Test
-    @DisplayName("routeAndProcess routes a blank single-page PDF to PaddleOCR")
-    void routeAndProcess_WhenSinglePageBlankPdf_ThenRouteToPaddleOcr() throws IOException {
+    @DisplayName("routeAndProcess routes a blank single-page PDF to ascend-ocr")
+    void routeAndProcess_WhenSinglePageBlankPdf_ThenRouteToAscendOcr() throws IOException {
         // given
         setThreshold(TEXT_THRESHOLD);
         byte[] pdfBytes = createBlankPdf();
         String filename = "blank.pdf";
         Document mockDoc = new Document("ocr result");
-        when(paddleOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
+        when(ascendOcrClient.process(any(byte[].class), eq(filename + "_page1.pdf"), isNull()))
                 .thenReturn(List.of(mockDoc));
 
         // when
@@ -295,7 +295,7 @@ class DocumentRouterTest {
 
         // then
         assertThat(result).containsExactly(mockDoc);
-        verify(paddleOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
+        verify(ascendOcrClient).process(any(byte[].class), eq(filename + "_page1.pdf"), isNull());
     }
 
     private void setThreshold(int threshold) {

@@ -1,8 +1,8 @@
-# Weather MCP: e2e test
+# ascend-weather-mcp: e2e test
 
 ## What this verifies
 
-- The AscendAgent discovers the WeatherMCP server at startup.
+- The AscendAgent discovers the ascend-weather-mcp server at startup.
 - A weather prompt is routed to the `getCurrentWeather` MCP tool.
 - The response contains concrete weather data for the requested city, not a generic refusal.
 
@@ -24,7 +24,7 @@ curl -fsS http://localhost:9917/actuator/health
 
 Expect HTTP 200 with `{"status":"UP"}`.
 
-Check the WeatherMCP server is reachable.
+Check the ascend-weather-mcp server is reachable.
 
 ```bash
 curl -fsS http://localhost:9998/actuator/health

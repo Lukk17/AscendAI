@@ -6,7 +6,7 @@
 
 | Constraint | Reason |
 | :--------- | :----- |
-| Python 3.11 | Matches the other Python services in the monorepo (ascend-audio-scribe, ascend-web-hunter, PaddleOCR). |
+| Python 3.11 | Matches the other Python services in the monorepo (ascend-audio-scribe, ascend-web-hunter, ascend-ocr). |
 | mem0ai 1.0.3 | The mem0 API changed across minor versions; the `Memory.from_config` pattern and the `results` key in return values are pinned to this version. Upgrading requires verifying the dict shapes in `src/service/memory_client.py:109-166`. |
 | Qdrant as the only supported vector store | mem0ai supports multiple backends; this service hard-codes `"provider": "qdrant"` in the config dict (`src/service/memory_client.py:76-101`). |
 | OpenAI-compatible embedding API | All three providers (LM Studio, OpenAI, Gemini) must expose an OpenAI-compatible `/embeddings` endpoint. The `embedder.provider` in the mem0 config is always `"openai"` regardless of which service backs it. |

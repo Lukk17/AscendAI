@@ -17,14 +17,14 @@ scrape_configs:
       - target_label: service
         replacement: ascend-agent
 
-  - job_name: weather-mcp
+  - job_name: ascend-weather-mcp
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - weather-mcp:9998
+          - ascend-weather-mcp:9998
     relabel_configs:
       - target_label: service
-        replacement: weather-mcp
+        replacement: ascend-weather-mcp
 
   - job_name: ascend-memory
     metrics_path: /metrics
@@ -53,14 +53,14 @@ scrape_configs:
       - target_label: service
         replacement: ascend-web-hunter
 
-  - job_name: ascend-paddle-ocr
+  - job_name: ascend-ocr
     metrics_path: /metrics
     static_configs:
       - targets:
-          - ascend-paddle-ocr:7022
+          - ascend-ocr:7022
     relabel_configs:
       - target_label: service
-        replacement: ascend-paddle-ocr
+        replacement: ascend-ocr
 
   # ─── Container runtime (cgroup memory vs. limit) ───
 

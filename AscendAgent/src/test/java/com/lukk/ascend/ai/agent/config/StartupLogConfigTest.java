@@ -95,7 +95,7 @@ class StartupLogConfigTest {
         compactionProperties.setProviderDefaults(new LinkedHashMap<>());
 
         when(mcpRegistry.entries()).thenReturn(List.of(
-                new McpClientEntry("weather", "http://localhost:9998", McpClientStatus.CONNECTED)
+                new McpClientEntry("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.CONNECTED)
         ));
 
         config = new StartupLogConfig(env, dataSource, redisTemplate, s3Client,

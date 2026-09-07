@@ -8,7 +8,7 @@
 
 - **WHEN** the operator dispatches with `stack_version=1.1.1`, `release_ascend_agent=true`, `release_ascend_audio_scribe=true`, and the other four app booleans `false`
 - **THEN** only `ascend-agent` and `ascend-audio-scribe` images are built and pushed
-- **AND** `weather-mcp`, `ascend-web-hunter`, `ascend-memory`, and `ascend-paddle-ocr` are not built and their images are untouched
+- **AND** `ascend-weather-mcp`, `ascend-web-hunter`, `ascend-memory`, and `ascend-ocr` are not built and their images are untouched
 
 #### Scenario: Tag push does not trigger the release
 
@@ -17,7 +17,7 @@
 
 ### Requirement: Image version is read from each app's committed manifest
 
-For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`AscendAgent`, `WeatherMCP`), `[project].version` in `pyproject.toml` for Python services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
+For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`AscendAgent`, `ascend-weather-mcp`), `[project].version` in `pyproject.toml` for Python services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
 
 #### Scenario: Tag equals the manifest version
 
@@ -47,14 +47,14 @@ For each selected app, the workflow SHALL compare the app's current manifest ver
 
 #### Scenario: Selected app not bumped fails the run
 
-- **WHEN** the previous release `ascend-ai_1.1.0` recorded `weather-mcp` at `1.0.0`, the current `WeatherMCP/build.gradle.kts` still says `1.0.0`, and `weather-mcp` is selected for release
-- **THEN** the workflow fails in the prepare stage with a message identifying `weather-mcp` as not bumped
+- **WHEN** the previous release `ascend-ai_1.1.0` recorded `ascend-weather-mcp` at `1.0.0`, the current `ascend-weather-mcp/build.gradle.kts` still says `1.0.0`, and `ascend-weather-mcp` is selected for release
+- **THEN** the workflow fails in the prepare stage with a message identifying `ascend-weather-mcp` as not bumped
 - **AND** no `docker login` or image push occurs for any app
 
 #### Scenario: Selected app correctly bumped proceeds
 
-- **WHEN** `weather-mcp` was `1.0.0` at the previous stack tag and its manifest now says `1.1.0`, and it is selected
-- **THEN** the guard passes and `lukk17/weather-mcp:1.1.0` is built and pushed
+- **WHEN** `ascend-weather-mcp` was `1.0.0` at the previous stack tag and its manifest now says `1.1.0`, and it is selected
+- **THEN** the guard passes and `lukk17/ascend-weather-mcp:1.1.0` is built and pushed
 
 #### Scenario: First release skips the guard
 
@@ -72,8 +72,8 @@ Each selected app's image SHALL be pushed to Docker Hub at `lukk17/<service>:<ma
 
 #### Scenario: Unselected app latest untouched
 
-- **WHEN** `ascend-paddle-ocr` is not selected in a release
-- **THEN** `lukk17/ascend-paddle-ocr:latest` is unchanged by the run
+- **WHEN** `ascend-ocr` is not selected in a release
+- **THEN** `lukk17/ascend-ocr:latest` is unchanged by the run
 
 ### Requirement: Docker Hub authentication via repository secrets
 
@@ -90,7 +90,7 @@ After all selected apps push successfully, the workflow SHALL create the Git tag
 
 #### Scenario: Release notes list all app versions
 
-- **WHEN** a release of `ascend-agent` (1.3.0) and `ascend-audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at weather-mcp 1.0.0, ascend-web-hunter 1.2.0, ascend-memory 0.4.0, ascend-paddle-ocr 0.1.0
+- **WHEN** a release of `ascend-agent` (1.3.0) and `ascend-audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 1.0.0, ascend-web-hunter 1.2.0, ascend-memory 0.4.0, ascend-ocr 0.1.0
 - **THEN** a GitHub Release tagged `ascend-ai_1.1.1` is created
 - **AND** its body lists all six apps with their current versions, marking `ascend-agent` and `ascend-audio-scribe` as released this run
 - **AND** the release is not a draft

@@ -5,7 +5,7 @@ graph TB
     subgraph "Developer Machine"
         LMStudio["LM Studio<br/>localhost:1234"]
         AscendAgent["AscendAgent<br/>localhost:9917<br/>(java -jar)"]
-        Weather["WeatherMCP<br/>localhost:9998<br/>(java -jar)"]
+        Weather["ascend-weather-mcp<br/>localhost:9998<br/>(java -jar)"]
     end
 
     subgraph "External Prerequisites"
@@ -48,7 +48,7 @@ graph TB
     Memory --> Qdrant
 ```
 
-In development, the AscendAgent and WeatherMCP run directly on the host JVM. PostgreSQL, Redis, Qdrant, and
+In development, the AscendAgent and ascend-weather-mcp run directly on the host JVM. PostgreSQL, Redis, Qdrant, and
 S3-compatible object storage (provided locally by a self-hosted emulator) are external prerequisites that must be running before
 starting docker-compose (in production these map to managed cloud services, with Amazon S3 in its place).
 Application and support services (ascend-audio-scribe, ascend-web-hunter, AscendMemory, SearXNG, FlareSolverr) run in Docker

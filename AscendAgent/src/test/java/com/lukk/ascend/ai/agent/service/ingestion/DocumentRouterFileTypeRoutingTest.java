@@ -1,8 +1,8 @@
 package com.lukk.ascend.ai.agent.service.ingestion;
 
 import com.lukk.ascend.ai.agent.exception.UnsupportedFileTypeException;
+import com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClient;
 import com.lukk.ascend.ai.agent.service.ingestion.client.DoclingClient;
-import com.lukk.ascend.ai.agent.service.ingestion.client.PaddleOcrClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,34 +33,34 @@ class DocumentRouterFileTypeRoutingTest {
     private DoclingClient doclingClient;
 
     @Mock
-    private PaddleOcrClient paddleOcrClient;
+    private AscendOcrClient ascendOcrClient;
 
     @InjectMocks
     private DocumentRouter documentRouter;
 
     @Test
-    @DisplayName("routeAndProcess routes .png file to PaddleOCR")
-    void routeAndProcess_PngExtension_RoutesToPaddleOcr() {
+    @DisplayName("routeAndProcess routes .png file to ascend-ocr")
+    void routeAndProcess_PngExtension_RoutesToAscendOcr() {
         // given
-        when(paddleOcrClient.process(any(byte[].class), anyString(), isNull()))
+        when(ascendOcrClient.process(any(byte[].class), anyString(), isNull()))
                 .thenReturn(List.of(new Document("ocr text")));
 
         // when
         List<Document> docs = documentRouter.routeAndProcess("img".getBytes(), "photo.png", "image/png");
 
         // then
-        verify(paddleOcrClient).process(any(byte[].class), eq("photo.png"), isNull());
+        verify(ascendOcrClient).process(any(byte[].class), eq("photo.png"), isNull());
         assertThat(docs).hasSize(1);
     }
 
     @Test
-    @DisplayName("routeAndProcess routes .jpg file to PaddleOCR")
-    void routeAndProcess_JpgExtension_RoutesToPaddleOcr() {
-        when(paddleOcrClient.process(any(), anyString(), isNull())).thenReturn(List.of(new Document("text")));
+    @DisplayName("routeAndProcess routes .jpg file to ascend-ocr")
+    void routeAndProcess_JpgExtension_RoutesToAscendOcr() {
+        when(ascendOcrClient.process(any(), anyString(), isNull())).thenReturn(List.of(new Document("text")));
 
         documentRouter.routeAndProcess("img".getBytes(), "scan.jpg", "image/jpeg");
 
-        verify(paddleOcrClient).process(any(), eq("scan.jpg"), isNull());
+        verify(ascendOcrClient).process(any(), eq("scan.jpg"), isNull());
     }
 
     @Test

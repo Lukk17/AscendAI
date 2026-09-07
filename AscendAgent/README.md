@@ -46,7 +46,7 @@ flowchart TD
 
     subgraph MCP ["Model Context Protocol (MCP)"]
         AscendAgent -- "Tool Discovery & Calls" --> ExtTools["External Tools"]
-        ExtTools --> Weather["Weather MCP"]
+        ExtTools --> Weather["ascend-weather-mcp"]
         ExtTools --> Audio["ascend-audio-scribe MCP"]
         ExtTools --> WebHunter["ascend-web-hunter MCP"]
         WebHunter --> Searxng["SearXNG"]

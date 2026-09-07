@@ -1,4 +1,4 @@
-Every command runs from `PaddleOCR/` through that module's own virtual environment (`.venv/Scripts/python.exe` on
+Every command runs from `ascend-ocr/` through that module's own virtual environment (`.venv/Scripts/python.exe` on
 Windows, `.venv/bin/python` on Linux and macOS), never the system Python. The gate is `--cov-fail-under=100` with
 `--cov-branch`, so every branch added below needs a test before the suite goes green.
 
@@ -216,7 +216,7 @@ useful.
 - [x] 5.4 Amend ADR-004 with the readiness condition this change adds, keeping its existing decisions intact.
       Verify the amendment names the four not-accepting conditions and states why liveness was deliberately left
       alone.
-      Done. `PaddleOCR/docs/architecture/decisions/ADR-004-liveness-readiness-split.md`, "Amendment (2026-09-07)".
+      Done. `ascend-ocr/docs/architecture/decisions/ADR-004-liveness-readiness-split.md`, "Amendment (2026-09-07)".
 
 ## 6. Input limits
 
@@ -264,8 +264,8 @@ useful.
 - [x] 7.2 Add a span per page nested under the existing request span, carrying the page index and the remaining
       budget at the point the page started. Verify with a test asserting the span count matches the page count and
       that the spans reattach to the submitting request's trace.
-      Done. `_predict_pages` opens `paddleocr.engine.predict.page` per page, nested under the ambient
-      `paddleocr.engine.predict` span since `start_as_current_span` attaches to the current context rather than a
+      Done. `_predict_pages` opens `ascend-ocr.engine.predict.page` per page, nested under the ambient
+      `ascend-ocr.engine.predict` span since `start_as_current_span` attaches to the current context rather than a
       passed-in one. `remaining_budget_seconds` is `-1.0` when there is no deadline (an unbounded request), so the
       attribute is always present and distinguishable from "budget of zero". Tests in `TestOcrServicePredictPages`
       (`test_one_span_per_page_carrying_index_and_remaining_budget`,
@@ -295,27 +295,27 @@ useful.
       overrides list alongside the pre-existing `paddleocr.*` / `fastmcp.*` / `slowapi.*` /
       `prometheus_fastapi_instrumentator.*` entries, the same treatment those already get for the same reason
       (no bundled type stubs), not a new category of suppression.
-- [x] 8.3 Update the environment variable list in `PaddleOCR/AGENTS.md` with the seven new settings and the two
-      derived values, and `PaddleOCR/README.md` with the budget model, the refusal limits, the detector bound and
+- [x] 8.3 Update the environment variable list in `ascend-ocr/AGENTS.md` with the seven new settings and the two
+      derived values, and `ascend-ocr/README.md` with the budget model, the refusal limits, the detector bound and
       its accuracy trade, and what readiness now promises. Both gain the memory model from design.md and the
       sentence that makes `OCR_WORKER_COUNT` a memory constraint rather than a throughput one. Verify every setting
       in `config.py` appears in AGENTS.md and that the README commands are copy-and-paste correct against the
       running service. Done, plus `docs/CONFIGURATION.md` (the file README actually points readers to for the full
       matrix) gained the same table.
 - [x] 8.4 Write the ADR recording the fixed 144 dpi rendering resolution under
-      `PaddleOCR/docs/architecture/decisions/`, following the format of the existing four and taking its content
+      `ascend-ocr/docs/architecture/decisions/`, following the format of the existing four and taking its content
       from design.md Decision 10: the constraint, the memory bound it buys, the quality it costs with the type size
       floor named, and the three rejected alternatives. Verify it is linked from the decisions README and that it
       states plainly that no configuration knob exists by design.
       Done: `ADR-005-fixed-pdf-render-resolution.md`, linked from the decisions README.
 - [x] 8.5 Write the ADR recording the bound on the detector's input under
-      `PaddleOCR/docs/architecture/decisions/`, taking its content from design.md Decision 11: the configuration
+      `ascend-ocr/docs/architecture/decisions/`, taking its content from design.md Decision 11: the configuration
       cause, the memory it buys per candidate bound, the accuracy it costs and where that cost lands, and why the
       deployed value is measured against real documents rather than defaulted. Verify it is linked from the
       decisions README and that it names the pixel ceiling it is deployed together with.
       Done: `ADR-006-detector-input-bound.md`, linked from the decisions README, records the resolved 1536 choice
       and its pairing with `OCR_MAX_INFERENCE_PIXELS=2,500,000`.
-- [x] 8.6 Update the arc42 pages under `PaddleOCR/docs/architecture/arc42/`: the runtime view gains the budget, the
+- [x] 8.6 Update the arc42 pages under `ascend-ocr/docs/architecture/arc42/`: the runtime view gains the budget, the
       reclamation path and the pool rebuild, the deployment view gains the memory model and states the single
       worker as a memory constraint rather than a throughput limit, and the risks page loses the memory question,
       which is now answered, and anything else the new guards have closed.
@@ -338,7 +338,7 @@ useful.
       page limit, an image above the pixel ceiling, a job engineered to overrun its budget, and a run in which the
       worker process is killed outright.
       Done against the module's own `.venv` interpreter (uvicorn started directly on 127.0.0.1:7122), not the
-      container — the running container (`ascend-paddle-ocr`, built 2026-09-04) still carries the pre-fix code
+      container — the running container (`ascend-ocr`, built 2026-09-04) still carries the pre-fix code
       (`_WORKER_POOL_SIZE`, no `OCR_WORKER_COUNT`), confirmed by reading its `ocr_service.py`, and it cannot be
       rebuilt this session. All five cases run against the real 20-page A4 PDF the incident left behind
       (`/tmp/tmp6ci_ewb6.pdf` in the container, copied out and also split into 1/2/3-page slices for the cases that

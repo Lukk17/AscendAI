@@ -100,7 +100,7 @@ Deletion SHALL set the document's status to `DELETING` before executing removal 
 
 ### Requirement: Single-document re-index through the DocumentRouter path
 
-The agent SHALL expose `POST /api/v1/documents/{id}/reindex` which re-processes exactly one document: fetch the object bytes from MinIO, process via `DocumentRouter.routeAndProcess` (extension-based routing to Markdown, Docling, PaddleOCR, Unstructured, or per-page PDF dispatch), split, remove the document's prior chunks for the target collection, and add the new chunks. Reindex SHALL bypass ETag deduplication, SHALL execute asynchronously returning HTTP 202 with a run id, SHALL set the document's status to `INDEXING` while running, and SHALL return 404 for unknown ids and 409 when the document's status is `DELETING`.
+The agent SHALL expose `POST /api/v1/documents/{id}/reindex` which re-processes exactly one document: fetch the object bytes from MinIO, process via `DocumentRouter.routeAndProcess` (extension-based routing to Markdown, Docling, ascend-ocr, Unstructured, or per-page PDF dispatch), split, remove the document's prior chunks for the target collection, and add the new chunks. Reindex SHALL bypass ETag deduplication, SHALL execute asynchronously returning HTTP 202 with a run id, SHALL set the document's status to `INDEXING` while running, and SHALL return 404 for unknown ids and 409 when the document's status is `DELETING`.
 
 #### Scenario: Reindex replaces chunks
 

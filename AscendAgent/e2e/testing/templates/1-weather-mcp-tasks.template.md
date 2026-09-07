@@ -1,4 +1,4 @@
-# Weather MCP: run tasks template
+# ascend-weather-mcp: run tasks template
 
 Spec: [../1-weather-mcp-test.md](../1-weather-mcp-test.md)
 
@@ -10,7 +10,7 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] AscendAgent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
-- [ ] WeatherMCP `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
+- [ ] ascend-weather-mcp `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 
 ### Reset state
 

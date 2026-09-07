@@ -31,16 +31,16 @@ jobs:
           filters: |
             ascend-agent:
               - 'AscendAgent/**'
-            weather-mcp:
-              - 'WeatherMCP/**'
+            ascend-weather-mcp:
+              - 'ascend-weather-mcp/**'
             ascend-audio-scribe:
               - 'ascend-audio-scribe/**'
             ascend-web-hunter:
               - 'ascend-web-hunter/**'
             ascend-memory:
               - 'AscendMemory/**'
-            ascend-paddle-ocr:
-              - 'PaddleOCR/**'
+            ascend-ocr:
+              - 'ascend-ocr/**'
             workflows:
               - '.github/workflows/**'
 
@@ -49,31 +49,31 @@ jobs:
         run: |
           ALL_SERVICES='[
             {"service":"ascend-agent",    "language":"java",   "path":"AscendAgent",    "python_version":""},
-            {"service":"weather-mcp",     "language":"java",   "path":"WeatherMCP",     "python_version":""},
+            {"service":"ascend-weather-mcp",     "language":"java",   "path":"ascend-weather-mcp",     "python_version":""},
             {"service":"ascend-audio-scribe",    "language":"python", "path":"ascend-audio-scribe",    "python_version":"3.11"},
             {"service":"ascend-web-hunter","language":"python","path":"ascend-web-hunter","python_version":"3.12"},
             {"service":"ascend-memory",   "language":"python", "path":"AscendMemory",   "python_version":"3.11"},
-            {"service":"ascend-paddle-ocr",      "language":"python", "path":"PaddleOCR",      "python_version":"3.11"}
+            {"service":"ascend-ocr",      "language":"python", "path":"ascend-ocr",      "python_version":"3.11"}
           ]'
 
           WORKFLOWS_CHANGED="${{ steps.filter.outputs.workflows }}"
           ASCEND_AGENT="${{ steps.filter.outputs.ascend-agent }}"
-          WEATHER_MCP="${{ steps.filter.outputs.weather-mcp }}"
+          ASCEND_WEATHER_MCP="${{ steps.filter.outputs.ascend-weather-mcp }}"
           ASCEND_AUDIO_SCRIBE="${{ steps.filter.outputs.ascend-audio-scribe }}"
           ASCEND_WEB_HUNTER="${{ steps.filter.outputs.ascend-web-hunter }}"
           ASCEND_MEMORY="${{ steps.filter.outputs.ascend-memory }}"
-          PADDLE_OCR="${{ steps.filter.outputs.ascend-paddle-ocr }}"
+          ASCEND_OCR="${{ steps.filter.outputs.ascend-ocr }}"
 
           if [ "$WORKFLOWS_CHANGED" = "true" ]; then
             MATRIX="{\"include\":$(echo "$ALL_SERVICES" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')}"
           else
             INCLUDE="[]"
             if [ "$ASCEND_AGENT"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-agent","language":"java","path":"AscendAgent","python_version":""}); print(json.dumps(a))'); fi
-            if [ "$WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"weather-mcp","language":"java","path":"WeatherMCP","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-weather-mcp","language":"java","path":"ascend-weather-mcp","python_version":""}); print(json.dumps(a))'); fi
             if [ "$ASCEND_AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-audio-scribe","language":"python","path":"ascend-audio-scribe","python_version":"3.11"}); print(json.dumps(a))'); fi
             if [ "$ASCEND_WEB_HUNTER" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-hunter","language":"python","path":"ascend-web-hunter","python_version":"3.12"}); print(json.dumps(a))'); fi
             if [ "$ASCEND_MEMORY"    = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-memory","language":"python","path":"AscendMemory","python_version":"3.11"}); print(json.dumps(a))'); fi
-            if [ "$PADDLE_OCR"       = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-paddle-ocr","language":"python","path":"PaddleOCR","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_OCR"       = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ocr","language":"python","path":"ascend-ocr","python_version":"3.11"}); print(json.dumps(a))'); fi
             MATRIX="{\"include\":$INCLUDE}"
           fi
 
@@ -110,7 +110,7 @@ jobs:
 
       # ascend-agent is the only Gradle module with a configured coverage
       # floor (jacocoTestCoverageVerification, 80% instruction coverage).
-      # weather-mcp has no such task, so nothing runs for it here.
+      # ascend-weather-mcp has no such task, so nothing runs for it here.
       - name: Enforce Jacoco coverage gate (ascend-agent)
         if: matrix.service == 'ascend-agent'
         working-directory: ${{ matrix.path }}
@@ -139,7 +139,7 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: mypy src
 
-      # ascend-audio-scribe and ascend-paddle-ocr already bake --cov-fail-under=100
+      # ascend-audio-scribe and ascend-ocr already bake --cov-fail-under=100
       # into their own pytest addopts, so plain `pytest` enforces it.
       - name: Run pytest
         if: matrix.language == 'python' && matrix.service != 'ascend-web-hunter' && matrix.service != 'ascend-memory'

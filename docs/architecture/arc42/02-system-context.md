@@ -11,10 +11,10 @@ graph TB
     subgraph "AscendAI Platform"
         Agent["AscendAgent"]
         AudioScribe["ascend-audio-scribe"]
-        Weather["WeatherMCP"]
+        Weather["ascend-weather-mcp"]
         WebHunter["ascend-web-hunter"]
         Memory["AscendMemory"]
-        PaddleOCR["PaddleOCR"]
+        PaddleOCR["ascend-ocr"]
     end
 
     subgraph "AI Providers"

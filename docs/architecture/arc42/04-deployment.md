@@ -9,7 +9,7 @@ graph TB
     subgraph "Developer Machine (Host)"
         LMStudio["LM Studio :1234"]
         Agent["AscendAgent :9917<br/>(java -jar)"]
-        Weather["WeatherMCP :9998<br/>(java -jar)"]
+        Weather["ascend-weather-mcp :9998<br/>(java -jar)"]
     end
 
     subgraph "External Prerequisites"
@@ -22,7 +22,7 @@ graph TB
     subgraph "Compose project: ascend-ai (docker-compose.yaml)"
         AudioScribe["ascend-audio-scribe :7017"]
         Memory["AscendMemory :7020"]
-        PaddleOCR["PaddleOCR :7022"]
+        PaddleOCR["ascend-ocr :7022"]
         Docling["Docling :5001"]
         Unstructured["Unstructured :9080"]
     end
@@ -69,12 +69,12 @@ graph TB
 | Service           | Port(s)         | Type                  | Runs in                |
 | :---------------- | :-------------- | :-------------------- | :--------------------- |
 | AscendAgent       | 9917            | Main API gateway      | Host JVM               |
-| WeatherMCP        | 9998            | MCP server            | Host JVM               |
+| ascend-weather-mcp | 9998            | MCP server            | Host JVM               |
 | LM Studio         | 1234            | Local LLM             | Host                   |
 | ascend-audio-scribe       | 7017            | MCP server            | Docker                 |
 | ascend-web-hunter   | 7021            | MCP server            | Docker                 |
 | AscendMemory      | 7020            | REST + MCP            | Docker                 |
-| PaddleOCR         | 7022            | MCP server            | Docker                 |
+| ascend-ocr        | 7022            | MCP server            | Docker                 |
 | Docling Serve     | 5001            | Document conversion   | Docker                 |
 | Unstructured API  | 9080            | Document parsing      | Docker                 |
 | SearXNG           | 9020            | Meta search           | Docker                 |

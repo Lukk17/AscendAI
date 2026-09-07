@@ -51,12 +51,12 @@
 - [x] 6.5 Test (`AnthropicPromptCacheStrategyMetricsTest`): stub a response with `cacheReadInputTokens=487`, assert all three counters increment correctly
 - [x] 6.6 Test (`OpenAiPromptCacheStrategyMetricsTest`): stub a response with `cachedTokens=512`, assert read + total counters increment
 
-## 7. Wire WeatherMCP (Spring Boot template)
+## 7. Wire ascend-weather-mcp (Spring Boot template)
 
-- [x] 7.1 Add Actuator + Prometheus dependencies to `WeatherMCP/build.gradle.kts`
-- [x] 7.2 Mirror `application.yaml` management block from AscendAgent with `service: weather-mcp`
-- [x] 7.3 Add scrape job `weather-mcp` to `infra/observability/prometheus/prometheus.yaml`
-- [ ] 7.4 Smoke test: `/actuator/prometheus` reachable, `service="weather-mcp"` tag present
+- [x] 7.1 Add Actuator + Prometheus dependencies to `ascend-weather-mcp/build.gradle.kts`
+- [x] 7.2 Mirror `application.yaml` management block from AscendAgent with `service: ascend-weather-mcp`
+- [x] 7.3 Add scrape job `ascend-weather-mcp` to `infra/observability/prometheus/prometheus.yaml`
+- [ ] 7.4 Smoke test: `/actuator/prometheus` reachable, `service="ascend-weather-mcp"` tag present
 
 ## 8. Logs layer — Vector + Loki
 
@@ -73,7 +73,7 @@
 - [x] 9.3 Create `infra/observability/otel-collector/otel-collector-config.yaml` with OTLP receivers (gRPC `:4317`, HTTP `:4318`), `batch` + `memory_limiter` processors, OTLP exporter to Tempo
 - [x] 9.4 Add `otel-collector` service to `docker-compose.yaml` (image `otel/opentelemetry-collector-contrib:0.x.x`, volume mount config, ports `4317` + `4318` docker-network only)
 - [x] 9.5 In `AscendAgent/src/main/resources/application-docker.yaml`, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-agent`, `OTEL_RESOURCE_ATTRIBUTES=service.version=@project.version@`
-- [x] 9.6 Same for `WeatherMCP/src/main/resources/application-docker.yaml` with `OTEL_SERVICE_NAME=weather-mcp`
+- [x] 9.6 Same for `ascend-weather-mcp/src/main/resources/application-docker.yaml` with `OTEL_SERVICE_NAME=ascend-weather-mcp`
 - [ ] 9.7 Verify Spring AI's existing OTel integration emits spans for LLM/tool calls without further wiring (Spring AI 1.1 ships OTel auto-instrumentation when the OTel BOM is on the classpath via Spring AI's transitive deps)
 - [ ] 9.8 Smoke test: send one chat prompt via AscendAgent → query Tempo via Grafana Explore: search by `service.name=ascend-agent` → expect a single trace with spans for the LLM call
 
@@ -88,11 +88,11 @@
 - [x] 10.7 Add scrape job `ascend-memory` to `infra/observability/prometheus/prometheus.yaml`
 - [ ] 10.8 Smoke test: `GET http://localhost:7020/metrics` returns 200 and includes `python_info{...}` plus `memory_operations_total`. Also send one search request → confirm Tempo has a trace with `service.name=ascend-memory`.
 
-## 11. Wire ascend-audio-scribe, ascend-web-hunter, PaddleOCR (Python repetition)
+## 11. Wire ascend-audio-scribe, ascend-web-hunter, ascend-ocr (Python repetition)
 
 - [x] 11.1 ascend-audio-scribe: dependencies, `Instrumentator(...).expose(app)`, OTel auto-instrumentation, `transcription_duration_seconds` + `transcription_audio_duration_seconds` histograms, scrape job
 - [x] 11.2 ascend-web-hunter: dependencies, expose, OTel, `search_results_returned` histogram + `extraction_tier_used_total` counter + `extraction_captcha_intervention_total` counter, scrape job
-- [x] 11.3 PaddleOCR: dependencies, expose, OTel, `ocr_pages_processed_total` counter + `ocr_duration_seconds` histogram, scrape job
+- [x] 11.3 ascend-ocr: dependencies, expose, OTel, `ocr_pages_processed_total` counter + `ocr_duration_seconds` histogram, scrape job
 - [ ] 11.4 Smoke test for each: `GET /metrics` returns 200 with the expected custom metric names; one request per service produces a trace in Tempo
 
 ## 12. Data-layer exporters
@@ -124,7 +124,7 @@
 
 ## 15. Hardening and verification
 
-- [ ] 15.1 Confirm `/actuator/env`, `/actuator/heapdump`, `/actuator/threaddump`, `/actuator/loggers`, `/actuator/caches` return 404 by default on AscendAgent and WeatherMCP
+- [ ] 15.1 Confirm `/actuator/env`, `/actuator/heapdump`, `/actuator/threaddump`, `/actuator/loggers`, `/actuator/caches` return 404 by default on AscendAgent and ascend-weather-mcp
 - [ ] 15.2 Add Spring Boot integration test `MetricsEndpointIT` that asserts `/actuator/prometheus` returns 200 and contains the names of every custom metric defined in this change (including the three new prompt-cache counters)
 - [x] 15.3 Add Python integration test per service asserting `/metrics` returns 200 and includes the custom metric names
 - [ ] 15.4 Add an integration test `OtelTraceShipsToTempoIT` that sends one chat prompt via AscendAgent, polls Tempo for a trace with `service.name=ascend-agent`, asserts the trace has at least one LLM-call span

@@ -2,7 +2,7 @@
 
 ### Requirement: Downstream services require a bearer service token on REST surfaces
 
-AscendMemory, ascend-audio-scribe, ascend-web-hunter, PaddleOCR, and WeatherMCP SHALL reject any REST request that does not carry `Authorization: Bearer <SERVICE_AUTH_TOKEN>` with HTTP 401, where `SERVICE_AUTH_TOKEN` is injected via environment variable. Token comparison SHALL be constant-time. Liveness/readiness endpoints (`/health`, and `/ready` / `/metrics` where present) SHALL remain unauthenticated so Docker healthchecks and Prometheus scrapes keep working. The token value SHALL never appear in logs or in checked-in configuration defaults.
+AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-ocr, and ascend-weather-mcp SHALL reject any REST request that does not carry `Authorization: Bearer <SERVICE_AUTH_TOKEN>` with HTTP 401, where `SERVICE_AUTH_TOKEN` is injected via environment variable. Token comparison SHALL be constant-time. Liveness/readiness endpoints (`/health`, and `/ready` / `/metrics` where present) SHALL remain unauthenticated so Docker healthchecks and Prometheus scrapes keep working. The token value SHALL never appear in logs or in checked-in configuration defaults.
 
 #### Scenario: Destructive memory endpoint rejects tokenless calls
 
@@ -27,7 +27,7 @@ AscendMemory, ascend-audio-scribe, ascend-web-hunter, PaddleOCR, and WeatherMCP 
 
 ### Requirement: Downstream services require the bearer service token on MCP surfaces
 
-The MCP surface of each downstream service (FastMCP Streamable HTTP endpoints on the Python services; the Spring AI MCP endpoint on WeatherMCP) SHALL enforce the same bearer-token check as the REST surface, so the MCP transport is not an authentication bypass.
+The MCP surface of each downstream service (FastMCP Streamable HTTP endpoints on the Python services; the Spring AI MCP endpoint on ascend-weather-mcp) SHALL enforce the same bearer-token check as the REST surface, so the MCP transport is not an authentication bypass.
 
 #### Scenario: Tokenless MCP call is rejected
 
@@ -56,11 +56,11 @@ When `SERVICE_AUTH_TOKEN` is set, enforcement SHALL be active. When it is unset 
 
 ### Requirement: AscendAgent attaches the service token on all outbound calls
 
-AscendAgent SHALL send `Authorization: Bearer <SERVICE_AUTH_TOKEN>` on every outbound request to the downstream services: the AscendMemory REST client, the PaddleOCR ingestion client, and every configured MCP client connection (ascend-audio-scribe, weather, ascend-web-hunter). With the compose stack fully secured, a chat turn that exercises memory and an MCP tool SHALL complete without any downstream 401.
+AscendAgent SHALL send `Authorization: Bearer <SERVICE_AUTH_TOKEN>` on every outbound request to the downstream services: the AscendMemory REST client, the ascend-ocr ingestion client, and every configured MCP client connection (ascend-audio-scribe, weather, ascend-web-hunter). With the compose stack fully secured, a chat turn that exercises memory and an MCP tool SHALL complete without any downstream 401.
 
 #### Scenario: MCP tool call carries the token
 
-- **WHEN** a prompt causes AscendAgent to invoke a WeatherMCP tool in the secured compose stack
+- **WHEN** a prompt causes AscendAgent to invoke a ascend-weather-mcp tool in the secured compose stack
 - **THEN** the MCP HTTP request from the agent carries the bearer service token
 - **AND** the tool result reaches the model (no 401 in the tool-call path)
 

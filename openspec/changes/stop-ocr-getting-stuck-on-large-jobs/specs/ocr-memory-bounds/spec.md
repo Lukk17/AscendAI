@@ -14,7 +14,7 @@ the deployed value SHALL be chosen by measuring both against real documents rath
 default. The owner measured 960, 1280 and 1536 against his own documents and chose 1536 as near lossless; the
 shipped default is therefore 1536, not the library's unbounded behaviour, and the three candidates with what each
 costs in memory and in detected lines are recorded in
-[ADR-006](../../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md).
+[ADR-006](../../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md).
 
 #### Scenario: Input larger than the bound
 

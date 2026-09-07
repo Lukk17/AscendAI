@@ -3,8 +3,8 @@ app:
     base-url: "http://unstructured-api:8000"
   docling:
     base-url: "http://docling-serve:5001"
-  paddleocr:
-    base-url: "http://ascend-paddle-ocr:7022"
+  ascend-ocr:
+    base-url: "http://ascend-ocr:7022"
   s3:
     # Floci (S3-compatible object store) must be running externally (port 9070)
     endpoint: "http://host.docker.internal:9070"
@@ -48,7 +48,7 @@ spring:
           connections:
             ascend-audio-scribe:
               url: http://ascend-audio-scribe:7017
-            weather:
-              url: http://weather-mcp:9998
+            ascend-weather-mcp:
+              url: http://ascend-weather-mcp:9998
             ascend-web-hunter:
               url: http://ascend-web-hunter:7021

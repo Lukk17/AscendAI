@@ -112,14 +112,14 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
   - verify: 401 tokenless on a transcribe route and on `/mcp`, 200 on `/health`
 - [ ] 7.4 ascend-web-hunter: the same REST dependency and FastMCP enforcement, `/health` open
   - verify: 401 tokenless on a search route and on `/mcp`, 200 on `/health`
-- [ ] 7.5 PaddleOCR: the same REST dependency on `/v1/ocr` and FastMCP enforcement, `/health` and `/ready` open
+- [ ] 7.5 ascend-ocr: the same REST dependency on `/v1/ocr` and FastMCP enforcement, `/health` and `/ready` open
   - verify: 401 tokenless on `/v1/ocr` and on `/mcp`, 200 on `/health` and `/ready`
 - [ ] 7.6 pytest per service covering the token matrix
   - verify: each service's suite asserts 401 without a token, 401 with a wrong token, non-401 with the correct token, open health, and a rejected tokenless MCP `tools/call`
 - [ ] 7.7 pytest per service for the posture rule
   - verify: with the compose posture signalled and `SERVICE_AUTH_TOKEN` unset the process exits non-zero before serving traffic; on a bare local run without the variable it serves requests without one
 
-## 8. Downstream service auth, WeatherMCP
+## 8. Downstream service auth, ascend-weather-mcp
 
 - [ ] 8.1 Add a `OncePerRequestFilter` doing the constant-time bearer compare against `SERVICE_AUTH_TOKEN` ahead of the MCP endpoints, health excluded, warn-and-open when unset locally and fail-fast in the docker posture
   - verify: MockMvc returns 401 on the MCP path without a token and with a wrong token, passes through with the correct token, and returns 200 on health without one
@@ -130,8 +130,8 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
 
 - [ ] 9.1 Bind `SERVICE_AUTH_TOKEN` through `@ConfigurationProperties` with no checked-in default, and attach `Authorization: Bearer` as a default header on the `SemanticMemoryClient` RestClient builder when configured
   - verify: MockRestServiceServer sees the header on `search` and on `wipeUserMemory`, sees no `Authorization` header when the token is unset, and the token value appears in no log output at any level
-- [ ] 9.2 Attach the same header on the PaddleOCR ingestion client
-  - verify: a stubbed PaddleOCR endpoint records the bearer header on an OCR call issued by the ingestion pipeline
+- [ ] 9.2 Attach the same header on the ascend-ocr ingestion client
+  - verify: a stubbed ascend-ocr endpoint records the bearer header on an OCR call issued by the ingestion pipeline
 - [ ] 9.3 Attach the header on all three MCP client connections (ascend-audio-scribe, weather, ascend-web-hunter), through Spring AI connection header configuration, falling back to a WebClient customizer where the connection type lacks header support
   - verify: an integration test against a stub MCP server records the bearer header on the outbound `tools/call` for each of the three connections
 - [ ] 9.4 Prove the secured path end to end at the client level
@@ -169,7 +169,7 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
   - verify: the stated numbers match the lifetimes actually set in the realm export from task 1.3, and the section states that AscendAgent adds no cache of its own
 - [ ] 12.6 Record the operating cost of self-hosted Keycloak in `docs/SECURITY.md`: the database, certificates, backup with a restore that has been exercised, the absence of a long-term support release upstream, the roughly monthly patch and quarterly minor cadence, breaking changes having shipped inside patch releases, and the requirement to re-verify sign-in after an upgrade
   - verify: the section exists, names the upgrade verification step, and the restore procedure has been performed once against a non-production realm with the result recorded
-- [ ] 12.7 Update the root `AGENTS.md` and the per-module `AGENTS.md` files (AscendAgent, AscendMemory, ascend-audio-scribe, ascend-web-hunter, PaddleOCR, WeatherMCP) with the new environment variables, the secured-by-default posture, and the dev-profile note
+- [ ] 12.7 Update the root `AGENTS.md` and the per-module `AGENTS.md` files (AscendAgent, AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-ocr, ascend-weather-mcp) with the new environment variables, the secured-by-default posture, and the dev-profile note
   - verify: `grep` for `SERVICE_AUTH_TOKEN` and `issuer-uri` finds them documented in every module whose service consumes them
 - [ ] 12.8 Install the decision records drafted in `openspec/changes/add-auth-and-identity/decisions/` into `AscendAgent/docs/architecture/decisions/`, taking the next free numbers at that moment, flipping each active record's Status line from proposed to accepted with the merge date, and carrying the deferred records across with their deferred status intact
   - verify: the files exist under `AscendAgent/docs/architecture/decisions/` with unique sequential numbers, no number collides with an existing record, every relative link inside them resolves, and each deferred record states plainly that it is not implemented by this change

@@ -17,8 +17,8 @@ AscendAI consists of multiple services with different optimal technology choices
 ### Decision
 
 Use a single monorepo with per-module build systems:
-- Java modules (AscendAgent, WeatherMCP): Gradle with `build.gradle.kts`
-- Python modules (ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR): `pyproject.toml` + pip
+- Java modules (AscendAgent, ascend-weather-mcp): Gradle with `build.gradle.kts`
+- Python modules (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr): `pyproject.toml` + pip
 
 Each module has its own `Dockerfile`, `AGENTS.md`, and independent dependency management. A shared [docker-compose.yaml](../../../docker-compose.yaml) at the root wires everything together.
 

@@ -2,8 +2,8 @@ package com.lukk.ascend.ai.agent.service.ingestion;
 
 import com.lukk.ascend.ai.agent.exception.DocumentRoutingException;
 import com.lukk.ascend.ai.agent.exception.UnsupportedFileTypeException;
+import com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClient;
 import com.lukk.ascend.ai.agent.service.ingestion.client.DoclingClient;
-import com.lukk.ascend.ai.agent.service.ingestion.client.PaddleOcrClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
@@ -32,7 +32,7 @@ public class DocumentRouter {
 
     private final IngestionService ingestionService;
     private final DoclingClient doclingClient;
-    private final PaddleOcrClient paddleOcrClient;
+    private final AscendOcrClient ascendOcrClient;
 
     @Value("${app.document-router.pdf-min-text-threshold-per-page:50}")
     private int pdfMinTextThresholdPerPage;
@@ -52,7 +52,7 @@ public class DocumentRouter {
         return switch (extension) {
             case "md" -> routeToMarkdown(fileBytes, filename);
             case "docx", "xlsx", "pptx", "html" -> routeToDocling(fileBytes, filename);
-            case "png", "jpg", "jpeg", "tiff", "bmp", "webp" -> routeToPaddleOcr(fileBytes, filename);
+            case "png", "jpg", "jpeg", "tiff", "bmp", "webp" -> routeToAscendOcr(fileBytes, filename);
             case "eml", "msg", "epub", "rtf", "xml", "odt" -> routeToUnstructured(fileBytes, filename);
             case "pdf" -> routePdfPerPage(fileBytes, filename);
             default -> throw new UnsupportedFileTypeException(extension);
@@ -73,9 +73,9 @@ public class DocumentRouter {
         return doclingClient.process(fileBytes, filename);
     }
 
-    private List<Document> routeToPaddleOcr(byte[] fileBytes, String filename) {
-        log.info("[DocumentRouter] Routing {} to PaddleOCR", filename);
-        return paddleOcrClient.process(fileBytes, filename, null);
+    private List<Document> routeToAscendOcr(byte[] fileBytes, String filename) {
+        log.info("[DocumentRouter] Routing {} to ascend-ocr", filename);
+        return ascendOcrClient.process(fileBytes, filename, null);
     }
 
     private List<Document> routeToUnstructured(byte[] fileBytes, String filename) {
@@ -106,7 +106,7 @@ public class DocumentRouter {
 
     // PDFBox isn't thread-safe enough to share a PDDocument across threads — slice
     // per-page text and a single-page PDF byte array here (sequentially), then dispatch
-    // the slow part (Docling / PaddleOCR network calls) in parallel below.
+    // the slow part (Docling / ascend-ocr network calls) in parallel below.
     private List<PageWork> sliceIntoPageWork(PDDocument pdfDocument, String filename, int totalPages) throws IOException {
         List<PageWork> pageWork = new ArrayList<>(totalPages);
         for (int pageIndex = 0; pageIndex < totalPages; pageIndex++) {
@@ -215,8 +215,8 @@ public class DocumentRouter {
 
     private List<Document> routeSinglePdfPage(byte[] pageBytes, String pageFilename, int textLength) {
         if (textLength < pdfMinTextThresholdPerPage) {
-            log.info("[DocumentRouter] {} classified as scanned/image page. Routing to PaddleOCR.", pageFilename);
-            return paddleOcrClient.process(pageBytes, pageFilename, null);
+            log.info("[DocumentRouter] {} classified as scanned/image page. Routing to ascend-ocr.", pageFilename);
+            return ascendOcrClient.process(pageBytes, pageFilename, null);
         }
         log.info("[DocumentRouter] {} classified as text page. Routing to Docling.", pageFilename);
         return doclingClient.process(pageBytes, pageFilename);

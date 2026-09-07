@@ -1,0 +1,74 @@
+# ascend-ocr — Diagrams
+
+---
+
+### C4 Container diagram
+
+```mermaid
+graph TB
+    accTitle: ascend-ocr C4 Container Diagram
+    accDescr: Shows ascend-ocr's position in the AscendAI platform, its callers, and its downstream dependencies.
+
+    Agent["AscendAgent<br/>(Spring Boot, Java 21)<br/>:9917"]
+    ObjectStore["S3-compatible object store<br/>:9070 (host.docker.internal)"]
+
+    subgraph "ascend-ocr service — :7022"
+        REST["REST surface<br/>POST /v1/ocr<br/>(multipart upload)"]
+        MCP["MCP surface<br/>POST /mcp<br/>(ocr_process tool)"]
+        OCRSvc["OcrService<br/>(LRU engine cache)"]
+        Guard["SSRF guard<br/>+ file:// jail"]
+    end
+
+    subgraph "Sibling MCP services"
+        AudioScribe["ascend-audio-scribe<br/>:7017"]
+        WeatherMCP["WeatherMCP<br/>:9998"]
+        WebHunter["ascend-web-hunter<br/>:7021"]
+    end
+
+    Agent -->|"MCP tools/call"| MCP
+    Agent -->|"REST multipart"| REST
+    REST --> OCRSvc
+    MCP --> Guard
+    Guard -->|"HTTP GET (allowlisted)"| ObjectStore
+    Guard --> OCRSvc
+    Agent -->|"MCP"| AudioScribe
+    Agent -->|"MCP"| WeatherMCP
+    Agent -->|"MCP"| WebHunter
+```
+
+ascend-ocr has no database. Model weights are baked into the container image at build time (`Dockerfile:23`). The only
+outbound network call is the MCP tool's URI fetch, which is gated by the SSRF guard. The object store is an external
+prerequisite, not a compose service; locally it is provided by a self-hosted S3-compatible emulator.
+
+---
+
+### MCP runtime happy path
+
+```mermaid
+sequenceDiagram
+    accTitle: MCP ocr_process happy path via the S3-compatible object store
+    accDescr: Shows the full call chain from AscendAgent through the SSRF guard, the object-store download, and the OCR engine.
+
+    participant Agent as AscendAgent :9917
+    participant MCP as ocr_process (mcp_server.py)
+    participant Guard as _validate_host
+    participant ObjectStore as Object store :9070 (host.docker.internal)
+    participant Pool as OCR worker process (ProcessPoolExecutor)
+    participant Engine as PaddleOCR engine (OcrService)
+
+    Agent->>MCP: tools/call ocr_process(file_uri="http://host.docker.internal:9070/bucket/img.png", lang="en")
+    MCP->>Guard: hostname="host.docker.internal"
+    Guard->>Guard: "host.docker.internal" in MCP_ALLOWED_HOSTS → skip IP check
+    MCP->>ObjectStore: GET http://host.docker.internal:9070/bucket/img.png (allow_redirects=False)
+    ObjectStore-->>MCP: 200 image bytes (streamed in 64 KB chunks, size checked)
+    MCP->>Pool: run_in_executor(get_process_pool(), run_ocr_in_worker, bytes, "img.png", "en")
+    Pool->>Engine: _get_engine("en") → LRU hit (warm since lifespan)
+    Engine->>Engine: write tempfile → engine.predict → delete tempfile
+    Engine-->>Pool: OcrJsonResponse(schema_version="1", pages=[...])
+    Pool-->>MCP: OcrJsonResponse
+    MCP-->>Agent: JSON-RPC result {content:[{type:"text",text:"{...}"}]}
+```
+
+If `host.docker.internal` is not in `MCP_ALLOWED_HOSTS`, `_validate_host` resolves it to a private RFC1918 address and
+raises `UnsafeUriError`, returning `{"code":"UNSAFE_URI","detail":"URI is not permitted"}` to the agent. See
+[ADR-001](../decisions/ADR-001-mcp-file-transport-uri-only.md).

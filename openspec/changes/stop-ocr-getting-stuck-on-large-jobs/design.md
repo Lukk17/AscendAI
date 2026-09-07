@@ -4,12 +4,12 @@ See [proposal.md](proposal.md) for the motivation and the measurements. The cons
 against the repository or the module's own `.venv`, never assumed.
 
 - One inference worker. `_WORKER_POOL_SIZE = 1` in
-  [ocr_service.py](../../../PaddleOCR/src/service/ocr_service.py), a `ProcessPoolExecutor` on a `spawn` context.
+  [ocr_service.py](../../../ascend-ocr/src/service/ocr_service.py), a `ProcessPoolExecutor` on a `spawn` context.
   The docstring gives the reason: PaddleOCR's CPU inference holds the GIL continuously, so running it in the API
   process would freeze the event loop.
 - The timeout is `asyncio.wait_for(loop.run_in_executor(...), timeout=settings.OCR_REQUEST_TIMEOUT)` in both
-  [rest_endpoints.py](../../../PaddleOCR/src/api/rest/rest_endpoints.py) and
-  [mcp_server.py](../../../PaddleOCR/src/api/mcp/mcp_server.py). It cancels the awaiting coroutine and nothing else.
+  [rest_endpoints.py](../../../ascend-ocr/src/api/rest/rest_endpoints.py) and
+  [mcp_server.py](../../../ascend-ocr/src/api/mcp/mcp_server.py). It cancels the awaiting coroutine and nothing else.
 - The library offers a page-by-page seam. `PaddleOCR.predict()` in
   `paddleocr/_pipelines/ocr.py` is `list(self.predict_iter(...))`, and `predict_iter` is public and returns the
   paddlex generator, which yields one result per page. Consuming that generator instead of the list is what makes a
@@ -144,7 +144,7 @@ a budget and an accuracy trade, both of which belong to the owner rather than to
 | Per-page allowance | 120 s | The one live observation: a twenty page document had consumed more than 2100 s of worker time without finishing, so the average page on that document cost at least 105 s. 120 s is the first round value above the observed floor. | Yes, task 1.2 |
 | Absolute request ceiling | 300 s, unchanged for now | Today's deployed `OCR_REQUEST_TIMEOUT` in `docker-compose.yaml`. Kept until measured, because changing it is a product decision about how long a caller holds a connection. | Yes, task 1.3 |
 | Dispatch margin | 5 s | The worker must give up before the parent does. Covers pickling the arguments, the spawn-context handoff, and the result trip back. | Yes, task 1.2 |
-| Detector long-side bound | 1536 (`text_det_limit_type="max"`) | Decision 11 and task 1.5, resolved. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near lossless: 1280 lost dotted separators on a form, 960 lost genuine footnotes from a legal opinion. Recorded with the full candidate table in [ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md). | No — owner decided |
+| Detector long-side bound | 1536 (`text_det_limit_type="max"`) | Decision 11 and task 1.5, resolved. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near lossless: 1280 lost dotted separators on a form, 960 lost genuine footnotes from a legal opinion. Recorded with the full candidate table in [ADR-006](../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). | No — owner decided |
 | Maximum pages | derived, not configured | `floor(ceiling / per-page allowance)`. At the provisional values that is 2. It is a deadline artifact and not a memory constraint, which the restatement below shows. | Follows its two inputs |
 | Reclamation grace | derived, not configured | `per-page allowance + dispatch margin`. The latest a healthy worker can legitimately return is one page's inference after its own budget expired, plus the trip back. | Follows its two inputs |
 | Pixel ceiling for one inference | 2,500,000, unchanged | Deployed together with the 1536 detector bound above, per this section's own concluding guidance: the defensible ceiling pending task 1.6 is the one that already covers the standard page sizes (A4 2.00 MP, Letter 1.94 MP, Legal 2.47 MP) with a bound deployed alongside it, which is where the change's original provisional value already sat. Not the 1,720,000 unbounded-case value computed further down, which assumes no detector bound and would needlessly refuse A4. Task 8.9 measured a real twenty-page A4 document against this pair and recorded the peak against the model's prediction. | Task 1.6 still open, for ceilings materially above the standard page sizes |
@@ -338,7 +338,7 @@ per_worker_peak_MiB = 635 + 143 x (cached_languages - 1) + 5302 x megapixels_of_
 ```
 
 with the detector bound of Decision 11 replacing part of the 5302 when one is deployed. That sentence goes into
-`PaddleOCR/AGENTS.md`, the README and the arc42 pages beside the setting, so raising the worker count reads as a
+`ascend-ocr/AGENTS.md`, the README and the arc42 pages beside the setting, so raising the worker count reads as a
 memory decision rather than as a throughput tweak.
 
 ### Decision 6: readiness gains a second condition, liveness gains nothing
@@ -450,7 +450,7 @@ gigabytes, so a larger container limit would buy nothing the host can honour.
 ### Decision 10: the fixed 144 dpi rendering resolution is accepted, recorded, and not exposed
 
 This is the decision the proposal asks to have written down, and it is the reason a document's cost depends on the
-page rather than on the scanner. It lands as an ADR under `PaddleOCR/docs/architecture/decisions/` in the format of
+page rather than on the scanner. It lands as an ADR under `ascend-ocr/docs/architecture/decisions/` in the format of
 the existing four, written in task 8.4. The content is settled here.
 
 The constraint. PaddleOCR rasterizes every PDF page at `PDF_RENDER_SCALE = 2.0`, which is 144 dpi, and neither the
@@ -534,7 +534,7 @@ exhaust the container, which is today's behaviour and is the incident.
 Task 1.5 has since reported. The owner measured 960, 1280 and 1536 against five of his own real documents and chose
 1536: near lossless, where 1280 lost dotted separators on a form and 960 lost genuine footnotes from a legal
 opinion. The full candidate table, what each costs in memory, and where the accuracy loss lands is recorded in
-[ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md). The shipped defaults are
+[ADR-006](../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). The shipped defaults are
 therefore `OCR_DETECTOR_MAX_SIDE=1536` paired with `OCR_MAX_INFERENCE_PIXELS=2,500,000` — this section's own
 concluding guidance for the defensible pixel ceiling pending task 1.6, not the 1,720,000 unbounded-case figure
 computed earlier in this section. An image deployed on its own therefore accepts A4 rather than refusing it, and
@@ -688,7 +688,7 @@ fields and every other response is untouched, so consumers that ignore unknown f
 Configuration is the one ordered part. The new settings all have defaults, so the image starts without any compose
 change, but the pixel ceiling and the detector bound are shipped as a pair by default: `OCR_DETECTOR_MAX_SIDE=1536`
 with `OCR_MAX_INFERENCE_PIXELS=2,500,000`, the owner's measured choice recorded in
-[ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md), so A4 and the other
+[ADR-006](../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md), so A4 and the other
 standard page sizes are accepted out of the box rather than refused pending a follow-up deploy. `OCR_REQUEST_TIMEOUT`
 and the per-page allowance still await task 1.3's measurement; until then they keep their provisional values and the
 derived page limit stays at 2, which is a disclosure of an existing limit rather than a regression this change
@@ -713,7 +713,7 @@ request parameter was added.
    applies and why the answer turned out not to be the reassuring one.
 3. Closed. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near
    lossless, deployed with the pixel ceiling held at 2,500,000. Recorded in
-   [ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md) with the full candidate
+   [ADR-006](../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md) with the full candidate
    table. Task 1.6, confirming the residual memory model at ceilings materially above the standard page sizes, stays
    open, but it bounds only how far the ceiling could later rise, not the pair actually deployed.
 4. Does the 318 MiB per megapixel residual hold at the top of the intended ceiling? Task 1.6 measures it. It bounds

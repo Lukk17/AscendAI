@@ -325,11 +325,11 @@ None.
 #### Example 2: MCP tool round-trip (`2-mcp-tool-test.md`)
 
 ```markdown
-# Weather MCP: e2e test
+# ascend-weather-mcp: e2e test
 
 ## What this verifies
 
-- The agent discovers and invokes the WeatherMCP tool for a weather prompt.
+- The agent discovers and invokes the ascend-weather-mcp tool for a weather prompt.
 - The response contains concrete weather data, not a refusal.
 
 ## Prerequisites
@@ -342,7 +342,7 @@ curl -fsS http://localhost:9917/actuator/health
 
 Expect HTTP 200 with `{"status":"UP"}`.
 
-Check the WeatherMCP server.
+Check the ascend-weather-mcp server.
 
 ```bash
 curl -fsS http://localhost:9998/actuator/health

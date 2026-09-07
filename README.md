@@ -35,9 +35,9 @@ graph TB
 
         subgraph "MCP Tool Services"
             AudioScribe["ascend-audio-scribe<br/>:7017<br/>Audio Transcription"]
-            Weather["WeatherMCP<br/>:9998<br/>Weather Data"]
+            Weather["ascend-weather-mcp<br/>:9998<br/>Weather Data"]
             WebHunter["ascend-web-hunter<br/>:7021<br/>Web Search"]
-            PaddleOCR["PaddleOCR<br/>:7022<br/>OCR"]
+            PaddleOCR["ascend-ocr<br/>:7022<br/>OCR"]
         end
 
         Memory["AscendMemory<br/>:7020<br/>Semantic Memory"]
@@ -105,8 +105,8 @@ conversations actually accumulate knowledge.
 - **Semantic memory via Mem0.** Long-lived, user-scoped memories searchable across sessions through the AscendMemory
   service.
 - **MCP tool servers.** First-class integrations for audio transcription ([ascend-audio-scribe](ascend-audio-scribe/AGENTS.md)), web
-  search ([ascend-web-hunter](ascend-web-hunter/AGENTS.md) + SearXNG), weather ([WeatherMCP](WeatherMCP/AGENTS.md)), and OCR
-  ([PaddleOCR](PaddleOCR/AGENTS.md)).
+  search ([ascend-web-hunter](ascend-web-hunter/AGENTS.md) + SearXNG), weather ([ascend-weather-mcp](ascend-weather-mcp/AGENTS.md)), and OCR
+  ([ascend-ocr](ascend-ocr/AGENTS.md)).
 - **Document ingestion to object storage.** Drop files (Markdown, PDF, DOCX) into a bucket and the pipeline parses them via
   Docling / Unstructured and indexes them automatically.
 - **Hybrid chat history.** Redis for the active context window, PostgreSQL for durable long-term archives and
@@ -216,8 +216,8 @@ Two architecture entry points, depending on what you're after.
 | **[ascend-audio-scribe](ascend-audio-scribe/AGENTS.md)**               | Python / FastMCP       | 7017 | Audio transcription (Whisper / OpenAI / HF)         |
 | **[ascend-web-hunter](ascend-web-hunter/AGENTS.md)**       | Python / FastMCP       | 7021 | Web search and scraping via SearXNG                 |
 | **[AscendMemory](AscendMemory/AGENTS.md)**             | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                     |
-| **[WeatherMCP](WeatherMCP/AGENTS.md)**                 | Java / Spring Boot     | 9998 | Weather data MCP server                             |
-| **[PaddleOCR](PaddleOCR/AGENTS.md)**                   | Python / FastMCP       | 7022 | OCR service                                         |
+| **[ascend-weather-mcp](ascend-weather-mcp/AGENTS.md)** | Java / Spring Boot     | 9998 | Weather data MCP server                             |
+| **[ascend-ocr](ascend-ocr/AGENTS.md)**                 | Python / FastMCP       | 7022 | OCR service                                         |
 
 #### Request flow
 
@@ -376,7 +376,7 @@ Override per request with the `provider` and `model` form fields, or globally vi
 
 #### AscendAI services
 
-Each service ships both REST and MCP surfaces (except WeatherMCP, MCP-only). The "Used by AscendAgent via" column shows
+Each service ships both REST and MCP surfaces (except ascend-weather-mcp, MCP-only). The "Used by AscendAgent via" column shows
 the actual transport AscendAgent uses today. The other surface is available for direct external use.
 
 | Service                                          | Port    | Surfaces        | Used by AscendAgent via | Role                                                                |
@@ -385,8 +385,8 @@ the actual transport AscendAgent uses today. The other surface is available for 
 | **[AscendMemory](AscendMemory/AGENTS.md)**       | `7020`  | REST + MCP      | REST                    | Semantic memory store (Mem0 + Qdrant). Search / insert per user.    |
 | **[ascend-audio-scribe](ascend-audio-scribe/AGENTS.md)**         | `7017`  | REST + MCP      | MCP (Streamable HTTP)   | Speech-to-text (faster-whisper / OpenAI / HF / Audacity merge).     |
 | **[ascend-web-hunter](ascend-web-hunter/AGENTS.md)** | `7021`  | REST + MCP      | MCP (Streamable HTTP)   | Web search + content extraction (SearXNG, Cloudflare, NoVNC).       |
-| **[PaddleOCR](PaddleOCR/AGENTS.md)**             | `7022`  | REST + MCP      | MCP (Streamable HTTP)   | Image OCR.                                                          |
-| **[WeatherMCP](WeatherMCP/AGENTS.md)**           | `9998`  | MCP only (SSE)  | MCP (SSE)               | Weather data tool (reference Spring AI MCP server).                 |
+| **[ascend-ocr](ascend-ocr/AGENTS.md)**           | `7022`  | REST + MCP      | MCP (Streamable HTTP)   | Image OCR.                                                          |
+| **[ascend-weather-mcp](ascend-weather-mcp/AGENTS.md)** | `9998`  | MCP only (SSE)  | MCP (SSE)               | Weather data tool (reference Spring AI MCP server).                 |
 
 #### Support services (in-stack, deployed via compose)
 

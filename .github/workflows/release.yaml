@@ -18,8 +18,8 @@ on:
         required: true
         type: boolean
         default: false
-      release_weather_mcp:
-        description: 'Release weather-mcp (WeatherMCP/build.gradle.kts version)'
+      release_ascend_weather_mcp:
+        description: 'Release ascend-weather-mcp (ascend-weather-mcp/build.gradle.kts version)'
         required: true
         type: boolean
         default: false
@@ -38,8 +38,8 @@ on:
         required: true
         type: boolean
         default: false
-      release_paddle_ocr:
-        description: 'Release ascend-paddle-ocr (PaddleOCR/pyproject.toml version)'
+      release_ascend_ocr:
+        description: 'Release ascend-ocr (ascend-ocr/pyproject.toml version)'
         required: true
         type: boolean
         default: false
@@ -71,17 +71,17 @@ jobs:
           STACK_VERSION: ${{ inputs.stack_version }}
           CREATE_RELEASE: ${{ inputs.create_github_release }}
           SEL_ASCEND_AGENT:     ${{ inputs.release_ascend_agent }}
-          SEL_WEATHER_MCP:      ${{ inputs.release_weather_mcp }}
+          SEL_ASCEND_WEATHER_MCP:      ${{ inputs.release_ascend_weather_mcp }}
           SEL_ASCEND_AUDIO_SCRIBE:     ${{ inputs.release_ascend_audio_scribe }}
           SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
           SEL_ASCEND_MEMORY:    ${{ inputs.release_ascend_memory }}
-          SEL_PADDLE_OCR:       ${{ inputs.release_paddle_ocr }}
+          SEL_ASCEND_OCR:       ${{ inputs.release_ascend_ocr }}
         run: |
           set -euo pipefail
 
           # ── 1. Fail if zero apps selected ─────────────────────────────────
           SELECTED_COUNT=0
-          for VAR in "$SEL_ASCEND_AGENT" "$SEL_WEATHER_MCP" "$SEL_ASCEND_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_HUNTER" "$SEL_ASCEND_MEMORY" "$SEL_PADDLE_OCR"; do
+          for VAR in "$SEL_ASCEND_AGENT" "$SEL_ASCEND_WEATHER_MCP" "$SEL_ASCEND_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_HUNTER" "$SEL_ASCEND_MEMORY" "$SEL_ASCEND_OCR"; do
             [ "$VAR" = "true" ] && SELECTED_COUNT=$((SELECTED_COUNT + 1))
           done
           if [ "$SELECTED_COUNT" -eq 0 ]; then
@@ -190,11 +190,11 @@ jobs:
           }
 
           check_and_add "$SEL_ASCEND_AGENT"      "ascend-agent"     "AscendAgent"    "java"   "AscendAgent/build.gradle.kts"
-          check_and_add "$SEL_WEATHER_MCP"        "weather-mcp"      "WeatherMCP"     "java"   "WeatherMCP/build.gradle.kts"
+          check_and_add "$SEL_ASCEND_WEATHER_MCP"        "ascend-weather-mcp"      "ascend-weather-mcp"     "java"   "ascend-weather-mcp/build.gradle.kts"
           check_and_add "$SEL_ASCEND_AUDIO_SCRIBE"       "ascend-audio-scribe"     "ascend-audio-scribe"    "python" "ascend-audio-scribe/pyproject.toml"
           check_and_add "$SEL_ASCEND_WEB_HUNTER"  "ascend-web-hunter" "ascend-web-hunter" "python" "ascend-web-hunter/pyproject.toml"
           check_and_add "$SEL_ASCEND_MEMORY"      "ascend-memory"    "AscendMemory"   "python" "AscendMemory/pyproject.toml"
-          check_and_add "$SEL_PADDLE_OCR"         "ascend-paddle-ocr"       "PaddleOCR"      "python" "PaddleOCR/pyproject.toml"
+          check_and_add "$SEL_ASCEND_OCR"         "ascend-ocr"       "ascend-ocr"      "python" "ascend-ocr/pyproject.toml"
 
           MATRIX="{\"include\":${MATRIX_INCLUDE}}"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -266,11 +266,11 @@ jobs:
         env:
           STACK_VERSION: ${{ inputs.stack_version }}
           SEL_ASCEND_AGENT:      ${{ inputs.release_ascend_agent }}
-          SEL_WEATHER_MCP:       ${{ inputs.release_weather_mcp }}
+          SEL_ASCEND_WEATHER_MCP:       ${{ inputs.release_ascend_weather_mcp }}
           SEL_ASCEND_AUDIO_SCRIBE:      ${{ inputs.release_ascend_audio_scribe }}
           SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
           SEL_ASCEND_MEMORY:     ${{ inputs.release_ascend_memory }}
-          SEL_PADDLE_OCR:        ${{ inputs.release_paddle_ocr }}
+          SEL_ASCEND_OCR:        ${{ inputs.release_ascend_ocr }}
         run: |
           set -euo pipefail
 
@@ -283,11 +283,11 @@ jobs:
           }
 
           V_ASCEND_AGENT=$(read_java_version "AscendAgent/build.gradle.kts")
-          V_WEATHER_MCP=$(read_java_version "WeatherMCP/build.gradle.kts")
+          V_ASCEND_WEATHER_MCP=$(read_java_version "ascend-weather-mcp/build.gradle.kts")
           V_ASCEND_AUDIO_SCRIBE=$(read_python_version "ascend-audio-scribe/pyproject.toml")
           V_ASCEND_WEB_HUNTER=$(read_python_version "ascend-web-hunter/pyproject.toml")
           V_ASCEND_MEMORY=$(read_python_version "AscendMemory/pyproject.toml")
-          V_PADDLE_OCR=$(read_python_version "PaddleOCR/pyproject.toml")
+          V_ASCEND_OCR=$(read_python_version "ascend-ocr/pyproject.toml")
 
           label() {
             local flag="$1"
@@ -302,11 +302,11 @@ jobs:
             printf "| Service | Version | |\n"
             printf "|---|---|---|\n"
             printf "| ascend-agent | %s |%s |\n"       "${V_ASCEND_AGENT}"      "$(label "$SEL_ASCEND_AGENT")"
-            printf "| weather-mcp | %s |%s |\n"        "${V_WEATHER_MCP}"       "$(label "$SEL_WEATHER_MCP")"
+            printf "| ascend-weather-mcp | %s |%s |\n"        "${V_ASCEND_WEATHER_MCP}"       "$(label "$SEL_ASCEND_WEATHER_MCP")"
             printf "| ascend-audio-scribe | %s |%s |\n"       "${V_ASCEND_AUDIO_SCRIBE}"      "$(label "$SEL_ASCEND_AUDIO_SCRIBE")"
             printf "| ascend-web-hunter | %s |%s |\n"  "${V_ASCEND_WEB_HUNTER}" "$(label "$SEL_ASCEND_WEB_HUNTER")"
             printf "| ascend-memory | %s |%s |\n"      "${V_ASCEND_MEMORY}"     "$(label "$SEL_ASCEND_MEMORY")"
-            printf "| ascend-paddle-ocr | %s |%s |\n"         "${V_PADDLE_OCR}"        "$(label "$SEL_PADDLE_OCR")"
+            printf "| ascend-ocr | %s |%s |\n"         "${V_ASCEND_OCR}"        "$(label "$SEL_ASCEND_OCR")"
             printf "\nApps marked **(released)** had their images built and pushed in this run. All others carry their previous image.\n"
             printf "\n---\n"
           } > release-body.md

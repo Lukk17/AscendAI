@@ -22,8 +22,8 @@ The AscendAgent needs to invoke external tools (audio transcription, web search,
 Use MCP (Streamable HTTP transport) as the standard protocol for all tool services. Spring AI provides `SyncMcpToolCallbackProvider` for automatic tool discovery and invocation.
 
 Tool services implement MCP servers using:
-- Java: `spring-ai-starter-mcp-server-webmvc` (WeatherMCP)
-- Python: `FastMCP` library (ascend-audio-scribe, ascend-web-hunter, PaddleOCR)
+- Java: `spring-ai-starter-mcp-server-webmvc` (ascend-weather-mcp)
+- Python: `FastMCP` library (ascend-audio-scribe, ascend-web-hunter, ascend-ocr)
 
 Exception: AscendMemory uses REST API instead of MCP for memory operations (see AscendAgent ADR-003) because memory operations are tightly coupled to the prompt flow and need synchronous, predictable behavior rather than LLM-driven tool selection.
 

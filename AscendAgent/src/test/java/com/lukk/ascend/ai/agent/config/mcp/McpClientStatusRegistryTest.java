@@ -50,7 +50,7 @@ class McpClientStatusRegistryTest {
     @Test
     @DisplayName("record persists a FAILED entry that does NOT appear in connectedNames")
     void record_Failed_DoesNotAppearInConnectedNames() {
-        registry.record("weather", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
+        registry.record("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
 
         assertThat(registry.entries()).hasSize(1);
         assertThat(registry.connectedNames()).isEmpty();
@@ -60,13 +60,13 @@ class McpClientStatusRegistryTest {
     @DisplayName("connectedNames returns only CONNECTED entries when registry has mixed states")
     void connectedNames_MixedStates_ReturnsOnlyConnected() {
         registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
-        registry.record("weather", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
+        registry.record("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
         registry.record("ascend-web-hunter", "http://localhost:7021", McpClientStatus.CONNECTED, null);
 
         Set<String> connected = registry.connectedNames();
 
         assertThat(connected).containsExactlyInAnyOrder("ascend-audio-scribe", "ascend-web-hunter");
-        assertThat(connected).doesNotContain("weather");
+        assertThat(connected).doesNotContain("ascend-weather-mcp");
     }
 
     @Test
@@ -109,9 +109,9 @@ class McpClientStatusRegistryTest {
     @DisplayName("resolveConnectionName falls back to the name when the title is blank")
     void resolveConnectionName_BlankTitleWithName_ReturnsName() {
         McpSyncClient client = mock(McpSyncClient.class);
-        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("weather", "", "0.0.1"));
+        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("ascend-weather-mcp", "", "0.0.1"));
 
-        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("weather");
+        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("ascend-weather-mcp");
     }
 
     @Test

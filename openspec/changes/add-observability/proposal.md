@@ -15,8 +15,8 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 **Metrics layer (Prometheus + Grafana):**
 
 - **AscendAgent (Spring Boot)**: add `spring-boot-starter-actuator` and `micrometer-registry-prometheus` dependencies. Expose `/actuator/health`, `/actuator/prometheus`, `/actuator/info`. Auto-pick-up Spring AI's `gen_ai.*` metrics. Add custom counters/timers/gauges for the failure modes we have already paid for once: memory extraction parse failures, memory insert failures, RAG retrieval thresholding outcomes, ingestion errors per source type, MCP tool latency. Add cache-token metrics emitted from the prompt-caching strategies so the L3 dashboard works.
-- **WeatherMCP (Spring Boot)**: same Actuator + Prometheus stack, expose `/actuator/prometheus`. Minimal custom metrics (tool-call counter is enough for an MCP server).
-- **Python services (ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR)**: add `prometheus-fastapi-instrumentator` to FastAPI apps and expose `/metrics`. Add a small set of custom domain counters per service (transcription duration, search-result count, memory-search latency, OCR pages-processed).
+- **ascend-weather-mcp (Spring Boot)**: same Actuator + Prometheus stack, expose `/actuator/prometheus`. Minimal custom metrics (tool-call counter is enough for an MCP server).
+- **Python services (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr)**: add `prometheus-fastapi-instrumentator` to FastAPI apps and expose `/metrics`. Add a small set of custom domain counters per service (transcription duration, search-result count, memory-search latency, OCR pages-processed).
 - **Prometheus**: new docker-compose service `prometheus` with a checked-in `infra/observability/prometheus/prometheus.yaml` that scrapes all six AscendAI services on their `/metrics` (or `/actuator/prometheus`) endpoints every 15 s, plus the data-layer prerequisites that publish metrics (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`). The S3-compatible object store publishes no Prometheus endpoint and is not scraped.
 - **Grafana**: new docker-compose service `grafana` with anonymous read-only access on a non-conflicting port (`7078` to avoid clashing with anything), provisioned with the Prometheus datasource, the Loki datasource (logs), the Tempo datasource (traces), and **six checked-in dashboards** (see below).
 
@@ -30,7 +30,7 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 
 - **OpenTelemetry Collector** container — single OTLP ingestion point (gRPC `:4317` and HTTP `:4318`). Receivers: OTLP. Processors: batch, memory_limiter. Exporters: Tempo. Future Datadog / Jaeger fan-out lives here without service changes.
 - **Tempo** container — trace storage backend, single-binary mode, filesystem-backed.
-- **AscendAgent + WeatherMCP** — Spring AI 1.1's auto-instrumentation already emits OpenTelemetry spans for every LLM call, tool call, and embedding call. Wire them at `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`.
+- **AscendAgent + ascend-weather-mcp** — Spring AI 1.1's auto-instrumentation already emits OpenTelemetry spans for every LLM call, tool call, and embedding call. Wire them at `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`.
 - **Python services** — add `opentelemetry-distro` + `opentelemetry-exporter-otlp` to `pyproject.toml`. One-line `auto_instrumentation` activation at app startup.
 - **Why OTel over a vendor agent**: Spring AI emits OTel natively; OTel collector is the industry-standard router for fan-out to any backend.
 
@@ -71,7 +71,7 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
   - `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/ChatExecutor.java` — timer `mcp.tool.duration` keyed by tool name.
   - `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/cache/AnthropicPromptCacheStrategy.java` — counter `prompt_cache.tokens.read{provider="anthropic"}` and `prompt_cache.tokens.creation{provider="anthropic"}` from `recordOutcome`. Powers L3 dashboard.
   - `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/service/cache/OpenAiPromptCacheStrategy.java` — counter `prompt_cache.tokens.read{provider}` from `recordOutcome` for OpenAI + Gemini providers.
-- **New code (WeatherMCP)**: same dependency lines + actuator config.
+- **New code (ascend-weather-mcp)**: same dependency lines + actuator config.
 - **New code (Python services)**: `prometheus-fastapi-instrumentator` + `opentelemetry-distro` + `opentelemetry-exporter-otlp` in `pyproject.toml`; one-line wiring in `src/main.py` per service for both `/metrics` and OTel auto-instrumentation; ~3 custom counters per service.
 - **New files**:
   - `docker-compose.yaml` — `prometheus`, `grafana`, `vector`, `loki`, `otel-collector`, `tempo`, `postgres-exporter`, `redis-exporter` services.

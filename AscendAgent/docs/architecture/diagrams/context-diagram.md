@@ -14,7 +14,7 @@ graph TB
     Anthropic["☁️ Anthropic"]
     MiniMax["☁️ MiniMax"]
     AudioScribe["🎙️ ascend-audio-scribe"]
-    Weather["🌤️ WeatherMCP"]
+    Weather["🌤️ ascend-weather-mcp"]
     WebHunter["🔍 ascend-web-hunter"]
     Memory["🧠 AscendMemory"]
 

@@ -92,7 +92,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 ### D7 — SSRF allowlists: explicit, no loopback
 
-- `MCP_ALLOWED_HOSTS` on both `ascend-paddle-ocr` and `ascend-audio-scribe` becomes `${MCP_ALLOWED_HOSTS:-object-store}`. The default allowlists only the in-network `object-store` hostname used for RAG-document and presigned-URL fetches. Local dev, where the S3-compatible object store runs on the host and is reached via `host.docker.internal`, sets `MCP_ALLOWED_HOSTS=host.docker.internal` in `.env` — a deliberate, documented, per-machine opt-in instead of a committed default that whitelists loopback everywhere.
+- `MCP_ALLOWED_HOSTS` on both `ascend-ocr` and `ascend-audio-scribe` becomes `${MCP_ALLOWED_HOSTS:-object-store}`. The default allowlists only the in-network `object-store` hostname used for RAG-document and presigned-URL fetches. Local dev, where the S3-compatible object store runs on the host and is reached via `host.docker.internal`, sets `MCP_ALLOWED_HOSTS=host.docker.internal` in `.env` — a deliberate, documented, per-machine opt-in instead of a committed default that whitelists loopback everywhere.
 - The deployment guide covers the cloud topology: the object store reachable at a private hostname, that hostname (and nothing else) in the allowlist.
 
 ### D8 — Observability exposure
@@ -102,7 +102,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 ### D9 — Production posture checklist mechanics
 
-- `depends_on` entries upgraded to the long form with `condition: service_healthy` wherever the dependency has a healthcheck; healthchecks added to `docling-serve`, `unstructured-api`, `weather-mcp`, `searxng`, `flaresolverr`, `grafana`, and `prometheus` so gating is meaningful.
+- `depends_on` entries upgraded to the long form with `condition: service_healthy` wherever the dependency has a healthcheck; healthchecks added to `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `grafana`, and `prometheus` so gating is meaningful.
 - A top-level `x-logging: &default-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) applied to every service — bounded disk usage on long-lived VMs.
 - Image pinning: audit confirms every image is version-pinned except `ngrok/ngrok:3` (floating major); pin it. Locally built images unaffected.
 - `SECURITY_ENABLED` passes through compose as `${SECURITY_ENABLED:-false}`; the deployment guide's production checklist requires `SECURITY_ENABLED=true` in the customer `.env`, and the AscendAgent production-profile guard (D3) warns loudly when it is false. The auth behavior behind the flag belongs to `add-auth-and-identity`.

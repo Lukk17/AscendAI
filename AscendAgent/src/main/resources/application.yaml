@@ -81,7 +81,7 @@ app:
     base-url: "http://localhost:5001"
     api-path: "/v1/convert/file"
 
-  paddleocr:
+  ascend-ocr:
     base-url: "http://localhost:7022"
     api-path: "/v1/ocr"
 
@@ -383,7 +383,7 @@ spring:
           connections:
             ascend-audio-scribe:
               url: http://localhost:7017
-            weather:
+            ascend-weather-mcp:
               url: http://localhost:9998
             ascend-web-hunter:
               url: http://localhost:7021

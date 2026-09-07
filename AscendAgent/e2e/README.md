@@ -149,8 +149,8 @@ parallel layout only matters when you care about wall-clock.
 ### Prerequisites before any test
 
 1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, S3-compatible object storage `:9070` (S3 API) / `:9071` (UI).
-2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, ascend-web-hunter, ascend-audio-scribe, PaddleOCR,
-   WeatherMCP, support services).
+2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, ascend-web-hunter, ascend-audio-scribe, ascend-ocr,
+   ascend-weather-mcp, support services).
 3. AscendAgent running on the host: `cd AscendAgent && ./gradlew bootRun`.
 
 If the AscendAgent startup banner shows any `[FAILED]` rows under `External dependencies`, fix that first. Each
@@ -187,9 +187,9 @@ specs need:
       "Bash(docker exec ascend-audio-scribe sh -c *)",
       "Bash(docker exec ascend-audio-scribe printenv *)",
       "Bash(docker exec ascend-audio-scribe curl *)",
-      "Bash(docker exec ascend-paddle-ocr sh -c *)",
-      "Bash(docker exec ascend-paddle-ocr printenv *)",
-      "Bash(docker exec ascend-paddle-ocr curl *)",
+      "Bash(docker exec ascend-ocr sh -c *)",
+      "Bash(docker exec ascend-ocr printenv *)",
+      "Bash(docker exec ascend-ocr curl *)",
       "Bash(docker exec -e PYTHONPATH=/app -w /app ascend-web-hunter python *)",
       "Bash(docker cp AscendAgent/e2e/fixtures/compaction-seeds/* redis:/tmp/*)",
       "Bash(docker cp ascend-web-hunter/e2e/harness/* ascend-web-hunter:/tmp/*)",
@@ -212,10 +212,10 @@ specs need:
 }
 ```
 
-Every entry names a specific container (`postgres`, `redis`, `ascend-agent`, `ascend-audio-scribe`, `ascend-paddle-ocr`,
+Every entry names a specific container (`postgres`, `redis`, `ascend-agent`, `ascend-audio-scribe`, `ascend-ocr`,
 `ascend-web-hunter`) or a specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998`
-WeatherMCP, `:7020` AscendMemory). No blanket `docker exec *`, `docker cp *` or `curl *`, and no entry for a container
-no spec touches: `searxng`, `flaresolverr`, `ngrok-ascend-web-hunter`, `weather-mcp`, `ascend-memory`, `docling-serve`,
+ascend-weather-mcp, `:7020` AscendMemory). No blanket `docker exec *`, `docker cp *` or `curl *`, and no entry for a container
+no spec touches: `searxng`, `flaresolverr`, `ngrok-ascend-web-hunter`, `ascend-weather-mcp`, `ascend-memory`, `docling-serve`,
 `unstructured-api` and the observability containers get nothing. Because the container name is pinned as the first
 token after `docker exec`, no entry can be used to smuggle in a different container or a flag such as `-u 0`. The
 object store needs no `docker exec` entry at all: it is published on the host by a compose project this repository
@@ -224,7 +224,7 @@ does not own, so every step against it is a plain HTTP call. If you only run a s
 This list covers every e2e suite in the repository, not only AscendAgent's own eleven specs, because this is the one
 place the allowlist shapes are documented. Two entries are read-only against `:9070` (`curl -fsS ...`, the `GET`
 listing calls), one is a delete (`curl -fsS -X DELETE ...`), and two are writes used to seed fixtures directly into
-the object store: ascend-audio-scribe's test 5 and PaddleOCR's test 6 both `PUT` a bucket and then `PUT` a fixture file into
+the object store: ascend-audio-scribe's test 5 and ascend-ocr's test 6 both `PUT` a bucket and then `PUT` a fixture file into
 it via `curl.exe` (PowerShell aliases plain `curl` to `Invoke-WebRequest`, so these specs call the real `curl.exe`
 binary).
 
@@ -332,7 +332,7 @@ Numbered by setup cost. Easiest first.
 
 | #  | Spec                                                                                            | Template                                                                                                              | What it proves                                                                                                          |
 | :- | :---------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
-| 1  | [testing/1-weather-mcp-test.md](testing/1-weather-mcp-test.md)                                  | [testing/templates/1-weather-mcp-tasks.template.md](testing/templates/1-weather-mcp-tasks.template.md)                                    | The agent discovers and invokes the WeatherMCP tool.                                                                    |
+| 1  | [testing/1-weather-mcp-test.md](testing/1-weather-mcp-test.md)                                  | [testing/templates/1-weather-mcp-tasks.template.md](testing/templates/1-weather-mcp-tasks.template.md)                                    | The agent discovers and invokes the ascend-weather-mcp tool.                                                                    |
 | 2  | [testing/2-image-description-test.md](testing/2-image-description-test.md)                      | [testing/templates/2-image-description-tasks.template.md](testing/templates/2-image-description-tasks.template.md)                        | An attached image reaches a vision-capable model and is described accurately.                                           |
 | 3  | [testing/3-summarization-test.md](testing/3-summarization-test.md)                              | [testing/templates/3-summarization-tasks.template.md](testing/templates/3-summarization-tasks.template.md)                                | A PDF attached inline is parsed page by page through Docling and summarised from real content.                          |
 | 4  | [testing/4-semantic-memory-test.md](testing/4-semantic-memory-test.md)                          | [testing/templates/4-semantic-memory-tasks.template.md](testing/templates/4-semantic-memory-tasks.template.md)                            | A fact stated in turn 1 is recalled in turn 2 from Qdrant via AscendMemory, after chat history is wiped.                |

@@ -2,10 +2,10 @@ package com.lukk.ascend.ai.agent.service.ingestion;
 
 /**
  * Shared metadata keys stamped onto {@link org.springframework.ai.document.Document} objects
- * by every ingestion producer (Markdown, Docling, PaddleOCR, Unstructured) and read back by
+ * by every ingestion producer (Markdown, Docling, ascend-ocr, Unstructured) and read back by
  * RAG retrieval and source-file presigning.
  *
- * <p>Per-protocol keys (e.g., PaddleOCR's {@code "lines"} / {@code "pages"} JSON keys,
+ * <p>Per-protocol keys (e.g., ascend-ocr's {@code "lines"} / {@code "pages"} JSON keys,
  * Docling's {@code "md_content"}) belong on their client classes — they are not metadata
  * shared across the pipeline.
  */

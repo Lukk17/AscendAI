@@ -2,11 +2,11 @@
 type = "docker_logs"
 include_containers = [
   "ascend-agent",
-  "weather-mcp",
+  "ascend-weather-mcp",
   "ascend-memory",
   "ascend-audio-scribe",
   "ascend-web-hunter",
-  "ascend-paddle-ocr",
+  "ascend-ocr",
 ]
 
 [sinks.loki]

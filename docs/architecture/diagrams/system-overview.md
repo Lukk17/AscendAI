@@ -9,9 +9,9 @@ graph TB
 
         subgraph "MCP Tool Services"
             AudioScribe["ascend-audio-scribe<br/>:7017<br/>Audio Transcription"]
-            Weather["WeatherMCP<br/>:9998<br/>Weather Data"]
+            Weather["ascend-weather-mcp<br/>:9998<br/>Weather Data"]
             WebHunter["ascend-web-hunter<br/>:7021<br/>Web Search"]
-            PaddleOCR["PaddleOCR<br/>:7022<br/>OCR"]
+            PaddleOCR["ascend-ocr<br/>:7022<br/>OCR"]
         end
 
         subgraph "Memory & Storage"

@@ -25,7 +25,7 @@ The ingestion controller SHALL sanitize the user-supplied filename before using 
 
 ### Requirement: Tenant metadata stamped on every ingested chunk
 
-Every ingestion producer (Markdown, Docling, PaddleOCR, Unstructured) SHALL stamp a `tenant_id` metadata key (declared in `IngestionMetadataKeys`) on every `Document` it writes to the vector store, set to the tenant resolved from the ingestion request's tenant context. Ingestion without a resolved tenant context SHALL fail; no chunk SHALL ever be written without `tenant_id`.
+Every ingestion producer (Markdown, Docling, ascend-ocr, Unstructured) SHALL stamp a `tenant_id` metadata key (declared in `IngestionMetadataKeys`) on every `Document` it writes to the vector store, set to the tenant resolved from the ingestion request's tenant context. Ingestion without a resolved tenant context SHALL fail; no chunk SHALL ever be written without `tenant_id`.
 
 #### Scenario: Uploaded document's chunks carry tenant metadata
 

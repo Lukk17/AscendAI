@@ -4,7 +4,7 @@ See proposal.md, "Why", for the motivation and the three defects this change clo
 
 Retrieval today runs in `RagRetrievalService.retrieve`. It asks Qdrant for `topK` candidates with the similarity threshold pinned to `0.0`, then filters in Java against `app.rag.similarity-threshold` so the near-miss scores stay visible in the logs. The kept list feeds two independent consumers: `buildContextBlock`, which concatenates raw chunk text under a `<rag_context>` wrapper until `app.rag.max-context-chars` runs out, and `buildSourceRefs`, which reads `bucket`, `key`, `displayName`, `mimeType`, `source` and `title` from the same chunks and deduplicates per object. The two disagree today: a chunk dropped by the character budget still contributes a `SourceRef`.
 
-Chunk metadata is stamped by four producers. `IngestionService.processMarkdown` and `parseUnstructuredResponse` stamp `source`, `title`, `type`. `DoclingClient` and `PaddleOcrClient` stamp `source` and `type` only. The shared key names live in `IngestionMetadataKeys`. `DocumentService.splitDocuments` runs Spring AI's `TokenTextSplitter` over the whole batch at once and returns a flat list, which copies parent metadata onto each chunk but adds nothing that identifies the chunk's position.
+Chunk metadata is stamped by four producers. `IngestionService.processMarkdown` and `parseUnstructuredResponse` stamp `source`, `title`, `type`. `DoclingClient` and `AscendOcrClient` stamp `source` and `type` only. The shared key names live in `IngestionMetadataKeys`. `DocumentService.splitDocuments` runs Spring AI's `TokenTextSplitter` over the whole batch at once and returns a flat list, which copies parent metadata onto each chunk but adds nothing that identifies the chunk's position.
 
 Two ingestion routes exist and they are not equivalent. The prompt-attachment route (`DocumentIngestionService`) calls `DocumentRouter`, which does extension-based routing including a per-page PDF split, but its output is never indexed. The corpus route (`ManualIngestionService.ingestObject`) indexes, but branches only on markdown versus unstructured and never reaches the router. Where the router does split pages, it labels each request with a synthetic filename (`filename + "_page" + n + ".pdf"`) that the parser clients then stamp as the chunk's `source`, so routing that path into the corpus as it stands would poison both `DocumentService.removeOldDocuments` (which deletes by `source ==`) and source presigning (which looks up the object by key).
 
@@ -63,7 +63,7 @@ This decision is recorded as ADR-011.
 
 `DocumentRouter` restamps `source` to the original filename or object key on every document its per-page path produces, so the synthetic per-page filename never leaves the router. That name stays useful where it belongs, in the conversion request and the log line.
 
-The alternative of passing both the real name and the page number down into `DoclingClient` and `PaddleOcrClient` was rejected. It widens two client signatures for the benefit of one caller, and it puts knowledge of a PDF page split into clients that also serve single-file calls where there is no page.
+The alternative of passing both the real name and the page number down into `DoclingClient` and `AscendOcrClient` was rejected. It widens two client signatures for the benefit of one caller, and it puts knowledge of a PDF page split into clients that also serve single-file calls where there is no page.
 
 ### D5. Ordinals are stamped by splitting per parent document, not over the batch
 

@@ -1,8 +1,8 @@
 package com.lukk.ascend.ai.agent.service.ingestion;
 
 import com.lukk.ascend.ai.agent.exception.DocumentRoutingException;
+import com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClient;
 import com.lukk.ascend.ai.agent.service.ingestion.client.DoclingClient;
-import com.lukk.ascend.ai.agent.service.ingestion.client.PaddleOcrClient;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Tests for DocumentRouter covering the awaitAllPagesOrThrow ExecutionException path.
- * When a page processing task (docling/paddleocr) throws a runtime exception,
+ * When a page processing task (docling/ascend-ocr) throws a runtime exception,
  * CompletableFuture.allOf().get() throws ExecutionException and we expect
  * DocumentRoutingException to be thrown.
  */
@@ -38,7 +38,7 @@ class DocumentRouterPdfExceptionTest {
     private DoclingClient doclingClient;
 
     @Mock
-    private PaddleOcrClient paddleOcrClient;
+    private AscendOcrClient ascendOcrClient;
 
     @InjectMocks
     private DocumentRouter documentRouter;
@@ -59,14 +59,14 @@ class DocumentRouterPdfExceptionTest {
     }
 
     @Test
-    @DisplayName("routeAndProcess throws DocumentRoutingException when PaddleOCR page task fails")
-    void routeAndProcess_PaddleOcrPageFails_ThrowsDocumentRoutingException() throws IOException {
-        // given — high threshold so page routes to PaddleOCR
+    @DisplayName("routeAndProcess throws DocumentRoutingException when ascend-ocr page task fails")
+    void routeAndProcess_AscendOcrPageFails_ThrowsDocumentRoutingException() throws IOException {
+        // given — high threshold so page routes to ascend-ocr
         ReflectionTestUtils.setField(documentRouter, "pdfMinTextThresholdPerPage", 10_000);
         ReflectionTestUtils.setField(documentRouter, "pdfParallelPages", 1);
         byte[] pdfBytes = createSinglePagePdf();
-        when(paddleOcrClient.process(any(byte[].class), anyString(), isNull()))
-                .thenThrow(new RuntimeException("paddle service down"));
+        when(ascendOcrClient.process(any(byte[].class), anyString(), isNull()))
+                .thenThrow(new RuntimeException("ascend-ocr service down"));
 
         // then
         assertThatThrownBy(() -> documentRouter.routeAndProcess(pdfBytes, "test.pdf", "application/pdf"))

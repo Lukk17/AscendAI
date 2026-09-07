@@ -7,22 +7,22 @@ from the code and the configuration as they stand after that change, not assumed
 
 - The page limit is derived, not configured. `Settings.OCR_MAX_PAGES` is
   `floor(OCR_REQUEST_TIMEOUT / OCR_PAGE_TIMEOUT_SECONDS)` in
-  [config.py](../../../PaddleOCR/src/config/config.py). Deployed values are `OCR_REQUEST_TIMEOUT=300` in
+  [config.py](../../../ascend-ocr/src/config/config.py). Deployed values are `OCR_REQUEST_TIMEOUT=300` in
   `docker-compose.yaml` and `OCR_PAGE_TIMEOUT_SECONDS=120` by default, so the limit is two, and
-  `enforce_page_limit` in [limits.py](../../../PaddleOCR/src/api/limits.py) refuses anything above it with
+  `enforce_page_limit` in [limits.py](../../../ascend-ocr/src/api/limits.py) refuses anything above it with
   `FILE_TOO_LARGE`.
 - One worker, and it is a memory constraint. `OCR_WORKER_COUNT` governs both the `ProcessPoolExecutor` size and the
-  admission gate's permit count in [ocr_service.py](../../../PaddleOCR/src/service/ocr_service.py). One A4 page's
+  admission gate's permit count in [ocr_service.py](../../../ascend-ocr/src/service/ocr_service.py). One A4 page's
   peak is already most of the container's 12,288 MiB.
 - The stop is cooperative and already page-granular. `_predict_pages` consumes `predict_iter()` and checks a
   deadline before pulling each page. The parent passes a remaining duration, never a wall clock time.
 - The reclamation and rebuild path exists. `_rebuild_pool(observed_generation, reason)` replaces the pool, is
   guarded by a lock and a generation counter, counts consecutive failures, and is already reached from two triggers.
 - Both surfaces already share one dispatch function. `dispatch_ocr_request(...)` in `ocr_service.py` is called from
-  [rest_endpoints.py](../../../PaddleOCR/src/api/rest/rest_endpoints.py) and
-  [mcp_server.py](../../../PaddleOCR/src/api/mcp/mcp_server.py), and both compute
+  [rest_endpoints.py](../../../ascend-ocr/src/api/rest/rest_endpoints.py) and
+  [mcp_server.py](../../../ascend-ocr/src/api/mcp/mcp_server.py), and both compute
   `min(pages x OCR_PAGE_TIMEOUT_SECONDS, OCR_REQUEST_TIMEOUT)` identically.
-- The service holds no persisted state today. `PaddleOCR/e2e/README.md` says so in as many words, there is no
+- The service holds no persisted state today. `ascend-ocr/e2e/README.md` says so in as many words, there is no
   database, no cache and no volume in `docker-compose.yaml`, and the only cross-process state is the Prometheus
   multiprocess directory that `is_engine_warm` reads.
 - The service has no authentication of its own. `SecurityHeadersMiddleware`, `CorrelationIdMiddleware` and the
@@ -34,8 +34,8 @@ from the code and the configuration as they stand after that change, not assumed
 - The scratch sweep horizon is the synchronous ceiling. `sweep_scratch_dir` removes anything older than
   `OCR_REQUEST_TIMEOUT + OCR_DISPATCH_MARGIN_SECONDS`.
 - The in-platform callers time out at 300 s. `app.ingestion.read-timeout` is 300000 ms in the agent's
-  `application.yaml`, used by the `ingestionRestClient` that `PaddleOcrClient` holds, and
-  `spring.ai.mcp.client.request-timeout` is 300 s. PaddleOCR's MCP server is not in the agent's connection list
+  `application.yaml`, used by the `ingestionRestClient` that `AscendOcrClient` holds, and
+  `spring.ai.mcp.client.request-timeout` is 300 s. ascend-ocr's MCP server is not in the agent's connection list
   today, so the agent reaches this module over REST only.
 - The agent never sends a long document as one request. `DocumentRouter.routePdfPerPage` slices a PDF into
   single-page PDFs and dispatches them with `pdf-parallel-pages: 4`. Images go whole, and an image is one page.
@@ -78,12 +78,12 @@ Non-Goals:
 | Queue document bound | `OCR_JOB_QUEUE_MAX_DOCUMENTS` | 8 | A chosen 400 MB storage budget for waiting submissions divided by the existing `MAX_FILE_SIZE_MB` of 50. The storage budget is a choice, not a measurement, because the module declares no volume and no disk quota to derive one from. | Chosen, stated |
 | Result retention | `OCR_JOB_RETENTION_SECONDS` | 14,400 s | Three job reading ceilings, so a caller whose polling died has a working session to notice and collect. It is a product trade against how long a document's own text sits on the service, not a measurement, and lowering it costs only late collection. | Chosen, stated |
 | Retained record cap | `OCR_JOB_MAX_RETAINED` | 100 | The window alone bounds nothing, because what fits inside it depends entirely on how fast the work is: about 160 documents if each is one A4 page at 90 s, and thousands if they are small images finishing in seconds. The count is what turns that into a stated number. 100 records at an estimated 100 KB for a twenty five page result is about 10 MB, and that per-result size is unmeasured, so task 1.3 measures it. | Derived from an unmeasured size |
-| Jobs directory | `OCR_JOBS_DIR` | a `paddle-ocr-jobs` directory beside the existing scratch directory | Matches `OCR_SCRATCH_DIR`'s own default shape. Kept separate from scratch because the two have different lifetimes and different sweep horizons. | Convention |
+| Jobs directory | `OCR_JOBS_DIR` | an `ascend-ocr-jobs` directory beside the existing scratch directory | Matches `OCR_SCRATCH_DIR`'s own default shape. Kept separate from scratch because the two have different lifetimes and different sweep horizons. | Convention |
 | Scratch sweep horizon | derived | job reading ceiling + dispatch margin | Replaces `OCR_REQUEST_TIMEOUT + OCR_DISPATCH_MARGIN_SECONDS`. A legitimate 80 minute job must never have its own working file swept out from under it. | Derived |
 
 Two values stay exactly as the previous change deployed them and are not reopened here: `OCR_DETECTOR_MAX_SIDE` at
 1536 and `OCR_MAX_INFERENCE_PIXELS` at 2,500,000, the owner's measured pair recorded in
-[ADR-006](../../../PaddleOCR/docs/architecture/decisions/ADR-006-detector-input-bound.md). Every memory figure below
+[ADR-006](../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). Every memory figure below
 assumes them.
 
 ### The job page ceiling, derived
@@ -190,7 +190,7 @@ separate change, and the measured per-page cost is what makes it due now.
 
 `POST /v1/ocr` and `ocr_process` keep their shape, their parameters, their error codes and their two page limit. The
 job path is new endpoints and new tools beside them. Under ADR-003 that is a non-breaking change requiring no
-version bump on either surface, and it means the AscendAgent's `PaddleOcrClient`, the Bruno collection, the contract
+version bump on either surface, and it means the AscendAgent's `AscendOcrClient`, the Bruno collection, the contract
 stub and every existing e2e spec keep passing untouched.
 
 The alternative, replacing the synchronous request with the job path, was rejected twice over: it is breaking, so it
@@ -374,7 +374,7 @@ workers, which the memory model forbids, or a queue that does not charge synchro
 is the thing that stops abandoned work.
 
 One more observation from reading that path, recorded because it is load-bearing for anyone testing the agent
-against this module and is not fixed here: `PaddleOcrClient` posts its multipart part as `files`, while
+against this module and is not fixed here: `AscendOcrClient` posts its multipart part as `files`, while
 `/v1/ocr` declares `file`. That mismatch is the agent's to confirm and fix.
 
 ### Decision 13: the identifier is the credential, so it is random and it is never a path

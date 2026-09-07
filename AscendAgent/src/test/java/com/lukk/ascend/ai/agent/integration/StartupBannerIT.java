@@ -52,7 +52,7 @@ class StartupBannerIT extends TestcontainersBase {
 
         when(mcpClientStatusRegistry.entries()).thenReturn(List.of(
                 new McpClientEntry("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED),
-                new McpClientEntry("weather", "http://localhost:9998", McpClientStatus.FAILED)
+                new McpClientEntry("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED)
         ));
     }
 

@@ -41,7 +41,7 @@ class FilteredToolCallbackProviderTest {
     @BeforeEach
     void setUp() {
         McpSchema.Implementation connectedInfo = new McpSchema.Implementation("AscendAI-Agent - ascend-audio-scribe", "ascend-audio-scribe", "0.0.1");
-        McpSchema.Implementation failedInfo = new McpSchema.Implementation("AscendAI-Agent - weather", "weather", "0.0.1");
+        McpSchema.Implementation failedInfo = new McpSchema.Implementation("AscendAI-Agent - ascend-weather-mcp", "ascend-weather-mcp", "0.0.1");
         when(connectedClient.getClientInfo()).thenReturn(connectedInfo);
         when(failedClient.getClientInfo()).thenReturn(failedInfo);
 

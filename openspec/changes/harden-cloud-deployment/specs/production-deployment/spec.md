@@ -95,11 +95,11 @@ The `ascend-web-hunter` service SHALL NOT declare `cap_add: SYS_ADMIN`. Chromium
 
 ### Requirement: SSRF allowlists exclude loopback by default
 
-`MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `ascend-audio-scribe` SHALL be env-driven with the default `object-store` (`${MCP_ALLOWED_HOSTS:-object-store}`). The committed compose files SHALL NOT list `localhost`, `127.0.0.1`, or `host.docker.internal` as allowlist defaults. Local-dev topologies where the S3-compatible object store runs on the Docker host SHALL opt in per machine by setting `MCP_ALLOWED_HOSTS` in `.env`, and this opt-in SHALL be documented in `.env.example` and the deployment guide.
+`MCP_ALLOWED_HOSTS` on `ascend-ocr` and `ascend-audio-scribe` SHALL be env-driven with the default `object-store` (`${MCP_ALLOWED_HOSTS:-object-store}`). The committed compose files SHALL NOT list `localhost`, `127.0.0.1`, or `host.docker.internal` as allowlist defaults. Local-dev topologies where the S3-compatible object store runs on the Docker host SHALL opt in per machine by setting `MCP_ALLOWED_HOSTS` in `.env`, and this opt-in SHALL be documented in `.env.example` and the deployment guide.
 
 #### Scenario: Loopback fetch is blocked by default
 
-- **WHEN** the stack runs with `MCP_ALLOWED_HOSTS` unset and a caller asks PaddleOCR's MCP tool to fetch `http://127.0.0.1:9070/some-object`
+- **WHEN** the stack runs with `MCP_ALLOWED_HOSTS` unset and a caller asks ascend-ocr's MCP tool to fetch `http://127.0.0.1:9070/some-object`
 - **THEN** the request is rejected with `UNSAFE_URI`
 
 #### Scenario: In-network object-store fetch succeeds
@@ -149,7 +149,7 @@ The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfac
 
 ### Requirement: Compose declares production runtime posture
 
-`docker-compose.yaml` SHALL apply a shared `x-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) to every service; SHALL upgrade `depends_on` entries to `condition: service_healthy` wherever the dependency defines a healthcheck; SHALL define healthchecks for `docling-serve`, `unstructured-api`, `weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`; SHALL pin every image to a specific version (including `ngrok/ngrok`); and SHALL pass `SECURITY_ENABLED=${SECURITY_ENABLED:-false}` to AscendAgent, with the production checklist in the deployment guide requiring `SECURITY_ENABLED=true`.
+`docker-compose.yaml` SHALL apply a shared `x-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) to every service; SHALL upgrade `depends_on` entries to `condition: service_healthy` wherever the dependency defines a healthcheck; SHALL define healthchecks for `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`; SHALL pin every image to a specific version (including `ngrok/ngrok`); and SHALL pass `SECURITY_ENABLED=${SECURITY_ENABLED:-false}` to AscendAgent, with the production checklist in the deployment guide requiring `SECURITY_ENABLED=true`.
 
 #### Scenario: Agent waits for healthy dependencies
 

@@ -4,7 +4,7 @@ The RAG knowledge base is write-only. The only ingestion endpoints are `POST /ap
 
 1. **Nobody can see what is indexed.** The only ingestion state today is Spring Integration's `INT_METADATA_STORE` key-value table (`JdbcMetadataStore` bean in `config/AppConfig.java`, schema auto-created via `spring.integration.jdbc.initialize-schema: always`, not Liquibase-managed) holding opaque `manual-ingestion:<s3-key>:<etag>` dedupe markers. No document name, size, MIME type, status, chunk count, last-indexed timestamp, or failure reason exists anywhere.
 2. **Deleting or re-indexing a document means operating MinIO and Qdrant by hand.** There is no endpoint to remove a document's object from the `knowledge-base` bucket, its chunks from the `ascendai-768` / `ascendai-1536` collections, and its dedupe marker together. Re-ingest replaces old chunks (`ManualIngestionService.ingestIntoActiveCollection` calls `documentService.removeOldDocuments`), but only as a side effect of a full bucket scan.
-3. **`POST /api/v1/ingestion/run` blocks the HTTP connection for the whole scan.** Docling / PaddleOCR processing of large PDFs runs minutes; the caller gets back only aggregate `{indexed, skipped, failed}` counts with no per-file failure detail and no way to check progress.
+3. **`POST /api/v1/ingestion/run` blocks the HTTP connection for the whole scan.** Docling / ascend-ocr processing of large PDFs runs minutes; the caller gets back only aggregate `{indexed, skipped, failed}` counts with no per-file failure detail and no way to check progress.
 
 The sibling changes `add-auth-and-identity` (ADMIN role) and `add-tenant-isolation` (document ownership) both presuppose a document resource to protect and scope. This change creates that resource.
 

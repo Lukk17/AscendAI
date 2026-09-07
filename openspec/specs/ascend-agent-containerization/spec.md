@@ -71,7 +71,7 @@ The `ascend-agent` compose entry SHALL set `SPRING_PROFILES_ACTIVE=docker` to ac
 
 - `app.unstructured.base-url` → the in-network `unstructured-api` service URL.
 - `app.docling.base-url` → the in-network `docling-serve` service URL.
-- `app.paddleocr.base-url` → the in-network `ascend-paddle-ocr` service URL.
+- `app.ascend-ocr.base-url` → the in-network `ascend-ocr` service URL.
 - `app.memory.semantic.base-url` → the in-network `ascend-memory` service URL.
 - `app.s3.endpoint`, `spring.datasource.url`, `spring.data.redis.host`, `spring.ai.vectorstore.qdrant.host` → `host.docker.internal` (since the S3-compatible object store, Postgres, Redis, and Qdrant are external host prerequisites).
 - `spring.ai.openai.base-url`, `app.ai.providers.lmstudio.base-url`, `app.embedding.providers.lmstudio.base-url` → `http://host.docker.internal:1234` for LM Studio reachability.
@@ -84,7 +84,7 @@ The compose `environment:` block SHALL NOT duplicate these URLs as `${KEY}` over
 #### Scenario: Container resolves in-network services via the docker profile
 
 - **WHEN** `ascend-agent` starts with `SPRING_PROFILES_ACTIVE=docker`
-- **THEN** boot logs show no `ConnectException` / `UnknownHostException` when contacting `ascend-memory`, `docling-serve`, `unstructured-api`, `ascend-audio-scribe`, `weather-mcp`, or `ascend-web-hunter`
+- **THEN** boot logs show no `ConnectException` / `UnknownHostException` when contacting `ascend-memory`, `docling-serve`, `unstructured-api`, `ascend-audio-scribe`, `ascend-weather-mcp`, or `ascend-web-hunter`
 - **AND** an MCP tool call routed via streamable-http succeeds without the operator setting any URL env vars
 
 #### Scenario: Container reaches host PostgreSQL and Redis via the docker profile

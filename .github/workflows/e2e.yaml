@@ -19,18 +19,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  weather-mcp:
-    name: e2e / weather-mcp (7 of 7 free specs)
+  ascend-weather-mcp:
+    name: e2e / ascend-weather-mcp (7 of 7 free specs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build and start weather-mcp
-        run: docker compose up -d --build weather-mcp
+      - name: Build and start ascend-weather-mcp
+        run: docker compose up -d --build ascend-weather-mcp
 
-      # weather-mcp has no compose healthcheck (confirmed absent from
+      # ascend-weather-mcp has no compose healthcheck (confirmed absent from
       # docker-compose.yaml), so wait on the actuator endpoint directly.
-      - name: Wait for weather-mcp health
+      - name: Wait for ascend-weather-mcp health
         run: |
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:9998/actuator/health | grep -q '"status":"UP"'; then
@@ -38,8 +38,8 @@ jobs:
             fi
             sleep 5
           done
-          echo "::error::weather-mcp did not become healthy in time"
-          docker logs weather-mcp
+          echo "::error::ascend-weather-mcp did not become healthy in time"
+          docker logs ascend-weather-mcp
           exit 1
 
       - name: Install Bruno CLI
@@ -88,7 +88,7 @@ jobs:
           # Spec 7: current-country-code-disambiguation. The spec's own Reset
           # state requires a cold geocoding cache, so restart the container
           # between the previous specs and this one.
-          docker restart weather-mcp
+          docker restart ascend-weather-mcp
           for i in $(seq 1 30); do
             curl -fsS http://localhost:9998/actuator/health | grep -q '"status":"UP"' && break
             sleep 5
@@ -97,22 +97,22 @@ jobs:
           bru run "weather-mcp/current-warsaw.yml" --env ascend-local --env-var "mcp_session_id=$SID"
           bru run "weather-mcp/current-warsaw-us.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
-      - name: Dump weather-mcp logs on failure
+      - name: Dump ascend-weather-mcp logs on failure
         if: failure()
-        run: docker logs weather-mcp
+        run: docker logs ascend-weather-mcp
 
-  ascend-paddle-ocr:
-    name: e2e / ascend-paddle-ocr (12 of 12 free specs)
+  ascend-ocr:
+    name: e2e / ascend-ocr (12 of 12 free specs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       # First build is 5-15 minutes: the PaddlePaddle wheels are heavy and
-      # the model cache is prefetched in the builder stage (see PaddleOCR
+      # the model cache is prefetched in the builder stage (see ascend-ocr
       # README). Acceptable here: this workflow is nightly/manual, not a
       # pull-request gate with a fast-feedback SLA.
-      - name: Build and start ascend-paddle-ocr
-        run: docker compose up -d --build --wait ascend-paddle-ocr
+      - name: Build and start ascend-ocr
+        run: docker compose up -d --build --wait ascend-ocr
 
       # The compose healthcheck only proves the process is alive (/health).
       # The OCR specs need the default-language engine warm, which is /ready.
@@ -124,8 +124,8 @@ jobs:
             fi
             sleep 5
           done
-          echo "::error::ascend-paddle-ocr did not warm up in time"
-          docker logs ascend-paddle-ocr
+          echo "::error::ascend-ocr did not warm up in time"
+          docker logs ascend-ocr
           exit 1
 
       - name: Install Bruno CLI
@@ -148,50 +148,50 @@ jobs:
           }
 
           # Spec 1: invalid-input
-          bru run "paddle-ocr/testing/ocr-invalid-no-file.yml" --env ascend-local
+          bru run "ocr/testing/ocr-invalid-no-file.yml" --env ascend-local
 
           # Spec 2: ocr-english
-          bru run "paddle-ocr/ocr.yml" --env ascend-local
+          bru run "ocr/ocr.yml" --env ascend-local
 
           # Spec 3: ocr-polish
-          bru run "paddle-ocr/testing/ocr-polish.yml" --env ascend-local
+          bru run "ocr/testing/ocr-polish.yml" --env ascend-local
 
           # Spec 4: ocr-default-language
-          bru run "paddle-ocr/testing/ocr-default-lang.yml" --env ascend-local
+          bru run "ocr/testing/ocr-default-lang.yml" --env ascend-local
 
           # Spec 5: mcp-tools-list
           SID=$(open_session)
-          bru run "paddle-ocr/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "ocr/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 6: mcp-ocr
           SID=$(open_session)
-          bru run "paddle-ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 7: ready-endpoint
-          bru run "paddle-ocr/ready.yml" --env ascend-local
+          bru run "ocr/ready.yml" --env ascend-local
 
           # Spec 8: mcp-ssrf-rejection
           SID=$(open_session)
-          bru run "paddle-ocr/testing/mcp-ssrf-link-local.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "ocr/testing/mcp-ssrf-link-local.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 9: mcp-bad-scheme
           SID=$(open_session)
-          bru run "paddle-ocr/testing/mcp-bad-scheme.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "ocr/testing/mcp-bad-scheme.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 10: mcp-credentials-rejection
           SID=$(open_session)
-          bru run "paddle-ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 11: mcp-file-uri-jail
           SID=$(open_session)
-          bru run "paddle-ocr/testing/mcp-file-uri-disabled.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "ocr/testing/mcp-file-uri-disabled.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 12: ocr-unsupported-mime
-          bru run "paddle-ocr/testing/ocr-unsupported-mime.yml" --env ascend-local
+          bru run "ocr/testing/ocr-unsupported-mime.yml" --env ascend-local
 
-      - name: Dump ascend-paddle-ocr logs on failure
+      - name: Dump ascend-ocr logs on failure
         if: failure()
-        run: docker logs ascend-paddle-ocr
+        run: docker logs ascend-ocr
 
   ascend-web-hunter:
     name: e2e / ascend-web-hunter (7 of 8 free specs)

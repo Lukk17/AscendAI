@@ -6,8 +6,8 @@ variables:
     value: http
   - name: mcp_session_id
     value: ""
-  - name: paddleOcrFixtures
-    value: ../../../../PaddleOCR/e2e/fixtures
+  - name: ocrFixtures
+    value: ../../../../ascend-ocr/e2e/fixtures
   - name: ascendAgentFixtures
     value: ../../../../AscendAgent/e2e/fixtures
   - name: audioScribeFixtures

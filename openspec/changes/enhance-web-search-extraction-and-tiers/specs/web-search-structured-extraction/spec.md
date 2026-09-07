@@ -50,7 +50,7 @@ On the first schema extraction for a domain, ascend-web-hunter SHALL persist the
 
 ### Requirement: Non-HTML content routed into the platform stack and richer output formats
 
-ascend-web-hunter SHALL route linked PDFs to Docling, image-heavy pages and linked images to PaddleOCR, and linked audio to ascend-audio-scribe, merging their extracted text into the result. The service SHALL additionally offer full-page screenshot and extracted-tables-as-rows among the selectable output formats.
+ascend-web-hunter SHALL route linked PDFs to Docling, image-heavy pages and linked images to ascend-ocr, and linked audio to ascend-audio-scribe, merging their extracted text into the result. The service SHALL additionally offer full-page screenshot and extracted-tables-as-rows among the selectable output formats.
 
 #### Scenario: Linked PDF routed to Docling
 

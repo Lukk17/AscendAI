@@ -83,7 +83,7 @@ The same two commands work in PowerShell. The files land in your working tree AN
 Then either invoke per-change (the `change` subcommand is required; `--schema` is an option on it):
 
 ```bash
-openspec new change "add-weather-mcp-test" --schema e2e-runbooks
+openspec new change "add-ascend-weather-mcp-test" --schema e2e-runbooks
 ```
 
 Or set it as the default in your project's `openspec/config.yaml` and drive it with `/opsx:propose`:

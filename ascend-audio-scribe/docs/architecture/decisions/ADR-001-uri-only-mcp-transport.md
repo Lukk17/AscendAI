@@ -12,7 +12,7 @@ The MCP surface accepts `audio_uri` instead of multipart uploads (MCP clients ar
 multipart story). Without explicit guards the URI fetcher reaches arbitrary network targets and arbitrary local
 files: an attacker can probe internal network topology via `http://169.254.169.254/...` (AWS IMDS), read internal
 service URLs (`http://qdrant:6333/`, `http://redis:6379/`), or read host secrets via `file:///etc/passwd`,
-`file:///proc/self/environ`. This is exactly the attack model PaddleOCR's ADR-001 fixed for its OCR fetcher.
+`file:///proc/self/environ`. This is exactly the attack model ascend-ocr's ADR-001 fixed for its OCR fetcher.
 
 ---
 
@@ -56,7 +56,7 @@ an MCP `validation_error` envelope. (`src/adapters/download_service.py`)
 
 - SSRF surface eliminated for the MCP path. Cloud metadata, internal services, and link-local addresses are blocked.
 - `file://` requires an explicit opt-in via env var; production deployments without that var get a clean rejection.
-- Same model as the sibling PaddleOCR service; ops staff only learn one pattern.
+- Same model as the sibling ascend-ocr service; ops staff only learn one pattern.
 
 ### Negative
 

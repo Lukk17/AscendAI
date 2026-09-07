@@ -1,6 +1,6 @@
 ## Why
 
-AscendAI is a six-service monorepo (AscendAgent, WeatherMCP, ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR) and today there is **no automated build, test, or release pipeline at all**. Every change is built and image-pushed by hand from the maintainer's laptop. Two concrete consequences:
+AscendAI is a six-service monorepo (AscendAgent, ascend-weather-mcp, ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr) and today there is **no automated build, test, or release pipeline at all**. Every change is built and image-pushed by hand from the maintainer's laptop. Two concrete consequences:
 
 1. **No PR signal.** Pull requests merge with no proof that the affected service even compiles, let alone passes its unit tests. The first time a regression is noticed is when someone runs `docker compose up` locally and a container restarts in a loop.
 2. **Release process is undocumented and unreproducible.** Docker Hub images at `lukk17/<service>:<tag>` are pushed manually; there is no record of which per-service version made up a given "state of the stack", and no way to reproduce a previously-shipped set of images.
@@ -19,7 +19,7 @@ This change adds two GitHub Actions workflows under `.github/workflows/`. **All 
   - **The dispatch form takes** (a) a `stack_version` (e.g. `1.1.1`, naming the monorepo release `ascend-ai_1.1.1`), and (b) a per-app boolean for **which apps to release**.
   - **For each selected app the workflow first guards versioning**: it compares the app's current manifest version against that app's version at the **previous `ascend-ai_*` release tag**. If a selected app's version was **not** bumped since the last stack release, the workflow **fails before pushing anything**. (On the very first release there is no previous tag, so the guard is skipped.)
   - **Each selected app is then built and pushed** to Docker Hub as `lukk17/<service>:<that app's manifest version>` plus `lukk17/<service>:latest`. Apps that are **not** selected are not built and keep their existing images and versions.
-  - **After the selected apps push**, the workflow creates the Git tag `ascend-ai_<stack_version>` and a **GitHub Release** whose body lists the **current version of every app** (released this round or not) — e.g. "ascend-ai_1.1.1 — ascend-agent 1.3.0, weather-mcp 1.0.0, ascend-web-hunter 1.2.0, …" — alongside GitHub's auto-generated PR notes. This GitHub Release **is** the changelog: it records the full per-app version snapshot for the monorepo release.
+  - **After the selected apps push**, the workflow creates the Git tag `ascend-ai_<stack_version>` and a **GitHub Release** whose body lists the **current version of every app** (released this round or not) — e.g. "ascend-ai_1.1.1 — ascend-agent 1.3.0, ascend-weather-mcp 1.0.0, ascend-web-hunter 1.2.0, …" — alongside GitHub's auto-generated PR notes. This GitHub Release **is** the changelog: it records the full per-app version snapshot for the monorepo release.
   - **No commits are made by the release workflow.** Because versions already live in the manifests (committed by the developer in the PR), the release is complete the moment it runs — no version-bump-and-commit-back step, no bot commit, no `[skip ci]` loop.
 
 The change also pins the GitHub repository configuration these workflows depend on:

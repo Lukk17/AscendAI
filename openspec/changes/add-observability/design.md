@@ -62,7 +62,7 @@ Every metric is in lowercase, dot-separated for the Spring side (Micrometer auto
 | `prompt_cache.tokens.total` | counter | `provider` | Total prompt tokens (cached + uncached) for L3 ratio computation. |
 | `gen_ai.client.token.usage` | (auto from Spring AI) | `model`, `type` (input/output), `provider` | Spend tracking, free with Spring AI 1.1. Powers L1 dashboard. |
 
-**WeatherMCP**: only `mcp.tool.duration` and the framework defaults.
+**ascend-weather-mcp**: only `mcp.tool.duration` and the framework defaults.
 
 **Python services** — same set as the original draft (transcription, search, memory ops, OCR pages).
 
@@ -81,7 +81,7 @@ The same `service` and `version` flow into Vector's log labels (`labels.service`
 | Service | Path | Bound to |
 |---|---|---|
 | AscendAgent | `/actuator/prometheus` | `127.0.0.1:9917` by default; remote exposure requires `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_REMOTE=true` |
-| WeatherMCP | `/actuator/prometheus` | same model |
+| ascend-weather-mcp | `/actuator/prometheus` | same model |
 | Python services | `/metrics` | bound to `0.0.0.0` inside the container; exposed only on the docker network |
 | Prometheus | `:7077` (host) → `:9090` (container) | exposed on host |
 | Grafana | `:7078` (host) → `:3000` (container) | exposed on host (anonymous read-only Viewer) |
@@ -123,7 +123,7 @@ Vector container reads Docker container logs via the `docker_logs` source:
 ```toml
 [sources.docker]
 type = "docker_logs"
-include_containers = ["ascend-agent", "weather-mcp", "ascend-memory", "ascend-audio-scribe", "ascend-web-hunter", "paddle-ocr"]
+include_containers = ["ascend-agent", "ascend-weather-mcp", "ascend-memory", "ascend-audio-scribe", "ascend-web-hunter", "ascend-ocr"]
 ```
 
 Then ships to Loki via the `loki` sink:
@@ -181,7 +181,7 @@ service:
       exporters: [otlp/tempo]
 ```
 
-**AscendAgent + WeatherMCP**: Spring Boot 3 already wires OpenTelemetry SDK by default when the OTel BOM is on the classpath (Spring AI 1.1 brings it transitively). Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` via `application-docker.yaml` and `OTEL_SERVICE_NAME=ascend-agent`. Spring AI's auto-instrumentation produces spans for every `gen_ai.client.*` call and tool invocation.
+**AscendAgent + ascend-weather-mcp**: Spring Boot 3 already wires OpenTelemetry SDK by default when the OTel BOM is on the classpath (Spring AI 1.1 brings it transitively). Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` via `application-docker.yaml` and `OTEL_SERVICE_NAME=ascend-agent`. Spring AI's auto-instrumentation produces spans for every `gen_ai.client.*` call and tool invocation.
 
 **Python services**: add `opentelemetry-distro` + `opentelemetry-exporter-otlp` to `pyproject.toml`. Activate via `opentelemetry-instrument uvicorn ...` in the entrypoint command, OR via the `auto_instrumentation` entry point in `src/main.py`. FastAPI / requests / httpx are auto-instrumented out of the box.
 
@@ -231,7 +231,7 @@ Strict additive change, executed in this order:
 
 1. Add metrics-only stack (Prometheus + Grafana + AscendAgent actuator wiring) to `docker-compose.yaml`.
 2. Wire AscendAgent custom metrics (memory, RAG, MCP, prompt-cache).
-3. Wire WeatherMCP (mirror).
+3. Wire ascend-weather-mcp (mirror).
 4. Add Vector + Loki containers + Vector config.
 5. Add OTel collector + Tempo containers + OTel config; enable Spring AI's auto-instrumentation pointing at the collector.
 6. Wire Python services for metrics (`prometheus-fastapi-instrumentator`).
