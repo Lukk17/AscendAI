@@ -15,7 +15,7 @@ http:
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AudioScribe\e2e\fixtures\meeting-clip.wav
+          - "{{audioScribeFixtures}}/meeting-clip.wav"
       - name: model
         type: text
         value: Systran/faster-whisper-large-v3

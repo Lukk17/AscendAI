@@ -15,15 +15,15 @@ http:
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\markdown-canary.md
+          - "{{ascendAgentFixtures}}/markdown-canary.md"
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\banana-price-poland.pdf
+          - "{{ascendAgentFixtures}}/banana-price-poland.pdf"
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\pierogi-recipe.docx
+          - "{{ascendAgentFixtures}}/pierogi-recipe.docx"
 
 runtime:
   scripts:

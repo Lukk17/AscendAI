@@ -15,7 +15,7 @@ http:
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\PaddleOCR\e2e\fixtures\argent-saga-chronicles-page1-polish.png
+          - "{{paddleOcrFixtures}}/argent-saga-chronicles-page1-polish.png"
       - name: lang
         type: text
         value: pl

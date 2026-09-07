@@ -15,7 +15,7 @@ request:
 
 docs:
   content: |-
-    Automated test suite for AudioScribe MCP Server.
+    Automated test suite for ascend-audio-scribe MCP Server.
 
     When running in docker change audio source to "audio_uri_docker"
   type: text/markdown

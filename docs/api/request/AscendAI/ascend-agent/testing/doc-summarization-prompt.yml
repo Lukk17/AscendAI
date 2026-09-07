@@ -15,7 +15,7 @@ http:
       - name: document
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\argent-saga-chronicle.pdf
+          - "{{ascendAgentFixtures}}/argent-saga-chronicle.pdf"
         contentType: file
       - name: prompt
         type: text
