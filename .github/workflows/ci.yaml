@@ -21,6 +21,12 @@ jobs:
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
       ascend_ai_agent: ${{ steps.filter.outputs.ascend-ai-agent == 'true' || steps.filter.outputs.workflows == 'true' }}
+      ascend_ai_agent_changed: ${{ steps.filter.outputs.ascend-ai-agent }}
+      ascend_weather_mcp_changed: ${{ steps.filter.outputs.ascend-weather-mcp }}
+      ascend_audio_scribe_changed: ${{ steps.filter.outputs.ascend-audio-scribe }}
+      ascend_web_hunter_changed: ${{ steps.filter.outputs.ascend-web-hunter }}
+      ascend_memory_changed: ${{ steps.filter.outputs.ascend-memory }}
+      ascend_ocr_changed: ${{ steps.filter.outputs.ascend-ocr }}
     steps:
       - uses: actions/checkout@v4
 
@@ -79,10 +85,129 @@ jobs:
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
+  verify-changelog:
+    name: Verify changelog version bump
+    needs: changes
+    if: >-
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+      && (needs.changes.outputs.ascend_ai_agent_changed == 'true'
+        || needs.changes.outputs.ascend_weather_mcp_changed == 'true'
+        || needs.changes.outputs.ascend_audio_scribe_changed == 'true'
+        || needs.changes.outputs.ascend_web_hunter_changed == 'true'
+        || needs.changes.outputs.ascend_memory_changed == 'true'
+        || needs.changes.outputs.ascend_ocr_changed == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Resolve the comparison base ref
+        id: base
+        run: |
+          set -euo pipefail
+
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+          if [ -z "${BASE_REF}" ]; then
+            # No pull request event, for example a manual dispatch: compare against master.
+            BASE_REF="master"
+          fi
+          echo "ref=${BASE_REF}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the base ref tip
+        run: git fetch --depth=1 origin "${{ steps.base.outputs.ref }}"
+
+      - name: Verify changelog version bumps for changed apps
+        env:
+          BASE_REF: ${{ steps.base.outputs.ref }}
+        run: |
+          set -euo pipefail
+
+          head_version() {
+            local FILE="$1"
+            if [ ! -f "$FILE" ]; then
+              printf 'ERROR: %s does not exist at HEAD.\n' "$FILE" >&2
+              return 1
+            fi
+            grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' "$FILE" || {
+              printf 'ERROR: no "## [x.y.z]" version entry found in %s at HEAD.\n' "$FILE" >&2
+              return 1
+            }
+          }
+
+          base_version() {
+            local FILE="$1"
+            local CONTENT
+            if ! CONTENT=$(git show "origin/${BASE_REF}:$FILE" 2>/dev/null); then
+              printf 'ERROR: %s does not exist at origin/%s. Cannot verify a version bump against a missing baseline.\n' "$FILE" "$BASE_REF" >&2
+              return 1
+            fi
+            printf '%s' "$CONTENT" | grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' || {
+              printf 'ERROR: no "## [x.y.z]" version entry found in %s at origin/%s.\n' "$FILE" "$BASE_REF" >&2
+              return 1
+            }
+          }
+
+          top_entry_has_content() {
+            local FILE="$1"
+            awk '
+              /^##[[:space:]]*\[[0-9]+\.[0-9]+\.[0-9]+\]/ {
+                if (seen) { exit }
+                seen = 1
+                next
+              }
+              seen && /^##[[:space:]]/ { exit }
+              seen { print }
+            ' "$FILE" | grep -qv '^[[:space:]]*$'
+          }
+
+          check_service() {
+            local SERVICE="$1"
+            local CHANGELOG="$2"
+            local HEAD_VERSION BASE_VERSION LOWER
+
+            HEAD_VERSION=$(head_version "$CHANGELOG") || return 1
+            BASE_VERSION=$(base_version "$CHANGELOG") || return 1
+
+            printf '\n--- %s ---\nHEAD:   %s\n%s: %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF" "$BASE_VERSION"
+
+            if [ "$HEAD_VERSION" = "$BASE_VERSION" ]; then
+              printf 'ERROR: %s CHANGELOG version equals %s (%s). Add a new top entry before merging.\n' "$SERVICE" "$BASE_REF" "$HEAD_VERSION"
+              return 1
+            fi
+
+            LOWER=$(printf '%s\n%s\n' "$BASE_VERSION" "$HEAD_VERSION" | sort -V | head -1)
+            if [ "$LOWER" != "$BASE_VERSION" ]; then
+              printf 'ERROR: %s HEAD version %s is not greater than %s %s.\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF" "$BASE_VERSION"
+              return 1
+            fi
+
+            if ! top_entry_has_content "$CHANGELOG"; then
+              printf 'ERROR: %s CHANGELOG top entry %s has no content beneath it. Describe the change before merging.\n' "$SERVICE" "$HEAD_VERSION"
+              return 1
+            fi
+
+            printf 'OK: %s %s > %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_VERSION"
+          }
+
+          FAILED=0
+          if [ "${{ needs.changes.outputs.ascend_ai_agent_changed }}" = "true" ]; then check_service ascend-ai-agent apps/ascend-ai-agent/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_weather_mcp_changed }}" = "true" ]; then check_service ascend-weather-mcp apps/ascend-weather-mcp/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_audio_scribe_changed }}" = "true" ]; then check_service ascend-audio-scribe apps/ascend-audio-scribe/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_web_hunter_changed }}" = "true" ]; then check_service ascend-web-hunter apps/ascend-web-hunter/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_memory_changed }}" = "true" ]; then check_service ascend-memory apps/ascend-memory/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_ocr_changed }}" = "true" ]; then check_service ascend-ocr apps/ascend-ocr/CHANGELOG.md || FAILED=1; fi
+          exit "$FAILED"
+
   build:
     name: Build & test ${{ matrix.service }}
-    needs: changes
-    if: ${{ fromJSON(needs.changes.outputs.matrix).include[0] != null }}
+    needs: [changes, verify-changelog]
+    if: >-
+      !cancelled()
+      && needs.verify-changelog.result != 'failure'
+      && fromJSON(needs.changes.outputs.matrix).include[0] != null
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -168,8 +293,11 @@ jobs:
 
   integration-test:
     name: Integration test (Testcontainers) ascend-ai-agent
-    needs: changes
-    if: ${{ needs.changes.outputs.ascend_ai_agent == 'true' }}
+    needs: [changes, verify-changelog]
+    if: >-
+      !cancelled()
+      && needs.verify-changelog.result != 'failure'
+      && needs.changes.outputs.ascend_ai_agent == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
