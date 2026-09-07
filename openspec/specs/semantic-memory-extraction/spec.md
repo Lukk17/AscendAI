@@ -1,7 +1,9 @@
 # semantic-memory-extraction Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+Facts are extracted from a conversation turn by asking an LLM for a JSON array, and thinking models routinely wrap that array in reasoning. The extractor recovers the array from a response carrying a preamble, markdown fences, or trailing prose, returns an empty list and a single warning when there is no array at all rather than throwing, and the extraction prompt itself forbids prose so the wrapped response stays the exception rather than the norm.
+
 ## Requirements
 ### Requirement: Robust JSON array extraction from LLM response
 

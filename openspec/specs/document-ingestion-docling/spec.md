@@ -1,7 +1,9 @@
 # document-ingestion-docling Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+AscendAgent converts uploaded documents through `docling-serve`, and this capability pins how it addresses that service. The client posts multipart files to the real conversion endpoint, the shipped defaults work against the `docling-serve` instance in the monorepo compose file with no overrides, the earlier wrong path is normalised with a warning instead of silently returning 404, and the fully resolved upload URL is logged at startup so a misconfiguration surfaces at boot rather than at the first user request.
+
 ## Requirements
 ### Requirement: Docling client targets the correct upload endpoint
 

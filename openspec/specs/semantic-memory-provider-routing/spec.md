@@ -1,7 +1,9 @@
 # semantic-memory-provider-routing Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+AscendMemory serves several embedding providers from one deployment, so its credentials cannot be global. Each supported provider resolves its own base URL and API key instead of sharing a single OpenAI pair, a missing key fails only when that provider is actually invoked and never at startup, embeddings are truncated to the dimension the Qdrant collection was created with so a provider's larger native vector is not rejected, and compose passes every provider pair through to the service.
+
 ## Requirements
 ### Requirement: AscendMemory routes embedder credentials per provider
 

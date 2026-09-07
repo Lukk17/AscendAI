@@ -1,7 +1,9 @@
 # rag-documentation Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+The RAG pipeline carries documentation obligations, and this capability states them as checkable requirements rather than leaving them to prose that drifts. An operator has to be told how files reach the knowledge-base bucket, that auto-ingestion is off by default and indexing is triggered by hand, how to turn the poller on and what it costs, how the embedding dimension is coupled to the collection name and what a provider switch therefore requires, and how the RAG corpus differs from semantic memory and from short-term chat history. The choice to default auto-ingestion to off is recorded as an architecture decision record.
+
 ## Requirements
 ### Requirement: README documents the RAG ingestion lifecycle
 

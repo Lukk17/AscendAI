@@ -1,7 +1,9 @@
 # prompt-caching Specification
 
 ## Purpose
-TBD - created by archiving change add-prompt-caching. Update Purpose after archive.
+
+The static prefix that every call re-sends is served from each provider's own prompt cache instead of being billed at full input rate on every turn. A strategy resolved by provider name decorates the system prompt and the memory-extractor instruction, cache hits and misses are visible in structured logs, a master toggle and per-provider toggles turn the whole thing off cleanly, and a cache-related failure is retried once undecorated so the chat flow never breaks. Only globally static content is ever placed in the cached prefix, which is what keeps one user's data out of another user's prompt.
+
 ## Requirements
 ### Requirement: Static prefix is cached per provider via the strategy resolver
 

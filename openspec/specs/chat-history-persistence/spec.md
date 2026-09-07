@@ -1,7 +1,9 @@
 # chat-history-persistence Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+Short-term chat history lives in Redis and has to stay bounded there. The configured `app.memory.chat-history.ttl` applies to every key `PersistentChatMemory` writes and is refreshed on each write, so an abandoned conversation ages out while an active one does not expire mid-session. The Postgres archive sits deliberately outside this TTL under a separate retention policy, and the configuration file is required to say so.
+
 ## Requirements
 ### Requirement: Redis chat-history honors the configured TTL
 

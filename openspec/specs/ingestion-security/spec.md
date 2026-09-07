@@ -1,7 +1,9 @@
 # ingestion-security Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+The upload boundary of the ingestion API takes hostile input and is treated as such. User-supplied filenames are sanitised before they reach an object key, a local path, or Qdrant metadata, uploads are accepted only when their content type is on a configurable allowlist, and multipart size limits turn an oversized upload into HTTP 413 instead of an out-of-memory JVM.
+
 ## Requirements
 ### Requirement: Filename sanitization before storage
 

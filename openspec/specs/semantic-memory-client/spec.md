@@ -1,7 +1,9 @@
 # semantic-memory-client Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+AscendAgent reaches the AscendMemory service over REST, and this capability pins the contract between them, which is where the two sides repeatedly drifted apart. It fixes the query-parameter and request-body naming on search, insert, wipe, and delete, maps the mem0 response fields onto the item record so retrieved facts are not silently dropped as null, validates the user id at every entry point before any HTTP call, defaults the base URL to the address compose actually publishes, and requires an explicit tally when some facts fail to insert instead of a silent loss.
+
 ## Requirements
 ### Requirement: AscendMemory search uses snake_case query parameters
 

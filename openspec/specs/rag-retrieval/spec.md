@@ -1,7 +1,9 @@
 # rag-retrieval Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+Retrieval decides which stored chunks reach the model. The configured similarity threshold is applied at vector-search time so every hit above it is injected, and a top-ranked hit that falls below the threshold no longer discards the entire retrieved set.
+
 ## Requirements
 ### Requirement: Similarity threshold is applied at vector-search time
 

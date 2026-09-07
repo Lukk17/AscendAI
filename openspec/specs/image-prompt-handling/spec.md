@@ -1,7 +1,9 @@
 # image-prompt-handling Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+An image attached to a prompt stays usable even when the client labels it badly. The agent resolves a MIME type for the uploaded part when the multipart `Content-Type` is missing, blank, or not a MIME type at all, falling back to the filename extension and then to a safe default, so a sloppy client header degrades into a working request instead of an HTTP 500.
+
 ## Requirements
 ### Requirement: Defensive MIME type resolution for uploaded image
 

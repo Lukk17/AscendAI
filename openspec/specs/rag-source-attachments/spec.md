@@ -1,7 +1,9 @@
 # rag-source-attachments Specification
 
 ## Purpose
-TBD - created by archiving change add-rag-source-attachments. Update Purpose after archive.
+
+A caller can ask for the documents that grounded a RAG answer, not only the text of the answer. An opt-in request field adds a deduplicated list of the contributing source documents, each carrying the metadata a client needs to show it and a way to fetch the original file. The capability is shaped so that the response is unchanged for callers who do not ask, a source that cannot be resolved is dropped instead of failing the answer, documents above a configured size cap are excluded, and download links never reach the logs or the persisted chat history.
+
 ## Requirements
 ### Requirement: Opt-in `attachSources` parameter on prompt endpoint
 
