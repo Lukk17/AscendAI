@@ -4,9 +4,9 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 
 ## 1. Schema and dependencies
 
-- [ ] 1.1 Create Liquibase changelog `AscendAgent/src/main/resources/db/changelog/02-usage-metering.xml` with three tables: `usage_ledger` (tenant_id, user_id, conversation_id nullable, provider, model, prompt_tokens, completion_tokens, cached_tokens, request_type, occurred_at UTC; covering index `(tenant_id, occurred_at)` plus `(user_id, occurred_at)`), `tenant_quota_config` (tenant_id unique, monthly_token_budget, per_user_daily_token_budget nullable overrides), `tenant_provider_key` (tenant_id + provider unique, wrapped_dek, ciphertext, gcm_nonce, kek_id, key_last4, created_at, updated_at)
+- [ ] 1.1 Create Liquibase changelog `apps/ascend-ai-agent/src/main/resources/db/changelog/02-usage-metering.xml` with three tables: `usage_ledger` (tenant_id, user_id, conversation_id nullable, provider, model, prompt_tokens, completion_tokens, cached_tokens, request_type, occurred_at UTC; covering index `(tenant_id, occurred_at)` plus `(user_id, occurred_at)`), `tenant_quota_config` (tenant_id unique, monthly_token_budget, per_user_daily_token_budget nullable overrides), `tenant_provider_key` (tenant_id + provider unique, wrapped_dek, ciphertext, gcm_nonce, kek_id, key_last4, created_at, updated_at)
 - [ ] 1.2 Reference the new changelog from `db.changelog-master.yaml`; run `./gradlew integrationTest` to confirm Liquibase applies cleanly on Testcontainers Postgres
-- [ ] 1.3 Add the Redis-backed Bucket4j dependency (Lettuce integration compatible with Spring Boot 3.5.4) to `AscendAgent/build.gradle.kts` and `gradle/libs.versions.toml`; pin the version (design Open Question 2)
+- [ ] 1.3 Add the Redis-backed Bucket4j dependency (Lettuce integration compatible with Spring Boot 3.5.4) to `apps/ascend-ai-agent/build.gradle.kts` and `gradle/libs.versions.toml`; pin the version (design Open Question 2)
 - [ ] 1.4 Add `app.usage.*` configuration block to `application.yaml` (metering/quotas/rate-limit/byok `enabled` flags, default tenant monthly budget, default user daily budget, warning threshold 0.8, per-endpoint bucket capacities and refill rates) and a `UsageProperties` `@ConfigurationProperties` class; mirror env vars (`USAGE_KEK` etc.) in `docker-compose.yaml`
 
 ## 2. Usage ledger
@@ -70,8 +70,8 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 - [ ] 7.1 Register the new counters (`usage.ledger.write_failed`, `usage.quota.rejected{scope}`, `usage.quota.warning{scope}`, `rate_limit.rejected{scope,endpoint}`, `rate_limit.redis_unavailable`) and verify they appear on `/actuator/prometheus`
 - [ ] 7.2 Build `infra/observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users by tokens, quota-consumption gauges per tenant, 429 rate by code/scope; register in the dashboards provisioning
 - [ ] 7.3 Author `docs/USAGE_AND_QUOTAS.md`: ledger schema, usage API examples (JSON + CSV), quota semantics (windows, overshoot, warning), rate-limit config, BYOK key lifecycle and KEK rotation notes; link from root README Documentation section
-- [ ] 7.4 Update `AscendAgent/AGENTS.md` (new package `service/usage/`, new endpoints, new env vars) and root `AGENTS.md` if the endpoint table changes
-- [ ] 7.5 Add an ADR under `AscendAgent/docs/architecture/decisions/` covering the envelope-encryption choice and the fail-open rate-limiting posture
+- [ ] 7.4 Update `apps/ascend-ai-agent/AGENTS.md` (new package `service/usage/`, new endpoints, new env vars) and root `AGENTS.md` if the endpoint table changes
+- [ ] 7.5 Add an ADR under `apps/ascend-ai-agent/docs/architecture/decisions/` covering the envelope-encryption choice and the fail-open rate-limiting posture
 
 ## 8. Verification
 

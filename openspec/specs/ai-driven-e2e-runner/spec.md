@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Defines the contract that lets an AI agent (or a human) execute the AscendAgent's capability-level e2e suite end-to-end against a live stack, capture per-run evidence, and emit reviewable PASS/FAIL verdicts as committed markdown artifacts. Pass criteria are observable behavior — HTTP status, response-body content, persisted state in Floci / Qdrant / Postgres — never log substrings.
+Defines the contract that lets an AI agent (or a human) execute the ascend-ai-agent's capability-level e2e suite end-to-end against a live stack, capture per-run evidence, and emit reviewable PASS/FAIL verdicts as committed markdown artifacts. Pass criteria are observable behavior — HTTP status, response-body content, persisted state in Floci / Qdrant / Postgres — never log substrings.
 
 ## Requirements
 
-### Requirement: Numbered immutable specs under `AscendAgent/e2e/testing/`
+### Requirement: Numbered immutable specs under `apps/ascend-ai-agent/e2e/testing/`
 
-The system SHALL ship one capability spec per testable behavior under `AscendAgent/e2e/testing/`, named `<N>-<feature>-test.md`. The number prefix orders specs by setup cost (smallest first). Each spec is immutable across runs — the runner never edits it. Every spec follows the fixed template: **What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures**.
+The system SHALL ship one capability spec per testable behavior under `apps/ascend-ai-agent/e2e/testing/`, named `<N>-<feature>-test.md`. The number prefix orders specs by setup cost (smallest first). Each spec is immutable across runs — the runner never edits it. Every spec follows the fixed template: **What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures**.
 
 #### Scenario: Specs are number-prefixed and immutable
 
@@ -34,7 +34,7 @@ For every spec the system SHALL ship a paired `<N>-<feature>-tasks.template.md` 
 
 ### Requirement: Per-run records under `runs/` with timestamped filenames
 
-For each execution the runner SHALL copy the matching template to `AscendAgent/e2e/testing/runs/<UTC-timestamp>_<N>-<feature>-tasks.md` (ISO 8601 with colons replaced by hyphens, e.g. `2026-05-12T17-23-36`). All five tests of one sweep SHALL share the same timestamp so a sweep groups by filename. Run records are gitignored by default; operators MAY force-add specific runs as audit artifacts.
+For each execution the runner SHALL copy the matching template to `apps/ascend-ai-agent/e2e/testing/runs/<UTC-timestamp>_<N>-<feature>-tasks.md` (ISO 8601 with colons replaced by hyphens, e.g. `2026-05-12T17-23-36`). All five tests of one sweep SHALL share the same timestamp so a sweep groups by filename. Run records are gitignored by default; operators MAY force-add specific runs as audit artifacts.
 
 #### Scenario: Sweep groups by shared timestamp
 
@@ -45,12 +45,12 @@ For each execution the runner SHALL copy the matching template to `AscendAgent/e
 #### Scenario: Runs are ignored by default
 
 - **WHEN** a runner produces a new run record
-- **THEN** `git status` does not list it as untracked because `AscendAgent/e2e/testing/runs/*` is gitignored (with `!.../runs/README.md` exception)
+- **THEN** `git status` does not list it as untracked because `apps/ascend-ai-agent/e2e/testing/runs/*` is gitignored (with `!.../runs/README.md` exception)
 - **AND** the operator MAY `git add -f` a specific run record to ship it as an audit example
 
 ### Requirement: Behavior-only pass criteria — no log assertions
 
-Every spec's **Expected** section SHALL assert only observable behavior, meaning HTTP status codes, response-body content matches, and persisted state in the S3-compatible object store / Qdrant / Postgres / Redis. The spec SHALL NOT include assertions of the form "AscendAgent log shows ..." or any log-substring check. Log lines are diagnostic for triage, not pass criteria.
+Every spec's **Expected** section SHALL assert only observable behavior, meaning HTTP status codes, response-body content matches, and persisted state in the S3-compatible object store / Qdrant / Postgres / Redis. The spec SHALL NOT include assertions of the form "ascend-ai-agent log shows ..." or any log-substring check. Log lines are diagnostic for triage, not pass criteria.
 
 #### Scenario: Expected section names no log substrings
 
@@ -122,7 +122,7 @@ Each run record SHALL include, under **Result summary**, fields for `Input token
 
 ### Requirement: Sweep runs against a live stack the runner does not manage
 
-The runner SHALL execute against a stack that is already running (`docker compose up -d` for backing services, `./gradlew bootRun` for the AscendAgent on host, or both fully containerized). The runner SHALL NOT start, stop, or recreate any container. Prerequisite check commands verify reachability; if any check fails the test halts and the run record's Verdict is FAIL with the failure recorded under Result summary.
+The runner SHALL execute against a stack that is already running (`docker compose up -d` for backing services, `./gradlew bootRun` for the ascend-ai-agent on host, or both fully containerized). The runner SHALL NOT start, stop, or recreate any container. Prerequisite check commands verify reachability; if any check fails the test halts and the run record's Verdict is FAIL with the failure recorded under Result summary.
 
 #### Scenario: Pre-flight unreachable halts the run
 
@@ -136,6 +136,6 @@ The five canonical capability tests SHALL be `1-weather-mcp-test.md` (MCP tool i
 
 #### Scenario: Capability matrix is documented in the e2e README
 
-- **WHEN** a contributor opens `AscendAgent/e2e/README.md`
+- **WHEN** a contributor opens `apps/ascend-ai-agent/e2e/README.md`
 - **THEN** the capability table lists exactly these five entries with links to spec and template files
 - **AND** "what it proves" describes the observable behavior each test exercises

@@ -36,5 +36,5 @@
 
 - [ ] 6.1 Extend `docs/SECURITY.md` (from `add-auth-and-identity`) with tenant and user administration: role model (`PLATFORM_ADMIN` vs tenant `ADMIN`), onboarding a tenant, inviting users, suspension and deletion semantics
 - [ ] 6.2 Add Bruno requests under `docs/api/request/AscendAI/` for the tenant and user admin endpoints (with a PLATFORM_ADMIN token variant)
-- [ ] 6.3 Note the admin endpoints and role model in `AscendAgent/AGENTS.md`
+- [ ] 6.3 Note the admin endpoints and role model in `apps/ascend-ai-agent/AGENTS.md`
 - [ ] 6.4 Run `./gradlew test integrationTest`; all green

@@ -99,7 +99,7 @@ PowerShell:
 curl.exe -sS -X DELETE "http://localhost:9070/knowledge-base"
 ```
 
-Expect HTTP 204. Then restart AscendAgent: `BucketInitConfig` recreates `knowledge-base` empty during startup, so you
+Expect HTTP 204. Then restart ascend-ai-agent: `BucketInitConfig` recreates `knowledge-base` empty during startup, so you
 never have to create it by hand.
 
 Confirm the bucket came back after the restart.
@@ -125,7 +125,7 @@ not recreated it yet, which points at a failed startup rather than at the object
 
 Qdrant holds two distinct collection groups:
 
-- **RAG (AscendAgent).** `ascendai-768` (lmstudio / gemini) or `ascendai-1536` (openai), depending on the active
+- **RAG (ascend-ai-agent).** `ascendai-768` (lmstudio / gemini) or `ascendai-1536` (openai), depending on the active
   embedding provider.
 - **Semantic memory (AscendMemory / mem0).** `ascend_memory_768` (lmstudio / gemini, 768 dims) or
   `ascend_memory_1536` (openai, 1536 dims).
@@ -228,13 +228,13 @@ Clear all history (full reset):
 TRUNCATE TABLE public.int_metadata_store;
 ```
 
-After running either, restart AscendAgent.
+After running either, restart ascend-ai-agent.
 
 ---
 
 ### 4. Resetting chat history (Redis + PostgreSQL)
 
-AscendAgent keeps chat context in two places:
+ascend-ai-agent keeps chat context in two places:
 
 - **Short-term (Redis).** Active context window sent to the LLM.
 - **Long-term (PostgreSQL).** Archived interactions for audit and analytics.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `AscendAgent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
+Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `apps/ascend-ai-agent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
 
 ## Deferral, 2026-09-04
 
@@ -16,7 +16,7 @@ What has to happen for this record to become active: a decision to import group 
 
 ## Context
 
-ADR-013 puts a broker between the customer's identity provider and AscendAgent. The agent reads a Keycloak token, not the customer's token, so anything the customer's provider asserted reaches the agent only if a mapper deliberately copied it across.
+ADR-013 puts a broker between the customer's identity provider and ascend-ai-agent. The agent reads a Keycloak token, not the customer's token, so anything the customer's provider asserted reaches the agent only if a mapper deliberately copied it across.
 
 For group identifiers the route is documented and single: an Attribute Importer on the brokered provider copies the array claim element by element into a multivalued user attribute, and a protocol mapper puts that attribute into the access token as an array. Attributes declared this way are administrator-context by default, so the signed-in person cannot write their own group list, which is the property that makes trusting the resulting claim defensible at all.
 

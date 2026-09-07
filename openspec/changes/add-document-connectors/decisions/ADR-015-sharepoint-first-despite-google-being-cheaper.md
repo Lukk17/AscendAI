@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-09-04. Amended 2026-09-05, see Amendment below. Accepted when the OpenSpec change `add-document-connectors` lands. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive, taking the next free number at that time.
+Proposed, 2026-09-04. Amended 2026-09-05, see Amendment below. Accepted when the OpenSpec change `add-document-connectors` lands. This file is the draft that moves into `apps/ascend-ai-agent/docs/architecture/decisions/` on archive, taking the next free number at that time.
 
 ## Amendment, 2026-09-05
 

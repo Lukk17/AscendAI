@@ -54,13 +54,13 @@ When `SERVICE_AUTH_TOKEN` is set, enforcement SHALL be active. When it is unset 
 - **THEN** it serves requests without requiring a token
 - **AND** the startup log contains a WARN that inbound authentication is disabled
 
-### Requirement: AscendAgent attaches the service token on all outbound calls
+### Requirement: ascend-ai-agent attaches the service token on all outbound calls
 
-AscendAgent SHALL send `Authorization: Bearer <SERVICE_AUTH_TOKEN>` on every outbound request to the downstream services: the AscendMemory REST client, the ascend-ocr ingestion client, and every configured MCP client connection (ascend-audio-scribe, weather, ascend-web-hunter). With the compose stack fully secured, a chat turn that exercises memory and an MCP tool SHALL complete without any downstream 401.
+ascend-ai-agent SHALL send `Authorization: Bearer <SERVICE_AUTH_TOKEN>` on every outbound request to the downstream services: the AscendMemory REST client, the ascend-ocr ingestion client, and every configured MCP client connection (ascend-audio-scribe, weather, ascend-web-hunter). With the compose stack fully secured, a chat turn that exercises memory and an MCP tool SHALL complete without any downstream 401.
 
 #### Scenario: MCP tool call carries the token
 
-- **WHEN** a prompt causes AscendAgent to invoke a ascend-weather-mcp tool in the secured compose stack
+- **WHEN** a prompt causes ascend-ai-agent to invoke a ascend-weather-mcp tool in the secured compose stack
 - **THEN** the MCP HTTP request from the agent carries the bearer service token
 - **AND** the tool result reaches the model (no 401 in the tool-call path)
 

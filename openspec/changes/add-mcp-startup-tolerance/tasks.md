@@ -1,6 +1,6 @@
 ## 1. Configuration
 
-- [x] 1.1 Add `spring.ai.mcp.client.initialized: false` to `AscendAgent/src/main/resources/application.yaml`,
+- [x] 1.1 Add `spring.ai.mcp.client.initialized: false` to `apps/ascend-ai-agent/src/main/resources/application.yaml`,
       with an inline-rationale comment (or ADR pointer) explaining the deferred-init contract.
 - [x] 1.2 Add a new `app.mcp.startup.init-timeout` property (default `5s`) to `application.yaml`, with sibling
       property bound through a `@ConfigurationProperties("app.mcp.startup") McpStartupProperties` record.
@@ -56,7 +56,7 @@
 ## 6. Tests
 
 - [x] 6.1 Write `McpStartupToleranceIT` under
-      `AscendAgent/src/test/java/com/lukk/ascend/ai/agent/integration/`. Use Testcontainers OR an in-process
+      `apps/ascend-ai-agent/src/test/java/com/lukk/ascend/ai/agent/integration/`. Use Testcontainers OR an in-process
       `McpSyncServer` via Spring AI's own builder bound to an ephemeral port for the "reachable" connection.
       For the "unreachable" connection, point at `http://localhost:1` (always refused).
 - [x] 6.2 Assert: context refreshes with 0 failures, registry has one `CONNECTED` and one `FAILED`,
@@ -71,24 +71,24 @@
 
 ## 7. Documentation
 
-- [x] 7.1 Update `AscendAgent/docs/architecture/arc42/08-crosscutting-concepts.md` "Model Context Protocol (MCP)"
+- [x] 7.1 Update `apps/ascend-ai-agent/docs/architecture/arc42/08-crosscutting-concepts.md` "Model Context Protocol (MCP)"
       section: add a "Startup tolerance" subsection describing the `initialized=false` + initialiser-loop pattern,
       and how to read the readiness-banner `MCP servers:` section.
-- [x] 7.2 Create `AscendAgent/docs/architecture/decisions/ADR-008-mcp-startup-tolerance.md` recording the
+- [x] 7.2 Create `apps/ascend-ai-agent/docs/architecture/decisions/ADR-008-mcp-startup-tolerance.md` recording the
       decision (built-in flag + small runner vs. custom client builder), the trade-offs, and pointers to the
       OpenSpec change `add-mcp-startup-tolerance` and the upstream Spring AI MCP Security "known limitation" note.
-- [x] 7.3 Update `AscendAgent/README.md` "Operational Workflow" or "Configuration" section to mention the
+- [x] 7.3 Update `apps/ascend-ai-agent/README.md` "Operational Workflow" or "Configuration" section to mention the
       tolerance behaviour and the `app.mcp.startup.init-timeout` knob.
 - [x] 7.4 Add the new ADR to
-      [docs/architecture/decisions/README.md](../../../docs/architecture/decisions/README.md) AscendAgent ADR list
-      and to `AscendAgent/docs/architecture/arc42/09-architecture-decisions.md`.
+      [docs/architecture/decisions/README.md](../../../docs/architecture/decisions/README.md) ascend-ai-agent ADR list
+      and to `apps/ascend-ai-agent/docs/architecture/arc42/09-architecture-decisions.md`.
 
 ## 8. Verification
 
-- [ ] 8.1 Manual smoke test: start AscendAgent with `ascend-audio-scribe` MCP shut down, observe banner shows
+- [ ] 8.1 Manual smoke test: start ascend-ai-agent with `ascend-audio-scribe` MCP shut down, observe banner shows
       `[FAILED]` for it and `[Connected]` for the others, prompt endpoint serves a request that doesn't need
       audio transcription successfully.
-- [ ] 8.2 Manual smoke test: start AscendAgent with all MCPs up, observe banner shows `[Connected]` for all
+- [ ] 8.2 Manual smoke test: start ascend-ai-agent with all MCPs up, observe banner shows `[Connected]` for all
       three, prompt endpoint behaviour is unchanged from current happy path.
 - [ ] 8.3 Run `./gradlew test integrationTest`. All green.
 - [ ] 8.4 Run `/code-reviewer` skill on the diff before opening a PR.

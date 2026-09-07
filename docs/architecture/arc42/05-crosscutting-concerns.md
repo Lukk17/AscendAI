@@ -4,8 +4,8 @@
 
 ### Multi-provider AI routing
 
-The AscendAgent supports 5 AI providers with per-request selection. Model IDs below mirror the values wired in
-[AscendAgent/src/main/resources/application.yaml](../../../AscendAgent/src/main/resources/application.yaml) for chat
+The ascend-ai-agent supports 5 AI providers with per-request selection. Model IDs below mirror the values wired in
+[apps/ascend-ai-agent/src/main/resources/application.yaml](../../../apps/ascend-ai-agent/src/main/resources/application.yaml) for chat
 defaults, memory extraction, and history compaction. Any other model the provider accepts works at request time via
 the `model` form field; the values below are what ships out of the box.
 
@@ -24,13 +24,13 @@ configures a `default-embedding` to route embedding operations to the correct ve
 
 ### Model Context Protocol (MCP)
 
-MCP services expose tools via Streamable HTTP (JSON-RPC 2.0). The AscendAgent discovers all tools at startup and
+MCP services expose tools via Streamable HTTP (JSON-RPC 2.0). The ascend-ai-agent discovers all tools at startup and
 attaches them to every `ChatClient`. When an LLM decides to use a tool, Spring AI transparently routes the call.
 
 ```mermaid
 sequenceDiagram
     participant LLM as AI Provider
-    participant Agent as AscendAgent
+    participant Agent as ascend-ai-agent
     participant MCP as MCP Service
 
     Agent->>LLM: Prompt with tool definitions
@@ -48,7 +48,7 @@ sequenceDiagram
 Python services (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr) expose both:
 
 - **REST API.** For direct HTTP integration and testing.
-- **MCP server.** For LLM tool discovery and invocation via AscendAgent.
+- **MCP server.** For LLM tool discovery and invocation via ascend-ai-agent.
 
 Both APIs share the same business logic layer.
 
@@ -63,7 +63,7 @@ Different AI providers use different embedding dimensions.
 | lmstudio, gemini  | `nomic-embed-text-v2`      | 768        | `ascendai-768`, `ascend_memory_768`     |
 | openai            | `text-embedding-3-small`   | 1536       | `ascendai-1536`, `ascend_memory_1536`   |
 
-The `embeddingProvider` parameter propagates through the full chain (AscendAgent to AscendMemory to Qdrant), ensuring
+The `embeddingProvider` parameter propagates through the full chain (ascend-ai-agent to AscendMemory to Qdrant), ensuring
 search and insert always target the matching collection.
 
 ---

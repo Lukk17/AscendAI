@@ -42,7 +42,7 @@ When `.github/workflows/**` itself changes, every service runs regardless of whe
 
 | Service | Language | Python version | Test command |
 |---|---|---|---|
-| `ascend-agent` | Java | — | `./gradlew --no-daemon build test` |
+| `ascend-ai-agent` | Java | — | `./gradlew --no-daemon build test` |
 | `ascend-weather-mcp` | Java | — | `./gradlew --no-daemon build test` |
 | `ascend-audio-scribe` | Python | 3.11 | `pytest` |
 | `ascend-web-hunter` | Python | 3.12 | `pytest` |
@@ -76,7 +76,7 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 |---|---|---|---|
 | `create_github_release` | boolean | yes | Default `true`. Untick to publish images only: no Git tag, no GitHub Release, no stack version consumed. |
 | `stack_version` | string | no | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. Required when `create_github_release` is ticked, ignored otherwise. |
-| `release_ascend_agent` | boolean | yes | Ship `ascend-agent`. Default `false`. |
+| `release_ascend_agent` | boolean | yes | Ship `ascend-ai-agent`. Default `false`. |
 | `release_ascend_weather_mcp` | boolean | yes | Ship `ascend-weather-mcp`. Default `false`. |
 | `release_ascend_audio_scribe` | boolean | yes | Ship `ascend-audio-scribe`. Default `false`. |
 | `release_ascend_web_hunter` | boolean | yes | Ship `ascend-web-hunter`. Default `false`. |
@@ -109,7 +109,7 @@ One consequence to be aware of. The bump guard compares each selected service ag
 
 Bumping an app's `version` in its manifest within a PR is what makes that app eligible for the next release.
 
-- **Java services** (`AscendAgent`, `ascend-weather-mcp`): edit the `version = "<x.y.z>"` line in `build.gradle.kts`.
+- **Java services** (`ascend-ai-agent`, `ascend-weather-mcp`): edit the `version = "<x.y.z>"` line in `build.gradle.kts`.
 - **Python services** (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`): edit the `version = "<x.y.z>"` line in `[project]` section of `pyproject.toml`.
 
 ### Manifest version extractors
@@ -161,7 +161,7 @@ Each build is pushed to both registries under the same name, tagged `v<version>`
 
 | Service key | Docker Hub image | GHCR image |
 |---|---|---|
-| `ascend-agent` | `lukk17/ascend-agent` | `ghcr.io/lukk17/ascend-agent` |
+| `ascend-ai-agent` | `lukk17/ascend-ai-agent` | `ghcr.io/lukk17/ascend-ai-agent` |
 | `ascend-weather-mcp` | `lukk17/ascend-weather-mcp` | `ghcr.io/lukk17/ascend-weather-mcp` |
 | `ascend-audio-scribe` | `lukk17/ascend-audio-scribe` | `ghcr.io/lukk17/ascend-audio-scribe` |
 | `ascend-web-hunter` | `lukk17/ascend-web-hunter` | `ghcr.io/lukk17/ascend-web-hunter` |

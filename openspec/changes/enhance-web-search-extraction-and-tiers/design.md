@@ -36,7 +36,7 @@ Parse JSON-LD, OpenGraph, and microdata first and return them as structured fiel
 
 ### D4 — Schema-guided extraction with self-healing recipes
 
-A schema mode: the caller supplies a JSON schema; the service returns validated JSON. The first extraction for a domain asks the LLM to emit CSS/XPath selectors alongside the values, and the selectors are persisted as a recipe. Later extractions replay the cheap selectors and skip the model; on drift (empty or type-mismatched fields against the schema) the recipe is regenerated. The LLM call targets a configurable OpenAI-compatible endpoint, so it can be a local model, AscendAgent's provider proxy (tenant-policy-aware, keeps data on-prem), or a cloud provider — the service stays decoupled and sovereign by default.
+A schema mode: the caller supplies a JSON schema; the service returns validated JSON. The first extraction for a domain asks the LLM to emit CSS/XPath selectors alongside the values, and the selectors are persisted as a recipe. Later extractions replay the cheap selectors and skip the model; on drift (empty or type-mismatched fields against the schema) the recipe is regenerated. The LLM call targets a configurable OpenAI-compatible endpoint, so it can be a local model, ascend-ai-agent's provider proxy (tenant-policy-aware, keeps data on-prem), or a cloud provider — the service stays decoupled and sovereign by default.
 
 ### D5 — Route non-HTML into the existing platform services
 

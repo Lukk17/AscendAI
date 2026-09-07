@@ -31,7 +31,7 @@ Because a disallowed tool is never given to the model, a prompt-injection payloa
 
 ### Requirement: Tenant-admin policy API scoped to the caller's tenant
 
-AscendAgent SHALL expose `/api/v1/admin/policy` (tenant `ADMIN`) to get and update the caller's tenant policy (provider/model and tool allow-lists). The operated tenant SHALL be derived from the token, never a parameter; a non-admin SHALL receive 403 and a cross-tenant attempt SHALL receive 403. An update that widens beyond the deployment default SHALL be rejected with a 4xx, and every policy change SHALL emit an audit event and evict the tenant's policy cache so the next request sees it without a restart.
+ascend-ai-agent SHALL expose `/api/v1/admin/policy` (tenant `ADMIN`) to get and update the caller's tenant policy (provider/model and tool allow-lists). The operated tenant SHALL be derived from the token, never a parameter; a non-admin SHALL receive 403 and a cross-tenant attempt SHALL receive 403. An update that widens beyond the deployment default SHALL be rejected with a 4xx, and every policy change SHALL emit an audit event and evict the tenant's policy cache so the next request sees it without a restart.
 
 #### Scenario: Update takes effect without restart
 

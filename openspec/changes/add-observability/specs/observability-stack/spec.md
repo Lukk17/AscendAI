@@ -8,7 +8,7 @@
 
 - **WHEN** `docker compose up -d` completes and 30 seconds elapse
 - **AND** `GET http://localhost:9090/api/v1/targets` is invoked
-- **THEN** every target with `job` ∈ {`ascend-agent`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `ascend-ocr`, `ascend-weather-mcp`, `qdrant`, `redis`, `postgres`} reports `health="up"`
+- **THEN** every target with `job` ∈ {`ascend-ai-agent`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `ascend-ocr`, `ascend-weather-mcp`, `qdrant`, `redis`, `postgres`} reports `health="up"`
 
 #### Scenario: Scrape interval is 15 seconds by default
 
@@ -32,13 +32,13 @@
 
 ### Requirement: Traces ship to Tempo via the OTel collector
 
-`docker-compose.yaml` SHALL define an `otel-collector` service and a `tempo` service. The OTel collector SHALL accept OTLP receivers on gRPC `:4317` and HTTP `:4318`, batch and memory-limit-process spans, and export to Tempo via OTLP. AscendAgent and ascend-weather-mcp SHALL be configured with `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` so Spring AI's auto-emitted spans land in Tempo. Python services SHALL be configured equivalently via `opentelemetry-distro`.
+`docker-compose.yaml` SHALL define an `otel-collector` service and a `tempo` service. The OTel collector SHALL accept OTLP receivers on gRPC `:4317` and HTTP `:4318`, batch and memory-limit-process spans, and export to Tempo via OTLP. ascend-ai-agent and ascend-weather-mcp SHALL be configured with `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` so Spring AI's auto-emitted spans land in Tempo. Python services SHALL be configured equivalently via `opentelemetry-distro`.
 
 #### Scenario: A single chat turn produces a queryable trace
 
-- **WHEN** AscendAgent serves one `POST /api/v1/ai/prompt` request
+- **WHEN** ascend-ai-agent serves one `POST /api/v1/ai/prompt` request
 - **AND** Tempo is queried via Grafana's Tempo datasource within 10 seconds
-- **THEN** a trace with `service.name=ascend-agent` exists for that request
+- **THEN** a trace with `service.name=ascend-ai-agent` exists for that request
 - **AND** the trace contains at least one Spring AI auto-emitted LLM-call span
 
 ### Requirement: Grafana runs in docker-compose with provisioned datasources and six dashboards

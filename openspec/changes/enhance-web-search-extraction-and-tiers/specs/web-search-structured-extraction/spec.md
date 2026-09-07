@@ -22,7 +22,7 @@ ascend-web-hunter SHALL run trafilatura and a readability extractor over the sam
 
 ### Requirement: Schema-guided extraction returns validated JSON
 
-ascend-web-hunter SHALL offer a read mode (REST and MCP) where the caller supplies a JSON schema and receives JSON validated against it. The extraction SHALL be produced via a configurable OpenAI-compatible endpoint, so it can run against a local model, AscendAgent's provider proxy, or a cloud provider without code change.
+ascend-web-hunter SHALL offer a read mode (REST and MCP) where the caller supplies a JSON schema and receives JSON validated against it. The extraction SHALL be produced via a configurable OpenAI-compatible endpoint, so it can run against a local model, ascend-ai-agent's provider proxy, or a cloud provider without code change.
 
 #### Scenario: Caller-supplied schema honored
 

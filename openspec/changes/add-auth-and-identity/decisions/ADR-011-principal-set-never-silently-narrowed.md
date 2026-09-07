@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 12.8 installs into `AscendAgent/docs/architecture/decisions/`, taking the next free number at that time.
+Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 12.8 installs into `apps/ascend-ai-agent/docs/architecture/decisions/`, taking the next free number at that time.
 
 ## Amendment, 2026-09-04
 

@@ -1,7 +1,7 @@
 [sources.docker_logs]
 type = "docker_logs"
 include_containers = [
-  "ascend-agent",
+  "ascend-ai-agent",
   "ascend-weather-mcp",
   "ascend-memory",
   "ascend-audio-scribe",

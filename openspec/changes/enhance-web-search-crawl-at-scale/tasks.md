@@ -26,7 +26,7 @@
 - [ ] 4.2 Engage the proxy only for crawl jobs when configured; document that ascend-web-hunter never runs or resells proxies
 - [ ] 4.3 Tests: with no proxy configured crawling works unchanged; with a stub proxy configured, crawl requests route through it
 
-## 5. Web connector into RAG (AscendAgent)
+## 5. Web connector into RAG (ascend-ai-agent)
 
 - [ ] 5.1 Add a `web` connector type under `service/connector/` (`add-document-connectors` framework): config = seed URLs / patterns / schedule
 - [ ] 5.2 On each scheduled run, trigger an ascend-web-hunter crawl, land the output in the tenant's MinIO prefix, and trigger the existing ingestion pipeline (land-bytes-then-ingest, no parallel parse path)
@@ -35,6 +35,6 @@
 
 ## 6. Documentation and scale honesty
 
-- [ ] 6.1 Update `ascend-web-hunter/AGENTS.md`: crawl API, frontier politeness, incremental recrawl, BYO-proxy hook, and an honest scale statement (hundreds-of-thousands-of-pages class, not proxy-network scale)
+- [ ] 6.1 Update `apps/ascend-web-hunter/AGENTS.md`: crawl API, frontier politeness, incremental recrawl, BYO-proxy hook, and an honest scale statement (hundreds-of-thousands-of-pages class, not proxy-network scale)
 - [ ] 6.2 Extend `docs/CONNECTORS.md` (from `add-document-connectors`) with the web connector setup
-- [ ] 6.3 Run `pytest` for ascend-web-hunter and `./gradlew test` for AscendAgent's connector additions; all green
+- [ ] 6.3 Run `pytest` for ascend-web-hunter and `./gradlew test` for ascend-ai-agent's connector additions; all green

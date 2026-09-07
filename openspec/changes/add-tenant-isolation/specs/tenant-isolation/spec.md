@@ -2,11 +2,11 @@
 
 ### Requirement: Tenant entity and persistence
 
-The agent SHALL persist tenants in a `tenants` table created via a Liquibase changelog in `AscendAgent/src/main/resources/db/changelog/`. Each tenant row SHALL have at minimum an `id` (the tenant identifier, primary key), a human-readable `display_name`, and a `created_at` timestamp. Tenant identifiers SHALL match `[a-z0-9-]{1,64}`; the agent SHALL reject any tenant id outside this format at the trust boundary so tenant ids are safe to embed verbatim in Redis keys, S3 key prefixes, Qdrant payload values, principal identifiers, and composite AscendMemory user ids.
+The agent SHALL persist tenants in a `tenants` table created via a Liquibase changelog in `apps/ascend-ai-agent/src/main/resources/db/changelog/`. Each tenant row SHALL have at minimum an `id` (the tenant identifier, primary key), a human-readable `display_name`, and a `created_at` timestamp. Tenant identifiers SHALL match `[a-z0-9-]{1,64}`; the agent SHALL reject any tenant id outside this format at the trust boundary so tenant ids are safe to embed verbatim in Redis keys, S3 key prefixes, Qdrant payload values, principal identifiers, and composite AscendMemory user ids.
 
 #### Scenario: Tenants table exists after migration
 
-- **WHEN** AscendAgent boots against a fresh database
+- **WHEN** ascend-ai-agent boots against a fresh database
 - **THEN** Liquibase creates the `tenants` table with `id`, `display_name`, and `created_at` columns
 - **AND** the reserved `default` tenant row exists
 

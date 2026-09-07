@@ -6,7 +6,7 @@ Proposed, 2026-09-04. Becomes Accepted when the OpenSpec change `add-tenant-isol
 
 ## Context
 
-AscendAgent stores every customer's data in one pool per store. Both Qdrant collections (`ascendai-768` and `ascendai-1536`) hold everyone's chunks, MinIO has one `knowledge-base` bucket keyed by sanitized filename, Redis keys chat history as `chat:{userId}`, and `chat_history` and `user_instructions` carry only `user_id`. Hosting two companies on one deployment means deciding where the boundary between them lives.
+ascend-ai-agent stores every customer's data in one pool per store. Both Qdrant collections (`ascendai-768` and `ascendai-1536`) hold everyone's chunks, MinIO has one `knowledge-base` bucket keyed by sanitized filename, Redis keys chat history as `chat:{userId}`, and `chat_history` and `user_instructions` carry only `user_id`. Hosting two companies on one deployment means deciding where the boundary between them lives.
 
 There are two shapes available. Separate the infrastructure per customer, so a Qdrant collection, an S3 bucket, a Redis namespace, and a Postgres schema exist per tenant. Or keep the shared infrastructure and put a discriminator on every row, key, and payload, enforced on every read and write.
 

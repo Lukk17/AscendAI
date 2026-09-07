@@ -1,6 +1,6 @@
 ## Purpose
 
-Enables users to attach image and document files to their chat prompts, which are uploaded as multipart form data to the AscendAgent prompt endpoint.
+Enables users to attach image and document files to their chat prompts, which are uploaded as multipart form data to the ascend-ai-agent prompt endpoint.
 
 ## ADDED Requirements
 

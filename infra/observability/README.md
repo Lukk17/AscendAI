@@ -15,7 +15,7 @@ The three signal types are kept separate end to end:
 ```mermaid
 graph LR
     subgraph "App containers"
-        SVC["ascend-agent · ascend-weather-mcp<br/>ascend-memory · ascend-audio-scribe<br/>ascend-web-hunter · ascend-ocr"]
+        SVC["ascend-ai-agent · ascend-weather-mcp<br/>ascend-memory · ascend-audio-scribe<br/>ascend-web-hunter · ascend-ocr"]
     end
 
     SVC -->|"/metrics scrape"| PROM["Prometheus"]
@@ -54,14 +54,14 @@ graph LR
 
 Prometheus ([prometheus/prometheus.yaml](prometheus/prometheus.yaml)) scrapes:
 
-- The two Java services (`ascend-agent`, `ascend-weather-mcp`) at `/actuator/prometheus` (Spring Boot Actuator + Micrometer).
+- The two Java services (`ascend-ai-agent`, `ascend-weather-mcp`) at `/actuator/prometheus` (Spring Boot Actuator + Micrometer).
 - The four Python services (`ascend-memory`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-ocr`) at `/metrics` (prometheus-fastapi-instrumentator).
 - Qdrant at `/metrics` (native, unprefixed metric names such as `collection_vectors` and `collections_total`).
 - Container Metrics Exporter at `/metrics` (`container_memory_used_bytes`, `container_memory_limit_bytes`, `container_start_time_seconds`, labelled per container by `name`). This is the only source in the stack for a container's total memory footprint against its `deploy.resources.limits.memory` ceiling. JVM heap metrics and Python RSS metrics each see only part of the process, not the cgroup limit itself.
 
 The object store, on host port `9070`, publishes no Prometheus metrics on any path, so Prometheus does not scrape it. Its liveness signal is `GET http://localhost:9070/_floci/health`, checked directly rather than through this stack.
 
-Every scrape job sets a `service` label (e.g. `service="ascend-agent"`), which is what the dashboards filter on.
+Every scrape job sets a `service` label (e.g. `service="ascend-ai-agent"`), which is what the dashboards filter on.
 
 #### Vector log shipping
 
@@ -85,10 +85,10 @@ The main compose file already wires this (`command: ["--config", "/etc/vector/ve
 4. Run a label query for the service you want, for example:
 
    ```text
-   {service="ascend-agent"}
+   {service="ascend-ai-agent"}
    ```
 
-Five of the six application containers are shipped under their own `service` label value: `ascend-agent`, `ascend-memory`, `ascend-audio-scribe`, `ascend-web-hunter`, and `ascend-ocr`.
+Five of the six application containers are shipped under their own `service` label value: `ascend-ai-agent`, `ascend-memory`, `ascend-audio-scribe`, `ascend-web-hunter`, and `ascend-ocr`.
 
 `ascend-weather-mcp` is intentionally console-silent: its `application.yml` suppresses console logging to keep the SSE stream clean, so it will not appear in Loki even though Vector is configured to watch it. That is expected, not a gap in the pipeline.
 
@@ -124,4 +124,4 @@ A restart alone does not prove a memory kill. The "Container Restarts (15m)" pan
 docker inspect <container> --format "{{.State.ExitCode}} {{.State.OOMKilled}}"
 ```
 
-Exit `137` with `OOMKilled=true` means the container runtime killed it for exceeding its memory limit. A JVM service (`ascend-agent`, `ascend-weather-mcp`) exiting with code `3` and `OOMKilled=false` means the JVM itself terminated via `-XX:+ExitOnOutOfMemoryError` before the cgroup limit was reached, a cleaner failure that still restarts under the existing `restart: unless-stopped` policy, but is a distinct condition from a runtime kill. Neither exit code is currently exported as a Prometheus metric. That would need a Docker-events exporter, which this stack does not have.
+Exit `137` with `OOMKilled=true` means the container runtime killed it for exceeding its memory limit. A JVM service (`ascend-ai-agent`, `ascend-weather-mcp`) exiting with code `3` and `OOMKilled=false` means the JVM itself terminated via `-XX:+ExitOnOutOfMemoryError` before the cgroup limit was reached, a cleaner failure that still restarts under the existing `restart: unless-stopped` policy, but is a distinct condition from a runtime kill. Neither exit code is currently exported as a Prometheus metric. That would need a Docker-events exporter, which this stack does not have.

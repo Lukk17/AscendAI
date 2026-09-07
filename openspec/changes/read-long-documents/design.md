@@ -7,22 +7,22 @@ from the code and the configuration as they stand after that change, not assumed
 
 - The page limit is derived, not configured. `Settings.OCR_MAX_PAGES` is
   `floor(OCR_REQUEST_TIMEOUT / OCR_PAGE_TIMEOUT_SECONDS)` in
-  [config.py](../../../ascend-ocr/src/config/config.py). Deployed values are `OCR_REQUEST_TIMEOUT=300` in
+  [config.py](../../../apps/ascend-ocr/src/config/config.py). Deployed values are `OCR_REQUEST_TIMEOUT=300` in
   `docker-compose.yaml` and `OCR_PAGE_TIMEOUT_SECONDS=120` by default, so the limit is two, and
-  `enforce_page_limit` in [limits.py](../../../ascend-ocr/src/api/limits.py) refuses anything above it with
+  `enforce_page_limit` in [limits.py](../../../apps/ascend-ocr/src/api/limits.py) refuses anything above it with
   `FILE_TOO_LARGE`.
 - One worker, and it is a memory constraint. `OCR_WORKER_COUNT` governs both the `ProcessPoolExecutor` size and the
-  admission gate's permit count in [ocr_service.py](../../../ascend-ocr/src/service/ocr_service.py). One A4 page's
+  admission gate's permit count in [ocr_service.py](../../../apps/ascend-ocr/src/service/ocr_service.py). One A4 page's
   peak is already most of the container's 12,288 MiB.
 - The stop is cooperative and already page-granular. `_predict_pages` consumes `predict_iter()` and checks a
   deadline before pulling each page. The parent passes a remaining duration, never a wall clock time.
 - The reclamation and rebuild path exists. `_rebuild_pool(observed_generation, reason)` replaces the pool, is
   guarded by a lock and a generation counter, counts consecutive failures, and is already reached from two triggers.
 - Both surfaces already share one dispatch function. `dispatch_ocr_request(...)` in `ocr_service.py` is called from
-  [rest_endpoints.py](../../../ascend-ocr/src/api/rest/rest_endpoints.py) and
-  [mcp_server.py](../../../ascend-ocr/src/api/mcp/mcp_server.py), and both compute
+  [rest_endpoints.py](../../../apps/ascend-ocr/src/api/rest/rest_endpoints.py) and
+  [mcp_server.py](../../../apps/ascend-ocr/src/api/mcp/mcp_server.py), and both compute
   `min(pages x OCR_PAGE_TIMEOUT_SECONDS, OCR_REQUEST_TIMEOUT)` identically.
-- The service holds no persisted state today. `ascend-ocr/e2e/README.md` says so in as many words, there is no
+- The service holds no persisted state today. `apps/ascend-ocr/e2e/README.md` says so in as many words, there is no
   database, no cache and no volume in `docker-compose.yaml`, and the only cross-process state is the Prometheus
   multiprocess directory that `is_engine_warm` reads.
 - The service has no authentication of its own. `SecurityHeadersMiddleware`, `CorrelationIdMiddleware` and the
@@ -58,7 +58,7 @@ Non-Goals:
 
 - Making OCR faster, or reading pages in parallel. The worker count stays one and the reason stays memory.
 - Changing the synchronous request in any way a caller can observe.
-- Pointing the AscendAgent at the job API, or changing its per-page fan-out. Both are the agent's decisions and are
+- Pointing the ascend-ai-agent at the job API, or changing its per-page fan-out. Both are the agent's decisions and are
   discussed under Decision 12 only so the consequence is on the record.
 - Authentication. Possession of an unguessable identifier is the whole access control, which is the same posture the
   service already has for its OCR endpoints, and raising it is a platform-wide decision rather than this change's.
@@ -83,7 +83,7 @@ Non-Goals:
 
 Two values stay exactly as the previous change deployed them and are not reopened here: `OCR_DETECTOR_MAX_SIDE` at
 1536 and `OCR_MAX_INFERENCE_PIXELS` at 2,500,000, the owner's measured pair recorded in
-[ADR-006](../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). Every memory figure below
+[ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). Every memory figure below
 assumes them.
 
 ### The job page ceiling, derived
@@ -190,7 +190,7 @@ separate change, and the measured per-page cost is what makes it due now.
 
 `POST /v1/ocr` and `ocr_process` keep their shape, their parameters, their error codes and their two page limit. The
 job path is new endpoints and new tools beside them. Under ADR-003 that is a non-breaking change requiring no
-version bump on either surface, and it means the AscendAgent's `AscendOcrClient`, the Bruno collection, the contract
+version bump on either surface, and it means the ascend-ai-agent's `AscendOcrClient`, the Bruno collection, the contract
 stub and every existing e2e spec keep passing untouched.
 
 The alternative, replacing the synchronous request with the job path, was rejected twice over: it is breaking, so it
@@ -359,7 +359,7 @@ The consequence is stated in the spec rather than hidden: while a long document 
 waits on the gate and fails on its own budget. The honest answer to that is the job path, which is what this change
 adds.
 
-### Decision 12: what the AscendAgent does is left alone, and recorded
+### Decision 12: what the ascend-ai-agent does is left alone, and recorded
 
 The agent slices every PDF page by page and dispatches four at a time. Each of those four is one page, so each gets
 an effective budget of `min(1 x 120, 240)`, which is 120 s. Against one worker at about 90 s per page the first is

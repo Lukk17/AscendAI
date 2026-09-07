@@ -43,7 +43,7 @@ OTel collector also future-proofs the migration story: same collector pipeline c
 
 Every metric is in lowercase, dot-separated for the Spring side (Micrometer auto-converts to underscore for Prometheus), suffixed `_total` for counters by Prometheus convention.
 
-**AscendAgent (`service="ascend-agent"`):**
+**ascend-ai-agent (`service="ascend-ai-agent"`):**
 
 | Metric | Type | Tags | Why |
 |---|---|---|---|
@@ -80,7 +80,7 @@ The same `service` and `version` flow into Vector's log labels (`labels.service`
 
 | Service | Path | Bound to |
 |---|---|---|
-| AscendAgent | `/actuator/prometheus` | `127.0.0.1:9917` by default; remote exposure requires `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_REMOTE=true` |
+| ascend-ai-agent | `/actuator/prometheus` | `127.0.0.1:9917` by default; remote exposure requires `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_REMOTE=true` |
 | ascend-weather-mcp | `/actuator/prometheus` | same model |
 | Python services | `/metrics` | bound to `0.0.0.0` inside the container; exposed only on the docker network |
 | Prometheus | `:7077` (host) → `:9090` (container) | exposed on host |
@@ -123,7 +123,7 @@ Vector container reads Docker container logs via the `docker_logs` source:
 ```toml
 [sources.docker]
 type = "docker_logs"
-include_containers = ["ascend-agent", "ascend-weather-mcp", "ascend-memory", "ascend-audio-scribe", "ascend-web-hunter", "ascend-ocr"]
+include_containers = ["ascend-ai-agent", "ascend-weather-mcp", "ascend-memory", "ascend-audio-scribe", "ascend-web-hunter", "ascend-ocr"]
 ```
 
 Then ships to Loki via the `loki` sink:
@@ -181,11 +181,11 @@ service:
       exporters: [otlp/tempo]
 ```
 
-**AscendAgent + ascend-weather-mcp**: Spring Boot 3 already wires OpenTelemetry SDK by default when the OTel BOM is on the classpath (Spring AI 1.1 brings it transitively). Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` via `application-docker.yaml` and `OTEL_SERVICE_NAME=ascend-agent`. Spring AI's auto-instrumentation produces spans for every `gen_ai.client.*` call and tool invocation.
+**ascend-ai-agent + ascend-weather-mcp**: Spring Boot 3 already wires OpenTelemetry SDK by default when the OTel BOM is on the classpath (Spring AI 1.1 brings it transitively). Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` via `application-docker.yaml` and `OTEL_SERVICE_NAME=ascend-ai-agent`. Spring AI's auto-instrumentation produces spans for every `gen_ai.client.*` call and tool invocation.
 
 **Python services**: add `opentelemetry-distro` + `opentelemetry-exporter-otlp` to `pyproject.toml`. Activate via `opentelemetry-instrument uvicorn ...` in the entrypoint command, OR via the `auto_instrumentation` entry point in `src/main.py`. FastAPI / requests / httpx are auto-instrumented out of the box.
 
-Result: a single chat turn produces a trace with spans for: AscendAgent receives the request → RAG embedding call → Qdrant vector search → LLM provider call → MCP tool fan-out → response. Visible end-to-end in Grafana's Tempo panel.
+Result: a single chat turn produces a trace with spans for: ascend-ai-agent receives the request → RAG embedding call → Qdrant vector search → LLM provider call → MCP tool fan-out → response. Visible end-to-end in Grafana's Tempo panel.
 
 ### D10 — Six dashboards with cross-pillar drilldown
 
@@ -200,7 +200,7 @@ Result: a single chat turn produces a trace with spans for: AscendAgent receives
 
 **L1 — Token Cost**: Multiplies `gen_ai.client.token.usage{provider="...",type="input"}` by per-provider $/1k input rates and `type="output"` by $/1k output rates. Rates are committed in `infra/observability/grafana/dashboards/pricing.yaml` so updates go through git review. Daily-bucketed `sum by (provider)` panel; line chart per provider over time; total $ panel.
 
-**L2 — RAG Quality**: Heatmap of `rag.top_score` histogram over time (shows score distribution drift). Time-series of `rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)` (miss-rate). Bar chart of ingestion-events-per-hour by `source_type` from `ingestion.upload.bytes_total`. Logs panel below pulls Loki entries matching `service="ascend-agent"` AND `level="WARN"` for retrieval-related warnings.
+**L2 — RAG Quality**: Heatmap of `rag.top_score` histogram over time (shows score distribution drift). Time-series of `rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)` (miss-rate). Bar chart of ingestion-events-per-hour by `source_type` from `ingestion.upload.bytes_total`. Logs panel below pulls Loki entries matching `service="ascend-ai-agent"` AND `level="WARN"` for retrieval-related warnings.
 
 **L3 — Cache Hit Rate**: `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider — the headline cache-hit-rate ratio. Side panel: absolute saved tokens per hour (`rate(prompt_cache.tokens.read[1h]) * 3600`). Validates that the prompt-caching change is firing in production. Flat-line at 0% for any provider would flag a regression.
 
@@ -229,8 +229,8 @@ The shipped `add-prompt-caching` change logs cache outcomes at INFO. That's enou
 
 Strict additive change, executed in this order:
 
-1. Add metrics-only stack (Prometheus + Grafana + AscendAgent actuator wiring) to `docker-compose.yaml`.
-2. Wire AscendAgent custom metrics (memory, RAG, MCP, prompt-cache).
+1. Add metrics-only stack (Prometheus + Grafana + ascend-ai-agent actuator wiring) to `docker-compose.yaml`.
+2. Wire ascend-ai-agent custom metrics (memory, RAG, MCP, prompt-cache).
 3. Wire ascend-weather-mcp (mirror).
 4. Add Vector + Loki containers + Vector config.
 5. Add OTel collector + Tempo containers + OTel config; enable Spring AI's auto-instrumentation pointing at the collector.

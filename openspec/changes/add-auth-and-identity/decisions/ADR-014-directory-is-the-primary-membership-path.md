@@ -2,7 +2,7 @@
 
 ## Status
 
-Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `AscendAgent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
+Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `apps/ascend-ai-agent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
 
 ## Deferral, 2026-09-04
 
@@ -22,7 +22,7 @@ Two facts, both checked against primary sources, make that ordering wrong in pra
 
 The first is a cap. Microsoft limits the groups claim to 200 group identifiers for the token protocols and 150 for SAML, counting nested groups. Above the cap it does not truncate the list. It emits no groups claim at all and substitutes a pointer to a Graph endpoint, which is the overage the `_claim_names` and `_claim_sources` markers describe. That is not a rare condition in a company of any size, and it lands on the people who belong to the most groups, which is to say the people whose access matters most.
 
-The second is brokering, decided in ADR-013. AscendAgent no longer reads the provider's token. It reads a Keycloak token, and the only group data in that token is whatever an Attribute Importer copied across. That importer copies a JSON array of textual elements into a multivalued attribute. The overage markers are not an array of strings, so they do not cross the broker through it, and no supported importer shape carries a JSON object claim across in a form the completeness test could read. Under the force synchronisation mode ADR-015 mandates, the attribute is correctly removed when the upstream claim is absent.
+The second is brokering, decided in ADR-013. ascend-ai-agent no longer reads the provider's token. It reads a Keycloak token, and the only group data in that token is whatever an Attribute Importer copied across. That importer copies a JSON array of textual elements into a multivalued attribute. The overage markers are not an array of strings, so they do not cross the broker through it, and no supported importer shape carries a JSON object claim across in a form the completeness test could read. Under the force synchronisation mode ADR-015 mandates, the attribute is correctly removed when the upstream claim is absent.
 
 Compose those two and the result is specific: an over-cap person arrives with an empty group claim carrying no marker of any kind, which is byte-for-byte what a person who genuinely belongs to no groups looks like. The completeness test from ADR-M007 is not merely unreliable on the brokered path. There is nothing in the token to test.
 
@@ -36,7 +36,7 @@ The token group claim is read only when no directory adapter is configured for t
 
 This is stated as the normal case rather than as a preference, because the difference shows up in what gets built. The directory path is the one the default test configuration exercises, the one the latency budget is measured against, and the one the onboarding runbook describes first. The claim path is the special case, and its tests say which cap they assume.
 
-Where AscendAgent validates a directly-issued provider token instead of a brokered one, the completeness test from ADR-M007 still applies and still earns its place, because on that path the overage markers are visible. An absent claim there means fall through to the directory and never an empty group set.
+Where ascend-ai-agent validates a directly-issued provider token instead of a brokered one, the completeness test from ADR-M007 still applies and still earns its place, because on that path the overage markers are visible. An absent claim there means fall through to the directory and never an empty group set.
 
 The Google path is always a directory call. A Google customer with no directory adapter configured resolves the tenant floor and nothing else, and that is documented as a deployment shape rather than as a fault.
 

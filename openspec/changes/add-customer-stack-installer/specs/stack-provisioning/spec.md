@@ -36,11 +36,11 @@ After the stack is up, the installer SHALL import the Keycloak realm export and 
 
 ### Requirement: Readiness smoke test is a hard install gate
 
-The installer SHALL run a smoke test verifying gateway TLS, AscendAgent health behind the gateway, token acquisition for the seeded admin, and one authenticated round-trip. The installer SHALL fail the install (non-zero exit, naming the failed check) if any check does not pass, so a broken stack is never handed over as complete.
+The installer SHALL run a smoke test verifying gateway TLS, ascend-ai-agent health behind the gateway, token acquisition for the seeded admin, and one authenticated round-trip. The installer SHALL fail the install (non-zero exit, naming the failed check) if any check does not pass, so a broken stack is never handed over as complete.
 
 #### Scenario: Broken stack fails the install
 
-- **WHEN** the smoke test runs while AscendAgent is unhealthy behind the gateway
+- **WHEN** the smoke test runs while ascend-ai-agent is unhealthy behind the gateway
 - **THEN** the installer exits non-zero and names the failed health check
 - **AND** does not report the install as successful
 

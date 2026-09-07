@@ -10,7 +10,7 @@ Accepted (2026-09-04)
 
 ### Context
 
-Something has to hold the caller's principal set, compose it into the search filter, and re-check every source reference before a download link is signed. That work can live inside AscendAgent, alongside the code that builds the `SearchRequest`, or behind a network hop in a separate authorization service, in the spirit of the MCP tool services that ADR-M002 standardised on.
+Something has to hold the caller's principal set, compose it into the search filter, and re-check every source reference before a download link is signed. That work can live inside ascend-ai-agent, alongside the code that builds the `SearchRequest`, or behind a network hop in a separate authorization service, in the spirit of the MCP tool services that ADR-M002 standardised on.
 
 The platform's existing instinct pushes toward the second. Tool capabilities became MCP servers. Semantic memory became a REST service. Extracting authorization would be consistent with that pattern.
 
@@ -20,7 +20,7 @@ It would also be wrong here, and the reason is worth writing down because the co
 
 ### Decision
 
-Permission enforcement stays inside AscendAgent, in the retrieval path, in the same code that composes the `SearchRequest` and in the same code that presigns source downloads.
+Permission enforcement stays inside ascend-ai-agent, in the retrieval path, in the same code that composes the `SearchRequest` and in the same code that presigns source downloads.
 
 Concretely: principal resolution and its Redis cache sit in the agent, the access-list predicate is composed into the same `FilterExpressionBuilder` expression that carries the tenant predicate from [add-tenant-isolation](../../../openspec/changes/add-tenant-isolation/), and `S3PresignedUrlService` re-checks each reference against the principal set itself rather than trusting that retrieval filtered it.
 

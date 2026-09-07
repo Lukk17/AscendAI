@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
-      ascend_agent: ${{ steps.filter.outputs.ascend-agent == 'true' || steps.filter.outputs.workflows == 'true' }}
+      ascend_ai_agent: ${{ steps.filter.outputs.ascend-ai-agent == 'true' || steps.filter.outputs.workflows == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,18 +29,18 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            ascend-agent:
-              - 'AscendAgent/**'
+            ascend-ai-agent:
+              - 'apps/ascend-ai-agent/**'
             ascend-weather-mcp:
-              - 'ascend-weather-mcp/**'
+              - 'apps/ascend-weather-mcp/**'
             ascend-audio-scribe:
-              - 'ascend-audio-scribe/**'
+              - 'apps/ascend-audio-scribe/**'
             ascend-web-hunter:
-              - 'ascend-web-hunter/**'
+              - 'apps/ascend-web-hunter/**'
             ascend-memory:
-              - 'AscendMemory/**'
+              - 'apps/ascend-memory/**'
             ascend-ocr:
-              - 'ascend-ocr/**'
+              - 'apps/ascend-ocr/**'
             workflows:
               - '.github/workflows/**'
 
@@ -48,16 +48,16 @@ jobs:
         id: build-matrix
         run: |
           ALL_SERVICES='[
-            {"service":"ascend-agent",    "language":"java",   "path":"AscendAgent",    "python_version":""},
-            {"service":"ascend-weather-mcp",     "language":"java",   "path":"ascend-weather-mcp",     "python_version":""},
-            {"service":"ascend-audio-scribe",    "language":"python", "path":"ascend-audio-scribe",    "python_version":"3.11"},
-            {"service":"ascend-web-hunter","language":"python","path":"ascend-web-hunter","python_version":"3.12"},
-            {"service":"ascend-memory",   "language":"python", "path":"AscendMemory",   "python_version":"3.11"},
-            {"service":"ascend-ocr",      "language":"python", "path":"ascend-ocr",      "python_version":"3.11"}
+            {"service":"ascend-ai-agent",    "language":"java",   "path":"apps/ascend-ai-agent",    "python_version":""},
+            {"service":"ascend-weather-mcp",     "language":"java",   "path":"apps/ascend-weather-mcp",     "python_version":""},
+            {"service":"ascend-audio-scribe",    "language":"python", "path":"apps/ascend-audio-scribe",    "python_version":"3.11"},
+            {"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"},
+            {"service":"ascend-memory",   "language":"python", "path":"apps/ascend-memory",   "python_version":"3.11"},
+            {"service":"ascend-ocr",      "language":"python", "path":"apps/ascend-ocr",      "python_version":"3.11"}
           ]'
 
           WORKFLOWS_CHANGED="${{ steps.filter.outputs.workflows }}"
-          ASCEND_AGENT="${{ steps.filter.outputs.ascend-agent }}"
+          ASCEND_AI_AGENT="${{ steps.filter.outputs.ascend-ai-agent }}"
           ASCEND_WEATHER_MCP="${{ steps.filter.outputs.ascend-weather-mcp }}"
           ASCEND_AUDIO_SCRIBE="${{ steps.filter.outputs.ascend-audio-scribe }}"
           ASCEND_WEB_HUNTER="${{ steps.filter.outputs.ascend-web-hunter }}"
@@ -68,12 +68,12 @@ jobs:
             MATRIX="{\"include\":$(echo "$ALL_SERVICES" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')}"
           else
             INCLUDE="[]"
-            if [ "$ASCEND_AGENT"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-agent","language":"java","path":"AscendAgent","python_version":""}); print(json.dumps(a))'); fi
-            if [ "$ASCEND_WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-weather-mcp","language":"java","path":"ascend-weather-mcp","python_version":""}); print(json.dumps(a))'); fi
-            if [ "$ASCEND_AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-audio-scribe","language":"python","path":"ascend-audio-scribe","python_version":"3.11"}); print(json.dumps(a))'); fi
-            if [ "$ASCEND_WEB_HUNTER" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-hunter","language":"python","path":"ascend-web-hunter","python_version":"3.12"}); print(json.dumps(a))'); fi
-            if [ "$ASCEND_MEMORY"    = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-memory","language":"python","path":"AscendMemory","python_version":"3.11"}); print(json.dumps(a))'); fi
-            if [ "$ASCEND_OCR"       = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ocr","language":"python","path":"ascend-ocr","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_AI_AGENT"  = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ai-agent","language":"java","path":"apps/ascend-ai-agent","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-weather-mcp","language":"java","path":"apps/ascend-weather-mcp","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-audio-scribe","language":"python","path":"apps/ascend-audio-scribe","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_WEB_HUNTER" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_MEMORY"    = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-memory","language":"python","path":"apps/ascend-memory","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_OCR"       = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ocr","language":"python","path":"apps/ascend-ocr","python_version":"3.11"}); print(json.dumps(a))'); fi
             MATRIX="{\"include\":$INCLUDE}"
           fi
 
@@ -108,11 +108,11 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: ./gradlew --no-daemon build test
 
-      # ascend-agent is the only Gradle module with a configured coverage
+      # ascend-ai-agent is the only Gradle module with a configured coverage
       # floor (jacocoTestCoverageVerification, 80% instruction coverage).
       # ascend-weather-mcp has no such task, so nothing runs for it here.
-      - name: Enforce Jacoco coverage gate (ascend-agent)
-        if: matrix.service == 'ascend-agent'
+      - name: Enforce Jacoco coverage gate (ascend-ai-agent)
+        if: matrix.service == 'ascend-ai-agent'
         working-directory: ${{ matrix.path }}
         run: ./gradlew --no-daemon jacocoTestCoverageVerification
 
@@ -167,9 +167,9 @@ jobs:
           if-no-files-found: ignore
 
   integration-test:
-    name: Integration test (Testcontainers) ascend-agent
+    name: Integration test (Testcontainers) ascend-ai-agent
     needs: changes
-    if: ${{ needs.changes.outputs.ascend_agent == 'true' }}
+    if: ${{ needs.changes.outputs.ascend_ai_agent == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -189,13 +189,13 @@ jobs:
       # delay the fast unit-test signal for every other module. ubuntu-latest
       # ships a working Docker daemon, so no extra setup is needed here.
       - name: Gradle integration test (Testcontainers)
-        working-directory: AscendAgent
+        working-directory: apps/ascend-ai-agent
         run: ./gradlew --no-daemon integrationTest
 
       - name: Upload integration test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-results-ascend-agent
-          path: AscendAgent/build/test-results/**/*.xml
+          name: integration-test-results-ascend-ai-agent
+          path: apps/ascend-ai-agent/build/test-results/**/*.xml
           if-no-files-found: ignore

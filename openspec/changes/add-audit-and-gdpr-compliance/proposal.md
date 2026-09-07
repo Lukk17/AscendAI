@@ -3,7 +3,7 @@
 AscendAI cannot be sold to EU companies in its current shape. Three compliance gaps, all verified in code:
 
 1. **No audit trail.** There is no record of who did what, anywhere in the codebase — no audit table, no audit service, nothing an auditor or an incident responder could query. A GDPR Article 30 processing record and any SOC-2-adjacent sales conversation both start with "show me the audit log", and today the answer is `docker logs`.
-2. **Customer content leaks into logs.** `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java` lines 90-97 log the **full prompt body** plus userId at INFO on every request. `application.yaml` lines 397-404 set `org.springframework.ai` to DEBUG, so Spring AI's request/response logging (prompt, document context, model output) also hits stdout — and the observability stack ships all stdout to Loki via Vector, giving prompt content a 168h searchable afterlife in a log store. (Side finding: the `com.lukk.ai.agent: DEBUG` entry names a logger that doesn't match the actual package `com.lukk.ascend.ai.agent` — it is a stale no-op.)
+2. **Customer content leaks into logs.** `apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java` lines 90-97 log the **full prompt body** plus userId at INFO on every request. `application.yaml` lines 397-404 set `org.springframework.ai` to DEBUG, so Spring AI's request/response logging (prompt, document context, model output) also hits stdout — and the observability stack ships all stdout to Loki via Vector, giving prompt content a 168h searchable afterlife in a log store. (Side finding: the `com.lukk.ai.agent: DEBUG` entry names a logger that doesn't match the actual package `com.lukk.ascend.ai.agent` — it is a stale no-op.)
 3. **The right to erasure (GDPR Article 17) is unimplementable.** AscendMemory has a per-user wipe (`POST /api/v1/memory/wipe`) and `SemanticMemoryClient` exposes it, but nothing deletes a user's chat history (Redis `chat:{userId}` keys + Postgres `chat_history`), `user_instructions` rows, ingested documents (MinIO `knowledge-base` bucket), or their Qdrant vectors (`ascendai-768` / `ascendai-1536`). A data-subject request today means five manual store-by-store operations with no proof of completion. Retention is equally absent: Postgres rows live forever (the `chat-history-persistence` spec explicitly defers "a separate retention policy" that was never built).
 
 ## What Changes
@@ -35,7 +35,7 @@ Depends on `add-auth-and-identity` (trustworthy actor identity, ADMIN role, toke
 
 ## Impact
 
-- **AscendAgent (bulk of the work)**:
+- **ascend-ai-agent (bulk of the work)**:
   - New Liquibase changelog under `src/main/resources/db/changelog/` for `audit_log` and `erasure_job` tables.
   - New `service/audit/` package: `AuditRecorder`, event listener, repository; new `service/erasure/` package: job orchestrator + per-store erasure steps; new `service/export/` package: export job orchestrator reusing the erasure store-walker inventory to assemble the archive + manifest.
   - New `controller/AuditController.java` and `controller/UserDataController.java` (erasure + export start/status/download).

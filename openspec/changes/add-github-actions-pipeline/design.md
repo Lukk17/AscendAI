@@ -1,6 +1,6 @@
 ## Context
 
-AscendAI is a six-service monorepo with two Java/Gradle services (`AscendAgent`, `ascend-weather-mcp`) and four Python/pyproject services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`). Each has its own `Dockerfile`. The compose files at the repo root wire them together with the external data-layer prerequisites (PostgreSQL, Redis, Qdrant, MinIO).
+AscendAI is a six-service monorepo with two Java/Gradle services (`ascend-ai-agent`, `ascend-weather-mcp`) and four Python/pyproject services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`). Each has its own `Dockerfile`. The compose files at the repo root wire them together with the external data-layer prerequisites (PostgreSQL, Redis, Qdrant, MinIO).
 
 There is no CI today. The maintainer builds and pushes Docker Hub images by hand (`lukk17/<service>:<tag>`). This change adds two GitHub Actions workflows: one that gives PRs a build/test signal, and one that performs **manual, operator-selected, version-from-manifest** releases with an aggregated monorepo release record.
 
@@ -30,7 +30,7 @@ There is no CI today. The maintainer builds and pushes Docker Hub images by hand
 
 ### D2 — CI: path-filtered matrix per service
 
-`ci.yaml` uses `dorny/paths-filter@v3` to compute one boolean per service from its directory (`AscendAgent/**`, `ascend-audio-scribe/**`, …). The matrix `build` job skips an entry whose service was untouched. A change to `.github/workflows/**` forces all services to run via a `workflows` fallback filter. Result: a docs-only PR runs zero builds; a single-service PR runs one.
+`ci.yaml` uses `dorny/paths-filter@v3` to compute one boolean per service from its directory (`apps/ascend-ai-agent/**`, `apps/ascend-audio-scribe/**`, …). The matrix `build` job skips an entry whose service was untouched. A change to `.github/workflows/**` forces all services to run via a `workflows` fallback filter. Result: a docs-only PR runs zero builds; a single-service PR runs one.
 
 ### D3 — CI: explicit Java/Python matrix entries
 
@@ -49,7 +49,7 @@ Each matrix entry declares `service`, `language`, `path`, and the toolchain vers
 
 The release does **not** accept or inject a per-app version. For each selected app it reads the version already committed in the manifest:
 
-- **Java** (`AscendAgent`, `ascend-weather-mcp`): the `version = "<x.y.z>"` assignment in `build.gradle.kts` (resolved by Gradle at build time; the built image inherently carries it).
+- **Java** (`ascend-ai-agent`, `ascend-weather-mcp`): the `version = "<x.y.z>"` assignment in `build.gradle.kts` (resolved by Gradle at build time; the built image inherently carries it).
 - **Python** (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`): `[project].version` in `pyproject.toml`.
 
 That read version is the Docker tag. There is **no `-Pversion` override, no `--build-arg BUILD_VERSION`, and no in-place file edit**. Because the version is already in the source the developer committed, releasing produces **zero commits** — the property the maintainer explicitly requires.
@@ -87,7 +87,7 @@ After `build-and-push` succeeds, a `release` job:
 2. Composes a release body listing every app and its version, marking which were shipped in this run, e.g.:
    ```text
    ascend-ai_1.1.1
-   - ascend-agent: 1.3.0  (released)
+   - ascend-ai-agent: 1.3.0  (released)
    - ascend-weather-mcp: 1.0.0
    - ascend-audio-scribe: 0.2.1  (released)
    - ascend-web-hunter: 1.2.0

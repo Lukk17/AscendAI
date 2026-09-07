@@ -2,7 +2,7 @@
 
 ## Status
 
-Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. Superseded for the current scope by ADR-016, which keeps this record's instinct and drops its enforcement. This file is the draft that moves into `AscendAgent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. Superseded for the current scope by ADR-016, which keeps this record's instinct and drops its enforcement. This file is the draft that moves into `apps/ascend-ai-agent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
 
 ## Deferral, 2026-09-05
 

@@ -206,7 +206,7 @@ A MinIO `mc ls local/uploads/canary/` shows the uploaded file with non-zero size
 Never logs.
 
 ```text
-WRONG: The AscendAgent log contains "MCP tool invoked: getCurrentWeather".
+WRONG: The ascend-ai-agent log contains "MCP tool invoked: getCurrentWeather".
 RIGHT: The response body contains a temperature value (which is only possible if the MCP tool was invoked).
 ```
 

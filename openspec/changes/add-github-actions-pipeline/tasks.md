@@ -8,7 +8,7 @@
 - [x] 2.1 Add `name: CI`, triggers: `pull_request`, `push: branches: [master]`, `workflow_dispatch`
 - [x] 2.2 Declare top-level `permissions: { contents: read }`; no secrets referenced anywhere in this workflow
 - [x] 2.3 Declare `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }`
-- [x] 2.4 First job `changes`: `dorny/paths-filter@v3` with one filter per service (`ascend-agent`, `ascend-weather-mcp`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `ascend-ocr`) plus a `workflows` filter (`.github/workflows/**`) that forces all services to run
+- [x] 2.4 First job `changes`: `dorny/paths-filter@v3` with one filter per service (`ascend-ai-agent`, `ascend-weather-mcp`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `ascend-ocr`) plus a `workflows` filter (`.github/workflows/**`) that forces all services to run
 - [x] 2.5 Second job `build` with `strategy.matrix` over each service `{ service, language, path, version }`; `if:` consumes the matching `changes` output OR the `workflows` output; `strategy.fail-fast: false`
 - [x] 2.6 Java step set: `actions/checkout@v4`, `actions/setup-java@v4` (temurin 21), `gradle/actions/setup-gradle@v3`, then `./gradlew --no-daemon build test` in `${{ matrix.path }}`
 - [x] 2.7 Python step set: `actions/checkout@v4`, `actions/setup-python@v5` (`cache: pip`, right version per service), `pip install -e .[dev]`, then `pytest` in `${{ matrix.path }}`
@@ -41,7 +41,7 @@
 ## 5. Verification
 
 - [ ] 5.1 PR touching only `README.md` → zero matrix entries run
-- [ ] 5.2 PR touching `AscendAgent/` → only the `ascend-agent` CI entry runs and passes
+- [ ] 5.2 PR touching `apps/ascend-ai-agent/` → only the `ascend-ai-agent` CI entry runs and passes
 - [ ] 5.3 PR touching a Python service → only that CI entry runs and `pytest` executes
 - [ ] 5.4 Dispatch `Release` selecting an app whose manifest version was NOT bumped since the last `ascend-ai_*` tag → run fails in `prepare` naming the app, no push occurs
 - [ ] 5.5 Dispatch `Release` with `stack_version` and one bumped app selected → only that image pushes at its manifest version + `:latest`; a `ascend-ai_<stack_version>` tag + GitHub Release is created listing all six app versions; the default branch gains no workflow commit

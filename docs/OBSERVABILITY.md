@@ -43,7 +43,7 @@ To jump directly to a dashboard: http://localhost:7078/d/<uid>
 
 Prometheus scrapes every 15 seconds. Scrape targets are in `infra/observability/prometheus/prometheus.yaml`.
 
-**Spring Boot services (AscendAgent :9917/actuator/prometheus, ascend-weather-mcp :9998/actuator/prometheus)**
+**Spring Boot services (ascend-ai-agent :9917/actuator/prometheus, ascend-weather-mcp :9998/actuator/prometheus)**
 
 - All JVM metrics via Micrometer: `jvm_memory_used_bytes`, `jvm_gc_pause_seconds`, `jvm_threads_*`, etc.
 - HTTP request metrics: `http_server_requests_seconds_count/sum/max` with `uri`, `method`, `status` tags.
@@ -67,24 +67,24 @@ Prometheus scrapes every 15 seconds. Scrape targets are in `infra/observability/
 
 Vector reads Docker container stdout/stderr via the Docker socket and ships to Loki with labels `service` (from `container_name`) and `source` (`docker`). No code changes are required in any service — they just write to stdout.
 
-To query logs in Grafana: Explore → Loki → `{service="ascend-agent"}`.
+To query logs in Grafana: Explore → Loki → `{service="ascend-ai-agent"}`.
 
-To filter by level: `{service="ascend-agent"} |= "WARN"`.
+To filter by level: `{service="ascend-ai-agent"} |= "WARN"`.
 
 ### Traces
 
 The OTel Collector receives OTLP on port 4317 (gRPC) and 4318 (HTTP) from all six application services. It batches and forwards to Tempo.
 
-- AscendAgent and ascend-weather-mcp: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via docker-compose.yaml). No additional code is required.
+- ascend-ai-agent and ascend-weather-mcp: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via docker-compose.yaml). No additional code is required.
 - Python services: OTel auto-instrumentation is activated when `OTEL_EXPORTER_OTLP_ENDPOINT` is set and the `opentelemetry-distro` package is installed and activated in `src/main.py`. FastAPI, httpx, and requests are auto-instrumented.
 
-To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-agent`.
+To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-ai-agent`.
 
 ---
 
 ## Metrics Inventory
 
-Every custom metric emitted by AscendAgent. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
+Every custom metric emitted by ascend-ai-agent. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
 
 | Metric (Spring notation) | Prometheus name | Type | Tags | Dashboards |
 |---|---|---|---|---|

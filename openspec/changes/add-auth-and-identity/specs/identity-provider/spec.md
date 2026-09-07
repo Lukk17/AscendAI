@@ -2,11 +2,11 @@
 
 ### Requirement: Keycloak is the platform's identity layer, one realm and one issuer
 
-The platform SHALL run a self-hosted Keycloak as its identity provider in every deployment posture, development and production alike. A single realm, `ascend-ai`, SHALL be the only token issuer AscendAgent validates against, and every customer SHALL be served by that one issuer rather than by an issuer of their own. Customer separation SHALL be expressed by the `tenant` claim, never by a realm boundary. AscendAgent SHALL therefore require no issuer registry, no per-request issuer resolution ahead of token validation, and no more than one configured `issuer-uri`.
+The platform SHALL run a self-hosted Keycloak as its identity provider in every deployment posture, development and production alike. A single realm, `ascend-ai`, SHALL be the only token issuer ascend-ai-agent validates against, and every customer SHALL be served by that one issuer rather than by an issuer of their own. Customer separation SHALL be expressed by the `tenant` claim, never by a realm boundary. ascend-ai-agent SHALL therefore require no issuer registry, no per-request issuer resolution ahead of token validation, and no more than one configured `issuer-uri`.
 
 #### Scenario: Two customers share one issuer
 
-- **WHEN** two people belonging to two different customers sign in and present their access tokens to AscendAgent
+- **WHEN** two people belonging to two different customers sign in and present their access tokens to ascend-ai-agent
 - **THEN** both tokens carry the same `iss` value, that of the `ascend-ai` realm
 - **AND** both are validated against the same JWKS with no per-customer issuer configuration
 - **AND** their resolved identities carry different `tenant` values
@@ -27,7 +27,7 @@ The direct access grant, in which the application itself collects the password a
 
 - **WHEN** an administrator creates an account with a password in a realm that has no brokered identity provider configured, and that person signs in through the application
 - **THEN** they are taken to Keycloak's own login page, and after entering their password the application receives an authorization code
-- **AND** exchanging that code with PKCE yields an access token AscendAgent accepts on a protected endpoint
+- **AND** exchanging that code with PKCE yields an access token ascend-ai-agent accepts on a protected endpoint
 
 #### Scenario: The application never sees the password
 
@@ -55,7 +55,7 @@ Group names SHALL satisfy the principal character set, so that every group can b
 
 ### Requirement: Keycloak runs as a provisioned docker-compose service
 
-The compose stack SHALL include a `keycloak` service that imports the checked-in realm export (`keycloak/realm-ascend-ai.json`) at startup, backed by the external PostgreSQL prerequisite (dedicated `keycloak` database). After `docker compose up`, the realm SHALL be usable with zero manual console configuration, and the service SHALL expose a healthcheck the AscendAgent's `depends_on` can gate on. The checked-in export SHALL be the source of truth for realm configuration, and a console edit that is not reflected back into the export SHALL be understood as lost at the next clean deploy.
+The compose stack SHALL include a `keycloak` service that imports the checked-in realm export (`keycloak/realm-ascend-ai.json`) at startup, backed by the external PostgreSQL prerequisite (dedicated `keycloak` database). After `docker compose up`, the realm SHALL be usable with zero manual console configuration, and the service SHALL expose a healthcheck the ascend-ai-agent's `depends_on` can gate on. The checked-in export SHALL be the source of truth for realm configuration, and a console edit that is not reflected back into the export SHALL be understood as lost at the next clean deploy.
 
 #### Scenario: Fresh stack yields a working issuer
 
@@ -107,12 +107,12 @@ The seeded test user, the `dev-all` realm group, and any client permitting a pas
 
 ### Requirement: Validating a different issuer directly remains supported as an escape hatch
 
-The platform SHALL keep the token issuer replaceable by configuration for a deployment that validates a different provider's tokens directly: pointing `spring.security.oauth2.resourceserver.jwt.issuer-uri` at any OIDC-compliant issuer, registering an equivalent client there, and mapping its claim names under `app.identity.claims` SHALL be sufficient, with no AscendAgent code change. This SHALL be documented as an escape hatch rather than as the normal deployment. The claims contract a replacement issuer must satisfy SHALL be: a stable subject claim for storage partitioning; an email claim; a role claim in one of the shapes the converter accepts; a `tenant` claim, defaulting to `default` when absent; and a group claim carrying the caller's group names. `docs/SECURITY.md` SHALL document the swap procedure, this contract, and the fact that it is not the normal deployment.
+The platform SHALL keep the token issuer replaceable by configuration for a deployment that validates a different provider's tokens directly: pointing `spring.security.oauth2.resourceserver.jwt.issuer-uri` at any OIDC-compliant issuer, registering an equivalent client there, and mapping its claim names under `app.identity.claims` SHALL be sufficient, with no ascend-ai-agent code change. This SHALL be documented as an escape hatch rather than as the normal deployment. The claims contract a replacement issuer must satisfy SHALL be: a stable subject claim for storage partitioning; an email claim; a role claim in one of the shapes the converter accepts; a `tenant` claim, defaulting to `default` when absent; and a group claim carrying the caller's group names. `docs/SECURITY.md` SHALL document the swap procedure, this contract, and the fact that it is not the normal deployment.
 
 #### Scenario: Issuer swap requires configuration only
 
 - **WHEN** the issuer-uri is repointed to a different OIDC-compliant identity provider that issues tokens satisfying the claims contract, and its claim names are mapped under `app.identity.claims`
-- **THEN** AscendAgent validates those tokens and resolves identity, roles, email, and group principals without any code change
+- **THEN** ascend-ai-agent validates those tokens and resolves identity, roles, email, and group principals without any code change
 
 #### Scenario: A replacement issuer with no group claim resolves the tenant floor
 

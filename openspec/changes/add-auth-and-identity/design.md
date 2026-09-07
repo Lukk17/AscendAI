@@ -1,8 +1,8 @@
 ## Context
 
-AscendAgent's security surface today is a placeholder. `SecurityConfig.java` is a two-branch filter chain: with `app.security.enabled=false` (the default) every request is permitAll; with it enabled, a single in-memory HTTP Basic user (`admin`/`admin` defaults from `SecurityProperties.java`) guards everything except `/actuator/health` and the Swagger paths. CSRF is disabled, sessions are stateless. User identity, the partitioning key for Redis chat history, Postgres persistence, Qdrant memory, and RAG scoping, comes from an `X-User-Id` request header (`PromptController.java:86-88`) that any client can set to any value, falling back to `app.user.default-id=user1`.
+ascend-ai-agent's security surface today is a placeholder. `SecurityConfig.java` is a two-branch filter chain: with `app.security.enabled=false` (the default) every request is permitAll; with it enabled, a single in-memory HTTP Basic user (`admin`/`admin` defaults from `SecurityProperties.java`) guards everything except `/actuator/health` and the Swagger paths. CSRF is disabled, sessions are stateless. User identity, the partitioning key for Redis chat history, Postgres persistence, Qdrant memory, and RAG scoping, comes from an `X-User-Id` request header (`PromptController.java:86-88`) that any client can set to any value, falling back to `app.user.default-id=user1`.
 
-The five downstream services have zero inbound auth. Their only middleware is request-id propagation and security response headers (for example `AscendMemory/src/observability/request_context.py`). AscendMemory's `POST /api/v1/memory/wipe` and `DELETE /api/v1/memory` are destructive and reachable by anyone on the docker network or exposed port. AscendAgent talks to them via a `RestClient` in `SemanticMemoryClient`, via ingestion REST clients (ascend-ocr), and via Spring AI's MCP client (`spring.ai.mcp.client.streamable-http.connections` in `application.yaml` lines 381-388: ascend-audio-scribe, weather, ascend-web-hunter).
+The five downstream services have zero inbound auth. Their only middleware is request-id propagation and security response headers (for example `apps/ascend-memory/src/observability/request_context.py`). AscendMemory's `POST /api/v1/memory/wipe` and `DELETE /api/v1/memory` are destructive and reachable by anyone on the docker network or exposed port. ascend-ai-agent talks to them via a `RestClient` in `SemanticMemoryClient`, via ingestion REST clients (ascend-ocr), and via Spring AI's MCP client (`spring.ai.mcp.client.streamable-http.connections` in `application.yaml` lines 381-388: ascend-audio-scribe, weather, ascend-web-hunter).
 
 Useful groundwork already exists: `spring-boot-starter-security` and `spring-boot-starter-oauth2-client` are on the classpath (`build.gradle.kts` lines 76, 46), and the `SecurityConfig` Javadoc explicitly earmarks the OAuth2/Keycloak swap as a separate change. This is that change.
 
@@ -25,7 +25,7 @@ Constraints:
 
 Goals:
 
-- Verified user identity: every request to a protected AscendAgent endpoint carries a JWT validated against a configurable OIDC issuer, and identity fields are read from claims, never from client-controlled headers.
+- Verified user identity: every request to a protected ascend-ai-agent endpoint carries a JWT validated against a configurable OIDC issuer, and identity fields are read from claims, never from client-controlled headers.
 - Role-based authorization: `USER` (chat, upload) and `ADMIN` (ingestion run, future admin surface) mapped from realm roles.
 - Closed downstream perimeter: no unauthenticated call reaches any Python service or ascend-weather-mcp, on either the REST or the MCP surface.
 - Keycloak as the product's identity layer: one self-hosted realm is the issuer in development and in production, provisioned from a checked-in export, with `docker compose up` yielding the same realm shape an operator deploys. The export is provisioning, not a test fixture.
@@ -52,7 +52,7 @@ Decision numbers are stable. A decision that has been deferred keeps its number 
 
 ### D1 - OAuth2 resource server with issuer-uri, not oauth2-client or a Keycloak adapter
 
-AscendAgent validates tokens and never initiates a login. So the correct Spring artifact is `spring-boot-starter-oauth2-resource-server` (Nimbus JWT decoder plus `issuer-uri` discovery), replacing the currently unused `spring-boot-starter-oauth2-client` dependency in `build.gradle.kts`. Configuration is the standard `spring.security.oauth2.resourceserver.jwt.issuer-uri`. The decoder pulls JWKS from the issuer's discovery document. Under D2 that issuer is our own Keycloak realm and it stays the same across every customer, so the property is not a customer-onboarding lever. It remains the escape hatch for a deployment that validates a provider's tokens directly. The deprecated Keycloak Spring adapter is not an option (end of life), and rolling our own JWT filter would re-implement what Nimbus already does.
+ascend-ai-agent validates tokens and never initiates a login. So the correct Spring artifact is `spring-boot-starter-oauth2-resource-server` (Nimbus JWT decoder plus `issuer-uri` discovery), replacing the currently unused `spring-boot-starter-oauth2-client` dependency in `build.gradle.kts`. Configuration is the standard `spring.security.oauth2.resourceserver.jwt.issuer-uri`. The decoder pulls JWKS from the issuer's discovery document. Under D2 that issuer is our own Keycloak realm and it stays the same across every customer, so the property is not a customer-onboarding lever. It remains the escape hatch for a deployment that validates a provider's tokens directly. The deprecated Keycloak Spring adapter is not an option (end of life), and rolling our own JWT filter would re-implement what Nimbus already does.
 
 Alternatives considered: keep HTTP Basic and harden it, which has no identity claims, no roles, and no mobile-app story; session-based `oauth2Login` in the agent, which is the wrong topology, because the Flutter app is the OAuth client and the agent is a pure API.
 
@@ -60,7 +60,7 @@ Alternatives considered: keep HTTP Basic and harden it, which has no identity cl
 
 Keycloak is the product's identity provider in production as well as locally. It is not a stand-in for a real provider that arrives later.
 
-One realm, `ascend-ai`, serves every customer, and it is the only token issuer AscendAgent validates against. Customers are not realms. A customer is a `tenant` value, optionally plus a brokered identity provider (D15) if they want corporate sign-on. Tenant separation is enforced by the tenant claim and the search filter that `add-tenant-isolation` composes, not by a realm boundary.
+One realm, `ascend-ai`, serves every customer, and it is the only token issuer ascend-ai-agent validates against. Customers are not realms. A customer is a `tenant` value, optionally plus a brokered identity provider (D15) if they want corporate sign-on. Tenant separation is enforced by the tenant claim and the search filter that `add-tenant-isolation` composes, not by a realm boundary.
 
 That is the whole answer to the question this change previously left open about whether a multi-customer deployment needs an issuer registry. It does not. One issuer is strictly simpler than a per-customer issuer with per-customer JWKS, per-customer discovery, and a resolution step in front of token validation. The resource-server configuration in D1 stays a single `issuer-uri`, and every sibling change that assumed one issuer keeps that assumption intact.
 
@@ -76,7 +76,7 @@ The export is the provisioning of a real system, so what it must contain is a co
 | Public client `ascend-flutter`, authorization code with PKCE `S256`, no secret, no direct access grants | The application client. Direct access grants stay off, because a password grant is prohibited by the security standard this repo follows, and it is not what password sign-in means (D2a) |
 | A realm password policy: minimum length, and brute-force detection enabled | Password sign-in is the default path, so the policy that protects it is part of the provisioning rather than something an operator remembers |
 | Realm groups, and the group protocol mapper emitting them into the access token as an array of group names | The only source of group principals in this version (D9) |
-| Protocol mappers emitting `tenant` and `email` into the access token | The rest of the claims contract every AscendAgent deployment reads. A mapper missing here is an empty field there |
+| Protocol mappers emitting `tenant` and `email` into the access token | The rest of the claims contract every ascend-ai-agent deployment reads. A mapper missing here is an empty field there |
 | Realm SSO session and access token lifetimes | The staleness bound for a group change (D18). They are a product disclosure, so they are checked in rather than left at whatever the default happens to be |
 | A brokered-provider template entry, disabled, carrying the tenant stamp mapper from D15 and nothing that imports an upstream authorization claim | Onboarding a customer who wants corporate sign-on becomes copying a shape that has been reviewed |
 | Nothing else | No seeded human user, no direct access grants, no stored provider tokens |
@@ -157,19 +157,19 @@ The dev identity also carries a principal set, and it has to be a usable one. Un
 
 ### D6 - Service-to-service auth: static bearer token now, client-credentials as upgrade path
 
-Baseline: one shared secret, `SERVICE_AUTH_TOKEN`, injected via env into all five downstream services and into AscendAgent. Downstream enforcement:
+Baseline: one shared secret, `SERVICE_AUTH_TOKEN`, injected via env into all five downstream services and into ascend-ai-agent. Downstream enforcement:
 
 - Python services: a FastAPI dependency (HTTPBearer plus constant-time compare) applied to every REST router, and the same check on the FastMCP surface via its middleware or auth hook, so `/mcp` is not a bypass. `/health` (and `/ready`, `/metrics` where present) stay open for compose healthchecks and Prometheus. The same pattern in all four services, implemented per service (they share no code package, so the spec pins identical behaviour instead).
 - ascend-weather-mcp: a `OncePerRequestFilter` doing the same compare ahead of the MCP endpoints, health excluded.
 - An unset or blank `SERVICE_AUTH_TOKEN` in a service means fail-fast at startup in the docker posture (refuse to boot open). A dev or local run without the env var logs a WARN and stays open, to preserve today's uvicorn and bootRun workflow.
 
-AscendAgent attaches `Authorization: Bearer ${SERVICE_AUTH_TOKEN}` on the `SemanticMemoryClient` RestClient (default header on the builder), the ascend-ocr and ingestion clients, and the MCP client connections. Spring AI's MCP client properties support per-connection custom headers, and where a connection type lacks header support, a customizer bean on the underlying WebClient supplies it.
+ascend-ai-agent attaches `Authorization: Bearer ${SERVICE_AUTH_TOKEN}` on the `SemanticMemoryClient` RestClient (default header on the builder), the ascend-ocr and ingestion clients, and the MCP client connections. Spring AI's MCP client properties support per-connection custom headers, and where a connection type lacks header support, a customizer bean on the underlying WebClient supplies it.
 
 Why not client-credentials from day one: it doubles the moving parts (every Python service becomes a resource server needing a JWKS fetch and clock sync against Keycloak, and the agent needs a token-refresh loop) for a perimeter that is compose-internal. The upgrade path is real and cheap later: Keycloak already runs, so add a confidential client per service, switch the FastAPI dependency from string compare to JWT validation against the same issuer, and swap the static header for `client_credentials` acquisition in the agent. The spec requirements are written against "a valid bearer token" so the upgrade does not change observable contracts. Known trade-offs of the baseline: one shared secret means no per-service identity or revocation granularity, and rotation is a coordinated env change plus restart, accepted for the current single-operator deployment and revisited by `harden-cloud-deployment`.
 
 ### D7 - Test strategy
 
-- AscendAgent: `spring-security-test` with `SecurityMockMvcRequestPostProcessors.jwt()`, so no Keycloak is needed in unit or slice tests. Cases: 401 without a token, 403 for `USER` on `/ingestion/run`, 200 with proper roles, identity resolved from `sub` and not from any header, `X-User-Id` ignored when sent.
+- ascend-ai-agent: `spring-security-test` with `SecurityMockMvcRequestPostProcessors.jwt()`, so no Keycloak is needed in unit or slice tests. Cases: 401 without a token, 403 for `USER` on `/ingestion/run`, 200 with proper roles, identity resolved from `sub` and not from any header, `X-User-Id` ignored when sent.
 - Python services: pytest against the FastAPI dependency, covering 401 on a missing or wrong token, 200 with the token, and `/health` open, plus one MCP-surface test proving `/mcp` rejects tokenless calls.
 - Outbound: assert the bearer header on `SemanticMemoryClient` requests (MockRestServiceServer-style) and on MCP connection config.
 - Realm export: the production export imports into a clean Keycloak and yields no human user and no client accepting a password grant, and the `ascend-flutter` client is public, PKCE `S256`, with direct access grants disabled. This is the assertion that keeps D2a from being undone.
@@ -203,7 +203,7 @@ The namespace enum is a closed set the factory rejects outside of. Adding `entra
 
 ### D9 - Group membership comes from the Keycloak group claim
 
-An administrator creates realm groups in Keycloak, puts people in them, and a group protocol mapper in the realm export emits the group names into the access token as an array claim. AscendAgent reads that claim under a configured name and mints one `local:group:<name>` principal per entry through the D8 factory.
+An administrator creates realm groups in Keycloak, puts people in them, and a group protocol mapper in the realm export emits the group names into the access token as an array claim. ascend-ai-agent reads that claim under a configured name and mints one `local:group:<name>` principal per entry through the D8 factory.
 
 That is the whole mechanism. There is no directory call, no second source, and no fallback, so there is no resolution order to get wrong and no completeness test to apply. An absent group claim means the caller is in no groups, which under Keycloak-only membership is a true statement about an administrator's decision rather than a suspicious silence. That is exactly the property that made the previous design's absent claim dangerous, and it is the reason removing the directory removes an entire class of failure along with a capability.
 
@@ -237,7 +237,7 @@ What remains true and worth stating: the symptom of a narrowed set is not an err
 
 ### D15 - Identity brokering is optional configuration for corporate sign-on
 
-A customer who wants their people to sign in with their existing corporate account can have their identity provider brokered inside the `ascend-ai` realm. The mechanism is Keycloak's generic OpenID Connect provider pointed at the customer's own discovery document, or the SAML provider where the customer only offers SAML. AscendAgent never speaks to the customer's provider.
+A customer who wants their people to sign in with their existing corporate account can have their identity provider brokered inside the `ascend-ai` realm. The mechanism is Keycloak's generic OpenID Connect provider pointed at the customer's own discovery document, or the SAML provider where the customer only offers SAML. ascend-ai-agent never speaks to the customer's provider.
 
 This is optional, and everything else in this change works without it. A customer with no brokered provider has accounts, passwords, groups, and an administrator, which is the normal shape of the product. A customer with a brokered provider has the same thing plus a different front door.
 
@@ -255,15 +255,15 @@ Onboarding a customer onto brokering is an administrative procedure with a writt
 
 ### D18 - Membership is as fresh as the token, and the realm sets that bound
 
-Group membership travels in the access token, so a change an administrator makes in Keycloak reaches AscendAgent when the caller next obtains a token. The staleness bound is the access token lifetime, and the realm's SSO session lifetime bounds how long a person can keep refreshing without signing in again. Both are set explicitly in the realm export rather than left at whatever the default happens to be, because they are the number a customer is told.
+Group membership travels in the access token, so a change an administrator makes in Keycloak reaches ascend-ai-agent when the caller next obtains a token. The staleness bound is the access token lifetime, and the realm's SSO session lifetime bounds how long a person can keep refreshing without signing in again. Both are set explicitly in the realm export rather than left at whatever the default happens to be, because they are the number a customer is told.
 
-There is exactly one such window in this version, and it is worth saying so, because the previous design had two that were easy to conflate. Nothing in AscendAgent caches a resolved set (D9), so there is no second window on top of the token's own. An administrator who needs a removal to take effect immediately ends that person's sessions in Keycloak, which is an administrative action with an immediate effect rather than a configuration change.
+There is exactly one such window in this version, and it is worth saying so, because the previous design had two that were easy to conflate. Nothing in ascend-ai-agent caches a resolved set (D9), so there is no second window on top of the token's own. An administrator who needs a removal to take effect immediately ends that person's sessions in Keycloak, which is an administrative action with an immediate effect rather than a configuration change.
 
 `docs/SECURITY.md` records the number as a product disclosure, and the number it records is the one the export actually sets.
 
 ### D19 - Brokered providers do not store upstream tokens
 
-No brokered provider is configured to store the token it received from the customer's identity provider, and AscendAgent does not retrieve upstream provider tokens through the broker.
+No brokered provider is configured to store the token it received from the customer's identity provider, and ascend-ai-agent does not retrieve upstream provider tokens through the broker.
 
 In this version there is nothing to use one for, and storing one would put a third party's live credentials in our database, turning an identity store into a credential store and pulling every one of those tokens into the erasure and breach scope that `add-audit-and-gdpr-compliance` inherits. Stored tokens stay off in the realm export and off in the onboarding template.
 
@@ -383,13 +383,13 @@ Under the current scope the customer-side prerequisite for brokering is only the
 
 ### Deferred D18a - Membership is only as fresh as the last brokered login
 
-Nothing refreshed group attributes between logins. A brokered provider writes its attributes at login and at no other time, so a group change at the customer's directory reached Keycloak when the person next signed in through the broker and not before. On the claim membership path the real staleness bound was therefore the realm's SSO session lifetime plus the access token lifetime, set by realm configuration rather than by anything in AscendAgent.
+Nothing refreshed group attributes between logins. A brokered provider writes its attributes at login and at no other time, so a group change at the customer's directory reached Keycloak when the person next signed in through the broker and not before. On the claim membership path the real staleness bound was therefore the realm's SSO session lifetime plus the access token lifetime, set by realm configuration rather than by anything in ascend-ai-agent.
 
-That is a second window alongside the principal cache, and the two bound different things. The cache bounds how long AscendAgent keeps its own copy of a resolved set. The session bounds how long the source of that set stays stale. Expiring the cache faster does not help on the claim path, because a fresh resolution reads the same stale attribute out of the same unchanged token. This was one of the arguments for the directory being the primary path: it is the only one of the two whose revocation window is bounded by something we set.
+That is a second window alongside the principal cache, and the two bound different things. The cache bounds how long ascend-ai-agent keeps its own copy of a resolved set. The session bounds how long the source of that set stays stale. Expiring the cache faster does not help on the claim path, because a fresh resolution reads the same stale attribute out of the same unchanged token. This was one of the arguments for the directory being the primary path: it is the only one of the two whose revocation window is bounded by something we set.
 
 ### Deferred D19a - Stored provider tokens as an escape hatch
 
-Keycloak can store the token it received from the brokered provider and expose it to the application, which would let AscendAgent call the customer's directory as the signed-in person rather than as a configured application identity. It costs an extra call per request and puts a third party's live credentials in our database.
+Keycloak can store the token it received from the brokered provider and expose it to the application, which would let ascend-ai-agent call the customer's directory as the signed-in person rather than as a configured application identity. It costs an extra call per request and puts a third party's live credentials in our database.
 
 It answers one real problem: the customer who will not consent to an application identity with directory read permission but will consent to their own people reading their own membership. If that customer arrives once directory lookups exist, this is the mechanism, switched on per brokered provider as a deliberate decision with a named cost.
 
@@ -420,11 +420,11 @@ Identity lands before anything that reads it, and the password path lands before
 
 1. Land the Keycloak compose service and the production realm export: roles with `USER` as the default, the application client with PKCE and direct access grants off, the password policy, realm groups and the group protocol mapper, the `tenant` and `email` mappers, and the session and token lifetimes D18 turns into a disclosure. Land the development overlay separately, carrying the seeded user, the `dev-all` group, and the direct-access-grant client the e2e suite uses. Nothing consumes any of it yet, so this is additive and carries no risk.
 2. Prove password sign-in end to end against that realm: an account, a password, Keycloak's own login page, an authorization code exchanged with PKCE, and a token. This is the path the rest of the change is built on.
-3. Land the AscendAgent resource server, the resolved identity (D3), and the principal identifier factory (D8). This is the step `add-tenant-isolation` and `add-document-connectors` are blocked on, and the contract freezes here.
+3. Land the ascend-ai-agent resource server, the resolved identity (D3), and the principal identifier factory (D8). This is the step `add-tenant-isolation` and `add-document-connectors` are blocked on, and the contract freezes here.
 4. Land group membership from the Keycloak group claim and the principal set with its cap (D9, D10, D14). Retrieval does not read the set yet, so correctness is observable through tests and through the principal-set-size metric before anything depends on it.
 5. Land optional brokering: the disabled template entry proven end to end against a second Keycloak realm standing in for a customer's provider, the hardcoded tenant mapper, the proof that an upstream token cannot override the tenant or mint a role, and the brokering runbook. Nothing earlier in this list depends on this step.
 6. Land downstream service auth in warn-only-when-unset mode (D6). With `SERVICE_AUTH_TOKEN` set in compose the services enforce, local bare runs keep working, and the agent does not have to be sending the token yet.
-7. Land AscendAgent outbound token attachment. This has to ship before compose sets `SERVICE_AUTH_TOKEN` for every service, or the agent starts getting 401s from its own downstream calls.
+7. Land ascend-ai-agent outbound token attachment. This has to ship before compose sets `SERVICE_AUTH_TOKEN` for every service, or the agent starts getting 401s from its own downstream calls.
 8. Flip compose to the secured posture end to end, migrate the Bruno collection and the e2e suite to token acquisition, and verify the full authorization matrix.
 9. Rollback: revert to the previous image tags and unset `SERVICE_AUTH_TOKEN` and the issuer environment variables. The dev profile is the operational escape hatch for a broken identity provider.
 

@@ -51,7 +51,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 - Automatic ACME (Let's Encrypt/ZeroSSL) with zero configuration beyond the domain name — the single-tenant-VM-per-customer model means one domain per deployment, Caddy's sweet spot.
 - `local_certs`/internal CA mode gives working self-signed TLS locally with the same Caddyfile, switched by the `ASCEND_DOMAIN` env var (a real domain triggers ACME; `localhost` triggers the internal CA).
-- Caddyfile routes: `/` → `ascend-agent:9917`; a reserved route (e.g. `/auth/*` or an `auth.` subdomain — finalized when `add-auth-and-identity` lands Keycloak) → `keycloak:8080`; optional operator-gated route to Grafana (default: not routed, loopback + SSH tunnel only).
+- Caddyfile routes: `/` → `ascend-ai-agent:9917`; a reserved route (e.g. `/auth/*` or an `auth.` subdomain — finalized when `add-auth-and-identity` lands Keycloak) → `keycloak:8080`; optional operator-gated route to Grafana (default: not routed, loopback + SSH tunnel only).
 - Caddy sets real `X-Forwarded-For` / `X-Forwarded-Proto` headers, which D6 relies on.
 
 **Alternatives considered:**
@@ -64,7 +64,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 - All credentials become compose env interpolations. Two classes:
   - **Always-required** (no sane default exists): `GRAFANA_ADMIN_PASSWORD`, `SEARXNG_SECRET`. These use compose's `${VAR:?message}` form — `docker compose up` fails immediately with a clear message if unset. `.env.example` ships them with placeholder guidance so local dev is a one-time copy-and-fill.
   - **Dev-defaulted** (a local default is legitimate because the store runs on the developer's own machine): Postgres user/password, Redis password (empty = passwordless local Redis), S3 access/secret keys, Qdrant API key (empty = unauthenticated local Qdrant). These use `${VAR:-devdefault}` in compose and `${VAR:devdefault}` in `application.yaml`.
-- **Production fail-fast for the dev-defaulted class**: AscendAgent gains a startup guard active only when the `production` Spring profile is present — it refuses to start if any datastore credential still equals its known dev default (`password`, `local`, empty Redis password, empty Qdrant key). This keeps local dev friction-free while making "forgot to set the S3 password" a startup error instead of a silent open door. The guard is a small `@Configuration` validator, not Spring Cloud Config or Vault.
+- **Production fail-fast for the dev-defaulted class**: ascend-ai-agent gains a startup guard active only when the `production` Spring profile is present — it refuses to start if any datastore credential still equals its known dev default (`password`, `local`, empty Redis password, empty Qdrant key). This keeps local dev friction-free while making "forgot to set the S3 password" a startup error instead of a silent open door. The guard is a small `@Configuration` validator, not Spring Cloud Config or Vault.
 - **SearXNG secret**: removed from `infra/searxng/settings.yml`, injected via the `SEARXNG_SECRET` env var (natively supported by SearXNG). The committed value is compromised by definition and the tasks include rotating it.
 - **Alternatives considered**: Docker secrets (`secrets:` top-level) — rejected: requires swarm mode or file-based secrets plumbing in every service, and the Python services read config from env vars; env + `.env` is the pattern the stack already uses. Vault/SOPS — rejected as YAGNI for single-VM single-tenant.
 
@@ -105,7 +105,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 - `depends_on` entries upgraded to the long form with `condition: service_healthy` wherever the dependency has a healthcheck; healthchecks added to `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `grafana`, and `prometheus` so gating is meaningful.
 - A top-level `x-logging: &default-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) applied to every service — bounded disk usage on long-lived VMs.
 - Image pinning: audit confirms every image is version-pinned except `ngrok/ngrok:3` (floating major); pin it. Locally built images unaffected.
-- `SECURITY_ENABLED` passes through compose as `${SECURITY_ENABLED:-false}`; the deployment guide's production checklist requires `SECURITY_ENABLED=true` in the customer `.env`, and the AscendAgent production-profile guard (D3) warns loudly when it is false. The auth behavior behind the flag belongs to `add-auth-and-identity`.
+- `SECURITY_ENABLED` passes through compose as `${SECURITY_ENABLED:-false}`; the deployment guide's production checklist requires `SECURITY_ENABLED=true` in the customer `.env`, and the ascend-ai-agent production-profile guard (D3) warns loudly when it is false. The auth behavior behind the flag belongs to `add-auth-and-identity`.
 
 ## Risks / Trade-offs
 

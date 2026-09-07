@@ -168,7 +168,7 @@ services:
 
   ascend-web-hunter:
     build:
-      context: ./ascend-web-hunter
+      context: ./apps/ascend-web-hunter
       dockerfile: Dockerfile
     container_name: ascend-web-hunter
     hostname: ascend-web-hunter
@@ -185,7 +185,7 @@ services:
       - API_PORT=7021
       - API_HOST=0.0.0.0
       - LOG_LEVEL=INFO
-      - SEARXNG_USER_AGENT=ascend-web-hunter/1.0
+      - SEARXNG_USER_AGENT=apps/ascend-web-hunter/1.0
       - SEARXNG_X_REAL_IP=0.0.0.0
       - SEARXNG_X_FORWARDED_FOR=0.0.0.0
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt

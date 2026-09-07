@@ -4,7 +4,7 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 
 ## 1. Provenance vocabulary and parser page numbers
 
-- [ ] 1.1 Capture one real Unstructured API response for a multi-page PDF and one for a multi-page DOCX into `AscendAgent/src/test/resources/` fixtures, and confirm from the captured JSON which field path carries the per-element page number. Verify: the fixtures are committed and the field path is quoted in the test that reads them, so no later task guesses it.
+- [ ] 1.1 Capture one real Unstructured API response for a multi-page PDF and one for a multi-page DOCX into `apps/ascend-ai-agent/src/test/resources/` fixtures, and confirm from the captured JSON which field path carries the per-element page number. Verify: the fixtures are committed and the field path is quoted in the test that reads them, so no later task guesses it.
 - [ ] 1.2 Add `PAGE`, `CHUNK_INDEX` and `CHUNK_COUNT` to `service/ingestion/IngestionMetadataKeys.java` with the same javadoc convention as the existing keys. Verify: `IngestionMetadataKeys` compiles and no producer references a page key literal anywhere else (grep for the literal returns only this class).
 - [ ] 1.3 Rewrite `IngestionService.parseUnstructuredResponse` to group elements by their page number and emit one `Document` per page, each carrying `source`, `title`, `type` and `page`, keeping the existing title-extraction behavior (first `Title` element wins, filename fallback). Verify: a unit test over the 1.1 PDF fixture asserts one document per page, page numbers ascending from 1, and no text lost against the current single-blob output.
 - [ ] 1.4 Handle elements that report no page number in `parseUnstructuredResponse` by emitting them as a document without `page` rather than assigning one. Verify: a unit test over a fixture with a page-less element asserts that element's text is present in a document whose metadata has no `page` key, and ingestion returns normally.
@@ -31,7 +31,7 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 
 ## 5. Reindex
 
-- [ ] 5.1 REINDEX REQUIRED. Document the reindex step in `AscendAgent/AGENTS.md` and in the RAG documentation: which fields are new, that documents indexed earlier degrade to document-level citations, and that the cost is one full parse per document including OCR. Verify: the text names the three payload fields and the degradation, and links the reindex endpoint.
+- [ ] 5.1 REINDEX REQUIRED. Document the reindex step in `apps/ascend-ai-agent/AGENTS.md` and in the RAG documentation: which fields are new, that documents indexed earlier degrade to document-level citations, and that the cost is one full parse per document including OCR. Verify: the text names the three payload fields and the degradation, and links the reindex endpoint.
 - [ ] 5.2 REINDEX REQUIRED. Reindex the local corpus and record the before and after state. Verify: for one previously indexed multi-page PDF, a Qdrant payload query shows no `page` key before and a `page` key on every chunk after, and the chunk count is unchanged or explained.
 
 ## 6. Labeled retrieval context
@@ -65,15 +65,15 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 
 ## 10. Architecture decision records
 
-- [ ] 10.1 Write `AscendAgent/docs/architecture/decisions/ADR-010-passage-level-citation-granularity.md` in the house format (title, Status with date, Context, Decision, Consequences, Related), recording why the retrieved passage is the citation unit rather than the document or a character range, and what each rejected option cost. Verify: the file exists, follows the section order of ADR-009, and is referenced from design.md decision D1.
-- [ ] 10.2 Write `AscendAgent/docs/architecture/decisions/ADR-011-provenance-carried-from-parser-to-index.md` recording that page and ordinal provenance is stamped by the producer that knows it and carried as chunk metadata, why re-deriving it at query time was rejected, and the reindex consequence. Verify: the file exists, follows the same format, and is referenced from design.md decision D3.
+- [ ] 10.1 Write `apps/ascend-ai-agent/docs/architecture/decisions/ADR-010-passage-level-citation-granularity.md` in the house format (title, Status with date, Context, Decision, Consequences, Related), recording why the retrieved passage is the citation unit rather than the document or a character range, and what each rejected option cost. Verify: the file exists, follows the section order of ADR-009, and is referenced from design.md decision D1.
+- [ ] 10.2 Write `apps/ascend-ai-agent/docs/architecture/decisions/ADR-011-provenance-carried-from-parser-to-index.md` recording that page and ordinal provenance is stamped by the producer that knows it and carried as chunk metadata, why re-deriving it at query time was rejected, and the reindex consequence. Verify: the file exists, follows the same format, and is referenced from design.md decision D3.
 - [ ] 10.3 Confirm the two new records do not renumber or contradict ADR-001 through ADR-009. Verify: the decisions directory lists ADR-001 to ADR-011 with no gap and no duplicate number.
 
 ## 11. Documentation and API surface
 
 - [ ] 11.1 Update the OpenAPI annotations so `citations` and `ingestedAt` are described on the prompt response, including that citation fields are omitted when unknown. Verify: the generated OpenAPI document shows both, with `citations` optional.
 - [ ] 11.2 Add a Bruno request under `docs/api/request/AscendAI/ascend-agent/` that exercises a citation-bearing prompt. Verify: running it against a live stack returns a response containing a `citations` array.
-- [ ] 11.3 Update `AscendAgent/AGENTS.md` and the RAG architecture documentation with the label form, the citation shape, and the three-level degradation. Verify: the text states the label form and the degradation order.
+- [ ] 11.3 Update `apps/ascend-ai-agent/AGENTS.md` and the RAG architecture documentation with the label form, the citation shape, and the three-level degradation. Verify: the text states the label form and the degradation order.
 
 ## 12. End-to-end verification
 
@@ -82,4 +82,4 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 - [ ] 12.3 Ask a question against a document indexed before this change and confirm the citation degrades to document level without failing. Verify: the citation entry carries only `label` and `name`, and the request returns 200.
 - [ ] 12.4 REINDEX REQUIRED. Reindex that same document and repeat 12.3, confirming the citation now carries a page or an ordinal. Verify: the same question returns a citation with a locator it did not have before.
 - [ ] 12.5 Confirm the kill switch restores the previous behavior end to end. Verify: with `app.rag.citations.enabled: false`, the same prompt returns no `citations` key and an answer with no label markers, and the `sources` array is unchanged in shape.
-- [ ] 12.6 Run the full AscendAgent test suite and the integration suite. Verify: `./gradlew test` and `./gradlew integrationTest` both pass with no assertion weakened or test disabled.
+- [ ] 12.6 Run the full ascend-ai-agent test suite and the integration suite. Verify: `./gradlew test` and `./gradlew integrationTest` both pass with no assertion weakened or test disabled.

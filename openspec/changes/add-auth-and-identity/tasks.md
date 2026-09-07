@@ -27,9 +27,9 @@ Every task carries its own verification, and every verification is an observable
 - [ ] 1.10 Confirm realm state survives container recreation beyond the import
   - verify: create a second realm user through the admin API, recreate the container, and that user is still present
 
-## 2. AscendAgent resource server
+## 2. ascend-ai-agent resource server
 
-- [ ] 2.1 `AscendAgent/build.gradle.kts`: replace `spring-boot-starter-oauth2-client` with `spring-boot-starter-oauth2-resource-server`; add `spring-security-test` to the test scope
+- [ ] 2.1 `apps/ascend-ai-agent/build.gradle.kts`: replace `spring-boot-starter-oauth2-client` with `spring-boot-starter-oauth2-resource-server`; add `spring-security-test` to the test scope
   - verify: `./gradlew dependencies --configuration runtimeClasspath` lists `spring-boot-starter-oauth2-resource-server` and does not list `spring-boot-starter-oauth2-client`
 - [ ] 2.2 Rewrite `SecurityConfig.java` as a JWT resource-server chain carrying the D4 matrix: `/api/v1/ai/prompt` and `/api/v1/ingestion/upload` need `USER` or `ADMIN`; `/api/v1/ingestion/run` needs `ADMIN`; `/actuator/health`, `/actuator/prometheus`, and the Swagger and OpenAPI paths are permitAll; everything else is authenticated. CSRF stays disabled, sessions stateless. Delete the HTTP Basic branch, the `UserDetailsService`, and the `PasswordEncoder` bean
   - verify: MockMvc returns 401 tokenless on prompt, 403 for a `USER` token on `/api/v1/ingestion/run`, 200 for an `ADMIN` token on the same path, and 200 tokenless on `/actuator/health` and `/swagger-ui.html`
@@ -126,7 +126,7 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
 - [ ] 8.2 Prove the docker posture refuses to boot open
   - verify: starting the container in the compose posture with `SERVICE_AUTH_TOKEN` unset exits non-zero before the port accepts a connection
 
-## 9. AscendAgent outbound token attachment
+## 9. ascend-ai-agent outbound token attachment
 
 - [ ] 9.1 Bind `SERVICE_AUTH_TOKEN` through `@ConfigurationProperties` with no checked-in default, and attach `Authorization: Bearer` as a default header on the `SemanticMemoryClient` RestClient builder when configured
   - verify: MockRestServiceServer sees the header on `search` and on `wipeUserMemory`, sees no `Authorization` header when the token is unset, and the token value appears in no log output at any level
@@ -150,10 +150,10 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
 
 - [ ] 11.1 Add a token-acquisition request against the seeded realm user to the Bruno collection at `docs/api/request/AscendAI/`, using the development overlay's client rather than the application client, and thread the bearer token through the existing requests by environment variable
   - verify: `bru run` against the secured stack completes the collection with no 401, removing the token step reproduces 401 on the first protected request, and the same collection run against a realm imported without the development overlay fails at the token step rather than obtaining a token
-- [ ] 11.2 Update the five e2e specs and their tasks-templates in `AscendAgent/e2e/` for the secured posture, adding the token step to setup and removing `X-User-Id` usage, while keeping the dev-profile path documented for ad-hoc manual runs
-  - verify: no spec or template under `AscendAgent/e2e/` still references `X-User-Id`, and each of the five names its token-acquisition setup step
+- [ ] 11.2 Update the five e2e specs and their tasks-templates in `apps/ascend-ai-agent/e2e/` for the secured posture, adding the token step to setup and removing `X-User-Id` usage, while keeping the dev-profile path documented for ad-hoc manual runs
+  - verify: no spec or template under `apps/ascend-ai-agent/e2e/` still references `X-User-Id`, and each of the five names its token-acquisition setup step
 - [ ] 11.3 Run the e2e sweep against the secured stack
-  - verify: all five specs pass with verdicts recorded under `AscendAgent/e2e/testing/runs/`
+  - verify: all five specs pass with verdicts recorded under `apps/ascend-ai-agent/e2e/testing/runs/`
 
 ## 12. Documentation and architecture decision records
 
@@ -166,14 +166,14 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
 - [ ] 12.4 Record the named limitation in `docs/SECURITY.md`: no principal this version mints matches a directory group identifier, so per-document permissions apply to directly-uploaded documents and connector-synced documents are visible tenant-wide, together with what would have to be built to lift it
   - verify: the section states both halves of the consequence and names the deferred work, and it does not describe the limitation as a defect
 - [ ] 12.5 Record the staleness window in `docs/SECURITY.md` as a product disclosure: a group membership change becomes visible at the caller's next token, bounded by the access token lifetime and the SSO session lifetime
-  - verify: the stated numbers match the lifetimes actually set in the realm export from task 1.3, and the section states that AscendAgent adds no cache of its own
+  - verify: the stated numbers match the lifetimes actually set in the realm export from task 1.3, and the section states that ascend-ai-agent adds no cache of its own
 - [ ] 12.6 Record the operating cost of self-hosted Keycloak in `docs/SECURITY.md`: the database, certificates, backup with a restore that has been exercised, the absence of a long-term support release upstream, the roughly monthly patch and quarterly minor cadence, breaking changes having shipped inside patch releases, and the requirement to re-verify sign-in after an upgrade
   - verify: the section exists, names the upgrade verification step, and the restore procedure has been performed once against a non-production realm with the result recorded
-- [ ] 12.7 Update the root `AGENTS.md` and the per-module `AGENTS.md` files (AscendAgent, AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-ocr, ascend-weather-mcp) with the new environment variables, the secured-by-default posture, and the dev-profile note
+- [ ] 12.7 Update the root `AGENTS.md` and the per-module `AGENTS.md` files (ascend-ai-agent, AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-ocr, ascend-weather-mcp) with the new environment variables, the secured-by-default posture, and the dev-profile note
   - verify: `grep` for `SERVICE_AUTH_TOKEN` and `issuer-uri` finds them documented in every module whose service consumes them
-- [ ] 12.8 Install the decision records drafted in `openspec/changes/add-auth-and-identity/decisions/` into `AscendAgent/docs/architecture/decisions/`, taking the next free numbers at that moment, flipping each active record's Status line from proposed to accepted with the merge date, and carrying the deferred records across with their deferred status intact
-  - verify: the files exist under `AscendAgent/docs/architecture/decisions/` with unique sequential numbers, no number collides with an existing record, every relative link inside them resolves, and each deferred record states plainly that it is not implemented by this change
-- [ ] 12.9 Update `AscendAgent/docs/architecture/` diagrams and arc42 sections for the resource-server posture and the principal resolution path
+- [ ] 12.8 Install the decision records drafted in `openspec/changes/add-auth-and-identity/decisions/` into `apps/ascend-ai-agent/docs/architecture/decisions/`, taking the next free numbers at that moment, flipping each active record's Status line from proposed to accepted with the merge date, and carrying the deferred records across with their deferred status intact
+  - verify: the files exist under `apps/ascend-ai-agent/docs/architecture/decisions/` with unique sequential numbers, no number collides with an existing record, every relative link inside them resolves, and each deferred record states plainly that it is not implemented by this change
+- [ ] 12.9 Update `apps/ascend-ai-agent/docs/architecture/` diagrams and arc42 sections for the resource-server posture and the principal resolution path
   - verify: the component diagram shows Keycloak as the issuer and the principal resolution step in the request path, and shows no directory adapter and no principal cache
 - [ ] 12.10 Keep `openspec/changes/add-auth-and-identity/tasks.md` checkboxes current as work proceeds
   - verify: `openspec instructions apply --change add-auth-and-identity --json` reports a completion count matching the checked boxes at every review point

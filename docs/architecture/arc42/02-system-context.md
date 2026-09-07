@@ -9,7 +9,7 @@ graph TB
     User["User / Client"]
 
     subgraph "AscendAI Platform"
-        Agent["AscendAgent"]
+        Agent["ascend-ai-agent"]
         AudioScribe["ascend-audio-scribe"]
         Weather["ascend-weather-mcp"]
         WebHunter["ascend-web-hunter"]

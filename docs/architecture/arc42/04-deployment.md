@@ -8,7 +8,7 @@
 graph TB
     subgraph "Developer Machine (Host)"
         LMStudio["LM Studio :1234"]
-        Agent["AscendAgent :9917<br/>(java -jar)"]
+        Agent["ascend-ai-agent :9917<br/>(java -jar)"]
         Weather["ascend-weather-mcp :9998<br/>(java -jar)"]
     end
 
@@ -68,7 +68,7 @@ graph TB
 
 | Service           | Port(s)         | Type                  | Runs in                |
 | :---------------- | :-------------- | :-------------------- | :--------------------- |
-| AscendAgent       | 9917            | Main API gateway      | Host JVM               |
+| ascend-ai-agent       | 9917            | Main API gateway      | Host JVM               |
 | ascend-weather-mcp | 9998            | MCP server            | Host JVM               |
 | LM Studio         | 1234            | Local LLM             | Host                   |
 | ascend-audio-scribe       | 7017            | MCP server            | Docker                 |

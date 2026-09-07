@@ -51,18 +51,18 @@ out/
 # e2e manual test run records — ephemeral, one per sweep. Keep the README,
 # ignore the timestamped run files. Move a particular run into version control
 # manually if you want it as an audit artifact.
-AscendAgent/e2e/testing/runs/*
-!AscendAgent/e2e/testing/runs/README.md
-ascend-weather-mcp/e2e/testing/runs/*
-!ascend-weather-mcp/e2e/testing/runs/README.md
-AscendMemory/e2e/testing/runs/*
-!AscendMemory/e2e/testing/runs/README.md
-ascend-web-hunter/e2e/testing/runs/*
-!ascend-web-hunter/e2e/testing/runs/README.md
-ascend-audio-scribe/e2e/testing/runs/*
-!ascend-audio-scribe/e2e/testing/runs/README.md
-ascend-ocr/e2e/testing/runs/*
-!ascend-ocr/e2e/testing/runs/README.md
+apps/ascend-ai-agent/e2e/testing/runs/*
+!apps/ascend-ai-agent/e2e/testing/runs/README.md
+apps/ascend-weather-mcp/e2e/testing/runs/*
+!apps/ascend-weather-mcp/e2e/testing/runs/README.md
+apps/ascend-memory/e2e/testing/runs/*
+!apps/ascend-memory/e2e/testing/runs/README.md
+apps/ascend-web-hunter/e2e/testing/runs/*
+!apps/ascend-web-hunter/e2e/testing/runs/README.md
+apps/ascend-audio-scribe/e2e/testing/runs/*
+!apps/ascend-audio-scribe/e2e/testing/runs/README.md
+apps/ascend-ocr/e2e/testing/runs/*
+!apps/ascend-ocr/e2e/testing/runs/README.md
 
 # Bruno CLI run-output dump. Bruno writes the report next to the collection
 # root when invoked with `--output` (the file is named after the format —
@@ -132,5 +132,5 @@ MANIFEST
 # Crawlee runtime state — request queues and key-value stores are ephemeral
 # artifacts produced at scrape time. They contain scraped URLs and responses
 # and must not be committed.
-ascend-web-hunter/src/storage/
-ascend-web-hunter/.crawlee_storage/
+apps/ascend-web-hunter/src/storage/
+apps/ascend-web-hunter/.crawlee_storage/

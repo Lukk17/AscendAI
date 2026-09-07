@@ -4,7 +4,7 @@
 
 ### Requirement: Tenant provider keys are stored encrypted at rest with envelope encryption
 
-AscendAgent SHALL store per-tenant provider API keys in a Liquibase-managed PostgreSQL table, encrypted with AES-256-GCM under a per-row data-encryption key that is itself wrapped by a master key-encryption key supplied via environment variable (`USAGE_KEK`). The row SHALL store only ciphertext, the wrapped DEK, the GCM nonce, a KEK identifier, and the key's last four characters. The plaintext key SHALL never be written to logs or persisted unencrypted anywhere.
+ascend-ai-agent SHALL store per-tenant provider API keys in a Liquibase-managed PostgreSQL table, encrypted with AES-256-GCM under a per-row data-encryption key that is itself wrapped by a master key-encryption key supplied via environment variable (`USAGE_KEK`). The row SHALL store only ciphertext, the wrapped DEK, the GCM nonce, a KEK identifier, and the key's last four characters. The plaintext key SHALL never be written to logs or persisted unencrypted anywhere.
 
 #### Scenario: Persisted key is not recoverable from the database alone
 
@@ -18,7 +18,7 @@ AscendAgent SHALL store per-tenant provider API keys in a Liquibase-managed Post
 
 ### Requirement: Provider-key management API is ADMIN-only and write-only
 
-AscendAgent SHALL expose `ADMIN`-role endpoints under `/api/v1/tenants/{tenantId}/provider-keys`: upsert a key for a provider, list configured keys, and delete a key. Read responses SHALL contain only provider name, `last4`, and timestamps — never the key itself, in any encoding. Non-`ADMIN` callers SHALL receive `403`.
+ascend-ai-agent SHALL expose `ADMIN`-role endpoints under `/api/v1/tenants/{tenantId}/provider-keys`: upsert a key for a provider, list configured keys, and delete a key. Read responses SHALL contain only provider name, `last4`, and timestamps — never the key itself, in any encoding. Non-`ADMIN` callers SHALL receive `403`.
 
 #### Scenario: Stored key is never returned
 
@@ -37,7 +37,7 @@ AscendAgent SHALL expose `ADMIN`-role endpoints under `/api/v1/tenants/{tenantId
 
 ### Requirement: Provider calls resolve the tenant key with fallback to the global key
 
-For every provider call, AscendAgent SHALL resolve credentials in this order: the calling tenant's stored key for the resolved provider, then the global deployment key from `AiProviderProperties`. Tenant-keyed provider clients SHALL be cached and evicted when the tenant's key is upserted or deleted. A provider authentication failure on a tenant key SHALL be surfaced as a client-visible error identifying the tenant key by `last4`, and SHALL NOT be silently retried on the global key.
+For every provider call, ascend-ai-agent SHALL resolve credentials in this order: the calling tenant's stored key for the resolved provider, then the global deployment key from `AiProviderProperties`. Tenant-keyed provider clients SHALL be cached and evicted when the tenant's key is upserted or deleted. A provider authentication failure on a tenant key SHALL be surfaced as a client-visible error identifying the tenant key by `last4`, and SHALL NOT be silently retried on the global key.
 
 #### Scenario: Tenant key is used over the global key
 

@@ -20,9 +20,9 @@ ADR-M004 through ADR-M009 are the decision set behind [permission-aware retrieva
 
 ---
 
-### AscendAgent-specific decisions
+### ascend-ai-agent-specific decisions
 
-Detailed ADRs for the AscendAgent internal architecture live in [AscendAgent/docs/architecture/decisions/](../../../AscendAgent/docs/architecture/decisions/).
+Detailed ADRs for the ascend-ai-agent internal architecture live in [apps/ascend-ai-agent/docs/architecture/decisions/](../../../apps/ascend-ai-agent/docs/architecture/decisions/).
 
 | ID      | Decision                                                |
 | :------ | :------------------------------------------------------ |

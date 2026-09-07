@@ -11,9 +11,9 @@ does not become the binding term until roughly ninety pages with no detector bou
 for A4 under the 1536 bound this module now deploys. Twenty five pages of A4 cost 276 MiB more than one page of A4.
 
 It falls out of two deadlines. `OCR_MAX_PAGES` is a derived property, `floor(OCR_REQUEST_TIMEOUT /
-OCR_PAGE_TIMEOUT_SECONDS)` in [config.py](../../../ascend-ocr/src/config/config.py). The deployed values are 300 s
+OCR_PAGE_TIMEOUT_SECONDS)` in [config.py](../../../apps/ascend-ocr/src/config/config.py). The deployed values are 300 s
 (`docker-compose.yaml`) and 120 s, so the answer is two, and `enforce_page_limit` in
-[limits.py](../../../ascend-ocr/src/api/limits.py) refuses anything above it. The refusal is correct given those
+[limits.py](../../../apps/ascend-ocr/src/api/limits.py) refuses anything above it. The refusal is correct given those
 numbers: a document that provably cannot finish inside the service's own ceiling should not be started.
 
 That ceiling was introduced for a good reason and this change keeps it. A twenty page document once failed at
@@ -24,7 +24,7 @@ The reason a larger ceiling is not the answer is that nobody can wait for it. A 
 consistent with the 47 to 100 s band recorded beside `OCR_PAGE_TIMEOUT_SECONDS` and with the 105 s per page the
 twenty page incident implies, so twenty five pages is about 37 minutes of work. The platform's own callers give up
 long before that: `app.ingestion.read-timeout` is 300000 ms in
-[application.yaml](../../../AscendAgent/src/main/resources/application.yaml), which is the client the chat
+[application.yaml](../../../apps/ascend-ai-agent/src/main/resources/application.yaml), which is the client the chat
 attachment path uses through `AscendOcrClient`, and `spring.ai.mcp.client.request-timeout` is 300 s for every MCP
 server the agent talks to. Raise the ceiling to 4800 s and the service spends 75 minutes inferring pages for a
 caller who disconnected at 300 s, which is the incident the previous change exists to end, arriving through the
@@ -85,9 +85,9 @@ What comes with the job, which is the part that is easy to leave half built:
 
 Two new error codes, `QUEUE_FULL` (503) and `JOB_NOT_FOUND` (404), plus a `SERVICE_RESTARTED` failure reason that
 appears only inside a job record. Adding codes is non-breaking under
-[ADR-003](../../../ascend-ocr/docs/architecture/decisions/ADR-003-versioning-strategy.md), and no existing code
+[ADR-003](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-003-versioning-strategy.md), and no existing code
 changes meaning. `ReadinessResponse` gains `jobs_queued` and `jobs_running`, additive, with `/ready` keeping its 200
-in both states as [ADR-004](../../../ascend-ocr/docs/architecture/decisions/ADR-004-liveness-readiness-split.md)
+in both states as [ADR-004](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-004-liveness-readiness-split.md)
 specifies.
 
 Nothing here is BREAKING.
@@ -114,7 +114,7 @@ four still reads true once jobs exist.
 
 ## Impact
 
-Code, all under `ascend-ocr/`:
+Code, all under `apps/ascend-ocr/`:
 
 - `src/service/job_store.py`: new. Job records on disk, atomic write and read, the id, the state transitions, the
   retention sweep and the startup recovery pass.
@@ -137,7 +137,7 @@ Code, all under `ascend-ocr/`:
 - `src/observability/metrics.py`: job outcomes, queue depth in jobs and in pages, queue wait, job duration and
   retained record count.
 
-Tests, all under `ascend-ocr/tests/`. The gate is `--cov-fail-under=100` with `--cov-branch`, so every branch added
+Tests, all under `apps/ascend-ocr/tests/`. The gate is `--cov-fail-under=100` with `--cov-branch`, so every branch added
 needs a test. Detail in [tasks.md](tasks.md).
 
 Configuration: `docker-compose.yaml` sets `OCR_REQUEST_TIMEOUT=240` in place of 300 and adds the job settings that
@@ -149,16 +149,16 @@ API: additive on both surfaces. No existing response field, error code or reques
 Dependencies: none added. The job store is files and JSON, deliberately, so this module keeps its property of having
 no external service dependency of its own.
 
-Docs: the environment table in `ascend-ocr/AGENTS.md`, `ascend-ocr/README.md`, `ascend-ocr/docs/CONFIGURATION.md`, the
-arc42 pages under `ascend-ocr/docs/architecture/arc42/`, an amendment to ADR-002 for the two new codes, an amendment
+Docs: the environment table in `apps/ascend-ocr/AGENTS.md`, `apps/ascend-ocr/README.md`, `apps/ascend-ocr/docs/CONFIGURATION.md`, the
+arc42 pages under `apps/ascend-ocr/docs/architecture/arc42/`, an amendment to ADR-002 for the two new codes, an amendment
 to ADR-004 for the two new readiness fields, and a new ADR recording why long documents became jobs rather than a
-larger timeout. `ascend-ocr/e2e/README.md` says the service holds no persisted state, which stops being true, so it
+larger timeout. `apps/ascend-ocr/e2e/README.md` says the service holds no persisted state, which stops being true, so it
 changes in the same commit as the store that makes it false.
 
 Test surfaces beyond the unit suite: three Bruno requests under `docs/api/request/AscendAI/ocr/`, and one new
-capability spec plus its run template under `ascend-ocr/e2e/testing/`.
+capability spec plus its run template under `apps/ascend-ocr/e2e/testing/`.
 
-Out of scope, named rather than silently left: pointing the AscendAgent at the job API. Its `DocumentRouter` already
+Out of scope, named rather than silently left: pointing the ascend-ai-agent at the job API. Its `DocumentRouter` already
 splits a PDF page by page and dispatches four at a time, so it never sends a long document as one request, and
 [design.md](design.md) records what that parallelism does against a single worker and why changing it is the
 agent's decision rather than this module's.

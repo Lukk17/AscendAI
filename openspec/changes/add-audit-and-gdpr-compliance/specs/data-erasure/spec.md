@@ -2,7 +2,7 @@
 
 ### Requirement: Per-user erasure endpoint starts an asynchronous job
 
-AscendAgent SHALL expose `DELETE /api/v1/users/{userId}/data` which creates a persisted erasure job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` (self-service) or by an ADMIN for any user; any other caller receives HTTP 403. Job state SHALL be persisted in a Postgres `erasure_job` table (Liquibase changelog) so that requests survive restarts and remain reportable after completion.
+ascend-ai-agent SHALL expose `DELETE /api/v1/users/{userId}/data` which creates a persisted erasure job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` (self-service) or by an ADMIN for any user; any other caller receives HTTP 403. Job state SHALL be persisted in a Postgres `erasure_job` table (Liquibase changelog) so that requests survive restarts and remain reportable after completion.
 
 #### Scenario: Self-service erasure accepted
 
@@ -36,7 +36,7 @@ An erasure job for user `{userId}` SHALL delete, recording a per-store outcome a
 
 ### Requirement: Erasure job status endpoint
 
-AscendAgent SHALL expose `GET /api/v1/users/{userId}/data/erasure/{jobId}` returning the job's status (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `PARTIAL`), per-store outcomes with deleted-item counts, and request/completion timestamps. Authorization matches the erasure endpoint (self or ADMIN).
+ascend-ai-agent SHALL expose `GET /api/v1/users/{userId}/data/erasure/{jobId}` returning the job's status (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `PARTIAL`), per-store outcomes with deleted-item counts, and request/completion timestamps. Authorization matches the erasure endpoint (self or ADMIN).
 
 #### Scenario: Status shows per-store counts
 

@@ -2,9 +2,9 @@
 
 ### Requirement: Every AscendAI service exposes a Prometheus-format metrics endpoint
 
-Every long-running AscendAI service (AscendAgent, ascend-weather-mcp, AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-ocr) SHALL expose an HTTP endpoint that returns metrics in OpenMetrics / Prometheus exposition format on a documented path. JVM services use `/actuator/prometheus`; Python services use `/metrics`.
+Every long-running AscendAI service (ascend-ai-agent, ascend-weather-mcp, AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-ocr) SHALL expose an HTTP endpoint that returns metrics in OpenMetrics / Prometheus exposition format on a documented path. JVM services use `/actuator/prometheus`; Python services use `/metrics`.
 
-#### Scenario: AscendAgent metrics endpoint
+#### Scenario: ascend-ai-agent metrics endpoint
 
 - **WHEN** `GET http://localhost:9917/actuator/prometheus` is invoked
 - **THEN** the response status is 200
@@ -21,10 +21,10 @@ Every long-running AscendAI service (AscendAgent, ascend-weather-mcp, AscendMemo
 
 Every long-running AscendAI service SHALL be configured to emit OpenTelemetry spans via OTLP to `http://otel-collector:4317`. JVM services rely on Spring AI 1.1's bundled OTel auto-instrumentation; Python services rely on `opentelemetry-distro` auto-instrumentation activated at startup.
 
-#### Scenario: AscendAgent emits a trace per chat turn
+#### Scenario: ascend-ai-agent emits a trace per chat turn
 
-- **WHEN** AscendAgent serves a single `POST /api/v1/ai/prompt` request
-- **AND** Tempo is queried for traces with `service.name=ascend-agent` within 5 seconds
+- **WHEN** ascend-ai-agent serves a single `POST /api/v1/ai/prompt` request
+- **AND** Tempo is queried for traces with `service.name=ascend-ai-agent` within 5 seconds
 - **THEN** at least one trace exists for that request
 - **AND** the trace contains at least one span tagged `gen_ai.operation.name=chat` (Spring AI's auto-emitted LLM-call span)
 
@@ -36,21 +36,21 @@ Every long-running AscendAI service SHALL be configured to emit OpenTelemetry sp
 
 ### Requirement: Common identification tags on every metric, log label, and span attribute
 
-Every metric emitted by any AscendAI service SHALL carry the tags `service` and `version`. The `service` tag value SHALL match the service's logical name (`ascend-agent`, `ascend-audio-scribe`, etc.). The `version` tag SHALL be derived from build metadata. The same `service` and `version` SHALL appear as Loki log labels and OTel span resource attributes (`service.name`, `service.version`).
+Every metric emitted by any AscendAI service SHALL carry the tags `service` and `version`. The `service` tag value SHALL match the service's logical name (`ascend-ai-agent`, `ascend-audio-scribe`, etc.). The `version` tag SHALL be derived from build metadata. The same `service` and `version` SHALL appear as Loki log labels and OTel span resource attributes (`service.name`, `service.version`).
 
 #### Scenario: Tag presence on a custom counter
 
-- **WHEN** a custom counter (e.g., `memory_extraction_parse_failed_total`) is scraped from AscendAgent
-- **THEN** every emitted sample carries `service="ascend-agent"` and a non-empty `version="..."` tag
+- **WHEN** a custom counter (e.g., `memory_extraction_parse_failed_total`) is scraped from ascend-ai-agent
+- **THEN** every emitted sample carries `service="ascend-ai-agent"` and a non-empty `version="..."` tag
 
 #### Scenario: Log labels match metric tags
 
-- **WHEN** a log line written by AscendAgent is queried in Loki
-- **THEN** the line carries the label `service="ascend-agent"`
+- **WHEN** a log line written by ascend-ai-agent is queried in Loki
+- **THEN** the line carries the label `service="ascend-ai-agent"`
 
 ### Requirement: Domain custom metrics — semantic memory
 
-AscendAgent SHALL emit the following metrics related to semantic memory operations.
+ascend-ai-agent SHALL emit the following metrics related to semantic memory operations.
 
 | Metric | Type | Required tags |
 |---|---|---|
@@ -77,7 +77,7 @@ AscendAgent SHALL emit the following metrics related to semantic memory operatio
 
 ### Requirement: Domain custom metrics — RAG retrieval
 
-AscendAgent SHALL emit the following metrics related to RAG retrieval.
+ascend-ai-agent SHALL emit the following metrics related to RAG retrieval.
 
 | Metric | Type | Required tags |
 |---|---|---|
@@ -99,7 +99,7 @@ AscendAgent SHALL emit the following metrics related to RAG retrieval.
 
 ### Requirement: Domain custom metrics — MCP tool calls
 
-AscendAgent SHALL record a timer for every MCP tool invocation.
+ascend-ai-agent SHALL record a timer for every MCP tool invocation.
 
 | Metric | Type | Required tags |
 |---|---|---|
@@ -107,12 +107,12 @@ AscendAgent SHALL record a timer for every MCP tool invocation.
 
 #### Scenario: Tool timer fires per call
 
-- **WHEN** AscendAgent invokes any MCP tool (e.g., `web_search`, `transcribe_audio`)
+- **WHEN** ascend-ai-agent invokes any MCP tool (e.g., `web_search`, `transcribe_audio`)
 - **THEN** `mcp_tool_duration_seconds_count{tool="<name>",outcome="<o>"}` increments by exactly 1
 
 ### Requirement: Domain custom metrics — prompt cache (powers L3 dashboard)
 
-AscendAgent SHALL emit prompt-cache token counters from each provider strategy's `recordOutcome(...)` so the L3 Cache Hit Rate dashboard can chart cache effectiveness over time.
+ascend-ai-agent SHALL emit prompt-cache token counters from each provider strategy's `recordOutcome(...)` so the L3 Cache Hit Rate dashboard can chart cache effectiveness over time.
 
 | Metric | Type | Required tags |
 |---|---|---|
@@ -138,11 +138,11 @@ AscendAgent SHALL emit prompt-cache token counters from each provider strategy's
 
 ### Requirement: Spring AI generative AI metrics auto-collection
 
-AscendAgent SHALL retain Spring AI's automatically-collected `gen_ai.*` metrics (notably `gen_ai_client_token_usage_total` with tags `model`, `type`, `provider`) once Actuator is on the classpath; no custom code is required, but the metrics MUST appear at `/actuator/prometheus`. The `provider` tag is required so the L1 Token Cost dashboard can multiply by per-provider pricing.
+ascend-ai-agent SHALL retain Spring AI's automatically-collected `gen_ai.*` metrics (notably `gen_ai_client_token_usage_total` with tags `model`, `type`, `provider`) once Actuator is on the classpath; no custom code is required, but the metrics MUST appear at `/actuator/prometheus`. The `provider` tag is required so the L1 Token Cost dashboard can multiply by per-provider pricing.
 
 #### Scenario: Token usage metric is exposed with provider tag
 
-- **WHEN** AscendAgent processes a prompt that invokes any chat provider
+- **WHEN** ascend-ai-agent processes a prompt that invokes any chat provider
 - **AND** `/actuator/prometheus` is then scraped
 - **THEN** the body contains a line matching `gen_ai_client_token_usage_total{...,provider="...",type="(input|output)",...}`
 

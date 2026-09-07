@@ -30,8 +30,8 @@
 #### Scenario: End-to-end memory recall
 
 - **WHEN** a fact has been previously inserted for user `frosty` of tenant `acme` and the user asks a question that should recall it
-- **THEN** AscendAgent logs `Received N semantic memory items for user: 'frosty'` with N >= 1
-- **AND** AscendAgent does NOT log `Semantic memory search failed for user 'frosty'. Status: 500 INTERNAL_SERVER_ERROR`
+- **THEN** ascend-ai-agent logs `Received N semantic memory items for user: 'frosty'` with N >= 1
+- **AND** ascend-ai-agent does NOT log `Semantic memory search failed for user 'frosty'. Status: 500 INTERNAL_SERVER_ERROR`
 
 ### Requirement: Wipe and delete operations are exposed by the client
 

@@ -17,7 +17,7 @@ The stack is split across two project files:
   runnable on its own; when run standalone it forms its own group in Docker Desktop.
 
 A third file exists for deploying the web-search stack to a machine of its own, without the rest of the platform:
-[ascend-web-hunter/deploy-standalone/](../ascend-web-hunter/deploy-standalone/README.md). It pulls published images rather than building, and
+[apps/ascend-web-hunter/deploy-standalone/](../apps/ascend-web-hunter/deploy-standalone/README.md). It pulls published images rather than building, and
 targets Docker Engine on Linux. It is a separate artifact on purpose and is not included by either file above. See
 [Standalone web-search deployment](#standalone-web-search-deployment).
 
@@ -134,7 +134,7 @@ After a service's first release, switch it once by hand at Package settings → 
 
 ### Standalone web-search deployment
 
-[ascend-web-hunter/deploy-standalone/](../ascend-web-hunter/deploy-standalone/README.md) is a copy-and-run bundle for putting the web-search
+[apps/ascend-web-hunter/deploy-standalone/](../apps/ascend-web-hunter/deploy-standalone/README.md) is a copy-and-run bundle for putting the web-search
 stack on its own host, a homelab box or a VPS, without the rest of AscendAI. It contains a compose file pinned to
 published image tags, an `.env.example`, a copy of the SearXNG settings overlay, and a README covering prerequisites,
 verification, resource sizing, and what is deliberately absent.
@@ -165,7 +165,7 @@ the entire sync check. Changing one means changing the other in the same commit.
 ### See also
 
 - [../README.md](../README.md). Monorepo overview, Quick Start, ports.
-- [../ascend-web-hunter/deploy-standalone/README.md](../ascend-web-hunter/deploy-standalone/README.md). Standalone web-search deployment.
+- [../apps/ascend-web-hunter/deploy-standalone/README.md](../apps/ascend-web-hunter/deploy-standalone/README.md). Standalone web-search deployment.
 - [../.github/workflows/README.md](../.github/workflows/README.md). CI and release workflows, image naming, registries.
 - [INGESTION.md](INGESTION.md). Document ingestion lifecycle.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Reset recipes when state gets stuck.

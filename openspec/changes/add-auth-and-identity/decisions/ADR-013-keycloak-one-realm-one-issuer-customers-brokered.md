@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 12.8 installs into `AscendAgent/docs/architecture/decisions/`, taking the next free number at that time.
+Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 12.8 installs into `apps/ascend-ai-agent/docs/architecture/decisions/`, taking the next free number at that time.
 
 ## Amendment, 2026-09-04
 
@@ -30,7 +30,7 @@ The sibling changes make the first question expensive to leave open. `add-tenant
 
 ## Decision
 
-Keycloak is the platform's identity provider in every posture, development and production alike. One realm, `ascend-ai`, is the only issuer AscendAgent validates against, and it serves every customer.
+Keycloak is the platform's identity provider in every posture, development and production alike. One realm, `ascend-ai`, is the only issuer ascend-ai-agent validates against, and it serves every customer.
 
 A customer is a brokered identity provider inside that realm. The provider's alias is the customer's identifier, and three things hang off it: a hardcoded-attribute mapper stamping the customer's `tenant` value onto everyone who arrives through it, the principal namespace their groups mint into, and the directory adapter that answers membership for them.
 
@@ -53,7 +53,7 @@ The realm export stops being a test fixture and becomes the provisioning of a re
 - Keycloak is now a service the platform operates, and if it is down nobody signs in at any customer. It needs a database, certificates, backups with a restore that has actually been run, and an upgrade habit. There is no long-term support release upstream, minor releases land roughly quarterly and patches roughly monthly, breaking changes have shipped inside patch releases, and sixteen security advisories were published this year through August. This is the standing cost of the decision. It is recorded rather than mitigated, because the available mitigations reduce the risk of an upgrade and do not remove the work.
 - One realm means one configuration blast radius. A mistake in the realm's user profile, its default roles, or its session lifetimes reaches every customer at once. The export being checked in, reviewed, and rebuilt deterministically is the control, and it is a weaker control than separate realms would have been.
 - The tenant claim is now load-bearing in a way it was not when it emitted the constant `default`. A brokered provider with no hardcoded-attribute mapper produces people with the wrong tenant rather than people with no tenant, which is a worse failure than the one it replaces. The onboarding verification exists to catch it.
-- Brokering means AscendAgent never sees the upstream provider's token. Anything not deliberately copied across by a mapper is unavailable to it, and ADR-015 is the whole discipline that follows from that.
+- Brokering means ascend-ai-agent never sees the upstream provider's token. Anything not deliberately copied across by a mapper is unavailable to it, and ADR-015 is the whole discipline that follows from that.
 
 ### Alternatives considered
 

@@ -39,12 +39,12 @@ and Architecture Decision Records (ADRs).
 
 | Index                                  | Description                                              |
 | :------------------------------------- | :------------------------------------------------------- |
-| [ADR Index](decisions/README.md)       | All monorepo-level and AscendAgent-specific ADRs.        |
+| [ADR Index](decisions/README.md)       | All monorepo-level and ascend-ai-agent-specific ADRs.        |
 
 ---
 
 ### Module-level architecture
 
-The AscendAgent has its own detailed arc42 documentation in
-[AscendAgent/docs/architecture/](../../AscendAgent/docs/architecture/) covering internal class structure, component
+The ascend-ai-agent has its own detailed arc42 documentation in
+[apps/ascend-ai-agent/docs/architecture/](../../apps/ascend-ai-agent/docs/architecture/) covering internal class structure, component
 diagrams, and module-specific ADRs.

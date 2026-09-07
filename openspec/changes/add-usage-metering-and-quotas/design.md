@@ -2,7 +2,7 @@
 
 ## Context
 
-Every LLM call in AscendAgent already funnels through one observation point: `PromptCacheStrategy.recordOutcome(userId, chatResponse)` is called by `service/chat/ChatExecutor.java` (line 95) and `service/memory/SemanticMemoryExtractor.java` (line 100), and every strategy implementation delegates to `service/cache/GenAiTokenUsageRecorder.java`, which reads `ChatResponse.getMetadata().getUsage()` and increments the aggregate `gen_ai.client.token.usage` Micrometer counter. That counter has no user/tenant tags and Prometheus retention is 72h, so it cannot back billing. The compaction path (`memory/ChatHistoryCompactionService.java`) and the embedding path call providers without passing through `recordOutcome` at all.
+Every LLM call in ascend-ai-agent already funnels through one observation point: `PromptCacheStrategy.recordOutcome(userId, chatResponse)` is called by `service/chat/ChatExecutor.java` (line 95) and `service/memory/SemanticMemoryExtractor.java` (line 100), and every strategy implementation delegates to `service/cache/GenAiTokenUsageRecorder.java`, which reads `ChatResponse.getMetadata().getUsage()` and increments the aggregate `gen_ai.client.token.usage` Micrometer counter. That counter has no user/tenant tags and Prometheus retention is 72h, so it cannot back billing. The compaction path (`memory/ChatHistoryCompactionService.java`) and the embedding path call providers without passing through `recordOutcome` at all.
 
 Provider clients are built **once at startup**: `service/provider/ChatModelResolver.initializeProviders()` (`@PostConstruct`) constructs one `OpenAiChatModel` / `AnthropicChatModel` per enabled provider from `AiProviderProperties`, with the API key baked into the `OpenAiApi` / `AnthropicApi` instance. BYOK therefore cannot be a per-request option tweak; it needs per-tenant client instances.
 
@@ -21,9 +21,9 @@ Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelo
 
 - One durable, queryable usage row per LLM-touching request, attributable to tenant + user, precise enough to invoice from.
 - Hard token budgets (tenant/month, user/day) enforced before money is spent, with a soft-warning event ahead of cut-off.
-- Request-rate limits that hold across AscendAgent replicas.
+- Request-rate limits that hold across ascend-ai-agent replicas.
 - Per-tenant provider keys that never leave the server in plaintext once written, with clean fallback to the deployment's global keys.
-- All enforcement lives in AscendAgent (the gateway); downstream Python services stay untouched.
+- All enforcement lives in ascend-ai-agent (the gateway); downstream Python services stay untouched.
 
 **Non-Goals:**
 

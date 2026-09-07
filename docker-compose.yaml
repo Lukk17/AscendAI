@@ -49,7 +49,7 @@ services:
 
   ascend-ocr:
     build:
-      context: ./ascend-ocr
+      context: ./apps/ascend-ocr
       dockerfile: Dockerfile
     image: ascend-ocr:local
     container_name: ascend-ocr
@@ -74,7 +74,7 @@ services:
       - MCP_DOWNLOAD_TIMEOUT_SECONDS=30
       # file:// is disabled by default; mount a writable dir and set
       # MCP_FILE_URI_ROOT to the in-container path to enable.
-      # - MCP_FILE_URI_ROOT=/var/lib/ascend-ocr/uploads
+      # - MCP_FILE_URI_ROOT=/var/lib/apps/ascend-ocr/uploads
       - RATE_LIMIT_DEFAULT=60/minute
       - RATE_LIMIT_OCR=20/minute
       - OTEL_ENABLED=true
@@ -102,12 +102,12 @@ services:
 
   # ─── Application services ───
 
-  ascend-agent:
+  ascend-ai-agent:
     build:
-      context: ./AscendAgent
+      context: ./apps/ascend-ai-agent
       dockerfile: Dockerfile
-    container_name: ascend-agent
-    hostname: ascend-agent
+    container_name: ascend-ai-agent
+    hostname: ascend-ai-agent
     restart: unless-stopped
     ports:
       - "9917:9917"
@@ -137,12 +137,12 @@ services:
       # binding for nested Map<String,String> is awkward).
       - APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED=${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:-true}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=ascend-agent
+      - OTEL_SERVICE_NAME=ascend-ai-agent
       - OTEL_RESOURCE_ATTRIBUTES=service.version=1.0.0
     networks:
       default:
         aliases:
-          - ascend-agent
+          - ascend-ai-agent
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9917/actuator/health"]
       interval: 30s
@@ -162,7 +162,7 @@ services:
 
   ascend-memory:
     build:
-      context: ./AscendMemory
+      context: ./apps/ascend-memory
       dockerfile: Dockerfile
     container_name: ascend-memory
     hostname: ascend-memory
@@ -220,7 +220,7 @@ services:
 
   ascend-weather-mcp:
     build:
-      context: ./ascend-weather-mcp
+      context: ./apps/ascend-weather-mcp
       dockerfile: Dockerfile
     # image: lukk17/ascend-weather-mcp:latest
     container_name: ascend-weather-mcp
@@ -247,7 +247,7 @@ services:
 
   ascend-audio-scribe:
     build:
-      context: ./ascend-audio-scribe
+      context: ./apps/ascend-audio-scribe
       dockerfile: Dockerfile
     # image: lukk17/ascend-audio-scribe:latest
     container_name: ascend-audio-scribe

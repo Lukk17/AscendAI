@@ -190,7 +190,7 @@ bru run "web-hunter/testing/auth-read-secure-anon.yml" --env ascend-local
 Part 2, Seed — scripted saucedemo login (harness not in the image; copy it in, then run).
 
 ```powershell
-docker cp ascend-web-hunter/e2e/harness/seed_authenticated_session.py ascend-web-hunter:/tmp/seed.py
+docker cp apps/ascend-web-hunter/e2e/harness/seed_authenticated_session.py ascend-web-hunter:/tmp/seed.py
 ```
 
 ```powershell

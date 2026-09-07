@@ -2,7 +2,7 @@
 
 ## Context
 
-The platform's documentation is spread across `docs/architecture/` (monorepo arc42, C4, ADRs), `AscendAgent/docs/architecture/` (internal), the root and per-module `README.md` and `AGENTS.md` files, topic docs (`SECURITY.md`, `COMPLIANCE.md`, `CONNECTORS.md`, `USAGE_AND_QUOTAS.md`, `DEPLOYMENT.md`, `MCP_SETUP.md`), and the OpenAPI/Bruno API collection. Each sibling change edits the slice it touches; none owns the whole. This change makes the set coherent after the others land.
+The platform's documentation is spread across `docs/architecture/` (monorepo arc42, C4, ADRs), `apps/ascend-ai-agent/docs/architecture/` (internal), the root and per-module `README.md` and `AGENTS.md` files, topic docs (`SECURITY.md`, `COMPLIANCE.md`, `CONNECTORS.md`, `USAGE_AND_QUOTAS.md`, `DEPLOYMENT.md`, `MCP_SETUP.md`), and the OpenAPI/Bruno API collection. Each sibling change edits the slice it touches; none owns the whole. This change makes the set coherent after the others land.
 
 ## Goals / Non-Goals
 

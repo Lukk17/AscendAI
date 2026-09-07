@@ -21,7 +21,7 @@
 
 ## 4. Readiness smoke test
 
-- [ ] 4.1 Create `deploy/smoke-test.sh` and `deploy/smoke-test.ps1`: verify gateway TLS, AscendAgent health behind the gateway, token acquisition for the seeded admin, and one authenticated round-trip
+- [ ] 4.1 Create `deploy/smoke-test.sh` and `deploy/smoke-test.ps1`: verify gateway TLS, ascend-ai-agent health behind the gateway, token acquisition for the seeded admin, and one authenticated round-trip
 - [ ] 4.2 Exit non-zero and name the failing check on any failure; the installer treats this as a hard gate
 - [ ] 4.3 Test: the smoke test passes on a healthy stack and fails visibly when the gateway or agent is down
 

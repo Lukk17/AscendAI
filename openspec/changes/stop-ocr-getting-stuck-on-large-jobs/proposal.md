@@ -12,12 +12,12 @@ while the only worker the service has was permanently occupied.
 Three separate faults produced that:
 
 1. The timeout wraps the whole document. `asyncio.wait_for(loop.run_in_executor(...), timeout=OCR_REQUEST_TIMEOUT)`
-   in both [rest_endpoints.py](../../../ascend-ocr/src/api/rest/rest_endpoints.py) and
-   [mcp_server.py](../../../ascend-ocr/src/api/mcp/mcp_server.py) is one budget for every page. Any multi-page
+   in both [rest_endpoints.py](../../../apps/ascend-ocr/src/api/rest/rest_endpoints.py) and
+   [mcp_server.py](../../../apps/ascend-ocr/src/api/mcp/mcp_server.py) is one budget for every page. Any multi-page
    document whose total cost passes five minutes fails no matter how healthy the service is.
 2. `asyncio.wait_for` cancels the coroutine that is waiting. It cannot touch work already running inside a
    `ProcessPoolExecutor`, so the timeout abandons the job rather than stopping it.
-3. `_WORKER_POOL_SIZE = 1` in [ocr_service.py](../../../ascend-ocr/src/service/ocr_service.py), so the abandoned job
+3. `_WORKER_POOL_SIZE = 1` in [ocr_service.py](../../../apps/ascend-ocr/src/service/ocr_service.py), so the abandoned job
    holds the only worker and every request behind it waits for work that has already been given up on.
 
 A fourth measured fact is unrelated to the timeout and needs its own guard. The service was OOM-killed once at
@@ -122,7 +122,7 @@ A bound on what the detector sees, which is the fix the measurement points at:
   between them is a task that requires measuring against his own documents. Said plainly: a lower bound reads less
   small text, in the sense that small lines stop being detected at all rather than being detected and misread.
   **Resolved**: the owner measured 960, 1280 and 1536 against five real documents and chose 1536 as near lossless —
-  see [ADR-006](../../../ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md) for the full table.
+  see [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md) for the full table.
 - The bound and the pixel ceiling are one decision in two settings. **Resolved**: they ship together as
   `OCR_DETECTOR_MAX_SIDE=1536` and `OCR_MAX_INFERENCE_PIXELS=2,500,000`, so an image deployed with its shipped
   defaults accepts A4 rather than refusing it. The paragraph below and the migration plan in `design.md` describe
@@ -165,7 +165,7 @@ A decision recorded:
   exposed. It is what bounds memory for every document, and it also means a dense scan cannot be read at higher
   quality even when the caller wants that, with no way to ask. The decision, its trade and its rejected
   alternatives are written in [design.md](design.md) Decision 10, and a task lands them as an ADR under
-  `ascend-ocr/docs/architecture/decisions/` in the existing format. No configuration knob is built for it, because
+  `apps/ascend-ocr/docs/architecture/decisions/` in the existing format. No configuration knob is built for it, because
   that is a future need. The measurement reopened its one deferred question, whether to raise the rendering scale,
   and Decision 10 now answers it with numbers and still says no.
 - The detector's input bound is the second decision worth recording, and it is the one with an accuracy trade
@@ -200,7 +200,7 @@ None. No capability under `openspec/specs/` covers the ascend-ocr module today, 
 
 ## Impact
 
-Code, all under `ascend-ocr/`:
+Code, all under `apps/ascend-ocr/`:
 
 - `src/service/ocr_service.py`: `process_file` iterates pages through `predict_iter()` and checks a cooperative
   deadline between them. `run_ocr_in_worker` carries the remaining budget as a duration. The pool gains a
@@ -223,7 +223,7 @@ Code, all under `ascend-ocr/`:
 - `src/observability/metrics.py`: queue depth, queue wait, per-page duration, deadline stops, worker replacements
   and pool rebuilds.
 
-Tests, all under `ascend-ocr/tests/`. The gate is `--cov-fail-under=100` with `--cov-branch`, so every branch added
+Tests, all under `apps/ascend-ocr/tests/`. The gate is `--cov-fail-under=100` with `--cov-branch`, so every branch added
 needs a test. Detail in [tasks.md](tasks.md).
 
 Dependencies: `pypdfium2` is already installed as a transitive dependency of paddlex and becomes a declared direct
@@ -247,8 +247,8 @@ accepts against how long a caller must hold a connection. Memory does not constr
 with a detector bound deployed. The second operational pair is the detector bound and the pixel ceiling, which are
 one decision in two settings and are deployed together, because there is no safe default for either alone.
 
-Docs: the environment variable list in `ascend-ocr/AGENTS.md`, `ascend-ocr/README.md`, the arc42 pages under
-`ascend-ocr/docs/architecture/arc42/`, an amendment to ADR-004 for the readiness condition, and two new ADRs, one
+Docs: the environment variable list in `apps/ascend-ocr/AGENTS.md`, `apps/ascend-ocr/README.md`, the arc42 pages under
+`apps/ascend-ocr/docs/architecture/arc42/`, an amendment to ADR-004 for the readiness condition, and two new ADRs, one
 for the fixed rendering resolution and one for the detector input bound. AGENTS.md, the README and the arc42 pages
 also gain the memory model and the sentence that makes the worker cap a memory constraint rather than a throughput
 one. All written when the change is applied.

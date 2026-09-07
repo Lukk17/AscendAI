@@ -2,7 +2,7 @@
 
 ### Requirement: User identity is derived from validated token claims
 
-AscendAgent SHALL resolve the request identity exclusively from the validated JWT: the user identifier used for chat history, semantic memory, and RAG scoping SHALL be the `sub` claim; `preferred_username` SHALL be carried for logging and display only and SHALL NOT be used as a storage key. The resolved identity SHALL be exposed to controllers and services as a single immutable value object carrying `userId`, `username`, `email`, `tenant`, `roles`, `groupIds`, and `principals`, so there is exactly one identity code path in secured and dev postures.
+ascend-ai-agent SHALL resolve the request identity exclusively from the validated JWT: the user identifier used for chat history, semantic memory, and RAG scoping SHALL be the `sub` claim; `preferred_username` SHALL be carried for logging and display only and SHALL NOT be used as a storage key. The resolved identity SHALL be exposed to controllers and services as a single immutable value object carrying `userId`, `username`, `email`, `tenant`, `roles`, `groupIds`, and `principals`, so there is exactly one identity code path in secured and dev postures.
 
 #### Scenario: Storage keys use the token subject
 
@@ -12,7 +12,7 @@ AscendAgent SHALL resolve the request identity exclusively from the validated JW
 
 ### Requirement: X-User-Id header is no longer trusted
 
-AscendAgent SHALL ignore the `X-User-Id` request header on all endpoints in the secured posture. A request carrying `X-User-Id` SHALL be processed under the token-derived identity, and the header value SHALL have no effect on which user's data is read or written. The `PromptController` fallback to `app.user.default-id` SHALL apply only in the `dev` profile.
+ascend-ai-agent SHALL ignore the `X-User-Id` request header on all endpoints in the secured posture. A request carrying `X-User-Id` SHALL be processed under the token-derived identity, and the header value SHALL have no effect on which user's data is read or written. The `PromptController` fallback to `app.user.default-id` SHALL apply only in the `dev` profile.
 
 #### Scenario: Spoofed header cannot switch identity
 

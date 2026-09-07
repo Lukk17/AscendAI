@@ -146,18 +146,18 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 ## Architecture
 
 - **Monorepo-level**: System overview, service interactions, deployment, ADRs — in `docs/architecture/`
-- **AscendAgent internals**: Component diagrams, internal arc42, module-specific ADRs — in `AscendAgent/docs/architecture/`
+- **ascend-ai-agent internals**: Component diagrams, internal arc42, module-specific ADRs — in `apps/ascend-ai-agent/docs/architecture/`
 
 ## Monorepo Structure
 
 | Module | Tech Stack | Port | Role |
 |---|---|---|---|
-| [AscendAgent](AscendAgent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
-| [ascend-audio-scribe](ascend-audio-scribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
-| [ascend-web-hunter](ascend-web-hunter/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
-| [AscendMemory](AscendMemory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
-| [ascend-weather-mcp](ascend-weather-mcp/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9998 | MCP server for weather data |
-| [ascend-ocr](ascend-ocr/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7022 | OCR service using PaddleOCR |
+| [ascend-ai-agent](apps/ascend-ai-agent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
+| [ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
+| [ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
+| [AscendMemory](apps/ascend-memory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
+| [ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9998 | MCP server for weather data |
+| [ascend-ocr](apps/ascend-ocr/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7022 | OCR service using PaddleOCR |
 
 ## External Prerequisites
 
@@ -179,7 +179,7 @@ Compose is split into two project files so each forms its own group in Docker De
 
 `SEARXNG_SECRET` is mandatory in `.env` for either invocation. Compose names the missing variable and refuses to start without it, and SearXNG will not boot without it either. It must be at least 32 characters, unique per deployment, and never the literal `ultrasecretkey`.
 
-A third, separate artifact exists for deploying the web-search stack to a machine of its own: [`ascend-web-hunter/deploy-standalone/`](ascend-web-hunter/deploy-standalone/README.md). It pulls published images instead of building, targets Docker Engine on Linux, and is not `include:`-d by anything. It carries a byte-identical copy of `infra/searxng/settings.yml` plus its own `.env.example`, and both must be updated in the same commit as their root counterparts. The intended differences between it and the development stack are listed in its README.
+A third, separate artifact exists for deploying the web-search stack to a machine of its own: [`apps/ascend-web-hunter/deploy-standalone/`](apps/ascend-web-hunter/deploy-standalone/README.md). It pulls published images instead of building, targets Docker Engine on Linux, and is not `include:`-d by anything. It carries a byte-identical copy of `infra/searxng/settings.yml` plus its own `.env.example`, and both must be updated in the same commit as their root counterparts. The intended differences between it and the development stack are listed in its README.
 
 ### `ascend-ai` (docker-compose.yaml)
 
@@ -214,24 +214,24 @@ docker compose up -d --build
 
 # 3. Ensure PostgreSQL has database 'ascend_ai' (user: postgres, password: local)
 
-# 4. Run the AscendAgent
-cd AscendAgent && ./gradlew bootRun
+# 4. Run the ascend-ai-agent
+cd apps/ascend-ai-agent && ./gradlew bootRun
 
 # 5. Python services run via uvicorn or docker-compose
 ```
 
 ## Cross-Module Conventions
 
-- **Java modules** (AscendAgent, ascend-weather-mcp): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.5.
+- **Java modules** (ascend-ai-agent, ascend-weather-mcp): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.5.
 - **Python modules** (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
 - **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) — never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
 - All services expose a `/health` endpoint for Docker healthchecks.
 - All services are containerized with Dockerfiles and wired through `docker-compose.yaml` (with `ascend-scrapper.docker-compose.yaml` included for the web-scraping stack).
-- MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the AscendAgent.
+- MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the ascend-ai-agent.
 
 ## End-to-End Test Suite
 
-Capability-level e2e tests for the AscendAgent live in [`AscendAgent/e2e/`](AscendAgent/e2e/README.md). Five numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`AscendAgent/e2e/README.md`](AscendAgent/e2e/README.md) for the full contract and capability matrix.
+Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-ai-agent/e2e/`](apps/ascend-ai-agent/e2e/README.md). Five numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-ai-agent/e2e/README.md`](apps/ascend-ai-agent/e2e/README.md) for the full contract and capability matrix.
 
 ## IDE Compatibility
 

@@ -48,5 +48,5 @@ The ingestion controller SHALL accept uploads only when the request's `Content-T
 
 - **WHEN** a 100 MB PDF is uploaded with default limits
 - **THEN** the controller returns HTTP 413 with body containing `Maximum upload size`
-- **AND** AscendAgent does not exhaust heap or crash
+- **AND** ascend-ai-agent does not exhaust heap or crash
 

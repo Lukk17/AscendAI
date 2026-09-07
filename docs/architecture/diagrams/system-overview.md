@@ -5,7 +5,7 @@ graph TB
     User["User"]
 
     subgraph "AscendAI Platform"
-        Agent["AscendAgent<br/>REST API :9917<br/>Spring Boot · Java 21"]
+        Agent["ascend-ai-agent<br/>REST API :9917<br/>Spring Boot · Java 21"]
 
         subgraph "MCP Tool Services"
             AudioScribe["ascend-audio-scribe<br/>:7017<br/>Audio Transcription"]
@@ -67,10 +67,10 @@ graph TB
 
 | Flow                | Path                                                                | Protocol                            |
 | :------------------ | :------------------------------------------------------------------ | :---------------------------------- |
-| User prompt         | User to AscendAgent to AI Provider to User                          | REST + LLM API                      |
-| Tool call           | AscendAgent to MCP Service to AscendAgent                           | MCP (Streamable HTTP)               |
-| RAG retrieval       | AscendAgent to Qdrant                                               | gRPC / HTTP                         |
-| Memory              | AscendAgent to AscendMemory to Qdrant                               | REST + Qdrant API                   |
-| Chat history        | AscendAgent to Redis (read / write), PostgreSQL (persist)           | TCP                                 |
-| Document ingestion  | S3-compatible storage to AscendAgent to Docling / Unstructured to Qdrant | S3 + REST + Qdrant              |
-| Web search          | AscendAgent to ascend-web-hunter to SearXNG to FlareSolverr           | MCP + HTTP                          |
+| User prompt         | User to ascend-ai-agent to AI Provider to User                          | REST + LLM API                      |
+| Tool call           | ascend-ai-agent to MCP Service to ascend-ai-agent                           | MCP (Streamable HTTP)               |
+| RAG retrieval       | ascend-ai-agent to Qdrant                                               | gRPC / HTTP                         |
+| Memory              | ascend-ai-agent to AscendMemory to Qdrant                               | REST + Qdrant API                   |
+| Chat history        | ascend-ai-agent to Redis (read / write), PostgreSQL (persist)           | TCP                                 |
+| Document ingestion  | S3-compatible storage to ascend-ai-agent to Docling / Unstructured to Qdrant | S3 + REST + Qdrant              |
+| Web search          | ascend-ai-agent to ascend-web-hunter to SearXNG to FlareSolverr           | MCP + HTTP                          |

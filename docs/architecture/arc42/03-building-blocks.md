@@ -7,7 +7,7 @@
 ```mermaid
 graph TB
     subgraph "Application Services"
-        Agent["AscendAgent<br/>Java 21 · Spring Boot<br/>:9917"]
+        Agent["ascend-ai-agent<br/>Java 21 · Spring Boot<br/>:9917"]
         AudioScribe["ascend-audio-scribe<br/>Python · FastMCP<br/>:7017"]
         Weather["ascend-weather-mcp<br/>Java · Spring Boot<br/>:9998"]
         WebHunter["ascend-web-hunter<br/>Python · FastMCP<br/>:7021"]
@@ -51,12 +51,12 @@ graph TB
 
 | Service                                                    | Role                                                                                                                       | Tech Stack                                 | Communication                       |
 | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------- | :---------------------------------- |
-| **[AscendAgent](../../../AscendAgent/AGENTS.md)**          | Central gateway: receives user prompts, routes to AI providers, assembles context (RAG + memory + history), dispatches MCP tool calls. | Java 21, Spring Boot 3.5, Spring AI 1.1    | REST API (in), MCP client (out)     |
-| **[ascend-audio-scribe](../../../ascend-audio-scribe/AGENTS.md)**          | Audio transcription: local (faster-whisper / GPU), OpenAI Whisper API, or HuggingFace. Supports multi-track Audacity projects. | Python 3.11, FastMCP                       | MCP server + REST API               |
-| **[ascend-weather-mcp](../../../ascend-weather-mcp/AGENTS.md)**            | Current weather data provider.                                                                                             | Java 21, Spring Boot 3.5, Spring AI        | MCP server                          |
-| **[ascend-web-hunter](../../../ascend-web-hunter/AGENTS.md)**  | Web search via SearXNG + multi-tiered content extraction with Cloudflare bypass.                                           | Python 3.12, FastMCP, Playwright           | MCP server + REST API               |
-| **[AscendMemory](../../../AscendMemory/AGENTS.md)**        | Semantic memory: stores and searches user-scoped facts using mem0ai + Qdrant.                                              | Python 3.11, FastAPI, mem0ai               | REST API + MCP server               |
-| **[ascend-ocr](../../../ascend-ocr/AGENTS.md)**            | OCR text extraction from images, multi-language.                                                                           | Python 3.11, FastMCP, PaddleOCR            | MCP server + REST API               |
+| **[ascend-ai-agent](../../../apps/ascend-ai-agent/AGENTS.md)**          | Central gateway: receives user prompts, routes to AI providers, assembles context (RAG + memory + history), dispatches MCP tool calls. | Java 21, Spring Boot 3.5, Spring AI 1.1    | REST API (in), MCP client (out)     |
+| **[ascend-audio-scribe](../../../apps/ascend-audio-scribe/AGENTS.md)**          | Audio transcription: local (faster-whisper / GPU), OpenAI Whisper API, or HuggingFace. Supports multi-track Audacity projects. | Python 3.11, FastMCP                       | MCP server + REST API               |
+| **[ascend-weather-mcp](../../../apps/ascend-weather-mcp/AGENTS.md)**            | Current weather data provider.                                                                                             | Java 21, Spring Boot 3.5, Spring AI        | MCP server                          |
+| **[ascend-web-hunter](../../../apps/ascend-web-hunter/AGENTS.md)**  | Web search via SearXNG + multi-tiered content extraction with Cloudflare bypass.                                           | Python 3.12, FastMCP, Playwright           | MCP server + REST API               |
+| **[AscendMemory](../../../apps/ascend-memory/AGENTS.md)**        | Semantic memory: stores and searches user-scoped facts using mem0ai + Qdrant.                                              | Python 3.11, FastAPI, mem0ai               | REST API + MCP server               |
+| **[ascend-ocr](../../../apps/ascend-ocr/AGENTS.md)**            | OCR text extraction from images, multi-language.                                                                           | Python 3.11, FastMCP, PaddleOCR            | MCP server + REST API               |
 
 ---
 
@@ -67,7 +67,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     actor User
-    participant Agent as AscendAgent
+    participant Agent as ascend-ai-agent
     participant Redis
     participant Qdrant
     participant Memory as AscendMemory
@@ -99,7 +99,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant S3 as S3-compatible storage
-    participant Agent as AscendAgent
+    participant Agent as ascend-ai-agent
     participant Docling as Docling / Unstructured
     participant Qdrant
 
@@ -116,10 +116,10 @@ sequenceDiagram
 
 Each module has its own `AGENTS.md` with build instructions, architecture details, and conventions.
 
-- [AscendAgent](../../../AscendAgent/AGENTS.md). Includes internal arc42 docs in
-  [AscendAgent/docs/architecture/](../../../AscendAgent/docs/architecture/).
-- [ascend-audio-scribe](../../../ascend-audio-scribe/AGENTS.md)
-- [ascend-web-hunter](../../../ascend-web-hunter/AGENTS.md)
-- [AscendMemory](../../../AscendMemory/AGENTS.md)
-- [ascend-weather-mcp](../../../ascend-weather-mcp/AGENTS.md)
-- [ascend-ocr](../../../ascend-ocr/AGENTS.md)
+- [ascend-ai-agent](../../../apps/ascend-ai-agent/AGENTS.md). Includes internal arc42 docs in
+  [apps/ascend-ai-agent/docs/architecture/](../../../apps/ascend-ai-agent/docs/architecture/).
+- [ascend-audio-scribe](../../../apps/ascend-audio-scribe/AGENTS.md)
+- [ascend-web-hunter](../../../apps/ascend-web-hunter/AGENTS.md)
+- [AscendMemory](../../../apps/ascend-memory/AGENTS.md)
+- [ascend-weather-mcp](../../../apps/ascend-weather-mcp/AGENTS.md)
+- [ascend-ocr](../../../apps/ascend-ocr/AGENTS.md)

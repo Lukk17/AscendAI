@@ -7,7 +7,7 @@ This change is the capstone. It runs last, after the others are implemented and 
 ## What Changes
 
 - **Monorepo architecture docs (`docs/architecture/`)**: refresh the arc42 sections and the C4 diagrams to show the end-state topology — the edge gateway as the only public surface, Keycloak as the identity provider, the tenant boundary across every data plane, the connector and crawl paths into RAG, and the metering/audit cross-cuts. Add or update ADRs for the decisions these changes made (gateway-only surface, presign resolution to an agent content endpoint, tenant model, per-tenant policy, tier-ladder restructure).
-- **AscendAgent internal architecture (`AscendAgent/docs/architecture/`)**: update the component diagrams and internal arc42 for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management) and the module-level ADRs.
+- **ascend-ai-agent internal architecture (`apps/ascend-ai-agent/docs/architecture/`)**: update the component diagrams and internal arc42 for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management) and the module-level ADRs.
 - **Cross-cutting request paths**: add/refresh the "path of one request" diagrams for the flows that changed shape — an authenticated streamed chat turn with RAG source attachments via the content endpoint, and an ingestion/connector document flowing into tenant RAG.
 - **READMEs (root + per module)**: bring the root `README.md` and each module README into line with the ordering/voice/section standard — quick-start that includes auth, honest alternatives comparison, configuration/ports reflecting the gateway and loopback bindings, and a complete documentation map linking every doc the platform ships (`SECURITY.md`, `COMPLIANCE.md`, `CONNECTORS.md`, `USAGE_AND_QUOTAS.md`, `DEPLOYMENT.md`, `MCP_SETUP.md`, the `deploy/` run-book).
 - **AGENTS.md files**: reconcile the root and per-module `AGENTS.md` with the shipped endpoints, roles, ports, compose services, and capability matrix so the machine-facing instructions match reality.
@@ -26,7 +26,7 @@ This change is the capstone. It runs last, after the others are implemented and 
 ## Impact
 
 - **Depends on**: every other change in this initiative — it documents their combined end state and must run after they are implemented and archived. If a dependency slips, this change documents what exists and flags what is pending, rather than describing unshipped behavior as shipped.
-- **Docs touched**: `docs/architecture/` (arc42, C4, ADRs), `AscendAgent/docs/architecture/`, root `README.md`, every module `README.md`, root and per-module `AGENTS.md`, and the documentation map; the OpenAPI spec and the Bruno collection under `docs/api/request/AscendAI/`.
+- **Docs touched**: `docs/architecture/` (arc42, C4, ADRs), `apps/ascend-ai-agent/docs/architecture/`, root `README.md`, every module `README.md`, root and per-module `AGENTS.md`, and the documentation map; the OpenAPI spec and the Bruno collection under `docs/api/request/AscendAI/`.
 - **No application code changes** — documentation, diagrams, and API-collection artifacts only.
 - **Verification**: a documentation review that every diagram matches the shipped topology, every documentation-map link resolves, the README quick-start actually works against a freshly installed stack, and the Bruno collection exercises every shipped endpoint.
 

@@ -36,7 +36,7 @@ After the stack is up, the installer imports the Keycloak realm export, then cal
 
 ### D4 — Readiness smoke test is a hard gate
 
-A scripted check verifies: the gateway serves TLS, AscendAgent is healthy behind it, a token can be acquired for the seeded admin, and one authenticated request round-trips. The installer exits non-zero and reports which check failed if any does, so a broken stack is never silently handed over.
+A scripted check verifies: the gateway serves TLS, ascend-ai-agent is healthy behind it, a token can be acquired for the seeded admin, and one authenticated request round-trips. The installer exits non-zero and reports which check failed if any does, so a broken stack is never silently handed over.
 
 ### D5 — Drive the single main compose file
 

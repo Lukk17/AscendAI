@@ -2,7 +2,7 @@
 
 ### Requirement: Per-user data export starts an asynchronous job
 
-AscendAgent SHALL expose `POST /api/v1/users/{userId}/data/export` which creates a persisted export job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` or by an ADMIN for any user; any other caller receives HTTP 403. Job state SHALL be persisted so the request survives restarts and remains reportable after completion, mirroring the erasure job lifecycle.
+ascend-ai-agent SHALL expose `POST /api/v1/users/{userId}/data/export` which creates a persisted export job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` or by an ADMIN for any user; any other caller receives HTTP 403. Job state SHALL be persisted so the request survives restarts and remains reportable after completion, mirroring the erasure job lifecycle.
 
 #### Scenario: Self-service export accepted
 
@@ -32,7 +32,7 @@ An export job SHALL assemble, into a single archive with a machine-readable mani
 
 ### Requirement: Export job status and download endpoint
 
-AscendAgent SHALL expose a status/download endpoint returning the job's status (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`), and, when complete, a means to download the assembled archive. Authorization matches the export start endpoint (self or ADMIN). Export start and completion SHALL be recorded through the audit-logging capability.
+ascend-ai-agent SHALL expose a status/download endpoint returning the job's status (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`), and, when complete, a means to download the assembled archive. Authorization matches the export start endpoint (self or ADMIN). Export start and completion SHALL be recorded through the audit-logging capability.
 
 #### Scenario: Completed export is downloadable and audited
 

@@ -2,7 +2,7 @@
 
 ## Context
 
-Two sibling changes lay the groundwork this one builds on. `add-auth-and-identity` makes AscendAgent an OAuth2 resource server against Keycloak (realm `ascend-ai`, roles `USER` / `ADMIN`, a PKCE public client for Flutter, and a `tenant` claim that is defined and propagated but not yet populated per user). `add-tenant-isolation` adds the `tenants` table, a fail-closed tenant-context holder resolved from the `tenant` claim, the slug format `[a-z0-9-]{1,64}`, and a default-tenant migration. Neither creates tenants or users at runtime, and neither wires the Keycloak side that would make a real user's token carry a `tenant` claim.
+Two sibling changes lay the groundwork this one builds on. `add-auth-and-identity` makes ascend-ai-agent an OAuth2 resource server against Keycloak (realm `ascend-ai`, roles `USER` / `ADMIN`, a PKCE public client for Flutter, and a `tenant` claim that is defined and propagated but not yet populated per user). `add-tenant-isolation` adds the `tenants` table, a fail-closed tenant-context holder resolved from the `tenant` claim, the slug format `[a-z0-9-]{1,64}`, and a default-tenant migration. Neither creates tenants or users at runtime, and neither wires the Keycloak side that would make a real user's token carry a `tenant` claim.
 
 The go-to-market is single-tenant-per-customer dedicated stacks first, multi-tenant later. The API must serve both: a `PLATFORM_ADMIN` who manages tenants (rare on a dedicated stack, central under multi-tenancy) and a tenant `ADMIN` who manages their own users (the common case on every stack).
 
@@ -34,11 +34,11 @@ Each tenant maps to a Keycloak group `/tenants/{tenantId}` with a group attribut
 
 Tenant lifecycle is a cross-tenant privilege, so it cannot be the tenant-scoped `ADMIN`. A new realm role `PLATFORM_ADMIN` gates `/api/v1/admin/tenants`. On a dedicated single-tenant stack it is held by the operator; under multi-tenancy it is the control-plane role. Tenant `ADMIN` (already defined by `add-auth-and-identity`) gates `/api/v1/admin/users` and is always constrained to the caller's own tenant server-side, never a path/body-supplied tenant.
 
-### D3 — AscendAgent talks to Keycloak through the Admin REST API with a service account
+### D3 — ascend-ai-agent talks to Keycloak through the Admin REST API with a service account
 
-Provisioning (create group, create user, assign role, trigger invite email) happens through Keycloak's Admin REST API. AscendAgent authenticates with a dedicated confidential client using client-credentials (service account with the `manage-users` / `manage-clients` realm-management roles it needs, nothing more). The secret follows the deployment secret conventions from `harden-cloud-deployment`.
+Provisioning (create group, create user, assign role, trigger invite email) happens through Keycloak's Admin REST API. ascend-ai-agent authenticates with a dedicated confidential client using client-credentials (service account with the `manage-users` / `manage-clients` realm-management roles it needs, nothing more). The secret follows the deployment secret conventions from `harden-cloud-deployment`.
 
-- Invitation flow: create the user disabled-until-verified, then trigger Keycloak's `execute-actions-email` with `UPDATE_PASSWORD` (and `VERIFY_EMAIL`) so Keycloak sends the branded set-password email. AscendAgent never handles the password.
+- Invitation flow: create the user disabled-until-verified, then trigger Keycloak's `execute-actions-email` with `UPDATE_PASSWORD` (and `VERIFY_EMAIL`) so Keycloak sends the branded set-password email. ascend-ai-agent never handles the password.
 
 ### D4 — Tenant status lives in Postgres; suspension is enforced at tenant-context resolution
 

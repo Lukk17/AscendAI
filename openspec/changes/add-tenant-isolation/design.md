@@ -1,6 +1,6 @@
 ## Context
 
-AscendAgent today is effectively a single-tenant application that happens to accept a `userId` form field. All four data planes are shared pools:
+ascend-ai-agent today is effectively a single-tenant application that happens to accept a `userId` form field. All four data planes are shared pools:
 
 - Qdrant: two collections (`ascendai-768`, `ascendai-1536`) with no owner metadata beyond `source`/`type`/`title` (`IngestionMetadataKeys`), searched with no filter (`RagRetrievalService`).
 - MinIO: one `knowledge-base` bucket, keys are `markdown/<file>` or `documents/<file>` (`IngestionController.determineFolder`).
@@ -43,7 +43,7 @@ AscendAgent today is effectively a single-tenant application that happens to acc
 Shared collections/bucket/tables with a mandatory `tenant_id` discriminator, enforced at every read and write path.
 
 - **Alternative — collection/bucket/schema per tenant**: stronger blast-radius isolation, but Qdrant collection count grows with tenants × embedding dims, MinIO bucket limits bite, Liquibase per-schema migration multiplies, and per-request provider routing (`VectorStoreResolver`) would need a second dimension. Rejected as disproportionate for the current scale; the fail-closed filter gives the same observable guarantee.
-- The discriminator approach also matches what AscendMemory/mem0 already does with `user_id`, so one mechanism covers all stores.
+- The discriminator approach also matches what apps/ascend-memory/mem0 already does with `user_id`, so one mechanism covers all stores.
 - The same reasoning applies harder to the access axis, and is why it is a second payload field rather than a second partitioning: groups are far more numerous than tenants, so a collection per group would multiply collections by groups times embedding dimensions. Qdrant offers no per-principal authorization model to fall back on, which is recorded upstream as ADR-M009.
 
 ### 2. Fail-closed tenant context
@@ -105,7 +105,7 @@ Object keys become `tenant/{tenantId}/markdown/...` and `tenant/{tenantId}/docum
 
 The agent sends `{tenantId}:{userId}` as `user_id` on every insert/search/wipe/delete. Qualification happens in one place — `SemanticMemoryClient` composes the id from `TenantContext` — so no call site can forget it (single choke point, mirrors how the client already owns snake_case naming).
 
-- **Alternative — add a `tenant_id` parameter to the AscendMemory API**: rejected. It widens the API surface of a service that would still have to trust the caller (AscendAgent is the only client inside the trust boundary), and namespacing the existing partition key achieves identical isolation with zero Python changes.
+- **Alternative — add a `tenant_id` parameter to the AscendMemory API**: rejected. It widens the API surface of a service that would still have to trust the caller (ascend-ai-agent is the only client inside the trust boundary), and namespacing the existing partition key achieves identical isolation with zero Python changes.
 
 ### 8. Migration: single Liquibase changelog, backfill to `default`
 
@@ -148,7 +148,7 @@ This change owns the pseudo-group because it owns the tenant identifier that nam
 
 ## Decision records
 
-Three decisions in this change are architecturally significant, are not already recorded in the monorepo decision log (`docs/architecture/decisions/`, which covers the permission model itself as ADR-M004 through ADR-M009), and are drafted here for placement in `AscendAgent/docs/architecture/decisions/`:
+Three decisions in this change are architecturally significant, are not already recorded in the monorepo decision log (`docs/architecture/decisions/`, which covers the permission model itself as ADR-M004 through ADR-M009), and are drafted here for placement in `apps/ascend-ai-agent/docs/architecture/decisions/`:
 
 | Draft | Records |
 | :--- | :--- |
@@ -156,7 +156,7 @@ Three decisions in this change are architecturally significant, are not already 
 | [ADR-011](decisions/ADR-011-single-similarity-search-call-site.md) | One method issues the similarity search, enforced by an architecture test (design decision 10) |
 | [ADR-012](decisions/ADR-012-fail-closed-on-missing-tenant-or-principals.md) | Fail closed on a missing tenant context or a missing principal set, with no fallback to the default tenant and no fallback to a tenant-only filter (design decision 2) |
 
-They are drafted inside this change folder so the change carries its own rationale, and task 9.1 moves them into `AscendAgent/docs/architecture/decisions/` when the change is implemented. Decisions 3, 6, and 7 (tenant slug format, key scoping, AscendMemory namespacing) stay design-local: they are settled here and nothing outside this change has to reason about them.
+They are drafted inside this change folder so the change carries its own rationale, and task 9.1 moves them into `apps/ascend-ai-agent/docs/architecture/decisions/` when the change is implemented. Decisions 3, 6, and 7 (tenant slug format, key scoping, AscendMemory namespacing) stay design-local: they are settled here and nothing outside this change has to reason about them.
 
 ## Risks / Trade-offs
 

@@ -9,18 +9,18 @@ No requirement, scenario, or behaviour on the password sign-in path SHALL depend
 #### Scenario: A realm with no brokered provider is fully functional
 
 - **WHEN** the realm contains no brokered identity provider and a person signs in with their Keycloak account and password
-- **THEN** they reach AscendAgent with a valid token, a resolved identity, roles, and a principal set built from their Keycloak groups
+- **THEN** they reach ascend-ai-agent with a valid token, a resolved identity, roles, and a principal set built from their Keycloak groups
 - **AND** no behaviour of the product is degraded by the absence of a brokered provider
 
 ### Requirement: One brokered identity provider per customer, configured rather than coded
 
-A customer who opts into corporate sign-on SHALL be represented in the `ascend-ai` realm by exactly one brokered identity provider, created as configuration through Keycloak's generic OpenID Connect provider pointed at the customer's own discovery document, or through its SAML provider where the customer offers only SAML. Onboarding a customer SHALL NOT require an AscendAgent code change or a release. AscendAgent SHALL never communicate with a customer's identity provider directly, and SHALL treat the brokered provider's alias as the customer's identifier inside the realm. There SHALL be no vendor-specific brokered provider type for Microsoft Entra ID: the generic OpenID Connect entry pointed at the customer's tenant discovery document is the supported mechanism, and the onboarding runbook SHALL name it.
+A customer who opts into corporate sign-on SHALL be represented in the `ascend-ai` realm by exactly one brokered identity provider, created as configuration through Keycloak's generic OpenID Connect provider pointed at the customer's own discovery document, or through its SAML provider where the customer offers only SAML. Onboarding a customer SHALL NOT require an ascend-ai-agent code change or a release. ascend-ai-agent SHALL never communicate with a customer's identity provider directly, and SHALL treat the brokered provider's alias as the customer's identifier inside the realm. There SHALL be no vendor-specific brokered provider type for Microsoft Entra ID: the generic OpenID Connect entry pointed at the customer's tenant discovery document is the supported mechanism, and the onboarding runbook SHALL name it.
 
 #### Scenario: A customer is onboarded without a code change
 
 - **WHEN** a customer's identity provider is brokered by creating a provider entry from the template in the realm export and configuring it per the runbook
-- **THEN** people from that customer can sign in and reach AscendAgent with a valid token
-- **AND** no AscendAgent source file changed and no release was cut
+- **THEN** people from that customer can sign in and reach ascend-ai-agent with a valid token
+- **AND** no ascend-ai-agent source file changed and no release was cut
 
 ### Requirement: The brokered provider stamps the tenant
 
@@ -76,7 +76,7 @@ Where brokered providers exist, the realm SHALL match a person to their customer
 
 ### Requirement: Provider tokens are not stored
 
-No brokered identity provider SHALL be configured to store the token it received from the customer's identity provider, and AscendAgent SHALL NOT retrieve upstream provider tokens through the broker. Enabling storage SHALL be understood as a deliberate per-provider exception with a named cost: third-party credentials held in our database, inside the erasure and breach scope of `add-audit-and-gdpr-compliance`.
+No brokered identity provider SHALL be configured to store the token it received from the customer's identity provider, and ascend-ai-agent SHALL NOT retrieve upstream provider tokens through the broker. Enabling storage SHALL be understood as a deliberate per-provider exception with a named cost: third-party credentials held in our database, inside the erasure and breach scope of `add-audit-and-gdpr-compliance`.
 
 #### Scenario: Stored tokens are off in the shipped configuration
 

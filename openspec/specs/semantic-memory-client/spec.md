@@ -2,7 +2,7 @@
 
 ## Purpose
 
-AscendAgent reaches the AscendMemory service over REST, and this capability pins the contract between them, which is where the two sides repeatedly drifted apart. It fixes the query-parameter and request-body naming on search, insert, wipe, and delete, maps the mem0 response fields onto the item record so retrieved facts are not silently dropped as null, validates the user id at every entry point before any HTTP call, defaults the base URL to the address compose actually publishes, and requires an explicit tally when some facts fail to insert instead of a silent loss.
+ascend-ai-agent reaches the AscendMemory service over REST, and this capability pins the contract between them, which is where the two sides repeatedly drifted apart. It fixes the query-parameter and request-body naming on search, insert, wipe, and delete, maps the mem0 response fields onto the item record so retrieved facts are not silently dropped as null, validates the user id at every entry point before any HTTP call, defaults the base URL to the address compose actually publishes, and requires an explicit tally when some facts fail to insert instead of a silent loss.
 
 ## Requirements
 ### Requirement: AscendMemory search uses snake_case query parameters
@@ -18,8 +18,8 @@ AscendAgent reaches the AscendMemory service over REST, and this capability pins
 #### Scenario: End-to-end memory recall
 
 - **WHEN** a fact has been previously inserted for user `frosty` and the user asks a question that should recall it
-- **THEN** AscendAgent logs `Received N semantic memory items for user: 'frosty'` with N >= 1
-- **AND** AscendAgent does NOT log `Semantic memory search failed for user 'frosty'. Status: 500 INTERNAL_SERVER_ERROR`
+- **THEN** ascend-ai-agent logs `Received N semantic memory items for user: 'frosty'` with N >= 1
+- **AND** ascend-ai-agent does NOT log `Semantic memory search failed for user 'frosty'. Status: 500 INTERNAL_SERVER_ERROR`
 
 ### Requirement: Wipe and delete operations are exposed by the client
 
@@ -54,11 +54,11 @@ Every public method on `SemanticMemoryClient` SHALL validate that `userId` is no
 
 ### Requirement: Default base URL matches docker-compose
 
-`SemanticMemoryProperties` SHALL default `baseUrl` to `http://localhost:7020` so that an out-of-the-box AscendAgent run against the monorepo `docker-compose.yaml` connects to AscendMemory without overrides.
+`SemanticMemoryProperties` SHALL default `baseUrl` to `http://localhost:7020` so that an out-of-the-box ascend-ai-agent run against the monorepo `docker-compose.yaml` connects to AscendMemory without overrides.
 
 #### Scenario: Boot with no overrides
 
-- **WHEN** AscendAgent boots with no `app.memory.semantic.base-url` override
+- **WHEN** ascend-ai-agent boots with no `app.memory.semantic.base-url` override
 - **THEN** `SemanticMemoryProperties.getBaseUrl()` returns `http://localhost:7020`
 
 ### Requirement: Failed-fact aggregation on extract+insert

@@ -7,7 +7,7 @@
 #### Scenario: Manual dispatch releases only the selected apps
 
 - **WHEN** the operator dispatches with `stack_version=1.1.1`, `release_ascend_agent=true`, `release_ascend_audio_scribe=true`, and the other four app booleans `false`
-- **THEN** only `ascend-agent` and `ascend-audio-scribe` images are built and pushed
+- **THEN** only `ascend-ai-agent` and `ascend-audio-scribe` images are built and pushed
 - **AND** `ascend-weather-mcp`, `ascend-web-hunter`, `ascend-memory`, and `ascend-ocr` are not built and their images are untouched
 
 #### Scenario: Tag push does not trigger the release
@@ -17,19 +17,19 @@
 
 ### Requirement: Image version is read from each app's committed manifest
 
-For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`AscendAgent`, `ascend-weather-mcp`), `[project].version` in `pyproject.toml` for Python services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
+For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`ascend-ai-agent`, `ascend-weather-mcp`), `[project].version` in `pyproject.toml` for Python services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
 
 #### Scenario: Tag equals the manifest version
 
-- **WHEN** `AscendAgent/build.gradle.kts` declares `version = "1.3.0"` and `ascend-agent` is selected for release
-- **THEN** the pushed image is tagged `lukk17/ascend-agent:1.3.0`
-- **AND** `AscendAgent/build.gradle.kts` on disk is unchanged after the run
+- **WHEN** `apps/ascend-ai-agent/build.gradle.kts` declares `version = "1.3.0"` and `ascend-ai-agent` is selected for release
+- **THEN** the pushed image is tagged `lukk17/ascend-ai-agent:1.3.0`
+- **AND** `apps/ascend-ai-agent/build.gradle.kts` on disk is unchanged after the run
 
 #### Scenario: Python manifest version
 
-- **WHEN** `ascend-audio-scribe/pyproject.toml` declares `[project] version = "0.2.1"` and `ascend-audio-scribe` is selected
+- **WHEN** `apps/ascend-audio-scribe/pyproject.toml` declares `[project] version = "0.2.1"` and `ascend-audio-scribe` is selected
 - **THEN** the pushed image is tagged `lukk17/ascend-audio-scribe:0.2.1`
-- **AND** `ascend-audio-scribe/pyproject.toml` on disk is unchanged after the run
+- **AND** `apps/ascend-audio-scribe/pyproject.toml` on disk is unchanged after the run
 
 ### Requirement: Release makes no commits
 
@@ -47,7 +47,7 @@ For each selected app, the workflow SHALL compare the app's current manifest ver
 
 #### Scenario: Selected app not bumped fails the run
 
-- **WHEN** the previous release `ascend-ai_1.1.0` recorded `ascend-weather-mcp` at `1.0.0`, the current `ascend-weather-mcp/build.gradle.kts` still says `1.0.0`, and `ascend-weather-mcp` is selected for release
+- **WHEN** the previous release `ascend-ai_1.1.0` recorded `ascend-weather-mcp` at `1.0.0`, the current `apps/ascend-weather-mcp/build.gradle.kts` still says `1.0.0`, and `ascend-weather-mcp` is selected for release
 - **THEN** the workflow fails in the prepare stage with a message identifying `ascend-weather-mcp` as not bumped
 - **AND** no `docker login` or image push occurs for any app
 
@@ -67,8 +67,8 @@ Each selected app's image SHALL be pushed to Docker Hub at `lukk17/<service>:<ma
 
 #### Scenario: Released app updates latest
 
-- **WHEN** `ascend-agent` is released at manifest version `1.3.0`
-- **THEN** both `lukk17/ascend-agent:1.3.0` and `lukk17/ascend-agent:latest` point at the new image
+- **WHEN** `ascend-ai-agent` is released at manifest version `1.3.0`
+- **THEN** both `lukk17/ascend-ai-agent:1.3.0` and `lukk17/ascend-ai-agent:latest` point at the new image
 
 #### Scenario: Unselected app latest untouched
 
@@ -90,9 +90,9 @@ After all selected apps push successfully, the workflow SHALL create the Git tag
 
 #### Scenario: Release notes list all app versions
 
-- **WHEN** a release of `ascend-agent` (1.3.0) and `ascend-audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 1.0.0, ascend-web-hunter 1.2.0, ascend-memory 0.4.0, ascend-ocr 0.1.0
+- **WHEN** a release of `ascend-ai-agent` (1.3.0) and `ascend-audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 1.0.0, ascend-web-hunter 1.2.0, ascend-memory 0.4.0, ascend-ocr 0.1.0
 - **THEN** a GitHub Release tagged `ascend-ai_1.1.1` is created
-- **AND** its body lists all six apps with their current versions, marking `ascend-agent` and `ascend-audio-scribe` as released this run
+- **AND** its body lists all six apps with their current versions, marking `ascend-ai-agent` and `ascend-audio-scribe` as released this run
 - **AND** the release is not a draft
 
 #### Scenario: Reusing a stack version is rejected

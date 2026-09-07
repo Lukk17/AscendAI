@@ -168,7 +168,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "description": "WARN-level log lines from ascend-agent matching retrieval keywords. Useful for diagnosing why miss rate spiked. Source: Loki, service=ascend-agent.",
+      "description": "WARN-level log lines from ascend-ai-agent matching retrieval keywords. Useful for diagnosing why miss rate spiked. Source: Loki, service=ascend-ai-agent.",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
       "id": 9,
       "options": {
@@ -184,7 +184,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=\"ascend-agent\"} |~ \"(?i)(retrieval|rag|threshold|embedding)\" | logfmt | level=~\"warn|error\"",
+          "expr": "{service=\"ascend-ai-agent\"} |~ \"(?i)(retrieval|rag|threshold|embedding)\" | logfmt | level=~\"warn|error\"",
           "legendFormat": "",
           "refId": "A"
         }

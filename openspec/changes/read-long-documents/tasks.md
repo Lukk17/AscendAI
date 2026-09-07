@@ -1,4 +1,4 @@
-Every command runs from `ascend-ocr/` through that module's own virtual environment (`.venv/Scripts/python.exe` on
+Every command runs from `apps/ascend-ocr/` through that module's own virtual environment (`.venv/Scripts/python.exe` on
 Windows, `.venv/bin/python` on Linux and macOS), never the system Python. The gate is `--cov-fail-under=100` with
 `--cov-branch`, so every branch added below needs a test before the suite goes green.
 
@@ -127,8 +127,8 @@ and the number table says either "confirmed" or what it moved to.
 
 ## 8. Documentation
 
-- [ ] 8.1 Update the environment variable list in `ascend-ocr/AGENTS.md`, `ascend-ocr/README.md` and
-      `ascend-ocr/docs/CONFIGURATION.md` with the six new settings, the derived reading ceiling and the changed
+- [ ] 8.1 Update the environment variable list in `apps/ascend-ocr/AGENTS.md`, `apps/ascend-ocr/README.md` and
+      `apps/ascend-ocr/docs/CONFIGURATION.md` with the six new settings, the derived reading ceiling and the changed
       `OCR_REQUEST_TIMEOUT`, each with the derivation from design.md's number table. Verify by diffing the settings
       in `config.py` against the three documents and confirming none is missing from any of them.
 - [ ] 8.2 Document the job path end to end for a caller: submit, poll, collect, delete, the five states, the two new
@@ -136,13 +136,13 @@ and the number table says either "confirmed" or what it moved to.
       can drive the whole path from the document alone against a running container.
 - [ ] 8.3 Write the ADR recording why a long document became a job rather than a larger timeout, with the three
       rejected shapes and their reasons, the derivation of the job page ceiling, and the durability and retention
-      trades. Verify it follows the existing format under `ascend-ocr/docs/architecture/decisions/` and is listed in
+      trades. Verify it follows the existing format under `apps/ascend-ocr/docs/architecture/decisions/` and is listed in
       that directory's README and in the arc42 decisions page.
 - [ ] 8.4 Amend ADR-002 with the two new codes and the record-level `SERVICE_RESTARTED` reason, and ADR-004 with the
       two new readiness fields. Verify both amendments follow the dated-amendment style ADR-004 already uses.
 - [ ] 8.5 Update the arc42 pages for the new building block, the job runtime view, and the deployment note about the
       jobs directory and its optional volume. Verify each page's diagram and text mention the store and the runner.
-- [ ] 8.6 Correct `ascend-ocr/e2e/README.md`, which states the service holds no persisted state, and give it the
+- [ ] 8.6 Correct `apps/ascend-ocr/e2e/README.md`, which states the service holds no persisted state, and give it the
       reset step for a suite run that leaves job records behind. Verify by running the reset step against a
       container with records present and confirming the store is empty afterwards.
 
@@ -151,7 +151,7 @@ and the number table says either "confirmed" or what it moved to.
 - [ ] 9.1 Add Bruno requests for submit, status and delete under `docs/api/request/AscendAI/ocr/`, following
       the existing `ocr.yml` shape. Verify each asserts its status code, the record shape and, for status, that a
       completed job carries the same result fields the synchronous request returns.
-- [ ] 9.2 Add one e2e capability spec and its run template under `ascend-ocr/e2e/testing/` for reading a document
+- [ ] 9.2 Add one e2e capability spec and its run template under `apps/ascend-ocr/e2e/testing/` for reading a document
       longer than the synchronous page limit through the job path. Verify it asserts observable behaviour only, uses
       a fixture with a canary string on a late page, and states its own reset step.
 - [ ] 9.3 Confirm the behaviour Decision 12 derives but does not observe: four concurrent single-page synchronous

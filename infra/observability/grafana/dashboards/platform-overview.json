@@ -36,7 +36,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-agent|ascend-weather-mcp\"}[2m]))",
+          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-ai-agent|ascend-weather-mcp\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         },
@@ -67,7 +67,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-agent|ascend-weather-mcp\",status=~\"5..\"}[2m]))",
+          "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"ascend-ai-agent|ascend-weather-mcp\",status=~\"5..\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         },
@@ -104,7 +104,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_server_requests_seconds_bucket{service=~\"ascend-agent|ascend-weather-mcp\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_server_requests_seconds_bucket{service=~\"ascend-ai-agent|ascend-weather-mcp\"}[5m])))",
           "legendFormat": "{{service}} p95",
           "refId": "A"
         },

@@ -10,8 +10,8 @@ Accepted
 
 ### Context
 
-The AscendAgent needs to invoke external tools (audio transcription, web search, weather, OCR) during LLM conversations. Options considered:
-1. Direct REST API calls hardcoded in the AscendAgent
+The ascend-ai-agent needs to invoke external tools (audio transcription, web search, weather, OCR) during LLM conversations. Options considered:
+1. Direct REST API calls hardcoded in the ascend-ai-agent
 2. Plugin architecture with in-process extensions
 3. Model Context Protocol (MCP), an open standard for LLM tool integration
 
@@ -25,7 +25,7 @@ Tool services implement MCP servers using:
 - Java: `spring-ai-starter-mcp-server-webmvc` (ascend-weather-mcp)
 - Python: `FastMCP` library (ascend-audio-scribe, ascend-web-hunter, ascend-ocr)
 
-Exception: AscendMemory uses REST API instead of MCP for memory operations (see AscendAgent ADR-003) because memory operations are tightly coupled to the prompt flow and need synchronous, predictable behavior rather than LLM-driven tool selection.
+Exception: AscendMemory uses REST API instead of MCP for memory operations (see ascend-ai-agent ADR-003) because memory operations are tightly coupled to the prompt flow and need synchronous, predictable behavior rather than LLM-driven tool selection.
 
 ---
 
@@ -33,6 +33,6 @@ Exception: AscendMemory uses REST API instead of MCP for memory operations (see 
 
 - Positive: LLM autonomously decides when to use tools: no hardcoded dispatch logic
 - Positive: Adding new tools requires only a new MCP server + docker-compose entry
-- Positive: Tools are discoverable at runtime: the AscendAgent doesn't need to know tool implementations
+- Positive: Tools are discoverable at runtime: the ascend-ai-agent doesn't need to know tool implementations
 - Negative: MCP adds protocol overhead compared to direct REST calls
 - Negative: Debugging tool calls requires understanding the MCP JSON-RPC layer

@@ -42,11 +42,11 @@ The default `app.unstructured.base-url` and the docker-profile override SHALL ea
 
 #### Scenario: Host-mode boot
 
-- **WHEN** AscendAgent runs as `./gradlew bootRun` against docker-compose services
+- **WHEN** ascend-ai-agent runs as `./gradlew bootRun` against docker-compose services
 - **THEN** the resolved Unstructured URL is `http://localhost:9080` and ingestion works for a DOCX upload
 
 #### Scenario: Container-mode boot
 
-- **WHEN** AscendAgent runs inside docker-compose with profile `docker`
+- **WHEN** ascend-ai-agent runs inside docker-compose with profile `docker`
 - **THEN** the resolved URL uses the docker-network service name and ingestion works
 

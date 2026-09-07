@@ -4,7 +4,7 @@
 
 ### Requirement: The edge gateway is the only publicly bound service
 
-`docker-compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
+`docker-compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-ai-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
 
 #### Scenario: External port scan shows only 80 and 443
 
@@ -12,11 +12,11 @@
 - **THEN** only ports 80 and 443 accept connections
 - **AND** direct connection attempts to 9917, 7020, 7017, 7021, 7022, 9998, 5001, 9080, 9020, 8191, 7077, and 7078 from outside the VM fail
 
-#### Scenario: AscendAgent is reachable through the gateway over TLS
+#### Scenario: ascend-ai-agent is reachable through the gateway over TLS
 
 - **WHEN** a client sends `POST https://<ASCEND_DOMAIN>/api/v1/ai/prompt` with a valid request body
-- **THEN** the gateway terminates TLS and proxies the request to `ascend-agent:9917`
-- **AND** the response is the same as a direct in-network call to AscendAgent
+- **THEN** the gateway terminates TLS and proxies the request to `ascend-ai-agent:9917`
+- **AND** the response is the same as a direct in-network call to ascend-ai-agent
 
 #### Scenario: Local dev gets a working TLS endpoint without a domain
 
@@ -42,7 +42,7 @@ Every host-port publication in `docker-compose.yaml` and `ascend-scrapper.docker
 
 ### Requirement: Credentials flow from environment with production fail-fast
 
-All credentials consumed by the stack SHALL be sourced from environment variables backed by `.env`: Postgres user/password, Redis password, S3 access/secret keys, Qdrant API key, Grafana admin user/password, and the SearXNG secret. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` required form so `docker compose up` fails immediately when they are unset. Datastore credentials MAY carry dev defaults in `application.yaml` (`${VAR:devdefault}`), but AscendAgent SHALL refuse to start under the `production` Spring profile while any datastore credential still equals its known dev default. The SearXNG `secret_key` SHALL be removed from `infra/searxng/settings.yml` and injected via the `SEARXNG_SECRET` env var; the previously committed value SHALL be treated as compromised and rotated.
+All credentials consumed by the stack SHALL be sourced from environment variables backed by `.env`: Postgres user/password, Redis password, S3 access/secret keys, Qdrant API key, Grafana admin user/password, and the SearXNG secret. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` required form so `docker compose up` fails immediately when they are unset. Datastore credentials MAY carry dev defaults in `application.yaml` (`${VAR:devdefault}`), but ascend-ai-agent SHALL refuse to start under the `production` Spring profile while any datastore credential still equals its known dev default. The SearXNG `secret_key` SHALL be removed from `infra/searxng/settings.yml` and injected via the `SEARXNG_SECRET` env var; the previously committed value SHALL be treated as compromised and rotated.
 
 #### Scenario: Missing required secret fails compose up
 
@@ -51,7 +51,7 @@ All credentials consumed by the stack SHALL be sourced from environment variable
 
 #### Scenario: Production profile rejects dev-default credentials
 
-- **WHEN** AscendAgent starts with the `production` Spring profile active and `S3_SECRET_KEY` still resolving to the dev default `password`
+- **WHEN** ascend-ai-agent starts with the `production` Spring profile active and `S3_SECRET_KEY` still resolving to the dev default `password`
 - **THEN** the application fails startup with an error naming the offending credential
 - **AND** with real values set for every datastore credential the application starts normally
 
@@ -149,12 +149,12 @@ The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfac
 
 ### Requirement: Compose declares production runtime posture
 
-`docker-compose.yaml` SHALL apply a shared `x-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) to every service; SHALL upgrade `depends_on` entries to `condition: service_healthy` wherever the dependency defines a healthcheck; SHALL define healthchecks for `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`; SHALL pin every image to a specific version (including `ngrok/ngrok`); and SHALL pass `SECURITY_ENABLED=${SECURITY_ENABLED:-false}` to AscendAgent, with the production checklist in the deployment guide requiring `SECURITY_ENABLED=true`.
+`docker-compose.yaml` SHALL apply a shared `x-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) to every service; SHALL upgrade `depends_on` entries to `condition: service_healthy` wherever the dependency defines a healthcheck; SHALL define healthchecks for `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`; SHALL pin every image to a specific version (including `ngrok/ngrok`); and SHALL pass `SECURITY_ENABLED=${SECURITY_ENABLED:-false}` to ascend-ai-agent, with the production checklist in the deployment guide requiring `SECURITY_ENABLED=true`.
 
 #### Scenario: Agent waits for healthy dependencies
 
 - **WHEN** `docker compose up -d` starts the stack from cold
-- **THEN** `ascend-agent` is not started until `ascend-memory`, `docling-serve`, and `unstructured-api` report healthy
+- **THEN** `ascend-ai-agent` is not started until `ascend-memory`, `docling-serve`, and `unstructured-api` report healthy
 
 #### Scenario: Log output is rotation-bounded
 

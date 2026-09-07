@@ -33,7 +33,7 @@ Out of scope (explicit): PDF/document handling (the service scrapes web pages; d
 
 - **Code:** `src/reader/web_reader.py` (orchestrator), all of `src/reader/strategies/*`, `src/reader/cloudflare/{cookie_manager,challenge_detector}.py`, `src/runtime/browser_pool.py`, `src/validator/{url_validator,content_validator}.py`, `src/search/search_client.py`, `src/api/rest/rest_endpoints.py`, `src/api/mcp/mcp_server.py`, `src/config/config.py`, `src/observability/metrics.py`.
 - **API:** new session endpoints + MCP tools; new optional read fields (`profile`, `tier`, `output_format`); structured-output response shape (additive, version-gated if the envelope changes).
-- **Repo hygiene:** `.gitignore` gains `ascend-web-hunter/src/storage/`; that directory is untracked and purged.
+- **Repo hygiene:** `.gitignore` gains `apps/ascend-web-hunter/src/storage/`; that directory is untracked and purged.
 - **Config:** new settings for auth/WAF TTLs, profiles, proxy, scroll, cache TTL, circuit-breaker thresholds. No new mandatory external dependency (Redis stays optional; in-memory fallback documented as supported for local use).
 - **Dependencies:** adds `readability-lxml` (and optionally a stealth library such as `patchright`); proxy support is configuration-only.
 - **Docs/ADRs:** ADRs for the per-profile session model and the storage_state/persistent-session reuse strategy; the e2e tier tests from `add-web-search-scraping-e2e` exercise the authenticated path once landed.
