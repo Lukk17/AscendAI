@@ -20,7 +20,7 @@
 
 ## 3. Secrets and credentials
 
-- [ ] 3.1 Remove `secret_key` from `searxng/settings.yml`; wire `SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set}` into the `searxng` service environment; document that the old committed value is compromised and every deployment generates a fresh one
+- [ ] 3.1 Remove `secret_key` from `infra/searxng/settings.yml`; wire `SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set}` into the `searxng` service environment; document that the old committed value is compromised and every deployment generates a fresh one
 - [ ] 3.2 Grafana: set `GF_AUTH_ANONYMOUS_ENABLED=false`, drop `GF_AUTH_ANONYMOUS_ORG_ROLE`, add `GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}` and `GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}`
 - [ ] 3.3 Parameterize `AscendAgent/src/main/resources/application.yaml`: `app.s3.access-key`/`secret-key` → `${S3_ACCESS_KEY:admin}`/`${S3_SECRET_KEY:password}`, `spring.datasource.username`/`password` → `${POSTGRES_USER:postgres}`/`${POSTGRES_PASSWORD:local}`, `spring.data.redis.password` → `${REDIS_PASSWORD:}`, Qdrant API key → `${QDRANT_API_KEY:}`; mirror any docker-profile overrides in `application-docker.yaml`; pass the variables through the `ascend-agent` compose environment
 - [ ] 3.4 Wire `QDRANT_API_KEY` into the `ascend-memory` compose environment and `REDIS_PASSWORD` into the `ascend-web-search` `REDIS_URL`, both defaulting to today's unauthenticated local behavior

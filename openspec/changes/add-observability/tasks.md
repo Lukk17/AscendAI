@@ -1,8 +1,8 @@
 ## 1. Bring up Prometheus + Grafana with empty scrape config
 
-- [x] 1.1 Create `observability/prometheus/prometheus.yaml` with `global.scrape_interval: 15s`, an empty `scrape_configs` list, and external labels `{cluster: "ascend-ai-local"}` (note: `.yaml` extension to match repo convention)
-- [x] 1.2 Create `observability/grafana/provisioning/datasources/datasources.yaml` declaring three datasources (`Prometheus` → `http://prometheus:9090`, `Loki` → `http://loki:3100`, `Tempo` → `http://tempo:3200`); `Prometheus` marked default
-- [x] 1.3 Create `observability/grafana/provisioning/dashboards/dashboards.yaml` that mounts `/var/lib/grafana/dashboards/` as the dashboard provider
+- [x] 1.1 Create `infra/observability/prometheus/prometheus.yaml` with `global.scrape_interval: 15s`, an empty `scrape_configs` list, and external labels `{cluster: "ascend-ai-local"}` (note: `.yaml` extension to match repo convention)
+- [x] 1.2 Create `infra/observability/grafana/provisioning/datasources/datasources.yaml` declaring three datasources (`Prometheus` → `http://prometheus:9090`, `Loki` → `http://loki:3100`, `Tempo` → `http://tempo:3200`); `Prometheus` marked default
+- [x] 1.3 Create `infra/observability/grafana/provisioning/dashboards/dashboards.yaml` that mounts `/var/lib/grafana/dashboards/` as the dashboard provider
 - [x] 1.4 Add `prometheus` service to `docker-compose.yaml` (image `prom/prometheus:v2.55.x`, volume mount config, port `9090`, command flag `--storage.tsdb.retention.time=72h`)
 - [x] 1.5 Add `grafana` service to `docker-compose.yaml` (image `grafana/grafana:11.x.x`, volume mounts for provisioning + dashboards directory, port `3030:3000`, env `GF_AUTH_ANONYMOUS_ENABLED=true`, `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`)
 - [ ] 1.6 Smoke test: `docker compose up -d prometheus grafana`, confirm `http://localhost:9090/-/ready` returns 200 and `http://localhost:3030/api/health` returns 200
@@ -14,7 +14,7 @@
 - [x] 2.2 In `AscendAgent/src/main/resources/application.yaml`, add `management.endpoints.web.exposure.include: health,info,prometheus`, `management.endpoint.health.show-details: when-authorized`, `management.metrics.tags.service: ascend-agent`, `management.metrics.tags.version: @project.version@`
 - [x] 2.3 Enable `processResources` filtering for `application.yaml` in `build.gradle.kts` so `@project.version@` resolves at build time
 - [x] 2.4 Create `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/config/MetricsConfig.java` with a `MeterRegistryCustomizer<MeterRegistry>` bean that applies common tags (`service`, `version`) globally
-- [x] 2.5 Add scrape job for AscendAgent to `observability/prometheus/prometheus.yaml`: `job_name: ascend-agent`, `metrics_path: /actuator/prometheus`, `static_configs.targets: [host.docker.internal:9917]`
+- [x] 2.5 Add scrape job for AscendAgent to `infra/observability/prometheus/prometheus.yaml`: `job_name: ascend-agent`, `metrics_path: /actuator/prometheus`, `static_configs.targets: [host.docker.internal:9917]`
 - [ ] 2.6 Smoke test: hit `http://localhost:9917/actuator/prometheus`, confirm body contains `jvm_memory_used_bytes`, `gen_ai_client_token_usage_total` (after one prompt), and the `service="ascend-agent"` tag appears on every line
 
 ## 3. Custom metrics — semantic memory
@@ -55,22 +55,22 @@
 
 - [x] 7.1 Add Actuator + Prometheus dependencies to `WeatherMCP/build.gradle.kts`
 - [x] 7.2 Mirror `application.yaml` management block from AscendAgent with `service: weather-mcp`
-- [x] 7.3 Add scrape job `weather-mcp` to `observability/prometheus/prometheus.yaml`
+- [x] 7.3 Add scrape job `weather-mcp` to `infra/observability/prometheus/prometheus.yaml`
 - [ ] 7.4 Smoke test: `/actuator/prometheus` reachable, `service="weather-mcp"` tag present
 
 ## 8. Logs layer — Vector + Loki
 
-- [x] 8.1 Create `observability/loki/loki-config.yaml` (single-binary mode, filesystem store, retention 168h)
+- [x] 8.1 Create `infra/observability/loki/loki-config.yaml` (single-binary mode, filesystem store, retention 168h)
 - [x] 8.2 Add `loki` service to `docker-compose.yaml` (image `grafana/loki:3.x.x`, volume mount config, port `3100` docker-network only)
-- [x] 8.3 Create `observability/vector/vector.toml` with: `[sources.docker]` reading via `docker_logs` source for the six AscendAI services; `[sinks.loki]` shipping to `http://loki:3100` with labels `service`, `source`. Add commented placeholder sinks for Datadog / CloudWatch / Splunk to document the migration story.
+- [x] 8.3 Create `infra/observability/vector/vector.toml` with: `[sources.docker]` reading via `docker_logs` source for the six AscendAI services; `[sinks.loki]` shipping to `http://loki:3100` with labels `service`, `source`. Add commented placeholder sinks for Datadog / CloudWatch / Splunk to document the migration story.
 - [x] 8.4 Add `vector` service to `docker-compose.yaml` (image `timberio/vector:0.42.x-alpine`, volume mount config, mount `/var/run/docker.sock:/var/run/docker.sock:ro`)
 - [ ] 8.5 Smoke test: tail a log line in any AscendAI service container, then query Loki via Grafana Logs panel: `{service="ascend-agent"}` should return the line within 5 seconds
 
 ## 9. Traces layer — OTel collector + Tempo
 
-- [x] 9.1 Create `observability/tempo/tempo-config.yaml` (single-binary mode, filesystem store, retention 168h, OTLP receiver on `:4317`)
+- [x] 9.1 Create `infra/observability/tempo/tempo-config.yaml` (single-binary mode, filesystem store, retention 168h, OTLP receiver on `:4317`)
 - [x] 9.2 Add `tempo` service to `docker-compose.yaml` (image `grafana/tempo:2.x.x`, volume mount config, port `3200` docker-network only, OTLP `4317` docker-network only)
-- [x] 9.3 Create `observability/otel-collector/otel-collector-config.yaml` with OTLP receivers (gRPC `:4317`, HTTP `:4318`), `batch` + `memory_limiter` processors, OTLP exporter to Tempo
+- [x] 9.3 Create `infra/observability/otel-collector/otel-collector-config.yaml` with OTLP receivers (gRPC `:4317`, HTTP `:4318`), `batch` + `memory_limiter` processors, OTLP exporter to Tempo
 - [x] 9.4 Add `otel-collector` service to `docker-compose.yaml` (image `otel/opentelemetry-collector-contrib:0.x.x`, volume mount config, ports `4317` + `4318` docker-network only)
 - [x] 9.5 In `AscendAgent/src/main/resources/application-docker.yaml`, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-agent`, `OTEL_RESOURCE_ATTRIBUTES=service.version=@project.version@`
 - [x] 9.6 Same for `WeatherMCP/src/main/resources/application-docker.yaml` with `OTEL_SERVICE_NAME=weather-mcp`
@@ -85,7 +85,7 @@
 - [x] 10.4 Set OTel env in `docker-compose.yaml` for the service: `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-memory`
 - [x] 10.5 Add a small `metrics.py` module that defines `Counter("memory_operations_total", ["operation","outcome"])` and `Histogram("memory_search_duration_seconds", ["embedding_provider"])`
 - [x] 10.6 Wire counter/histogram increments into the REST handlers in `src/api/rest/rest_endpoints.py`
-- [x] 10.7 Add scrape job `ascend-memory` to `observability/prometheus/prometheus.yaml`
+- [x] 10.7 Add scrape job `ascend-memory` to `infra/observability/prometheus/prometheus.yaml`
 - [ ] 10.8 Smoke test: `GET http://localhost:7020/metrics` returns 200 and includes `python_info{...}` plus `memory_operations_total`. Also send one search request → confirm Tempo has a trace with `service.name=ascend-memory`.
 
 ## 11. Wire AudioScribe, AscendWebSearch, PaddleOCR (Python repetition)
@@ -105,12 +105,12 @@
 
 ## 13. Provision dashboards (six total)
 
-- [x] 13.1 Build `observability/grafana/dashboards/platform-overview.json` with panels: request rate per service, error rate per service, p95 latency per service, JVM heap, Python RSS
-- [x] 13.2 Build `observability/grafana/dashboards/ai-pipeline.json` with panels: tokens per minute by provider/model, provider mix, RAG hit-rate, memory parse-failure rate, MCP tool call rate
-- [x] 13.3 Build `observability/grafana/dashboards/infrastructure.json` with panels: Qdrant collection point counts, Redis ops/sec + used memory, Postgres connections + db size
-- [x] 13.4 **L1 — Token Cost** (`observability/grafana/dashboards/token-cost.json`): per-provider $/day computed via `gen_ai.client.token.usage{provider="...",type="input"} × pricing_input + ... type="output" × pricing_output`. Pricing rates committed in `observability/grafana/dashboards/pricing.yaml` keyed by provider; loaded into the dashboard via JSON variable substitution at build time
-- [x] 13.5 **L2 — RAG Quality** (`observability/grafana/dashboards/rag-quality.json`): heatmap of `rag_top_score_bucket` over time, time-series of miss-rate (`rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)`), bar chart of ingestion-events-per-hour by `source_type`. Logs panel below querying Loki for `{service="ascend-agent"} |~ "Retrieval:"`
-- [x] 13.6 **L3 — Cache Hit Rate** (`observability/grafana/dashboards/cache-hit-rate.json`): primary panel `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider; side panel absolute saved-token count `rate(prompt_cache.tokens.read[1h]) * 3600` per provider; flat-line-at-zero alert annotation (UI only, no Alertmanager)
+- [x] 13.1 Build `infra/observability/grafana/dashboards/platform-overview.json` with panels: request rate per service, error rate per service, p95 latency per service, JVM heap, Python RSS
+- [x] 13.2 Build `infra/observability/grafana/dashboards/ai-pipeline.json` with panels: tokens per minute by provider/model, provider mix, RAG hit-rate, memory parse-failure rate, MCP tool call rate
+- [x] 13.3 Build `infra/observability/grafana/dashboards/infrastructure.json` with panels: Qdrant collection point counts, Redis ops/sec + used memory, Postgres connections + db size
+- [x] 13.4 **L1 — Token Cost** (`infra/observability/grafana/dashboards/token-cost.json`): per-provider $/day computed via `gen_ai.client.token.usage{provider="...",type="input"} × pricing_input + ... type="output" × pricing_output`. Pricing rates committed in `infra/observability/grafana/dashboards/pricing.yaml` keyed by provider; loaded into the dashboard via JSON variable substitution at build time
+- [x] 13.5 **L2 — RAG Quality** (`infra/observability/grafana/dashboards/rag-quality.json`): heatmap of `rag_top_score_bucket` over time, time-series of miss-rate (`rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)`), bar chart of ingestion-events-per-hour by `source_type`. Logs panel below querying Loki for `{service="ascend-agent"} |~ "Retrieval:"`
+- [x] 13.6 **L3 — Cache Hit Rate** (`infra/observability/grafana/dashboards/cache-hit-rate.json`): primary panel `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider; side panel absolute saved-token count `rate(prompt_cache.tokens.read[1h]) * 3600` per provider; flat-line-at-zero alert annotation (UI only, no Alertmanager)
 - [ ] 13.7 Verify each dashboard renders non-empty data after running representative traffic
 - [ ] 13.8 Sanity-check dashboard portability: each panel JSON cites its underlying metric/log/trace query in a description field; no hard-coded datasource UIDs other than the provisioned `Prometheus` / `Loki` / `Tempo` names
 
@@ -118,7 +118,7 @@
 
 - [x] 14.1 Author `docs/OBSERVABILITY.md`: stack overview (three pillars), what each dashboard shows, how to access Prometheus / Grafana / Loki / Tempo, how to add a custom metric in Java (snippet) and Python (snippet), how to add a span attribute, the cardinality discipline rules from D5, the Vector → Datadog migration recipe
 - [ ] 14.2 Add a "Metrics Inventory" table to OBSERVABILITY.md listing every custom metric, type, tags, and the dashboard(s) that use it — so renaming a metric flags downstream impact
-- [ ] 14.3 Add a "Pricing Rates" section explaining how to update `observability/grafana/dashboards/pricing.yaml` when provider pricing changes (commit + restart Grafana to reload)
+- [ ] 14.3 Add a "Pricing Rates" section explaining how to update `infra/observability/grafana/dashboards/pricing.yaml` when provider pricing changes (commit + restart Grafana to reload)
 - [x] 14.4 Update root `README.md` Documentation section to link `docs/OBSERVABILITY.md`
 - [ ] 14.5 Add a one-liner to each module's `AGENTS.md` referencing OBSERVABILITY.md for instrumenting new code
 

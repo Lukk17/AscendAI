@@ -11,7 +11,7 @@ AscendAI has no per-tenant or per-user accounting of what anything costs, and no
 - **Quotas.** Per-tenant monthly token budget and per-user daily token budget, with configurable platform defaults and per-tenant overrides. Enforced **before** the provider call; an exhausted budget returns `429` with `Retry-After` and a structured error body. Crossing a soft-warning threshold (default 80%) emits a log event and a metric so operators can alert before hard cut-off.
 - **Rate limiting.** Per-user and per-tenant request-rate limits on the chat endpoint, ingestion upload, and web-search-tool-invoking paths. Redis-backed token buckets (Bucket4j vs. Redis Lua decided in design) so limits hold across AscendAgent replicas. Over-limit requests get `429` + `Retry-After`.
 - **BYOK provider credentials.** Per-tenant provider API keys stored encrypted at rest and resolved at request time, falling back to the global deployment keys when a tenant has none. Keys are write-only through the API (only `last4` and metadata are ever returned); management endpoints are `ADMIN`-only. This requires per-tenant provider clients — today `ChatModelResolver` builds one client per provider at startup (`@PostConstruct initializeProviders()`), so resolution gains a tenant-keyed client cache.
-- **Observability feed.** The existing `gen_ai.client.token.usage` counter gains `tenant` and `request_type` tags (bounded cardinality — tenant count is small and operator-controlled), and a Usage & Quotas Grafana dashboard joins the existing `observability/grafana/dashboards/` set.
+- **Observability feed.** The existing `gen_ai.client.token.usage` counter gains `tenant` and `request_type` tags (bounded cardinality — tenant count is small and operator-controlled), and a Usage & Quotas Grafana dashboard joins the existing `infra/observability/grafana/dashboards/` set.
 
 ## Capabilities
 
@@ -32,7 +32,7 @@ AscendAI has no per-tenant or per-user accounting of what anything costs, and no
 - **Dependencies**: `AscendAgent/build.gradle.kts` gains a Redis-backed rate-limiter dependency (Bucket4j + Lettuce integration or equivalent — design decides).
 - **Database**: new Liquibase changelog in `src/main/resources/db/changelog/` (usage ledger table, quota config table, tenant provider-key table) referenced from `db.changelog-master.yaml`.
 - **Configuration**: `application.yaml` gains default quota/rate-limit values and the master encryption key env var; `docker-compose.yaml` mirrors the env vars.
-- **Observability**: extra tags on `gen_ai.client.token.usage`, new quota/rate-limit counters, one new provisioned Grafana dashboard under `observability/grafana/dashboards/`.
+- **Observability**: extra tags on `gen_ai.client.token.usage`, new quota/rate-limit counters, one new provisioned Grafana dashboard under `infra/observability/grafana/dashboards/`.
 - **API surface**: new `GET /api/v1/usage`, new `ADMIN` endpoints under `/api/v1/tenants/{tenantId}/provider-keys`; chat/ingestion/web-search paths can now return `429`.
 - **Depends on**: `add-auth-and-identity` (authenticated principal, `USER`/`ADMIN` roles) and `add-tenant-isolation` (tenant model and `tenant` claim). Neither is re-specified here. `add-chat-streaming-and-conversations` interaction: streamed responses must still record a ledger row at stream completion (design consideration).
 - **Docs**: `docs/` usage-and-billing page, module `AGENTS.md` touch-ups, Bruno collection additions for the new endpoints.

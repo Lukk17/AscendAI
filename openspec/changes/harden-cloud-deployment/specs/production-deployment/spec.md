@@ -42,7 +42,7 @@ Every host-port publication in `docker-compose.yaml` and `ascend-scrapper.docker
 
 ### Requirement: Credentials flow from environment with production fail-fast
 
-All credentials consumed by the stack SHALL be sourced from environment variables backed by `.env`: Postgres user/password, Redis password, S3 access/secret keys, Qdrant API key, Grafana admin user/password, and the SearXNG secret. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` required form so `docker compose up` fails immediately when they are unset. Datastore credentials MAY carry dev defaults in `application.yaml` (`${VAR:devdefault}`), but AscendAgent SHALL refuse to start under the `production` Spring profile while any datastore credential still equals its known dev default. The SearXNG `secret_key` SHALL be removed from `searxng/settings.yml` and injected via the `SEARXNG_SECRET` env var; the previously committed value SHALL be treated as compromised and rotated.
+All credentials consumed by the stack SHALL be sourced from environment variables backed by `.env`: Postgres user/password, Redis password, S3 access/secret keys, Qdrant API key, Grafana admin user/password, and the SearXNG secret. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` required form so `docker compose up` fails immediately when they are unset. Datastore credentials MAY carry dev defaults in `application.yaml` (`${VAR:devdefault}`), but AscendAgent SHALL refuse to start under the `production` Spring profile while any datastore credential still equals its known dev default. The SearXNG `secret_key` SHALL be removed from `infra/searxng/settings.yml` and injected via the `SEARXNG_SECRET` env var; the previously committed value SHALL be treated as compromised and rotated.
 
 #### Scenario: Missing required secret fails compose up
 
@@ -59,7 +59,7 @@ All credentials consumed by the stack SHALL be sourced from environment variable
 
 - **WHEN** a reviewer greps the repository for the old SearXNG `secret_key` value and for `access-key: admin` / `secret-key: password` as literal committed values
 - **THEN** no committed file contains a credential that a production deployment would accept
-- **AND** `searxng/settings.yml` contains no `secret_key` entry
+- **AND** `infra/searxng/settings.yml` contains no `secret_key` entry
 
 ### Requirement: Personal-machine artifacts are opt-in
 

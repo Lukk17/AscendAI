@@ -13,7 +13,7 @@ This change **depends on** two siblings and re-specifies neither:
 
 A third sibling, `add-chat-streaming-and-conversations`, will make chat responses streamable; usage metadata for a streamed call is only complete when the stream finishes, which constrains where the ledger write can happen.
 
-Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelog-master.yaml`), Redis (already a hard prerequisite, used for chat history), and the `add-observability` Grafana stack with provisioned dashboards under `observability/grafana/dashboards/`.
+Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelog-master.yaml`), Redis (already a hard prerequisite, used for chat history), and the `add-observability` Grafana stack with provisioned dashboards under `infra/observability/grafana/dashboards/`.
 
 ## Goals / Non-Goals
 
@@ -101,7 +101,7 @@ Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL te
 
 - `GenAiTokenUsageRecorder` gains `tenant` and `request_type` tags on `gen_ai.client.token.usage` (bounded cardinality: tenants are operator-created, request types are a closed set of four).
 - New counters: `usage.ledger.write_failed`, `usage.quota.rejected{scope}`, `usage.quota.warning{scope}`, `rate_limit.rejected{scope,endpoint}`, `rate_limit.redis_unavailable`.
-- One new provisioned dashboard `observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users, quota-consumption gauges, 429 rates.
+- One new provisioned dashboard `infra/observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users, quota-consumption gauges, 429 rates.
 
 ## Risks / Trade-offs
 

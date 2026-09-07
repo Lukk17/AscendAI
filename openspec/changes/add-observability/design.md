@@ -198,7 +198,7 @@ Result: a single chat turn produces a trace with spans for: AscendAgent receives
 | 5 | RAG Quality (L2) | metrics + logs | Top-K score distribution; miss-rate trends; ingestion throughput |
 | 6 | Cache Hit Rate (L3) | metrics | Is the prompt-caching change actually saving money? |
 
-**L1 — Token Cost**: Multiplies `gen_ai.client.token.usage{provider="...",type="input"}` by per-provider $/1k input rates and `type="output"` by $/1k output rates. Rates are committed in `observability/grafana/dashboards/pricing.yaml` so updates go through git review. Daily-bucketed `sum by (provider)` panel; line chart per provider over time; total $ panel.
+**L1 — Token Cost**: Multiplies `gen_ai.client.token.usage{provider="...",type="input"}` by per-provider $/1k input rates and `type="output"` by $/1k output rates. Rates are committed in `infra/observability/grafana/dashboards/pricing.yaml` so updates go through git review. Daily-bucketed `sum by (provider)` panel; line chart per provider over time; total $ panel.
 
 **L2 — RAG Quality**: Heatmap of `rag.top_score` histogram over time (shows score distribution drift). Time-series of `rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)` (miss-rate). Bar chart of ingestion-events-per-hour by `source_type` from `ingestion.upload.bytes_total`. Logs panel below pulls Loki entries matching `service="ascend-agent"` AND `level="WARN"` for retrieval-related warnings.
 

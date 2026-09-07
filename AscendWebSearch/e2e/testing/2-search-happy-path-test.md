@@ -51,7 +51,7 @@ Expect a non-zero results count. If results is `0` and the unresponsive-engines 
 CAPTCHA across all enabled engines, the residential / shared egress IP is being walled by upstream search
 providers — the AscendWebSearch service itself is healthy but this test cannot exercise the end-to-end happy
 path. Mark this run **BLOCKED** (not FAIL) and re-run when an upstream is reachable; the suspended_times in
-`searxng/settings.yml` are set to seconds-to-minutes so recovery is fast once the upstreams release the IP.
+`infra/searxng/settings.yml` are set to seconds-to-minutes so recovery is fast once the upstreams release the IP.
 
 ## Reset state
 

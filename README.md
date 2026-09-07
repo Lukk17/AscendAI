@@ -400,7 +400,7 @@ the actual transport AscendAgent uses today. The other surface is available for 
 
 #### Observability stack (in-stack, deployed via compose)
 
-Full setup and usage in [observability/README.md](observability/README.md).
+Full setup and usage in [infra/observability/README.md](infra/observability/README.md).
 
 | Service             | Port            | Exposed       | Role                                                                 |
 | :------------------ | :-------------- | :------------ | :------------------------------------------------------------------ |
@@ -438,7 +438,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / object store / PostgreSQL / Redis reset recipes.             |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)                                                                        | Metrics, logs, traces — what is collected, dashboards, how to instrument. |
-| [observability/README.md](observability/README.md)                                                                   | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
+| [infra/observability/README.md](infra/observability/README.md)                                                       | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
 | [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |

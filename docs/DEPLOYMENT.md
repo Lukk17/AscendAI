@@ -28,7 +28,7 @@ stack and compose will refuse to start without them, naming the one that is miss
 
 - `SEARXNG_SECRET`. SearXNG's session-signing key. At least 32 characters, unique per deployment, never the literal
   `ultrasecretkey`. It replaced a `secret_key` that used to be committed in
-  [searxng/settings.yml](../searxng/settings.yml), so that value must be treated as compromised and never reused.
+  [infra/searxng/settings.yml](../infra/searxng/settings.yml), so that value must be treated as compromised and never reused.
 - `NGROK_AUTHTOKEN`. Only when running `ngrok-ascend-web-search`.
 
 `VNC_PASSWORD` is optional locally. Leaving it empty means the NoVNC desktop accepts any client and the container logs
@@ -148,7 +148,7 @@ Three things differ from the development stack in a way worth knowing before dep
   Prometheus metrics on `/metrics` are unaffected and still exposed.
 - SearXNG and FlareSolverr publish no ports. They are reachable only from inside the stack.
 
-The bundle carries its own copy of [searxng/settings.yml](../searxng/settings.yml), kept byte-identical so a `diff` is
+The bundle carries its own copy of [infra/searxng/settings.yml](../infra/searxng/settings.yml), kept byte-identical so a `diff` is
 the entire sync check. Changing one means changing the other in the same commit.
 
 ---

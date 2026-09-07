@@ -148,7 +148,7 @@ Telemetry. In the full platform this service exports traces over OTLP to an Open
 
 This is not a degraded mode. The service reads `OTEL_EXPORTER_OTLP_ENDPOINT` once at startup and, finding it unset, never initialises OpenTelemetry at all. Nothing retries, nothing logs errors, nothing waits. The application is fully functional without it.
 
-To get traces back you would need a collector accepting OTLP over gRPC on port 4317, plus somewhere to store and view what it collects. The working configuration for all of that is in the repository root: the `otel-collector`, `tempo` and `grafana` services in `docker-compose.yaml`, with their config files under `observability/`. Add them here, then set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` on the ascend-web-search service.
+To get traces back you would need a collector accepting OTLP over gRPC on port 4317, plus somewhere to store and view what it collects. The working configuration for all of that is in the repository root: the `otel-collector`, `tempo` and `grafana` services in `docker-compose.yaml`, with their config files under `infra/observability/`. Add them here, then set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` on the ascend-web-search service.
 
 Metrics are a separate matter. The service exposes Prometheus metrics on its own HTTP port regardless of whether OpenTelemetry is configured, so any Prometheus that can reach port 7021 can scrape them without adding anything to this stack.
 
@@ -249,10 +249,10 @@ The equivalent file in the repository root is `ascend-scrapper.docker-compose.ya
 
 ### Keeping this directory in sync
 
-`searxng/settings.yml` here is a copy of `searxng/settings.yml` in the repository root, kept byte-identical on purpose so that a diff is the whole check.
+`searxng/settings.yml` here is a copy of `infra/searxng/settings.yml` in the repository root, kept byte-identical on purpose so that a diff is the whole check.
 
 ```bash
-diff searxng/settings.yml ../../searxng/settings.yml
+diff searxng/settings.yml ../../infra/searxng/settings.yml
 ```
 
 That command printing nothing means they match. When you change one, change the other in the same commit.

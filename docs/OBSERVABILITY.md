@@ -18,7 +18,7 @@ All eight observability containers start automatically with `docker compose up`.
 
 ## How to Reach Grafana
 
-Open http://localhost:7078 in a browser. Grafana is configured with anonymous read-only Viewer access — no login required. The three datasources (Prometheus, Loki, Tempo) are provisioned at startup. The six dashboards below are loaded from `observability/grafana/dashboards/` and visible under the Dashboards menu immediately after the stack starts.
+Open http://localhost:7078 in a browser. Grafana is configured with anonymous read-only Viewer access — no login required. The three datasources (Prometheus, Loki, Tempo) are provisioned at startup. The six dashboards below are loaded from `infra/observability/grafana/dashboards/` and visible under the Dashboards menu immediately after the stack starts.
 
 ---
 
@@ -41,7 +41,7 @@ To jump directly to a dashboard: http://localhost:7078/d/<uid>
 
 ### Metrics
 
-Prometheus scrapes every 15 seconds. Scrape targets are in `observability/prometheus/prometheus.yaml`.
+Prometheus scrapes every 15 seconds. Scrape targets are in `infra/observability/prometheus/prometheus.yaml`.
 
 **Spring Boot services (AscendAgent :9917/actuator/prometheus, WeatherMCP :9998/actuator/prometheus)**
 
@@ -246,10 +246,10 @@ These rules prevent Prometheus from accumulating millions of time-series (high c
 
 ## Token Cost Pricing Rates
 
-Token cost estimates in the L1 dashboard use hardcoded rates from `observability/grafana/dashboards/pricing.yaml`. When a provider changes its pricing:
+Token cost estimates in the L1 dashboard use hardcoded rates from `infra/observability/grafana/dashboards/pricing.yaml`. When a provider changes its pricing:
 
-1. Edit `observability/grafana/dashboards/pricing.yaml` with the new rates.
-2. Update the matching PromQL expressions in `observability/grafana/dashboards/token-cost.json` (the multiplier constants match the rates in `pricing.yaml`).
+1. Edit `infra/observability/grafana/dashboards/pricing.yaml` with the new rates.
+2. Update the matching PromQL expressions in `infra/observability/grafana/dashboards/token-cost.json` (the multiplier constants match the rates in `pricing.yaml`).
 3. Restart Grafana to reload the provisioned dashboard.
 
 ```bash
@@ -260,7 +260,7 @@ docker compose restart grafana
 
 ## Vector to Cloud Migration
 
-If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, edit `observability/vector/vector.toml`. The file contains commented-out sink blocks for each target. Uncomment the desired sink, set the required environment variable, and restart Vector.
+If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, edit `infra/observability/vector/vector.toml`. The file contains commented-out sink blocks for each target. Uncomment the desired sink, set the required environment variable, and restart Vector.
 
 ```bash
 docker compose restart vector

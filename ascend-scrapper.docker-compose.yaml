@@ -31,7 +31,7 @@ services:
       # seconds-to-minutes (not days) and JSON format is exposed for /ready.
       # NOT mounted :ro because SearXNG's container init chowns the file at
       # boot; a read-only mount makes the container restart-loop.
-      - ./searxng/settings.yml:/etc/searxng/settings.yml
+      - ./infra/searxng/settings.yml:/etc/searxng/settings.yml
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
       interval: 10s

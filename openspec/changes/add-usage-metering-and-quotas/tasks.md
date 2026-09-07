@@ -68,7 +68,7 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 ## 7. Observability and documentation
 
 - [ ] 7.1 Register the new counters (`usage.ledger.write_failed`, `usage.quota.rejected{scope}`, `usage.quota.warning{scope}`, `rate_limit.rejected{scope,endpoint}`, `rate_limit.redis_unavailable`) and verify they appear on `/actuator/prometheus`
-- [ ] 7.2 Build `observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users by tokens, quota-consumption gauges per tenant, 429 rate by code/scope; register in the dashboards provisioning
+- [ ] 7.2 Build `infra/observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users by tokens, quota-consumption gauges per tenant, 429 rate by code/scope; register in the dashboards provisioning
 - [ ] 7.3 Author `docs/USAGE_AND_QUOTAS.md`: ledger schema, usage API examples (JSON + CSV), quota semantics (windows, overshoot, warning), rate-limit config, BYOK key lifecycle and KEK rotation notes; link from root README Documentation section
 - [ ] 7.4 Update `AscendAgent/AGENTS.md` (new package `service/usage/`, new endpoints, new env vars) and root `AGENTS.md` if the endpoint table changes
 - [ ] 7.5 Add an ADR under `AscendAgent/docs/architecture/decisions/` covering the envelope-encryption choice and the fail-open rate-limiting posture

@@ -2,7 +2,7 @@
 
 ### Requirement: Prometheus runs in docker-compose with checked-in scrape config
 
-`docker-compose.yaml` SHALL define a `prometheus` service that uses a checked-in `observability/prometheus/prometheus.yaml` configuration (`.yaml` extension to match the repo's YAML convention). The Prometheus instance SHALL scrape every AscendAI application service plus the data-layer prerequisites that publish metrics (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`). The S3-compatible object store publishes no Prometheus endpoint and is not scraped.
+`docker-compose.yaml` SHALL define a `prometheus` service that uses a checked-in `infra/observability/prometheus/prometheus.yaml` configuration (`.yaml` extension to match the repo's YAML convention). The Prometheus instance SHALL scrape every AscendAI application service plus the data-layer prerequisites that publish metrics (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`). The S3-compatible object store publishes no Prometheus endpoint and is not scraped.
 
 #### Scenario: Prometheus targets are healthy after stack startup
 
@@ -27,7 +27,7 @@
 
 #### Scenario: Vector config documents migration sinks
 
-- **WHEN** `observability/vector/vector.toml` is read
+- **WHEN** `infra/observability/vector/vector.toml` is read
 - **THEN** the file contains commented placeholder sink stanzas for `datadog_logs`, `aws_cloudwatch_logs`, and `splunk_hec` showing the migration recipe
 
 ### Requirement: Traces ship to Tempo via the OTel collector
@@ -90,14 +90,14 @@ The `prometheus` service SHALL pass `--storage.tsdb.retention.time=72h` to bound
 
 ### Requirement: Six dashboards cover platform, AI pipeline, infrastructure, cost, quality, cache
 
-Six Grafana dashboards SHALL be checked into `observability/grafana/dashboards/` and provisioned at startup.
+Six Grafana dashboards SHALL be checked into `infra/observability/grafana/dashboards/` and provisioned at startup.
 
 | Dashboard | Required panels |
 |---|---|
 | Platform Overview | request rate per service, error rate per service, p95 latency per service, JVM heap (Java services), Python process memory (Python services) |
 | AI Pipeline | tokens per minute by model, provider mix (pie / bar), RAG hit-rate (above_threshold / total), memory parse-failure rate, MCP tool call rate by tool |
 | Infrastructure | Qdrant collection sizes, Redis ops/sec and memory, Postgres connection count |
-| Token Cost (L1) | Per-provider $/day computed via `gen_ai.client.token.usage` × per-provider pricing rates from `observability/grafana/dashboards/pricing.yaml` |
+| Token Cost (L1) | Per-provider $/day computed via `gen_ai.client.token.usage` × per-provider pricing rates from `infra/observability/grafana/dashboards/pricing.yaml` |
 | RAG Quality (L2) | Heatmap of `rag_top_score_bucket` over time; time-series of retrieval miss-rate; bar chart of ingestion-events-per-hour by source type; embedded Loki logs panel |
 | Cache Hit Rate (L3) | `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider; absolute saved-token panel; 0%-flatline annotation per provider |
 
@@ -110,7 +110,7 @@ Six Grafana dashboards SHALL be checked into `observability/grafana/dashboards/`
 
 #### Scenario: Token Cost dashboard reflects pricing.yaml updates
 
-- **WHEN** an operator edits `observability/grafana/dashboards/pricing.yaml` to change a provider's `per_1k_input` rate
+- **WHEN** an operator edits `infra/observability/grafana/dashboards/pricing.yaml` to change a provider's `per_1k_input` rate
 - **AND** Grafana is restarted (`docker compose restart grafana`)
 - **THEN** the Token Cost dashboard's $/day panel for that provider reflects the new rate
 - **AND** no other dashboard is affected
@@ -123,11 +123,11 @@ Six Grafana dashboards SHALL be checked into `observability/grafana/dashboards/`
 
 ### Requirement: Pricing rates committed in version control
 
-The per-provider $/1k-token pricing rates consumed by the L1 Token Cost dashboard SHALL be committed to `observability/grafana/dashboards/pricing.yaml`. The file SHALL be a flat YAML map keyed by provider name with `per_1k_input` and `per_1k_output` numeric fields. Updates SHALL go through git review.
+The per-provider $/1k-token pricing rates consumed by the L1 Token Cost dashboard SHALL be committed to `infra/observability/grafana/dashboards/pricing.yaml`. The file SHALL be a flat YAML map keyed by provider name with `per_1k_input` and `per_1k_output` numeric fields. Updates SHALL go through git review.
 
 #### Scenario: Pricing file shape
 
-- **WHEN** `observability/grafana/dashboards/pricing.yaml` is read
+- **WHEN** `infra/observability/grafana/dashboards/pricing.yaml` is read
 - **THEN** it parses as a YAML map
 - **AND** at minimum it contains entries for `anthropic`, `openai`, `gemini`, `minimax`, `lmstudio`
 - **AND** every entry has numeric `per_1k_input` and `per_1k_output` fields
