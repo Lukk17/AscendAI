@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/AscendAI.iml" filepath="$PROJECT_DIR$/.idea/AscendAI.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-ai-agent.main.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-ai-agent.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-ai-agent.test.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-ai-agent.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/weather-mcp.main.iml" filepath="$PROJECT_DIR$/.idea/modules/weather-mcp.main.iml" />
+    </modules>
+  </component>
+</project>
