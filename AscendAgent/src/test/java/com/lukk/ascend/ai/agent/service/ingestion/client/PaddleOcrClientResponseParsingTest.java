@@ -2,10 +2,10 @@ package com.lukk.ascend.ai.agent.service.ingestion.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,14 +29,21 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class PaddleOcrClientResponseParsingTest {
 
+    private static final String BASE_URL = "http://localhost:7022";
+    private static final String API_PATH = "/v1/ocr";
+
     @Mock
     private RestClient restClient;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    @InjectMocks
     private PaddleOcrClient client;
+
+    @BeforeEach
+    void setUp() {
+        client = new PaddleOcrClient(restClient, objectMapper, BASE_URL, API_PATH);
+    }
 
 
     private void stubChain(String jsonResponse) {

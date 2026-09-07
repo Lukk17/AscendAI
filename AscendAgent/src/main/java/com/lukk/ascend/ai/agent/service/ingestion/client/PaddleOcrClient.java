@@ -17,6 +17,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +29,7 @@ import java.util.Optional;
 public class PaddleOcrClient {
 
     private static final String TYPE_PADDLE_OCR = "paddleocr";
-    private static final String PARAM_FILES = "files";
+    private static final String PARAM_FILE = "file";
     private static final String PARAM_LANG = "lang";
     private static final String JSON_PAGES = "pages";
     private static final String JSON_LINES = "lines";
@@ -54,14 +55,17 @@ public class PaddleOcrClient {
         log.info("[PaddleOcrClient] Sending file to PaddleOCR: {}", filename);
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add(PARAM_FILES, new NamedByteArrayResource(fileBytes, filename));
-        Optional.ofNullable(lang)
-                .filter(StringUtils::hasText)
-                .ifPresent(l -> body.add(PARAM_LANG, l));
+        body.add(PARAM_FILE, new NamedByteArrayResource(fileBytes, filename));
+
+        // PaddleOCR declares `lang` as a query parameter on POST /v1/ocr, not a multipart
+        // form field (see AscendAgent/src/test/resources/paddleocr/openapi-contract.json).
+        String uri = UriComponentsBuilder.fromUriString(paddleBaseUrl + paddleApiPath)
+                .queryParamIfPresent(PARAM_LANG, Optional.ofNullable(lang).filter(StringUtils::hasText))
+                .toUriString();
 
         try {
             String response = restClient.post()
-                    .uri(paddleBaseUrl + paddleApiPath)
+                    .uri(uri)
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(body)
                     .retrieve()

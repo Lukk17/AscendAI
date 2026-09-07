@@ -2,10 +2,10 @@ package com.lukk.ascend.ai.agent.service.ingestion.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,6 +28,8 @@ class PaddleOcrClientTest {
 
     private static final String FILENAME = "invoice.png";
     private static final byte[] BYTES = "image_data".getBytes();
+    private static final String BASE_URL = "http://localhost:7022";
+    private static final String API_PATH = "/v1/ocr";
 
     @Mock
     private RestClient restClient;
@@ -35,8 +37,12 @@ class PaddleOcrClientTest {
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    @InjectMocks
     private PaddleOcrClient paddleOcrClient;
+
+    @BeforeEach
+    void setUp() {
+        paddleOcrClient = new PaddleOcrClient(restClient, objectMapper, BASE_URL, API_PATH);
+    }
 
     @Test
     @DisplayName("process extracts OCR text lines from a valid PaddleOCR JSON response")

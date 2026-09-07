@@ -1,0 +1,651 @@
+{
+    "schema_version": "1",
+    "filename": "argent-saga-chronicles-page1-polish.png",
+    "language": "en",
+    "pages": [
+        {
+            "page_number": 1,
+            "lines": [
+                {
+                    "text": "Cze Pierwsza \u2014 Stary Blask",
+                    "confidence": 0.9868090748786926,
+                    "bounding_box": [
+                        [
+                            8.0,
+                            36.0
+                        ],
+                        [
+                            212.0,
+                            39.0
+                        ],
+                        [
+                            212.0,
+                            60.0
+                        ],
+                        [
+                            8.0,
+                            56.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Dlugo przed Eklipsa, gdy Pie Spiralnych Sto\u00edc wci trzymato swiaty obrzeza w swojej powolnej kolysce, na",
+                    "confidence": 0.9765508770942688,
+                    "bounding_box": [
+                        [
+                            7.0,
+                            83.0
+                        ],
+                        [
+                            733.0,
+                            90.0
+                        ],
+                        [
+                            733.0,
+                            113.0
+                        ],
+                        [
+                            7.0,
+                            106.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "klifowej p\u00f3tce Halen Veyr urodzito sie dziecko kamieniarza imieniem Devyn Solveh. Tym dzieckiem byla",
+                    "confidence": 0.9857389330863953,
+                    "bounding_box": [
+                        [
+                            7.0,
+                            107.0
+                        ],
+                        [
+                            703.0,
+                            115.0
+                        ],
+                        [
+                            703.0,
+                            138.0
+                        ],
+                        [
+                            7.0,
+                            130.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Aenaria, a od jej si\u00f3dmego roku zycia widziata nici gwiezdnego wiatla, kt\u00f3re wiaza wszystko z galaktycznym",
+                    "confidence": 0.9871344566345215,
+                    "bounding_box": [
+                        [
+                            6.0,
+                            132.0
+                        ],
+                        [
+                            735.0,
+                            139.0
+                        ],
+                        [
+                            735.0,
+                            163.0
+                        ],
+                        [
+                            6.0,
+                            156.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "jadrem. Jej ojciec, kt\u00f3ry takich nici nie widziat, zaprowadzit ja do jedynych ludzi mogacych jej uwierzy: do",
+                    "confidence": 0.986870288848877,
+                    "bounding_box": [
+                        [
+                            6.0,
+                            158.0
+                        ],
+                        [
+                            721.0,
+                            164.0
+                        ],
+                        [
+                            721.0,
+                            184.0
+                        ],
+                        [
+                            6.0,
+                            178.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "milczacych kontemplatyw\u00f3w strzegacych g\u00f3rnych taras\u00f3w klifu \u2014 mezczyzn i kobiet, kt\u00f3rzy wyrzekli sie swoich",
+                    "confidence": 0.9799039363861084,
+                    "bounding_box": [
+                        [
+                            6.0,
+                            179.0
+                        ],
+                        [
+                            755.0,
+                            186.0
+                        ],
+                        [
+                            754.0,
+                            210.0
+                        ],
+                        [
+                            6.0,
+                            203.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "imion. Stuchali Aenarii przez godzine, po czym poprosili, by zostawita ich w ciszy na dziewie dni.",
+                    "confidence": 0.9736807942390442,
+                    "bounding_box": [
+                        [
+                            6.0,
+                            205.0
+                        ],
+                        [
+                            658.0,
+                            210.0
+                        ],
+                        [
+                            658.0,
+                            231.0
+                        ],
+                        [
+                            6.0,
+                            226.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Wr\u00f3cita dziewiatego dnia i zostala przyjeta jako Sluchajaca. Miala dwanascie lat.",
+                    "confidence": 0.9761886596679688,
+                    "bounding_box": [
+                        [
+                            4.0,
+                            251.0
+                        ],
+                        [
+                            549.0,
+                            257.0
+                        ],
+                        [
+                            548.0,
+                            280.0
+                        ],
+                        [
+                            4.0,
+                            274.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Do trzydziestego drugiego roku zycia wykula pierwsze ze wietInych Ostrzy \u2014 waskie, jednosieczne miecze,",
+                    "confidence": 0.9840887784957886,
+                    "bounding_box": [
+                        [
+                            2.0,
+                            299.0
+                        ],
+                        [
+                            732.0,
+                            306.0
+                        ],
+                        [
+                            732.0,
+                            329.0
+                        ],
+                        [
+                            2.0,
+                            322.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "kt\u00f3rych stal stapiata sie z krystalicznym gwiezdnym odfamkiem z deszcz\u00f3w meteoryt\u00f3w w Drey Reaches. Ostrza",
+                    "confidence": 0.982833743095398,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            324.0
+                        ],
+                        [
+                            759.0,
+                            329.0
+                        ],
+                        [
+                            758.0,
+                            353.0
+                        ],
+                        [
+                            1.0,
+                            348.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "nucity w obecnosci gwiezdnego swiatla, a kontemplatywowie, patrzac jak dobywa pierwszego z nich,",
+                    "confidence": 0.9825252890586853,
+                    "bounding_box": [
+                        [
+                            2.0,
+                            350.0
+                        ],
+                        [
+                            687.0,
+                            356.0
+                        ],
+                        [
+                            686.0,
+                            377.0
+                        ],
+                        [
+                            2.0,
+                            371.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "rozpoznali, ze zakon, kt\u00f3rego strzegli bez imienia przez dwa stulecia, w ko\u00e1cu znalazt swoja zatozycielke.",
+                    "confidence": 0.9650067090988159,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            374.0
+                        ],
+                        [
+                            707.0,
+                            380.0
+                        ],
+                        [
+                            707.0,
+                            401.0
+                        ],
+                        [
+                            1.0,
+                            395.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Aenaria Solveh nazwala ich Vellami, od starego stowa znaczacego ,ni\", a pod jej kierownictwem klasztorna",
+                    "confidence": 0.9784980416297913,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            397.0
+                        ],
+                        [
+                            736.0,
+                            403.0
+                        ],
+                        [
+                            736.0,
+                            425.0
+                        ],
+                        [
+                            0.0,
+                            420.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "swiatynia Halen Veyr zostata wykuta gtebiej w skale. Tam, gdzie bylo trzystu kontemplatyw\u00f3w, w roku 4317 P.E.",
+                    "confidence": 0.9770375490188599,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            421.0
+                        ],
+                        [
+                            757.0,
+                            425.0
+                        ],
+                        [
+                            756.0,
+                            449.0
+                        ],
+                        [
+                            0.0,
+                            445.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "(Przed Eklipsa) znajdowato si dziewie tysiecy Vell\u00f3w. Do czasu Rozdarcia, trzy stulecia p\u00f3zniej, bylo ich",
+                    "confidence": 0.9705116152763367,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            448.0
+                        ],
+                        [
+                            709.0,
+                            452.0
+                        ],
+                        [
+                            709.0,
+                            473.0
+                        ],
+                        [
+                            1.0,
+                            469.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "trzydziesci tysiecy.",
+                    "confidence": 0.9933565258979797,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            472.0
+                        ],
+                        [
+                            136.0,
+                            475.0
+                        ],
+                        [
+                            136.0,
+                            496.0
+                        ],
+                        [
+                            0.0,
+                            493.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Vellowie nie sa religia. Sa dyscyplina. Stuchajaca moze awansowa na Reke, potem na Gtos, a wreszcie \u2014 raz na",
+                    "confidence": 0.974879801273346,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            519.0
+                        ],
+                        [
+                            759.0,
+                            524.0
+                        ],
+                        [
+                            759.0,
+                            544.0
+                        ],
+                        [
+                            1.0,
+                            539.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "pokolenie \u2014 jedna z nich zostaje wyniesiona na Bladego Stewarda, straznika pierwszego ostrza zakonu, Zeba",
+                    "confidence": 0.9814512133598328,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            543.0
+                        ],
+                        [
+                            740.0,
+                            547.0
+                        ],
+                        [
+                            740.0,
+                            567.0
+                        ],
+                        [
+                            1.0,
+                            563.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Czapli. To ostrze Aenaria wykuta w swoim trzydziestym drugim roku zycia. Zostato dobyte dziewi razy w ciagu",
+                    "confidence": 0.9787777066230774,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            568.0
+                        ],
+                        [
+                            758.0,
+                            573.0
+                        ],
+                        [
+                            757.0,
+                            593.0
+                        ],
+                        [
+                            1.0,
+                            588.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "omiu stuleci: podczas pogrzebu kazdego Bladego Stewarda i raz, na otwarciu Konkordu Mireth.",
+                    "confidence": 0.9942439794540405,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            592.0
+                        ],
+                        [
+                            655.0,
+                            596.0
+                        ],
+                        [
+                            655.0,
+                            616.0
+                        ],
+                        [
+                            1.0,
+                            612.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Cze Druga \u2014 Eklipsa i Rozdarcie",
+                    "confidence": 0.9888559579849243,
+                    "bounding_box": [
+                        [
+                            2.0,
+                            639.0
+                        ],
+                        [
+                            240.0,
+                            639.0
+                        ],
+                        [
+                            240.0,
+                            659.0
+                        ],
+                        [
+                            2.0,
+                            659.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "W roku zerowym \u2014 dacie, wok\u00f3t kt\u00f3rej obracaja sie wszystkie p\u00f3\u00edniejsze kalendarze \u2014 drugie stoce systemu",
+                    "confidence": 0.9770914316177368,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            687.0
+                        ],
+                        [
+                            751.0,
+                            691.0
+                        ],
+                        [
+                            751.0,
+                            711.0
+                        ],
+                        [
+                            1.0,
+                            707.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Yann-Karoth zapadto sie bez ostrzezenia. Nie bylo rozblysku poprzedzajacego, fluktuacji termicznej ani",
+                    "confidence": 0.9930064678192139,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            711.0
+                        ],
+                        [
+                            698.0,
+                            715.0
+                        ],
+                        [
+                            698.0,
+                            735.0
+                        ],
+                        [
+                            0.0,
+                            731.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "przyciemnienia. Astronomowie Yann-Karoth, kt\u00f3rzy przez tysiac lat byli najlepszymi obserwatorami gwiazd na",
+                    "confidence": 0.9833866953849792,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            735.0
+                        ],
+                        [
+                            749.0,
+                            738.0
+                        ],
+                        [
+                            749.0,
+                            760.0
+                        ],
+                        [
+                            0.0,
+                            757.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "obrzezu, nie otrzymali zadnego ostrzezenia. Zapas wytworzyla wstrzas grawitacyjny, kt\u00f3ry zmiazdzyl plaszcz",
+                    "confidence": 0.9771274924278259,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            758.0
+                        ],
+                        [
+                            741.0,
+                            763.0
+                        ],
+                        [
+                            741.0,
+                            784.0
+                        ],
+                        [
+                            0.0,
+                            779.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "planety w siedemnascie minut.",
+                    "confidence": 0.9749088287353516,
+                    "bounding_box": [
+                        [
+                            1.0,
+                            786.0
+                        ],
+                        [
+                            222.0,
+                            786.0
+                        ],
+                        [
+                            222.0,
+                            803.0
+                        ],
+                        [
+                            1.0,
+                            803.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "Sposr\u00f3d osmiu miliard\u00f3w mieszka\u00edc\u00f3w Yann-Karoth trzysta tysiecy przezylo. Byli to ci, kt\u00f3rzy znajdowali sie na",
+                    "confidence": 0.9747090339660645,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            829.0
+                        ],
+                        [
+                            759.0,
+                            837.0
+                        ],
+                        [
+                            758.0,
+                            860.0
+                        ],
+                        [
+                            0.0,
+                            852.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "transportowcach, stacjach g\u00f3rniczych w zewnetrznym pasie lub krazownikach szkoleniowych w cieniu drugiego",
+                    "confidence": 0.9915323257446289,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            851.0
+                        ],
+                        [
+                            762.0,
+                            859.0
+                        ],
+                        [
+                            762.0,
+                            885.0
+                        ],
+                        [
+                            0.0,
+                            877.0
+                        ]
+                    ]
+                },
+                {
+                    "text": "ksiezyca. Wr\u00f3d ocalonych byl",
+                    "confidence": 0.9844759702682495,
+                    "bounding_box": [
+                        [
+                            0.0,
+                            879.0
+                        ],
+                        [
+                            217.0,
+                            877.0
+                        ],
+                        [
+                            217.0,
+                            897.0
+                        ],
+                        [
+                            0.0,
+                            899.0
+                        ]
+                    ]
+                }
+            ]
+        }
+    ],
+    "processing_time_seconds": 105.634
+}
