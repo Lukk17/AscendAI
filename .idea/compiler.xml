@@ -24,9 +24,9 @@
       <module name="ascend-ai-agent" options="-parameters" />
       <module name="ascend-ai-agent.main" options="-parameters" />
       <module name="ascend-ai-agent.test" options="-parameters" />
-      <module name="weather-mcp" options="-parameters" />
-      <module name="weather-mcp.main" options="-parameters" />
-      <module name="weather-mcp.test" options="-parameters" />
+      <module name="ascend-weather-mcp" options="-parameters" />
+      <module name="ascend-weather-mcp.main" options="-parameters" />
+      <module name="ascend-weather-mcp.test" options="-parameters" />
     </option>
   </component>
 </project>

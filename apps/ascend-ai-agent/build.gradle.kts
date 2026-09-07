@@ -10,7 +10,6 @@ jacoco {
     toolVersion = libs.versions.jacoco.get()
 }
 
-group = "com.lukk"
 version = "0.0.1"
 
 java {

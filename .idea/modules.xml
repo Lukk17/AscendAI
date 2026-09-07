@@ -5,7 +5,8 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/AscendAI.iml" filepath="$PROJECT_DIR$/.idea/AscendAI.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-ai-agent.main.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-ai-agent.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-ai-agent.test.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-ai-agent.test.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/weather-mcp.main.iml" filepath="$PROJECT_DIR$/.idea/modules/weather-mcp.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-weather-mcp.main.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-weather-mcp.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-weather-mcp.test.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-weather-mcp.test.iml" />
     </modules>
   </component>
 </project>
