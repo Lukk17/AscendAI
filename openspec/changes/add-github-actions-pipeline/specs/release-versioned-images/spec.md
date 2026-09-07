@@ -8,7 +8,7 @@
 
 - **WHEN** the operator dispatches with `stack_version=1.1.1`, `release_ascend_agent=true`, `release_audio_scribe=true`, and the other four app booleans `false`
 - **THEN** only `ascend-agent` and `audio-scribe` images are built and pushed
-- **AND** `weather-mcp`, `ascend-web-search`, `ascend-memory`, and `ascend-paddle-ocr` are not built and their images are untouched
+- **AND** `weather-mcp`, `ascend-web-hunter`, `ascend-memory`, and `ascend-paddle-ocr` are not built and their images are untouched
 
 #### Scenario: Tag push does not trigger the release
 
@@ -17,7 +17,7 @@
 
 ### Requirement: Image version is read from each app's committed manifest
 
-For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`AscendAgent`, `WeatherMCP`), `[project].version` in `pyproject.toml` for Python services (`AudioScribe`, `AscendWebSearch`, `AscendMemory`, `PaddleOCR`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
+For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`AscendAgent`, `WeatherMCP`), `[project].version` in `pyproject.toml` for Python services (`AudioScribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
 
 #### Scenario: Tag equals the manifest version
 
@@ -90,7 +90,7 @@ After all selected apps push successfully, the workflow SHALL create the Git tag
 
 #### Scenario: Release notes list all app versions
 
-- **WHEN** a release of `ascend-agent` (1.3.0) and `audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at weather-mcp 1.0.0, ascend-web-search 1.2.0, ascend-memory 0.4.0, ascend-paddle-ocr 0.1.0
+- **WHEN** a release of `ascend-agent` (1.3.0) and `audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at weather-mcp 1.0.0, ascend-web-hunter 1.2.0, ascend-memory 0.4.0, ascend-paddle-ocr 0.1.0
 - **THEN** a GitHub Release tagged `ascend-ai_1.1.1` is created
 - **AND** its body lists all six apps with their current versions, marking `ascend-agent` and `audio-scribe` as released this run
 - **AND** the release is not a draft

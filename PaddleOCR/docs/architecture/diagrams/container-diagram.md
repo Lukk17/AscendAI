@@ -22,7 +22,7 @@ graph TB
     subgraph "Sibling MCP services"
         AudioScribe["AudioScribe<br/>:7017"]
         WeatherMCP["WeatherMCP<br/>:9998"]
-        WebSearch["AscendWebSearch<br/>:7021"]
+        WebHunter["ascend-web-hunter<br/>:7021"]
     end
 
     Agent -->|"MCP tools/call"| MCP
@@ -33,7 +33,7 @@ graph TB
     Guard --> OCRSvc
     Agent -->|"MCP"| AudioScribe
     Agent -->|"MCP"| WeatherMCP
-    Agent -->|"MCP"| WebSearch
+    Agent -->|"MCP"| WebHunter
 ```
 
 PaddleOCR has no database. Model weights are baked into the container image at build time (`Dockerfile:23`). The only

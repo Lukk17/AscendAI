@@ -15,7 +15,7 @@ graph TB
     MiniMax["MiniMax API<br/>(Anthropic-compatible)"]
     AudioScribe["AudioScribe MCP<br/>(port 7017)"]
     Weather["Weather MCP<br/>(port 9998)"]
-    WebSearch["AscendWebSearch MCP<br/>(port 7021)"]
+    WebHunter["ascend-web-hunter MCP<br/>(port 7021)"]
     Memory["AscendMemory<br/>(port 7020)"]
 
     User -->|"REST API<br/>POST /api/v1/ai/prompt"| AscendAgent
@@ -26,7 +26,7 @@ graph TB
     AscendAgent -->|"Anthropic API"| MiniMax
     AscendAgent -->|"MCP (Streamable HTTP)"| AudioScribe
     AscendAgent -->|"MCP (SSE)"| Weather
-    AscendAgent -->|"MCP (Streamable HTTP)"| WebSearch
+    AscendAgent -->|"MCP (Streamable HTTP)"| WebHunter
     AscendAgent -->|"REST API"| Memory
 ```
 

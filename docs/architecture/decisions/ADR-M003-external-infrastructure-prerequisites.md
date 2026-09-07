@@ -22,7 +22,7 @@ The [docker-compose.yaml](../../../docker-compose.yaml) originally bundled gener
 Move Redis, Qdrant, S3-compatible object storage, and PostgreSQL out of [docker-compose.yaml](../../../docker-compose.yaml). They become external prerequisites that must be running before `docker-compose up`. Application services connect to them via `host.docker.internal`. Locally, the object store is provided by a self-hosted S3-compatible emulator. In production it is Amazon S3 or an equivalent managed service.
 
 The [docker-compose.yaml](../../../docker-compose.yaml) now only contains:
-- Application services: AscendMemory, AudioScribe, AscendWebSearch, WeatherMCP, PaddleOCR
+- Application services: AscendMemory, AudioScribe, ascend-web-hunter, WeatherMCP, PaddleOCR
 - Support services: SearXNG, FlareSolverr, Docling Serve, Unstructured API
 
 ---

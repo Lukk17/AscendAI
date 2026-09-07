@@ -65,7 +65,7 @@ the OCR worker process. PaddleOCR inference on this deployment is CPU-only, capp
 `processing_time_seconds` the service reports for itself, measured 57.1 and 72.4 seconds on isolated calls against
 the 212 KB English fixture on 2026-09-03. Full round trip is longer: 60.7 and 82.1 seconds on isolated calls the
 same day, and 84.3, 99.9 and 105.6 seconds for specs 4, 3 and 2 during the full 2026-09-03 sweep, when the
-AscendAgent, AscendWebSearch, AscendMemory and WeatherMCP suites were exercising the same host concurrently. Budget
+AscendAgent, ascend-web-hunter, AscendMemory and WeatherMCP suites were exercising the same host concurrently. Budget
 60 to 110 seconds per engine-bound call and treat the top of that band as the normal cost of a busy host.
 
 Running two engine specs at the same time saturates every core and pushes individual calls past even that band,

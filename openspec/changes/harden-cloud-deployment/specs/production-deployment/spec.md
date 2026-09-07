@@ -63,7 +63,7 @@ All credentials consumed by the stack SHALL be sourced from environment variable
 
 ### Requirement: Personal-machine artifacts are opt-in
 
-The compose files SHALL contain no personal absolute paths. The `audio-scribe` volumes SHALL use env-interpolated sources with named-volume defaults (`${HF_CACHE_ROOT:-hf-cache}:/hf-cache`, `${AUDIO_SCRIBE_MEDIA_ROOT:-audio-scribe-media}:/audio`), and `MCP_FILE_URI_ROOT` SHALL default to empty (`${AUDIO_SCRIBE_FILE_URI_ROOT:-}`), which disables `file://` URIs. The `ngrok-ascend-web-search` service SHALL be gated behind a compose profile so it does not start by default.
+The compose files SHALL contain no personal absolute paths. The `audio-scribe` volumes SHALL use env-interpolated sources with named-volume defaults (`${HF_CACHE_ROOT:-hf-cache}:/hf-cache`, `${AUDIO_SCRIBE_MEDIA_ROOT:-audio-scribe-media}:/audio`), and `MCP_FILE_URI_ROOT` SHALL default to empty (`${AUDIO_SCRIBE_FILE_URI_ROOT:-}`), which disables `file://` URIs. The `ngrok-ascend-web-hunter` service SHALL be gated behind a compose profile so it does not start by default.
 
 #### Scenario: Default deployment cannot read host files via transcription
 
@@ -80,16 +80,16 @@ The compose files SHALL contain no personal absolute paths. The `audio-scribe` v
 #### Scenario: Ngrok does not start by default
 
 - **WHEN** a developer runs `docker compose up -d`
-- **THEN** `ngrok-ascend-web-search` is not created
+- **THEN** `ngrok-ascend-web-hunter` is not created
 - **AND** activating its profile (via `COMPOSE_PROFILES` in `.env`) starts it
 
-### Requirement: AscendWebSearch runs without SYS_ADMIN
+### Requirement: ascend-web-hunter runs without SYS_ADMIN
 
-The `ascend-web-search` service SHALL NOT declare `cap_add: SYS_ADMIN`. Chromium sandboxing SHALL instead be enabled by a checked-in seccomp profile (`security/chromium-seccomp.json`) referenced via `security_opt`, together with `init: true` for child-process reaping. The existing `shm_size: 2gb` SHALL be retained.
+The `ascend-web-hunter` service SHALL NOT declare `cap_add: SYS_ADMIN`. Chromium sandboxing SHALL instead be enabled by a checked-in seccomp profile (`security/chromium-seccomp.json`) referenced via `security_opt`, together with `init: true` for child-process reaping. The existing `shm_size: 2gb` SHALL be retained.
 
 #### Scenario: Capability removed while extraction still works
 
-- **WHEN** the `ascend-web-search` container is inspected after `docker compose up`
+- **WHEN** the `ascend-web-hunter` container is inspected after `docker compose up`
 - **THEN** `docker inspect` shows no added capabilities and the custom seccomp profile applied
 - **AND** the Playwright extraction tier successfully renders a JavaScript-heavy page end-to-end
 
@@ -109,13 +109,13 @@ The `ascend-web-search` service SHALL NOT declare `cap_add: SYS_ADMIN`. Chromium
 
 ### Requirement: SearXNG runs with its limiter enabled and real client context
 
-The `ascend-web-search` environment SHALL set `SEARXNG_LIMITER=true` and SHALL NOT set the spoofed `SEARXNG_X_FORWARDED_FOR` / `SEARXNG_X_REAL_IP` constants. AscendWebSearch SHALL forward the client context it received (originating from the gateway's `X-Forwarded-For`) on its SearXNG requests.
+The `ascend-web-hunter` environment SHALL set `SEARXNG_LIMITER=true` and SHALL NOT set the spoofed `SEARXNG_X_FORWARDED_FOR` / `SEARXNG_X_REAL_IP` constants. ascend-web-hunter SHALL forward the client context it received (originating from the gateway's `X-Forwarded-For`) on its SearXNG requests.
 
 #### Scenario: Limiter is active
 
 - **WHEN** SearXNG starts via `docker compose up`
 - **THEN** its effective configuration reports the limiter enabled
-- **AND** search requests from AscendWebSearch carry a real forwarded client address, not `0.0.0.0`
+- **AND** search requests from ascend-web-hunter carry a real forwarded client address, not `0.0.0.0`
 
 ### Requirement: Observability UIs require authentication and are not publicly bound
 

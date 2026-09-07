@@ -12,5 +12,5 @@
 | **Ingestion Pipeline**     | S3 to Unstructured API to Token Splitter to Qdrant flow for indexing documents.                                       |
 | **Virtual Threads**        | Java 21 lightweight threads that enable high-throughput concurrency without thread-pool sizing.                       |
 | **Qdrant**                 | Open-source vector database used for RAG similarity search.                                                           |
-| **SearXNG**                | Privacy-respecting meta search engine used by AscendWebSearch.                                                        |
-| **FlareSolverr**           | Proxy for bypassing Cloudflare protection, used by AscendWebSearch.                                                   |
+| **SearXNG**                | Privacy-respecting meta search engine used by ascend-web-hunter.                                                        |
+| **FlareSolverr**           | Proxy for bypassing Cloudflare protection, used by ascend-web-hunter.                                                   |

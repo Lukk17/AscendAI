@@ -13,11 +13,11 @@ The stack is split across two project files:
   so a single `docker compose up` from the repo root brings up the full stack (merged into the `ascend-ai` project;
   one group in Docker Desktop).
 - [ascend-scrapper.docker-compose.yaml](../ascend-scrapper.docker-compose.yaml). Project `ascend-scrapper`.
-  Web-scraping stack (`searxng`, `flaresolverr`, `ascend-web-search`, `ngrok-ascend-web-search`). Self-contained and
+  Web-scraping stack (`searxng`, `flaresolverr`, `ascend-web-hunter`, `ngrok-ascend-web-hunter`). Self-contained and
   runnable on its own; when run standalone it forms its own group in Docker Desktop.
 
 A third file exists for deploying the web-search stack to a machine of its own, without the rest of the platform:
-[AscendWebSearch/deploy-standalone/](../AscendWebSearch/deploy-standalone/README.md). It pulls published images rather than building, and
+[ascend-web-hunter/deploy-standalone/](../ascend-web-hunter/deploy-standalone/README.md). It pulls published images rather than building, and
 targets Docker Engine on Linux. It is a separate artifact on purpose and is not included by either file above. See
 [Standalone web-search deployment](#standalone-web-search-deployment).
 
@@ -29,7 +29,7 @@ stack and compose will refuse to start without them, naming the one that is miss
 - `SEARXNG_SECRET`. SearXNG's session-signing key. At least 32 characters, unique per deployment, never the literal
   `ultrasecretkey`. It replaced a `secret_key` that used to be committed in
   [infra/searxng/settings.yml](../infra/searxng/settings.yml), so that value must be treated as compromised and never reused.
-- `NGROK_AUTHTOKEN`. Only when running `ngrok-ascend-web-search`.
+- `NGROK_AUTHTOKEN`. Only when running `ngrok-ascend-web-hunter`.
 
 `VNC_PASSWORD` is optional locally. Leaving it empty means the NoVNC desktop accepts any client and the container logs
 a warning at boot, which is acceptable because port 7900 is never published outside the compose network. It is
@@ -79,7 +79,7 @@ docker compose up -d --build --force-recreate
 
 #### Build and recreate a single service
 
-`<service>` is the name from either compose file (e.g. `audio-scribe`, `ascend-web-search`). `--no-deps` skips linked
+`<service>` is the name from either compose file (e.g. `audio-scribe`, `ascend-web-hunter`). `--no-deps` skips linked
 services (database, redis, etc.). For services in the scrapper file you can target them through the merged invocation
 above (because of `include:`) or with `-f ascend-scrapper.docker-compose.yaml`.
 
@@ -134,7 +134,7 @@ After a service's first release, switch it once by hand at Package settings → 
 
 ### Standalone web-search deployment
 
-[AscendWebSearch/deploy-standalone/](../AscendWebSearch/deploy-standalone/README.md) is a copy-and-run bundle for putting the web-search
+[ascend-web-hunter/deploy-standalone/](../ascend-web-hunter/deploy-standalone/README.md) is a copy-and-run bundle for putting the web-search
 stack on its own host, a homelab box or a VPS, without the rest of AscendAI. It contains a compose file pinned to
 published image tags, an `.env.example`, a copy of the SearXNG settings overlay, and a README covering prerequisites,
 verification, resource sizing, and what is deliberately absent.
@@ -165,7 +165,7 @@ the entire sync check. Changing one means changing the other in the same commit.
 ### See also
 
 - [../README.md](../README.md). Monorepo overview, Quick Start, ports.
-- [../AscendWebSearch/deploy-standalone/README.md](../AscendWebSearch/deploy-standalone/README.md). Standalone web-search deployment.
+- [../ascend-web-hunter/deploy-standalone/README.md](../ascend-web-hunter/deploy-standalone/README.md). Standalone web-search deployment.
 - [../.github/workflows/README.md](../.github/workflows/README.md). CI and release workflows, image naming, registries.
 - [INGESTION.md](INGESTION.md). Document ingestion lifecycle.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Reset recipes when state gets stuck.

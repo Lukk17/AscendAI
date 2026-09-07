@@ -15,7 +15,7 @@ graph TB
     MiniMax["☁️ MiniMax"]
     AudioScribe["🎙️ AudioScribe"]
     Weather["🌤️ WeatherMCP"]
-    WebSearch["🔍 AscendWebSearch"]
+    WebHunter["🔍 ascend-web-hunter"]
     Memory["🧠 AscendMemory"]
 
     User -->|"REST API"| AscendAgent
@@ -26,7 +26,7 @@ graph TB
     AscendAgent -->|"Chat Completion"| MiniMax
     AscendAgent -->|"MCP"| AudioScribe
     AscendAgent -->|"MCP"| Weather
-    AscendAgent -->|"MCP"| WebSearch
+    AscendAgent -->|"MCP"| WebHunter
     AscendAgent -->|"REST"| Memory
 ```
 

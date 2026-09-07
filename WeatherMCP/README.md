@@ -119,7 +119,7 @@ It's a demonstration MCP server, not a critical service. The interesting thing i
 self-contained Spring Boot module that AscendAgent picks up over MCP without code changes on the agent side. Drop in
 another `@Tool` method and AscendAgent will surface it on next restart.
 
-For larger MCP servers (audio, web search, OCR), see [AudioScribe/](../AudioScribe/), [AscendWebSearch/](../AscendWebSearch/),
+For larger MCP servers (audio, web search, OCR), see [AudioScribe/](../AudioScribe/), [ascend-web-hunter/](../ascend-web-hunter/),
 [PaddleOCR/](../PaddleOCR/).
 
 ---

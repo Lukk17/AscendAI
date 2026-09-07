@@ -10,7 +10,7 @@ graph TB
         subgraph "MCP Tool Services"
             AudioScribe["AudioScribe<br/>:7017<br/>Audio Transcription"]
             Weather["WeatherMCP<br/>:9998<br/>Weather Data"]
-            WebSearch["AscendWebSearch<br/>:7021<br/>Web Search"]
+            WebHunter["ascend-web-hunter<br/>:7021<br/>Web Search"]
             PaddleOCR["PaddleOCR<br/>:7022<br/>OCR"]
         end
 
@@ -42,7 +42,7 @@ graph TB
 
     Agent -->|"MCP"| AudioScribe
     Agent -->|"MCP"| Weather
-    Agent -->|"MCP"| WebSearch
+    Agent -->|"MCP"| WebHunter
     Agent -->|"MCP"| PaddleOCR
     Agent -->|"REST"| Memory
 
@@ -56,8 +56,8 @@ graph TB
     Agent --> DL
     Agent --> UN
 
-    WebSearch --> SX
-    WebSearch --> FS
+    WebHunter --> SX
+    WebHunter --> FS
     Memory --> QD
 ```
 
@@ -73,4 +73,4 @@ graph TB
 | Memory              | AscendAgent to AscendMemory to Qdrant                               | REST + Qdrant API                   |
 | Chat history        | AscendAgent to Redis (read / write), PostgreSQL (persist)           | TCP                                 |
 | Document ingestion  | S3-compatible storage to AscendAgent to Docling / Unstructured to Qdrant | S3 + REST + Qdrant              |
-| Web search          | AscendAgent to AscendWebSearch to SearXNG to FlareSolverr           | MCP + HTTP                          |
+| Web search          | AscendAgent to ascend-web-hunter to SearXNG to FlareSolverr           | MCP + HTTP                          |

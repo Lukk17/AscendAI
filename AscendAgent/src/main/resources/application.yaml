@@ -385,7 +385,7 @@ spring:
               url: http://localhost:7017
             weather:
               url: http://localhost:9998
-            ascend-web-search:
+            ascend-web-hunter:
               url: http://localhost:7021
 
     openai:

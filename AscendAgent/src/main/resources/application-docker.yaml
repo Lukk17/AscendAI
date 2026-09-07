@@ -50,5 +50,5 @@ spring:
               url: http://audio-scribe:7017
             weather:
               url: http://weather-mcp:9998
-            ascend-web-search:
-              url: http://ascend-web-search:7021
+            ascend-web-hunter:
+              url: http://ascend-web-hunter:7021

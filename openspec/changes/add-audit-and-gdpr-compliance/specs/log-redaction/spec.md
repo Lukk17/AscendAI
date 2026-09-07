@@ -27,7 +27,7 @@ AscendAgent SHALL NOT write user prompt text or attached document content to any
 
 ### Requirement: Platform-wide redaction convention covers all six services
 
-A written redaction convention SHALL be documented (in `docs/COMPLIANCE.md`) and applied across AscendAgent, WeatherMCP, AudioScribe, AscendWebSearch, AscendMemory, and PaddleOCR: user-supplied content — prompts, documents, transcripts, memory text, scraped page content, OCR output — is never passed as a log argument; logs carry lengths, counts, hashes, and identifiers instead. Each Python service's `[ServiceName]`-prefixed logging SHALL be audited against the convention as part of this change and any content leakage fixed.
+A written redaction convention SHALL be documented (in `docs/COMPLIANCE.md`) and applied across AscendAgent, WeatherMCP, AudioScribe, ascend-web-hunter, AscendMemory, and PaddleOCR: user-supplied content — prompts, documents, transcripts, memory text, scraped page content, OCR output — is never passed as a log argument; logs carry lengths, counts, hashes, and identifiers instead. Each Python service's `[ServiceName]`-prefixed logging SHALL be audited against the convention as part of this change and any content leakage fixed.
 
 #### Scenario: Python service logs metadata, not content
 

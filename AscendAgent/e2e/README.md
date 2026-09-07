@@ -149,7 +149,7 @@ parallel layout only matters when you care about wall-clock.
 ### Prerequisites before any test
 
 1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, S3-compatible object storage `:9070` (S3 API) / `:9071` (UI).
-2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, AscendWebSearch, AudioScribe, PaddleOCR,
+2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, ascend-web-hunter, AudioScribe, PaddleOCR,
    WeatherMCP, support services).
 3. AscendAgent running on the host: `cd AscendAgent && ./gradlew bootRun`.
 
@@ -190,9 +190,9 @@ specs need:
       "Bash(docker exec ascend-paddle-ocr sh -c *)",
       "Bash(docker exec ascend-paddle-ocr printenv *)",
       "Bash(docker exec ascend-paddle-ocr curl *)",
-      "Bash(docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *)",
+      "Bash(docker exec -e PYTHONPATH=/app -w /app ascend-web-hunter python *)",
       "Bash(docker cp AscendAgent/e2e/fixtures/compaction-seeds/* redis:/tmp/*)",
-      "Bash(docker cp AscendWebSearch/e2e/harness/* ascend-web-search:/tmp/*)",
+      "Bash(docker cp ascend-web-hunter/e2e/harness/* ascend-web-hunter:/tmp/*)",
       "Bash(curl -fsS http://localhost:6333/*)",
       "Bash(curl -X POST http://localhost:6333/*)",
       "Bash(curl -fsS http://localhost:9070/*)",
@@ -213,9 +213,9 @@ specs need:
 ```
 
 Every entry names a specific container (`postgres`, `redis`, `ascend-agent`, `audio-scribe`, `ascend-paddle-ocr`,
-`ascend-web-search`) or a specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998`
+`ascend-web-hunter`) or a specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998`
 WeatherMCP, `:7020` AscendMemory). No blanket `docker exec *`, `docker cp *` or `curl *`, and no entry for a container
-no spec touches: `searxng`, `flaresolverr`, `ngrok-ascend-web-search`, `weather-mcp`, `ascend-memory`, `docling-serve`,
+no spec touches: `searxng`, `flaresolverr`, `ngrok-ascend-web-hunter`, `weather-mcp`, `ascend-memory`, `docling-serve`,
 `unstructured-api` and the observability containers get nothing. Because the container name is pinned as the first
 token after `docker exec`, no entry can be used to smuggle in a different container or a flag such as `-u 0`. The
 object store needs no `docker exec` entry at all: it is published on the host by a compose project this repository
@@ -230,9 +230,9 @@ binary).
 
 The two `docker cp` entries are the only copies the suite needs, and both go one way, from a fixed fixture directory
 in the repository into `/tmp` of one named container. AscendAgent's tests 10 and 11 copy a Redis seed file in before
-loading it with `docker exec redis sh -c "redis-cli < /tmp/..."`, and AscendWebSearch's test 7 copies
+loading it with `docker exec redis sh -c "redis-cli < /tmp/..."`, and ascend-web-hunter's test 7 copies
 `seed_authenticated_session.py` in before running it with
-`docker exec -e PYTHONPATH=/app -w /app ascend-web-search python *`. Nothing in the suite copies anything out of a
+`docker exec -e PYTHONPATH=/app -w /app ascend-web-hunter python *`. Nothing in the suite copies anything out of a
 container, so no entry permits that direction.
 
 The `sh -c` entries exist because several specs need a shell inside the container: key-presence checks that print

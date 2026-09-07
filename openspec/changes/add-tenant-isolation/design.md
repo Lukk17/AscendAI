@@ -34,7 +34,7 @@ AscendAgent today is effectively a single-tenant application that happens to acc
 - Per-tenant quotas or usage metering (owned by `add-usage-metering-and-quotas`).
 - Tenant-aware audit logging or GDPR export/erasure (owned by `add-audit-and-gdpr-compliance`).
 - Physical isolation (separate databases/collections/buckets per tenant) — this change delivers logical isolation within shared infrastructure.
-- Changes to AscendMemory, AudioScribe, AscendWebSearch, WeatherMCP, or PaddleOCR service code.
+- Changes to AscendMemory, AudioScribe, ascend-web-hunter, WeatherMCP, or PaddleOCR service code.
 
 ## Decisions
 

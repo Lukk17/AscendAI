@@ -193,13 +193,13 @@ jobs:
         if: failure()
         run: docker logs ascend-paddle-ocr
 
-  ascend-web-search:
-    name: e2e / ascend-web-search (7 of 8 free specs)
+  ascend-web-hunter:
+    name: e2e / ascend-web-hunter (7 of 8 free specs)
     runs-on: ubuntu-latest
     services:
       # Redis is an external prerequisite in every AscendAI environment, not
       # a docker-compose service. Provide it as a job-level service container
-      # instead; ascend-web-search already reaches host-bound services via
+      # instead; ascend-web-hunter already reaches host-bound services via
       # host.docker.internal (extra_hosts: host-gateway is already set in the
       # compose file), so no compose edit is needed to wire it up.
       redis:
@@ -215,8 +215,8 @@ jobs:
       - name: Generate ephemeral SEARXNG_SECRET
         run: echo "SEARXNG_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-      - name: Build and start searxng, flaresolverr, ascend-web-search
-        run: docker compose up -d --build --wait searxng flaresolverr ascend-web-search
+      - name: Build and start searxng, flaresolverr, ascend-web-hunter
+        run: docker compose up -d --build --wait searxng flaresolverr ascend-web-hunter
 
       - name: Install Bruno CLI
         run: npm install -g @usebruno/cli
@@ -238,39 +238,39 @@ jobs:
           }
 
           # Spec 1: invalid-input
-          bru run "web-search/testing/search-blank-query.yml" --env ascend-local
-          bru run "web-search/testing/search-missing-query.yml" --env ascend-local
-          bru run "web-search/testing/search-overlong-query.yml" --env ascend-local
+          bru run "web-hunter/testing/search-blank-query.yml" --env ascend-local
+          bru run "web-hunter/testing/search-missing-query.yml" --env ascend-local
+          bru run "web-hunter/testing/search-overlong-query.yml" --env ascend-local
 
           # Spec 2: search-happy-path
-          bru run "web-search/testing/search-stable-query.yml" --env ascend-local
+          bru run "web-hunter/testing/search-stable-query.yml" --env ascend-local
 
           # Spec 3: read-example-com
-          bru run "web-search/testing/extract-example-com.yml" --env ascend-local
+          bru run "web-hunter/testing/extract-example-com.yml" --env ascend-local
 
           # Spec 4: mcp-tools-list
           SID=$(open_session)
-          bru run "web-search/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "web-hunter/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 5: mcp-search
           SID=$(open_session)
-          bru run "web-search/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=$SID"
+          bru run "web-hunter/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=$SID"
 
           # Spec 6: tiered-scraping. Hits live third-party sites (Wikipedia,
           # a Cloudflare-protected target, a JS-rendered page); this step can
           # flake on upstream rate-limiting or bot-blocking outside our
-          # control, independent of AscendWebSearch's own correctness.
-          bru run "web-search/testing/extract-tier-static-wikipedia.yml" --env ascend-local
-          bru run "web-search/testing/extract-tier-cloudflare.yml" --env ascend-local
-          bru run "web-search/testing/extract-tier-js-quotes.yml" --env ascend-local
+          # control, independent of ascend-web-hunter's own correctness.
+          bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local
+          bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local
+          bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local
 
           # Spec 8: session-clear
-          bru run "web-search/testing/session-clear-existing.yml" --env ascend-local
-          bru run "web-search/testing/session-clear-idempotent.yml" --env ascend-local
+          bru run "web-hunter/testing/session-clear-existing.yml" --env ascend-local
+          bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
 
-      - name: Dump ascend-web-search logs on failure
+      - name: Dump ascend-web-hunter logs on failure
         if: failure()
-        run: docker logs ascend-web-search
+        run: docker logs ascend-web-hunter
 
   ascend-memory:
     name: e2e / ascend-memory (2 of 6 free specs)

@@ -1,7 +1,7 @@
 ## Context
 
 AscendAgent's `application.yaml` currently configures three MCP servers (`audioscribe`, `weather`,
-`ascend-web-search`) under `spring.ai.mcp.client.streamable-http.connections`. Spring AI's
+`ascend-web-hunter`) under `spring.ai.mcp.client.streamable-http.connections`. Spring AI's
 `McpClientAutoConfiguration` reads this map and produces a `List<McpSyncClient>` bean. As part of that factory
 method, it iterates the list and calls `.initialize()` on each client, which performs the MCP `initialize` JSON-RPC
 handshake. The handshake is implemented as a reactive WebClient call with a `request-timeout` of 300s (current

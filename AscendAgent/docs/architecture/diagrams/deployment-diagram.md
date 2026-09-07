@@ -19,7 +19,7 @@ graph TB
         SearXNG["SearXNG<br/>:9020"]
         FlareSolverr["FlareSolverr<br/>:8191"]
         AudioScribe["AudioScribe<br/>:7017"]
-        WebSearch["AscendWebSearch<br/>:7021"]
+        WebHunter["ascend-web-hunter<br/>:7021"]
         Memory["AscendMemory<br/>:7020"]
     end
 
@@ -37,19 +37,19 @@ graph TB
     AscendAgent --> S3
     AscendAgent --> AudioScribe
     AscendAgent --> Weather
-    AscendAgent --> WebSearch
+    AscendAgent --> WebHunter
     AscendAgent --> Memory
     AscendAgent -.-> OpenAI
     AscendAgent -.-> Gemini
     AscendAgent -.-> Anthropic
     AscendAgent -.-> MiniMax
-    WebSearch --> SearXNG
-    WebSearch --> FlareSolverr
+    WebHunter --> SearXNG
+    WebHunter --> FlareSolverr
     Memory --> Qdrant
 ```
 
 In development, the AscendAgent and WeatherMCP run directly on the host JVM. PostgreSQL, Redis, Qdrant, and
 S3-compatible object storage (provided locally by a self-hosted emulator) are external prerequisites that must be running before
 starting docker-compose (in production these map to managed cloud services, with Amazon S3 in its place).
-Application and support services (AudioScribe, AscendWebSearch, AscendMemory, SearXNG, FlareSolverr) run in Docker
+Application and support services (AudioScribe, ascend-web-hunter, AscendMemory, SearXNG, FlareSolverr) run in Docker
 Compose. Cloud AI providers are optional (dashed lines), only accessed when their provider is enabled and selected.

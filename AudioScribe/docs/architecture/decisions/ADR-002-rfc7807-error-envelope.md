@@ -10,7 +10,7 @@
 Previously every error path used `HTTPException(detail=f"...{e}")`, interpolating the raw exception string into the
 response body. Upstream errors from OpenAI / HF / faster-whisper can include API key fragments (`sk-...`,
 `Bearer ...`), file paths, and stack frames. The endpoint contract diverged from sibling services (AscendMemory,
-AscendWebSearch) which adopted RFC 7807 envelopes.
+ascend-web-hunter) which adopted RFC 7807 envelopes.
 
 ---
 

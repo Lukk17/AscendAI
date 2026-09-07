@@ -18,7 +18,7 @@ graph TB
             AscendAgent["AscendAgent<br/>:9917"]
             AudioScribe["AudioScribe<br/>:7017"]
             Weather["WeatherMCP<br/>:9998"]
-            WebSearch["AscendWebSearch<br/>:7021"]
+            WebHunter["ascend-web-hunter<br/>:7021"]
             Memory["AscendMemory<br/>:7020"]
         end
 
@@ -34,14 +34,14 @@ graph TB
 
     AscendAgent -->|"MCP"| AudioScribe
     AscendAgent -->|"MCP"| Weather
-    AscendAgent -->|"MCP"| WebSearch
+    AscendAgent -->|"MCP"| WebHunter
     AscendAgent -->|"REST"| Memory
     AscendAgent --> Postgres
     AscendAgent --> Redis
     AscendAgent --> Qdrant
     AscendAgent --> S3
-    WebSearch --> SearXNG
-    WebSearch --> FlareSolverr
+    WebHunter --> SearXNG
+    WebHunter --> FlareSolverr
     Memory --> Qdrant
     AscendAgent -->|"OpenAI API"| LMStudio
 ```
@@ -56,7 +56,7 @@ graph TB
 | LM Studio         | 1234                          | HTTP          | Local LLM, runs on host, not in Docker.                 |
 | AudioScribe       | 7017                          | HTTP          | MCP server for audio transcription.                     |
 | WeatherMCP        | 9998                          | HTTP          | MCP server for weather data.                            |
-| AscendWebSearch   | 7021                          | HTTP          | MCP server for web search.                              |
+| ascend-web-hunter   | 7021                          | HTTP          | MCP server for web search.                              |
 | AscendMemory      | 7020                          | HTTP          | REST API for semantic memory.                           |
 | PostgreSQL        | 5432                          | TCP           | Relational database (external prerequisite).            |
 | Redis             | 6379                          | TCP           | Cache (external prerequisite).                          |
@@ -71,7 +71,7 @@ graph TB
 
 - **Docker Engine** 24+ with Compose V2.
 - **Java 21+** for AscendAgent and WeatherMCP (run outside Docker during dev).
-- **Python 3.11+** for AudioScribe, AscendWebSearch, AscendMemory.
+- **Python 3.11+** for AudioScribe, ascend-web-hunter, AscendMemory.
 - **LM Studio** installed on host for local LLM inference.
 - **External prerequisites.** PostgreSQL, Redis, Qdrant, and S3-compatible object storage must be running before
   starting docker-compose. In production these map to managed cloud services.

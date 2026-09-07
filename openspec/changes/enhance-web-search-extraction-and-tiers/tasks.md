@@ -37,6 +37,6 @@
 
 ## 6. Documentation
 
-- [ ] 6.1 Update `AscendWebSearch/AGENTS.md`: new tier ladder, extraction modes, output formats, config variables
+- [ ] 6.1 Update `ascend-web-hunter/AGENTS.md`: new tier ladder, extraction modes, output formats, config variables
 - [ ] 6.2 ADRs for the tier restructure (FlareSolverr retirement) and the self-healing recipe model
-- [ ] 6.3 Run `pytest` for AscendWebSearch; all green
+- [ ] 6.3 Run `pytest` for ascend-web-hunter; all green

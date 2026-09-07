@@ -48,8 +48,8 @@ flowchart TD
         AscendAgent -- "Tool Discovery & Calls" --> ExtTools["External Tools"]
         ExtTools --> Weather["Weather MCP"]
         ExtTools --> Audio["AudioScribe MCP"]
-        ExtTools --> WebSearch["AscendWebSearch MCP"]
-        WebSearch --> Searxng["SearXNG"]
+        ExtTools --> WebHunter["ascend-web-hunter MCP"]
+        WebHunter --> Searxng["SearXNG"]
     end
 
     subgraph Ingestion ["Ingestion Pipeline"]
@@ -149,8 +149,8 @@ The monorepo's [docker-compose.yaml](../docker-compose.yaml) brings up the in-st
 - **Unstructured API.** Document parsing for PDFs / PPTX / etc.
 - **PostgreSQL.** Metadata store (schema `ascend_ai`).
 - **Redis.** Cache and active memory.
-- **SearXNG.** Self-hosted meta-search engine, backend for ascend-web-search.
-- **ascend-web-search.** MCP server providing `web_search` and `read_url` tools.
+- **SearXNG.** Self-hosted meta-search engine, backend for ascend-web-hunter.
+- **ascend-web-hunter.** MCP server providing `web_search` and `read_url` tools.
 - **ascend-memory.** Semantic memory service used by the agent over REST.
 
 #### LLM provider
@@ -207,7 +207,7 @@ docker compose up -d --build
 ```
 
 External prerequisites (PostgreSQL, Redis, Qdrant, object storage) must already be running on the host. They aren't part of
-compose. Compose itself brings up the application services (ascend-memory, ascend-web-search, audio-scribe, etc.)
+compose. Compose itself brings up the application services (ascend-memory, ascend-web-hunter, audio-scribe, etc.)
 plus the support stack (SearXNG, FlareSolverr, Docling, Unstructured).
 
 #### 2. Run the AscendAgent

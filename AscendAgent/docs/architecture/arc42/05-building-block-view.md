@@ -10,7 +10,7 @@ graph TB
         AscendAgent["AscendAgent<br/>(Spring Boot)"]
         AudioScribe["AudioScribe<br/>(FastMCP/Python)"]
         Weather["WeatherMCP<br/>(Spring Boot/Java)"]
-        WebSearch["AscendWebSearch<br/>(FastMCP/Python)"]
+        WebHunter["ascend-web-hunter<br/>(FastMCP/Python)"]
         Memory["AscendMemory<br/>(FastAPI/Python)"]
     end
 
@@ -25,14 +25,14 @@ graph TB
 
     AscendAgent --> AudioScribe
     AscendAgent --> Weather
-    AscendAgent --> WebSearch
+    AscendAgent --> WebHunter
     AscendAgent --> Memory
     AscendAgent --> Postgres
     AscendAgent --> Redis
     AscendAgent --> Qdrant
     AscendAgent --> S3
-    WebSearch --> SearXNG
-    WebSearch --> FlareSolverr
+    WebHunter --> SearXNG
+    WebHunter --> FlareSolverr
 ```
 
 ---

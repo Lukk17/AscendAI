@@ -2,7 +2,7 @@
 
 ## Context
 
-AscendWebSearch escalates reads through curl_cffi → FlareSolverr → Playwright → Crawlee with NoVNC for human intervention. `enhance-web-search-scraping` already added session replay into every tier, coherent fingerprints (`src/reader/fingerprint.py`), an optional proxy seam (`src/proxy/proxy_provider.py`), read caching, per-domain metrics, and circuit breakers. FlareSolverr's only job is solving the Cloudflare challenge and returning cookies; a patched stealth browser both solves the challenge and renders the page, so the middle tiers can collapse. Patchright is a drop-in Playwright replacement (patched Chromium); Camoufox is a hardened Firefox driven through Playwright — both free and self-hosted.
+ascend-web-hunter escalates reads through curl_cffi → FlareSolverr → Playwright → Crawlee with NoVNC for human intervention. `enhance-web-search-scraping` already added session replay into every tier, coherent fingerprints (`src/reader/fingerprint.py`), an optional proxy seam (`src/proxy/proxy_provider.py`), read caching, per-domain metrics, and circuit breakers. FlareSolverr's only job is solving the Cloudflare challenge and returning cookies; a patched stealth browser both solves the challenge and renders the page, so the middle tiers can collapse. Patchright is a drop-in Playwright replacement (patched Chromium); Camoufox is a hardened Firefox driven through Playwright — both free and self-hosted.
 
 Extraction returns trafilatura output with a readability fallback: a single main-content blob, no embedded structured data, no schema-guided output, and linked PDFs/images are ignored even though the platform runs Docling, PaddleOCR, and AudioScribe.
 

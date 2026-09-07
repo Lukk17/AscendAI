@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     ports:
-      # Bound to loopback: only this host reaches it. AscendWebSearch talks to
+      # Bound to loopback: only this host reaches it. ascend-web-hunter talks to
       # it over the compose network by alias, so nothing outside needs the port.
       # It stays published because config.py defaults to http://localhost:9020
       # when the service runs natively instead of in a container.
@@ -89,7 +89,7 @@ services:
 
   # Off by default: this machine already runs its own Redis as an external
   # prerequisite (docs/architecture/memory-budget.md), reachable via
-  # host.docker.internal, which is what ascend-web-search's REDIS_URL
+  # host.docker.internal, which is what ascend-web-hunter's REDIS_URL
   # default below still points at. This service exists so the standalone
   # deploy-standalone bundle can ship the same definition and be
   # self-contained on a host with no Redis of its own. Activate here only to
@@ -102,11 +102,11 @@ services:
   # host-wide. The Compose service name and network alias stay "redis" so
   # the internal DNS name in REDIS_URL still resolves.
   #
-  # No depends_on from ascend-web-search onto this service: Compose refuses
+  # No depends_on from ascend-web-hunter onto this service: Compose refuses
   # to resolve a depends_on that crosses a profile boundary (a service with
   # no profile depending on one gated by a profile) unless the profile is
   # active, which would break every default, profile-less run. Verified
-  # with `docker compose config` before writing this. ascend-web-search's
+  # with `docker compose config` before writing this. ascend-web-hunter's
   # own Redis client already tolerates Redis being absent or unreachable
   # (src/reader/cloudflare/cookie_manager.py falls back to an in-memory
   # cache, and GET /ready reports "degraded" rather than failing), so no
@@ -143,16 +143,16 @@ services:
 
   # ─── Web search service ───
 
-  ngrok-ascend-web-search:
+  ngrok-ascend-web-hunter:
     image: ngrok/ngrok:3
-    container_name: ngrok-ascend-web-search
+    container_name: ngrok-ascend-web-hunter
     restart: unless-stopped
     logging: *default-logging
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    command: "http ascend-web-search:7900"
+    command: "http ascend-web-hunter:7900"
     depends_on:
-      - ascend-web-search
+      - ascend-web-hunter
     deploy:
       resources:
         limits:
@@ -164,14 +164,14 @@ services:
     networks:
       default:
         aliases:
-          - ngrok-ascend-web-search
+          - ngrok-ascend-web-hunter
 
-  ascend-web-search:
+  ascend-web-hunter:
     build:
-      context: ./AscendWebSearch
+      context: ./ascend-web-hunter
       dockerfile: Dockerfile
-    container_name: ascend-web-search
-    hostname: ascend-web-search
+    container_name: ascend-web-hunter
+    hostname: ascend-web-hunter
     restart: unless-stopped
     logging: *default-logging
     ports:
@@ -185,13 +185,13 @@ services:
       - API_PORT=7021
       - API_HOST=0.0.0.0
       - LOG_LEVEL=INFO
-      - SEARXNG_USER_AGENT=AscendWebSearch/1.0
+      - SEARXNG_USER_AGENT=ascend-web-hunter/1.0
       - SEARXNG_X_REAL_IP=0.0.0.0
       - SEARXNG_X_FORWARDED_FOR=0.0.0.0
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
       - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
-      - PUBLIC_VNC_URL=http://ngrok-ascend-web-search:4040/api/tunnels
+      - PUBLIC_VNC_URL=http://ngrok-ascend-web-hunter:4040/api/tunnels
       # Defaults to this machine's own external-prerequisite Redis. Override
       # to redis://redis:6379/0 to point at the optional bundled instance
       # above once it's running (`docker compose --profile redis up`).
@@ -202,7 +202,7 @@ services:
       # so only the ngrok tunnel can reach it. The homelab bundle requires it.
       - VNC_PASSWORD=${VNC_PASSWORD:-}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=ascend-web-search
+      - OTEL_SERVICE_NAME=ascend-web-hunter
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.3
     cap_add:
       - SYS_ADMIN
@@ -231,4 +231,4 @@ services:
     networks:
       default:
         aliases:
-          - ascend-web-search
+          - ascend-web-hunter

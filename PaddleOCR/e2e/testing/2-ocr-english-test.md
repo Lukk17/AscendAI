@@ -83,7 +83,7 @@ Engine time, the `processing_time_seconds` the service reports for itself, measu
 calls against this 212 KB fixture on 2026-09-03.
 
 Full round trip (upload plus inference plus response) is longer and moves with host load. Isolated calls the same
-day came in at 60.7 s and 82.1 s. During the full 2026-09-03 sweep, with the AscendAgent, AscendWebSearch,
+day came in at 60.7 s and 82.1 s. During the full 2026-09-03 sweep, with the AscendAgent, ascend-web-hunter,
 AscendMemory and WeatherMCP suites hitting the same host at the same time, the three engine-bound specs measured
 84.3 s (spec 4), 99.9 s (spec 3) and 105.6 s (spec 2). Plan for 60 to 110 s per engine-bound call and read the
 upper end as normal under concurrent load, not as a hang.

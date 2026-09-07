@@ -22,7 +22,7 @@
 
 ### Requirement: Path-filtered matrix per service
 
-`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-agent` → `AscendAgent/**`, `weather-mcp` → `WeatherMCP/**`, `audio-scribe` → `AudioScribe/**`, `ascend-web-search` → `AscendWebSearch/**`, `ascend-memory` → `AscendMemory/**`, `ascend-paddle-ocr` → `PaddleOCR/**`.
+`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-agent` → `AscendAgent/**`, `weather-mcp` → `WeatherMCP/**`, `audio-scribe` → `AudioScribe/**`, `ascend-web-hunter` → `ascend-web-hunter/**`, `ascend-memory` → `AscendMemory/**`, `ascend-paddle-ocr` → `PaddleOCR/**`.
 
 #### Scenario: Docs-only PR runs zero matrix entries
 
@@ -64,7 +64,7 @@ For each Java service in the matrix, the workflow SHALL set up Eclipse Temurin J
 
 ### Requirement: Python services install editable with dev extras and run pytest
 
-For each Python service in the matrix, the workflow SHALL set up the per-service Python interpreter via `actions/setup-python@v5` with `cache: pip`, install the service in editable mode with dev extras (`pip install -e .[dev]`), and run `pytest` from the service's subdirectory. The build SHALL fail if any test fails or if pytest exits non-zero. Per-service Python versions: `AudioScribe`, `AscendMemory`, `PaddleOCR` use `3.11`; `AscendWebSearch` uses `3.12`.
+For each Python service in the matrix, the workflow SHALL set up the per-service Python interpreter via `actions/setup-python@v5` with `cache: pip`, install the service in editable mode with dev extras (`pip install -e .[dev]`), and run `pytest` from the service's subdirectory. The build SHALL fail if any test fails or if pytest exits non-zero. Per-service Python versions: `AudioScribe`, `AscendMemory`, `PaddleOCR` use `3.11`; `ascend-web-hunter` uses `3.12`.
 
 #### Scenario: AudioScribe matrix entry installs and tests
 
@@ -73,9 +73,9 @@ For each Python service in the matrix, the workflow SHALL set up the per-service
 - **AND** `pip install -e .[dev]` succeeds from `AudioScribe/`
 - **AND** `pytest` runs from `AudioScribe/` and exits zero
 
-#### Scenario: AscendWebSearch uses Python 3.12
+#### Scenario: ascend-web-hunter uses Python 3.12
 
-- **WHEN** the `ascend-web-search` matrix entry executes
+- **WHEN** the `ascend-web-hunter` matrix entry executes
 - **THEN** the setup-python step is configured with `python-version: '3.12'`
 - **AND** the resulting interpreter reports `Python 3.12.x` in the build log
 

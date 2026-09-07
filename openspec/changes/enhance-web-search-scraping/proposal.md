@@ -1,6 +1,6 @@
 ## Why
 
-AscendWebSearch escalates a read across four extraction tiers (curl_cffi → FlareSolverr → Playwright → Crawlee, with NoVNC for human login/CAPTCHA), but it cannot reliably scrape login-walled sites such as LinkedIn — the headline pain point. A four-lens investigation (debugger, code review, security audit, architecture) found the login itself works (the NoVNC monitor correctly captures the full cookie jar, including httpOnly auth cookies like `li_at`), but the captured session is **never replayed into the browser tiers**: `PlaywrightStrategy` and `CrawleeStrategy` open a fresh anonymous context with no `storage_state` and no cookies, and only the `curl_cffi` tier reads cookies back — yet `curl_cffi` cannot render LinkedIn's JavaScript app. So the tier that holds the session cannot render the page, and the tier that can render the page never receives the session. Compounding factors: a flat 7200s (2h) TTL discards a login that is valid for months; FlareSolverr only persists cookies when a Cloudflare `cf_clearance` cookie is present, discarding non-Cloudflare auth cookies; and the store is keyed by domain only.
+ascend-web-hunter escalates a read across four extraction tiers (curl_cffi → FlareSolverr → Playwright → Crawlee, with NoVNC for human login/CAPTCHA), but it cannot reliably scrape login-walled sites such as LinkedIn — the headline pain point. A four-lens investigation (debugger, code review, security audit, architecture) found the login itself works (the NoVNC monitor correctly captures the full cookie jar, including httpOnly auth cookies like `li_at`), but the captured session is **never replayed into the browser tiers**: `PlaywrightStrategy` and `CrawleeStrategy` open a fresh anonymous context with no `storage_state` and no cookies, and only the `curl_cffi` tier reads cookies back — yet `curl_cffi` cannot render LinkedIn's JavaScript app. So the tier that holds the session cannot render the page, and the tier that can render the page never receives the session. Compounding factors: a flat 7200s (2h) TTL discards a login that is valid for months; FlareSolverr only persists cookies when a Cloudflare `cf_clearance` cookie is present, discarding non-Cloudflare auth cookies; and the store is keyed by domain only.
 
 The same investigation surfaced real defects to fix while we are in this code (a swallowed human-intervention signal on the links path, an SSRF guard that only runs at the edge and is bypassed by redirects/DNS-rebinding, challenge detection silently skipped on pages over 50 KB, a content validator that fails open, and committed Crawlee runtime state leaking scraped URLs into git), plus opportunities to make extraction genuinely best-in-class (structured output, readability fallback, the scroll/pagination settings that exist in config but are never wired up, coherent anti-bot evasion, result caching, and per-domain observability).
 
@@ -27,13 +27,13 @@ Out of scope (explicit): PDF/document handling (the service scrapes web pages; d
 - `web-search-caching-observability`: read-result caching, per-domain success metrics, and circuit breakers on external dependencies.
 
 ### Modified Capabilities
-<!-- None: AscendWebSearch has no existing capability specs under openspec/specs/. -->
+<!-- None: ascend-web-hunter has no existing capability specs under openspec/specs/. -->
 
 ## Impact
 
 - **Code:** `src/reader/web_reader.py` (orchestrator), all of `src/reader/strategies/*`, `src/reader/cloudflare/{cookie_manager,challenge_detector}.py`, `src/runtime/browser_pool.py`, `src/validator/{url_validator,content_validator}.py`, `src/search/search_client.py`, `src/api/rest/rest_endpoints.py`, `src/api/mcp/mcp_server.py`, `src/config/config.py`, `src/observability/metrics.py`.
 - **API:** new session endpoints + MCP tools; new optional read fields (`profile`, `tier`, `output_format`); structured-output response shape (additive, version-gated if the envelope changes).
-- **Repo hygiene:** `.gitignore` gains `AscendWebSearch/src/storage/`; that directory is untracked and purged.
+- **Repo hygiene:** `.gitignore` gains `ascend-web-hunter/src/storage/`; that directory is untracked and purged.
 - **Config:** new settings for auth/WAF TTLs, profiles, proxy, scroll, cache TTL, circuit-breaker thresholds. No new mandatory external dependency (Redis stays optional; in-memory fallback documented as supported for local use).
 - **Dependencies:** adds `readability-lxml` (and optionally a stealth library such as `patchright`); proxy support is configuration-only.
 - **Docs/ADRs:** ADRs for the per-profile session model and the storage_state/persistent-session reuse strategy; the e2e tier tests from `add-web-search-scraping-e2e` exercise the authenticated path once landed.

@@ -88,10 +88,10 @@
 - [x] 10.7 Add scrape job `ascend-memory` to `infra/observability/prometheus/prometheus.yaml`
 - [ ] 10.8 Smoke test: `GET http://localhost:7020/metrics` returns 200 and includes `python_info{...}` plus `memory_operations_total`. Also send one search request → confirm Tempo has a trace with `service.name=ascend-memory`.
 
-## 11. Wire AudioScribe, AscendWebSearch, PaddleOCR (Python repetition)
+## 11. Wire AudioScribe, ascend-web-hunter, PaddleOCR (Python repetition)
 
 - [x] 11.1 AudioScribe: dependencies, `Instrumentator(...).expose(app)`, OTel auto-instrumentation, `transcription_duration_seconds` + `transcription_audio_duration_seconds` histograms, scrape job
-- [x] 11.2 AscendWebSearch: dependencies, expose, OTel, `search_results_returned` histogram + `extraction_tier_used_total` counter + `extraction_captcha_intervention_total` counter, scrape job
+- [x] 11.2 ascend-web-hunter: dependencies, expose, OTel, `search_results_returned` histogram + `extraction_tier_used_total` counter + `extraction_captcha_intervention_total` counter, scrape job
 - [x] 11.3 PaddleOCR: dependencies, expose, OTel, `ocr_pages_processed_total` counter + `ocr_duration_seconds` histogram, scrape job
 - [ ] 11.4 Smoke test for each: `GET /metrics` returns 200 with the expected custom metric names; one request per service produces a trace in Tempo
 

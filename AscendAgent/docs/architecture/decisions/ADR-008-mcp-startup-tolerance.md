@@ -10,7 +10,7 @@
 
 ## Context
 
-AscendAgent configures three MCP servers (AudioScribe, WeatherMCP, AscendWebSearch) via
+AscendAgent configures three MCP servers (AudioScribe, WeatherMCP, ascend-web-hunter) via
 `spring.ai.mcp.client.streamable-http.connections`. Spring AI 1.1.5's `McpClientAutoConfiguration` calls
 `McpSyncClient.initialize()` on every configured client during context refresh. If any server is unreachable at
 startup, the entire Spring context fails to refresh, taking the whole API gateway offline for a peripheral

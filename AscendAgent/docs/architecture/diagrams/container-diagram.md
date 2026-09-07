@@ -8,7 +8,7 @@ graph TB
         AscendAgent["AscendAgent<br/>(Spring Boot, Java 21)<br/>:9917"]
         AudioScribe["AudioScribe<br/>(FastMCP, Python)<br/>:7017"]
         Weather["WeatherMCP<br/>(Spring Boot, Java)<br/>:9998"]
-        WebSearch["AscendWebSearch<br/>(FastMCP, Python)<br/>:7021"]
+        WebHunter["ascend-web-hunter<br/>(FastMCP, Python)<br/>:7021"]
         Memory["AscendMemory<br/>(FastAPI, Python)<br/>:7020"]
     end
 
@@ -32,7 +32,7 @@ graph TB
     User -->|"HTTP"| AscendAgent
     AscendAgent -->|"MCP"| AudioScribe
     AscendAgent -->|"MCP"| Weather
-    AscendAgent -->|"MCP"| WebSearch
+    AscendAgent -->|"MCP"| WebHunter
     AscendAgent -->|"REST"| Memory
     AscendAgent --> Postgres
     AscendAgent --> Redis
@@ -40,8 +40,8 @@ graph TB
     AscendAgent --> S3
     AscendAgent --> LMStudio
     AscendAgent --> CloudAPIs
-    WebSearch --> SearXNG
-    WebSearch --> FlareSolverr
+    WebHunter --> SearXNG
+    WebHunter --> FlareSolverr
     Memory --> Qdrant
 ```
 

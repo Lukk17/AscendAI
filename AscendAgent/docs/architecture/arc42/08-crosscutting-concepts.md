@@ -29,7 +29,7 @@ Currently registered MCP services:
 
 - **AudioScribe.** Audio transcription.
 - **WeatherMCP.** Current weather data.
-- **AscendWebSearch.** Web search via SearXNG.
+- **ascend-web-hunter.** Web search via SearXNG.
 
 #### Startup tolerance
 

@@ -65,5 +65,5 @@ callers pass `text` only.
 
 ### Risks
 
-- **FastMCP version changes**: FastMCP 3.3.1 is pinned (upgraded from 2.14.5 to align with AscendWebSearch). The ASGI
+- **FastMCP version changes**: FastMCP 3.3.1 is pinned (upgraded from 2.14.5 to align with ascend-web-hunter). The ASGI
   mount pattern and lifespan integration must be re-validated on each upgrade.

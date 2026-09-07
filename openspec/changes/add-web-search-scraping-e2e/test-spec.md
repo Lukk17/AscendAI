@@ -35,7 +35,7 @@ bru --version
 
 Expect a version string.
 
-Check the AscendWebSearch server is reachable.
+Check the ascend-web-hunter server is reachable.
 
 ```powershell
 curl -fsS http://localhost:7021/health
@@ -99,19 +99,19 @@ cd docs/api/request/AscendAI
 Step 1 — static tier (row 1). Send the request and wait for HTTP 200 before continuing.
 
 ```powershell
-bru run "web-search/testing/extract-tier-static-wikipedia.yml" --env ascend-local
+bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local
 ```
 
 Step 2 — Cloudflare tier (row 2). Send the request and wait for HTTP 200 before continuing.
 
 ```powershell
-bru run "web-search/testing/extract-tier-cloudflare.yml" --env ascend-local
+bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local
 ```
 
 Step 3 — JavaScript tier (row 3). Send the request and wait for HTTP 200 before continuing.
 
 ```powershell
-bru run "web-search/testing/extract-tier-js-quotes.yml" --env ascend-local
+bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local
 ```
 
 ## Expected
@@ -143,7 +143,7 @@ None. The read tool takes a URL string; the "fixtures" are the live external URL
 
 ## Concurrency
 
-- **Mutates:** Redis — AscendWebSearch session / cookie cache, keys for this test's target domains
+- **Mutates:** Redis — ascend-web-hunter session / cookie cache, keys for this test's target domains
   (`en.wikipedia.org`, `scrapingcourse.com`, `quotes.toscrape.com`, and any real-world category sites added later). The
   extraction pipeline writes per-domain session cookies on a successful fetch.
 - **Conflicts with:** any other test that reads or scrapes the same target URLs and may flush their Redis keys. In

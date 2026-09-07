@@ -46,7 +46,7 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 
 - [ ] 5.1 Create `service/usage/RateLimiterService` wrapping Bucket4j Redis buckets keyed `{endpointGroup}:{user|tenant}:{id}` with capacities/refill from `UsageProperties`
 - [ ] 5.2 Register a `HandlerInterceptor` on `POST /api/v1/ai/prompt` and `POST /api/v1/ingestion/upload` consuming from the user and tenant buckets; rejection throws `RateLimitExceededException` → `429` with `code=RATE_LIMITED`, `scope`, `retryAfterSeconds`, and `Retry-After` header from the bucket's nanos-to-wait
-- [ ] 5.3 Wrap AscendWebSearch MCP tool callbacks with a dedicated `web-search` bucket; on empty bucket, short-circuit the tool call and return a tool result telling the model the retry delay (chat request itself still returns `200`)
+- [ ] 5.3 Wrap ascend-web-hunter MCP tool callbacks with a dedicated `web-search` bucket; on empty bucket, short-circuit the tool call and return a tool result telling the model the retry delay (chat request itself still returns `200`)
 - [ ] 5.4 Fail-open on Redis errors: admit the request, WARN once per incident window, increment `rate_limit.redis_unavailable`; honour `app.usage.rate-limit.enabled=false`
 - [ ] 5.5 Test: burst past the per-user chat bucket returns `429` with consistent header/body before controller logic runs
 - [ ] 5.6 Test: per-tenant bucket rejects aggregate over-rate traffic with `scope="tenant"` while each user is under their own limit

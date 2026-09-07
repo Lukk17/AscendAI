@@ -2,7 +2,7 @@
 
 ### Requirement: Every AscendAI service exposes a Prometheus-format metrics endpoint
 
-Every long-running AscendAI service (AscendAgent, WeatherMCP, AscendMemory, AudioScribe, AscendWebSearch, PaddleOCR) SHALL expose an HTTP endpoint that returns metrics in OpenMetrics / Prometheus exposition format on a documented path. JVM services use `/actuator/prometheus`; Python services use `/metrics`.
+Every long-running AscendAI service (AscendAgent, WeatherMCP, AscendMemory, AudioScribe, ascend-web-hunter, PaddleOCR) SHALL expose an HTTP endpoint that returns metrics in OpenMetrics / Prometheus exposition format on a documented path. JVM services use `/actuator/prometheus`; Python services use `/metrics`.
 
 #### Scenario: AscendAgent metrics endpoint
 
@@ -172,8 +172,8 @@ Each Python service SHALL emit at least the following custom metrics in addition
 |---|---|---|---|
 | AudioScribe | `transcription.duration_seconds` | histogram | `provider`, `outcome` |
 | AudioScribe | `transcription.audio_duration_seconds` | histogram | `provider` |
-| AscendWebSearch | `search.results_returned` | histogram | `engine`, `outcome` |
-| AscendWebSearch | `extraction.tier_used_total` | counter | `tier` |
+| ascend-web-hunter | `search.results_returned` | histogram | `engine`, `outcome` |
+| ascend-web-hunter | `extraction.tier_used_total` | counter | `tier` |
 | AscendMemory | `memory.operations_total` | counter | `operation`, `outcome` |
 | AscendMemory | `memory.search.duration_seconds` | histogram | `embedding_provider` |
 | PaddleOCR | `ocr.pages_processed_total` | counter | `language`, `outcome` |

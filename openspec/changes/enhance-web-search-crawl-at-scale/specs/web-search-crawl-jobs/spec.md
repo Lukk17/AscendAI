@@ -2,7 +2,7 @@
 
 ### Requirement: Async crawl job API
 
-AscendWebSearch SHALL expose a crawl API (REST and MCP) that accepts seed URLs, include/exclude URL patterns, a maximum depth, a page budget, and an optional extraction schema, and returns a job id without blocking for the crawl. Job status SHALL be queryable, a terminal state MAY fire a configured webhook, and results SHALL be written to MinIO as markdown or NDJSON. Per-page extraction SHALL reuse the extraction pipeline from `enhance-web-search-extraction-and-tiers`.
+ascend-web-hunter SHALL expose a crawl API (REST and MCP) that accepts seed URLs, include/exclude URL patterns, a maximum depth, a page budget, and an optional extraction schema, and returns a job id without blocking for the crawl. Job status SHALL be queryable, a terminal state MAY fire a configured webhook, and results SHALL be written to MinIO as markdown or NDJSON. Per-page extraction SHALL reuse the extraction pipeline from `enhance-web-search-extraction-and-tiers`.
 
 #### Scenario: Crawl respects scope and returns a job id
 
@@ -37,7 +37,7 @@ The crawl frontier SHALL be Redis-backed and SHALL enforce, per registrable doma
 
 ### Requirement: Incremental recrawl via content hash and conditional requests
 
-AscendWebSearch SHALL store, per crawled URL, a content hash and the server's ETag / Last-Modified, and SHALL issue conditional requests on recrawl. A page reported unchanged (304 or an unchanged content hash) SHALL be short-circuited before extraction and result writing, so it is neither re-extracted nor re-embedded.
+ascend-web-hunter SHALL store, per crawled URL, a content hash and the server's ETag / Last-Modified, and SHALL issue conditional requests on recrawl. A page reported unchanged (304 or an unchanged content hash) SHALL be short-circuited before extraction and result writing, so it is neither re-extracted nor re-embedded.
 
 #### Scenario: Unchanged page skipped on recrawl
 
@@ -51,7 +51,7 @@ AscendWebSearch SHALL store, per crawled URL, a content hash and the server's ET
 
 ### Requirement: Optional bring-your-own-proxy hook, never a hosted proxy
 
-AscendWebSearch SHALL provide an off-by-default configuration hook for customer-supplied proxy credentials, engaged only for crawl jobs when configured, building on the existing proxy seam. AscendWebSearch SHALL NOT run, host, or resell a proxy network. With no proxy configured, crawling SHALL work unchanged at lower volume.
+ascend-web-hunter SHALL provide an off-by-default configuration hook for customer-supplied proxy credentials, engaged only for crawl jobs when configured, building on the existing proxy seam. ascend-web-hunter SHALL NOT run, host, or resell a proxy network. With no proxy configured, crawling SHALL work unchanged at lower volume.
 
 #### Scenario: Crawl works without a proxy
 

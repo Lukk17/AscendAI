@@ -2,7 +2,7 @@
 
 ### Requirement: Web connector crawls a site into tenant RAG through the existing framework
 
-A `web` connector type SHALL be available in the `add-document-connectors` framework, configured with seed URLs / patterns and a sync schedule. On each scheduled run it SHALL trigger an AscendWebSearch crawl, land the crawl output in the tenant's MinIO prefix, and trigger the existing ingestion pipeline — the framework's land-bytes-then-ingest contract. The connector SHALL NOT parse, chunk, or embed content itself and SHALL NOT write to Qdrant directly.
+A `web` connector type SHALL be available in the `add-document-connectors` framework, configured with seed URLs / patterns and a sync schedule. On each scheduled run it SHALL trigger an ascend-web-hunter crawl, land the crawl output in the tenant's MinIO prefix, and trigger the existing ingestion pipeline — the framework's land-bytes-then-ingest contract. The connector SHALL NOT parse, chunk, or embed content itself and SHALL NOT write to Qdrant directly.
 
 #### Scenario: Scheduled crawl lands in tenant RAG
 

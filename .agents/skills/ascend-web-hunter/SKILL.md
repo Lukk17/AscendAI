@@ -1,6 +1,6 @@
 ---
 name: ascend-web-hunter
-description: Search the web and scrape/extract page content via the self-hosted AscendWebSearch service. Use this whenever the task involves running a web search the agent should perform itself, or fetching, reading, or extracting content from a URL, job listings, articles, product pages, docs, paywalled or Cloudflare-protected sites. Handles WAFs automatically and escalates CAPTCHAs / login walls to a remote browser the user can drive on their phone.
+description: Search the web and scrape/extract page content via the self-hosted ascend-web-hunter service. Use this whenever the task involves running a web search the agent should perform itself, or fetching, reading, or extracting content from a URL, job listings, articles, product pages, docs, paywalled or Cloudflare-protected sites. Handles WAFs automatically and escalates CAPTCHAs / login walls to a remote browser the user can drive on their phone.
 ---
 
 # Ascend Web Hunter
@@ -15,7 +15,7 @@ for human help), so most pages just work, and a session layer for getting past l
 The service can live anywhere: a container name on the same Docker network, a `host:port` pair, a hostname on a
 local network, or a public HTTPS address behind a reverse proxy. There is no default here on purpose: a default
 that's wrong for the current environment looks like a working configuration right up until the first request
-fails. Take the base URL from whatever configuration surface the runtime provides for AscendWebSearch (an MCP
+fails. Take the base URL from whatever configuration surface the runtime provides for ascend-web-hunter (an MCP
 server URL, an env var, a settings file) and ask the user if none is configured. Examples below use `$BASE` as a
 placeholder.
 

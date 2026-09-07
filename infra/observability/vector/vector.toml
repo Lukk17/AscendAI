@@ -5,7 +5,7 @@ include_containers = [
   "weather-mcp",
   "ascend-memory",
   "audio-scribe",
-  "ascend-web-search",
+  "ascend-web-hunter",
   "ascend-paddle-ocr",
 ]
 

@@ -2,7 +2,7 @@
 
 ### Requirement: Embedded structured data is parsed before heuristics
 
-AscendWebSearch SHALL parse JSON-LD, OpenGraph, and microdata from a page and return them as structured fields alongside the extracted text, performed before any heuristic or model-based extraction runs.
+ascend-web-hunter SHALL parse JSON-LD, OpenGraph, and microdata from a page and return them as structured fields alongside the extracted text, performed before any heuristic or model-based extraction runs.
 
 #### Scenario: JSON-LD and OpenGraph returned
 
@@ -12,7 +12,7 @@ AscendWebSearch SHALL parse JSON-LD, OpenGraph, and microdata from a page and re
 
 ### Requirement: Scored ensemble main-content extraction
 
-AscendWebSearch SHALL run trafilatura and a readability extractor over the same DOM, score each on text-vs-link density and boilerplate ratio, and return the higher-scoring result as the main content, rather than always preferring one extractor with the other as a fallback.
+ascend-web-hunter SHALL run trafilatura and a readability extractor over the same DOM, score each on text-vs-link density and boilerplate ratio, and return the higher-scoring result as the main content, rather than always preferring one extractor with the other as a fallback.
 
 #### Scenario: Ensemble keeps the better extractor
 
@@ -22,7 +22,7 @@ AscendWebSearch SHALL run trafilatura and a readability extractor over the same 
 
 ### Requirement: Schema-guided extraction returns validated JSON
 
-AscendWebSearch SHALL offer a read mode (REST and MCP) where the caller supplies a JSON schema and receives JSON validated against it. The extraction SHALL be produced via a configurable OpenAI-compatible endpoint, so it can run against a local model, AscendAgent's provider proxy, or a cloud provider without code change.
+ascend-web-hunter SHALL offer a read mode (REST and MCP) where the caller supplies a JSON schema and receives JSON validated against it. The extraction SHALL be produced via a configurable OpenAI-compatible endpoint, so it can run against a local model, AscendAgent's provider proxy, or a cloud provider without code change.
 
 #### Scenario: Caller-supplied schema honored
 
@@ -36,7 +36,7 @@ AscendWebSearch SHALL offer a read mode (REST and MCP) where the caller supplies
 
 ### Requirement: Self-healing per-domain selector recipes
 
-On the first schema extraction for a domain, AscendWebSearch SHALL persist the LLM-emitted CSS/XPath selectors as a recipe. Subsequent extractions for that domain SHALL replay the persisted selectors and skip the model. Every replay SHALL be validated against the caller's schema; on drift (empty or type-mismatched fields), the recipe SHALL be regenerated via the model.
+On the first schema extraction for a domain, ascend-web-hunter SHALL persist the LLM-emitted CSS/XPath selectors as a recipe. Subsequent extractions for that domain SHALL replay the persisted selectors and skip the model. Every replay SHALL be validated against the caller's schema; on drift (empty or type-mismatched fields), the recipe SHALL be regenerated via the model.
 
 #### Scenario: Recipe replay skips the model
 
@@ -50,7 +50,7 @@ On the first schema extraction for a domain, AscendWebSearch SHALL persist the L
 
 ### Requirement: Non-HTML content routed into the platform stack and richer output formats
 
-AscendWebSearch SHALL route linked PDFs to Docling, image-heavy pages and linked images to PaddleOCR, and linked audio to AudioScribe, merging their extracted text into the result. The service SHALL additionally offer full-page screenshot and extracted-tables-as-rows among the selectable output formats.
+ascend-web-hunter SHALL route linked PDFs to Docling, image-heavy pages and linked images to PaddleOCR, and linked audio to AudioScribe, merging their extracted text into the result. The service SHALL additionally offer full-page screenshot and extracted-tables-as-rows among the selectable output formats.
 
 #### Scenario: Linked PDF routed to Docling
 

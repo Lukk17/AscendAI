@@ -2,7 +2,7 @@
 
 ### Requirement: Downstream services require a bearer service token on REST surfaces
 
-AscendMemory, AudioScribe, AscendWebSearch, PaddleOCR, and WeatherMCP SHALL reject any REST request that does not carry `Authorization: Bearer <SERVICE_AUTH_TOKEN>` with HTTP 401, where `SERVICE_AUTH_TOKEN` is injected via environment variable. Token comparison SHALL be constant-time. Liveness/readiness endpoints (`/health`, and `/ready` / `/metrics` where present) SHALL remain unauthenticated so Docker healthchecks and Prometheus scrapes keep working. The token value SHALL never appear in logs or in checked-in configuration defaults.
+AscendMemory, AudioScribe, ascend-web-hunter, PaddleOCR, and WeatherMCP SHALL reject any REST request that does not carry `Authorization: Bearer <SERVICE_AUTH_TOKEN>` with HTTP 401, where `SERVICE_AUTH_TOKEN` is injected via environment variable. Token comparison SHALL be constant-time. Liveness/readiness endpoints (`/health`, and `/ready` / `/metrics` where present) SHALL remain unauthenticated so Docker healthchecks and Prometheus scrapes keep working. The token value SHALL never appear in logs or in checked-in configuration defaults.
 
 #### Scenario: Destructive memory endpoint rejects tokenless calls
 
@@ -56,7 +56,7 @@ When `SERVICE_AUTH_TOKEN` is set, enforcement SHALL be active. When it is unset 
 
 ### Requirement: AscendAgent attaches the service token on all outbound calls
 
-AscendAgent SHALL send `Authorization: Bearer <SERVICE_AUTH_TOKEN>` on every outbound request to the downstream services: the AscendMemory REST client, the PaddleOCR ingestion client, and every configured MCP client connection (audioscribe, weather, ascend-web-search). With the compose stack fully secured, a chat turn that exercises memory and an MCP tool SHALL complete without any downstream 401.
+AscendAgent SHALL send `Authorization: Bearer <SERVICE_AUTH_TOKEN>` on every outbound request to the downstream services: the AscendMemory REST client, the PaddleOCR ingestion client, and every configured MCP client connection (audioscribe, weather, ascend-web-hunter). With the compose stack fully secured, a chat turn that exercises memory and an MCP tool SHALL complete without any downstream 401.
 
 #### Scenario: MCP tool call carries the token
 

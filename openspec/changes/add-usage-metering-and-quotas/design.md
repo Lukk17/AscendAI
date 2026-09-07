@@ -29,7 +29,7 @@ Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelo
 
 - Payment processing, invoicing documents, price-to-currency conversion in the API (the Grafana token-cost dashboard already handles $ via `pricing.yaml`).
 - Authentication, role model, or tenant modelling (owned by the sibling changes).
-- Rate limiting inside AscendMemory / AscendWebSearch / AudioScribe themselves — they are only reachable through the gateway or trusted service calls.
+- Rate limiting inside AscendMemory / ascend-web-hunter / AudioScribe themselves — they are only reachable through the gateway or trusted service calls.
 - Predictive cost estimation (pre-counting prompt tokens before the provider call).
 
 ## Decisions
@@ -71,7 +71,7 @@ Tenant budget window = calendar month UTC; user budget window = calendar day UTC
 Placement:
 
 - Chat (`POST /api/v1/ai/prompt`) and ingestion upload (`POST /api/v1/ingestion/upload`): a `HandlerInterceptor` keyed by `{userId}` and `{tenantId}` per endpoint group, registered ahead of controller execution.
-- Web-search tool invocations happen **inside** a chat turn (MCP tool callback), not on their own HTTP endpoint, so the interceptor cannot see them; the tool-callback wrapper around the AscendWebSearch MCP tools consumes from a dedicated `web-search` bucket and surfaces a tool-level "rate limited, retry after Ns" result to the model instead of a 429 (the enclosing chat request already passed its own limit).
+- Web-search tool invocations happen **inside** a chat turn (MCP tool callback), not on their own HTTP endpoint, so the interceptor cannot see them; the tool-callback wrapper around the ascend-web-hunter MCP tools consumes from a dedicated `web-search` bucket and surfaces a tool-level "rate limited, retry after Ns" result to the model instead of a 429 (the enclosing chat request already passed its own limit).
 
 Both a user bucket and a tenant bucket must have capacity; the stricter one wins. On rejection: `429`, `Retry-After` from Bucket4j's nanos-to-wait, and the standard error body. **Fail-open** when Redis is unreachable (WARN + `rate_limit.redis_unavailable` metric): availability of chat outranks limit precision, and the quota gate (D4, Postgres-backed rebuild) still bounds total spend.
 

@@ -61,11 +61,11 @@ class McpClientStatusRegistryTest {
     void connectedNames_MixedStates_ReturnsOnlyConnected() {
         registry.record("audioscribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
         registry.record("weather", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
-        registry.record("ascend-web-search", "http://localhost:7021", McpClientStatus.CONNECTED, null);
+        registry.record("ascend-web-hunter", "http://localhost:7021", McpClientStatus.CONNECTED, null);
 
         Set<String> connected = registry.connectedNames();
 
-        assertThat(connected).containsExactlyInAnyOrder("audioscribe", "ascend-web-search");
+        assertThat(connected).containsExactlyInAnyOrder("audioscribe", "ascend-web-hunter");
         assertThat(connected).doesNotContain("weather");
     }
 

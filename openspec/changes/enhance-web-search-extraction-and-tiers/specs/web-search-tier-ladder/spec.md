@@ -2,7 +2,7 @@
 
 ### Requirement: Tier ladder is curl_cffi → Patchright → Camoufox → NoVNC with FlareSolverr retired
 
-AscendWebSearch SHALL escalate reads through curl_cffi, then Patchright (patched Chromium, the default browser tier), then Camoufox (hardened Firefox, tried automatically when Patchright is detected/blocked or fails), then NoVNC human intervention. FlareSolverr SHALL be removed from the ladder and the codebase; its Cloudflare-challenge and cookie-persistence role SHALL be covered by the patched-browser tiers replaying the stored session. All browser tiers SHALL be free and self-hosted; no paid external service SHALL be required.
+ascend-web-hunter SHALL escalate reads through curl_cffi, then Patchright (patched Chromium, the default browser tier), then Camoufox (hardened Firefox, tried automatically when Patchright is detected/blocked or fails), then NoVNC human intervention. FlareSolverr SHALL be removed from the ladder and the codebase; its Cloudflare-challenge and cookie-persistence role SHALL be covered by the patched-browser tiers replaying the stored session. All browser tiers SHALL be free and self-hosted; no paid external service SHALL be required.
 
 #### Scenario: Patchright block escalates to Camoufox
 
@@ -18,7 +18,7 @@ AscendWebSearch SHALL escalate reads through curl_cffi, then Patchright (patched
 
 ### Requirement: Per-domain tier memory with decay
 
-AscendWebSearch SHALL record, per registrable domain in Redis, the cheapest tier that last succeeded, and SHALL start subsequent reads for that domain at the remembered tier. The remembered tier SHALL decay back toward curl_cffi on a configurable schedule, so a transient block does not pin a domain to an expensive tier indefinitely.
+ascend-web-hunter SHALL record, per registrable domain in Redis, the cheapest tier that last succeeded, and SHALL start subsequent reads for that domain at the remembered tier. The remembered tier SHALL decay back toward curl_cffi on a configurable schedule, so a transient block does not pin a domain to an expensive tier indefinitely.
 
 #### Scenario: Remembered tier is the start point
 

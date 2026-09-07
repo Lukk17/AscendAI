@@ -34,7 +34,7 @@ Sibling change `add-auth-and-identity` owns application-level identity (JWT reso
 **Chosen:** a hybrid inside the existing `docker-compose.yaml`:
 
 1. Every host-port publication becomes `"${EXPOSE_BIND:-127.0.0.1}:host:container"`. Default is loopback: local dev keeps `localhost:<port>` access for every service exactly as today, and on a cloud VM those ports are unreachable from outside without any operator action. An operator who genuinely needs LAN exposure of a single service can SSH-tunnel or temporarily set `EXPOSE_BIND=0.0.0.0` — documented as a dev-only escape hatch.
-2. Dev-only whole services (`ngrok-ascend-web-search`) get `profiles: ["captcha-intervention"]` — absent from `docker compose up` unless the profile is activated via `COMPOSE_PROFILES` in `.env`.
+2. Dev-only whole services (`ngrok-ascend-web-hunter`) get `profiles: ["captcha-intervention"]` — absent from `docker compose up` unless the profile is activated via `COMPOSE_PROFILES` in `.env`.
 3. Personal mounts become env-interpolated volume sources with named-volume defaults (D4), so no override file is needed for them.
 
 **Alternatives considered:**
@@ -73,7 +73,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 - `audio-scribe` volumes become `- "${HF_CACHE_ROOT:-hf-cache}:/hf-cache"` and `- "${AUDIO_SCRIBE_MEDIA_ROOT:-audio-scribe-media}:/audio"`, with `hf-cache` and `audio-scribe-media` declared as named volumes. Compose treats a pathless value as a named volume and a path as a bind mount, so the owner's two `.env` lines (`HF_CACHE_ROOT=D:/Development/AI/hf-cache`, `AUDIO_SCRIBE_MEDIA_ROOT=C:\Users\Lukk\Desktop`) restore today's behavior; every other deployment gets empty, harmless named volumes.
 - `MCP_FILE_URI_ROOT` becomes `${AUDIO_SCRIBE_FILE_URI_ROOT:-}` — empty means `file://` URIs disabled (AudioScribe's existing contract: unset ⇒ rejected). Reading host files through transcription becomes an explicit opt-in, never a default.
 
-### D5 — Dropping `SYS_ADMIN` from `ascend-web-search`
+### D5 — Dropping `SYS_ADMIN` from `ascend-web-hunter`
 
 `SYS_ADMIN` was added for Chromium's sandbox, which needs `clone(2)` with new-namespace flags that Docker's default seccomp profile blocks. `SYS_ADMIN` grants far more (mount, bpf-adjacent operations, device administration) — an unacceptable capability while rendering untrusted web pages.
 
@@ -87,7 +87,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 ### D6 — SearXNG limiter and real client IP
 
-- `SEARXNG_LIMITER=true` and the spoofed `SEARXNG_X_FORWARDED_FOR=0.0.0.0` / `SEARXNG_X_REAL_IP=0.0.0.0` env vars are removed from `ascend-web-search`. AscendWebSearch forwards the `X-Forwarded-For` it receives (originating at the Caddy gateway) instead of a spoofed constant, so SearXNG's per-client limiter sees real clients.
+- `SEARXNG_LIMITER=true` and the spoofed `SEARXNG_X_FORWARDED_FOR=0.0.0.0` / `SEARXNG_X_REAL_IP=0.0.0.0` env vars are removed from `ascend-web-hunter`. ascend-web-hunter forwards the `X-Forwarded-For` it receives (originating at the Caddy gateway) instead of a spoofed constant, so SearXNG's per-client limiter sees real clients.
 - SearXNG itself stays loopback-bound (D1); the limiter is defense in depth for in-network abuse, not a public-surface control.
 
 ### D7 — SSRF allowlists: explicit, no loopback

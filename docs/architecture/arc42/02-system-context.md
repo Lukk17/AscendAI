@@ -12,7 +12,7 @@ graph TB
         Agent["AscendAgent"]
         AudioScribe["AudioScribe"]
         Weather["WeatherMCP"]
-        WebSearch["AscendWebSearch"]
+        WebHunter["ascend-web-hunter"]
         Memory["AscendMemory"]
         PaddleOCR["PaddleOCR"]
     end
@@ -42,7 +42,7 @@ graph TB
     User -->|"REST API"| Agent
     Agent -->|"MCP"| AudioScribe
     Agent -->|"MCP"| Weather
-    Agent -->|"MCP"| WebSearch
+    Agent -->|"MCP"| WebHunter
     Agent -->|"MCP"| PaddleOCR
     Agent -->|"REST"| Memory
     Agent --> Postgres
@@ -56,8 +56,8 @@ graph TB
     Agent -.->|"per-request"| Anthropic
     Agent -.->|"per-request"| Gemini
     Agent -.->|"per-request"| MiniMax
-    WebSearch --> SearXNG
-    WebSearch --> FlareSolverr
+    WebHunter --> SearXNG
+    WebHunter --> FlareSolverr
     Memory --> Qdrant
 ```
 

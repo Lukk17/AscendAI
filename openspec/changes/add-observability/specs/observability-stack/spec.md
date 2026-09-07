@@ -8,7 +8,7 @@
 
 - **WHEN** `docker compose up -d` completes and 30 seconds elapse
 - **AND** `GET http://localhost:9090/api/v1/targets` is invoked
-- **THEN** every target with `job` ∈ {`ascend-agent`, `audio-scribe`, `ascend-web-search`, `ascend-memory`, `paddle-ocr`, `weather-mcp`, `qdrant`, `redis`, `postgres`} reports `health="up"`
+- **THEN** every target with `job` ∈ {`ascend-agent`, `audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `paddle-ocr`, `weather-mcp`, `qdrant`, `redis`, `postgres`} reports `health="up"`
 
 #### Scenario: Scrape interval is 15 seconds by default
 

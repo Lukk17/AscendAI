@@ -123,7 +123,7 @@ Boot env-var binding (uppercase, dots and dashes to underscores).
 - **`app.rag.similarity-threshold`**. Lower bound for injecting retrieved context.
 - **`app.ingestion.auto.enabled`** (`false`). Auto-poll the object-store bucket on a schedule. Off by default to avoid
   embedding-cost surprises.
-- **`spring.ai.mcp.client.*`**. MCP server URLs for Weather, AudioScribe, AscendWebSearch.
+- **`spring.ai.mcp.client.*`**. MCP server URLs for Weather, AudioScribe, ascend-web-hunter.
 
 The Qdrant collections (`ascendai-768` and `ascendai-1536`) are auto-created at startup; the active collection comes
 from the chosen embedding provider's vector dimensions.

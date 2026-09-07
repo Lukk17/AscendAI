@@ -1,0 +1,221 @@
+name: ascend-scrapper
+
+# Standalone web-search stack for a single-host deployment (homelab, VPS).
+# This file is self-contained: it builds nothing and pulls every image from a
+# public registry. See README.md for prerequisites and how it differs from the
+# development stack in the repository root.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # ─── Search infrastructure ───
+
+  searxng:
+    image: searxng/searxng:2026.8.14-094c33d40
+    container_name: searxng
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - "SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set in .env (at least 32 characters, unique to this deployment)}"
+    volumes:
+      # NOT mounted :ro because SearXNG's container init chowns the file at
+      # boot; a read-only mount makes the container restart-loop.
+      - ./searxng/settings.yml:/etc/searxng/settings.yml
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    networks:
+      default:
+        aliases:
+          - searxng
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
+    container_name: flaresolverr
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=UTC
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8191/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    deploy:
+      resources:
+        # Runs its own Chrome, which is why this is the second-largest budget.
+        limits:
+          cpus: "1.0"
+          memory: 1280M
+        reservations:
+          cpus: "0.15"
+          memory: 256M
+    networks:
+      default:
+        aliases:
+          - flaresolverr
+
+  # ─── Optional bundled Redis (profile: redis) ───
+
+  # Off by default, so this bundle keeps its documented behaviour against an
+  # operator-supplied external Redis unchanged. Activate to make the bundle
+  # fully self-contained: `docker compose --profile redis up -d`. REDIS_URL
+  # below already defaults to this service, so nothing else needs setting.
+  # See "Prerequisites" in README.md for every Redis option this bundle
+  # supports.
+  #
+  # No depends_on from ascend-web-hunter onto this service: Compose refuses
+  # to resolve a depends_on that crosses a profile boundary (a service with
+  # no profile depending on one gated by a profile) unless the profile is
+  # active, which would break every run that doesn't activate it. Verified
+  # with `docker compose config` before writing this. ascend-web-hunter's
+  # own Redis client already tolerates Redis being absent or unreachable
+  # (falls back to an in-memory cache, and GET /ready reports "degraded"
+  # rather than failing), so no explicit wait is needed either way.
+  redis:
+    image: redis:8.10.1-alpine
+    container_name: redis
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - redis
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    deploy:
+      resources:
+        # The platform's own Redis instance peaks at 46 MiB
+        # (../../docs/architecture/memory-budget.md, memory.peak,
+        # 2026-09-06). 256M leaves headroom for session growth on this 8 GB
+        # host without threatening its budget; see "Resource footprint"
+        # below for the full arithmetic.
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    networks:
+      default:
+        aliases:
+          - redis
+
+  # ─── Web search service ───
+
+  ngrok-ascend-web-hunter:
+    image: ngrok/ngrok:3
+    container_name: ngrok-ascend-web-hunter
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - "NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:?NGROK_AUTHTOKEN must be set in .env (get one at https://dashboard.ngrok.com/get-started/your-authtoken)}"
+    command: "http ascend-web-hunter:7900"
+    depends_on:
+      - ascend-web-hunter
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 96M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    networks:
+      default:
+        aliases:
+          - ngrok-ascend-web-hunter
+
+  ascend-web-hunter:
+    image: lukk17/ascend-web-hunter:v0.0.3
+    container_name: ascend-web-hunter
+    hostname: ascend-web-hunter
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "7021:7021"
+    extra_hosts:
+      # Docker Engine on Linux does not define this name on its own.
+      # REDIS_URL below depends on it resolving to the Docker host.
+      - "host.docker.internal:host-gateway"
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080
+      - API_PORT=7021
+      - API_HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+      - SEARXNG_USER_AGENT=ascend-web-hunter/1.0
+      - SEARXNG_X_REAL_IP=0.0.0.0
+      - SEARXNG_X_FORWARDED_FOR=0.0.0.0
+      - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
+      - VALIDATION_MIN_WORDS=10
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      - PUBLIC_VNC_URL=http://ngrok-ascend-web-hunter:4040/api/tunnels
+      # Defaults to the bundled Redis above (profile: redis). Override to
+      # redis://host.docker.internal:6379/0 to use an external Redis instead
+      # and leave the bundled service off. See README.md.
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - NOVNC_TIMEOUT_SECONDS=600
+      # Required here. The ngrok tunnel puts the NoVNC desktop on the public
+      # internet, so an unauthenticated desktop is not an option.
+      - "VNC_PASSWORD=${VNC_PASSWORD:?VNC_PASSWORD must be set in .env (8 characters, the VNC protocol truncates anything longer)}"
+    cap_add:
+      - SYS_ADMIN
+    # 1gb rather than the development stack's 2gb. /dev/shm is charged to this
+    # container's memory cgroup, so shared memory eats the ceiling below.
+    # Docker's 64m default is what crashes Chromium; 1gb is ample for one browser.
+    shm_size: "1gb"
+    depends_on:
+      searxng:
+        condition: service_healthy
+      flaresolverr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        # Sized for an 8 GB host. See "Resource footprint" in README.md for the
+        # arithmetic and for what to change on a larger or smaller machine.
+        limits:
+          cpus: "1.5"
+          memory: 2560M
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    networks:
+      default:
+        aliases:
+          - ascend-web-hunter
+
+volumes:
+  # Holds the bundled Redis's solved-session data (Cloudflare clearance
+  # cookies, CAPTCHA outcomes) across container restarts. Without it, every
+  # restart of the redis service starts cold and a human has to re-solve
+  # every challenge by hand. Unused when the redis profile stays off.
+  redisdata:

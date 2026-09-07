@@ -23,12 +23,12 @@ AscendAgent SHALL enforce request-rate limits on `POST /api/v1/ai/prompt` and `P
 
 ### Requirement: Web-search tool invocations are rate limited inside the chat turn
 
-Because web-search tool calls happen inside a chat turn (MCP tool callback) rather than on their own HTTP endpoint, AscendAgent SHALL consume from a dedicated `web-search` bucket (per user and per tenant) around each AscendWebSearch MCP tool invocation. When the bucket is empty, the tool invocation SHALL NOT reach the AscendWebSearch service; instead the tool result returned to the model SHALL state that the tool is rate limited and after how many seconds it may be retried.
+Because web-search tool calls happen inside a chat turn (MCP tool callback) rather than on their own HTTP endpoint, AscendAgent SHALL consume from a dedicated `web-search` bucket (per user and per tenant) around each ascend-web-hunter MCP tool invocation. When the bucket is empty, the tool invocation SHALL NOT reach the ascend-web-hunter service; instead the tool result returned to the model SHALL state that the tool is rate limited and after how many seconds it may be retried.
 
 #### Scenario: Rate-limited tool call is short-circuited
 
 - **WHEN** the model requests a web-search tool call and the caller's `web-search` bucket is empty
-- **THEN** no request is sent to AscendWebSearch and the model receives a tool result describing the rate limit and the retry delay, while the enclosing chat request still completes with `200`
+- **THEN** no request is sent to ascend-web-hunter and the model receives a tool result describing the rate limit and the retry delay, while the enclosing chat request still completes with `200`
 
 ### Requirement: Rate-limit rejection carries a structured error and Retry-After
 

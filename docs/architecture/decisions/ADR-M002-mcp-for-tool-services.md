@@ -23,7 +23,7 @@ Use MCP (Streamable HTTP transport) as the standard protocol for all tool servic
 
 Tool services implement MCP servers using:
 - Java: `spring-ai-starter-mcp-server-webmvc` (WeatherMCP)
-- Python: `FastMCP` library (AudioScribe, AscendWebSearch, PaddleOCR)
+- Python: `FastMCP` library (AudioScribe, ascend-web-hunter, PaddleOCR)
 
 Exception: AscendMemory uses REST API instead of MCP for memory operations (see AscendAgent ADR-003) because memory operations are tightly coupled to the prompt flow and need synchronous, predictable behavior rather than LLM-driven tool selection.
 

@@ -28,10 +28,10 @@ graph TB
     end
 
     subgraph "Compose project: ascend-scrapper (ascend-scrapper.docker-compose.yaml)"
-        WebSearch["AscendWebSearch :7021"]
+        WebHunter["ascend-web-hunter :7021"]
         SearXNG["SearXNG :9020"]
         Flare["FlareSolverr :8191"]
-        Ngrok["ngrok-ascend-web-search"]
+        Ngrok["ngrok-ascend-web-hunter"]
     end
 
     subgraph "Cloud (Optional)"
@@ -48,7 +48,7 @@ graph TB
     Agent --> S3
     Agent --> AudioScribe
     Agent --> Weather
-    Agent --> WebSearch
+    Agent --> WebHunter
     Agent --> Memory
     Agent --> PaddleOCR
     Agent --> Docling
@@ -57,8 +57,8 @@ graph TB
     Agent -.-> Gemini
     Agent -.-> Anthropic
     Agent -.-> MiniMax
-    WebSearch --> SearXNG
-    WebSearch --> Flare
+    WebHunter --> SearXNG
+    WebHunter --> Flare
     Memory --> Qdrant
 ```
 
@@ -72,7 +72,7 @@ graph TB
 | WeatherMCP        | 9998            | MCP server            | Host JVM               |
 | LM Studio         | 1234            | Local LLM             | Host                   |
 | AudioScribe       | 7017            | MCP server            | Docker                 |
-| AscendWebSearch   | 7021            | MCP server            | Docker                 |
+| ascend-web-hunter   | 7021            | MCP server            | Docker                 |
 | AscendMemory      | 7020            | REST + MCP            | Docker                 |
 | PaddleOCR         | 7022            | MCP server            | Docker                 |
 | Docling Serve     | 5001            | Document conversion   | Docker                 |

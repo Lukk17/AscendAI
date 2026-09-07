@@ -20,7 +20,7 @@ Use Spring AI's MCP client (`spring-ai-starter-mcp-client-webflux`) with Streama
 ## Consequences
 
 - **Positive**: Standardized protocol — any MCP-compliant service is automatically discovered
-- **Positive**: Language-agnostic — MCP services can be Java (WeatherMCP), Python (AudioScribe, WebSearch), or any other language
+- **Positive**: Language-agnostic — MCP services can be Java (WeatherMCP), Python (AudioScribe, WebHunter), or any other language
 - **Positive**: Adding a new tool = deploying a service + adding one URL to YAML
 - **Negative**: Startup dependency on all MCP services being available
 - **Negative**: Synchronous MCP calls block the virtual thread during tool execution

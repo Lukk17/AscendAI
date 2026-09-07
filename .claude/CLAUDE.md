@@ -5,7 +5,7 @@
 @../AGENTS.md
 @../AscendAgent/AGENTS.md
 @../AudioScribe/AGENTS.md
-@../AscendWebSearch/AGENTS.md
+@../ascend-web-hunter/AGENTS.md
 @../AscendMemory/AGENTS.md
 @../WeatherMCP/AGENTS.md
 @../PaddleOCR/AGENTS.md
