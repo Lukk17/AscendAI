@@ -82,7 +82,7 @@ The full reference, including every timeout and threshold, is [docs/configuratio
 
 Two compose files run this service and they are deliberately different:
 
-- `../compose.ascend-web-hunter.yaml` at the repo root. Development. Builds from source, publishes SearXNG and
+- `../../compose.ascend-web-hunter.yaml` at the repo root. Development. Builds from source, publishes SearXNG and
   FlareSolverr on loopback so the service can run natively against them, exports OTLP telemetry to the platform
   collector.
 - [`deploy-standalone/compose.yaml`](deploy-standalone/README.md). Standalone single-host deployment. Pulls published images pinned to
