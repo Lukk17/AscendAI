@@ -31,12 +31,9 @@ out/
 !/.idea/AscendAI.iml
 !/.idea/modules.xml
 !/.idea/gradle.xml
-!/.idea/compiler.xml
 !/.idea/misc.xml
 !/.idea/vcs.xml
 !/.idea/inspectionProfiles/
-!/.idea/modules/
-!/.idea/modules/*.iml
 
 # VS Code
 .vscode/
