@@ -250,7 +250,7 @@ The equivalent file in the repository root is `compose.ascend-web-hunter.yaml`. 
 `searxng/settings.yml` here is a copy of `infra/searxng/settings.yml` in the repository root, kept byte-identical on purpose so that a diff is the whole check.
 
 ```bash
-diff searxng/settings.yml ../../infra/searxng/settings.yml
+diff searxng/settings.yml ../../../infra/searxng/settings.yml
 ```
 
 That command printing nothing means they match. When you change one, change the other in the same commit.

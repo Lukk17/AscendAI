@@ -92,7 +92,7 @@ The full list of intended differences is in [deploy-standalone/README.md](deploy
 identical in both files.
 
 **Sync rule.** [`deploy-standalone/searxng/settings.yml`](deploy-standalone/searxng/settings.yml) is a byte-identical copy of
-`../infra/searxng/settings.yml`, so `diff` between them is the whole check. When you change one, change the other in the same
+`../../infra/searxng/settings.yml`, so `diff` between them is the whole check. When you change one, change the other in the same
 commit. The same applies to environment variables: a new variable in the scrapper stack goes into the root
 `.env.example`, into [`deploy-standalone/.env.example`](deploy-standalone/.env.example), and into the configuration table in
 [deploy-standalone/README.md](deploy-standalone/README.md).

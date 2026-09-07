@@ -303,20 +303,6 @@ PowerShell:
 docker compose up -d --build
 ```
 
-Optional, bring up only the web-scraping stack as its own Docker Desktop group.
-
-Bash:
-
-```bash
-docker compose -f compose.ascend-web-hunter.yaml up -d --build
-```
-
-PowerShell:
-
-```powershell
-docker compose -f compose.ascend-web-hunter.yaml up -d --build
-```
-
 **3. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
 
 On first start the agent creates the `knowledge-base` bucket in the object store and initialises metadata tables. The API is then
@@ -347,6 +333,13 @@ cd apps/ascend-ai-agent
 ```powershell
 ./gradlew bootRun
 ```
+
+**5. Optional: point IntelliJ at each module's Python interpreter.**
+
+The committed `.idea/` project opens with the right module layout, but a Python interpreter is registered per user,
+not per project, so a fresh clone has none. Open each of `apps/ascend-audio-scribe`, `apps/ascend-web-hunter`,
+`apps/ascend-memory`, and `apps/ascend-ocr` in turn; IntelliJ detects the module's own `.venv/` at its root and offers
+to use it. Accept the offer once per module.
 
 For advanced compose flags, per-service rebuilds, and production notes see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 For document ingestion see [docs/INGESTION.md](docs/INGESTION.md).

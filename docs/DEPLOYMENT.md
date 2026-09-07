@@ -13,8 +13,8 @@ The stack is split across two project files:
   so a single `docker compose up` from the repo root brings up the full stack (merged into the `ascend-ai` project;
   one group in Docker Desktop).
 - [compose.ascend-web-hunter.yaml](../compose.ascend-web-hunter.yaml). Project `ascend-scrapper`.
-  Web-scraping stack (`searxng`, `flaresolverr`, `ascend-web-hunter`, `ngrok-ascend-web-hunter`). Self-contained and
-  runnable on its own; when run standalone it forms its own group in Docker Desktop.
+  Web-scraping stack (`searxng`, `flaresolverr`, `ascend-web-hunter`, `ngrok-ascend-web-hunter`), pulled in by the
+  main file's `include:`.
 
 A third file exists for deploying the web-search stack to a machine of its own, without the rest of the platform:
 [apps/ascend-web-hunter/deploy-standalone/](../apps/ascend-web-hunter/deploy-standalone/README.md). It pulls published images rather than building, and
@@ -49,20 +49,6 @@ PowerShell:
 docker compose up -d --build
 ```
 
-#### Bring up only the scrapper stack
-
-Bash:
-
-```bash
-docker compose -f compose.ascend-web-hunter.yaml up -d --build
-```
-
-PowerShell:
-
-```powershell
-docker compose -f compose.ascend-web-hunter.yaml up -d --build
-```
-
 #### Rebuild and recreate everything
 
 Bash:
@@ -80,8 +66,8 @@ docker compose up -d --build --force-recreate
 #### Build and recreate a single service
 
 `<service>` is the name from either compose file (e.g. `ascend-audio-scribe`, `ascend-web-hunter`). `--no-deps` skips linked
-services (database, redis, etc.). For services in the scrapper file you can target them through the merged invocation
-above (because of `include:`) or with `-f compose.ascend-web-hunter.yaml`.
+services (database, redis, etc.). For services in the scrapper file, target them through the merged invocation above
+(because of `include:`).
 
 Bash:
 

@@ -91,8 +91,7 @@ graph TB
 External services must be running before `docker compose up`. The main file
 [compose.yaml](../../../compose.yaml) (project `ascend-ai`) uses `include:` to pull in
 [compose.ascend-web-hunter.yaml](../../../compose.ascend-web-hunter.yaml) (project `ascend-scrapper`), so a
-single command brings up the full stack. Running the scrapper file directly
-(`docker compose -f compose.ascend-web-hunter.yaml up`) keeps it as its own Docker Desktop group.
+single command brings up the full stack.
 
 | Service     | Purpose                                                | Cloud equivalent                |
 | :---------- | :----------------------------------------------------- | :------------------------------ |
