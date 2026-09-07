@@ -2,7 +2,7 @@
 
 ### Requirement: Prometheus runs in docker-compose with checked-in scrape config
 
-`docker-compose.yaml` SHALL define a `prometheus` service that uses a checked-in `infra/observability/prometheus/prometheus.yaml` configuration (`.yaml` extension to match the repo's YAML convention). The Prometheus instance SHALL scrape every AscendAI application service plus the data-layer prerequisites that publish metrics (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`). The S3-compatible object store publishes no Prometheus endpoint and is not scraped.
+`compose.yaml` SHALL define a `prometheus` service that uses a checked-in `infra/observability/prometheus/prometheus.yaml` configuration (`.yaml` extension to match the repo's YAML convention). The Prometheus instance SHALL scrape every AscendAI application service plus the data-layer prerequisites that publish metrics (Qdrant native, Redis via `redis_exporter`, Postgres via `postgres_exporter`). The S3-compatible object store publishes no Prometheus endpoint and is not scraped.
 
 #### Scenario: Prometheus targets are healthy after stack startup
 
@@ -17,7 +17,7 @@
 
 ### Requirement: Logs ship to Loki via Vector
 
-`docker-compose.yaml` SHALL define a `vector` service and a `loki` service. Vector SHALL read Docker container stdout/stderr via the `docker_logs` source and ship to Loki via the `loki` sink. Vector SHALL be the chosen shipper (not Promtail) so the `vector.toml` can swap the destination to Datadog / CloudWatch / Splunk in future without service changes.
+`compose.yaml` SHALL define a `vector` service and a `loki` service. Vector SHALL read Docker container stdout/stderr via the `docker_logs` source and ship to Loki via the `loki` sink. Vector SHALL be the chosen shipper (not Promtail) so the `vector.toml` can swap the destination to Datadog / CloudWatch / Splunk in future without service changes.
 
 #### Scenario: Log line reaches Loki within 5 seconds
 
@@ -32,7 +32,7 @@
 
 ### Requirement: Traces ship to Tempo via the OTel collector
 
-`docker-compose.yaml` SHALL define an `otel-collector` service and a `tempo` service. The OTel collector SHALL accept OTLP receivers on gRPC `:4317` and HTTP `:4318`, batch and memory-limit-process spans, and export to Tempo via OTLP. ascend-ai-agent and ascend-weather-mcp SHALL be configured with `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` so Spring AI's auto-emitted spans land in Tempo. Python services SHALL be configured equivalently via `opentelemetry-distro`.
+`compose.yaml` SHALL define an `otel-collector` service and a `tempo` service. The OTel collector SHALL accept OTLP receivers on gRPC `:4317` and HTTP `:4318`, batch and memory-limit-process spans, and export to Tempo via OTLP. ascend-ai-agent and ascend-weather-mcp SHALL be configured with `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` so Spring AI's auto-emitted spans land in Tempo. Python services SHALL be configured equivalently via `opentelemetry-distro`.
 
 #### Scenario: A single chat turn produces a queryable trace
 
@@ -43,7 +43,7 @@
 
 ### Requirement: Grafana runs in docker-compose with provisioned datasources and six dashboards
 
-`docker-compose.yaml` SHALL define a `grafana` service exposed on host port `3030` with anonymous Viewer access enabled by default. Grafana SHALL be provisioned at startup with three datasources (`Prometheus`, `Loki`, `Tempo`) and six checked-in dashboards (`Platform Overview`, `AI Pipeline`, `Infrastructure`, `Token Cost`, `RAG Quality`, `Cache Hit Rate`).
+`compose.yaml` SHALL define a `grafana` service exposed on host port `3030` with anonymous Viewer access enabled by default. Grafana SHALL be provisioned at startup with three datasources (`Prometheus`, `Loki`, `Tempo`) and six checked-in dashboards (`Platform Overview`, `AI Pipeline`, `Infrastructure`, `Token Cost`, `RAG Quality`, `Cache Hit Rate`).
 
 #### Scenario: Grafana is reachable after stack startup
 
@@ -65,7 +65,7 @@
 
 ### Requirement: Observability stack is always-on (no opt-out profile)
 
-The `prometheus`, `grafana`, `vector`, `loki`, `otel-collector`, `tempo`, `postgres-exporter`, and `redis-exporter` services in `docker-compose.yaml` SHALL run by default with no `profiles:` attribute. There SHALL NOT be a `--profile no-observability` opt-out — observability is part of the always-on happy path. Operators who do not want it must comment the services out manually.
+The `prometheus`, `grafana`, `vector`, `loki`, `otel-collector`, `tempo`, `postgres-exporter`, and `redis-exporter` services in `compose.yaml` SHALL run by default with no `profiles:` attribute. There SHALL NOT be a `--profile no-observability` opt-out — observability is part of the always-on happy path. Operators who do not want it must comment the services out manually.
 
 #### Scenario: Default install includes all observability containers
 

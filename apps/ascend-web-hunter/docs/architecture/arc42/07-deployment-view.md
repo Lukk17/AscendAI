@@ -4,8 +4,8 @@
 
 ### docker-compose placement
 
-ascend-web-hunter runs as the `ascend-web-hunter` service in `ascend-scrapper.docker-compose.yaml` (project
-`ascend-scrapper`). This file is included by the top-level `docker-compose.yaml` via `include:`, so
+ascend-web-hunter runs as the `ascend-web-hunter` service in `compose.ascend-web-hunter.yaml` (project
+`ascend-scrapper`). This file is included by the top-level `compose.yaml` via `include:`, so
 `docker compose up` from the monorepo root brings up the scraper stack alongside the main application stack.
 It can also be started independently as its own Docker Desktop group.
 

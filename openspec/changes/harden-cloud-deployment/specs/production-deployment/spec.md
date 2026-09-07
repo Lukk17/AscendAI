@@ -4,7 +4,7 @@
 
 ### Requirement: The edge gateway is the only publicly bound service
 
-`docker-compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-ai-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
+`compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-ai-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
 
 #### Scenario: External port scan shows only 80 and 443
 
@@ -26,7 +26,7 @@
 
 ### Requirement: Internal service ports bind to loopback by default
 
-Every host-port publication in `docker-compose.yaml` and `ascend-scrapper.docker-compose.yaml` except the gateway's SHALL use the form `"${EXPOSE_BIND:-127.0.0.1}:<host-port>:<container-port>"`. With `EXPOSE_BIND` unset the port binds to `127.0.0.1` only. The main `docker-compose.yaml` SHALL remain the single compose entry point (no `-f` flag, no second compose project), and `docker compose up` from the repo root SHALL continue to bring up the full stack.
+Every host-port publication in `compose.yaml` and `compose.ascend-web-hunter.yaml` except the gateway's SHALL use the form `"${EXPOSE_BIND:-127.0.0.1}:<host-port>:<container-port>"`. With `EXPOSE_BIND` unset the port binds to `127.0.0.1` only. The main `compose.yaml` SHALL remain the single compose entry point (no `-f` flag, no second compose project), and `docker compose up` from the repo root SHALL continue to bring up the full stack.
 
 #### Scenario: Fresh clone binds services to loopback
 
@@ -149,7 +149,7 @@ The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfac
 
 ### Requirement: Compose declares production runtime posture
 
-`docker-compose.yaml` SHALL apply a shared `x-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) to every service; SHALL upgrade `depends_on` entries to `condition: service_healthy` wherever the dependency defines a healthcheck; SHALL define healthchecks for `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`; SHALL pin every image to a specific version (including `ngrok/ngrok`); and SHALL pass `SECURITY_ENABLED=${SECURITY_ENABLED:-false}` to ascend-ai-agent, with the production checklist in the deployment guide requiring `SECURITY_ENABLED=true`.
+`compose.yaml` SHALL apply a shared `x-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) to every service; SHALL upgrade `depends_on` entries to `condition: service_healthy` wherever the dependency defines a healthcheck; SHALL define healthchecks for `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`; SHALL pin every image to a specific version (including `ngrok/ngrok`); and SHALL pass `SECURITY_ENABLED=${SECURITY_ENABLED:-false}` to ascend-ai-agent, with the production checklist in the deployment guide requiring `SECURITY_ENABLED=true`.
 
 #### Scenario: Agent waits for healthy dependencies
 

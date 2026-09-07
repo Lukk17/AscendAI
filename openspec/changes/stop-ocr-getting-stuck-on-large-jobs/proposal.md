@@ -4,7 +4,7 @@ The OCR service wedges on a large job and then lies about it. All three parts of
 running stack, not inferred.
 
 A twenty page document was submitted and failed at 300 seconds, the value of `OCR_REQUEST_TIMEOUT` in
-[docker-compose.yaml](../../../docker-compose.yaml). The caller got an error. The worker did not stop. It kept
+[compose.yaml](../../../compose.yaml). The caller got an error. The worker did not stop. It kept
 running for a further thirty minutes at two to four cores, producing an answer no one was waiting for, and it was
 still running when the observation ended. Throughout all of that `/ready` answered 200 with `status: "ready"`,
 while the only worker the service has was permanently occupied.
@@ -239,7 +239,7 @@ Accuracy: deploying a detector bound is the one change here a caller can see in 
 on small text and leaves recognition quality alone, one line in twenty nine at the single measured point, and the
 deployed value is chosen by measuring against the owner's own documents rather than defaulted.
 
-Operational: `OCR_REQUEST_TIMEOUT` in `docker-compose.yaml` is 300 today and that value is what turned a healthy
+Operational: `OCR_REQUEST_TIMEOUT` in `compose.yaml` is 300 today and that value is what turned a healthy
 twenty page job into an error. It is re-derived from the measured per-page time in task 1.2, together with the page
 count limit it implies, and the pair is an owner decision because it trades how large a document the service
 accepts against how long a caller must hold a connection. Memory does not constrain that trade: a page retains

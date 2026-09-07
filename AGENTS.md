@@ -174,14 +174,14 @@ These services must be running before starting docker-compose. In production the
 
 Compose is split into two project files so each forms its own group in Docker Desktop when run standalone:
 
-- **`docker-compose.yaml`** (project `ascend-ai`) — main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
-- **`ascend-scrapper.docker-compose.yaml`** (project `ascend-scrapper`) — web-scraping stack. Self-contained; can be run on its own with `docker compose -f ascend-scrapper.docker-compose.yaml up`.
+- **`compose.yaml`** (project `ascend-ai`) — main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
+- **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) — web-scraping stack. Self-contained; can be run on its own with `docker compose -f compose.ascend-web-hunter.yaml up`.
 
 `SEARXNG_SECRET` is mandatory in `.env` for either invocation. Compose names the missing variable and refuses to start without it, and SearXNG will not boot without it either. It must be at least 32 characters, unique per deployment, and never the literal `ultrasecretkey`.
 
 A third, separate artifact exists for deploying the web-search stack to a machine of its own: [`apps/ascend-web-hunter/deploy-standalone/`](apps/ascend-web-hunter/deploy-standalone/README.md). It pulls published images instead of building, targets Docker Engine on Linux, and is not `include:`-d by anything. It carries a byte-identical copy of `infra/searxng/settings.yml` plus its own `.env.example`, and both must be updated in the same commit as their root counterparts. The intended differences between it and the development stack are listed in its README.
 
-### `ascend-ai` (docker-compose.yaml)
+### `ascend-ai` (compose.yaml)
 
 | Service | Port | Purpose |
 |---|---|---|
@@ -192,7 +192,7 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 | ascend-weather-mcp | 9998 | Weather MCP |
 | ascend-audio-scribe | 7017 | Audio transcription MCP |
 
-### `ascend-scrapper` (ascend-scrapper.docker-compose.yaml)
+### `ascend-scrapper` (compose.ascend-web-hunter.yaml)
 
 | Service | Port | Purpose |
 |---|---|---|
@@ -209,9 +209,6 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 # 2. Start application and support services (the main file pulls in ascend-scrapper via `include:`)
 docker compose up -d --build
 
-# Or bring up just the scrapper stack as its own Docker Desktop group:
-# docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
-
 # 3. Ensure PostgreSQL has database 'ascend_ai' (user: postgres, password: local)
 
 # 4. Run the ascend-ai-agent
@@ -226,7 +223,7 @@ cd apps/ascend-ai-agent && ./gradlew bootRun
 - **Python modules** (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
 - **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) — never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
 - All services expose a `/health` endpoint for Docker healthchecks.
-- All services are containerized with Dockerfiles and wired through `docker-compose.yaml` (with `ascend-scrapper.docker-compose.yaml` included for the web-scraping stack).
+- All services are containerized with Dockerfiles and wired through `compose.yaml` (with `compose.ascend-web-hunter.yaml` included for the web-scraping stack).
 - MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the ascend-ai-agent.
 
 ## End-to-End Test Suite

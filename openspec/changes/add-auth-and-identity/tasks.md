@@ -16,7 +16,7 @@ Every task carries its own verification, and every verification is an observable
   - verify: `jq` shows the group membership mapper on the `ascend-flutter` client emitting a full-path-free array claim, and a token for an account in the seeded group carries that group name in the claim
 - [ ] 1.5 Author the development overlay separately: the seeded test user with both roles, an email address, and membership of realm group `dev-all`, plus the direct-access-grant client the Bruno collection and e2e suite use, imported only in the development compose posture
   - verify: importing the production export alone into a clean Keycloak yields no human user and no client accepting a password grant, and importing the overlay as well yields both
-- [ ] 1.6 Add the `keycloak` service to `docker-compose.yaml`: `quay.io/keycloak/keycloak` with `start-dev --import-realm`, the export and the development overlay mounted into `/opt/keycloak/data/import/`, backed by the external PostgreSQL on a dedicated `keycloak` database, healthcheck exposed, non-conflicting host port
+- [ ] 1.6 Add the `keycloak` service to `compose.yaml`: `quay.io/keycloak/keycloak` with `start-dev --import-realm`, the export and the development overlay mounted into `/opt/keycloak/data/import/`, backed by the external PostgreSQL on a dedicated `keycloak` database, healthcheck exposed, non-conflicting host port
   - verify: on a clean environment the container reaches healthy, and `GET /realms/ascend-ai/.well-known/openid-configuration` returns 200 carrying a `jwks_uri`, with no manual console step performed
 - [ ] 1.7 Prove password sign-in end to end through Keycloak's own login page, with no brokered provider configured anywhere in the realm
   - verify: an authorization request against `ascend-flutter` reaches Keycloak's login page, submitting the seeded account's password returns an authorization code, and exchanging that code with the PKCE verifier returns an access token; no request issued by the client carries the password
@@ -139,7 +139,7 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
 
 ## 10. Secured compose posture end to end
 
-- [ ] 10.1 Wire `SERVICE_AUTH_TOKEN` and the issuer environment variables through `docker-compose.yaml` for all six services, with the agent's `depends_on` gated on the Keycloak healthcheck
+- [ ] 10.1 Wire `SERVICE_AUTH_TOKEN` and the issuer environment variables through `compose.yaml` for all six services, with the agent's `depends_on` gated on the Keycloak healthcheck
   - verify: `docker compose config` shows the variables resolved for every service and the dependency condition on Keycloak's health
 - [ ] 10.2 Integration test against a real issuer using a Testcontainers Keycloak
   - verify: the agent boots against the container's issuer, obtains a token, and the full authorization matrix from 2.2 holds over real HTTP

@@ -4,7 +4,7 @@
 
 The stack was built for a single developer's Windows workstation: every service publishes to all host interfaces, credentials are hardcoded defaults, personal paths (`C:\Users\Lukk\Desktop`, `D:/Development/AI/hf-cache`) are baked into the compose file, and everything speaks plain HTTP. The target now is a single-tenant VM per external customer, running the same compose stack, reachable only through TLS on 80/443.
 
-Hard constraint from the repo owner: `docker-compose.yaml` is the single compose entry point. It `include:`-s `ascend-scrapper.docker-compose.yaml`; every compose command runs against the main file with no `-f` flag. Whatever production mechanism is chosen must keep `docker compose up` from the repo root as the local-dev experience and must not create a second standalone compose project.
+Hard constraint from the repo owner: `compose.yaml` is the single compose entry point. It `include:`-s `compose.ascend-web-hunter.yaml`; every compose command runs against the main file with no `-f` flag. Whatever production mechanism is chosen must keep `docker compose up` from the repo root as the local-dev experience and must not create a second standalone compose project.
 
 Sibling change `add-auth-and-identity` owns application-level identity (JWT resource server, Keycloak compose service, service tokens). This change owns everything below it: network exposure, TLS, secrets transport, and container hardening. The two meet at exactly one point — the gateway must route to Keycloak once it exists.
 
@@ -31,7 +31,7 @@ Sibling change `add-auth-and-identity` owns application-level identity (JWT reso
 
 ### D1 — Production mechanism: env-driven bind addresses + compose profiles, one file
 
-**Chosen:** a hybrid inside the existing `docker-compose.yaml`:
+**Chosen:** a hybrid inside the existing `compose.yaml`:
 
 1. Every host-port publication becomes `"${EXPOSE_BIND:-127.0.0.1}:host:container"`. Default is loopback: local dev keeps `localhost:<port>` access for every service exactly as today, and on a cloud VM those ports are unreachable from outside without any operator action. An operator who genuinely needs LAN exposure of a single service can SSH-tunnel or temporarily set `EXPOSE_BIND=0.0.0.0` — documented as a dev-only escape hatch.
 2. Dev-only whole services (`ngrok-ascend-web-hunter`) get `profiles: ["captcha-intervention"]` — absent from `docker compose up` unless the profile is activated via `COMPOSE_PROFILES` in `.env`.

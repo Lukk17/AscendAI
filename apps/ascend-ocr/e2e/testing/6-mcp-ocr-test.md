@@ -55,7 +55,7 @@ Check the ascend-ocr container has `MCP_ALLOWED_HOSTS` including `host.docker.in
 docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS
 ```
 
-Expect `host.docker.internal,localhost,127.0.0.1` (or any superset containing `host.docker.internal`). If empty, set the env var in `docker-compose.yaml` under the `ascend-ocr` service and recreate the container.
+Expect `host.docker.internal,localhost,127.0.0.1` (or any superset containing `host.docker.internal`). If empty, set the env var in `compose.yaml` under the `ascend-ocr` service and recreate the container.
 
 ## Reset state
 

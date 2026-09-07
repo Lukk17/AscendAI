@@ -134,7 +134,7 @@ python src/main.py
 
 #### With Docker (recommended)
 
-The service is wired into the main `docker-compose.yaml` at the repo root as `ascend-memory`. Run every compose command
+The service is wired into the main `compose.yaml` at the repo root as `ascend-memory`. Run every compose command
 against the main file (no `-f` flag); the scrapper file is included transitively.
 
 Start (or rebuild) just this service from the repo root:

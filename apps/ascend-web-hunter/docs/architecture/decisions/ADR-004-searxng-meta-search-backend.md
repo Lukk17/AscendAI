@@ -89,4 +89,4 @@ parameter caps the number of articles parsed; all parsing stops once `limit` res
 - `src/api/rest/rest_endpoints.py:26-38` — `GET /api/v1/web/search` calls `search_client.search`.
 - `src/api/mcp/mcp_server.py:16-28` — `web_search` MCP tool calls `search_client.search`.
 - `src/config/config.py` — `SEARXNG_BASE_URL`, `SEARCH_TIMEOUT`, `SEARXNG_USER_AGENT`.
-- `ascend-scrapper.docker-compose.yaml` — SearXNG service definition at port 9020.
+- `compose.ascend-web-hunter.yaml` — SearXNG service definition at port 9020.

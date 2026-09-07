@@ -1,6 +1,6 @@
 # Observability
 
-AscendAI ships a full three-pillar observability stack (metrics, logs, traces) as always-on containers in `docker-compose.yaml`. This document explains what is collected, how to reach the dashboards, how to add your own instrumentation, and what to expect in terms of resource usage.
+AscendAI ships a full three-pillar observability stack (metrics, logs, traces) as always-on containers in `compose.yaml`. This document explains what is collected, how to reach the dashboards, how to add your own instrumentation, and what to expect in terms of resource usage.
 
 ---
 
@@ -75,7 +75,7 @@ To filter by level: `{service="ascend-ai-agent"} |= "WARN"`.
 
 The OTel Collector receives OTLP on port 4317 (gRPC) and 4318 (HTTP) from all six application services. It batches and forwards to Tempo.
 
-- ascend-ai-agent and ascend-weather-mcp: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via docker-compose.yaml). No additional code is required.
+- ascend-ai-agent and ascend-weather-mcp: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via compose.yaml). No additional code is required.
 - Python services: OTel auto-instrumentation is activated when `OTEL_EXPORTER_OTLP_ENDPOINT` is set and the `opentelemetry-distro` package is installed and activated in `src/main.py`. FastAPI, httpx, and requests are auto-instrumented.
 
 To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-ai-agent`.

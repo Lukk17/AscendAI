@@ -74,7 +74,7 @@
 
 - [ ] 9.1 Create a multi-stage `AscendChat/Dockerfile`: first stage uses the pinned Flutter SDK image to run `flutter build web --release`, second stage uses a pinned `nginx:alpine` image to serve the build output
 - [ ] 9.2 Create `AscendChat/nginx.conf` with a single-page-app fallback (try_files to `index.html`) and API reverse proxy from `/api/` to the ascend-ai-agent container
-- [ ] 9.3 Add the `ascend-chat` service to `docker-compose.yaml` with port mapping (default 3000), dependency on ascend-ai-agent, and a health check
+- [ ] 9.3 Add the `ascend-chat` service to `compose.yaml` with port mapping (default 3000), dependency on ascend-ai-agent, and a health check
 - [ ] 9.4 Verify the containerized build runs end-to-end: `docker compose build ascend-chat` succeeds and the web app loads at `http://localhost:3000`
 
 ## 10. Testing and Verification
@@ -86,4 +86,4 @@
 - [ ] 10.5 Write unit tests for `AscendApiClient` with mocked HTTP responses
 - [ ] 10.6 Run `flutter test` and verify all tests pass
 - [ ] 10.7 Run `flutter analyze` and verify zero issues
-- [ ] 10.8 Update the root `README.md` monorepo structure table and `docker-compose.yaml` services table with the new `AscendChat` module
+- [ ] 10.8 Update the root `README.md` monorepo structure table and `compose.yaml` services table with the new `AscendChat` module

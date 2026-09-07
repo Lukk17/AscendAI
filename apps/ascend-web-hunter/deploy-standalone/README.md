@@ -49,6 +49,8 @@ This bundle ships its own Redis as a fifth container, on by default, so the bund
 
 Copy this whole directory to the host. It needs all four files, including `searxng/settings.yml`, which SearXNG will not start without.
 
+Updating an existing deployment that still has the old `docker-compose.yaml` from before this bundle was renamed to `compose.yaml`? Delete that old file after copying the new one. Compose prefers `compose.yaml` and silently ignores `docker-compose.yaml` when both are present, so a leftover copy is not read, and edits made to it do nothing.
+
 Create the secrets file from the example.
 
 ```bash
@@ -103,7 +105,7 @@ The interactive API documentation at [http://localhost:7021/docs](http://localho
 
 ### Configuration
 
-Three secrets live in `.env` and nothing else should, plus one optional connection override. Everything else is set directly in `docker-compose.yaml`, because it is configuration rather than credentials and belongs in version control where changes are visible.
+Three secrets live in `.env` and nothing else should, plus one optional connection override. Everything else is set directly in `compose.yaml`, because it is configuration rather than credentials and belongs in version control where changes are visible.
 
 | Variable | Required | What it does |
 |---|---|---|
@@ -142,7 +144,7 @@ Telemetry. In the full platform this service exports traces over OTLP to an Open
 
 This is not a degraded mode. The service reads `OTEL_EXPORTER_OTLP_ENDPOINT` once at startup and, finding it unset, never initialises OpenTelemetry at all. Nothing retries, nothing logs errors, nothing waits. The application is fully functional without it.
 
-To get traces back you would need a collector accepting OTLP over gRPC on port 4317, plus somewhere to store and view what it collects. The working configuration for all of that is in the repository root: the `otel-collector`, `tempo` and `grafana` services in `docker-compose.yaml`, with their config files under `infra/observability/`. Add them here, then set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` on the ascend-web-hunter service.
+To get traces back you would need a collector accepting OTLP over gRPC on port 4317, plus somewhere to store and view what it collects. The working configuration for all of that is in the repository root: the `otel-collector`, `tempo` and `grafana` services in `compose.yaml`, with their config files under `infra/observability/`. Add them here, then set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` on the ascend-web-hunter service.
 
 Metrics are a separate matter. The service exposes Prometheus metrics on its own HTTP port regardless of whether OpenTelemetry is configured, so any Prometheus that can reach port 7021 can scrape them without adding anything to this stack.
 
@@ -222,7 +224,7 @@ The container runs with `SYS_ADMIN` capability, which Chromium's sandbox needs. 
 
 ### Differences from the development stack
 
-The equivalent file in the repository root is `ascend-scrapper.docker-compose.yaml`. Everything below is a deliberate difference, not drift. Anything not on this list should be identical in both files.
+The equivalent file in the repository root is `compose.ascend-web-hunter.yaml`. Everything below is a deliberate difference, not drift. Anything not on this list should be identical in both files.
 
 | Topic | Development stack | This file |
 |---|---|---|

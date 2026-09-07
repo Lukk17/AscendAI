@@ -14,7 +14,7 @@ AscendAI has no user-facing frontend. Every interaction with the platform goes t
 - Support image and document attachment uploads via multipart form data.
 - Display RAG source document references returned by the assistant.
 - Apply a dark-mode-first custom theme consistent with the AscendAI brand.
-- Wire the module into `docker-compose.yaml` for optional containerized deployment behind nginx.
+- Wire the module into `compose.yaml` for optional containerized deployment behind nginx.
 - Add a module-level `AGENTS.md` to the new module for agent instructions.
 
 ## Capabilities
@@ -35,5 +35,5 @@ AscendAI has no user-facing frontend. Every interaction with the platform goes t
 - New top-level module `AscendChat/` with its own `pubspec.yaml`, `AGENTS.md`, `Dockerfile`, and source tree.
 - Depends on the ascend-ai-agent HTTP API (port 9917), specifically the existing `POST /api/v1/ai/prompt` and the specced streaming and conversation endpoints from the `add-chat-streaming-and-conversations` change.
 - Requires Flutter SDK 3.x and Dart 3.x on the build machine.
-- Adds a new service entry to `docker-compose.yaml` for the containerized web build.
+- Adds a new service entry to `compose.yaml` for the containerized web build.
 - No changes to any existing backend module code.

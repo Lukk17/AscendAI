@@ -2,8 +2,8 @@
 
 ## 1. Port bindings and compose mechanics
 
-- [ ] 1.1 Rewrite every `ports:` entry in `docker-compose.yaml` (docling-serve, unstructured-api, ascend-ocr, ascend-ai-agent, ascend-memory, ascend-weather-mcp, ascend-audio-scribe, prometheus, grafana) to the `"${EXPOSE_BIND:-127.0.0.1}:<host>:<container>"` form
-- [ ] 1.2 Rewrite every `ports:` entry in `ascend-scrapper.docker-compose.yaml` (searxng, flaresolverr, ascend-web-hunter) to the same form
+- [ ] 1.1 Rewrite every `ports:` entry in `compose.yaml` (docling-serve, unstructured-api, ascend-ocr, ascend-ai-agent, ascend-memory, ascend-weather-mcp, ascend-audio-scribe, prometheus, grafana) to the `"${EXPOSE_BIND:-127.0.0.1}:<host>:<container>"` form
+- [ ] 1.2 Rewrite every `ports:` entry in `compose.ascend-web-hunter.yaml` (searxng, flaresolverr, ascend-web-hunter) to the same form
 - [ ] 1.3 Add a top-level `x-logging: &default-logging` anchor (json-file, `max-size: 10m`, `max-file: 3`) and apply `logging: *default-logging` to every service in both files
 - [ ] 1.4 Pin `ngrok/ngrok:3` to an exact version tag and confirm every other `image:` line in both files is already exact-pinned
 - [ ] 1.5 Verify: `docker compose config` renders cleanly; `docker compose up -d` from the repo root brings up the full stack as one project with no `-f` flag; `docker inspect` shows every published port bound to `127.0.0.1`; a request to `http://<host-LAN-IP>:7020/health` from another machine fails while `http://localhost:7020/health` succeeds
@@ -11,7 +11,7 @@
 ## 2. Edge gateway
 
 - [ ] 2.1 Create `gateway/Caddyfile`: site block on `{$ASCEND_DOMAIN:localhost}`, reverse_proxy to `ascend-ai-agent:9917`, forwarded headers on, commented reserved routes for Keycloak (`/auth/*` path form and `auth.` subdomain form, per design D2)
-- [ ] 2.2 Add the `gateway` service to `docker-compose.yaml`: pinned `caddy:2.x` image, ports `"80:80"` and `"443:443"` (all interfaces — the one exception to task 1.1), Caddyfile + cert-storage volume mounts, `ASCEND_DOMAIN` env, healthcheck, restart policy, logging anchor
+- [ ] 2.2 Add the `gateway` service to `compose.yaml`: pinned `caddy:2.x` image, ports `"80:80"` and `"443:443"` (all interfaces — the one exception to task 1.1), Caddyfile + cert-storage volume mounts, `ASCEND_DOMAIN` env, healthcheck, restart policy, logging anchor
 - [ ] 2.3 Add a commented, operator-gated Caddy route for Grafana (disabled by default per design D8)
 - [ ] 2.4 Verify locally: `docker compose up -d gateway` with `ASCEND_DOMAIN` unset serves `https://localhost` from Caddy's internal CA; `curl -k https://localhost/actuator/health` proxies through to ascend-ai-agent and returns 200
 - [ ] 2.5 Coordinate with `add-auth-and-identity`: note in that change's tasks that uncommenting the Keycloak route in `gateway/Caddyfile` is part of its Keycloak wiring
@@ -37,7 +37,7 @@
 ## 5. Container hardening — ascend-web-hunter
 
 - [ ] 5.1 Add `security/chromium-seccomp.json` (Chromium seccomp profile permitting user-namespace clone/unshare/setns per design D5) to the repo
-- [ ] 5.2 In `ascend-scrapper.docker-compose.yaml`, remove `cap_add: SYS_ADMIN` from `ascend-web-hunter`; add `security_opt: ["seccomp=./security/chromium-seccomp.json"]` and `init: true`
+- [ ] 5.2 In `compose.ascend-web-hunter.yaml`, remove `cap_add: SYS_ADMIN` from `ascend-web-hunter`; add `security_opt: ["seccomp=./security/chromium-seccomp.json"]` and `init: true`
 - [ ] 5.3 Verify: `docker inspect ascend-web-hunter` shows no added capabilities and the seccomp profile applied; the Playwright extraction tier renders a JavaScript-heavy page end-to-end inside the rebuilt container
 
 ## 6. SSRF and SearXNG posture

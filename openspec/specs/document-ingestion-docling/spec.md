@@ -7,7 +7,7 @@ ascend-ai-agent converts uploaded documents through `docling-serve`, and this ca
 ## Requirements
 ### Requirement: Docling client targets the correct upload endpoint
 
-The Docling client SHALL POST multipart files to the `/v1/convert/file` endpoint of `docling-serve`. The default configuration SHALL work out of the box against the `docling-serve` instance defined in the monorepo `docker-compose.yaml` (port 5001).
+The Docling client SHALL POST multipart files to the `/v1/convert/file` endpoint of `docling-serve`. The default configuration SHALL work out of the box against the `docling-serve` instance defined in the monorepo `compose.yaml` (port 5001).
 
 #### Scenario: Default configuration round-trips
 

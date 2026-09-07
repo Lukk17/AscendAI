@@ -288,7 +288,7 @@ variable. It has to be at least 32 characters, unique to this deployment, and no
 
 **2. Bring up the stack.**
 
-The main compose file pulls in [ascend-scrapper.docker-compose.yaml](ascend-scrapper.docker-compose.yaml) via `include:`,
+The main compose file pulls in [compose.ascend-web-hunter.yaml](compose.ascend-web-hunter.yaml) via `include:`,
 so a single `up` brings up the full stack (ascend-ai-agent + tool services + scrapper).
 
 Bash:
@@ -308,13 +308,13 @@ Optional, bring up only the web-scraping stack as its own Docker Desktop group.
 Bash:
 
 ```bash
-docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
+docker compose -f compose.ascend-web-hunter.yaml up -d --build
 ```
 
 PowerShell:
 
 ```powershell
-docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
+docker compose -f compose.ascend-web-hunter.yaml up -d --build
 ```
 
 **3. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).

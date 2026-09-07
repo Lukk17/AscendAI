@@ -24,7 +24,7 @@ land in Redis so the next request to the same domain reuses them.
 
 ### Quick start
 
-The scrapper compose file is `include:`-d by the main `docker-compose.yaml` at the repo root, so every command runs
+The scrapper compose file is `include:`-d by the main `compose.yaml` at the repo root, so every command runs
 against the main file (no `-f` flag).
 
 Set `SEARXNG_SECRET` in the repo-root `.env` first. Compose refuses to start without it, and SearXNG refuses to boot

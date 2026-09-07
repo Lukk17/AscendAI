@@ -2,7 +2,7 @@
 
 ## Context
 
-`harden-cloud-deployment` makes the main `docker-compose.yaml` the single entry point, puts a gateway on 80/443, moves every secret into `.env`, and fails fast on an unset secret in the production posture — but the actual VM, DNS, TLS, secret generation, realm import, and verification are a manual runbook. `add-auth-and-identity` ships a checked-in realm export; `add-tenant-administration` provides the API to create the first tenant and admin. The pieces exist; nothing strings them into a repeatable install.
+`harden-cloud-deployment` makes the main `compose.yaml` the single entry point, puts a gateway on 80/443, moves every secret into `.env`, and fails fast on an unset secret in the production posture — but the actual VM, DNS, TLS, secret generation, realm import, and verification are a manual runbook. `add-auth-and-identity` ships a checked-in realm export; `add-tenant-administration` provides the API to create the first tenant and admin. The pieces exist; nothing strings them into a repeatable install.
 
 ## Goals / Non-Goals
 
@@ -40,7 +40,7 @@ A scripted check verifies: the gateway serves TLS, ascend-ai-agent is healthy be
 
 ### D5 — Drive the single main compose file
 
-The installer runs the existing `docker compose up` against the main `docker-compose.yaml` with no `-f` flags, so an installed stack is identical to a hand-brought-up one. This preserves the owner's hard constraint that the main compose file is the only entry point.
+The installer runs the existing `docker compose up` against the main `compose.yaml` with no `-f` flags, so an installed stack is identical to a hand-brought-up one. This preserves the owner's hard constraint that the main compose file is the only entry point.
 
 ## Risks / Trade-offs
 

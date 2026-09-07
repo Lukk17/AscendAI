@@ -23,7 +23,7 @@ useful.
       measured values in the same table. This resolves the first half of Open Question 1.
 - [ ] 1.3 Decide the deployed absolute ceiling with the owner, from the p95 in 1.2 and the largest document the
       service must accept. Verify the chosen pair is recorded in design.md's number table, that the derived page
-      limit is stated alongside it, and that `OCR_REQUEST_TIMEOUT` in `docker-compose.yaml` matches. State to the
+      limit is stated alongside it, and that `OCR_REQUEST_TIMEOUT` in `compose.yaml` matches. State to the
       owner that memory does not constrain this trade: a page retains 11.5 MiB, so the page limit is a deadline
       artifact and the only thing a larger ceiling costs is how long a caller holds a connection. This resolves the
       second half of Open Question 1.
@@ -324,7 +324,7 @@ useful.
       (new "Memory model and the single worker" section, extended env var table), `11-risks-and-technical-debt.md`
       (the decompression-bomb, unmeasured-memory-cost and whole-document-timeout risks marked Closed, with what
       closed them; the single-worker risk rewritten around `OCR_WORKER_COUNT` as a memory constraint).
-- [ ] 8.7 Update `docker-compose.yaml` with the deployed values from tasks 1.3, 1.4 and 1.5, deploying the detector
+- [ ] 8.7 Update `compose.yaml` with the deployed values from tasks 1.3, 1.4 and 1.5, deploying the detector
       bound and the pixel ceiling together because neither is safe alone, and any other new setting whose default
       the deployment overrides.
       Not done this session: out of scope by explicit instruction ("do not touch any compose file, memory limits are

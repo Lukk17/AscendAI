@@ -1,6 +1,6 @@
 # Observability
 
-This directory holds the full local observability stack for AscendAI: metrics, logs, and traces. Every service here is defined in the main [docker-compose.yaml](../../docker-compose.yaml) under the "Observability stack" block and comes up with the rest of the platform on a single `docker compose up`.
+This directory holds the full local observability stack for AscendAI: metrics, logs, and traces. Every service here is defined in the main [compose.yaml](../../compose.yaml) under the "Observability stack" block and comes up with the rest of the platform on a single `docker compose up`.
 
 The three signal types are kept separate end to end:
 

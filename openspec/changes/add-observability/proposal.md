@@ -45,14 +45,14 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 
 **Documentation**: a new `docs/OBSERVABILITY.md` walks through what is collected (metrics + logs + traces), how to find it in Grafana, and how to add a custom metric, log field, or span. Cross-link from the root README "Documentation" section.
 
-**Defaults**: observability stack runs **always-on** in `docker-compose.yaml`. The earlier draft included a `--profile no-observability` opt-out; user dropped it as out of scope. The actuator endpoints on the JVM services are bound to localhost-only by default; remote exposure requires an explicit env var.
+**Defaults**: observability stack runs **always-on** in `compose.yaml`. The earlier draft included a `--profile no-observability` opt-out; user dropped it as out of scope. The actuator endpoints on the JVM services are bound to localhost-only by default; remote exposure requires an explicit env var.
 
 ## Capabilities
 
 ### New Capabilities
 
 - `service-metrics` — every AscendAI service emits a uniform Prometheus-format metrics endpoint with framework-default metrics plus a defined minimum set of domain counters/timers, plus auto-instrumented OpenTelemetry spans.
-- `observability-stack` — Prometheus + Grafana + Vector + Loki + OTel collector + Tempo run in `docker-compose.yaml` with checked-in scrape config, Vector sources/sinks, OTel collector pipeline, and six provisioned Grafana dashboards (Platform Overview, AI Pipeline, Infrastructure, Token Cost, RAG Quality, Cache Hit Rate).
+- `observability-stack` — Prometheus + Grafana + Vector + Loki + OTel collector + Tempo run in `compose.yaml` with checked-in scrape config, Vector sources/sinks, OTel collector pipeline, and six provisioned Grafana dashboards (Platform Overview, AI Pipeline, Infrastructure, Token Cost, RAG Quality, Cache Hit Rate).
 
 ### Modified Capabilities
 
@@ -74,7 +74,7 @@ This change wires a full observability layer into the AscendAI stack: **metrics,
 - **New code (ascend-weather-mcp)**: same dependency lines + actuator config.
 - **New code (Python services)**: `prometheus-fastapi-instrumentator` + `opentelemetry-distro` + `opentelemetry-exporter-otlp` in `pyproject.toml`; one-line wiring in `src/main.py` per service for both `/metrics` and OTel auto-instrumentation; ~3 custom counters per service.
 - **New files**:
-  - `docker-compose.yaml` — `prometheus`, `grafana`, `vector`, `loki`, `otel-collector`, `tempo`, `postgres-exporter`, `redis-exporter` services.
+  - `compose.yaml` — `prometheus`, `grafana`, `vector`, `loki`, `otel-collector`, `tempo`, `postgres-exporter`, `redis-exporter` services.
   - `infra/observability/prometheus/prometheus.yaml`
   - `infra/observability/vector/vector.toml` (with commented placeholder sinks for Datadog / CloudWatch / Splunk)
   - `infra/observability/loki/loki-config.yaml`

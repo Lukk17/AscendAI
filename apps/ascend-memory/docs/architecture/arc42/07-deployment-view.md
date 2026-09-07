@@ -46,7 +46,7 @@ listens on `0.0.0.0:7020` via `uvicorn src.main:app`.
 
 ### Docker Compose (monorepo)
 
-AscendMemory is declared in the monorepo root `docker-compose.yaml` under service `ascend-memory`. It connects to the
+AscendMemory is declared in the monorepo root `compose.yaml` under service `ascend-memory`. It connects to the
 shared Qdrant container on the compose network. The relevant env vars to set in the compose file or a `.env`:
 
 | Variable | Compose-typical value |

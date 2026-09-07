@@ -1,7 +1,7 @@
 name: ascend-ai
 
 include:
-  - ascend-scrapper.docker-compose.yaml
+  - compose.ascend-web-hunter.yaml
 
 services:
 

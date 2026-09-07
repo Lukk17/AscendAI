@@ -54,7 +54,7 @@ Every public method on `SemanticMemoryClient` SHALL validate that `userId` is no
 
 ### Requirement: Default base URL matches docker-compose
 
-`SemanticMemoryProperties` SHALL default `baseUrl` to `http://localhost:7020` so that an out-of-the-box ascend-ai-agent run against the monorepo `docker-compose.yaml` connects to AscendMemory without overrides.
+`SemanticMemoryProperties` SHALL default `baseUrl` to `http://localhost:7020` so that an out-of-the-box ascend-ai-agent run against the monorepo `compose.yaml` connects to AscendMemory without overrides.
 
 #### Scenario: Boot with no overrides
 

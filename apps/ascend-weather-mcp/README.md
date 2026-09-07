@@ -59,7 +59,7 @@ PowerShell:
 .\gradlew.bat bootRun
 ```
 
-Or via Docker. The service is wired into the main [docker-compose.yaml](../../docker-compose.yaml) at the monorepo root as
+Or via Docker. The service is wired into the main [compose.yaml](../../compose.yaml) at the monorepo root as
 `ascend-weather-mcp`. Run every compose command against the main file (no `-f` flag).
 
 Start (or rebuild) just this service from the repo root:

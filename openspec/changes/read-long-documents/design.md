@@ -8,7 +8,7 @@ from the code and the configuration as they stand after that change, not assumed
 - The page limit is derived, not configured. `Settings.OCR_MAX_PAGES` is
   `floor(OCR_REQUEST_TIMEOUT / OCR_PAGE_TIMEOUT_SECONDS)` in
   [config.py](../../../apps/ascend-ocr/src/config/config.py). Deployed values are `OCR_REQUEST_TIMEOUT=300` in
-  `docker-compose.yaml` and `OCR_PAGE_TIMEOUT_SECONDS=120` by default, so the limit is two, and
+  `compose.yaml` and `OCR_PAGE_TIMEOUT_SECONDS=120` by default, so the limit is two, and
   `enforce_page_limit` in [limits.py](../../../apps/ascend-ocr/src/api/limits.py) refuses anything above it with
   `FILE_TOO_LARGE`.
 - One worker, and it is a memory constraint. `OCR_WORKER_COUNT` governs both the `ProcessPoolExecutor` size and the
@@ -23,7 +23,7 @@ from the code and the configuration as they stand after that change, not assumed
   [mcp_server.py](../../../apps/ascend-ocr/src/api/mcp/mcp_server.py), and both compute
   `min(pages x OCR_PAGE_TIMEOUT_SECONDS, OCR_REQUEST_TIMEOUT)` identically.
 - The service holds no persisted state today. `apps/ascend-ocr/e2e/README.md` says so in as many words, there is no
-  database, no cache and no volume in `docker-compose.yaml`, and the only cross-process state is the Prometheus
+  database, no cache and no volume in `compose.yaml`, and the only cross-process state is the Prometheus
   multiprocess directory that `is_engine_warm` reads.
 - The service has no authentication of its own. `SecurityHeadersMiddleware`, `CorrelationIdMiddleware` and the
   slowapi rate limiter are the whole of the request-level protection, and `RATE_LIMIT_DEFAULT` is 60 per minute with
@@ -500,7 +500,7 @@ Ordered, because one of the settings is not a default:
 
 1. Deploy the image. Every new setting has a default that is safe on its own, and the job path is available
    immediately.
-2. Set `OCR_REQUEST_TIMEOUT=240` in `docker-compose.yaml`, replacing 300. Nothing a caller can observe changes, for
+2. Set `OCR_REQUEST_TIMEOUT=240` in `compose.yaml`, replacing 300. Nothing a caller can observe changes, for
    the reason in the numbers table. Leaving it at 300 is also harmless, and only leaves the ceiling unreachable
    again.
 3. Optionally mount a volume at `OCR_JOBS_DIR` if finished results must survive a container recreate. Without it,

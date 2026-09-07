@@ -12,7 +12,7 @@ for A4 under the 1536 bound this module now deploys. Twenty five pages of A4 cos
 
 It falls out of two deadlines. `OCR_MAX_PAGES` is a derived property, `floor(OCR_REQUEST_TIMEOUT /
 OCR_PAGE_TIMEOUT_SECONDS)` in [config.py](../../../apps/ascend-ocr/src/config/config.py). The deployed values are 300 s
-(`docker-compose.yaml`) and 120 s, so the answer is two, and `enforce_page_limit` in
+(`compose.yaml`) and 120 s, so the answer is two, and `enforce_page_limit` in
 [limits.py](../../../apps/ascend-ocr/src/api/limits.py) refuses anything above it. The refusal is correct given those
 numbers: a document that provably cannot finish inside the service's own ceiling should not be started.
 
@@ -140,7 +140,7 @@ Code, all under `apps/ascend-ocr/`:
 Tests, all under `apps/ascend-ocr/tests/`. The gate is `--cov-fail-under=100` with `--cov-branch`, so every branch added
 needs a test. Detail in [tasks.md](tasks.md).
 
-Configuration: `docker-compose.yaml` sets `OCR_REQUEST_TIMEOUT=240` in place of 300 and adds the job settings that
+Configuration: `compose.yaml` sets `OCR_REQUEST_TIMEOUT=240` in place of 300 and adds the job settings that
 differ from their defaults. A jobs directory that must outlive a container recreate needs a volume, which the
 deployment page documents rather than the compose file assuming.
 

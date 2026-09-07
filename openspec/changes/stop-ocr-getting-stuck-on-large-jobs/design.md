@@ -43,7 +43,7 @@ against the repository or the module's own `.venv`, never assumed.
   `DOWNLOAD_FAILED` 502, `INTERNAL_ERROR` 500 (`src/api/exception_handlers.py`, ADR-002).
 - The liveness and readiness split is already decided in ADR-004: `/health` is liveness and carries the Docker
   healthcheck, `/ready` answers 200 in both states with the condition in the body.
-- Container limits are 12 GiB and 4.0 CPUs (`docker-compose.yaml`), and `apply_cpu_thread_limit()` already caps the
+- Container limits are 12 GiB and 4.0 CPUs (`compose.yaml`), and `apply_cpu_thread_limit()` already caps the
   intra-op thread pool to the CPU limit, so one inference already saturates the cores.
 - The test gate is `--cov-fail-under=100` with `--cov-branch`.
 
@@ -142,7 +142,7 @@ a budget and an accuracy trade, both of which belong to the owner rather than to
 |---|---|---|---|
 | Worker count | 1 | Today's `_WORKER_POOL_SIZE`, unchanged. It is a memory constraint: peak is one job's cost multiplied by this value, and one job's cost is already most of the container limit. See Decision 5. | No |
 | Per-page allowance | 120 s | The one live observation: a twenty page document had consumed more than 2100 s of worker time without finishing, so the average page on that document cost at least 105 s. 120 s is the first round value above the observed floor. | Yes, task 1.2 |
-| Absolute request ceiling | 300 s, unchanged for now | Today's deployed `OCR_REQUEST_TIMEOUT` in `docker-compose.yaml`. Kept until measured, because changing it is a product decision about how long a caller holds a connection. | Yes, task 1.3 |
+| Absolute request ceiling | 300 s, unchanged for now | Today's deployed `OCR_REQUEST_TIMEOUT` in `compose.yaml`. Kept until measured, because changing it is a product decision about how long a caller holds a connection. | Yes, task 1.3 |
 | Dispatch margin | 5 s | The worker must give up before the parent does. Covers pickling the arguments, the spawn-context handoff, and the result trip back. | Yes, task 1.2 |
 | Detector long-side bound | 1536 (`text_det_limit_type="max"`) | Decision 11 and task 1.5, resolved. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near lossless: 1280 lost dotted separators on a form, 960 lost genuine footnotes from a legal opinion. Recorded with the full candidate table in [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). | No — owner decided |
 | Maximum pages | derived, not configured | `floor(ceiling / per-page allowance)`. At the provisional values that is 2. It is a deadline artifact and not a memory constraint, which the restatement below shows. | Follows its two inputs |

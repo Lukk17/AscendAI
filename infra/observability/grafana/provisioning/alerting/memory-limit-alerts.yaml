@@ -47,4 +47,4 @@ groups:
           severity: warning
         annotations:
           summary: Container {{ $labels.name }} is above 85% of its configured memory limit
-          description: Container {{ $labels.name }} has stayed above 85% of its deploy.resources.limits.memory ceiling for 5 minutes. It is at risk of being OOM-killed by the container runtime. Compare against the limit set in docker-compose.yaml and check docker stats for the container.
+          description: Container {{ $labels.name }} has stayed above 85% of its deploy.resources.limits.memory ceiling for 5 minutes. It is at risk of being OOM-killed by the container runtime. Compare against the limit set in compose.yaml and check docker stats for the container.

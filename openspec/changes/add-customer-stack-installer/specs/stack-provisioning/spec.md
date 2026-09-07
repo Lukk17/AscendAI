@@ -46,9 +46,9 @@ The installer SHALL run a smoke test verifying gateway TLS, ascend-ai-agent heal
 
 ### Requirement: Installer drives the single main compose file
 
-The installer SHALL bring the stack up by running `docker compose` against the main `docker-compose.yaml` with no `-f` flags, so an installed stack is identical to a hand-brought-up one.
+The installer SHALL bring the stack up by running `docker compose` against the main `compose.yaml` with no `-f` flags, so an installed stack is identical to a hand-brought-up one.
 
 #### Scenario: No secondary compose project
 
 - **WHEN** the installer brings the stack up
-- **THEN** it uses the main `docker-compose.yaml` as the only compose entry point and no `-f` override
+- **THEN** it uses the main `compose.yaml` as the only compose entry point and no `-f` override

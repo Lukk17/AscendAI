@@ -175,7 +175,7 @@ The error body shape across both surfaces is `{"code": "...", "detail": "..."}`.
 The full env-var matrix (twenty-three settings across service, OCR engine, request budgets and memory bounds, MCP
 transport, rate limits, OpenTelemetry) is
 documented in [docs/CONFIGURATION.md](docs/CONFIGURATION.md). The defaults are safe for a single-instance local run;
-the docker-compose service at [docker-compose.yaml](../../docker-compose.yaml) carries the production overrides.
+the docker-compose service at [compose.yaml](../../compose.yaml) carries the production overrides.
 
 ---
 
@@ -218,7 +218,7 @@ mutmut run
 
 ### Docker
 
-The repo-root [docker-compose.yaml](../../docker-compose.yaml) defines the `ascend-ocr` service with the env
+The repo-root [compose.yaml](../../compose.yaml) defines the `ascend-ocr` service with the env
 vars, the healthcheck, and resource limits. From the repo root:
 
 Build the image. First build is 5 to 15 minutes because the PaddlePaddle wheels are heavy and the model cache is

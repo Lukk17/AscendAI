@@ -30,7 +30,7 @@ ascend-ai-agent ships as a reproducible container image and runs as a service in
 
 ### Requirement: Container exposes a healthcheck
 
-The Dockerfile SHALL declare a `HEALTHCHECK` that probes `http://localhost:9917/actuator/health` so that Docker can mark the container `healthy` once the application is ready to serve requests. The matching `docker-compose.yaml` `ascend-ai-agent` service SHALL declare an equivalent healthcheck with the same URL and a 30-second interval. Spring Boot Actuator is already on the ascend-ai-agent classpath and exposure is already scoped to `management.endpoints.web.exposure.include: health` in `application.yaml`; no other actuator endpoints SHALL be exposed by this change.
+The Dockerfile SHALL declare a `HEALTHCHECK` that probes `http://localhost:9917/actuator/health` so that Docker can mark the container `healthy` once the application is ready to serve requests. The matching `compose.yaml` `ascend-ai-agent` service SHALL declare an equivalent healthcheck with the same URL and a 30-second interval. Spring Boot Actuator is already on the ascend-ai-agent classpath and exposure is already scoped to `management.endpoints.web.exposure.include: health` in `application.yaml`; no other actuator endpoints SHALL be exposed by this change.
 
 #### Scenario: Container reaches healthy state
 
@@ -51,7 +51,7 @@ The Dockerfile SHALL declare a `HEALTHCHECK` that probes `http://localhost:9917/
 
 ### Requirement: ascend-ai-agent runs as a Compose service by default
 
-`docker-compose.yaml` SHALL define an `ascend-ai-agent` service that builds from `./apps/ascend-ai-agent/Dockerfile`, maps host port `9917` to container port `9917`, sets `extra_hosts: ["host.docker.internal:host-gateway"]`, declares `depends_on: [ascend-memory, docling-serve, unstructured-api]`, and has NO `profiles:` gating so that `docker compose up` starts it together with every other service. A developer SHALL also be able to fall back to the host-mode workflow (`docker compose stop ascend-ai-agent` followed by `./gradlew bootRun` on the host) without a port conflict and without modifying the compose file.
+`compose.yaml` SHALL define an `ascend-ai-agent` service that builds from `./apps/ascend-ai-agent/Dockerfile`, maps host port `9917` to container port `9917`, sets `extra_hosts: ["host.docker.internal:host-gateway"]`, declares `depends_on: [ascend-memory, docling-serve, unstructured-api]`, and has NO `profiles:` gating so that `docker compose up` starts it together with every other service. A developer SHALL also be able to fall back to the host-mode workflow (`docker compose stop ascend-ai-agent` followed by `./gradlew bootRun` on the host) without a port conflict and without modifying the compose file.
 
 #### Scenario: Default compose up starts ascend-ai-agent
 
@@ -95,7 +95,7 @@ The compose `environment:` block SHALL NOT duplicate these URLs as `${KEY}` over
 
 #### Scenario: No compose file defines the object store
 
-- **WHEN** a reviewer greps `docker-compose.yaml` and `ascend-scrapper.docker-compose.yaml` for a service definition of the object store
+- **WHEN** a reviewer greps `compose.yaml` and `compose.ascend-web-hunter.yaml` for a service definition of the object store
 - **THEN** neither file defines a `minio` service nor a `floci` service
 - **AND** `AGENTS.md` lists the object store under external prerequisites on ports `9070` / `9071`
 
@@ -106,7 +106,7 @@ The compose `environment:` block SHALL NOT duplicate these URLs as `${KEY}` over
 
 ### Requirement: Provider API keys flow as runtime env from `.env`, never baked into the image
 
-Provider API keys are runtime-only. The `ascend-ai-agent` compose entry SHALL pass `OPENAI_API_KEY`, `ASCEND_ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and `MINIMAX_API_KEY` through `environment:` in the form `KEY=${KEY}`, sourced from a developer-local `.env` file at the repository root. No API key SHALL appear as an `ARG` or `ENV` in the Dockerfile, and no API key SHALL appear as a hardcoded value in `docker-compose.yaml`.
+Provider API keys are runtime-only. The `ascend-ai-agent` compose entry SHALL pass `OPENAI_API_KEY`, `ASCEND_ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and `MINIMAX_API_KEY` through `environment:` in the form `KEY=${KEY}`, sourced from a developer-local `.env` file at the repository root. No API key SHALL appear as an `ARG` or `ENV` in the Dockerfile, and no API key SHALL appear as a hardcoded value in `compose.yaml`.
 
 #### Scenario: Compose reads provider keys from `.env`
 
@@ -121,12 +121,12 @@ Provider API keys are runtime-only. The `ascend-ai-agent` compose entry SHALL pa
 
 ### Requirement: A `.env.example` documents the secrets compose consumes
 
-The repository SHALL ship a committed `.env.example` file at the monorepo root, next to `docker-compose.yaml`. The file SHALL list every `${KEY}` variable referenced by `docker-compose.yaml` and `ascend-scrapper.docker-compose.yaml` with empty values (all are secrets), and SHALL include a one-line comment above each variable explaining its purpose and which service consumes it. The actual `.env` file SHALL be excluded by `.gitignore` so it is never committed.
+The repository SHALL ship a committed `.env.example` file at the monorepo root, next to `compose.yaml`. The file SHALL list every `${KEY}` variable referenced by `compose.yaml` and `compose.ascend-web-hunter.yaml` with empty values (all are secrets), and SHALL include a one-line comment above each variable explaining its purpose and which service consumes it. The actual `.env` file SHALL be excluded by `.gitignore` so it is never committed.
 
 #### Scenario: `.env.example` is committed and complete
 
 - **WHEN** a reviewer opens `.env.example`
-- **THEN** every `${KEY}` reference present in `docker-compose.yaml` or `ascend-scrapper.docker-compose.yaml` appears in `.env.example` on its own line
+- **THEN** every `${KEY}` reference present in `compose.yaml` or `compose.ascend-web-hunter.yaml` appears in `.env.example` on its own line
 - **AND** every variable has an empty value (no leaked secret)
 - **AND** a one-line comment above each variable identifies the consuming service
 

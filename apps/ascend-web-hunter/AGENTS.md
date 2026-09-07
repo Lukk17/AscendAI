@@ -82,10 +82,10 @@ The full reference, including every timeout and threshold, is [docs/configuratio
 
 Two compose files run this service and they are deliberately different:
 
-- `../ascend-scrapper.docker-compose.yaml` at the repo root. Development. Builds from source, publishes SearXNG and
+- `../compose.ascend-web-hunter.yaml` at the repo root. Development. Builds from source, publishes SearXNG and
   FlareSolverr on loopback so the service can run natively against them, exports OTLP telemetry to the platform
   collector.
-- [`deploy-standalone/docker-compose.yaml`](deploy-standalone/README.md). Standalone single-host deployment. Pulls published images pinned to
+- [`deploy-standalone/compose.yaml`](deploy-standalone/README.md). Standalone single-host deployment. Pulls published images pinned to
   a version tag, publishes nothing but port 7021, no telemetry, requires `VNC_PASSWORD`.
 
 The full list of intended differences is in [deploy-standalone/README.md](deploy-standalone/README.md). Anything not on that list should be

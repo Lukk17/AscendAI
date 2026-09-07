@@ -3,8 +3,8 @@
 - [x] 1.1 Create `infra/observability/prometheus/prometheus.yaml` with `global.scrape_interval: 15s`, an empty `scrape_configs` list, and external labels `{cluster: "ascend-ai-local"}` (note: `.yaml` extension to match repo convention)
 - [x] 1.2 Create `infra/observability/grafana/provisioning/datasources/datasources.yaml` declaring three datasources (`Prometheus` → `http://prometheus:9090`, `Loki` → `http://loki:3100`, `Tempo` → `http://tempo:3200`); `Prometheus` marked default
 - [x] 1.3 Create `infra/observability/grafana/provisioning/dashboards/dashboards.yaml` that mounts `/var/lib/grafana/dashboards/` as the dashboard provider
-- [x] 1.4 Add `prometheus` service to `docker-compose.yaml` (image `prom/prometheus:v2.55.x`, volume mount config, port `9090`, command flag `--storage.tsdb.retention.time=72h`)
-- [x] 1.5 Add `grafana` service to `docker-compose.yaml` (image `grafana/grafana:11.x.x`, volume mounts for provisioning + dashboards directory, port `3030:3000`, env `GF_AUTH_ANONYMOUS_ENABLED=true`, `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`)
+- [x] 1.4 Add `prometheus` service to `compose.yaml` (image `prom/prometheus:v2.55.x`, volume mount config, port `9090`, command flag `--storage.tsdb.retention.time=72h`)
+- [x] 1.5 Add `grafana` service to `compose.yaml` (image `grafana/grafana:11.x.x`, volume mounts for provisioning + dashboards directory, port `3030:3000`, env `GF_AUTH_ANONYMOUS_ENABLED=true`, `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`)
 - [ ] 1.6 Smoke test: `docker compose up -d prometheus grafana`, confirm `http://localhost:9090/-/ready` returns 200 and `http://localhost:3030/api/health` returns 200
 - [x] 1.7 Both services start by default (no profile attribute) — observability is always-on per user direction
 
@@ -61,17 +61,17 @@
 ## 8. Logs layer — Vector + Loki
 
 - [x] 8.1 Create `infra/observability/loki/loki-config.yaml` (single-binary mode, filesystem store, retention 168h)
-- [x] 8.2 Add `loki` service to `docker-compose.yaml` (image `grafana/loki:3.x.x`, volume mount config, port `3100` docker-network only)
+- [x] 8.2 Add `loki` service to `compose.yaml` (image `grafana/loki:3.x.x`, volume mount config, port `3100` docker-network only)
 - [x] 8.3 Create `infra/observability/vector/vector.toml` with: `[sources.docker]` reading via `docker_logs` source for the six AscendAI services; `[sinks.loki]` shipping to `http://loki:3100` with labels `service`, `source`. Add commented placeholder sinks for Datadog / CloudWatch / Splunk to document the migration story.
-- [x] 8.4 Add `vector` service to `docker-compose.yaml` (image `timberio/vector:0.42.x-alpine`, volume mount config, mount `/var/run/docker.sock:/var/run/docker.sock:ro`)
+- [x] 8.4 Add `vector` service to `compose.yaml` (image `timberio/vector:0.42.x-alpine`, volume mount config, mount `/var/run/docker.sock:/var/run/docker.sock:ro`)
 - [ ] 8.5 Smoke test: tail a log line in any AscendAI service container, then query Loki via Grafana Logs panel: `{service="ascend-ai-agent"}` should return the line within 5 seconds
 
 ## 9. Traces layer — OTel collector + Tempo
 
 - [x] 9.1 Create `infra/observability/tempo/tempo-config.yaml` (single-binary mode, filesystem store, retention 168h, OTLP receiver on `:4317`)
-- [x] 9.2 Add `tempo` service to `docker-compose.yaml` (image `grafana/tempo:2.x.x`, volume mount config, port `3200` docker-network only, OTLP `4317` docker-network only)
+- [x] 9.2 Add `tempo` service to `compose.yaml` (image `grafana/tempo:2.x.x`, volume mount config, port `3200` docker-network only, OTLP `4317` docker-network only)
 - [x] 9.3 Create `infra/observability/otel-collector/otel-collector-config.yaml` with OTLP receivers (gRPC `:4317`, HTTP `:4318`), `batch` + `memory_limiter` processors, OTLP exporter to Tempo
-- [x] 9.4 Add `otel-collector` service to `docker-compose.yaml` (image `otel/opentelemetry-collector-contrib:0.x.x`, volume mount config, ports `4317` + `4318` docker-network only)
+- [x] 9.4 Add `otel-collector` service to `compose.yaml` (image `otel/opentelemetry-collector-contrib:0.x.x`, volume mount config, ports `4317` + `4318` docker-network only)
 - [x] 9.5 In `apps/ascend-ai-agent/src/main/resources/application-docker.yaml`, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-ai-agent`, `OTEL_RESOURCE_ATTRIBUTES=service.version=@project.version@`
 - [x] 9.6 Same for `apps/ascend-weather-mcp/src/main/resources/application-docker.yaml` with `OTEL_SERVICE_NAME=ascend-weather-mcp`
 - [ ] 9.7 Verify Spring AI's existing OTel integration emits spans for LLM/tool calls without further wiring (Spring AI 1.1 ships OTel auto-instrumentation when the OTel BOM is on the classpath via Spring AI's transitive deps)
@@ -82,7 +82,7 @@
 - [x] 10.1 Add `prometheus-fastapi-instrumentator`, `opentelemetry-distro`, `opentelemetry-exporter-otlp` to `apps/ascend-memory/pyproject.toml`
 - [x] 10.2 In `apps/ascend-memory/src/main.py`, after FastAPI app construction: `Instrumentator().instrument(app).expose(app)` for `/metrics`
 - [x] 10.3 Activate OTel auto-instrumentation: either run uvicorn under `opentelemetry-instrument` in the Dockerfile entrypoint, OR add `from opentelemetry.instrumentation.auto_instrumentation import sitecustomize` import shim
-- [x] 10.4 Set OTel env in `docker-compose.yaml` for the service: `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-memory`
+- [x] 10.4 Set OTel env in `compose.yaml` for the service: `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-memory`
 - [x] 10.5 Add a small `metrics.py` module that defines `Counter("memory_operations_total", ["operation","outcome"])` and `Histogram("memory_search_duration_seconds", ["embedding_provider"])`
 - [x] 10.6 Wire counter/histogram increments into the REST handlers in `src/api/rest/rest_endpoints.py`
 - [x] 10.7 Add scrape job `ascend-memory` to `infra/observability/prometheus/prometheus.yaml`

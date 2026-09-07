@@ -114,7 +114,7 @@ The dashboards are saved as JSON via Grafana's "Share → Export" with `For exte
 
 ### D7 — Always-on, no opt-out
 
-The earlier draft included a `--profile no-observability` opt-out. User dropped it: observability runs by default in `docker-compose.yaml` with no profile attribute on any of the eight new containers. Operators who don't want it can comment out the services in `docker-compose.yaml` (manual edit), which is acceptable given the always-on default makes the happy path simpler.
+The earlier draft included a `--profile no-observability` opt-out. User dropped it: observability runs by default in `compose.yaml` with no profile attribute on any of the eight new containers. Operators who don't want it can comment out the services in `compose.yaml` (manual edit), which is acceptable given the always-on default makes the happy path simpler.
 
 ### D8 — Logs via Vector + Loki (Vector chosen for vendor-neutrality)
 
@@ -229,7 +229,7 @@ The shipped `add-prompt-caching` change logs cache outcomes at INFO. That's enou
 
 Strict additive change, executed in this order:
 
-1. Add metrics-only stack (Prometheus + Grafana + ascend-ai-agent actuator wiring) to `docker-compose.yaml`.
+1. Add metrics-only stack (Prometheus + Grafana + ascend-ai-agent actuator wiring) to `compose.yaml`.
 2. Wire ascend-ai-agent custom metrics (memory, RAG, MCP, prompt-cache).
 3. Wire ascend-weather-mcp (mirror).
 4. Add Vector + Loki containers + Vector config.

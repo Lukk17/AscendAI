@@ -19,7 +19,7 @@ graph TB
         S3["S3-compatible storage :9070/9071"]
     end
 
-    subgraph "Compose project: ascend-ai (docker-compose.yaml)"
+    subgraph "Compose project: ascend-ai (compose.yaml)"
         AudioScribe["ascend-audio-scribe :7017"]
         Memory["AscendMemory :7020"]
         PaddleOCR["ascend-ocr :7022"]
@@ -27,7 +27,7 @@ graph TB
         Unstructured["Unstructured :9080"]
     end
 
-    subgraph "Compose project: ascend-scrapper (ascend-scrapper.docker-compose.yaml)"
+    subgraph "Compose project: ascend-scrapper (compose.ascend-web-hunter.yaml)"
         WebHunter["ascend-web-hunter :7021"]
         SearXNG["SearXNG :9020"]
         Flare["FlareSolverr :8191"]
@@ -89,10 +89,10 @@ graph TB
 ### Prerequisites
 
 External services must be running before `docker compose up`. The main file
-[docker-compose.yaml](../../../docker-compose.yaml) (project `ascend-ai`) uses `include:` to pull in
-[ascend-scrapper.docker-compose.yaml](../../../ascend-scrapper.docker-compose.yaml) (project `ascend-scrapper`), so a
+[compose.yaml](../../../compose.yaml) (project `ascend-ai`) uses `include:` to pull in
+[compose.ascend-web-hunter.yaml](../../../compose.ascend-web-hunter.yaml) (project `ascend-scrapper`), so a
 single command brings up the full stack. Running the scrapper file directly
-(`docker compose -f ascend-scrapper.docker-compose.yaml up`) keeps it as its own Docker Desktop group.
+(`docker compose -f compose.ascend-web-hunter.yaml up`) keeps it as its own Docker Desktop group.
 
 | Service     | Purpose                                                | Cloud equivalent                |
 | :---------- | :----------------------------------------------------- | :------------------------------ |

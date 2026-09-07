@@ -6,7 +6,7 @@ The monorepo architecture docs (`docs/architecture/`) and the ascend-ai-agent in
 
 #### Scenario: Container diagram shows the gateway and identity provider
 
-- **WHEN** the C4 container diagram is reviewed against the shipped `docker-compose.yaml`
+- **WHEN** the C4 container diagram is reviewed against the shipped `compose.yaml`
 - **THEN** it shows the gateway as the only public entry point and Keycloak as the identity provider
 - **AND** no service other than the gateway is shown as publicly reachable
 

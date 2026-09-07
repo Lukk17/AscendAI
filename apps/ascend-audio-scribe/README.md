@@ -175,7 +175,7 @@ uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
 
 #### With Docker (recommended)
 
-The service is wired into the main `docker-compose.yaml` at the repo root as `ascend-audio-scribe`. Run every compose command
+The service is wired into the main `compose.yaml` at the repo root as `ascend-audio-scribe`. Run every compose command
 against the main file (no `-f` flag).
 
 Start (or rebuild) just this service from the repo root:

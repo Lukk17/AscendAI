@@ -8,7 +8,7 @@ and the number table says either "confirmed" or what it moved to.
 
 ## 1. Confirm the two derived numbers
 
-- [ ] 1.1 Re-read the deployed values before touching anything: `OCR_REQUEST_TIMEOUT` in `docker-compose.yaml`,
+- [ ] 1.1 Re-read the deployed values before touching anything: `OCR_REQUEST_TIMEOUT` in `compose.yaml`,
       `OCR_PAGE_TIMEOUT_SECONDS`, `OCR_DETECTOR_MAX_SIDE` and `OCR_MAX_INFERENCE_PIXELS` in `src/config/config.py`.
       Verify by recording the four values in design.md's number table and confirming the derived `OCR_MAX_PAGES` is
       still 2, so the change starts from the state it claims to.
@@ -30,7 +30,7 @@ and the number table says either "confirmed" or what it moved to.
 - [ ] 2.2 Add the job reading ceiling as a derived property, `OCR_JOB_MAX_PAGES x OCR_PAGE_TIMEOUT_SECONDS`, beside
       the existing `OCR_MAX_PAGES` and `OCR_RECLAMATION_GRACE_SECONDS`. Verify with a test asserting it recomputes
       when either input changes and that it cannot be set from the environment.
-- [ ] 2.3 Lower `OCR_REQUEST_TIMEOUT` to 240 in `docker-compose.yaml`. Verify that the derived `OCR_MAX_PAGES` is
+- [ ] 2.3 Lower `OCR_REQUEST_TIMEOUT` to 240 in `compose.yaml`. Verify that the derived `OCR_MAX_PAGES` is
       still 2 and that a two page document's effective budget is unchanged at 240 s, with a test that computes the
       effective budget from the settings rather than asserting a literal.
 - [ ] 2.4 Reject a configuration whose queue page bound is below the job page ceiling, since a single maximal

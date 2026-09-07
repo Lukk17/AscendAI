@@ -64,7 +64,7 @@ The AscendMemory `Settings` model SHALL expose three independent base-URL / API-
 
 ### Requirement: docker-compose passes per-provider env vars to AscendMemory
 
-`docker-compose.yaml` SHALL pass `LMSTUDIO_BASE_URL`, `LMSTUDIO_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `GEMINI_BASE_URL`, and `GEMINI_API_KEY` to the `ascend-memory` service so that all three providers route correctly out of the box.
+`compose.yaml` SHALL pass `LMSTUDIO_BASE_URL`, `LMSTUDIO_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `GEMINI_BASE_URL`, and `GEMINI_API_KEY` to the `ascend-memory` service so that all three providers route correctly out of the box.
 
 #### Scenario: Container env reflects per-provider routing
 

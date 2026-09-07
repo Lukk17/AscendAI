@@ -141,7 +141,7 @@ Before running the application, ensure the support services are reachable.
 
 #### Docker environment
 
-The monorepo's [docker-compose.yaml](../../docker-compose.yaml) brings up the in-stack services. External prerequisites
+The monorepo's [compose.yaml](../../compose.yaml) brings up the in-stack services. External prerequisites
 (PostgreSQL, Redis, Qdrant, object storage) are run on the host or in cloud.
 
 - **Object storage** (locally: Floci). S3-compatible storage for file ingestion. Ports `9070` (API), `9071` (web UI).

@@ -74,7 +74,7 @@ Theme preference (dark, light, auto) is stored using `shared_preferences`. On st
 
 ### 8. Containerization
 
-The web build is containerized with a multi-stage Dockerfile: Flutter SDK stage builds the web app, then an nginx stage serves the static assets. The container is added to `docker-compose.yaml` as `ascend-chat` on a configurable port (default 3000).
+The web build is containerized with a multi-stage Dockerfile: Flutter SDK stage builds the web app, then an nginx stage serves the static assets. The container is added to `compose.yaml` as `ascend-chat` on a configurable port (default 3000).
 
 **Alternatives considered:**
 - No containerization: inconsistent with the rest of the monorepo where every module has a Dockerfile.

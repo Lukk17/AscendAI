@@ -27,7 +27,7 @@
 
 ## 5. Orchestration over the single compose file
 
-- [ ] 5.1 The installer runs `docker compose up` against the main `docker-compose.yaml` with no `-f` flags (owner constraint); ordered infra → bootstrap → compose up → realm/tenant → smoke test
+- [ ] 5.1 The installer runs `docker compose up` against the main `compose.yaml` with no `-f` flags (owner constraint); ordered infra → bootstrap → compose up → realm/tenant → smoke test
 - [ ] 5.2 End-to-end rehearsal on a throwaway target: infra provisioned, secrets generated, stack healthy, first tenant/admin usable, smoke test green
 
 ## 6. Documentation

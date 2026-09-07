@@ -8,11 +8,11 @@ Build, rebuild, and publish AscendAI services. For day-to-day Quick Start see th
 
 The stack is split across two project files:
 
-- [docker-compose.yaml](../docker-compose.yaml). Project `ascend-ai`. Includes
-  [ascend-scrapper.docker-compose.yaml](../ascend-scrapper.docker-compose.yaml) via the top-level `include:` directive,
+- [compose.yaml](../compose.yaml). Project `ascend-ai`. Includes
+  [compose.ascend-web-hunter.yaml](../compose.ascend-web-hunter.yaml) via the top-level `include:` directive,
   so a single `docker compose up` from the repo root brings up the full stack (merged into the `ascend-ai` project;
   one group in Docker Desktop).
-- [ascend-scrapper.docker-compose.yaml](../ascend-scrapper.docker-compose.yaml). Project `ascend-scrapper`.
+- [compose.ascend-web-hunter.yaml](../compose.ascend-web-hunter.yaml). Project `ascend-scrapper`.
   Web-scraping stack (`searxng`, `flaresolverr`, `ascend-web-hunter`, `ngrok-ascend-web-hunter`). Self-contained and
   runnable on its own; when run standalone it forms its own group in Docker Desktop.
 
@@ -54,13 +54,13 @@ docker compose up -d --build
 Bash:
 
 ```bash
-docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
+docker compose -f compose.ascend-web-hunter.yaml up -d --build
 ```
 
 PowerShell:
 
 ```powershell
-docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
+docker compose -f compose.ascend-web-hunter.yaml up -d --build
 ```
 
 #### Rebuild and recreate everything
@@ -81,7 +81,7 @@ docker compose up -d --build --force-recreate
 
 `<service>` is the name from either compose file (e.g. `ascend-audio-scribe`, `ascend-web-hunter`). `--no-deps` skips linked
 services (database, redis, etc.). For services in the scrapper file you can target them through the merged invocation
-above (because of `include:`) or with `-f ascend-scrapper.docker-compose.yaml`.
+above (because of `include:`) or with `-f compose.ascend-web-hunter.yaml`.
 
 Bash:
 

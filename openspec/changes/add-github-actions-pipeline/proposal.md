@@ -47,6 +47,6 @@ The change also pins the GitHub repository configuration these workflows depend 
   - `.github/workflows/README.md` (operator notes: secrets, the per-app-version + app-selection release model, how the bump guard works)
 - **No source changes** to any of the six services. Each `Dockerfile`, `build.gradle.kts`, and `pyproject.toml` is consumed as-is; the image version is whatever the committed manifest already says. **The workflows never edit or commit a version.**
 - **Developer-workflow convention (documented, not code-enforced)**: bumping an app's `version` in its manifest within a PR is what makes that app eligible for the next release. The release operator then selects which already-bumped apps to ship.
-- **No changes** to `docker-compose.yaml` or `ascend-scrapper.docker-compose.yaml`.
+- **No changes** to `compose.yaml` or `compose.ascend-web-hunter.yaml`.
 - **Repository settings**: only the two Docker Hub secrets. No branch-protection or auto-delete-branches recommendations (maintainer's policy, out of scope).
 - **Backwards compat**: fully additive. Existing manual `./gradlew build` / `docker push` flows still work; the workflows can be ignored entirely.

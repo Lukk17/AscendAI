@@ -4,7 +4,7 @@
 
 ### docker-compose placement
 
-ascend-ocr runs as the `ascend-ocr` service in `docker-compose.yaml` (root of the monorepo). It is grouped
+ascend-ocr runs as the `ascend-ocr` service in `compose.yaml` (root of the monorepo). It is grouped
 with the other non-scraper support services — Docling Serve, Unstructured API, WeatherMCP, ascend-audio-scribe, AscendMemory.
 
 ```mermaid
@@ -64,7 +64,7 @@ compose `healthcheck` stanza should be set). The operator should configure the l
 | `OCR_POOL_REBUILD_MAX_CONSECUTIVE` | `3` | Consecutive failed pool rebuilds before the service gives up and stays not-ready. |
 | `OCR_SCRATCH_DIR` | `<system temp>/ascend-ocr-scratch` | Worker upload scratch directory, swept of stale files by every fresh worker and at startup. |
 
-The `docker-compose.yaml` service block sets `API_PORT`, `API_HOST`, `LOG_LEVEL`, `DEFAULT_LANGUAGE`,
+The `compose.yaml` service block sets `API_PORT`, `API_HOST`, `LOG_LEVEL`, `DEFAULT_LANGUAGE`,
 `MAX_FILE_SIZE_MB`, and `OCR_REQUEST_TIMEOUT` explicitly. `MCP_ALLOWED_HOSTS` is not set in the default compose
 configuration and must be added manually to run the MCP e2e tests. See
 [e2e/testing/6-mcp-ocr-test.md](../../../e2e/testing/6-mcp-ocr-test.md).
@@ -73,7 +73,7 @@ configuration and must be added manually to run the MCP e2e tests. See
 
 ### Memory model and the single worker
 
-The container carries a 12 GiB memory limit and a 4.0 CPU limit (`docker-compose.yaml`). Peak resident memory for
+The container carries a 12 GiB memory limit and a 4.0 CPU limit (`compose.yaml`). Peak resident memory for
 one OCR call is measured, not estimated:
 
 ```text
