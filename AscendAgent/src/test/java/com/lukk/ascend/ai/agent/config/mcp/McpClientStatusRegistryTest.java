@@ -36,15 +36,15 @@ class McpClientStatusRegistryTest {
     @Test
     @DisplayName("record persists a CONNECTED entry that appears in entries and connectedNames")
     void record_Connected_AppearsInEntriesAndConnectedNames() {
-        registry.record("audioscribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
 
         assertThat(registry.entries()).hasSize(1);
         McpClientEntry entry = registry.entries().iterator().next();
-        assertThat(entry.name()).isEqualTo("audioscribe");
+        assertThat(entry.name()).isEqualTo("ascend-audio-scribe");
         assertThat(entry.url()).isEqualTo("http://localhost:7017");
         assertThat(entry.status()).isEqualTo(McpClientStatus.CONNECTED);
 
-        assertThat(registry.connectedNames()).containsExactly("audioscribe");
+        assertThat(registry.connectedNames()).containsExactly("ascend-audio-scribe");
     }
 
     @Test
@@ -59,20 +59,20 @@ class McpClientStatusRegistryTest {
     @Test
     @DisplayName("connectedNames returns only CONNECTED entries when registry has mixed states")
     void connectedNames_MixedStates_ReturnsOnlyConnected() {
-        registry.record("audioscribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
         registry.record("weather", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
         registry.record("ascend-web-hunter", "http://localhost:7021", McpClientStatus.CONNECTED, null);
 
         Set<String> connected = registry.connectedNames();
 
-        assertThat(connected).containsExactlyInAnyOrder("audioscribe", "ascend-web-hunter");
+        assertThat(connected).containsExactlyInAnyOrder("ascend-audio-scribe", "ascend-web-hunter");
         assertThat(connected).doesNotContain("weather");
     }
 
     @Test
     @DisplayName("record with null cause does not throw")
     void record_NullCause_DoesNotThrow() {
-        registry.record("audioscribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
 
         assertThat(registry.entries()).hasSize(1);
     }
@@ -80,17 +80,17 @@ class McpClientStatusRegistryTest {
     @Test
     @DisplayName("recording the same name twice overwrites the earlier entry")
     void record_SameName_OverwritesPreviousEntry() {
-        registry.record("audioscribe", "http://localhost:7017", McpClientStatus.FAILED, new RuntimeException("refused"));
-        registry.record("audioscribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.FAILED, new RuntimeException("refused"));
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
 
         assertThat(registry.entries()).hasSize(1);
-        assertThat(registry.connectedNames()).containsExactly("audioscribe");
+        assertThat(registry.connectedNames()).containsExactly("ascend-audio-scribe");
     }
 
     @Test
     @DisplayName("DISABLED entry does not appear in connectedNames")
     void record_Disabled_DoesNotAppearInConnectedNames() {
-        registry.record("audioscribe", "http://localhost:7017", McpClientStatus.DISABLED, null);
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.DISABLED, null);
 
         assertThat(registry.connectedNames()).isEmpty();
         assertThat(registry.entries()).hasSize(1);
@@ -100,9 +100,9 @@ class McpClientStatusRegistryTest {
     @DisplayName("resolveConnectionName prefers the client title when present")
     void resolveConnectionName_TitlePresent_ReturnsTitle() {
         McpSyncClient client = mock(McpSyncClient.class);
-        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("audioscribe-server", "Audioscribe Title", "0.0.1"));
+        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("ascend-audio-scribe-server", "Ascend Audio Scribe Title", "0.0.1"));
 
-        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("Audioscribe Title");
+        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("Ascend Audio Scribe Title");
     }
 
     @Test

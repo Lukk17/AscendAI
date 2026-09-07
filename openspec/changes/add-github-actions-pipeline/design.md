@@ -1,6 +1,6 @@
 ## Context
 
-AscendAI is a six-service monorepo with two Java/Gradle services (`AscendAgent`, `WeatherMCP`) and four Python/pyproject services (`AudioScribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`). Each has its own `Dockerfile`. The compose files at the repo root wire them together with the external data-layer prerequisites (PostgreSQL, Redis, Qdrant, MinIO).
+AscendAI is a six-service monorepo with two Java/Gradle services (`AscendAgent`, `WeatherMCP`) and four Python/pyproject services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`). Each has its own `Dockerfile`. The compose files at the repo root wire them together with the external data-layer prerequisites (PostgreSQL, Redis, Qdrant, MinIO).
 
 There is no CI today. The maintainer builds and pushes Docker Hub images by hand (`lukk17/<service>:<tag>`). This change adds two GitHub Actions workflows: one that gives PRs a build/test signal, and one that performs **manual, operator-selected, version-from-manifest** releases with an aggregated monorepo release record.
 
@@ -30,7 +30,7 @@ There is no CI today. The maintainer builds and pushes Docker Hub images by hand
 
 ### D2 — CI: path-filtered matrix per service
 
-`ci.yaml` uses `dorny/paths-filter@v3` to compute one boolean per service from its directory (`AscendAgent/**`, `AudioScribe/**`, …). The matrix `build` job skips an entry whose service was untouched. A change to `.github/workflows/**` forces all services to run via a `workflows` fallback filter. Result: a docs-only PR runs zero builds; a single-service PR runs one.
+`ci.yaml` uses `dorny/paths-filter@v3` to compute one boolean per service from its directory (`AscendAgent/**`, `ascend-audio-scribe/**`, …). The matrix `build` job skips an entry whose service was untouched. A change to `.github/workflows/**` forces all services to run via a `workflows` fallback filter. Result: a docs-only PR runs zero builds; a single-service PR runs one.
 
 ### D3 — CI: explicit Java/Python matrix entries
 
@@ -41,7 +41,7 @@ Each matrix entry declares `service`, `language`, `path`, and the toolchain vers
 `release.yaml` is triggered **only** from the Actions UI. Inputs:
 
 - `stack_version` — required string, e.g. `1.1.1`. The monorepo release is named `ascend-ai_<stack_version>` (so the Git tag is `ascend-ai_1.1.1`). Normal semver with the `ascend-ai_` prefix; **not** date-based.
-- Six required booleans, one per app — `release_ascend_agent`, `release_weather_mcp`, `release_audio_scribe`, `release_ascend_web_hunter`, `release_ascend_memory`, `release_paddle_ocr` (default `false`). GitHub dispatch inputs have no native multi-select, so a boolean per app is the clearest "which apps to release" control.
+- Six required booleans, one per app — `release_ascend_agent`, `release_weather_mcp`, `release_ascend_audio_scribe`, `release_ascend_web_hunter`, `release_ascend_memory`, `release_paddle_ocr` (default `false`). GitHub dispatch inputs have no native multi-select, so a boolean per app is the clearest "which apps to release" control.
 
 **Why no tag trigger / no version input that overrides the manifest:** the operator's "I'm shipping these apps now" gesture must be explicit, and the per-app versions must already be in the source. The release is a pure read-build-push-record over committed state.
 
@@ -50,7 +50,7 @@ Each matrix entry declares `service`, `language`, `path`, and the toolchain vers
 The release does **not** accept or inject a per-app version. For each selected app it reads the version already committed in the manifest:
 
 - **Java** (`AscendAgent`, `WeatherMCP`): the `version = "<x.y.z>"` assignment in `build.gradle.kts` (resolved by Gradle at build time; the built image inherently carries it).
-- **Python** (`AudioScribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`): `[project].version` in `pyproject.toml`.
+- **Python** (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`): `[project].version` in `pyproject.toml`.
 
 That read version is the Docker tag. There is **no `-Pversion` override, no `--build-arg BUILD_VERSION`, and no in-place file edit**. Because the version is already in the source the developer committed, releasing produces **zero commits** — the property the maintainer explicitly requires.
 
@@ -89,7 +89,7 @@ After `build-and-push` succeeds, a `release` job:
    ascend-ai_1.1.1
    - ascend-agent: 1.3.0  (released)
    - weather-mcp: 1.0.0
-   - audio-scribe: 0.2.1  (released)
+   - ascend-audio-scribe: 0.2.1  (released)
    - ascend-web-hunter: 1.2.0
    - ascend-memory: 0.4.0
    - ascend-paddle-ocr: 0.1.0

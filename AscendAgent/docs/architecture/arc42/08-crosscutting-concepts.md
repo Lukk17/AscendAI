@@ -27,7 +27,7 @@ call to the appropriate MCP service.
 
 Currently registered MCP services:
 
-- **AudioScribe.** Audio transcription.
+- **ascend-audio-scribe.** Audio transcription.
 - **WeatherMCP.** Current weather data.
 - **ascend-web-hunter.** Web search via SearXNG.
 

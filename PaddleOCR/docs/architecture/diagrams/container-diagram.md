@@ -20,7 +20,7 @@ graph TB
     end
 
     subgraph "Sibling MCP services"
-        AudioScribe["AudioScribe<br/>:7017"]
+        AudioScribe["ascend-audio-scribe<br/>:7017"]
         WeatherMCP["WeatherMCP<br/>:9998"]
         WebHunter["ascend-web-hunter<br/>:7021"]
     end

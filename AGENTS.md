@@ -153,7 +153,7 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 | Module | Tech Stack | Port | Role |
 |---|---|---|---|
 | [AscendAgent](AscendAgent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
-| [AudioScribe](AudioScribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
+| [ascend-audio-scribe](ascend-audio-scribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
 | [ascend-web-hunter](ascend-web-hunter/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
 | [AscendMemory](AscendMemory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
 | [WeatherMCP](WeatherMCP/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9998 | MCP server for weather data |
@@ -190,7 +190,7 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 | AscendMemory | 7020 | Semantic memory REST + MCP |
 | PaddleOCR | 7022 | OCR REST + MCP |
 | WeatherMCP | 9998 | Weather MCP |
-| AudioScribe | 7017 | Audio transcription MCP |
+| ascend-audio-scribe | 7017 | Audio transcription MCP |
 
 ### `ascend-scrapper` (ascend-scrapper.docker-compose.yaml)
 
@@ -223,7 +223,7 @@ cd AscendAgent && ./gradlew bootRun
 ## Cross-Module Conventions
 
 - **Java modules** (AscendAgent, WeatherMCP): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.5.
-- **Python modules** (AudioScribe, ascend-web-hunter, AscendMemory, PaddleOCR): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
+- **Python modules** (ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
 - **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) — never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
 - All services expose a `/health` endpoint for Docker healthchecks.
 - All services are containerized with Dockerfiles and wired through `docker-compose.yaml` (with `ascend-scrapper.docker-compose.yaml` included for the web-scraping stack).

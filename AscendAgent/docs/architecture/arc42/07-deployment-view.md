@@ -16,7 +16,7 @@ graph TB
     subgraph "Docker Compose Network"
         subgraph "Application Services"
             AscendAgent["AscendAgent<br/>:9917"]
-            AudioScribe["AudioScribe<br/>:7017"]
+            AudioScribe["ascend-audio-scribe<br/>:7017"]
             Weather["WeatherMCP<br/>:9998"]
             WebHunter["ascend-web-hunter<br/>:7021"]
             Memory["AscendMemory<br/>:7020"]
@@ -54,7 +54,7 @@ graph TB
 | :---------------- | :---------------------------- | :------------ | :------------------------------------------------------ |
 | AscendAgent       | 9917                          | HTTP          | Main API gateway.                                       |
 | LM Studio         | 1234                          | HTTP          | Local LLM, runs on host, not in Docker.                 |
-| AudioScribe       | 7017                          | HTTP          | MCP server for audio transcription.                     |
+| ascend-audio-scribe       | 7017                          | HTTP          | MCP server for audio transcription.                     |
 | WeatherMCP        | 9998                          | HTTP          | MCP server for weather data.                            |
 | ascend-web-hunter   | 7021                          | HTTP          | MCP server for web search.                              |
 | AscendMemory      | 7020                          | HTTP          | REST API for semantic memory.                           |
@@ -71,7 +71,7 @@ graph TB
 
 - **Docker Engine** 24+ with Compose V2.
 - **Java 21+** for AscendAgent and WeatherMCP (run outside Docker during dev).
-- **Python 3.11+** for AudioScribe, ascend-web-hunter, AscendMemory.
+- **Python 3.11+** for ascend-audio-scribe, ascend-web-hunter, AscendMemory.
 - **LM Studio** installed on host for local LLM inference.
 - **External prerequisites.** PostgreSQL, Redis, Qdrant, and S3-compatible object storage must be running before
   starting docker-compose. In production these map to managed cloud services.

@@ -59,8 +59,8 @@ AscendMemory/e2e/testing/runs/*
 !AscendMemory/e2e/testing/runs/README.md
 ascend-web-hunter/e2e/testing/runs/*
 !ascend-web-hunter/e2e/testing/runs/README.md
-AudioScribe/e2e/testing/runs/*
-!AudioScribe/e2e/testing/runs/README.md
+ascend-audio-scribe/e2e/testing/runs/*
+!ascend-audio-scribe/e2e/testing/runs/README.md
 PaddleOCR/e2e/testing/runs/*
 !PaddleOCR/e2e/testing/runs/README.md
 

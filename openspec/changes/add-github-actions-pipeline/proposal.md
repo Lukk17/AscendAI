@@ -1,6 +1,6 @@
 ## Why
 
-AscendAI is a six-service monorepo (AscendAgent, WeatherMCP, AudioScribe, ascend-web-hunter, AscendMemory, PaddleOCR) and today there is **no automated build, test, or release pipeline at all**. Every change is built and image-pushed by hand from the maintainer's laptop. Two concrete consequences:
+AscendAI is a six-service monorepo (AscendAgent, WeatherMCP, ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR) and today there is **no automated build, test, or release pipeline at all**. Every change is built and image-pushed by hand from the maintainer's laptop. Two concrete consequences:
 
 1. **No PR signal.** Pull requests merge with no proof that the affected service even compiles, let alone passes its unit tests. The first time a regression is noticed is when someone runs `docker compose up` locally and a container restarts in a loop.
 2. **Release process is undocumented and unreproducible.** Docker Hub images at `lukk17/<service>:<tag>` are pushed manually; there is no record of which per-service version made up a given "state of the stack", and no way to reproduce a previously-shipped set of images.

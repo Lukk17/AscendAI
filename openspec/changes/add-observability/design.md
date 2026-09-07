@@ -123,7 +123,7 @@ Vector container reads Docker container logs via the `docker_logs` source:
 ```toml
 [sources.docker]
 type = "docker_logs"
-include_containers = ["ascend-agent", "weather-mcp", "ascend-memory", "audio-scribe", "ascend-web-hunter", "paddle-ocr"]
+include_containers = ["ascend-agent", "weather-mcp", "ascend-memory", "ascend-audio-scribe", "ascend-web-hunter", "paddle-ocr"]
 ```
 
 Then ships to Loki via the `loki` sink:

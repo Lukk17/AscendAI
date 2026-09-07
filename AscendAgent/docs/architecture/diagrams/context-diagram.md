@@ -13,7 +13,7 @@ graph TB
     Gemini["☁️ Google Gemini"]
     Anthropic["☁️ Anthropic"]
     MiniMax["☁️ MiniMax"]
-    AudioScribe["🎙️ AudioScribe"]
+    AudioScribe["🎙️ ascend-audio-scribe"]
     Weather["🌤️ WeatherMCP"]
     WebHunter["🔍 ascend-web-hunter"]
     Memory["🧠 AscendMemory"]

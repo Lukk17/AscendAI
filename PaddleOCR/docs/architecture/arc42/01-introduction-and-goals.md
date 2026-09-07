@@ -9,7 +9,7 @@ parallel surfaces: a REST API for direct upload workflows and an MCP server for 
 accepts images and PDFs, runs text extraction, and returns structured JSON with per-page, per-line text, confidence
 scores, and bounding boxes.
 
-Within the monorepo, PaddleOCR is a peer of AudioScribe and ascend-web-hunter: a FastMCP-based Python service that the
+Within the monorepo, PaddleOCR is a peer of ascend-audio-scribe and ascend-web-hunter: a FastMCP-based Python service that the
 AscendAgent calls via the Model Context Protocol. It has no database, no message queue, and no dependencies on the
 other MCP services.
 

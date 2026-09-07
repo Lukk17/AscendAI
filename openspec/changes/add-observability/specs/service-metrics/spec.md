@@ -2,7 +2,7 @@
 
 ### Requirement: Every AscendAI service exposes a Prometheus-format metrics endpoint
 
-Every long-running AscendAI service (AscendAgent, WeatherMCP, AscendMemory, AudioScribe, ascend-web-hunter, PaddleOCR) SHALL expose an HTTP endpoint that returns metrics in OpenMetrics / Prometheus exposition format on a documented path. JVM services use `/actuator/prometheus`; Python services use `/metrics`.
+Every long-running AscendAI service (AscendAgent, WeatherMCP, AscendMemory, ascend-audio-scribe, ascend-web-hunter, PaddleOCR) SHALL expose an HTTP endpoint that returns metrics in OpenMetrics / Prometheus exposition format on a documented path. JVM services use `/actuator/prometheus`; Python services use `/metrics`.
 
 #### Scenario: AscendAgent metrics endpoint
 
@@ -36,7 +36,7 @@ Every long-running AscendAI service SHALL be configured to emit OpenTelemetry sp
 
 ### Requirement: Common identification tags on every metric, log label, and span attribute
 
-Every metric emitted by any AscendAI service SHALL carry the tags `service` and `version`. The `service` tag value SHALL match the service's logical name (`ascend-agent`, `audio-scribe`, etc.). The `version` tag SHALL be derived from build metadata. The same `service` and `version` SHALL appear as Loki log labels and OTel span resource attributes (`service.name`, `service.version`).
+Every metric emitted by any AscendAI service SHALL carry the tags `service` and `version`. The `service` tag value SHALL match the service's logical name (`ascend-agent`, `ascend-audio-scribe`, etc.). The `version` tag SHALL be derived from build metadata. The same `service` and `version` SHALL appear as Loki log labels and OTel span resource attributes (`service.name`, `service.version`).
 
 #### Scenario: Tag presence on a custom counter
 
@@ -170,8 +170,8 @@ Each Python service SHALL emit at least the following custom metrics in addition
 
 | Service | Metric | Type | Required tags |
 |---|---|---|---|
-| AudioScribe | `transcription.duration_seconds` | histogram | `provider`, `outcome` |
-| AudioScribe | `transcription.audio_duration_seconds` | histogram | `provider` |
+| ascend-audio-scribe | `transcription.duration_seconds` | histogram | `provider`, `outcome` |
+| ascend-audio-scribe | `transcription.audio_duration_seconds` | histogram | `provider` |
 | ascend-web-hunter | `search.results_returned` | histogram | `engine`, `outcome` |
 | ascend-web-hunter | `extraction.tier_used_total` | counter | `tier` |
 | AscendMemory | `memory.operations_total` | counter | `operation`, `outcome` |
@@ -179,7 +179,7 @@ Each Python service SHALL emit at least the following custom metrics in addition
 | PaddleOCR | `ocr.pages_processed_total` | counter | `language`, `outcome` |
 | PaddleOCR | `ocr.duration_seconds` | histogram | `language` |
 
-#### Scenario: AudioScribe transcription metric records duration
+#### Scenario: ascend-audio-scribe transcription metric records duration
 
 - **WHEN** any `/api/v1/transcribe/*` request completes successfully
 - **THEN** `transcription_duration_seconds_count{provider="<p>",outcome="ok"}` increments by 1

@@ -35,14 +35,14 @@ scrape_configs:
       - target_label: service
         replacement: ascend-memory
 
-  - job_name: audio-scribe
+  - job_name: ascend-audio-scribe
     metrics_path: /metrics
     static_configs:
       - targets:
-          - audio-scribe:7017
+          - ascend-audio-scribe:7017
     relabel_configs:
       - target_label: service
-        replacement: audio-scribe
+        replacement: ascend-audio-scribe
 
   - job_name: ascend-web-hunter
     metrics_path: /metrics

@@ -1,6 +1,6 @@
 ## Context
 
-AscendAgent's `application.yaml` currently configures three MCP servers (`audioscribe`, `weather`,
+AscendAgent's `application.yaml` currently configures three MCP servers (`ascend-audio-scribe`, `weather`,
 `ascend-web-hunter`) under `spring.ai.mcp.client.streamable-http.connections`. Spring AI's
 `McpClientAutoConfiguration` reads this map and produces a `List<McpSyncClient>` bean. As part of that factory
 method, it iterates the list and calls `.initialize()` on each client, which performs the MCP `initialize` JSON-RPC

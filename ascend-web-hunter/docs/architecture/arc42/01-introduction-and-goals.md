@@ -10,7 +10,7 @@ AscendAgent. Given a search query it returns ranked result URLs via SearXNG; giv
 plain text using a six-strategy escalation chain that ranges from a lightweight HTTP client to a human-operated
 browser session.
 
-Within the monorepo, ascend-web-hunter is a peer of AudioScribe and PaddleOCR: a FastMCP-based Python service
+Within the monorepo, ascend-web-hunter is a peer of ascend-audio-scribe and PaddleOCR: a FastMCP-based Python service
 called by AscendAgent through the Model Context Protocol. It has no database and no other inbound callers.
 
 ---

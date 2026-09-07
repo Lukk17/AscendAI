@@ -13,7 +13,7 @@ graph TB
     Gemini["Gemini API<br/>(OpenAI-compatible)"]
     Anthropic["Anthropic API"]
     MiniMax["MiniMax API<br/>(Anthropic-compatible)"]
-    AudioScribe["AudioScribe MCP<br/>(port 7017)"]
+    AudioScribe["ascend-audio-scribe MCP<br/>(port 7017)"]
     Weather["Weather MCP<br/>(port 9998)"]
     WebHunter["ascend-web-hunter MCP<br/>(port 7021)"]
     Memory["AscendMemory<br/>(port 7020)"]

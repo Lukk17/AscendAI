@@ -43,7 +43,7 @@ Depends on `add-auth-and-identity` (trustworthy actor identity, ADMIN role, toke
   - `controller/IngestionController.java`, `service/rag/S3PresignedUrlService.java` — audit events on upload / run / presign.
   - `src/main/resources/application.yaml` + `application-docker.yaml` — logging-level corrections, `app.retention.*` and `app.audit.*` properties.
   - New scheduled retention job.
-- **Python services**: log-content audit of AudioScribe, ascend-web-hunter, AscendMemory, PaddleOCR against the redaction convention; fixes where leakage is found.
+- **Python services**: log-content audit of ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR against the redaction convention; fixes where leakage is found.
 - **Cross-change coordination**: actor identity and ADMIN gate from `add-auth-and-identity`; tenant attribution from `add-tenant-isolation`; usage-row erasure coordinated with `add-usage-metering-and-quotas`.
 - **Tests**: erasure integration test asserting zero residue across all five stores (Testcontainers); audit-row-per-action tests; log-capture test asserting prompt bodies are absent; retention job tests.
 - **Docs**: new `docs/COMPLIANCE.md`; README documentation-map link; `AGENTS.md` notes where conventions change.

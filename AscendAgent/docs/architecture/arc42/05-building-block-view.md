@@ -8,7 +8,7 @@
 graph TB
     subgraph "AscendAI Platform"
         AscendAgent["AscendAgent<br/>(Spring Boot)"]
-        AudioScribe["AudioScribe<br/>(FastMCP/Python)"]
+        AudioScribe["ascend-audio-scribe<br/>(FastMCP/Python)"]
         Weather["WeatherMCP<br/>(Spring Boot/Java)"]
         WebHunter["ascend-web-hunter<br/>(FastMCP/Python)"]
         Memory["AscendMemory<br/>(FastAPI/Python)"]

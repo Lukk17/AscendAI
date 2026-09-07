@@ -23,13 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>MCP is kept disabled at the {@code TestcontainersBase} layer to avoid interfering
  * with other ITs. This class overrides that flag and redirects every connection URL
- * configured in {@code application.yaml} (audioscribe, weather, ascend-web-hunter) to
+ * configured in {@code application.yaml} (ascend-audio-scribe, weather, ascend-web-hunter) to
  * an unreachable port, leaving the broader chat-model providers disabled as usual. Those
  * connection keys are redirected rather than replaced with a fictional one because
  * {@code Map<String, ConnectionParameters>} property binding merges by key across
  * property sources, so a dynamically-added key would sit alongside, not instead of, the
  * three real ones. Redirecting all three keeps the test deterministic regardless of
- * whether the real AudioScribe/WeatherMCP/ascend-web-hunter services happen to be reachable
+ * whether the real ascend-audio-scribe/WeatherMCP/ascend-web-hunter services happen to be reachable
  * on the host running the test, which is exactly what this test verifies: every configured
  * MCP client ends up FAILED and the context still starts.
  */
@@ -40,7 +40,7 @@ class McpStartupToleranceIT extends TestcontainersBase {
         registry.add("spring.ai.mcp.client.enabled", () -> true);
         registry.add("spring.ai.mcp.client.initialized", () -> false);
         registry.add("app.mcp.startup.init-timeout", () -> "1s");
-        registry.add("spring.ai.mcp.client.streamable-http.connections.audioscribe.url",
+        registry.add("spring.ai.mcp.client.streamable-http.connections.ascend-audio-scribe.url",
                 () -> "http://localhost:1");
         registry.add("spring.ai.mcp.client.streamable-http.connections.weather.url",
                 () -> "http://localhost:1");

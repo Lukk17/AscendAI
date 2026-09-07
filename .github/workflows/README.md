@@ -44,7 +44,7 @@ When `.github/workflows/**` itself changes, every service runs regardless of whe
 |---|---|---|---|
 | `ascend-agent` | Java | — | `./gradlew --no-daemon build test` |
 | `weather-mcp` | Java | — | `./gradlew --no-daemon build test` |
-| `audio-scribe` | Python | 3.11 | `pytest` |
+| `ascend-audio-scribe` | Python | 3.11 | `pytest` |
 | `ascend-web-hunter` | Python | 3.12 | `pytest` |
 | `ascend-memory` | Python | 3.11 | `pytest` |
 | `ascend-paddle-ocr` | Python | 3.11 | `pytest` |
@@ -78,7 +78,7 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 | `stack_version` | string | no | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. Required when `create_github_release` is ticked, ignored otherwise. |
 | `release_ascend_agent` | boolean | yes | Ship `ascend-agent`. Default `false`. |
 | `release_weather_mcp` | boolean | yes | Ship `weather-mcp`. Default `false`. |
-| `release_audio_scribe` | boolean | yes | Ship `audio-scribe`. Default `false`. |
+| `release_ascend_audio_scribe` | boolean | yes | Ship `ascend-audio-scribe`. Default `false`. |
 | `release_ascend_web_hunter` | boolean | yes | Ship `ascend-web-hunter`. Default `false`. |
 | `release_ascend_memory` | boolean | yes | Ship `ascend-memory`. Default `false`. |
 | `release_paddle_ocr` | boolean | yes | Ship `ascend-paddle-ocr`. Default `false`. |
@@ -110,7 +110,7 @@ One consequence to be aware of. The bump guard compares each selected service ag
 Bumping an app's `version` in its manifest within a PR is what makes that app eligible for the next release.
 
 - **Java services** (`AscendAgent`, `WeatherMCP`): edit the `version = "<x.y.z>"` line in `build.gradle.kts`.
-- **Python services** (`AudioScribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`): edit the `version = "<x.y.z>"` line in `[project]` section of `pyproject.toml`.
+- **Python services** (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `PaddleOCR`): edit the `version = "<x.y.z>"` line in `[project]` section of `pyproject.toml`.
 
 ### Manifest version extractors
 
@@ -163,7 +163,7 @@ Each build is pushed to both registries under the same name, tagged `v<version>`
 |---|---|---|
 | `ascend-agent` | `lukk17/ascend-agent` | `ghcr.io/lukk17/ascend-agent` |
 | `weather-mcp` | `lukk17/weather-mcp` | `ghcr.io/lukk17/weather-mcp` |
-| `audio-scribe` | `lukk17/audio-scribe` | `ghcr.io/lukk17/audio-scribe` |
+| `ascend-audio-scribe` | `lukk17/ascend-audio-scribe` | `ghcr.io/lukk17/ascend-audio-scribe` |
 | `ascend-web-hunter` | `lukk17/ascend-web-hunter` | `ghcr.io/lukk17/ascend-web-hunter` |
 | `ascend-memory` | `lukk17/ascend-memory` | `ghcr.io/lukk17/ascend-memory` |
 | `ascend-paddle-ocr` | `lukk17/ascend-paddle-ocr` | `ghcr.io/lukk17/ascend-paddle-ocr` |

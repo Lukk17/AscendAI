@@ -4,7 +4,7 @@
 
 ascend-web-hunter escalates reads through curl_cffi → FlareSolverr → Playwright → Crawlee with NoVNC for human intervention. `enhance-web-search-scraping` already added session replay into every tier, coherent fingerprints (`src/reader/fingerprint.py`), an optional proxy seam (`src/proxy/proxy_provider.py`), read caching, per-domain metrics, and circuit breakers. FlareSolverr's only job is solving the Cloudflare challenge and returning cookies; a patched stealth browser both solves the challenge and renders the page, so the middle tiers can collapse. Patchright is a drop-in Playwright replacement (patched Chromium); Camoufox is a hardened Firefox driven through Playwright — both free and self-hosted.
 
-Extraction returns trafilatura output with a readability fallback: a single main-content blob, no embedded structured data, no schema-guided output, and linked PDFs/images are ignored even though the platform runs Docling, PaddleOCR, and AudioScribe.
+Extraction returns trafilatura output with a readability fallback: a single main-content blob, no embedded structured data, no schema-guided output, and linked PDFs/images are ignored even though the platform runs Docling, PaddleOCR, and ascend-audio-scribe.
 
 ## Goals / Non-Goals
 
@@ -40,7 +40,7 @@ A schema mode: the caller supplies a JSON schema; the service returns validated 
 
 ### D5 — Route non-HTML into the existing platform services
 
-Linked PDFs → Docling, image-heavy pages / linked images → PaddleOCR, linked audio → AudioScribe, over HTTP to the services the compose stack already runs. This is configuration (service URLs), not new parsing code, and gives the scraper document-understanding depth no standalone competitor ships.
+Linked PDFs → Docling, image-heavy pages / linked images → PaddleOCR, linked audio → ascend-audio-scribe, over HTTP to the services the compose stack already runs. This is configuration (service URLs), not new parsing code, and gives the scraper document-understanding depth no standalone competitor ships.
 
 ## Risks / Trade-offs
 

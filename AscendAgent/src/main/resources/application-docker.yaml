@@ -46,8 +46,8 @@ spring:
       client:
         streamable-http:
           connections:
-            audioscribe:
-              url: http://audio-scribe:7017
+            ascend-audio-scribe:
+              url: http://ascend-audio-scribe:7017
             weather:
               url: http://weather-mcp:9998
             ascend-web-hunter:

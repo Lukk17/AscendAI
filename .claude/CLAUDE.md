@@ -4,7 +4,7 @@
 
 @../AGENTS.md
 @../AscendAgent/AGENTS.md
-@../AudioScribe/AGENTS.md
+@../ascend-audio-scribe/AGENTS.md
 @../ascend-web-hunter/AGENTS.md
 @../AscendMemory/AGENTS.md
 @../WeatherMCP/AGENTS.md

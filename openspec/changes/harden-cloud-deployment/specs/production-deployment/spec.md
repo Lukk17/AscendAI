@@ -63,18 +63,18 @@ All credentials consumed by the stack SHALL be sourced from environment variable
 
 ### Requirement: Personal-machine artifacts are opt-in
 
-The compose files SHALL contain no personal absolute paths. The `audio-scribe` volumes SHALL use env-interpolated sources with named-volume defaults (`${HF_CACHE_ROOT:-hf-cache}:/hf-cache`, `${AUDIO_SCRIBE_MEDIA_ROOT:-audio-scribe-media}:/audio`), and `MCP_FILE_URI_ROOT` SHALL default to empty (`${AUDIO_SCRIBE_FILE_URI_ROOT:-}`), which disables `file://` URIs. The `ngrok-ascend-web-hunter` service SHALL be gated behind a compose profile so it does not start by default.
+The compose files SHALL contain no personal absolute paths. The `ascend-audio-scribe` volumes SHALL use env-interpolated sources with named-volume defaults (`${HF_CACHE_ROOT:-hf-cache}:/hf-cache`, `${ASCEND_AUDIO_SCRIBE_MEDIA_ROOT:-ascend-audio-scribe-media}:/audio`), and `MCP_FILE_URI_ROOT` SHALL default to empty (`${ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT:-}`), which disables `file://` URIs. The `ngrok-ascend-web-hunter` service SHALL be gated behind a compose profile so it does not start by default.
 
 #### Scenario: Default deployment cannot read host files via transcription
 
-- **WHEN** the stack starts with `AUDIO_SCRIBE_FILE_URI_ROOT` and `AUDIO_SCRIBE_MEDIA_ROOT` unset
-- **AND** a caller sends the AudioScribe MCP tool a `file:///audio/anything.mp3` URI
+- **WHEN** the stack starts with `ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT` and `ASCEND_AUDIO_SCRIBE_MEDIA_ROOT` unset
+- **AND** a caller sends the ascend-audio-scribe MCP tool a `file:///audio/anything.mp3` URI
 - **THEN** the request is rejected because `file://` support is disabled
 - **AND** `/audio` inside the container is an empty named volume, not a host directory
 
 #### Scenario: Owner restores the Desktop workflow via .env
 
-- **WHEN** the repo owner sets `AUDIO_SCRIBE_MEDIA_ROOT` to a host path and `AUDIO_SCRIBE_FILE_URI_ROOT=/audio` in `.env` and restarts the service
+- **WHEN** the repo owner sets `ASCEND_AUDIO_SCRIBE_MEDIA_ROOT` to a host path and `ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT=/audio` in `.env` and restarts the service
 - **THEN** `file://` transcription of files in that directory works as it did before this change
 
 #### Scenario: Ngrok does not start by default
@@ -95,7 +95,7 @@ The `ascend-web-hunter` service SHALL NOT declare `cap_add: SYS_ADMIN`. Chromium
 
 ### Requirement: SSRF allowlists exclude loopback by default
 
-`MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `audio-scribe` SHALL be env-driven with the default `object-store` (`${MCP_ALLOWED_HOSTS:-object-store}`). The committed compose files SHALL NOT list `localhost`, `127.0.0.1`, or `host.docker.internal` as allowlist defaults. Local-dev topologies where the S3-compatible object store runs on the Docker host SHALL opt in per machine by setting `MCP_ALLOWED_HOSTS` in `.env`, and this opt-in SHALL be documented in `.env.example` and the deployment guide.
+`MCP_ALLOWED_HOSTS` on `ascend-paddle-ocr` and `ascend-audio-scribe` SHALL be env-driven with the default `object-store` (`${MCP_ALLOWED_HOSTS:-object-store}`). The committed compose files SHALL NOT list `localhost`, `127.0.0.1`, or `host.docker.internal` as allowlist defaults. Local-dev topologies where the S3-compatible object store runs on the Docker host SHALL opt in per machine by setting `MCP_ALLOWED_HOSTS` in `.env`, and this opt-in SHALL be documented in `.env.example` and the deployment guide.
 
 #### Scenario: Loopback fetch is blocked by default
 

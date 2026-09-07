@@ -45,7 +45,7 @@ sequenceDiagram
 
 ### Dual API surfaces
 
-Python services (AudioScribe, ascend-web-hunter, AscendMemory, PaddleOCR) expose both:
+Python services (ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR) expose both:
 
 - **REST API.** For direct HTTP integration and testing.
 - **MCP server.** For LLM tool discovery and invocation via AscendAgent.

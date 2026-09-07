@@ -40,7 +40,7 @@ class FilteredToolCallbackProviderTest {
 
     @BeforeEach
     void setUp() {
-        McpSchema.Implementation connectedInfo = new McpSchema.Implementation("AscendAI-Agent - audioscribe", "audioscribe", "0.0.1");
+        McpSchema.Implementation connectedInfo = new McpSchema.Implementation("AscendAI-Agent - ascend-audio-scribe", "ascend-audio-scribe", "0.0.1");
         McpSchema.Implementation failedInfo = new McpSchema.Implementation("AscendAI-Agent - weather", "weather", "0.0.1");
         when(connectedClient.getClientInfo()).thenReturn(connectedInfo);
         when(failedClient.getClientInfo()).thenReturn(failedInfo);
@@ -72,7 +72,7 @@ class FilteredToolCallbackProviderTest {
     @DisplayName("getToolCallbacks with no clients returns empty array")
     void getToolCallbacks_NoClients_ReturnsEmptyArray() {
         FilteredToolCallbackProvider emptyProvider = new FilteredToolCallbackProvider(List.of(), registry);
-        when(registry.connectedNames()).thenReturn(Set.of("audioscribe"));
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
         ToolCallback[] callbacks = emptyProvider.getToolCallbacks();
 
@@ -82,7 +82,7 @@ class FilteredToolCallbackProviderTest {
     @Test
     @DisplayName("getToolCallbacks filters out client whose name is not in connected set")
     void getToolCallbacks_OnlyConnectedClientNamesFiltered_FailedClientExcluded() {
-        when(registry.connectedNames()).thenReturn(Set.of("audioscribe"));
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
                 List.of(failedClient), registry);

@@ -245,13 +245,13 @@ services:
         aliases:
           - weather-mcp
 
-  audio-scribe:
+  ascend-audio-scribe:
     build:
-      context: ./AudioScribe
+      context: ./ascend-audio-scribe
       dockerfile: Dockerfile
-    # image: lukk17/audio-scribe:latest
-    container_name: audio-scribe
-    hostname: audio-scribe
+    # image: lukk17/ascend-audio-scribe:latest
+    container_name: ascend-audio-scribe
+    hostname: ascend-audio-scribe
     restart: unless-stopped
     ports:
       - "7017:7017"
@@ -266,7 +266,7 @@ services:
       # Enables file:// URIs jailed to /audio (the host Desktop mount).
       - MCP_FILE_URI_ROOT=/audio
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=audio-scribe
+      - OTEL_SERVICE_NAME=ascend-audio-scribe
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
     volumes:
       - D:/Development/AI/hf-cache:/hf-cache
@@ -294,7 +294,7 @@ services:
     networks:
       default:
         aliases:
-          - audio-scribe
+          - ascend-audio-scribe
 
   # ─── Observability stack ───
 

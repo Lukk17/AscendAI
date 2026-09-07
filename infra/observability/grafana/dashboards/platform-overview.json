@@ -42,7 +42,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}[2m]))",
+          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "B"
         }
@@ -73,7 +73,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|audio-scribe|ascend-web-hunter|ascend-paddle-ocr\",status=~\"5..\"}[2m]))",
+          "expr": "sum by (service) (rate(http_request_duration_seconds_count{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\",status=~\"5..\"}[2m]))",
           "legendFormat": "{{service}}",
           "refId": "B"
         }
@@ -110,7 +110,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket{service=~\"ascend-memory|audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}[5m])))",
           "legendFormat": "{{service}} p95",
           "refId": "B"
         }
@@ -165,7 +165,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "process_resident_memory_bytes{service=~\"ascend-memory|audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}",
+          "expr": "process_resident_memory_bytes{service=~\"ascend-memory|ascend-audio-scribe|ascend-web-hunter|ascend-paddle-ocr\"}",
           "legendFormat": "{{service}} RSS",
           "refId": "A"
         }

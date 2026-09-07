@@ -23,8 +23,8 @@ on:
         required: true
         type: boolean
         default: false
-      release_audio_scribe:
-        description: 'Release audio-scribe (AudioScribe/pyproject.toml version)'
+      release_ascend_audio_scribe:
+        description: 'Release ascend-audio-scribe (ascend-audio-scribe/pyproject.toml version)'
         required: true
         type: boolean
         default: false
@@ -72,7 +72,7 @@ jobs:
           CREATE_RELEASE: ${{ inputs.create_github_release }}
           SEL_ASCEND_AGENT:     ${{ inputs.release_ascend_agent }}
           SEL_WEATHER_MCP:      ${{ inputs.release_weather_mcp }}
-          SEL_AUDIO_SCRIBE:     ${{ inputs.release_audio_scribe }}
+          SEL_ASCEND_AUDIO_SCRIBE:     ${{ inputs.release_ascend_audio_scribe }}
           SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
           SEL_ASCEND_MEMORY:    ${{ inputs.release_ascend_memory }}
           SEL_PADDLE_OCR:       ${{ inputs.release_paddle_ocr }}
@@ -81,7 +81,7 @@ jobs:
 
           # ── 1. Fail if zero apps selected ─────────────────────────────────
           SELECTED_COUNT=0
-          for VAR in "$SEL_ASCEND_AGENT" "$SEL_WEATHER_MCP" "$SEL_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_HUNTER" "$SEL_ASCEND_MEMORY" "$SEL_PADDLE_OCR"; do
+          for VAR in "$SEL_ASCEND_AGENT" "$SEL_WEATHER_MCP" "$SEL_ASCEND_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_HUNTER" "$SEL_ASCEND_MEMORY" "$SEL_PADDLE_OCR"; do
             [ "$VAR" = "true" ] && SELECTED_COUNT=$((SELECTED_COUNT + 1))
           done
           if [ "$SELECTED_COUNT" -eq 0 ]; then
@@ -191,7 +191,7 @@ jobs:
 
           check_and_add "$SEL_ASCEND_AGENT"      "ascend-agent"     "AscendAgent"    "java"   "AscendAgent/build.gradle.kts"
           check_and_add "$SEL_WEATHER_MCP"        "weather-mcp"      "WeatherMCP"     "java"   "WeatherMCP/build.gradle.kts"
-          check_and_add "$SEL_AUDIO_SCRIBE"       "audio-scribe"     "AudioScribe"    "python" "AudioScribe/pyproject.toml"
+          check_and_add "$SEL_ASCEND_AUDIO_SCRIBE"       "ascend-audio-scribe"     "ascend-audio-scribe"    "python" "ascend-audio-scribe/pyproject.toml"
           check_and_add "$SEL_ASCEND_WEB_HUNTER"  "ascend-web-hunter" "ascend-web-hunter" "python" "ascend-web-hunter/pyproject.toml"
           check_and_add "$SEL_ASCEND_MEMORY"      "ascend-memory"    "AscendMemory"   "python" "AscendMemory/pyproject.toml"
           check_and_add "$SEL_PADDLE_OCR"         "ascend-paddle-ocr"       "PaddleOCR"      "python" "PaddleOCR/pyproject.toml"
@@ -267,7 +267,7 @@ jobs:
           STACK_VERSION: ${{ inputs.stack_version }}
           SEL_ASCEND_AGENT:      ${{ inputs.release_ascend_agent }}
           SEL_WEATHER_MCP:       ${{ inputs.release_weather_mcp }}
-          SEL_AUDIO_SCRIBE:      ${{ inputs.release_audio_scribe }}
+          SEL_ASCEND_AUDIO_SCRIBE:      ${{ inputs.release_ascend_audio_scribe }}
           SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
           SEL_ASCEND_MEMORY:     ${{ inputs.release_ascend_memory }}
           SEL_PADDLE_OCR:        ${{ inputs.release_paddle_ocr }}
@@ -284,7 +284,7 @@ jobs:
 
           V_ASCEND_AGENT=$(read_java_version "AscendAgent/build.gradle.kts")
           V_WEATHER_MCP=$(read_java_version "WeatherMCP/build.gradle.kts")
-          V_AUDIO_SCRIBE=$(read_python_version "AudioScribe/pyproject.toml")
+          V_ASCEND_AUDIO_SCRIBE=$(read_python_version "ascend-audio-scribe/pyproject.toml")
           V_ASCEND_WEB_HUNTER=$(read_python_version "ascend-web-hunter/pyproject.toml")
           V_ASCEND_MEMORY=$(read_python_version "AscendMemory/pyproject.toml")
           V_PADDLE_OCR=$(read_python_version "PaddleOCR/pyproject.toml")
@@ -303,7 +303,7 @@ jobs:
             printf "|---|---|---|\n"
             printf "| ascend-agent | %s |%s |\n"       "${V_ASCEND_AGENT}"      "$(label "$SEL_ASCEND_AGENT")"
             printf "| weather-mcp | %s |%s |\n"        "${V_WEATHER_MCP}"       "$(label "$SEL_WEATHER_MCP")"
-            printf "| audio-scribe | %s |%s |\n"       "${V_AUDIO_SCRIBE}"      "$(label "$SEL_AUDIO_SCRIBE")"
+            printf "| ascend-audio-scribe | %s |%s |\n"       "${V_ASCEND_AUDIO_SCRIBE}"      "$(label "$SEL_ASCEND_AUDIO_SCRIBE")"
             printf "| ascend-web-hunter | %s |%s |\n"  "${V_ASCEND_WEB_HUNTER}" "$(label "$SEL_ASCEND_WEB_HUNTER")"
             printf "| ascend-memory | %s |%s |\n"      "${V_ASCEND_MEMORY}"     "$(label "$SEL_ASCEND_MEMORY")"
             printf "| ascend-paddle-ocr | %s |%s |\n"         "${V_PADDLE_OCR}"        "$(label "$SEL_PADDLE_OCR")"

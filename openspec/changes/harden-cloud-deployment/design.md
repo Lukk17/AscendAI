@@ -70,8 +70,8 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 ### D4 — Personal mounts: env-interpolated volume sources with named-volume defaults
 
-- `audio-scribe` volumes become `- "${HF_CACHE_ROOT:-hf-cache}:/hf-cache"` and `- "${AUDIO_SCRIBE_MEDIA_ROOT:-audio-scribe-media}:/audio"`, with `hf-cache` and `audio-scribe-media` declared as named volumes. Compose treats a pathless value as a named volume and a path as a bind mount, so the owner's two `.env` lines (`HF_CACHE_ROOT=D:/Development/AI/hf-cache`, `AUDIO_SCRIBE_MEDIA_ROOT=C:\Users\Lukk\Desktop`) restore today's behavior; every other deployment gets empty, harmless named volumes.
-- `MCP_FILE_URI_ROOT` becomes `${AUDIO_SCRIBE_FILE_URI_ROOT:-}` — empty means `file://` URIs disabled (AudioScribe's existing contract: unset ⇒ rejected). Reading host files through transcription becomes an explicit opt-in, never a default.
+- `ascend-audio-scribe` volumes become `- "${HF_CACHE_ROOT:-hf-cache}:/hf-cache"` and `- "${ASCEND_AUDIO_SCRIBE_MEDIA_ROOT:-ascend-audio-scribe-media}:/audio"`, with `hf-cache` and `ascend-audio-scribe-media` declared as named volumes. Compose treats a pathless value as a named volume and a path as a bind mount, so the owner's two `.env` lines (`HF_CACHE_ROOT=D:/Development/AI/hf-cache`, `ASCEND_AUDIO_SCRIBE_MEDIA_ROOT=C:\Users\Lukk\Desktop`) restore today's behavior; every other deployment gets empty, harmless named volumes.
+- `MCP_FILE_URI_ROOT` becomes `${ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT:-}` — empty means `file://` URIs disabled (ascend-audio-scribe's existing contract: unset ⇒ rejected). Reading host files through transcription becomes an explicit opt-in, never a default.
 
 ### D5 — Dropping `SYS_ADMIN` from `ascend-web-hunter`
 
@@ -92,7 +92,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 ### D7 — SSRF allowlists: explicit, no loopback
 
-- `MCP_ALLOWED_HOSTS` on both `ascend-paddle-ocr` and `audio-scribe` becomes `${MCP_ALLOWED_HOSTS:-object-store}`. The default allowlists only the in-network `object-store` hostname used for RAG-document and presigned-URL fetches. Local dev, where the S3-compatible object store runs on the host and is reached via `host.docker.internal`, sets `MCP_ALLOWED_HOSTS=host.docker.internal` in `.env` — a deliberate, documented, per-machine opt-in instead of a committed default that whitelists loopback everywhere.
+- `MCP_ALLOWED_HOSTS` on both `ascend-paddle-ocr` and `ascend-audio-scribe` becomes `${MCP_ALLOWED_HOSTS:-object-store}`. The default allowlists only the in-network `object-store` hostname used for RAG-document and presigned-URL fetches. Local dev, where the S3-compatible object store runs on the host and is reached via `host.docker.internal`, sets `MCP_ALLOWED_HOSTS=host.docker.internal` in `.env` — a deliberate, documented, per-machine opt-in instead of a committed default that whitelists loopback everywhere.
 - The deployment guide covers the cloud topology: the object store reachable at a private hostname, that hostname (and nothing else) in the allowlist.
 
 ### D8 — Observability exposure

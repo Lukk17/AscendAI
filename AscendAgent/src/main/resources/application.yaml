@@ -381,7 +381,7 @@ spring:
           enabled: true
         streamable-http:
           connections:
-            audioscribe:
+            ascend-audio-scribe:
               url: http://localhost:7017
             weather:
               url: http://localhost:9998

@@ -47,7 +47,7 @@ flowchart TD
     subgraph MCP ["Model Context Protocol (MCP)"]
         AscendAgent -- "Tool Discovery & Calls" --> ExtTools["External Tools"]
         ExtTools --> Weather["Weather MCP"]
-        ExtTools --> Audio["AudioScribe MCP"]
+        ExtTools --> Audio["ascend-audio-scribe MCP"]
         ExtTools --> WebHunter["ascend-web-hunter MCP"]
         WebHunter --> Searxng["SearXNG"]
     end
@@ -207,7 +207,7 @@ docker compose up -d --build
 ```
 
 External prerequisites (PostgreSQL, Redis, Qdrant, object storage) must already be running on the host. They aren't part of
-compose. Compose itself brings up the application services (ascend-memory, ascend-web-hunter, audio-scribe, etc.)
+compose. Compose itself brings up the application services (ascend-memory, ascend-web-hunter, ascend-audio-scribe, etc.)
 plus the support stack (SearXNG, FlareSolverr, Docling, Unstructured).
 
 #### 2. Run the AscendAgent

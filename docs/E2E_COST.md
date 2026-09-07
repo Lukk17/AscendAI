@@ -19,7 +19,7 @@ Source: [developers.openai.com/api/docs/pricing](https://developers.openai.com/a
 | gpt-5.1 | 1.25 | 0.125 | 10.00 | Confirmed 2026-09-04. The 2026-09-03 pass recorded this as unknown, which was wrong: the model is on the page. Requested chat model in [AscendAgent e2e spec 2](../AscendAgent/e2e/testing/2-image-description-test.md). |
 | gpt-4o | 2.50 | 1.25 | 10.00 | Configured chat default for the openai provider. The cached-input rate is confirmed at exactly half the standard input rate, closing the gap the 2026-09-03 pass left open on [spec 8](../AscendAgent/e2e/testing/8-prompt-cache-openai-test.md)'s 2,560 cached tokens. |
 | gpt-4o-mini | 0.15 | n/a (not separately checked) | 0.60 | Configured memory-extraction and compaction model for the openai provider. Never actually billed in this sweep, see [Findings](#findings). |
-| Whisper (transcription) | 0.006 $ / minute of audio | n/a | n/a | Not a per-token rate. Used by [AudioScribe e2e specs 2 and 5](../AudioScribe/e2e/testing/). The page prices "Whisper" without the `whisper-1` suffix the service actually sends. |
+| Whisper (transcription) | 0.006 $ / minute of audio | n/a | n/a | Not a per-token rate. Used by [ascend-audio-scribe e2e specs 2 and 5](../ascend-audio-scribe/e2e/testing/). The page prices "Whisper" without the `whisper-1` suffix the service actually sends. |
 | text-embedding-3-small | 0.02 | n/a | n/a (embedding, input only) | Configured embedding model for the openai provider in AscendAgent, and the model AscendMemory's own specs billed against. |
 | text-embedding-3-large | 0.13 | n/a | n/a (embedding, input only) | Priced for completeness. Not wired into any AscendAgent provider config today, see [application.yaml:237-257](../AscendAgent/src/main/resources/application.yaml#L237-L257). |
 
@@ -72,7 +72,7 @@ Embedding providers wired in: lmstudio uses `text-embedding-nomic-embed-text-v2-
 
 ### Usage
 
-Call counts below are structural facts, derived from the code and from each spec's request payload. Token figures come from the sweep of 2026-09-03. AscendAgent's specs 1, 2, 4, 8, 9, 10, and 11 come from the run at [`AscendAgent/e2e/testing/runs/2026-09-03T19-16-18_*`](../AscendAgent/e2e/testing/runs/), spec 3 comes from the fifth of five back-to-back re-runs at [`AscendAgent/e2e/testing/runs/2026-09-03T20-21-27Z_3-summarization-tasks.md`](../AscendAgent/e2e/testing/runs/2026-09-03T20-21-27Z_3-summarization-tasks.md), run after a retry/fan-out fix for an intermittent document-routing failure (see [Non-cost defects](#non-cost-defects-the-sweep-also-found)). AudioScribe's specs come from [`AudioScribe/e2e/testing/runs/2026-09-03T19-27-52_*`](../AudioScribe/e2e/testing/runs/), and AscendMemory's come from [`AscendMemory/e2e/testing/runs/2026-09-03T19-19-53_*`](../AscendMemory/e2e/testing/runs/) plus a fix re-run at [`AscendMemory/e2e/testing/runs/2026-09-03T19-46-17_*`](../AscendMemory/e2e/testing/runs/) for four specs. Every `<UTC-timestamp>_<N>-<feature>-tasks.md` file carries an `Input tokens` / `Output tokens` field in its `Result summary`, and that field is the source for every number below.
+Call counts below are structural facts, derived from the code and from each spec's request payload. Token figures come from the sweep of 2026-09-03. AscendAgent's specs 1, 2, 4, 8, 9, 10, and 11 come from the run at [`AscendAgent/e2e/testing/runs/2026-09-03T19-16-18_*`](../AscendAgent/e2e/testing/runs/), spec 3 comes from the fifth of five back-to-back re-runs at [`AscendAgent/e2e/testing/runs/2026-09-03T20-21-27Z_3-summarization-tasks.md`](../AscendAgent/e2e/testing/runs/2026-09-03T20-21-27Z_3-summarization-tasks.md), run after a retry/fan-out fix for an intermittent document-routing failure (see [Non-cost defects](#non-cost-defects-the-sweep-also-found)). ascend-audio-scribe's specs come from [`ascend-audio-scribe/e2e/testing/runs/2026-09-03T19-27-52_*`](../ascend-audio-scribe/e2e/testing/runs/), and AscendMemory's come from [`AscendMemory/e2e/testing/runs/2026-09-03T19-19-53_*`](../AscendMemory/e2e/testing/runs/) plus a fix re-run at [`AscendMemory/e2e/testing/runs/2026-09-03T19-46-17_*`](../AscendMemory/e2e/testing/runs/) for four specs. Every `<UTC-timestamp>_<N>-<feature>-tasks.md` file carries an `Input tokens` / `Output tokens` field in its `Result summary`, and that field is the source for every number below.
 
 #### Scope: what "outside the storage group" means
 
@@ -80,7 +80,7 @@ Call counts below are structural facts, derived from the code and from each spec
 
 #### A note on totals against the original ask
 
-The task that produced this document stated 43 specifications outside the storage group, 25 free, and paid counts of eight in AscendAgent, two in AudioScribe, four in AscendMemory, roughly 59 total paid calls (23 chat, 34 embedding, 2 audio). Counting the actual spec files on disk as of 2026-09-03 gave a different total: 45 specifications outside the storage group (30 free, 15 paid), because [PaddleOCR/e2e/README.md](../PaddleOCR/e2e/README.md)'s own capability table lists 6 specs but 12 exist on disk (specs 7 through 12 cover `/ready`, MCP SSRF, MCP scheme rejection, MCP credential rejection, MCP file-URI jail, and unsupported MIME, none of which the README table mentions), and because AudioScribe spec 5 also requires `OPENAI_API_KEY` per its own README and therefore counts as a third paid AudioScribe spec, not a second. The eight-in-AscendAgent and four-in-AscendMemory figures did independently verify against the code.
+The task that produced this document stated 43 specifications outside the storage group, 25 free, and paid counts of eight in AscendAgent, two in ascend-audio-scribe, four in AscendMemory, roughly 59 total paid calls (23 chat, 34 embedding, 2 audio). Counting the actual spec files on disk as of 2026-09-03 gave a different total: 45 specifications outside the storage group (30 free, 15 paid), because [PaddleOCR/e2e/README.md](../PaddleOCR/e2e/README.md)'s own capability table lists 6 specs but 12 exist on disk (specs 7 through 12 cover `/ready`, MCP SSRF, MCP scheme rejection, MCP credential rejection, MCP file-URI jail, and unsupported MIME, none of which the README table mentions), and because ascend-audio-scribe spec 5 also requires `OPENAI_API_KEY` per its own README and therefore counts as a third paid ascend-audio-scribe spec, not a second. The eight-in-AscendAgent and four-in-AscendMemory figures did independently verify against the code.
 
 Re-counting the spec files on disk on 2026-09-06 moves the total again, to 48 specifications outside the storage group (33 free, 15 paid). The paid side is unchanged; the free side moved because [ascend-web-hunter/e2e/README.md](../ascend-web-hunter/e2e/README.md) undercounted its own module the same way the PaddleOCR README did: its capability table listed 7 specs while 8 already existed on disk (spec 8, `session/clear`, had a Bruno request, an e2e spec, and a task template but was never added to the table), and two more specs (9, `session/status`, and 10, `session/establish`) were added on 2026-09-06 to close a matching gap — both endpoints existed in the router and were already unit-tested, just never carried through to the e2e suite or the Bruno collection. ascend-web-hunter's real count is therefore 10, not 7. This document uses the verified 48 / 33 / 15 split throughout, not the 45 / 30 / 15 figure the 2026-09-03 pass settled on. See the tables below for exactly which specs make up the difference.
 
@@ -131,7 +131,7 @@ The ~3,000-token figure for the parsed PDF is measured, not guessed: decompressi
 
 Estimated total: 49 embedding calls carrying roughly 15,600 tokens, of which one spec, run five times, accounts for about 96 percent of the volume.
 
-#### AudioScribe (3 of 5 specs)
+#### ascend-audio-scribe (3 of 5 specs)
 
 Each paid spec makes exactly one transcription call. Free: spec 1 (invalid input, rejected before any provider call) and spec 4 (MCP `tools/list`, a protocol probe with no provider call).
 
@@ -141,9 +141,9 @@ Each paid spec makes exactly one transcription call. Free: spec 1 (invalid input
 | 3 | transcribe-hf | Hugging Face Inference (`whisper-large-v3`) | 1 | 9.48 s (0.158 min) | not applicable, billed by audio duration | not applicable, billed by audio duration |
 | 5 | mcp-transcribe | OpenAI Whisper (via MCP tool) | 1 | not re-measured in this sweep | not applicable, billed by audio duration | not applicable, billed by audio duration |
 
-Both duration figures come from `ffprobe` against the shared fixture, [`AudioScribe/e2e/fixtures/meeting-clip.wav`](../AudioScribe/e2e/fixtures/meeting-clip.wav), read during the [transcribe-openai run](../AudioScribe/e2e/testing/runs/2026-09-03T19-27-52_2-transcribe-openai-tasks.md). Neither provider returned a usage object for either call, which is expected: Whisper transcription is billed by audio minute, not by token, and the AudioScribe REST endpoint returns only the flat transcript text, not the raw provider response. Spec 5 (mcp-transcribe) makes a third structural paid call on the same fixture through the same OpenAI backend, but the 2026-09-03T19-27-52 sweep did not include it. It was last exercised earlier the same day at [17:06 UTC](../AudioScribe/e2e/testing/runs/2026-09-03T17-06-00_5-mcp-transcribe-tasks.md), also against `meeting-clip.wav`. If it ran at the same duration, it would add another 0.158 minutes at the OpenAI rate. This document does not add it to the priced total below, since it was not part of the final measured pass.
+Both duration figures come from `ffprobe` against the shared fixture, [`ascend-audio-scribe/e2e/fixtures/meeting-clip.wav`](../ascend-audio-scribe/e2e/fixtures/meeting-clip.wav), read during the [transcribe-openai run](../ascend-audio-scribe/e2e/testing/runs/2026-09-03T19-27-52_2-transcribe-openai-tasks.md). Neither provider returned a usage object for either call, which is expected: Whisper transcription is billed by audio minute, not by token, and the ascend-audio-scribe REST endpoint returns only the flat transcript text, not the raw provider response. Spec 5 (mcp-transcribe) makes a third structural paid call on the same fixture through the same OpenAI backend, but the 2026-09-03T19-27-52 sweep did not include it. It was last exercised earlier the same day at [17:06 UTC](../ascend-audio-scribe/e2e/testing/runs/2026-09-03T17-06-00_5-mcp-transcribe-tasks.md), also against `meeting-clip.wav`. If it ran at the same duration, it would add another 0.158 minutes at the OpenAI rate. This document does not add it to the priced total below, since it was not part of the final measured pass.
 
-The fixture itself carries a defect: it is documented in the AudioScribe e2e suite as a five-second mono WAV but is actually a 9.48-second LAME-encoded MP3 elementary stream wearing a `.wav` filename (see [Non-cost defects](#non-cost-defects-the-sweep-also-found)). The 0.158-minute duration used below is the real, measured one.
+The fixture itself carries a defect: it is documented in the ascend-audio-scribe e2e suite as a five-second mono WAV but is actually a 9.48-second LAME-encoded MP3 elementary stream wearing a `.wav` filename (see [Non-cost defects](#non-cost-defects-the-sweep-also-found)). The 0.158-minute duration used below is the real, measured one.
 
 Totals: 3 transcription calls structurally, 2 against OpenAI (priced at 0.006 $/minute) and 1 against Hugging Face (priced by compute time, approximated in the cost section below). The cost section prices the 2 calls the final sweep actually measured, spec 2 against OpenAI and spec 3 against Hugging Face, and leaves spec 5 out because it was not part of that pass.
 
@@ -175,7 +175,7 @@ Every spec in these three modules drives only local or self-hosted services (the
 1. Open [Prices](#prices) and replace any rate that changed, keeping the source URL and read date on the row.
 2. Leave every table in [Usage](#usage) untouched. Call counts do not change when a price changes.
 3. For each paid row, multiply its input and output token counts by the matching price-table rate, splitting cached from uncached input where the spec exercises prompt caching (specs 8, 9, 10, and 11), and sum across rows.
-4. For AudioScribe rows, multiply audio minutes by the $/minute rate instead of a token rate. The Hugging Face row is not a per-minute rate at all, see step 6.
+4. For ascend-audio-scribe rows, multiply audio minutes by the $/minute rate instead of a token rate. The Hugging Face row is not a per-minute rate at all, see step 6.
 5. Skip every MiniMax row. The subscription makes them free at the margin, see the top of this document.
 6. Carry the three approximations separately so the verifiable figure stays recoverable: spec 10's unlogged compaction output, the Hugging Face compute-time conversion, and the embedding token estimate. The cost section below keeps them in their own subsection for exactly this reason.
 7. Treat Gemini as an open cost rather than a zero if a future spec routes to it. Nothing in today's suite does.
@@ -206,11 +206,11 @@ gpt-4o, AscendAgent spec 8, prompt-cache-openai, two calls. Rates 2.50 uncached 
 
 The 2026-09-03 pass carried this row at 0.0180 because it could not confirm a cached-input rate and so assumed no discount at all. The confirmed 1.25 rate takes 0.0032 off, and 0.0147850 is the real figure, not a ceiling.
 
-Whisper `whisper-1`, AudioScribe spec 2, transcribe-openai. Rate 0.006 $ per minute of audio, against the measured 9.48-second fixture.
+Whisper `whisper-1`, ascend-audio-scribe spec 2, transcribe-openai. Rate 0.006 $ per minute of audio, against the measured 9.48-second fixture.
 
 - 0.158 min x 0.006 = 0.000948
 
-AudioScribe spec 5, mcp-transcribe, is a structurally identical third Whisper call on the same fixture but was not part of the 19:27:52 pass, so it stays out of this total. Adding it would cost another 0.000948.
+ascend-audio-scribe spec 5, mcp-transcribe, is a structurally identical third Whisper call on the same fixture but was not part of the 19:27:52 pass, so it stays out of this total. Adding it would cost another 0.000948.
 
 text-embedding-3-small. Rate 0.02 input. Volume from [Embedding calls the run records never captured](#embedding-calls-the-run-records-never-captured), roughly 15,600 tokens across 49 calls. This is an estimate.
 
@@ -263,13 +263,13 @@ Anthropic subtotal = 0.0387306 + 0.004115 = 0.0428456
 
 #### Hugging Face
 
-whisper-large-v3 via the `hf-inference` provider, AudioScribe spec 3, transcribe-hf. There is no per-minute rate and no flat rate, so the audio duration is not the billing unit. Compute time is, at the underlying hardware's per-second price.
+whisper-large-v3 via the `hf-inference` provider, ascend-audio-scribe spec 3, transcribe-hf. There is no per-minute rate and no flat rate, so the audio duration is not the billing unit. Compute time is, at the underlying hardware's per-second price.
 
-The only compute-time figure the sweep captured is the client-observed 3,078 ms round trip recorded in the [spec 3 run record](../AudioScribe/e2e/testing/runs/2026-09-03T19-27-52_3-transcribe-hf-tasks.md). That is wall clock through AudioScribe and the network, so the compute seconds Hugging Face actually billed are a subset of it. The only hardware rate the pricing page publishes is the 0.00012 $ per GPU second in its own worked example.
+The only compute-time figure the sweep captured is the client-observed 3,078 ms round trip recorded in the [spec 3 run record](../ascend-audio-scribe/e2e/testing/runs/2026-09-03T19-27-52_3-transcribe-hf-tasks.md). That is wall clock through ascend-audio-scribe and the network, so the compute seconds Hugging Face actually billed are a subset of it. The only hardware rate the pricing page publishes is the 0.00012 $ per GPU second in its own worked example.
 
 - 3.078 s x 0.00012 = 0.000369
 
-Treat that as an upper bound rather than a quote. Two things push the real figure lower: billed compute excludes the network and AudioScribe's own overhead inside the 3,078 ms, and the pricing page notes `hf-inference` runs mostly on CPU, which is cheaper per second than the GPU rate the example uses. A 9.48-second clip decoded by a large ASR model in roughly three seconds of wall clock is not a workload that can plausibly cost more than a twentieth of a cent at any published rate.
+Treat that as an upper bound rather than a quote. Two things push the real figure lower: billed compute excludes the network and ascend-audio-scribe's own overhead inside the 3,078 ms, and the pricing page notes `hf-inference` runs mostly on CPU, which is cheaper per second than the GPU rate the example uses. A 9.48-second clip decoded by a large ASR model in roughly three seconds of wall clock is not a workload that can plausibly cost more than a twentieth of a cent at any published rate.
 
 Hugging Face subtotal = 0.000369, entirely approximated.
 
@@ -352,8 +352,8 @@ None of these affect the arithmetic above. They are recorded here because the ru
 - Five assertions read response fields that do not exist in the payload they were checking.
 - Two specifications named response fields the service never actually returns.
 - Four request files sent double-encoded query text: `search-reykjavik.yml`, `search-alpha.yml`, `search-beta.yml`, and `search-isolation-user-b.yml` under [docs/api/request/AscendAI/memory/testing/](../docs/api/request/AscendAI/memory/testing/), each manually percent-encoding a value that Bruno's own `encodeUrl: true` setting then encoded a second time, corrected and re-run at [`AscendMemory/e2e/testing/runs/2026-09-03T19-46-17_*`](../AscendMemory/e2e/testing/runs/).
-- Specifications instructed the runner to print API keys into the transcript: AudioScribe's `OPENAI_API_KEY` and `HF_TOKEN` prerequisite checks in its OpenAI and Hugging Face transcription specs, both substituted for a non-printing presence check instead.
-- A fixture documented as a five-second mono WAV turned out to be a 9.48-second MP3 elementary stream wearing a `.wav` filename: [`AudioScribe/e2e/fixtures/meeting-clip.wav`](../AudioScribe/e2e/fixtures/meeting-clip.wav).
+- Specifications instructed the runner to print API keys into the transcript: ascend-audio-scribe's `OPENAI_API_KEY` and `HF_TOKEN` prerequisite checks in its OpenAI and Hugging Face transcription specs, both substituted for a non-printing presence check instead.
+- A fixture documented as a five-second mono WAV turned out to be a 9.48-second MP3 elementary stream wearing a `.wav` filename: [`ascend-audio-scribe/e2e/fixtures/meeting-clip.wav`](../ascend-audio-scribe/e2e/fixtures/meeting-clip.wav).
 - A check asserted a response-time threshold as proof a backend call never fired, but container overhead alone already sits above that threshold on every request regardless of truth. AscendMemory's invalid-input spec was corrected to a structural proof plus an observable Qdrant point-count check instead.
 - A request file was weaker than its siblings, missing an assertion the equivalent requests in the same spec all carried.
 - A document-conversion failure, an intermittent 422 `Failed to route PDF page` error on the AscendAgent summarization spec, traced back to a supervisor process killing its own worker rather than to the document or the model. Fixed with a retry/fan-out and confirmed clean across [five consecutive re-runs](../AscendAgent/e2e/testing/runs/2026-09-03T20-21-27Z_3-summarization-tasks.md).

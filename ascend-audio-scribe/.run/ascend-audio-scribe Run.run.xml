@@ -1,0 +1,37 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ascend-audio-scribe Run" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+    <deployment type="dockerfile">
+      <settings>
+        <option name="imageTag" value="ascend-audio-scribe:latest" />
+        <option name="containerName" value="ascend-audio-scribe" />
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="HF_HOME" />
+              <option name="value" value="/hf-cache" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="portBindings">
+          <list>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="7017" />
+              <option name="hostPort" value="7017" />
+            </DockerPortBindingImpl>
+          </list>
+        </option>
+        <option name="commandLineOptions" value="--gpus all --env HF_TOKEN --env OPENAI_API_KEY" />
+        <option name="sourceFilePath" value="ascend-audio-scribe/Dockerfile" />
+        <option name="volumeBindings">
+          <list>
+            <DockerVolumeBindingImpl>
+              <option name="containerPath" value="/hf-cache" />
+              <option name="hostPath" value="$PROJECT_DIR$/../../AI/hf-cache" />
+            </DockerVolumeBindingImpl>
+          </list>
+        </option>
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

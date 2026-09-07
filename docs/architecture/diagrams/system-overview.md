@@ -8,7 +8,7 @@ graph TB
         Agent["AscendAgent<br/>REST API :9917<br/>Spring Boot · Java 21"]
 
         subgraph "MCP Tool Services"
-            AudioScribe["AudioScribe<br/>:7017<br/>Audio Transcription"]
+            AudioScribe["ascend-audio-scribe<br/>:7017<br/>Audio Transcription"]
             Weather["WeatherMCP<br/>:9998<br/>Weather Data"]
             WebHunter["ascend-web-hunter<br/>:7021<br/>Web Search"]
             PaddleOCR["PaddleOCR<br/>:7022<br/>OCR"]

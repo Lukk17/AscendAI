@@ -1,2 +1,3 @@
 schema: e2e-runbooks
 created: 2026-06-14
+skip_specs: true

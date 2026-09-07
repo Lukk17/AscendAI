@@ -79,7 +79,7 @@ docker compose up -d --build --force-recreate
 
 #### Build and recreate a single service
 
-`<service>` is the name from either compose file (e.g. `audio-scribe`, `ascend-web-hunter`). `--no-deps` skips linked
+`<service>` is the name from either compose file (e.g. `ascend-audio-scribe`, `ascend-web-hunter`). `--no-deps` skips linked
 services (database, redis, etc.). For services in the scrapper file you can target them through the merged invocation
 above (because of `include:`) or with `-f ascend-scrapper.docker-compose.yaml`.
 

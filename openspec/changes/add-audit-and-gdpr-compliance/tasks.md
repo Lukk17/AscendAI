@@ -4,7 +4,7 @@
 - [ ] 1.2 In `AscendAgent/src/main/resources/application.yaml` `logging.level`, replace the stale `com.lukk.ai.agent: DEBUG` entry with `com.lukk.ascend.ai.agent: DEBUG` (dev posture keeps DEBUG)
 - [ ] 1.3 Add a `logging.level` block to `AscendAgent/src/main/resources/application-docker.yaml` pinning `org.springframework.ai: INFO` and `com.lukk.ascend.ai.agent: INFO`
 - [ ] 1.4 Sweep AscendAgent service classes (`AscendChatService`, RAG, ingestion, memory packages) for log statements that pass prompt/document/memory content as arguments; convert offenders to length/count/hash form
-- [ ] 1.5 Sweep the four Python services (AudioScribe, ascend-web-hunter, AscendMemory, PaddleOCR) for log statements emitting transcript, scraped-page, memory-text, or OCR content; fix any leakage found and note the clean files in the PR description
+- [ ] 1.5 Sweep the four Python services (ascend-audio-scribe, ascend-web-hunter, AscendMemory, PaddleOCR) for log statements emitting transcript, scraped-page, memory-text, or OCR content; fix any leakage found and note the clean files in the PR description
 - [ ] 1.6 Test (`PromptControllerLogRedactionTest`): capture logs via a ListAppender while calling the endpoint with a marker prompt; assert the marker string is absent and length + digest are present
 - [ ] 1.7 Test: with the `docker` profile active, assert the effective level for `org.springframework.ai` is INFO (LoggerContext inspection)
 

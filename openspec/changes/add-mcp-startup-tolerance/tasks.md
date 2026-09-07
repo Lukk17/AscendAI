@@ -85,7 +85,7 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Manual smoke test: start AscendAgent with `audioscribe` MCP shut down, observe banner shows
+- [ ] 8.1 Manual smoke test: start AscendAgent with `ascend-audio-scribe` MCP shut down, observe banner shows
       `[FAILED]` for it and `[Connected]` for the others, prompt endpoint serves a request that doesn't need
       audio transcription successfully.
 - [ ] 8.2 Manual smoke test: start AscendAgent with all MCPs up, observe banner shows `[Connected]` for all

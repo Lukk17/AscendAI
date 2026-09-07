@@ -15,7 +15,7 @@ The three signal types are kept separate end to end:
 ```mermaid
 graph LR
     subgraph "App containers"
-        SVC["ascend-agent · weather-mcp<br/>ascend-memory · audio-scribe<br/>ascend-web-hunter · ascend-paddle-ocr"]
+        SVC["ascend-agent · weather-mcp<br/>ascend-memory · ascend-audio-scribe<br/>ascend-web-hunter · ascend-paddle-ocr"]
     end
 
     SVC -->|"/metrics scrape"| PROM["Prometheus"]
@@ -55,7 +55,7 @@ graph LR
 Prometheus ([prometheus/prometheus.yaml](prometheus/prometheus.yaml)) scrapes:
 
 - The two Java services (`ascend-agent`, `weather-mcp`) at `/actuator/prometheus` (Spring Boot Actuator + Micrometer).
-- The four Python services (`ascend-memory`, `audio-scribe`, `ascend-web-hunter`, `ascend-paddle-ocr`) at `/metrics` (prometheus-fastapi-instrumentator).
+- The four Python services (`ascend-memory`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-paddle-ocr`) at `/metrics` (prometheus-fastapi-instrumentator).
 - Qdrant at `/metrics` (native, unprefixed metric names such as `collection_vectors` and `collections_total`).
 - Container Metrics Exporter at `/metrics` (`container_memory_used_bytes`, `container_memory_limit_bytes`, `container_start_time_seconds`, labelled per container by `name`). This is the only source in the stack for a container's total memory footprint against its `deploy.resources.limits.memory` ceiling. JVM heap metrics and Python RSS metrics each see only part of the process, not the cgroup limit itself.
 
@@ -88,7 +88,7 @@ The main compose file already wires this (`command: ["--config", "/etc/vector/ve
    {service="ascend-agent"}
    ```
 
-Five of the six application containers are shipped under their own `service` label value: `ascend-agent`, `ascend-memory`, `audio-scribe`, `ascend-web-hunter`, and `ascend-paddle-ocr`.
+Five of the six application containers are shipped under their own `service` label value: `ascend-agent`, `ascend-memory`, `ascend-audio-scribe`, `ascend-web-hunter`, and `ascend-paddle-ocr`.
 
 `weather-mcp` is intentionally console-silent: its `application.yml` suppresses console logging to keep the SSE stream clean, so it will not appear in Loki even though Vector is configured to watch it. That is expected, not a gap in the pipeline.
 

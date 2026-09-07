@@ -5,7 +5,7 @@
 ### docker-compose placement
 
 PaddleOCR runs as the `ascend-paddle-ocr` service in `docker-compose.yaml` (root of the monorepo). It is grouped
-with the other non-scraper support services — Docling Serve, Unstructured API, WeatherMCP, AudioScribe, AscendMemory.
+with the other non-scraper support services — Docling Serve, Unstructured API, WeatherMCP, ascend-audio-scribe, AscendMemory.
 
 ```mermaid
 graph TB

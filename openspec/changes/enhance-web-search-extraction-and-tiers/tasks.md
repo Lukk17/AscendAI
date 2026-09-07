@@ -31,7 +31,7 @@
 
 ## 5. Non-HTML routing and output formats
 
-- [ ] 5.1 Route linked PDFs to Docling, image-heavy pages / linked images to PaddleOCR, linked audio to AudioScribe (service URLs from config); merge extracted text into the result
+- [ ] 5.1 Route linked PDFs to Docling, image-heavy pages / linked images to PaddleOCR, linked audio to ascend-audio-scribe (service URLs from config); merge extracted text into the result
 - [ ] 5.2 Add full-page screenshot and extracted-tables-as-rows to the selectable output formats
 - [ ] 5.3 Tests: a page linking a PDF yields Docling-extracted text; a table page yields structured rows; screenshot output returns image bytes
 

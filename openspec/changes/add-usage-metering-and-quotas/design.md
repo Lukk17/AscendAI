@@ -29,7 +29,7 @@ Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelo
 
 - Payment processing, invoicing documents, price-to-currency conversion in the API (the Grafana token-cost dashboard already handles $ via `pricing.yaml`).
 - Authentication, role model, or tenant modelling (owned by the sibling changes).
-- Rate limiting inside AscendMemory / ascend-web-hunter / AudioScribe themselves — they are only reachable through the gateway or trusted service calls.
+- Rate limiting inside AscendMemory / ascend-web-hunter / ascend-audio-scribe themselves — they are only reachable through the gateway or trusted service calls.
 - Predictive cost estimation (pre-counting prompt tokens before the provider call).
 
 ## Decisions

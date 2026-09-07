@@ -149,7 +149,7 @@ parallel layout only matters when you care about wall-clock.
 ### Prerequisites before any test
 
 1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, S3-compatible object storage `:9070` (S3 API) / `:9071` (UI).
-2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, ascend-web-hunter, AudioScribe, PaddleOCR,
+2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, ascend-web-hunter, ascend-audio-scribe, PaddleOCR,
    WeatherMCP, support services).
 3. AscendAgent running on the host: `cd AscendAgent && ./gradlew bootRun`.
 
@@ -184,9 +184,9 @@ specs need:
       "Bash(docker exec ascend-agent sh -c *)",
       "Bash(docker exec ascend-agent printenv *)",
       "Bash(docker exec ascend-agent ls *)",
-      "Bash(docker exec audio-scribe sh -c *)",
-      "Bash(docker exec audio-scribe printenv *)",
-      "Bash(docker exec audio-scribe curl *)",
+      "Bash(docker exec ascend-audio-scribe sh -c *)",
+      "Bash(docker exec ascend-audio-scribe printenv *)",
+      "Bash(docker exec ascend-audio-scribe curl *)",
       "Bash(docker exec ascend-paddle-ocr sh -c *)",
       "Bash(docker exec ascend-paddle-ocr printenv *)",
       "Bash(docker exec ascend-paddle-ocr curl *)",
@@ -212,7 +212,7 @@ specs need:
 }
 ```
 
-Every entry names a specific container (`postgres`, `redis`, `ascend-agent`, `audio-scribe`, `ascend-paddle-ocr`,
+Every entry names a specific container (`postgres`, `redis`, `ascend-agent`, `ascend-audio-scribe`, `ascend-paddle-ocr`,
 `ascend-web-hunter`) or a specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` AscendAgent, `:9998`
 WeatherMCP, `:7020` AscendMemory). No blanket `docker exec *`, `docker cp *` or `curl *`, and no entry for a container
 no spec touches: `searxng`, `flaresolverr`, `ngrok-ascend-web-hunter`, `weather-mcp`, `ascend-memory`, `docling-serve`,
@@ -224,7 +224,7 @@ does not own, so every step against it is a plain HTTP call. If you only run a s
 This list covers every e2e suite in the repository, not only AscendAgent's own eleven specs, because this is the one
 place the allowlist shapes are documented. Two entries are read-only against `:9070` (`curl -fsS ...`, the `GET`
 listing calls), one is a delete (`curl -fsS -X DELETE ...`), and two are writes used to seed fixtures directly into
-the object store: AudioScribe's test 5 and PaddleOCR's test 6 both `PUT` a bucket and then `PUT` a fixture file into
+the object store: ascend-audio-scribe's test 5 and PaddleOCR's test 6 both `PUT` a bucket and then `PUT` a fixture file into
 it via `curl.exe` (PowerShell aliases plain `curl` to `Invoke-WebRequest`, so these specs call the real `curl.exe`
 binary).
 
@@ -236,7 +236,7 @@ loading it with `docker exec redis sh -c "redis-cli < /tmp/..."`, and ascend-web
 container, so no entry permits that direction.
 
 The `sh -c` entries exist because several specs need a shell inside the container: key-presence checks that print
-`present` or `missing` rather than the secret itself (AscendAgent tests 8 and 9, AudioScribe tests 2, 3 and 5),
+`present` or `missing` rather than the secret itself (AscendAgent tests 8 and 9, ascend-audio-scribe tests 2, 3 and 5),
 transcript cleanup (`rm -f /tmp/transcript_*.md`), and the Redis seed load. On Windows the `sh -c` wrapper is also
 what stops Git Bash rewriting a leading-slash container path such as `/tmp/...` into a Windows path before `docker`
 sees it.
@@ -320,7 +320,7 @@ document rather than memorised knowledge.
 | `dedup-pierogi-grandma.md`                                 | RAG dedup (test 7)                     | Grandma Maria's pierogi recipe (GRANDMA-DEDUP-CANARY).                    |
 | `argent-saga-chronicle.pdf`                                | Summarization (test 3)                 | Fictional saga with unique proper nouns.                                  |
 | `image.png`                                                | Image description (test 2)             | Recognisable subject the model can describe.                              |
-| `meeting-clip.wav`                                         | (future audio test)                    | Short meeting recording. Despite the `.wav` extension this is a LAME-encoded MP3 elementary stream (MPEG sync word `0xfff3`, no RIFF header): mono, 24 kHz, 9.48 seconds, 56880 bytes. Byte-identical to `AudioScribe/e2e/fixtures/meeting-clip.wav`. See [../../AudioScribe/e2e/fixtures/README.md](../../AudioScribe/e2e/fixtures/README.md) for the full `ffprobe` breakdown. |
+| `meeting-clip.wav`                                         | (future audio test)                    | Short meeting recording. Despite the `.wav` extension this is a LAME-encoded MP3 elementary stream (MPEG sync word `0xfff3`, no RIFF header): mono, 24 kHz, 9.48 seconds, 56880 bytes. Byte-identical to `ascend-audio-scribe/e2e/fixtures/meeting-clip.wav`. See [../../ascend-audio-scribe/e2e/fixtures/README.md](../../ascend-audio-scribe/e2e/fixtures/README.md) for the full `ffprobe` breakdown. |
 | `compaction-seeds/seed-compaction-fires.{sql,redis}`       | Compaction fires (test 10)             | 21-row deterministic chat history with sprinkled facts.                   |
 | `compaction-seeds/seed-compaction-idempotency.{sql,redis}` | Compaction idempotency (test 11)       | 1 summary row + 8 raw turns, mimicking post-compaction state.             |
 

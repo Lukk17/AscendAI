@@ -20,7 +20,7 @@ graph TB
     end
 
     subgraph "Compose project: ascend-ai (docker-compose.yaml)"
-        AudioScribe["AudioScribe :7017"]
+        AudioScribe["ascend-audio-scribe :7017"]
         Memory["AscendMemory :7020"]
         PaddleOCR["PaddleOCR :7022"]
         Docling["Docling :5001"]
@@ -71,7 +71,7 @@ graph TB
 | AscendAgent       | 9917            | Main API gateway      | Host JVM               |
 | WeatherMCP        | 9998            | MCP server            | Host JVM               |
 | LM Studio         | 1234            | Local LLM             | Host                   |
-| AudioScribe       | 7017            | MCP server            | Docker                 |
+| ascend-audio-scribe       | 7017            | MCP server            | Docker                 |
 | ascend-web-hunter   | 7021            | MCP server            | Docker                 |
 | AscendMemory      | 7020            | REST + MCP            | Docker                 |
 | PaddleOCR         | 7022            | MCP server            | Docker                 |
