@@ -1,5 +1,6 @@
 package com.lukk.ascend.ai.agent.config.mcp;
 
+import com.lukk.ascend.ai.agent.config.properties.McpStartupProperties;
 import io.modelcontextprotocol.client.McpSyncClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
@@ -13,8 +14,10 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,10 +28,18 @@ import java.util.regex.Pattern;
  * Wraps the full list of {@link McpSyncClient} instances and exposes only the tool
  * callbacks from clients that are currently in {@link McpClientStatus#CONNECTED} state.
  *
- * <p>At {@link #getToolCallbacks()} time this builds a fresh {@link SyncMcpToolCallbackProvider}
- * over only the CONNECTED clients, so the LLM never receives a tool definition that would
- * route to a FAILED client. The client-list filter approach is used rather than post-hoc
- * callback filtering to avoid fragile callback→client reverse lookups; see ADR-008.
+ * <p>At {@link #getToolCallbacks()} time this discovers tools from each CONNECTED client
+ * individually, so the LLM never receives a tool definition that would route to a FAILED
+ * client, and one client's failure cannot abort discovery for the others. The client-list
+ * filter approach is used rather than post-hoc callback filtering to avoid fragile
+ * callback→client reverse lookups; see ADR-008.
+ *
+ * <p>An MCP session idle for long enough that the server has forgotten it surfaces from
+ * {@code listTools()} as a runtime exception (Spring AI's {@code SyncMcpToolCallbackProvider}
+ * does not retry). {@link #discoverToolCallbacks(McpSyncClient)} recovers from that with one
+ * reconnect-and-retry cycle per client, bounded by the same {@code app.mcp.startup.init-timeout}
+ * used at boot; a client still failing after that reconnect degrades to an empty tool list for
+ * this request rather than failing the whole chat request.
  */
 @Component
 @Primary
@@ -38,14 +49,17 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
 
     private final List<McpSyncClient> allClients;
     private final McpClientStatusRegistry registry;
+    private final McpStartupProperties startupProperties;
 
     /** OpenAI and Anthropic require tool function names to match this pattern. */
     private static final Pattern ILLEGAL_TOOL_NAME_CHARS = Pattern.compile("[^a-zA-Z0-9_-]");
 
     public FilteredToolCallbackProvider(List<McpSyncClient> allClients,
-                                        McpClientStatusRegistry registry) {
+                                        McpClientStatusRegistry registry,
+                                        McpStartupProperties startupProperties) {
         this.allClients = allClients;
         this.registry = registry;
+        this.startupProperties = startupProperties;
     }
 
     @Override
@@ -60,10 +74,49 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
             return new ToolCallback[0];
         }
 
-        ToolCallback[] sanitized = Arrays.stream(new SyncMcpToolCallbackProvider(connectedClients).getToolCallbacks())
+        List<ToolCallback> discovered = new ArrayList<>();
+        for (McpSyncClient client : connectedClients) {
+            discovered.addAll(discoverToolCallbacks(client));
+        }
+
+        ToolCallback[] sanitized = discovered.stream()
                 .map(FilteredToolCallbackProvider::sanitizeName)
                 .toArray(ToolCallback[]::new);
         return disambiguateCollisions(sanitized);
+    }
+
+    private List<ToolCallback> discoverToolCallbacks(McpSyncClient client) {
+        String name = resolveConnectionName(client);
+        try {
+            return List.of(new SyncMcpToolCallbackProvider(List.of(client)).getToolCallbacks());
+        } catch (RuntimeException firstFailure) {
+            log.warn("MCP client '{}' tool discovery failed, attempting reconnect: {}",
+                    name, firstFailure.getMessage());
+            if (!reconnect(client, name)) {
+                return List.of();
+            }
+            try {
+                return List.of(new SyncMcpToolCallbackProvider(List.of(client)).getToolCallbacks());
+            } catch (RuntimeException retryFailure) {
+                log.warn("MCP client '{}' tool discovery still failing after reconnect, excluding its tools "
+                                + "from this request: {}", name, retryFailure.getMessage());
+                return List.of();
+            }
+        }
+    }
+
+    private boolean reconnect(McpSyncClient client, String name) {
+        try {
+            Mono.fromRunnable(client::initialize)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .timeout(startupProperties.getInitTimeout())
+                    .block();
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("MCP client '{}' reconnect failed within {}: {}",
+                    name, startupProperties.getInitTimeout(), e.getMessage());
+            return false;
+        }
     }
 
     /**

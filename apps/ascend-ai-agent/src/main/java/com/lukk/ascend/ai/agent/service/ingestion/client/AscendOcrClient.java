@@ -17,12 +17,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @Component
@@ -56,12 +54,13 @@ public class AscendOcrClient {
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add(PARAM_FILE, new NamedByteArrayResource(fileBytes, filename));
+        // ascend-ocr's documented contract declares `lang` as a multipart form field on
+        // POST /v1/ocr, not a query parameter.
+        if (StringUtils.hasText(lang)) {
+            body.add(PARAM_LANG, lang);
+        }
 
-        // ascend-ocr declares `lang` as a query parameter on POST /v1/ocr, not a multipart
-        // form field (see apps/ascend-ai-agent/src/test/resources/ascend-ocr/openapi-contract.json).
-        String uri = UriComponentsBuilder.fromUriString(ascendOcrBaseUrl + ascendOcrApiPath)
-                .queryParamIfPresent(PARAM_LANG, Optional.ofNullable(lang).filter(StringUtils::hasText))
-                .toUriString();
+        String uri = ascendOcrBaseUrl + ascendOcrApiPath;
 
         try {
             String response = restClient.post()

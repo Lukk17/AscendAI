@@ -1,7 +1,9 @@
 package com.lukk.ascend.ai.agent.config.mcp;
 
+import com.lukk.ascend.ai.agent.config.properties.McpStartupProperties;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema;
+import io.modelcontextprotocol.spec.McpTransportSessionNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,10 +19,13 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +41,8 @@ class FilteredToolCallbackProviderTest {
     @Mock
     private McpSyncClient failedClient;
 
+    private McpStartupProperties startupProperties;
+
     private FilteredToolCallbackProvider provider;
 
     @BeforeEach
@@ -45,7 +52,8 @@ class FilteredToolCallbackProviderTest {
         when(connectedClient.getClientInfo()).thenReturn(connectedInfo);
         when(failedClient.getClientInfo()).thenReturn(failedInfo);
 
-        provider = new FilteredToolCallbackProvider(List.of(connectedClient, failedClient), registry);
+        startupProperties = new McpStartupProperties();
+        provider = new FilteredToolCallbackProvider(List.of(connectedClient, failedClient), registry, startupProperties);
     }
 
     @Test
@@ -71,7 +79,7 @@ class FilteredToolCallbackProviderTest {
     @Test
     @DisplayName("getToolCallbacks with no clients returns empty array")
     void getToolCallbacks_NoClients_ReturnsEmptyArray() {
-        FilteredToolCallbackProvider emptyProvider = new FilteredToolCallbackProvider(List.of(), registry);
+        FilteredToolCallbackProvider emptyProvider = new FilteredToolCallbackProvider(List.of(), registry, startupProperties);
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
         ToolCallback[] callbacks = emptyProvider.getToolCallbacks();
@@ -85,11 +93,47 @@ class FilteredToolCallbackProviderTest {
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(failedClient), registry);
+                List.of(failedClient), registry, startupProperties);
 
         ToolCallback[] callbacks = singleProvider.getToolCallbacks();
 
         assertThat(callbacks).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getToolCallbacks reconnects and retries when a CONNECTED client's session has gone stale")
+    void getToolCallbacks_StaleSessionOnFirstDiscovery_ReconnectsAndReturnsToolsFromRetry() {
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
+        when(connectedClient.listTools())
+                .thenThrow(new McpTransportSessionNotFoundException("stale-session-id"))
+                .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
+
+        FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
+                List.of(connectedClient), registry, startupProperties);
+
+        ToolCallback[] callbacks = singleProvider.getToolCallbacks();
+
+        assertThat(callbacks).hasSize(1);
+        assertThat(callbacks[0].getToolDefinition().name()).isEqualTo("transcribe");
+        verify(connectedClient, times(1)).initialize();
+        verify(connectedClient, times(2)).listTools();
+    }
+
+    @Test
+    @DisplayName("getToolCallbacks excludes a client still failing after reconnect but keeps other clients' tools")
+    void getToolCallbacks_DiscoveryStillFailsAfterReconnect_ExcludesThatClientKeepsOthers() {
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe", "ascend-weather-mcp"));
+        when(connectedClient.listTools())
+                .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
+        when(failedClient.listTools())
+                .thenThrow(new McpTransportSessionNotFoundException("stale-session-id"));
+
+        ToolCallback[] callbacks = provider.getToolCallbacks();
+
+        assertThat(callbacks).hasSize(1);
+        assertThat(callbacks[0].getToolDefinition().name()).isEqualTo("transcribe");
+        verify(failedClient, times(1)).initialize();
+        verify(failedClient, times(2)).listTools();
     }
 
     @Test
@@ -173,5 +217,14 @@ class FilteredToolCallbackProviderTest {
                 return callOutput;
             }
         };
+    }
+
+    private static McpSchema.Tool stubTool(String name) {
+        McpSchema.JsonSchema inputSchema = new McpSchema.JsonSchema("object", Map.of(), List.of(), false, null, null);
+        return McpSchema.Tool.builder()
+                .name(name)
+                .description("stub MCP tool " + name)
+                .inputSchema(inputSchema)
+                .build();
     }
 }

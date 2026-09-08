@@ -38,25 +38,24 @@ class AscendOcrClientLiveContractTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    @DisplayName("process sends the multipart part name and query param name ascend-ocr's own OpenAPI contract requires")
-    void process_SendsPartAndQueryParamNamesFromRealContract() throws IOException {
+    @DisplayName("process sends file and lang as multipart form fields, matching ascend-ocr's own documented contract")
+    void process_SendsFileAndLangAsMultipartFormFields() throws IOException {
         JsonNode contract = readJsonResource(OPENAPI_CONTRACT_RESOURCE);
         String requiredFieldName = contract
                 .at("/components/schemas/Body_process_ocr_v1_ocr_post/required/0").asText();
-        JsonNode langParam = contract.at("/paths/~1v1~1ocr/post/parameters/0");
-        assertThat(langParam.at("/in").asText()).isEqualTo("query");
-        String queryParamName = langParam.at("/name").asText();
 
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         AscendOcrClient client = new AscendOcrClient(builder.build(), objectMapper, BASE_URL, API_PATH);
 
-        server.expect(requestTo(BASE_URL + API_PATH + "?" + queryParamName + "=pl"))
+        server.expect(requestTo(BASE_URL + API_PATH))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(request -> {
                     String rawBody = new String(
                             ((MockClientHttpRequest) request).getBodyAsBytes(), StandardCharsets.ISO_8859_1);
                     assertThat(rawBody).contains("name=\"" + requiredFieldName + "\"");
+                    assertThat(rawBody).contains("name=\"lang\"");
+                    assertThat(rawBody).contains("pl");
                 })
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
