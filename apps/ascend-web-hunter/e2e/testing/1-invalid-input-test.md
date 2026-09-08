@@ -23,7 +23,7 @@ Expect a version string. If the command is not found, install it with `npm insta
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -37,19 +37,19 @@ None. This test does not write persisted state and is read-only against SearXNG 
 
 Send three Bruno requests in sequence. Each must complete before the next begins.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "web-hunter/testing/search-blank-query.yml" --env ascend-local
 ```
 
-```powershell
+```bash
 bru run "web-hunter/testing/search-missing-query.yml" --env ascend-local
 ```
 
-```powershell
+```bash
 bru run "web-hunter/testing/search-overlong-query.yml" --env ascend-local
 ```
 

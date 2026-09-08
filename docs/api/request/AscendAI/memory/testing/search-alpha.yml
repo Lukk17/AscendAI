@@ -22,6 +22,14 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("memory_search returns success status with results array", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("status");
+            expect(data.status).to.equal("success");
+            expect(data).to.have.property("results");
+            expect(data.results).to.be.an("array");
+        });
 
 settings:
   encodeUrl: true

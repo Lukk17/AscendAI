@@ -70,7 +70,11 @@ docker exec redis redis-cli DEL user:frostyCompactionIdempotencyTest:instruction
 Step 1. Send one prompt as `frostyCompactionIdempotencyTest`. The chat history grows from 9 → 11 rows (1 new user + 1 new assistant). The compaction trigger should NOT fire because turns past the existing summary (10) is less than the trigger (20).
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/compaction-idempotency-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/compaction-idempotency-prompt.yml" --env ascend-local
 ```
 
 Step 2. Wait long enough that any async compaction would have completed if it were going to.

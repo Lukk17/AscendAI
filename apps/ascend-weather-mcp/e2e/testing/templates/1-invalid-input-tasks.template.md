@@ -17,7 +17,7 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:9998/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Step 1: `curl -fsS -i -X POST http://localhost:9998/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
 - [ ] Send `invalid-blank-city.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 - [ ] Send `invalid-crlf-city.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 - [ ] Send `invalid-country-code.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200

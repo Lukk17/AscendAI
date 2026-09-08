@@ -33,6 +33,17 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("Web hunter advertises expected search and content reading tools", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const toolNames = envelope.result.tools.map(function (t) { return t.name; });
+            expect(toolNames).to.include("web_search");
+            expect(toolNames).to.include("web_read");
+            expect(toolNames).to.include("session_establish");
+            expect(toolNames).to.include("session_status");
+            expect(toolNames).to.include("session_clear");
+        });
 
 settings:
   encodeUrl: true

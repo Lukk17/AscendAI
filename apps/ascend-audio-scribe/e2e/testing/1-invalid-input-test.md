@@ -16,7 +16,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -24,7 +24,7 @@ Expect a version string. If the command is not found, install it with `npm insta
 
 Check the ascend-audio-scribe server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7017/health
 ```
 
@@ -38,11 +38,11 @@ None. This test does not write any persisted state (the request is rejected befo
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "transcribe/testing/transcribe-invalid-no-file.yml" --env ascend-local
 ```
 

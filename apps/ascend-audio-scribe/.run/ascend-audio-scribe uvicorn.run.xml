@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="ascend-audio-scribe Server" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="ascend-audio-scribe uvicorn" type="PythonConfigurationType" factoryName="Python">
     <module name="AscendAI" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />

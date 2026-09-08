@@ -46,18 +46,57 @@ docker build -t ascend-memory:latest .
 **Core Dependencies**:
 - mem0ai (2.0.4) — Memory management library
 - Qdrant (port 6333) — Vector database backend
-- OpenAI-compatible API for embeddings (LM Studio or OpenAI)
+- OpenAI-compatible API for embeddings (LM Studio, OpenAI, or Gemini)
+
+**Embedding providers and collections**: `PROVIDER_CONFIGS` in `src/config/config.py` (lines 25-50) hardcodes three
+providers, each pinned to its own embedding model, dimension count, and Qdrant collection. The collection name, the
+embedding model, and the dimension count are not configurable by environment variable. Only the endpoint and API key
+per provider are.
+
+| Provider | Embedding model | Dims | Qdrant collection | Endpoint / key vars |
+|---|---|---|---|---|
+| `lmstudio` | `text-embedding-nomic-embed-text-v2-moe` | 768 | `ascend_memory_768` | `LMSTUDIO_BASE_URL`, `LMSTUDIO_API_KEY` |
+| `openai` | `text-embedding-3-small` | 1536 | `ascend_memory_1536` | `OPENAI_BASE_URL`, `OPENAI_API_KEY` |
+| `gemini` | `gemini-embedding-001` | 768 | `ascend_memory_768` | `GEMINI_BASE_URL`, `GEMINI_API_KEY` |
+
+`lmstudio` and `gemini` share `ascend_memory_768` because both embed at 768 dimensions. `openai` gets its own
+`ascend_memory_1536` collection. A caller supplies `provider` per REST call or MCP tool call. ascend-ai-agent always
+sends one explicitly, resolved from the chat provider's own embedding default. When a caller omits `provider`
+entirely, `resolve_provider()` (`src/service/memory_client.py:25`) falls back to `MEM0_DEFAULT_PROVIDER` (default
+`lmstudio`).
 
 ## Environment Variables
 
-- `OPENAI_API_KEY` — API key for embedding model
-- `OPENAI_BASE_URL` — Embedding API endpoint (default: LM Studio at `http://host.docker.internal:1234/v1`)
-- `API_PORT` — Service port (default: 7020)
-- `QDRANT_HOST` / `QDRANT_PORT` — Qdrant connection
-- `MEM0_EMBEDDING_MODEL` — Embedding model name (default: `text-embedding-nomic-embed-text-v2-moe`)
-- `MEM0_COLLECTION_NAME` — Qdrant collection (default: `ascend_memory`)
-- `MEM0_EMBEDDING_DIMS` — Embedding dimensions (default: 768)
+- `MEM0_DEFAULT_PROVIDER` — Embedding provider used when a caller omits `provider` (default: `lmstudio`)
+- `LMSTUDIO_BASE_URL` / `LMSTUDIO_API_KEY` — Endpoint and key for the `lmstudio` provider (default base URL: `http://localhost:1234/v1`)
+- `OPENAI_API_KEY` — API key for the `openai` provider (required when `provider=openai` is used)
+- `OPENAI_BASE_URL` — Endpoint for the `openai` provider (default: `https://api.openai.com/v1`)
+- `GEMINI_BASE_URL` / `GEMINI_API_KEY` — Endpoint and key for the `gemini` provider
+- `MEM0_LLM_MODEL` — Model mem0 uses for its own extraction LLM (default: `meta-llama-3.1-8b-instruct`). Unlike the
+  embedding model, dims, and collection above, this one really is environment-configurable, but it's one value
+  shared across all three providers' `llm` block (`src/service/memory_client.py:130-137`), not a per-provider entry.
+  Only exercised when `MEM0_INFER_MEMORY=true`.
 - `MEM0_INFER_MEMORY` — Enable memory inference (default: false)
+- `API_PORT` — Service port (default: 7020)
+- `API_HOST` — Bind address (default: `0.0.0.0`)
+- `LOG_LEVEL` — Logging level (default: `INFO`)
+- `QDRANT_HOST` / `QDRANT_PORT` — Qdrant connection
+- `DEFAULT_USER_ID` — Fallback `user_id` when a REST or MCP caller omits it (default: `default_user`)
+- `MAX_USER_ID_LENGTH` — Input cap on `user_id` length (default: `128`)
+- `MAX_QUERY_LENGTH` — Input cap on search query length (default: `2048`)
+- `MAX_MEMORY_TEXT_LENGTH` — Input cap on stored memory text length (default: `32768`)
+- `MAX_SEARCH_LIMIT` — Upper bound on the `limit` search parameter (default: `100`)
+
+`compose.yaml`'s `ascend-memory` service sets `API_HOST=0.0.0.0` and `LOG_LEVEL=INFO` explicitly, matching the code
+defaults, so neither is a real override. The other six vars added above (`MEM0_LLM_MODEL`, `DEFAULT_USER_ID`,
+`MAX_USER_ID_LENGTH`, `MAX_QUERY_LENGTH`, `MAX_MEMORY_TEXT_LENGTH`, `MAX_SEARCH_LIMIT`) aren't set in `compose.yaml`
+at all, so the running container uses their code defaults as-is.
+
+`MEM0_EMBEDDING_MODEL`, `MEM0_COLLECTION_NAME`, and `MEM0_EMBEDDING_DIMS` are not read anywhere in this service
+(verified: zero matches under `src/`). The embedding model, collection name, and dimension count come from the
+provider table above, not from the environment. Qdrant on this host still holds a bare `ascend_memory` collection
+alongside `ascend_memory_768` and `ascend_memory_1536`: a leftover from before the dimension-suffix scheme, not
+something this service reads or writes to.
 
 ## Code Conventions
 

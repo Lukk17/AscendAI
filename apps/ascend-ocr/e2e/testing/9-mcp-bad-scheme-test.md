@@ -7,11 +7,11 @@ other than `http`, `https`, or `file` — including `ftp://`, `data:`, `gopher:/
 
 ## Prerequisites
 
-```powershell
+```bash
 bru --version
 ```
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
@@ -23,7 +23,7 @@ None.
 
 Open MCP session per spec 8, then:
 
-```powershell
+```bash
 bru run "ocr/testing/mcp-bad-scheme.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>"
 ```
 

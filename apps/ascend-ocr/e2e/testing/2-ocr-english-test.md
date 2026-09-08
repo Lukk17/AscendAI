@@ -15,7 +15,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -23,7 +23,7 @@ Expect a version string.
 
 Check the ascend-ocr server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
@@ -31,11 +31,11 @@ Expect HTTP 200 with `"status":"ok"` in the body.
 
 Check the English canary fixture exists.
 
-```powershell
-Test-Path apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png
+```bash
+ls apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png
 ```
 
-Expect `True`. If missing, generate it per [`apps/ascend-ocr/e2e/fixtures/README.md`](../fixtures/README.md).
+Expect the file path printed. If missing, generate it per [`apps/ascend-ocr/e2e/fixtures/README.md`](../fixtures/README.md).
 
 ## Reset state
 
@@ -46,11 +46,11 @@ None. OCR is stateless except for the warmed engine cache, which is initialised 
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "ocr/ocr.yml" --env ascend-local
 ```
 

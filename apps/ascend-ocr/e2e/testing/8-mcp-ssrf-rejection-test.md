@@ -11,17 +11,17 @@ connection attempt; verifiable via dropping `MCP_ALLOWED_HOSTS` to a value not c
 
 ## Prerequisites
 
-```powershell
+```bash
 bru --version
 ```
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
 Check that `169.254.169.254` is NOT in `MCP_ALLOWED_HOSTS`.
 
-```powershell
+```bash
 docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS
 ```
 
@@ -35,13 +35,19 @@ None.
 
 **Step 1.** Open an MCP session via `initialize`; capture `Mcp-Session-Id`.
 
+Windows:
 ```powershell
 curl.exe -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
 ```
 
+Unix:
+```bash
+curl -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
+```
+
 **Step 2.** Send the SSRF probe with the captured session ID.
 
-```powershell
+```bash
 bru run "ocr/testing/mcp-ssrf-link-local.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>"
 ```
 
@@ -49,4 +55,3 @@ bru run "ocr/testing/mcp-ssrf-link-local.yml" --env ascend-local --env-var "mcp_
 
 - Step 1 returns HTTP 200 with an `Mcp-Session-Id` header.
 - Step 2 returns HTTP 200 carrying a JSON-RPC error envelope (`error` field present OR `result.isError` truthy).
-- No outbound network call to `169.254.169.254` (verifiable by host firewall / docker network policy if installed).

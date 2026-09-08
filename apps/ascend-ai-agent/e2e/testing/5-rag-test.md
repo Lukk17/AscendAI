@@ -125,19 +125,31 @@ docker exec redis redis-cli DEL user:frostyRagTest:instructions
 Step 1. Upload the three fixtures in one multipart request. Wait for HTTP 200 before continuing.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
 ```
 
 Step 2. Trigger ingestion (no prefix → scans the whole bucket). Wait for HTTP 200 and a non-zero `indexed` count before continuing.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
 ```
 
 Step 3. Send the RAG prompt. The Bruno request saves three alternative `prompt=` rows on the same field; only one is enabled by default. Run the request once with the current default, then edit the YAML to enable the next prompt row (and disable the previous) and re-run. Do this once per fixture for full coverage.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-prompt.yml" --env ascend-local
 ```
 
 The three prompts saved in the request:

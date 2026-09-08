@@ -3,6 +3,10 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/AscendAI.iml" filepath="$PROJECT_DIR$/.idea/AscendAI.iml" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-memory/ascend-memory.iml" filepath="$PROJECT_DIR$/apps/ascend-memory/ascend-memory.iml" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-web-hunter/ascend-web-hunter.iml" filepath="$PROJECT_DIR$/apps/ascend-web-hunter/ascend-web-hunter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-audio-scribe/ascend-audio-scribe.iml" filepath="$PROJECT_DIR$/apps/ascend-audio-scribe/ascend-audio-scribe.iml" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-ocr/ascend-ocr.iml" filepath="$PROJECT_DIR$/apps/ascend-ocr/ascend-ocr.iml" />
     </modules>
   </component>
 </project>

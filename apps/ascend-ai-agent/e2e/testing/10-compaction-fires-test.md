@@ -78,7 +78,11 @@ docker exec redis redis-cli DEL user:frostyCompactionFiresTest:instructions
 Step 1. Send one prompt as `frostyCompactionFiresTest`. This adds 2 rows (1 user + 1 assistant), bringing the chat history to 23 rows. The compaction trigger fires async after the `add(...)`.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/compaction-fires-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/compaction-fires-prompt.yml" --env ascend-local
 ```
 
 Step 2. Wait up to 5 seconds for the async compaction to complete.

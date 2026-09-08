@@ -10,9 +10,8 @@ The bootstrap import in [AGENT_TOOLING.md](AGENT_TOOLING.md) pulls everything fr
 time. On every later update it re-adds skills and subagents you removed on purpose.
 
 The commands below refresh **only what is already in the working tree**. Skills added locally that do not exist
-upstream stay untouched. Skills deleted locally stay deleted. [.claude/skills](../.claude/skills) and
-[.opencode/skills](../.opencode/skills) are symlinks into [.agents/skills/](../.agents/skills/), so they update with
-it.
+upstream stay untouched. Skills deleted locally stay deleted. [.claude/skills](../.claude/skills) is a symlink into
+[.agents/skills/](../.agents/skills/), so it updates with it.
 
 To pull a brand-new upstream skill or subagent, run a one-off `git checkout agent-standards/master -- <path>` first.
 Later refreshes will then keep it current.
@@ -81,14 +80,11 @@ foreach ($base in '.claude/agents', '.opencode/agents') { foreach ($f in Get-Chi
 
 These paths are deliberately not refreshed:
 
-- [.codex/skills/](../.codex/skills), [.claude/skills/](../.claude/skills), [.opencode/skills/](../.opencode/skills):
+- [.codex/skills/](../.codex/skills) and [.claude/skills/](../.claude/skills):
   symlinks pointing at [.agents/skills/](../.agents/skills/). They update automatically when the canonical directory
   does.
 - [.claude/CLAUDE.md](../.claude/CLAUDE.md): consumer-owned entry point. It imports `AGENTS.md` files and stays under
   your control.
-- [AGENTS.md.example](../AGENTS.md.example), [kilo.jsonc.example](../kilo.jsonc.example),
-  [opencode.json.example](../opencode.json.example), [.mcp.json.example](../.mcp.json.example): template files
-  consumed once at initial setup. Refreshing them silently would clobber per-project customisation.
 - The customised [AGENTS.md](../AGENTS.md) at the repo root: source of truth for project conventions. Owned by this
   consumer, not by upstream.
 

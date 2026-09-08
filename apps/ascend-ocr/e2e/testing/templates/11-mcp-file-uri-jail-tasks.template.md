@@ -25,7 +25,6 @@ Copy this file to `../runs/<UTC-timestamp>_11-mcp-file-uri-jail-tasks.md` before
 
 - [ ] Step 1 returns HTTP 200 and the `Mcp-Session-Id` header value is non-empty
 - [ ] Step 2 returns HTTP 200 carrying a JSON-RPC error envelope referencing `UNSAFE_URI` (file:// disabled when root unset)
-- [ ] ascend-ocr did NOT open `/etc/passwd` (verifiable via process audit if `auditd` is configured)
 
 ### Verdict
 

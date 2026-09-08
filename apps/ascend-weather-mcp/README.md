@@ -107,7 +107,7 @@ every other long-running service in the repo. See [.agents/skills/coding-standar
 
 [service/WeatherToolService.java](src/main/java/com/lukk/ascend/ai/mcp/weather/service/WeatherToolService.java)
 exposes `getCurrentWeather` annotated with `@Tool`. A `ToolCallbackProvider` bean in
-[provider/ToolProvider.java](src/main/java/com/lukk/ascend/ai/mcp/weather/provider/ToolProvider.java) lists it
+[provider/WeatherToolConfig.java](src/main/java/com/lukk/ascend/ai/mcp/weather/provider/WeatherToolConfig.java) lists it
 explicitly so discovery is deterministic, not implicit. ascend-ai-agent's MCP client then sees it in the registered tools
 array on startup and the LLM can call it whenever the prompt asks for live weather.
 

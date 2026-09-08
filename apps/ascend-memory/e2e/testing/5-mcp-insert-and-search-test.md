@@ -16,7 +16,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -24,7 +24,7 @@ Expect a version string.
 
 Check the AscendMemory server is reachable and ready.
 
-```powershell
+```bash
 curl -fsS http://localhost:7020/health
 ```
 
@@ -32,7 +32,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check Qdrant is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:6333/readyz
 ```
 
@@ -42,7 +42,7 @@ Expect HTTP 200.
 
 Wipe the dedicated test user so the search at the end of the run reflects only what this test inserts.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryMcpInsertSearchTest"
 ```
 
@@ -50,15 +50,23 @@ Expect HTTP 200 with `{"status":"success", ...}`.
 
 ## Run
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the
 response headers.
 
+**PowerShell:**
+
 ```powershell
 curl.exe -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+```
+
+**Unix:**
+
+```bash
+curl -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in
@@ -66,13 +74,13 @@ the next steps.
 
 **Step 2.** Insert the canary memory via MCP.
 
-```powershell
+```bash
 bru run "memory/testing/mcp-insert.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 
 **Step 3.** Search via MCP for a semantically related query.
 
-```powershell
+```bash
 bru run "memory/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 
@@ -83,7 +91,7 @@ by `user_id` in mem0 regardless of which channel (REST or MCP) wrote the memory,
 insert wrote. The section sits next to `Run` because that is where the state it names is created, but the runner
 executes it last, after the `Expected` assertions below have been checked against the live state.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryMcpInsertSearchTest"
 ```
 

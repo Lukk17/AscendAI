@@ -16,7 +16,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -24,7 +24,7 @@ Expect a version string.
 
 Check the AscendMemory server is reachable and ready.
 
-```powershell
+```bash
 curl -fsS http://localhost:7020/health
 ```
 
@@ -32,7 +32,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check Qdrant is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:6333/readyz
 ```
 
@@ -43,7 +43,7 @@ Expect HTTP 200.
 Wipe user A so the test is not contaminated by canary data from a previous run. User B is never
 written to by this test and needs no wipe.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryIsolationUserA"
 ```
 
@@ -53,19 +53,19 @@ Expect HTTP 200 with `{"status":"success", ...}`.
 
 Two Bruno requests in sequence. Step 2 must not start until step 1 has returned HTTP 200.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Insert the canary memory for user A.
 
-```powershell
+```bash
 bru run "memory/testing/insert-isolation-user-a.yml" --env ascend-local
 ```
 
 **Step 2.** Search for related content as a completely different user B.
 
-```powershell
+```bash
 bru run "memory/testing/search-isolation-user-b.yml" --env ascend-local
 ```
 
@@ -75,7 +75,7 @@ Wipe user A so its canary memory does not survive into the next run. User B is n
 it needs no wipe. The section sits next to `Run` because that is where the state it names is created, but the
 runner executes it last, after the `Expected` assertions below have been checked against the live state.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryIsolationUserA"
 ```
 

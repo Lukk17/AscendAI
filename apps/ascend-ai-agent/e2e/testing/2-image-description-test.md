@@ -59,7 +59,8 @@ docker exec redis redis-cli DEL user:frostyImageDescriptionTest:instructions
 Send the Bruno request and wait for the response before moving to the Expected section.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/image-description-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+bru run "ascend-agent/testing/image-description-prompt.yml" --env ascend-local
 ```
 
 ## Post-run cleanup

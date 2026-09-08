@@ -1,6 +1,6 @@
 # Tiered web scraping: run tasks template
 
-Spec: [../6-tiered-scraping-test.md](../6-tiered-scraping-test.md)
+Spec: [test-spec.md](test-spec.md)
 
 Copy this file to `../runs/<UTC-timestamp>_6-tiered-scraping-tasks.md` before starting a run. Tick boxes as you go.
 Add anything you did beyond the spec under **Additional tasks I did**.

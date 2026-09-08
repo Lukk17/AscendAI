@@ -206,13 +206,18 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 ```bash
 # 1. Ensure external prerequisites are running (PostgreSQL :5432, Redis :6379, Qdrant :6333, S3-compatible object storage :9070)
 
-# 2. Start application and support services (the main file pulls in ascend-scrapper via `include:`)
+# 2. Start application and support services, including ascend-ai-agent itself, as containers
+#    (the main file pulls in ascend-scrapper via `include:`)
 docker compose up -d --build
 
 # 3. Ensure PostgreSQL has database 'ascend_ai' (user: postgres, password: local)
 
-# 4. Run the ascend-ai-agent
-cd apps/ascend-ai-agent && ./gradlew bootRun
+# 4. ascend-ai-agent is already running as a container on :9917 from step 2. Only run it on the
+#    host instead (IDE debugging, breakpoints) if you first stop that one container, since both
+#    fight over port 9917:
+#    docker compose stop ascend-ai-agent
+#    cd apps/ascend-ai-agent
+#    ./gradlew bootRun
 
 # 5. Python services run via uvicorn or docker-compose
 ```
@@ -228,7 +233,7 @@ cd apps/ascend-ai-agent && ./gradlew bootRun
 
 ## End-to-End Test Suite
 
-Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-ai-agent/e2e/`](apps/ascend-ai-agent/e2e/README.md). Five numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-ai-agent/e2e/README.md`](apps/ascend-ai-agent/e2e/README.md) for the full contract and capability matrix.
+Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-ai-agent/e2e/`](apps/ascend-ai-agent/e2e/README.md). Eleven numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-ai-agent/e2e/README.md`](apps/ascend-ai-agent/e2e/README.md) for the full contract and capability matrix.
 
 ## IDE Compatibility
 

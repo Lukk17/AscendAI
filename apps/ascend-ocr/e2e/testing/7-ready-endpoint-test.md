@@ -10,11 +10,11 @@
 
 Bruno CLI installed; ascend-ocr `/health` returns HTTP 200.
 
-```powershell
+```bash
 bru --version
 ```
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
@@ -24,11 +24,11 @@ None.
 
 ## Run
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "ocr/ready.yml" --env ascend-local
 ```
 

@@ -16,7 +16,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -24,7 +24,7 @@ Expect a version string.
 
 Check the ascend-audio-scribe server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7017/health
 ```
 
@@ -32,7 +32,7 @@ Expect HTTP 200 with `{"status":"ok","service":"ascend-audio-scribe"}`.
 
 Check the ascend-audio-scribe container has `HF_TOKEN` configured.
 
-```powershell
+```bash
 docker exec ascend-audio-scribe sh -c '[ -n "$HF_TOKEN" ] && echo present || echo missing'
 ```
 
@@ -41,8 +41,8 @@ Expect `present`. Never `printenv` the raw value. This check proves the variable
 
 Check outbound HTTPS to the Hugging Face Inference API works from the ascend-audio-scribe container.
 
-```powershell
-docker exec ascend-audio-scribe curl -fsS -o NUL -w "%{http_code}\n" https://router.huggingface.co/hf-inference
+```bash
+docker exec ascend-audio-scribe curl -fsS -o /dev/null -w "%{http_code}\n" https://router.huggingface.co/hf-inference
 ```
 
 Expect HTTP 404. The router has no route registered at that exact path: an inference call needs a model path
@@ -52,8 +52,16 @@ DNS failure, a timeout, or a blocked connection would not produce.
 
 Check the canary fixture is present.
 
+**PowerShell:**
+
 ```powershell
 dir ascend-audio-scribe\e2e\fixtures\meeting-clip.wav
+```
+
+**Unix:**
+
+```bash
+ls -lh ascend-audio-scribe/e2e/fixtures/meeting-clip.wav
 ```
 
 Expect the file to exist and be at least 1 KB. If missing, record the canary phrase per
@@ -64,7 +72,7 @@ Expect the file to exist and be at least 1 KB. If missing, record the canary phr
 Delete any stale `transcript_hf.md` cache entries from prior runs to keep `/tmp` clean and rule out a stale download
 contaminating the assertion.
 
-```powershell
+```bash
 docker exec ascend-audio-scribe sh -c "rm -f /tmp/transcript_*.md"
 ```
 
@@ -72,11 +80,11 @@ docker exec ascend-audio-scribe sh -c "rm -f /tmp/transcript_*.md"
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "transcribe/testing/transcribe-hf-canary.yml" --env ascend-local
 ```
 

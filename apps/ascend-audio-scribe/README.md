@@ -245,8 +245,19 @@ docker run -d --name ascend-audio-scribe --gpus all -p 7017:7017 -e OPENAI_API_K
 
 #### REST client
 
-For ad-hoc testing, [mcp_requests.http](mcp_requests.http) contains ready-to-use HTTP requests for the VS Code REST
-Client extension. It covers both standard API calls and MCP protocol interactions.
+For ad-hoc testing, the Bruno collection at [docs/api/request/AscendAI/transcribe/](../../docs/api/request/AscendAI/transcribe/) and [docs/api/request/AscendAI/mcp/audio-scribe/](../../docs/api/request/AscendAI/mcp/audio-scribe/) contains ready-to-use requests for both standard API calls and MCP protocol interactions.
+
+Change to the Bruno collection root:
+
+```bash
+cd docs/api/request/AscendAI
+```
+
+Run a request:
+
+```bash
+bru run "transcribe/testing/transcribe-openai-canary.yml" --env ascend-local
+```
 
 #### Local transcription
 
@@ -621,7 +632,7 @@ pip install --no-cache-dir .
 | [src/transcription/](src/transcription/)                                   | Local / OpenAI / HF backends and the Audacity merger.       |
 | [src/api/rest/rest_endpoints.py](src/api/rest/rest_endpoints.py)           | REST endpoints under `/api/v1/transcribe/*`.                |
 | [src/api/mcp/mcp_server.py](src/api/mcp/mcp_server.py)                     | FastMCP tool definitions.                                   |
-| [mcp_requests.http](mcp_requests.http)                                     | Example REST + MCP requests for the VS Code REST Client.    |
+| [docs/api/request/AscendAI/transcribe/](../../docs/api/request/AscendAI/transcribe/) and [docs/api/request/AscendAI/mcp/audio-scribe/](../../docs/api/request/AscendAI/mcp/audio-scribe/) | Example REST + MCP requests in the Bruno collection.         |
 | [skills/ascend-audio-scribe/SKILL.md](skills/ascend-audio-scribe/SKILL.md)               | Drop-in agent skill for downstream agents.                  |
 | [../../README.md](../../README.md)                                               | Monorepo overview, architecture, ports.                     |
 | [../../docs/architecture/README.md](../../docs/architecture/README.md)           | Monorepo architecture, ADRs.                                |

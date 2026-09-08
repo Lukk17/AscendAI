@@ -16,7 +16,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -24,7 +24,7 @@ Expect a version string.
 
 Check the ascend-weather-mcp server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:9998/actuator/health
 ```
 
@@ -32,7 +32,7 @@ Expect HTTP 200 with `{"status":"UP"}`.
 
 Check outbound HTTPS to Open-Meteo's geocoding API works.
 
-```powershell
+```bash
 curl -fsS "https://geocoding-api.open-meteo.com/v1/search?name=Berlin&count=1"
 ```
 
@@ -46,21 +46,27 @@ None. This test makes one geocoding call; whether it's cached from a prior run d
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the response headers.
 
+Windows:
 ```powershell
 curl.exe -fsS -i -X POST http://localhost:9998/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+```
+
+Unix:
+```bash
+curl -fsS -i -X POST http://localhost:9998/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in the next step(s).
 
 **Step 2.** Send the tool call(s) with the captured session ID injected:
 
-```powershell
+```bash
 bru run "weather-mcp/current-not-found.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 

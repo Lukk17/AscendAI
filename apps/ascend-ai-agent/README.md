@@ -256,8 +256,8 @@ URLs, and the registered MCP tools.
 
 #### 3. End-to-end tests
 
-Capability tests live under [e2e/](e2e/). Five numbered specs (`1-weather-mcp` through `5-rag`) exercise the agent
-end-to-end via the Bruno collection at `../../docs/api/request/AscendAI/`. Each spec has a paired tasks template; the
+Capability tests live under [e2e/](e2e/). Eleven numbered specs (`1-weather-mcp` through `11-compaction-idempotency`)
+exercise the agent end-to-end via the Bruno collection at `../../docs/api/request/AscendAI/`. Each spec has a paired tasks template; the
 runner copies it into `e2e/testing/runs/<UTC-timestamp>_<N>-<feature>-tasks.md`, ticks the checkbox list as it
 executes, and records token usage plus wall-clock time. Assertions are observable behaviour only: HTTP status,
 response body, persisted state in the object store / Qdrant / Postgres. See [e2e/README.md](e2e/README.md) for the full contract,
@@ -274,7 +274,11 @@ Run a single test.
 Bash:
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
 ```
 
 PowerShell:
@@ -292,7 +296,11 @@ Run the whole suite.
 Bash:
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing" --env ascend-local
 ```
 
 PowerShell:

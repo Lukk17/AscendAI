@@ -85,7 +85,8 @@ curl -X POST http://localhost:6333/collections/ascend_memory_1536/points/delete 
 Step 1. Save turn. Send the request and wait for HTTP 200 before continuing.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/memory-test-save.yml" --env ascend-local
+cd docs/api/request/AscendAI
+bru run "ascend-agent/testing/memory-test-save.yml" --env ascend-local
 ```
 
 Step 2. Clear short-term chat again so the recall turn cannot leak from chat history. Run both commands and wait for them to return before continuing.
@@ -101,7 +102,8 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM chat_history 
 Step 3. Recall turn. Send the request and wait for the response before moving to the Expected section.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/memory-test-retrieve.yml" --env ascend-local
+cd docs/api/request/AscendAI
+bru run "ascend-agent/testing/memory-test-retrieve.yml" --env ascend-local
 ```
 
 ## Post-run cleanup

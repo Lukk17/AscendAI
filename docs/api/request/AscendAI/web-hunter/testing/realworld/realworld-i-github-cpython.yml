@@ -20,7 +20,11 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("returns a valid terminal verdict (success or human-intervention)", function () {
+        test("returns valid status code (200 or 428)", function () {
+            const st = res.getStatus();
+            expect([200, 428]).to.include(st);
+        });
+        test("body status field is success or human-intervention (never error)", function () {
             const st = res.getStatus();
             const b = res.getBody() || {};
             if (st === 200) {
@@ -28,7 +32,6 @@ runtime:
                 const content = b.content || b.text || b.markdown || "";
                 expect(content.length, "success must carry content").to.be.at.least(1);
             } else {
-                expect(st).to.equal(428);
                 expect(b.status).to.equal("human_intervention_required");
                 expect(b.vnc_url).to.be.a("string").and.not.empty;
             }

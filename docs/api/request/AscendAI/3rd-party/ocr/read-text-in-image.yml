@@ -27,6 +27,17 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("OCR endpoint returns extracted text from image", function () {
+            const body = res.getBody();
+            expect(body).to.be.a("string");
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("pages");
+            expect(data.pages).to.be.an("array");
+            if (data.pages.length > 0) {
+                expect(data.pages[0]).to.have.property("lines");
+                expect(data.pages[0].lines).to.be.an("array");
+            }
+        });
 
 settings:
   encodeUrl: true

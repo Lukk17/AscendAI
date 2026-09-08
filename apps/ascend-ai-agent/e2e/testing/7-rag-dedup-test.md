@@ -65,19 +65,31 @@ Per the Group A hermetic contract, this spec only resets its own artifacts (`ded
 Step 1. Upload the two dedup fixtures.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-dedup-upload.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-dedup-upload.yml" --env ascend-local
 ```
 
 Step 2. Trigger ingestion.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
 ```
 
 Step 3. Send the dedup prompt with `attachSources=true`.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-dedup-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-dedup-prompt.yml" --env ascend-local
 ```
 
 ## Post-run cleanup

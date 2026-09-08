@@ -176,7 +176,7 @@ otherwise the human never receives the link and the test stalls forever.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -184,7 +184,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -192,7 +192,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check FlareSolverr is reachable (used by the Cloudflare tiers).
 
-```powershell
+```bash
 curl -fsS http://localhost:8191/
 ```
 
@@ -206,8 +206,16 @@ in the harness, and the human types nothing for the captcha (they solve it in th
 Flush the Redis session keys so the before/after pairs start from a genuine **blocked** state (otherwise a stale
 session/clearance hides the regression).
 
+**PowerShell:**
+
 ```powershell
 docker exec redis redis-cli --scan --pattern "session:*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
+```
+
+**Unix:**
+
+```bash
+docker exec redis redis-cli --scan --pattern "session:*" | while read key; do docker exec redis redis-cli DEL "$key"; done
 ```
 
 ## Run
@@ -220,19 +228,19 @@ docker exec redis redis-cli --scan --pattern "session:*" | ForEach-Object { dock
 
 Move into the Bruno collection root first.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 Part 3, Call 1 — captcha blocked (main thread, first).
 
-```powershell
+```bash
 bru run "web-hunter/testing/captcha-clearance-blocked.yml" --env ascend-local
 ```
 
 Part 3, Capture check — after you solve the challenge via the returned `vnc_url`.
 
-```powershell
+```bash
 docker exec redis redis-cli GET "session:google.com:default"
 ```
 
@@ -240,29 +248,29 @@ Expect a JSON value whose `auth` entry contains a `_GRECAPTCHA` cookie.
 
 Part 2, Call 1 — login blocked (anonymous).
 
-```powershell
+```bash
 bru run "web-hunter/testing/auth-read-secure-anon.yml" --env ascend-local
 ```
 
 Part 2, Seed — scripted saucedemo login (harness not in the image; copy it in, then run).
 
-```powershell
+```bash
 docker cp apps/ascend-web-hunter/e2e/harness/seed_authenticated_session.py ascend-web-hunter:/tmp/seed.py
 ```
 
-```powershell
+```bash
 docker exec -e PYTHONPATH=/app -w /app ascend-web-hunter python /tmp/seed.py
 ```
 
 Part 2, Call 2 — after login.
 
-```powershell
+```bash
 bru run "web-hunter/testing/auth-read-secure.yml" --env ascend-local
 ```
 
 Part 1 — the real-world matrix (parallel-safe across runners).
 
-```powershell
+```bash
 bru run "web-hunter/testing/realworld" --env ascend-local
 ```
 

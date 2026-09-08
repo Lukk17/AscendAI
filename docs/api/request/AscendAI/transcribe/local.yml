@@ -35,6 +35,12 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("transcription endpoint returns status and content", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("status");
+            expect(data).to.have.property("transcription").or.have.property("segments").or.have.property("transcript");
+        });
 
 settings:
   encodeUrl: true

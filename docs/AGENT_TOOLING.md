@@ -45,7 +45,7 @@ git fetch agent-standards
 ```
 
 ```bash
-git checkout agent-standards/master -- .agents .claude .opencode .codex docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/AGENTS-UPDATE.md AGENTS.md.example kilo.jsonc.example opencode.json.example .mcp.json
+git checkout agent-standards/master -- .agents .claude .opencode .codex docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/AGENTS-UPDATE.md
 ```
 
 Commit the imported files when you're ready.
@@ -55,44 +55,19 @@ What this pulls:
 - [.agents/skills/](../.agents/skills/): canonical skill files.
 - [.claude/CLAUDE.md](../.claude/CLAUDE.md), [.claude/skills/](../.claude/skills/) (symlink),
   [.claude/agents/](../.claude/agents/): Claude Code wiring plus generated subagent files.
-- [.opencode/skills/](../.opencode/skills/) (symlink), [.opencode/agents/](../.opencode/agents/): OpenCode subagent
-  files, also read natively by Kilo Code.
+- [.opencode/agents/](../.opencode/agents/): OpenCode subagent files, also read natively by Kilo Code.
 - [.codex/skills/](../.codex/skills/) (symlink): Codex skill discovery path.
 - [docs/AGENT_TOOLING.md](AGENT_TOOLING.md): this document, kept in sync with the central repo.
 - [docs/MCP_SETUP.md](MCP_SETUP.md): human-side MCP setup guide (env vars, keys, OS-specific commands).
 - [docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md): the per-OS selective update procedure, kept in sync with the central
   repo (it refreshes itself).
-- [AGENTS.md.example](../AGENTS.md.example), [kilo.jsonc.example](../kilo.jsonc.example),
-  [opencode.json.example](../opencode.json.example), [.mcp.json.example](../.mcp.json.example): templates you rename
-  and customise.
 
 What this does **not** pull:
 
 - `subagents/` (canonical templates) and `tools/` (generator) live only in the agent-standards repo and are never
   imported into consumer projects.
 
-Then copy the templates into place:
-
-```bash
-cp AGENTS.md.example AGENTS.md
-```
-
-```bash
-cp kilo.jsonc.example kilo.jsonc
-```
-
-```bash
-cp opencode.json.example opencode.json
-```
-
-```bash
-cp .mcp.json .mcp.json
-```
-
-The `kilo.jsonc`, `opencode.json`, and `.mcp.json` copies are optional. Only `AGENTS.md` is required.
-
-Copy the optional templates when you want shared MCP servers (see [MCP servers](#mcp-servers) below) or agent-specific
-configuration.
+Create your own `AGENTS.md` at the repo root by copying from upstream or editing from scratch to define your project's agent conventions.
 
 #### Step 2, pulling future updates
 
@@ -111,11 +86,8 @@ They:
 Commit the refreshed files when ready.
 
 Files intentionally NOT touched by the update: the symlinked skill directories
-([.claude/skills/](../.claude/skills/), [.opencode/skills/](../.opencode/skills/), [.codex/skills/](../.codex/skills/)),
-[.claude/CLAUDE.md](../.claude/CLAUDE.md), [AGENTS.md.example](../AGENTS.md.example),
-[kilo.jsonc.example](../kilo.jsonc.example), [.mcp.json.example](../.mcp.json.example),
-[opencode.json.example](../opencode.json.example), and your customised `AGENTS.md`. These are templates and personal
-config set once at initial setup.
+([.claude/skills/](../.claude/skills/), [.codex/skills/](../.codex/skills/)), [.claude/CLAUDE.md](../.claude/CLAUDE.md),
+and your customised `AGENTS.md`. These are personal config set once at initial setup.
 
 If [docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md) is missing (the project was imported before this doc shipped), pull it
 with a one-off `git checkout agent-standards/master -- docs/AGENTS-UPDATE.md`, then use it for every later refresh.
@@ -165,18 +137,7 @@ The full catalogue lives in [.agents/skills/](../.agents/skills/) (one directory
 
 ### MCP servers
 
-Two committed templates ship the default MCP servers: [.mcp.json.example](../.mcp.json.example) (Claude Code) and the
-`mcp` block in [opencode.json.example](../opencode.json.example) (OpenCode plus Kilo Code).
-
-Copy them into place when you want the shared server set:
-
-```bash
-cp .mcp.json .mcp.json
-```
-
-```bash
-cp opencode.json.example opencode.json
-```
+Two config files define the default MCP servers: `.mcp.json` (Claude Code) and `opencode.json` (OpenCode plus Kilo Code).
 
 Full human setup (prerequisites, key acquisition, environment-variable export per OS, Claude Desktop and Codex CLI
 global configs, verification, and the full default-server list) lives in [MCP_SETUP.md](MCP_SETUP.md). The AI agent
@@ -190,11 +151,7 @@ OpenSpec installs skills and commands into each agent's native directories.
 
 #### How symlinks work with OpenSpec
 
-The [.claude/skills/](../.claude/skills/), [.opencode/skills/](../.opencode/skills/), and
-[.codex/skills/](../.codex/skills/) directories are symlinked to [.agents/skills/](../.agents/skills/). Kilo Code
-reads [.agents/skills/](../.agents/skills/) natively without a symlink. When `openspec init` writes skills to any of
-the symlinked directories, they land in [.agents/skills/](../.agents/skills/), the canonical location read by every
-agent.
+The [.claude/skills/](../.claude/skills/) and [.codex/skills/](../.codex/skills/) directories are symlinked to [.agents/skills/](../.agents/skills/). Kilo Code reads [.agents/skills/](../.agents/skills/) natively without a symlink. When `openspec init` writes skills to any of the symlinked directories, they land in [.agents/skills/](../.agents/skills/), the canonical location read by every agent.
 
 Commands are tool-specific (different formats per agent) and cannot be centralised. OpenSpec writes them into each
 tool's native commands directory, which is expected.

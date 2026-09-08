@@ -19,6 +19,12 @@ runtime:
         test("Status code is 422", function () {
             expect(res.getStatus()).to.equal(422);
         });
+        test("detail array contains missing-field error for query", function () {
+            const detail = res.getBody().detail;
+            expect(detail).to.be.an("array");
+            const queryError = detail.find(e => e.type === "missing" && e.loc && e.loc.includes("query"));
+            expect(queryError, "missing error for 'query' field not found").to.exist;
+        });
 
 settings:
   encodeUrl: true

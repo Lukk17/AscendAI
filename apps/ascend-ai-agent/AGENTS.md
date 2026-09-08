@@ -17,7 +17,10 @@ The ascend-ai-agent is the central Spring Boot API gateway for the AscendAI plat
 # Build
 ./gradlew build
 
-# Run (port 9917)
+# Run (port 9917) — only if the monorepo's docker compose stack isn't already running this
+# service as a container (compose.yaml's ascend-ai-agent service, also port 9917). Both routes
+# genuinely work. Running both at once fights over the port. Check first:
+# docker compose ps ascend-ai-agent
 ./gradlew bootRun
 
 # Run unit tests
@@ -35,12 +38,16 @@ docker build -t ascend-ai-agent:latest .
 
 ## End-to-end tests
 
-Capability-level e2e tests live in [`e2e/`](e2e/README.md). Five numbered specs (`1-weather-mcp` through `5-rag`) exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec asserts only observable behavior — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. Each spec has a sidecar `<N>-<feature>-tasks.template.md` the runner copies into `e2e/testing/runs/` per run.
+Capability-level e2e tests live in [`e2e/`](e2e/README.md). Eleven numbered specs (`1-weather-mcp` through `11-compaction-idempotency`) exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec asserts only observable behavior — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. Each spec has a sidecar `<N>-<feature>-tasks.template.md` the runner copies into `e2e/testing/runs/` per run.
 
 Quick invocation:
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
 ```
 
 See [`e2e/README.md`](e2e/README.md) for the full contract, capability matrix, and how to add a new test. If you drive the suite via Claude Code's `e2e-runner` subagent, allowlist the spec-prescribed reset commands in your local [`.claude/settings.local.json`](../../.claude/settings.local.json) per the "Claude Code permission allowlist" section of `e2e/README.md`. Without the allowlist the runner finishes but verdicts are environmental noise from leaked state.

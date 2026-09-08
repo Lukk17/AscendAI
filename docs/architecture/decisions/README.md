@@ -34,3 +34,4 @@ Detailed ADRs for the ascend-ai-agent internal architecture live in [apps/ascend
 | ADR-006 | Multi-provider semantic memory routing.                 |
 | ADR-007 | Ingestion auto-poller off by default.                   |
 | ADR-008 | MCP startup tolerance via `initialized=false` and deferred init loop. |
+| ADR-009 | Bounded retry and fan-out cap for Docling page conversion. |

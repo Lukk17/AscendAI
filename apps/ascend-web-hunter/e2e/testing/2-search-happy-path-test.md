@@ -18,7 +18,7 @@ highly — minimising flakiness from upstream result churn.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -26,7 +26,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -34,7 +34,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check the SearXNG backend is reachable from the host.
 
-```powershell
+```bash
 curl -fsS "http://localhost:9020/search?q=test&format=html"
 ```
 
@@ -43,8 +43,16 @@ Expect HTTP 200 with HTML content.
 Confirm SearXNG's upstream engines actually return results. The settings.yml overlay enables JSON; this query
 fans the meta-search across every enabled engine and parses the count from the response.
 
+**PowerShell:**
+
 ```powershell
 $json = curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | ConvertFrom-Json; "$($json.results.Count) results, $($json.unresponsive_engines.Count) blocked engines"
+```
+
+**Unix:**
+
+```bash
+curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | python3 -c "import json, sys; d = json.load(sys.stdin); print(f\"{len(d.get('results', []))} results, {len(d.get('unresponsive_engines', []))} blocked engines\")"
 ```
 
 Expect a non-zero results count. If results is `0` and the unresponsive-engines list shows access-denied /
@@ -61,11 +69,11 @@ None. SearXNG owns its own internal cache; the host does not write persisted sta
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "web-hunter/testing/search-stable-query.yml" --env ascend-local
 ```
 

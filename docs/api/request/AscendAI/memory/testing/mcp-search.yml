@@ -38,6 +38,16 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("MCP memory_search returns success envelope with results array", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload).to.have.property("status");
+            expect(payload.status).to.equal("success");
+            expect(payload).to.have.property("results");
+            expect(payload.results).to.be.an("array");
+        });
 
 settings:
   encodeUrl: true

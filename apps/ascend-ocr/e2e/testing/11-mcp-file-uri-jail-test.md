@@ -7,17 +7,17 @@ traversal Critical from the security audit.
 
 ## Prerequisites
 
-```powershell
+```bash
 bru --version
 ```
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
 Check that `MCP_FILE_URI_ROOT` is unset.
 
-```powershell
+```bash
 docker exec ascend-ocr printenv MCP_FILE_URI_ROOT
 ```
 
@@ -31,14 +31,13 @@ None.
 
 Open MCP session per spec 8, then:
 
-```powershell
+```bash
 bru run "ocr/testing/mcp-file-uri-disabled.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>"
 ```
 
 ## Expected
 
 - HTTP 200 carrying a JSON-RPC error envelope referencing `UNSAFE_URI`.
-- ascend-ocr did NOT open `/etc/passwd` (verifiable via process audit if `auditd` is configured).
 
 ## Optional second case — root configured
 

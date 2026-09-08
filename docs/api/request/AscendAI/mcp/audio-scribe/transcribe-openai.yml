@@ -1,7 +1,7 @@
 info:
   name: transcribe-openai
   type: http
-  seq: 4
+  seq: 5
 
 http:
   method: POST
@@ -39,6 +39,20 @@ runtime:
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
+        });
+        test("transcribe_openai returns a success envelope with transcription", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("success");
+            expect(payload).to.have.property("source");
+            expect(payload.source).to.equal("openai");
+            expect(payload).to.have.property("model");
+            expect(payload.model).to.equal("whisper-1");
+            expect(payload).to.have.property("language");
+            expect(payload.language).to.equal("en");
+            expect(payload).to.have.property("transcription");
         });
 
 settings:

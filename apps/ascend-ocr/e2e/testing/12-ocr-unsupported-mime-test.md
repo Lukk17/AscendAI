@@ -8,16 +8,16 @@ trusting headers.
 
 ## Prerequisites
 
-```powershell
+```bash
 bru --version
 ```
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
-```powershell
-Test-Path apps/ascend-ocr/e2e/fixtures/not-an-image.txt
+```bash
+ls apps/ascend-ocr/e2e/fixtures/not-an-image.txt
 ```
 
 Expect `True`.
@@ -28,11 +28,11 @@ None.
 
 ## Run
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "ocr/testing/ocr-unsupported-mime.yml" --env ascend-local
 ```
 

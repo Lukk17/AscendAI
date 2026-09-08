@@ -55,3 +55,18 @@ share vector dimensions share the same collection.
 | `lmstudio` (default)   | `text-embedding-nomic-embed-text-v2-moe`     | 768        | `ascend_memory_768`    |
 | `openai`               | `text-embedding-3-small`                     | 1536       | `ascend_memory_1536`   |
 | `gemini`               | `gemini-embedding-001`                       | 768        | `ascend_memory_768`    |
+
+---
+
+### Input limits
+
+| Variable                 | Default                                                            | Purpose                                                                  |
+| :----------------------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------- |
+| `DEFAULT_USER_ID`        | `default_user`                                                     | Fallback `user_id` when a REST or MCP caller omits it.                  |
+| `MAX_USER_ID_LENGTH`     | `128`                                                              | Input cap on `user_id` length.                                          |
+| `MAX_QUERY_LENGTH`       | `2048`                                                             | Input cap on search query length.                                       |
+| `MAX_MEMORY_TEXT_LENGTH` | `32768`                                                            | Input cap on stored memory text length.                                 |
+| `MAX_SEARCH_LIMIT`       | `100`                                                              | Upper bound on the `limit` search parameter.                            |
+
+None of the five vars above is set in the root `compose.yaml`, so the running container uses these code defaults
+as-is.

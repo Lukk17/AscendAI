@@ -38,11 +38,11 @@ fills in `Result summary` and `Verdict`, and logs anything done outside the spec
 
 Every test runs the matching Bruno request file under `docs/api/request/AscendAI/memory/testing/` via the Bruno CLI.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "memory/testing/<request>.yml" --env ascend-local
 ```
 

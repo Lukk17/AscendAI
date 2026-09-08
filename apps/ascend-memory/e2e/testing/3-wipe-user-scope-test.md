@@ -15,7 +15,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -23,7 +23,7 @@ Expect a version string.
 
 Check the AscendMemory server is reachable and ready.
 
-```powershell
+```bash
 curl -fsS http://localhost:7020/health
 ```
 
@@ -31,7 +31,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check Qdrant is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:6333/readyz
 ```
 
@@ -41,11 +41,11 @@ Expect HTTP 200.
 
 Wipe both test users so the run starts from a known-empty state for both partitions.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryWipeAlpha"
 ```
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryWipeBeta"
 ```
 
@@ -55,35 +55,35 @@ Each returns HTTP 200 with `{"status":"success", ...}`.
 
 Four Bruno requests in sequence. Each must complete before the next begins.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Seed Alpha with a distinctive memory.
 
-```powershell
+```bash
 bru run "memory/testing/insert-alpha.yml" --env ascend-local
 ```
 
 **Step 2.** Seed Beta with a different distinctive memory.
 
-```powershell
+```bash
 bru run "memory/testing/insert-beta.yml" --env ascend-local
 ```
 
 **Step 3.** Wipe Alpha only.
 
-```powershell
+```bash
 bru run "memory/testing/wipe-alpha.yml" --env ascend-local
 ```
 
 **Step 4.** Search both users and inspect the results.
 
-```powershell
+```bash
 bru run "memory/testing/search-alpha.yml" --env ascend-local
 ```
 
-```powershell
+```bash
 bru run "memory/testing/search-beta.yml" --env ascend-local
 ```
 
@@ -95,11 +95,11 @@ where the state it names is created, but the runner executes it last, after the 
 checked against the live state. At that point, wipe Beta and re-wipe Alpha so neither user's memories carry over
 into the next run.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryWipeAlpha"
 ```
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryWipeBeta"
 ```
 

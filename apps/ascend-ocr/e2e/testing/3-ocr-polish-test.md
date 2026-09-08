@@ -4,7 +4,8 @@
 
 - `POST /v1/ocr` with the `argent-saga-chronicles-page1-polish.png` fixture and `lang=pl` returns HTTP 200.
 - The response body parses as an `OcrJsonResponse` with `filename`, `language`, `pages`, `processing_time_seconds`.
-- `language` is a non-empty string (ascend-ocr returns its configured `DEFAULT_LANGUAGE`, currently `"en"`, regardless of the per-request `lang` parameter — the real proof the Polish model engaged is the Polish-character assertion below).
+- `language` equals `"pl"`, echoing the per-request `lang` parameter — the Polish-character assertion below is a
+  second, independent proof that the Polish model actually engaged.
 - The concatenated `pages[*].lines[*].text` (case-insensitive) contains the canary substring `Saga Świetlna`, `Aenaria`, or `Eklipsą`.
 - The concatenated extracted text contains at least one Polish-specific accented character from the set
   `{ś, ż, ą, ę, ć, ó, ł, ń, ź}` — this is the assertion that proves the Polish model loaded (and not the English
@@ -12,11 +13,18 @@
 - Each `OcrTextLine.confidence` is a finite number in `[0.0, 1.0]`.
 - `processing_time_seconds` is a finite non-negative number.
 
+**Corrected expectation (2026-09-08).** Earlier revisions of this spec asserted that the service returned its
+configured `DEFAULT_LANGUAGE` regardless of the per-request `lang`, and treated that as intended design. It was not
+design, it was a bug: the REST endpoint declared `lang` without a form-field marker, so FastAPI read it as a query
+parameter and never saw the multipart form value, meaning every REST OCR request ran the English model no matter
+what it asked for. This spec now asserts the behaviour that should always have been true — a Polish request comes
+back tagged `"pl"` — instead of the bug's symptom.
+
 ## Prerequisites
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -24,7 +32,7 @@ Expect a version string.
 
 Check the ascend-ocr server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
@@ -32,11 +40,11 @@ Expect HTTP 200 with `"status":"ok"` in the body.
 
 Check the Polish canary fixture exists.
 
-```powershell
-Test-Path apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1-polish.png
+```bash
+ls apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1-polish.png
 ```
 
-Expect `True`. If missing, generate it per [`apps/ascend-ocr/e2e/fixtures/README.md`](../fixtures/README.md) using a font
+Expect the file path printed. If missing, generate it per [`apps/ascend-ocr/e2e/fixtures/README.md`](../fixtures/README.md) using a font
 that supports Polish glyphs.
 
 ## Reset state
@@ -49,11 +57,11 @@ but not the assertion outcome.
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "ocr/testing/ocr-polish.yml" --env ascend-local
 ```
 
@@ -61,7 +69,7 @@ bru run "ocr/testing/ocr-polish.yml" --env ascend-local
 
 - HTTP 200.
 - Response body matches the `OcrJsonResponse` schema.
-- `language` is a non-empty string (ascend-ocr returns `DEFAULT_LANGUAGE`, not the per-request `lang`).
+- `language` equals `"pl"` (the per-request `lang` parameter, correctly echoed — see "Corrected expectation" above).
 - `filename` equals `"argent-saga-chronicles-page1-polish.png"`.
 - `pages` is non-empty.
 - The concatenated text from `pages[*].lines[*].text` (case-insensitive) contains the substring `Saga Świetlna`, `Aenaria`, or `Eklipsą`.

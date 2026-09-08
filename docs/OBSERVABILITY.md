@@ -12,7 +12,7 @@ AscendAI ships a full three-pillar observability stack (metrics, logs, traces) a
 | Logs | Vector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
 | Traces | OTel Collector + Tempo + Grafana | http://localhost:7078 → Explore → Tempo |
 
-All eight observability containers start automatically with `docker compose up`. There is no profile flag required — observability is always-on.
+All seven observability containers start automatically with `docker compose up`. There is no profile flag required — observability is always-on.
 
 ---
 
@@ -272,7 +272,7 @@ No service code changes are required. Vector handles the fan-out.
 
 ## Resource Usage
 
-At idle, the eight observability containers consume approximately:
+At idle, the seven observability containers consume approximately:
 
 | Container | RAM (idle) |
 |---|---|
@@ -282,9 +282,7 @@ At idle, the eight observability containers consume approximately:
 | vector | ~30 MB |
 | otel-collector | ~40 MB |
 | tempo | ~120 MB |
-| postgres-exporter | ~15 MB |
-| redis-exporter | ~10 MB |
-| **Total** | **~495 MB** |
+| **Total** | **~470 MB** |
 
 Disk retention is bounded:
 - Prometheus: 72 hours (`--storage.tsdb.retention.time=72h`), approximately 200 MB steady state under normal load.

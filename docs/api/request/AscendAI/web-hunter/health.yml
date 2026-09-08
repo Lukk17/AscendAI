@@ -14,6 +14,11 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("web-hunter endpoint returns response", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(typeof data).to.equal("object");
+        });
 
 settings:
   encodeUrl: true

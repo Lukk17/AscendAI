@@ -1,7 +1,7 @@
 info:
   name: current-not-found
   type: http
-  seq: 7
+  seq: 8
 
 http:
   method: POST

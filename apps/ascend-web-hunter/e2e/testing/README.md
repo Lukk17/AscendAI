@@ -35,11 +35,11 @@ progresses, fills in `Result summary` and `Verdict`, and logs anything done outs
 Every test runs the matching Bruno request file under `docs/api/request/AscendAI/web-hunter/testing/` via the
 Bruno CLI.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "web-hunter/testing/<request>.yml" --env ascend-local
 ```
 
@@ -70,10 +70,11 @@ be run on its own.
 9. [9-session-status-test.md](9-session-status-test.md). `POST /api/v2/web/session/status` across its `none`,
    `expired`, and `active` states. Redis-only, no egress — same cost tier as 1, 4, and 8.
 10. [10-session-establish-test.md](10-session-establish-test.md). `POST /api/v2/web/session/establish` — asserts
-    the immediate response, plus a live-verified finding: the background monitor captures a session under the
-    *default* profile within seconds regardless of the profile requested. Launches a real headful Playwright
-    browser that can be held by a background monitor for up to 10 minutes. Highest per-run resource cost in this
-    module's suite; do not run in parallel with test 8 or with itself; see the spec's own cost note.
+    the immediate response, plus a live-verified finding: the background monitor's "cleared" check accepts any
+    unchallenged page, so it captures a session within seconds even though nobody solved a challenge. Launches a
+    real headful Playwright browser that can be held by a background monitor for up to 10 minutes. Highest per-run
+    resource cost in this module's suite; do not run in parallel with test 8 or with itself; see the spec's own
+    cost note.
 
 ## Cross-cutting conventions
 

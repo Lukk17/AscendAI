@@ -36,7 +36,7 @@
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
               <option name="name" value="ENGINE_CACHE_MAX_SIZE" />
-              <option name="value" value="8" />
+              <option name="value" value="2" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
               <option name="name" value="MCP_ALLOWED_HOSTS" />

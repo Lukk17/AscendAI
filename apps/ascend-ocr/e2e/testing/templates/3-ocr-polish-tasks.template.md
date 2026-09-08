@@ -24,7 +24,7 @@ Copy this file to `../runs/<UTC-timestamp>_3-ocr-polish-tasks.md` before startin
 
 - [ ] HTTP 200
 - [ ] Response body matches `OcrJsonResponse` schema
-- [ ] `language` is a non-empty string (server returns `DEFAULT_LANGUAGE`, not request `lang`)
+- [ ] `language` equals `"pl"` (echoes the per-request `lang` parameter, per the spec's corrected expectation)
 - [ ] `filename="argent-saga-chronicles-page1-polish.png"`
 - [ ] `pages` is non-empty
 - [ ] Concatenated `pages[*].lines[*].text` (case-insensitive) contains `Saga Świetlna`, `Aenaria`, or `Eklipsą`

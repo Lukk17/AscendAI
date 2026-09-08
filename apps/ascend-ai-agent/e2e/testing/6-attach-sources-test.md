@@ -99,7 +99,11 @@ Per the Group A hermetic contract, this spec only resets and cleans the artifact
 Step 1. Upload the pierogi-recipe fixture. The existing rag-ingestion-upload sends three; for this spec we re-use it because dropping just one upload from the multipart request and re-running it for one file is overkill. The other two uploads are idempotent against the object store.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
 ```
 
 Step 2. Trigger ingestion (no prefix → scans the whole bucket).
@@ -111,13 +115,21 @@ docker exec postgres psql -U postgres -d ascend_ai -c "DELETE FROM int_metadata_
 ```
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
 ```
 
 Step 3. Send the attach-sources prompt. This request asks about Helena's pierogi recipe with `attachSources=true` and the test user-id `frostyAttachSourcesTest`.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/attach-sources-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/attach-sources-prompt.yml" --env ascend-local
 ```
 
 Capture the response body (Bruno prints it on success). Extract `response.sources[0].downloadUrl` from the JSON.

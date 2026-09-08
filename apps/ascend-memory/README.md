@@ -101,17 +101,30 @@ PowerShell:
 pip install -e .[dev]
 ```
 
-**4. Run the server.** Defaults in [src/config/config.py](src/config/config.py) point at local LM Studio. Override
-through env vars for any other provider.
+**4. Run the server.** With no env vars set, [src/config/config.py](src/config/config.py) already defaults to
+`provider=lmstudio` against a local LM Studio instance at `http://localhost:1234/v1`.
+
+Bash:
+
+```bash
+python src/main.py
+```
+
+PowerShell:
+
+```powershell
+python src/main.py
+```
+
+To route to OpenAI instead, export `OPENAI_API_KEY` and pass `provider=openai` per request (or set
+`MEM0_DEFAULT_PROVIDER=openai` to make it the default). `OPENAI_BASE_URL` already defaults to the real OpenAI
+endpoint and only needs overriding for a custom OpenAI-compatible gateway, not for LM Studio, which has its own
+`LMSTUDIO_BASE_URL`.
 
 Bash:
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-```
-
-```bash
-export OPENAI_BASE_URL="http://localhost:1234/v1"
 ```
 
 ```bash
@@ -122,10 +135,6 @@ PowerShell:
 
 ```powershell
 $env:OPENAI_API_KEY="sk-..."
-```
-
-```powershell
-$env:OPENAI_BASE_URL="http://localhost:1234/v1"
 ```
 
 ```powershell
@@ -164,7 +173,7 @@ docker build -t ascend-memory:latest .
 Standalone run, when iterating outside compose:
 
 ```bash
-docker run -d --name ascend-memory -p 7020:7020 -e OPENAI_API_KEY="sk-..." -e OPENAI_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
+docker run -d --name ascend-memory -p 7020:7020 -e LMSTUDIO_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
 ```
 
 **Tag and push to a registry (optional).**
@@ -306,7 +315,7 @@ The service exposes an MCP server at `/mcp` (mounted via HTTP Streamable).
 
 #### HTTP Streamable requirements
 
-When invoking the MCP endpoints manually (e.g. via [mcp_requests.http](mcp_requests.http) or curl):
+When invoking the MCP endpoints manually (e.g. via the Bruno collection at [docs/api/request/AscendAI/mcp/memory/](../../docs/api/request/AscendAI/mcp/memory/) or curl):
 
 1. **Endpoints.** The standard `http_app` exposes `/sse` (for connection) and `/messages` (for requests).
    Configuration may expose `/mcp` handling both.
@@ -323,8 +332,17 @@ When invoking the MCP endpoints manually (e.g. via [mcp_requests.http](mcp_reque
 
 #### Testing MCP
 
-A collection of example requests lives at [mcp_requests.http](mcp_requests.http) (use the VS Code REST Client
-extension).
+Example MCP requests live in the Bruno collection. Change to the collection root:
+
+```bash
+cd docs/api/request/AscendAI
+```
+
+Run a request:
+
+```bash
+bru run "memory/testing/insert-reykjavik.yml" --env ascend-local
+```
 
 ---
 
@@ -446,7 +464,7 @@ Dependency management lives in [pyproject.toml](pyproject.toml). Add a new depen
 | [src/observability/request_context.py](src/observability/request_context.py) | `X-Request-ID` middleware and request-id ContextVar.              |
 | [src/observability/metrics.py](src/observability/metrics.py)               | Prometheus counters and histograms exposed at `/metrics`.           |
 | [docs/architecture/decisions/](docs/architecture/decisions/)               | ADRs 1-6 (mem0ai, Qdrant, user_id scope, MCP↔REST, observability, mem0 2.x upgrade). |
-| [mcp_requests.http](mcp_requests.http)                                     | Example MCP requests for the VS Code REST Client extension.         |
+| [docs/api/request/AscendAI/memory/](../../docs/api/request/AscendAI/memory/) and [docs/api/request/AscendAI/mcp/memory/](../../docs/api/request/AscendAI/mcp/memory/) | Example REST + MCP requests in the Bruno collection.         |
 | [skills/ascend-memory/SKILL.md](skills/ascend-memory/SKILL.md)             | Drop-in agent skill for downstream agents.                          |
 | [../../README.md](../../README.md)                                               | Monorepo overview, architecture, ports.                             |
 | [../../docs/architecture/README.md](../../docs/architecture/README.md)           | Monorepo architecture, ADRs.                                        |

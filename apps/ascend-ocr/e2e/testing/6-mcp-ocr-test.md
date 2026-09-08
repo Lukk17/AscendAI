@@ -18,7 +18,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -26,7 +26,7 @@ Expect a version string.
 
 Check the ascend-ocr server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
@@ -34,24 +34,30 @@ Expect HTTP 200 with `"status":"ok"` in the body.
 
 Check the English canary fixture exists on the host.
 
-```powershell
-Test-Path apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png
+```bash
+ls apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png
 ```
 
-Expect `True`.
+Expect the file path printed.
 
 Check the object store is reachable on the host. It serves the S3 API on port 9070 without authentication, so
 this spec needs no client, no credentials, and no container name.
 
+Windows:
 ```powershell
 curl.exe -fsS http://localhost:9070/_floci/health
+```
+
+Unix:
+```bash
+curl -fsS http://localhost:9070/_floci/health
 ```
 
 Expect HTTP 200 with `"s3":"running"` in the JSON body.
 
 Check the ascend-ocr container has `MCP_ALLOWED_HOSTS` including `host.docker.internal`. The MCP tool's SSRF guard blocks RFC1918 destinations by default; the docker-internal `host.docker.internal` host-gateway resolves to a private IP and must be explicitly allowlisted. See [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md) for the policy.
 
-```powershell
+```bash
 docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS
 ```
 
@@ -66,8 +72,14 @@ machine.
 Create the dedicated `e2e-fixtures` bucket. The call is idempotent: an existing bucket answers HTTP 200 exactly like a
 freshly created one.
 
+Windows:
 ```powershell
 curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"
+```
+
+Unix:
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"
 ```
 
 Expect `200`.
@@ -75,44 +87,56 @@ Expect `200`.
 Drop only this test's fixture so the re-upload is clean. A key that is already gone also returns HTTP 204, so the step
 is safe to re-run.
 
-```powershell
-curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
+```bash
+curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
 ```
 
 Upload the fixture straight from the host. No client and no intermediate container copy: the S3 endpoint takes the
 bytes on a plain `PUT`.
 
+Windows:
 ```powershell
 curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: image/png" --data-binary "@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png" "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
+```
+
+Unix:
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" -X PUT -H "Content-Type: image/png" --data-binary "@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png" "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
 ```
 
 Expect `200`.
 
 Verify the object lands in the bucket.
 
-```powershell
-curl.exe -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=argent-saga"
+```bash
+curl -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=argent-saga"
 ```
 
 Expect a `ListBucketResult` carrying `<Key>argent-saga-chronicles-page1.png</Key>` with a `<Size>` of `212563`.
 
 ## Run
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the response headers.
 
+Windows:
 ```powershell
 curl.exe -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+```
+
+Unix:
+```bash
+curl -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in the next step.
 
 **Step 2.** Send the `tools/call` with the captured session ID injected:
 
-```powershell
+```bash
 bru run "ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 
@@ -122,8 +146,8 @@ Drop the fixture this spec uploaded, so the bucket is left exactly as the spec f
 the Run step passed or failed. The command names the `e2e-fixtures` bucket literally and one key, and a key that is
 already gone also returns HTTP 204, so the step is safe to re-run.
 
-```powershell
-curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
+```bash
+curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
 ```
 
 Leave the bucket itself in place. This spec creates it only if absent, and other specs seed their own fixtures into

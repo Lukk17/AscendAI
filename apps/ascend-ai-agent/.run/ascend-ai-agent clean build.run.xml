@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="ascend-ai-agent Build" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="ascend-ai-agent clean build" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$/apps/ascend-ai-agent" />

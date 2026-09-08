@@ -23,6 +23,11 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("extract returns structured content", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("status").or.have.property("content").or.have.property("text");
+        });
 
 settings:
   encodeUrl: true

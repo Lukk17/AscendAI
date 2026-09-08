@@ -21,8 +21,20 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("Status code is 422", function () {
+        test("Status code is 422 (validation error for missing user_id)", function () {
             expect(res.getStatus()).to.equal(422);
+        });
+        test("Response contains validation error detail for missing user_id", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("detail");
+            expect(data.detail).to.be.an("array");
+            expect(data.detail.length).to.be.greaterThan(0);
+            const userIdError = data.detail.find(err =>
+                err.loc && Array.isArray(err.loc) && err.loc.includes("user_id")
+            );
+            expect(userIdError).to.exist;
+            expect(userIdError.type).to.equal("missing");
         });
 
 settings:

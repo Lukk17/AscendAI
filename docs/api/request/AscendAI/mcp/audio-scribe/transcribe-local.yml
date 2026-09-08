@@ -41,6 +41,19 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("transcribe_local returns a success envelope with transcription", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("success");
+            expect(payload).to.have.property("source");
+            expect(payload.source).to.equal("local");
+            expect(payload).to.have.property("model");
+            expect(payload).to.have.property("language");
+            expect(payload.language).to.equal("en");
+            expect(payload).to.have.property("transcription");
+        });
 
 settings:
   encodeUrl: true

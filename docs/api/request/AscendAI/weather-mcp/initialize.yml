@@ -1,0 +1,45 @@
+info:
+  name: initialize
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9998/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "{{mcp_protocol_version}}",
+          "capabilities": {},
+          "clientInfo": { "name": "http-client", "version": "1.0" }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: "test(\"Status code is 200\", function () {\r
+        \    expect(res.getStatus()).to.equal(200);\r
+        });\r
+        test(\"Session ID is set\", function () {\r
+        \    const sessionId = res.getHeader(\"Mcp-Session-Id\");\r
+        \    expect(sessionId).to.not.be.undefined;\r
+        \    expect(sessionId).to.not.be.empty;\r
+        });"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

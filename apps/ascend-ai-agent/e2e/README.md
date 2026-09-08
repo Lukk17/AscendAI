@@ -149,9 +149,13 @@ parallel layout only matters when you care about wall-clock.
 ### Prerequisites before any test
 
 1. External infra running: PostgreSQL `:5432`, Redis `:6379`, Qdrant `:6333`, S3-compatible object storage `:9070` (S3 API) / `:9071` (UI).
-2. Compose stack up: `docker compose up -d --build` (brings up AscendMemory, ascend-web-hunter, ascend-audio-scribe, ascend-ocr,
-   ascend-weather-mcp, support services).
-3. ascend-ai-agent running on the host: `cd apps/ascend-ai-agent && ./gradlew bootRun`.
+2. Compose stack up: `docker compose up -d --build` (brings up ascend-ai-agent itself, AscendMemory, ascend-web-hunter,
+   ascend-audio-scribe, ascend-ocr, ascend-weather-mcp, support services).
+3. ascend-ai-agent reachable on `:9917`. Step 2 already runs it as a container, so check first rather than starting
+   a second instance: `docker compose ps ascend-ai-agent` or `curl -fsS http://localhost:9917/actuator/health`. Only
+   if you deliberately stopped that container for local Java debugging (`docker compose stop ascend-ai-agent`), run
+   it on the host instead: `cd apps/ascend-ai-agent && ./gradlew bootRun`. Running both at once fails: they fight
+   over port 9917.
 
 If the ascend-ai-agent startup banner shows any `[FAILED]` rows under `External dependencies`, fix that first. Each
 individual spec also has explicit prereq checks the runner executes before starting.
@@ -268,7 +272,11 @@ Run one capability.
 Bash:
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
 ```
 
 PowerShell:
@@ -286,7 +294,11 @@ Run the whole suite (Bruno's directory mode).
 Bash:
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing" --env ascend-local
 ```
 
 PowerShell:

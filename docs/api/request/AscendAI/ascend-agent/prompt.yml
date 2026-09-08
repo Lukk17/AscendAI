@@ -70,6 +70,19 @@ http:
         disabled: true
   auth: inherit
 
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("agent prompt endpoint returns response", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("status").or.have.property("response").or.have.property("result");
+        });
+
 settings:
   encodeUrl: true
   timeout: 0

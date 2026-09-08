@@ -20,7 +20,7 @@ All three are asserted on the response body only, never on log output.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -28,7 +28,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -36,7 +36,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check Redis is reachable from the host's Docker context (this test seeds and reads keys directly).
 
-```powershell
+```bash
 docker exec redis redis-cli PING
 ```
 
@@ -48,18 +48,18 @@ Confirm `example.com` and `example.org` currently carry no session (both are IAN
 `example.com` is read constantly by test 3 through the `curl_cffi` tier, which never writes a session record, and
 `example.org` is touched by no other spec in this suite).
 
-```powershell
+```bash
 docker exec redis redis-cli EXISTS "session:example.com:default"
 ```
 
-```powershell
+```bash
 docker exec redis redis-cli EXISTS "session:example.org:default"
 ```
 
 Expect `0` for both. If `example.org` returns `1`, a previous run of this spec did not clean up — delete it before
 continuing.
 
-```powershell
+```bash
 docker exec redis redis-cli DEL "session:example.org:default"
 ```
 
@@ -68,11 +68,11 @@ Seed a **stale** session record for `example.org`. The fixture
 `1735689600` (2025-01-01T00:00:00Z), far older than the 14-day TTL, so `status()` computes an already-lapsed auth
 window without the test needing to wait 14 days for one to occur naturally.
 
-```powershell
+```bash
 docker cp apps/ascend-web-hunter/e2e/fixtures/session-status-expired-seed.json redis:/tmp/session-status-expired-seed.json
 ```
 
-```powershell
+```bash
 docker exec redis sh -c "redis-cli -x SETEX 'session:example.org:default' 1209600 < /tmp/session-status-expired-seed.json"
 ```
 
@@ -82,19 +82,19 @@ Expect `OK`.
 
 Move into the Bruno collection root first.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 Call 1 — `example.com`, which has never carried a session (the `none` branch).
 
-```powershell
+```bash
 bru run "web-hunter/testing/session-status-none.yml" --env ascend-local
 ```
 
 Call 2 — `example.org`, seeded with the stale fixture above (the `expired` branch).
 
-```powershell
+```bash
 bru run "web-hunter/testing/session-status-expired.yml" --env ascend-local
 ```
 
@@ -102,17 +102,35 @@ Re-seed `example.org` with a **fresh** `saved_at` (current Unix time) so the sam
 window. This has no static fixture — the timestamp has to be "now" at run time — so build it inline instead of
 committing a file that would immediately go stale.
 
+**PowerShell:**
+
 ```powershell
 $epoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $json = '{"auth":{"storage_state":{"cookies":[{"name":"e2e-probe","value":"1","domain":".example.org","path":"/","expires":-1,"httpOnly":false,"secure":true,"sameSite":"Lax"}],"origins":[]},"user_agent":"e2e-session-status-test/1.0","saved_at":' + $epoch + '}}'
 Set-Content -Path session-status-active-seed.json -Value $json -NoNewline -Encoding ascii
 ```
 
+**Unix:**
+
+```bash
+epoch=$(date +%s)
+json="{\"auth\":{\"storage_state\":{\"cookies\":[{\"name\":\"e2e-probe\",\"value\":\"1\",\"domain\":\".example.org\",\"path\":\"/\",\"expires\":-1,\"httpOnly\":false,\"secure\":true,\"sameSite\":\"Lax\"}],\"origins\":[]},\"user_agent\":\"e2e-session-status-test/1.0\",\"saved_at\":$epoch}}"
+printf '%s' "$json" > session-status-active-seed.json
+```
+
+**PowerShell:**
+
 ```powershell
 docker cp session-status-active-seed.json redis:/tmp/session-status-active-seed.json
 ```
 
-```powershell
+**Unix:**
+
+```bash
+docker cp session-status-active-seed.json redis:/tmp/session-status-active-seed.json
+```
+
+```bash
 docker exec redis sh -c "redis-cli -x SETEX 'session:example.org:default' 1209600 < /tmp/session-status-active-seed.json"
 ```
 
@@ -120,7 +138,7 @@ Expect `OK`.
 
 Call 3 — `example.org` again, now inside its TTL window (the `active` branch).
 
-```powershell
+```bash
 bru run "web-hunter/testing/session-status-active.yml" --env ascend-local
 ```
 
@@ -136,11 +154,11 @@ bru run "web-hunter/testing/session-status-active.yml" --env ascend-local
 - **No collateral damage:** every session key that existed before this test started is still present and unchanged
   afterward, and `example.org`'s key — created only by this test — is removed at cleanup.
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli DEL "session:example.org:default"
   ```
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli --scan --pattern "session:*"
   ```
 
@@ -148,8 +166,8 @@ bru run "web-hunter/testing/session-status-active.yml" --env ascend-local
 
   Delete the locally-generated seed file the Run section created (it is not a committed fixture):
 
-  ```powershell
-  Remove-Item session-status-active-seed.json
+  ```bash
+  rm session-status-active-seed.json
   ```
 
 ## Fixtures

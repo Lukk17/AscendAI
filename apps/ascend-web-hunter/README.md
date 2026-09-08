@@ -6,7 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.60-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-4c1)](#)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue)](../../LICENSE)
 
 ---
 
@@ -169,4 +169,4 @@ skill covers search, read, and the session establish/status/clear endpoints, the
 
 ### License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See the top-level [LICENSE](../../LICENSE) at the monorepo root.

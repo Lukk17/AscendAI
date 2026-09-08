@@ -8,14 +8,12 @@ whatever MCP tools the running agent exposes; it doesn't need this document.
 
 ---
 
-### What ships
+### What to configure
 
-Two committed templates in the repo root:
+Two config files you need to set up in the repo root:
 
-- [.mcp.json.example](../.mcp.json.example): Claude Code project scope. Schema key `mcpServers`. Env-var syntax:
-  `${VAR}` and `${VAR:-default}`.
-- [opencode.json.example](../opencode.json.example): OpenCode plus Kilo Code project scope (they share the file).
-  Schema key `mcp` alongside `instructions`. Env-var syntax: `{env:VAR}` (no `$`).
+- `.mcp.json`: Claude Code project scope. Schema key `mcpServers`. Env-var syntax: `${VAR}` and `${VAR:-default}`.
+- `opencode.json`: OpenCode plus Kilo Code project scope (they share the file). Schema key `mcp` alongside `instructions`. Env-var syntax: `{env:VAR}` (no `$`).
 
 Default servers, in order:
 
@@ -32,20 +30,9 @@ block; Claude Code's schema has no `enabled` flag.
 
 ---
 
-### Step 1, copy the templates
+### Step 1, create the config files
 
-From the project root:
-
-```bash
-cp .mcp.json .mcp.json
-```
-
-```bash
-cp opencode.json.example opencode.json
-```
-
-Both files are gitignored at the agent-standards repo level. In your consumer project, decide per-team whether to
-commit them. If you keep `${VAR}` or `{env:VAR}` placeholders and never inline secrets, the files are commit-safe.
+Create `.mcp.json` and `opencode.json` at the project root, or copy from a prior setup. Both files are gitignored at the agent-standards repo level. In your consumer project, decide per-team whether to commit them. If you keep `${VAR}` or `{env:VAR}` placeholders and never inline secrets, the files are commit-safe.
 
 ---
 
@@ -147,10 +134,7 @@ quit (system-tray icon) and relaunched.
 
 ### Step 5, variables you can override
 
-Every variable in the table is optional. The defaults are baked into the template files, either via `${VAR:-default}`
-in [.mcp.json.example](../.mcp.json.example) or as hardcoded literals in
-[opencode.json.example](../opencode.json.example). Set a variable only when you need to point at a non-default host
-or supply a real token.
+Every variable in the table is optional. The defaults use `${VAR:-default}` syntax in `.mcp.json` (Claude Code) or hardcoded literals in `opencode.json` (OpenCode plus Kilo Code). Set a variable only when you need to point at a non-default host or supply a real token.
 
 | Variable                          | Used by      | Effect when unset                                |
 | --------------------------------- | ------------ | ------------------------------------------------ |
@@ -161,12 +145,8 @@ or supply a real token.
 
 Important asymmetry between the two files:
 
-- [.mcp.json.example](../.mcp.json.example) (Claude Code) uses `${VAR:-default}`, so every env var has a resolvable
-  fallback. Files parse with no env set.
-- [opencode.json.example](../opencode.json.example) (OpenCode plus Kilo) uses `{env:VAR}` for tokens and **hardcodes
-  the URL defaults** because OpenCode's substitution syntax has no `:-default` fallback. To point OpenCode at a
-  non-default URL, edit the literal string in your local `opencode.json` (or set `OPENCODE_CONFIG_CONTENT` for a
-  session-scoped override).
+- `.mcp.json` (Claude Code) uses `${VAR:-default}`, so every env var has a resolvable fallback. Files parse with no env set.
+- `opencode.json` (OpenCode plus Kilo) uses `{env:VAR}` for tokens and hardcodes the URL defaults, because OpenCode's substitution syntax has no `:-default` fallback. To point OpenCode at a non-default URL, edit the literal string in your local `opencode.json` (or set `OPENCODE_CONFIG_CONTENT` for a session-scoped override).
 
 If a token-style variable is unset, the MCP starts but the upstream service rejects the empty token. That's a noisy
 but local failure; your other MCPs still work. Disable the server entirely if you don't plan to use it.
@@ -267,9 +247,7 @@ If a server fails to connect:
 
 ### Adding or changing a server
 
-Edit [.mcp.json.example](../.mcp.json.example) and [opencode.json.example](../opencode.json.example) in the
-agent-standards repo, commit, and consumer projects pull via the Step 2 update flow in
-[AGENT_TOOLING.md](AGENT_TOOLING.md).
+Edit `.mcp.json` and `opencode.json` in your project to add or change MCP servers. To synchronise across multiple consumer projects, make the changes in the agent-standards repo, commit, and pull via the update flow in [AGENT_TOOLING.md](AGENT_TOOLING.md).
 
 To customise per-project without affecting upstream, edit the copied `.mcp.json` and `opencode.json` directly. Those
 are local to each consumer.

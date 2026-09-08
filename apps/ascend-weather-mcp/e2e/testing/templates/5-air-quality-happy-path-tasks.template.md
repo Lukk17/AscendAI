@@ -18,7 +18,7 @@ Copy this file to `../runs/<UTC-timestamp>_5-air-quality-happy-path-tasks.md` be
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:9998/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Step 1: `curl -fsS -i -X POST http://localhost:9998/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
 - [ ] Send `air-quality-warsaw.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 
 ### Expected

@@ -67,7 +67,8 @@ docker exec redis redis-cli DEL user:frostySummarizationTest:instructions
 Send the Bruno request and wait for the response before moving to the Expected section. The request may take 30–90 seconds because each PDF page is sent to Docling.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/doc-summarization-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+bru run "ascend-agent/testing/doc-summarization-prompt.yml" --env ascend-local
 ```
 
 ## Post-run cleanup

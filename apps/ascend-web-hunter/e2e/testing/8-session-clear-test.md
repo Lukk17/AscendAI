@@ -22,7 +22,7 @@ run in parallel with everything else in the suite.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -30,7 +30,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -38,7 +38,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check Redis is reachable from the host's Docker context (this test seeds and reads a key directly).
 
-```powershell
+```bash
 docker exec redis redis-cli PING
 ```
 
@@ -49,18 +49,18 @@ Expect `PONG`.
 Confirm `example.net` and `example.com` currently carry no session (both are IANA-reserved documentation
 domains touched by no other spec in this suite, so this should already be true on a clean run).
 
-```powershell
+```bash
 docker exec redis redis-cli EXISTS "session:example.net:default"
 ```
 
-```powershell
+```bash
 docker exec redis redis-cli EXISTS "session:example.com:default"
 ```
 
 Expect `0` for both. If either returns `1`, a previous run of this spec did not clean up — delete it before
 continuing.
 
-```powershell
+```bash
 docker exec redis redis-cli DEL "session:example.net:default"
 ```
 
@@ -71,17 +71,17 @@ only needs a record to exist under the key the service reads. Copy it into the `
 JSON through a PowerShell or bash pipe into `redis-cli -x` mangles it — PowerShell prepends a BOM, bash treats a
 bare quoted string as a command — a file + shell redirection avoids both).
 
-```powershell
+```bash
 docker cp apps/ascend-web-hunter/e2e/fixtures/session-clear-seed.json redis:/tmp/session-clear-seed.json
 ```
 
-```powershell
+```bash
 docker exec redis sh -c "redis-cli -x SETEX 'session:example.net:default' 1209600 < /tmp/session-clear-seed.json"
 ```
 
 Expect `OK`.
 
-```powershell
+```bash
 docker exec redis redis-cli EXISTS "session:example.net:default"
 ```
 
@@ -91,19 +91,19 @@ Expect `1`.
 
 Move into the Bruno collection root first.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 Call 1 — clear the session just seeded for `example.net`.
 
-```powershell
+```bash
 bru run "web-hunter/testing/session-clear-existing.yml" --env ascend-local
 ```
 
 Call 2 — clear `example.com`, which has never carried a session (the idempotent / no-op path).
 
-```powershell
+```bash
 bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
 ```
 
@@ -113,7 +113,7 @@ bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
   `"https://example.net/"`, `existed` equals `true`. After the call, `session:example.net:default` no longer
   exists in Redis:
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli EXISTS "session:example.net:default"
   ```
 
@@ -123,7 +123,7 @@ bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
   `"https://example.com/"`, `existed` equals `false`, `cleared_cache_entries` equals `0`. Redis never held
   `session:example.com:default` before or after the call:
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli EXISTS "session:example.com:default"
   ```
 
@@ -132,7 +132,7 @@ bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
 - **No collateral damage:** every session key that existed before this test started (any domain other than
   `example.net`) is still present and unchanged after the run.
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli --scan --pattern "session:*"
   ```
 

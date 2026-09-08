@@ -17,7 +17,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -25,7 +25,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -33,7 +33,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check outbound HTTPS to `example.com` works from this host (independently of the ascend-web-hunter container).
 
-```powershell
+```bash
 curl -fsS https://www.example.com/
 ```
 
@@ -45,8 +45,16 @@ internet and the test cannot pass for environmental reasons.
 Optionally flush the Redis session-cache key for `example.com` to force a cold extraction. This is not required —
 the response shape is identical for cache hits and misses — but a cold run exercises the full tiered fallback.
 
+**PowerShell:**
+
 ```powershell
 docker exec redis redis-cli --scan --pattern "*example.com*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
+```
+
+**Unix:**
+
+```bash
+docker exec redis redis-cli --scan --pattern "*example.com*" | while read key; do docker exec redis redis-cli DEL "$key"; done
 ```
 
 If you choose not to reset, document the choice under **Additional tasks I did** in the run record.
@@ -55,11 +63,11 @@ If you choose not to reset, document the choice under **Additional tasks I did**
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "web-hunter/testing/extract-example-com.yml" --env ascend-local
 ```
 

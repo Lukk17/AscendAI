@@ -29,19 +29,15 @@ http:
 runtime:
   scripts:
     - type: tests
-      code: "// Automatically extract header and save to collection variable\r
-
-        // pm.collectionVariables.set(\"mcp_session_id\", res.getHeader(\"MCP-Session-Id\"));\r
-
-        \r
-
-        test(\"Session ID is set\", function () {\r
-
-        \    expect(bru.getCollectionVar(\"mcp_session_id\")).to.not.be.undefined;\r
-
-        \    expect(bru.getCollectionVar(\"mcp_session_id\")).to.not.be.empty;\r
-
-        });"
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Session ID header is returned and non-empty", function () {
+            const sessionId = res.getHeader("MCP-Session-Id");
+            expect(sessionId).to.not.be.undefined;
+            expect(sessionId).to.not.be.empty;
+        });
 
 settings:
   encodeUrl: true

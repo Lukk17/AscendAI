@@ -20,7 +20,7 @@ self-description. No outbound HTTPS is required.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -28,7 +28,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -42,15 +42,23 @@ None. `tools/list` is a stateless read of the MCP server's tool registry.
 
 Two steps.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the
 response headers.
 
+**PowerShell:**
+
 ```powershell
 curl.exe -fsS -i -X POST http://localhost:7021/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+```
+
+**Unix:**
+
+```bash
+curl -fsS -i -X POST http://localhost:7021/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in
@@ -58,7 +66,7 @@ the next step.
 
 **Step 2.** Send the `tools/list` call with the captured session ID injected:
 
-```powershell
+```bash
 bru run "web-hunter/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 

@@ -7,11 +7,11 @@ HTTP fetch — closes the credential-leakage class flagged in the security audit
 
 ## Prerequisites
 
-```powershell
+```bash
 bru --version
 ```
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
@@ -25,14 +25,26 @@ None.
 
 **Step 2.** Send the credentials probe, writing the run output to a file so the response frame can be read back.
 
+Windows:
 ```powershell
 bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>" -o "$env:TEMP\ocr-creds-run.json" -f json
 ```
 
+Unix:
+```bash
+bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>" -o "/tmp/ocr-creds-run.json" -f json
+```
+
 **Step 3.** Print the response frame the service sent back.
 
+Windows:
 ```powershell
 (Get-Content "$env:TEMP\ocr-creds-run.json" -Raw | ConvertFrom-Json)[0].results[0].response.data
+```
+
+Unix:
+```bash
+jq '.[0].results[0].response.data' < /tmp/ocr-creds-run.json
 ```
 
 Bruno's console output shows the status and its own test results but never the response body, so step 3 is what

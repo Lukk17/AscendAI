@@ -59,7 +59,8 @@ docker exec redis redis-cli DEL user:frostyWeatherMcpTest:instructions
 Send the Bruno request and wait for the response before moving to the Expected section.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
+cd docs/api/request/AscendAI
+bru run "ascend-agent/testing/weather-mcp-prompt.yml" --env ascend-local
 ```
 
 ## Post-run cleanup

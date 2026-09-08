@@ -16,7 +16,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -24,7 +24,7 @@ Expect a version string.
 
 Check the ascend-audio-scribe server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7017/health
 ```
 
@@ -32,7 +32,7 @@ Expect HTTP 200 with `{"status":"ok","service":"ascend-audio-scribe"}`.
 
 Check the ascend-audio-scribe container has `OPENAI_API_KEY` configured.
 
-```powershell
+```bash
 docker exec ascend-audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'
 ```
 
@@ -41,8 +41,8 @@ Expect `present`. Never `printenv` the raw value. This check proves the variable
 
 Check outbound HTTPS to OpenAI works from the ascend-audio-scribe container.
 
-```powershell
-docker exec ascend-audio-scribe curl -fsS -o NUL -w "%{http_code}\n" https://api.openai.com/v1/models
+```bash
+docker exec ascend-audio-scribe curl -fsS -o /dev/null -w "%{http_code}\n" https://api.openai.com/v1/models
 ```
 
 Expect HTTP 200 (when the key is valid) or HTTP 401 (when the key is unset/invalid — confirms egress works even if
@@ -50,8 +50,16 @@ the key check itself failed).
 
 Check the canary fixture is present.
 
+**PowerShell:**
+
 ```powershell
 dir ascend-audio-scribe\e2e\fixtures\meeting-clip.wav
+```
+
+**Unix:**
+
+```bash
+ls -lh ascend-audio-scribe/e2e/fixtures/meeting-clip.wav
 ```
 
 Expect the file to exist and be at least 1 KB. If missing, record the canary phrase per
@@ -62,7 +70,7 @@ Expect the file to exist and be at least 1 KB. If missing, record the canary phr
 Delete any stale `transcript_openai.md` cache entries from prior runs to keep `/tmp` clean and rule out a stale
 download contaminating the assertion.
 
-```powershell
+```bash
 docker exec ascend-audio-scribe sh -c "rm -f /tmp/transcript_*.md"
 ```
 
@@ -70,11 +78,11 @@ docker exec ascend-audio-scribe sh -c "rm -f /tmp/transcript_*.md"
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "transcribe/testing/transcribe-openai-canary.yml" --env ascend-local
 ```
 

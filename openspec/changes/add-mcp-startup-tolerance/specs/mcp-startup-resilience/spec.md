@@ -81,7 +81,7 @@ The readiness-log banner emitted by `StartupLogConfig` on
 `AvailabilityChangeEvent<ReadinessState.ACCEPTING_TRAFFIC>` SHALL contain an `MCP servers:` section with one line
 per configured `streamable-http` connection. Each line MUST follow the format
 `<connection-name>: <url> [Connected | FAILED]` with the 4-space / 6-space indentation defined in
-[coding-standards](../../../.agents/skills/coding-standards/SKILL.md). The exception detail of failed clients
+[coding-standards](../../../../../.agents/skills/coding-standards/SKILL.md). The exception detail of failed clients
 MUST NOT appear in the banner.
 
 #### Scenario: Banner with mixed states
@@ -102,7 +102,7 @@ MUST NOT appear in the banner.
 ### Requirement: Configuration uses Spring AI's built-in deferral flag
 
 The application SHALL set `spring.ai.mcp.client.initialized=false` in
-[application.yaml](../../../apps/ascend-ai-agent/src/main/resources/application.yaml). The project MUST NOT replace,
+[application.yaml](../../../../../apps/ascend-ai-agent/src/main/resources/application.yaml). The project MUST NOT replace,
 override, or fork Spring AI's `McpClientAutoConfiguration` or `SyncMcpToolCallbackProvider` beans.
 
 #### Scenario: Spring AI version upgrade within the 1.1.x line

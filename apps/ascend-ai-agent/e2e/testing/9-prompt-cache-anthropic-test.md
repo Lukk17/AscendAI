@@ -44,7 +44,11 @@ docker exec redis redis-cli DEL user:frostyPromptCacheAnthropicTest:instructions
 Step 1. First prompt (cache miss expected; this writes the cache entry).
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/prompt-cache-anthropic.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/prompt-cache-anthropic.yml" --env ascend-local
 ```
 
 Capture response 1's `metadata.usage`. Note `nativeUsage.cache_creation_input_tokens` (expected: > 0, Anthropic charges to write the cache entry on the first call).
@@ -52,7 +56,11 @@ Capture response 1's `metadata.usage`. Note `nativeUsage.cache_creation_input_to
 Step 2. Second prompt within ~5 minutes (cache hit expected).
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/prompt-cache-anthropic.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/prompt-cache-anthropic.yml" --env ascend-local
 ```
 
 Capture response 2's `metadata.usage`. Note `nativeUsage.cache_read_input_tokens` (expected: > 0 and equal-ish to step-1's `nativeUsage.cache_creation_input_tokens`).

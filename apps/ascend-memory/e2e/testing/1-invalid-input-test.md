@@ -12,7 +12,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -20,7 +20,7 @@ Expect a version string. If the command is not found, install it with `npm insta
 
 Check the AscendMemory server is reachable and ready.
 
-```powershell
+```bash
 curl -fsS http://localhost:7020/health
 ```
 
@@ -35,14 +35,14 @@ None. This test does not reach mem0; no `user_id` is touched in Qdrant.
 
 Capture a Qdrant baseline, then send one Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Record the current point count of the `ascend_memory_1536` collection (the collection the default
 provider chain would eventually write to if this request ever reached mem0).
 
-```powershell
+```bash
 curl -fsS http://localhost:6333/collections/ascend_memory_1536
 ```
 
@@ -50,7 +50,7 @@ Note the `result.points_count` value as the baseline.
 
 **Step 2.** Send the malformed insert request.
 
-```powershell
+```bash
 bru run "memory/testing/invalid-missing-user.yml" --env ascend-local
 ```
 

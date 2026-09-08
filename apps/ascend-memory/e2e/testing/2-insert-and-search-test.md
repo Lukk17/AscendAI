@@ -17,7 +17,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -25,7 +25,7 @@ Expect a version string.
 
 Check the AscendMemory server is reachable and ready.
 
-```powershell
+```bash
 curl -fsS http://localhost:7020/health
 ```
 
@@ -33,7 +33,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check Qdrant is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:6333/readyz
 ```
 
@@ -43,7 +43,7 @@ Expect HTTP 200.
 
 Wipe the dedicated test user so the search at the end of the run reflects only what this test inserts.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryInsertSearchTest"
 ```
 
@@ -53,19 +53,19 @@ Expect HTTP 200 with `{"status":"success", ...}`.
 
 Two Bruno requests in sequence.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Insert the canary memory.
 
-```powershell
+```bash
 bru run "memory/testing/insert-reykjavik.yml" --env ascend-local
 ```
 
 **Step 2.** Search with a semantically related query.
 
-```powershell
+```bash
 bru run "memory/testing/search-reykjavik.yml" --env ascend-local
 ```
 
@@ -75,7 +75,7 @@ Wipe the test user so its inserted memory does not survive into the next run. Th
 because that is where the state it names is created, but the runner executes it last, after the `Expected`
 assertions below have been checked against the live state.
 
-```powershell
+```bash
 curl -fsS -X POST "http://localhost:7020/api/v1/memory/wipe?user_id=frostyMemoryInsertSearchTest"
 ```
 

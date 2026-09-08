@@ -46,12 +46,13 @@ listens on `0.0.0.0:7020` via `uvicorn src.main:app`.
 
 ### Docker Compose (monorepo)
 
-AscendMemory is declared in the monorepo root `compose.yaml` under service `ascend-memory`. It connects to the
-shared Qdrant container on the compose network. The relevant env vars to set in the compose file or a `.env`:
+AscendMemory is declared in the monorepo root `compose.yaml` under service `ascend-memory`. Qdrant is not a
+container on that compose network. It's an external prerequisite the operator runs separately, reached from inside
+the container via `host.docker.internal`. The relevant env vars, as set in the root `compose.yaml`:
 
-| Variable | Compose-typical value |
-| :------- | :-------------------- |
-| `QDRANT_HOST` | `qdrant` (service name on the compose network) |
+| Variable | Compose value |
+| :------- | :------------ |
+| `QDRANT_HOST` | `host.docker.internal` |
 | `QDRANT_PORT` | `6333` |
 | `LMSTUDIO_BASE_URL` | `http://host.docker.internal:1234/v1` |
 

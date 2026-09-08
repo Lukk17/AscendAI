@@ -1,6 +1,6 @@
 # Real-world + authenticated + human-captcha scraping: run tasks template
 
-Spec: [../7-authenticated-realworld-scraping-test.md](../7-authenticated-realworld-scraping-test.md)
+Spec: [7-authenticated-realworld-scraping-test.md](7-authenticated-realworld-scraping-test.md)
 
 Copy this file to `../runs/<UTC-timestamp>_7-authenticated-realworld-scraping-tasks.md` before starting a run. Tick
 boxes as you go. Record each best-effort row's actual verdict and any skip under **Additional tasks I did**.

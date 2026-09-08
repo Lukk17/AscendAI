@@ -11,6 +11,7 @@
             <option value="$PROJECT_DIR$/apps/ascend-ai-agent" />
           </set>
         </option>
+        <option name="useQualifiedModuleNames" value="false" />
       </GradleProjectSettings>
       <GradleProjectSettings>
         <option name="externalProjectPath" value="$PROJECT_DIR$/apps/ascend-weather-mcp" />
@@ -20,6 +21,7 @@
             <option value="$PROJECT_DIR$/apps/ascend-weather-mcp" />
           </set>
         </option>
+        <option name="useQualifiedModuleNames" value="false" />
       </GradleProjectSettings>
     </option>
   </component>

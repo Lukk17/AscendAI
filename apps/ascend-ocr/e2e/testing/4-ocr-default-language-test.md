@@ -17,7 +17,7 @@ update the spec to match the deployment's default before the run.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -25,7 +25,7 @@ Expect a version string.
 
 Check the ascend-ocr server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7022/health
 ```
 
@@ -33,17 +33,17 @@ Expect HTTP 200 with `"status":"ok"` in the body.
 
 Check the English canary fixture exists.
 
-```powershell
-Test-Path apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png
+```bash
+ls apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png
 ```
 
-Expect `True`.
+Expect the file path printed.
 
 Check the running container's `DEFAULT_LANGUAGE` is `en` (the documented default). If unsure, inspect the container
 environment.
 
-```powershell
-docker inspect ascend-ocr --format "{{range .Config.Env}}{{println .}}{{end}}"
+```bash
+docker inspect ascend-ocr --format '{{range .Config.Env}}{{println .}}{{end}}'
 ```
 
 Look for `DEFAULT_LANGUAGE=en` or its absence (absence means the in-code default of `en` applies).
@@ -56,11 +56,11 @@ None.
 
 Single Bruno request.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "ocr/testing/ocr-default-lang.yml" --env ascend-local
 ```
 

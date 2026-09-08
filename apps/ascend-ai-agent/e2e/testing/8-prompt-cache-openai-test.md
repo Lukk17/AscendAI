@@ -44,7 +44,11 @@ docker exec redis redis-cli DEL user:frostyPromptCacheOpenaiTest:instructions
 Step 1. First prompt (cache miss expected; this seeds OpenAI's prefix cache).
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/prompt-cache-openai.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/prompt-cache-openai.yml" --env ascend-local
 ```
 
 Capture response 1's `metadata.usage` block. Note `nativeUsage.prompt_tokens_details.cached_tokens` (expected: 0 or absent on a fresh-cache run; non-zero is acceptable when OpenAI's server-side cache TTL hasn't expired from a prior local run) and `promptTokens` (expected: ≥ 1024, required for OpenAI auto cache to fire on the next call).
@@ -52,7 +56,11 @@ Capture response 1's `metadata.usage` block. Note `nativeUsage.prompt_tokens_det
 Step 2. Second prompt within ~5 minutes (cache hit expected). Same Bruno request, run again.
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/prompt-cache-openai.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/prompt-cache-openai.yml" --env ascend-local
 ```
 
 Capture response 2's `metadata.usage`. Note `nativeUsage.prompt_tokens_details.cached_tokens` (expected: > 0).

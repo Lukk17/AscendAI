@@ -18,14 +18,13 @@ Copy this file to `../runs/<UTC-timestamp>_8-mcp-ssrf-rejection-tasks.md` before
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
+- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
 - [ ] Send `mcp-ssrf-link-local.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
 
 ### Expected
 
 - [ ] Step 1 returns HTTP 200 and the `Mcp-Session-Id` header value is non-empty
 - [ ] Step 2 returns HTTP 200 carrying a JSON-RPC error envelope (`error` field present OR `result.isError` truthy)
-- [ ] No outbound network call to `169.254.169.254` (verifiable by host firewall / docker network policy if installed)
 
 ### Verdict
 

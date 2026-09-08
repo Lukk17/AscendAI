@@ -22,6 +22,9 @@ runtime:
         test("Status code is 400", function () {
             expect(res.getStatus()).to.equal(400);
         });
+        test("detail field contains empty-query message", function () {
+            expect(res.getBody().detail).to.equal("query must not be empty");
+        });
 
 settings:
   encodeUrl: true

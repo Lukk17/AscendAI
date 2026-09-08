@@ -18,7 +18,7 @@
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -26,7 +26,7 @@ Expect a version string.
 
 Check the ascend-audio-scribe server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7017/health
 ```
 
@@ -34,7 +34,7 @@ Expect HTTP 200 with `{"status":"ok","service":"ascend-audio-scribe"}`.
 
 Check the ascend-audio-scribe container has `OPENAI_API_KEY` configured.
 
-```powershell
+```bash
 docker exec ascend-audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'
 ```
 
@@ -42,8 +42,16 @@ Expect `present`. Never `printenv` the raw value. This check proves the variable
 
 Check the fixture exists on the host.
 
+**PowerShell:**
+
 ```powershell
 Test-Path apps/ascend-audio-scribe/e2e/fixtures/meeting-clip.wav
+```
+
+**Unix:**
+
+```bash
+ls apps/ascend-audio-scribe/e2e/fixtures/meeting-clip.wav
 ```
 
 Expect `True`.
@@ -51,8 +59,8 @@ Expect `True`.
 Check the object store is reachable on the host. It serves the S3 API on port 9070 without authentication, so
 this spec needs no client, no credentials, and no container name.
 
-```powershell
-curl.exe -fsS http://localhost:9070/_floci/health
+```bash
+curl -fsS http://localhost:9070/_floci/health
 ```
 
 Expect HTTP 200 with `"s3":"running"` in the JSON body.
@@ -66,8 +74,8 @@ machine.
 Create the dedicated `e2e-fixtures` bucket. The call is idempotent: an existing bucket answers HTTP 200 exactly like a
 freshly created one.
 
-```powershell
-curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"
 ```
 
 Expect `200`.
@@ -75,50 +83,58 @@ Expect `200`.
 Drop only this test's fixture so the re-upload is clean. A key that is already gone also returns HTTP 204, so the step
 is safe to re-run.
 
-```powershell
-curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
+```bash
+curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
 ```
 
 Upload the fixture straight from the host. No client and no intermediate container copy: the S3 endpoint takes the
 bytes on a plain `PUT`.
 
-```powershell
-curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: audio/mpeg" --data-binary "@apps/ascend-audio-scribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" -X PUT -H "Content-Type: audio/mpeg" --data-binary "@apps/ascend-audio-scribe/e2e/fixtures/meeting-clip.wav" "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
 ```
 
 Expect `200`.
 
 Verify the object lands in the bucket.
 
-```powershell
-curl.exe -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=meeting-clip"
+```bash
+curl -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=meeting-clip"
 ```
 
 Expect a `ListBucketResult` carrying `<Key>meeting-clip.wav</Key>` with a `<Size>` of `56880`.
 
 Delete any stale `.md` cache entries from prior runs to keep `/tmp` clean inside the ascend-audio-scribe container.
 
-```powershell
+```bash
 docker exec ascend-audio-scribe sh -c "rm -f /tmp/transcript_*.md"
 ```
 
 ## Run
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 **Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the response headers.
 
+**PowerShell:**
+
 ```powershell
 curl.exe -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+```
+
+**Unix:**
+
+```bash
+curl -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in the next step(s).
 
 **Step 2.** Send the tool call with the captured session ID injected:
 
-```powershell
+```bash
 bru run "transcribe/testing/mcp-transcribe.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
 ```
 
@@ -128,8 +144,8 @@ Drop the fixture this spec uploaded, so the bucket is left exactly as the spec f
 the Run step passed or failed. The command names the `e2e-fixtures` bucket literally and one key, and a key that is
 already gone also returns HTTP 204, so the step is safe to re-run.
 
-```powershell
-curl.exe -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
+```bash
+curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/meeting-clip.wav"
 ```
 
 Leave the bucket itself in place. This spec creates it only if absent, and other specs seed their own fixtures into

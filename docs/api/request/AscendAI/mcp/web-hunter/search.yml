@@ -39,6 +39,18 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("web_search returns a list of search results without error", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload).to.be.an("array");
+            expect(payload.length).to.be.greaterThan(0);
+            if (payload.length > 0) {
+                expect(payload[0]).to.have.property("title");
+                expect(payload[0]).to.have.property("url");
+            }
+        });
 
 settings:
   encodeUrl: true

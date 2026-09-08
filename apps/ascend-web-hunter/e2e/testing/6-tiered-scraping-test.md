@@ -30,7 +30,7 @@ rotate WAFs and go down, so refine it as real targets are discovered.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -38,7 +38,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -46,7 +46,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 
 Check FlareSolverr is reachable (required for the Cloudflare tier, row 2).
 
-```powershell
+```bash
 curl -fsS http://localhost:8191/
 ```
 
@@ -55,7 +55,7 @@ reasons.
 
 Check outbound HTTPS to the static target works from this host (independently of the container).
 
-```powershell
+```bash
 curl -fsS https://en.wikipedia.org/wiki/Web_scraping
 ```
 
@@ -65,8 +65,16 @@ pass.
 Confirm the JavaScript target's canary phrase is not already present in its raw markup, so row 3's assertion
 means something. Strip inline `<script>` blocks first, then look for the phrase.
 
+**PowerShell:**
+
 ```powershell
 ((Invoke-WebRequest -Uri "https://quotes.toscrape.com/js/" -UseBasicParsing).Content -replace '(?s)<script.*?</script>', '') -match 'The world as we have created it'
+```
+
+**Unix:**
+
+```bash
+curl -fsS "https://quotes.toscrape.com/js/" | sed 's/<script[^>]*>.*<\/script>//gs' | grep -c "The world as we have created it"
 ```
 
 Expect `False`.
@@ -79,8 +87,16 @@ see, and there the phrase is genuinely absent.
 
 To see the difference for yourself, run the same expression without the strip and expect `True`.
 
+**PowerShell:**
+
 ```powershell
 (Invoke-WebRequest -Uri "https://quotes.toscrape.com/js/" -UseBasicParsing).Content -match 'The world as we have created it'
+```
+
+**Unix:**
+
+```bash
+curl -fsS "https://quotes.toscrape.com/js/" | grep -c "The world as we have created it"
 ```
 
 ## Reset state
@@ -89,49 +105,89 @@ Optional. Flush the Redis session-cache keys for the target domains to force col
 tiered fallback. Not required — the response shape is identical for cache hits and misses. Run one block per
 domain; document the choice under **Additional tasks I did** if you skip it.
 
+**PowerShell:**
+
 ```powershell
 docker exec redis redis-cli --scan --pattern "*en.wikipedia.org*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
+
+**Unix:**
+
+```bash
+docker exec redis redis-cli --scan --pattern "*en.wikipedia.org*" | while read key; do docker exec redis redis-cli DEL "$key"; done
+```
+
+**PowerShell:**
 
 ```powershell
 docker exec redis redis-cli --scan --pattern "*scrapingcourse.com*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
 ```
 
+**Unix:**
+
+```bash
+docker exec redis redis-cli --scan --pattern "*scrapingcourse.com*" | while read key; do docker exec redis redis-cli DEL "$key"; done
+```
+
+**PowerShell:**
+
 ```powershell
 docker exec redis redis-cli --scan --pattern "*quotes.toscrape.com*" | ForEach-Object { docker exec redis redis-cli DEL $_ }
+```
+
+**Unix:**
+
+```bash
+docker exec redis redis-cli --scan --pattern "*quotes.toscrape.com*" | while read key; do docker exec redis redis-cli DEL "$key"; done
 ```
 
 ## Run
 
 Move into the Bruno collection root first.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
 Step 1 — static tier (row 1). Send the request and wait for HTTP 200 before continuing.
 
-```powershell
+```bash
 bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local
 ```
 
 Step 2 — Cloudflare tier (row 2). Send the request and wait for HTTP 200 before continuing.
 
-```powershell
+```bash
 bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local
 ```
 
 Step 3 — JavaScript tier (row 3). Send the request and wait for HTTP 200 before continuing.
 
+**PowerShell:**
+
 ```powershell
 bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local -o "$env:TEMP\js-quotes-run.json" -f json
+```
+
+**Unix:**
+
+```bash
+bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local -o "/tmp/js-quotes-run.json" -f json
 ```
 
 Step 4. Read back which tier served row 3. Bruno's console output never prints the response body, so this is what
 makes the `mode` assertion checkable.
 
+**PowerShell:**
+
 ```powershell
 (Get-Content "$env:TEMP\js-quotes-run.json" -Raw | ConvertFrom-Json)[0].results[0].response.data.mode
+```
+
+**Unix:**
+
+```bash
+python3 -c "import json, sys; d = json.load(open('/tmp/js-quotes-run.json')); print(d[0]['results'][0]['response']['data']['mode'])"
 ```
 
 ## Expected

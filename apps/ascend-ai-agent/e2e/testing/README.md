@@ -49,7 +49,11 @@ Bruno CLI.
 Bash:
 
 ```bash
-cd docs/api/request/AscendAI && bru run "ascend-agent/testing/<request>.yml" --env ascend-local
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "ascend-agent/testing/<request>.yml" --env ascend-local
 ```
 
 PowerShell:

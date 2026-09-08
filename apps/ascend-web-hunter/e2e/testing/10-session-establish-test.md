@@ -17,12 +17,19 @@ resolves the background monitor. Running it against the live service on port 702
 `session:example.net:default` existed, holding an empty-cookie record, well before any human could have acted. Two
 things explain it, both confirmed by reading the code the monitor actually runs:
 
-1. **The requested `profile` never reaches the capture path.** `SessionManager.establish`'s second parameter is
-   named `_profile` — the leading underscore marks it unused — and neither `NoVNCStrategy.get_html` nor
-   `_monitor_for_cookies` nor its `save_storage_state` call ever receives a profile at all, so every capture lands
-   under `settings.SESSION_DEFAULT_PROFILE` ("default") regardless of what the caller asked for. The REST and MCP
-   surfaces both advertise a `profile` field on this endpoint; establishing under a non-default profile silently
-   does not work.
+1. **The requested `profile` reaches the capture path.** `SessionManager.establish` threads `profile` all the way
+   through: `NoVNCStrategy(effective_profile)`, `_monitor_for_cookies(url, intervention_type, self.profile)`, and
+   every `save_storage_state(url, storage_state, user_agent, profile)` call inside the monitor's poll loop, each
+   falling back to `settings.SESSION_DEFAULT_PROFILE` only when the caller supplied none, the same rule `status()`
+   and `clear()` already use. Covered by
+   `tests/session/test_session_manager.py::test_establish_forwards_named_profile_to_novnc_strategy` and
+   `::test_establish_defaults_profile_when_none_given`.
+
+   *Corrected observation, not a new feature:* this spec originally found the opposite here.
+   `SessionManager.establish`'s second parameter was named `_profile`, the leading underscore marking it unused, so
+   every capture landed under the default profile regardless of what the caller asked for. That has since been
+   fixed in the codebase. This bullet was rewritten on 2026-09-08 to match the code as it stands, not the code this
+   spec first ran against.
 2. **The captcha-branch "cleared" check does not require a challenge to have existed.**
    `ChallengeDetector.is_content_accepted` — "the single shared decision point... before the NoVNC monitor declares
    a challenge cleared" — returns true for any response that is not a recognised block page and has real content.
@@ -30,12 +37,15 @@ things explain it, both confirmed by reading the code the monitor actually runs:
    5 seconds by default), so `establish()` against a plain URL captures whatever cookies exist — often none — as
    though a challenge had just been solved.
 
-Neither of these is fixed here. Fixing (1) means threading `profile` through `NoVNCStrategy.get_html`,
-`_monitor_for_cookies`, and every `save_storage_state` call inside it; fixing (2), if it is even wrong rather than
-the intended fast path for challenges that clear themselves, needs a design decision about what "an unchallenged
-page was 'cleared' instantly" should mean. Both are flagged to the owner as findings from this task, not changed by
-it. This spec instead documents the real behaviour and works around it: it targets `example.net` (not the
-`example.com` key tests 3, 8, and 9 depend on being sessionless) and cleans up the record its own call creates.
+(1) has since been fixed, independently of this spec, and the bullet above is corrected to match. (2) is unchanged:
+whether an unchallenged page being "cleared" instantly is the right behaviour is still an open design question for
+the owner, not something this spec decides. Between this spec's original run and the 2026-09-08 correction, an
+unrelated commit added a gate to the same "cleared" check that required a block to have been observed first in the
+same monitor run. That gate silently broke the contract this spec asserts below, so `session/establish` stopped
+writing any record for an unchallenged page like `example.net`. The regression was found and reverted, so
+behaviour (2) and the `EXISTS` assertion below again match a live run. This spec still only documents behaviour: it
+targets `example.net` (not the `example.com` key tests 3, 8, and 9 depend on being sessionless) and cleans up the
+record its own call creates.
 
 ## Why this spec is not "free" the way 1, 4, 8, and 9 are
 
@@ -57,7 +67,7 @@ belongs in the cost-free set in dollar terms.
 
 Check Bruno CLI is installed.
 
-```powershell
+```bash
 bru --version
 ```
 
@@ -65,7 +75,7 @@ Expect a version string.
 
 Check the ascend-web-hunter server is reachable.
 
-```powershell
+```bash
 curl -fsS http://localhost:7021/health
 ```
 
@@ -74,7 +84,7 @@ Expect HTTP 200 with `{"status":"ok"}`.
 Check Redis is reachable from the host's Docker context (this test seeds nothing but does inspect and clean up a
 key the call itself creates).
 
-```powershell
+```bash
 docker exec redis redis-cli PING
 ```
 
@@ -85,14 +95,14 @@ Expect `PONG`.
 Confirm `example.net` currently carries no session (IANA-reserved documentation domain; test 8 is the only other
 spec that touches its `default`-profile key, and only transiently during its own run).
 
-```powershell
+```bash
 docker exec redis redis-cli EXISTS "session:example.net:default"
 ```
 
 Expect `0`. If it returns `1`, a previous run of this spec (or of test 8) did not clean up — delete it before
 continuing.
 
-```powershell
+```bash
 docker exec redis redis-cli DEL "session:example.net:default"
 ```
 
@@ -100,11 +110,11 @@ docker exec redis redis-cli DEL "session:example.net:default"
 
 Move into the Bruno collection root first.
 
-```powershell
+```bash
 cd docs/api/request/AscendAI
 ```
 
-```powershell
+```bash
 bru run "web-hunter/testing/session-establish.yml" --env ascend-local
 ```
 
@@ -116,7 +126,7 @@ bru run "web-hunter/testing/session-establish.yml" --env ascend-local
   default; 15 gives a safe margin over browser launch + navigation), then confirm the capture the "Two behaviours"
   section above describes actually happened:
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli EXISTS "session:example.net:default"
   ```
 
@@ -124,11 +134,11 @@ bru run "web-hunter/testing/session-establish.yml" --env ascend-local
 
 - Clean up the record this test created, so `example.net` is sessionless again for test 8 or a repeat of this test:
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli DEL "session:example.net:default"
   ```
 
-  ```powershell
+  ```bash
   docker exec redis redis-cli EXISTS "session:example.net:default"
   ```
 
