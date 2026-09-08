@@ -107,31 +107,28 @@ async def _poll_captcha(
     url: str,
     storage_state: dict[str, Any],
     profile: str | None,
-    ever_blocked: bool,
-) -> tuple[bool, bool, bool]:
-    """Run one captcha-branch poll. Returns (resolved, page_blocked, ever_blocked).
+) -> tuple[bool, bool]:
+    """Run one captcha-branch poll. Returns (resolved, page_blocked).
 
-    A session is only captured on a genuine transition: the page must have
-    shown a known block signature at some earlier poll in this same monitor
-    run (`ever_blocked`) before it is treated as cleared now. An ordinary page
-    that is already showing real content on the very first poll never sets
-    `ever_blocked`, so establish() against a page nobody had to solve records
-    nothing. A Cloudflare clearance cookie is independent evidence a real
-    challenge was solved, so it still short-circuits the transition
-    requirement.
+    `is_content_accepted` is the single shared decision point for whether a
+    page counts as real, unblocked content (see ChallengeDetector). A session
+    is captured as soon as that is true, whether or not this monitor run ever
+    observed a block first: `session/establish` is the proactive counterpart
+    to passive capture and must persist a record for an ordinary,
+    never-challenged page too, not only for a solved captcha. A Cloudflare
+    clearance cookie is independent evidence a real challenge was solved.
     """
     page_content = await page.content()
     page_blocked = ChallengeDetector.is_blocked(200, page_content)
-    ever_blocked = ever_blocked or page_blocked
-    cleared = ever_blocked and ChallengeDetector.is_content_accepted(200, page_content)
+    cleared = ChallengeDetector.is_content_accepted(200, page_content)
     if cleared or _has_clearance_cookie(storage_state):
         user_agent = await page.evaluate("navigator.userAgent")
         await cookie_manager.save_storage_state(url, storage_state, user_agent, profile)
         logger.info("NoVNC Strategy: captcha solved for %s, captured session and stopping", url)
 
-        return True, page_blocked, ever_blocked
+        return True, page_blocked
 
-    return False, page_blocked, ever_blocked
+    return False, page_blocked
 
 
 async def _poll_login(page: Any, url: str, storage_state: dict[str, Any], profile: str | None) -> bool:
@@ -153,22 +150,20 @@ async def _poll_once(
     url: str,
     intervention_type: str,
     profile: str | None,
-    ever_blocked: bool,
-) -> tuple[bool, bool, bool]:
-    """Run a single monitor poll. Returns (resolved, page_blocked, ever_blocked);
-    page_blocked and ever_blocked are only meaningful for the captcha branch and
-    default to True/unchanged on a transient error so an all-errors timeout is
-    labeled 'rejected'-safe."""
+) -> tuple[bool, bool]:
+    """Run a single monitor poll. Returns (resolved, page_blocked); page_blocked
+    is only meaningful for the captcha branch and defaults to True on a
+    transient error so an all-errors timeout is labeled 'rejected'-safe."""
     try:
         storage_state = cast("dict[str, Any]", await context.storage_state())
         if intervention_type == "captcha":
-            return await _poll_captcha(page, url, storage_state, profile, ever_blocked)
+            return await _poll_captcha(page, url, storage_state, profile)
 
-        return await _poll_login(page, url, storage_state, profile), True, ever_blocked
+        return await _poll_login(page, url, storage_state, profile), True
     except Exception as e:
         logger.debug("NoVNC Strategy: Transient error syncing session cookies: %s", e)
 
-        return False, True, ever_blocked
+        return False, True
 
 
 async def _monitor_for_cookies(
@@ -213,11 +208,8 @@ async def _monitor_for_cookies(
             loop = asyncio.get_running_loop()
             start_time = loop.time()
             last_page_blocked = True
-            ever_blocked = False
             while loop.time() - start_time < settings.NOVNC_TIMEOUT_SECONDS:
-                resolved, last_page_blocked, ever_blocked = await _poll_once(
-                    page, context, url, intervention_type, profile, ever_blocked
-                )
+                resolved, last_page_blocked = await _poll_once(page, context, url, intervention_type, profile)
                 if resolved:
                     outcome = "resolved"
 

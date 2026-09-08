@@ -100,6 +100,35 @@ async def test_read_routes_browser_first_when_stored_session_exists():
 
 
 @pytest.mark.asyncio
+async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as_a_stored_session():
+    """establish() legitimately writes a record with zero cookies for a page
+    nobody was challenged on (see NoVNCStrategy's monitor). The tier chooser
+    must not read that record as grounds to force the browser tier -- it
+    buys no auth benefit and costs exactly what tiering exists to avoid.
+    Exercises the real CookieManager, not the module's default mock, so the
+    fix is proven where it lives (the read side), not merely asserted."""
+    from src.reader.cloudflare.cookie_manager import CookieManager
+
+    CookieManager._instance = None
+    fresh_cookie_manager = CookieManager()
+    fresh_cookie_manager._memory_store = {}
+    fresh_cookie_manager.redis_client = None
+    await fresh_cookie_manager.save_storage_state(
+        "https://empty-jar.example.com", {"cookies": [], "origins": []}, "UA"
+    )
+
+    with patch(
+        "src.reader.web_reader.cookie_manager.get_storage_state",
+        new=fresh_cookie_manager.get_storage_state,
+    ):
+        prefer = await WebReader()._prefer_browser(
+            "https://empty-jar.example.com", heavy_mode=False, profile=None
+        )
+
+    assert prefer is False
+
+
+@pytest.mark.asyncio
 async def test_read_propagates_human_intervention():
     exc = HumanInterventionRequiredException("http://vnc", "captcha")
     with patch(

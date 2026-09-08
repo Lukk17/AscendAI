@@ -146,12 +146,19 @@ class CookieManager:
         alternative -- trusting the longest-lived cookie present -- risks the
         opposite failure this fix exists to close: reporting a dead session
         as active.
+
+        An entry with no cookies at all reports 0 regardless of the ceiling:
+        the ceiling is a trust boundary for cookies that exist, not a reason
+        to treat an empty jar as an authenticated session on its own.
         """
         saved_at = float(auth_entry.get("saved_at", 0) or 0)
         now = time.time()
         ceiling_remaining = settings.SESSION_AUTH_TTL_SECONDS - (now - saved_at)
 
         cookies = auth_entry.get("storage_state", {}).get("cookies", [])
+        if not cookies:
+            return 0.0
+
         hard_expiries = _hard_cookie_expiries(cookies)
         if not hard_expiries:
             return max(ceiling_remaining, 0.0)

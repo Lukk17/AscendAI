@@ -80,6 +80,39 @@ async def test_status_returns_active_with_no_auth_key_in_record(mgr: SessionMana
     assert info.last_validated is None
 
 
+@pytest.mark.asyncio
+async def test_status_does_not_report_active_for_a_freshly_saved_empty_cookie_jar(mgr: SessionManager):
+    """establish() legitimately writes a record with zero cookies for a page
+    nobody was challenged on (see NoVNCStrategy's monitor). status() must not
+    read that record's timestamp alone as grounds to report an active
+    session with the full sliding ceiling remaining -- an empty jar
+    authenticates nothing. Exercises the real CookieManager, not a mock, so
+    the fix is proven where it lives (the read side), not merely asserted."""
+    from src.reader.cloudflare.cookie_manager import CookieManager
+
+    CookieManager._instance = None
+    fresh_cookie_manager = CookieManager()
+    fresh_cookie_manager._memory_store = {}
+    fresh_cookie_manager.redis_client = None
+    await fresh_cookie_manager.save_storage_state(
+        "https://empty-jar.example.com", {"cookies": [], "origins": []}, "UA"
+    )
+
+    with (
+        patch(
+            "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+            new=fresh_cookie_manager.get_auth_ttl_remaining,
+        ),
+        patch(
+            "src.session.session_manager.cookie_manager._load_record",
+            new=fresh_cookie_manager._load_record,
+        ),
+    ):
+        info = await mgr.status("https://empty-jar.example.com")
+
+    assert info.status != "active"
+
+
 def test_session_info_to_dict(mgr: SessionManager):
     from src.session.session_manager import SessionInfo
 

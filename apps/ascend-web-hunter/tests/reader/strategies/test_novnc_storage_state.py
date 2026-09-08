@@ -152,10 +152,13 @@ async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_se
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_never_writes_session_for_never_challenged_page():
-    """The reported bug: establish() against an ordinary page that already shows
-    real content on the very first poll, with no prior blocked state, must
-    never capture a session — nobody solved anything."""
+async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page():
+    """establish() is the proactive counterpart to passive capture: a call
+    against an ordinary page that already shows real content on the very
+    first poll, with no block ever observed, must still persist a session
+    record on that first poll -- not only once a captcha is solved. See
+    e2e/testing/10-session-establish-test.md, "Two behaviours this spec
+    found live, not assumed"."""
     from src.reader.strategies import novnc_strategy as ns
 
     page = MagicMock()
@@ -177,9 +180,6 @@ async def test_novnc_captcha_monitor_never_writes_session_for_never_challenged_p
     mock_p.__aexit__ = AsyncMock(return_value=False)
     mock_p.chromium.launch = AsyncMock(return_value=browser)
 
-    async def fake_sleep(seconds):
-        raise RuntimeError("abort loop after one iteration")
-
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=mock_p),
         patch(
@@ -187,11 +187,10 @@ async def test_novnc_captcha_monitor_never_writes_session_for_never_challenged_p
             new=AsyncMock(),
         ) as mock_save,
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
-        patch("src.reader.strategies.novnc_strategy.asyncio.sleep", side_effect=fake_sleep),
     ):
         await ns._monitor_for_cookies("https://ordinary-site.example/", "captcha")
 
-    mock_save.assert_not_awaited()
+    mock_save.assert_awaited_once()
 
 
 @pytest.mark.asyncio

@@ -298,6 +298,35 @@ async def test_get_auth_ttl_remaining_reports_positive_for_a_genuinely_live_sess
     assert 0 < ttl <= 3600
 
 
+@pytest.mark.asyncio
+async def test_get_auth_ttl_remaining_reports_zero_for_a_freshly_saved_empty_cookie_jar():
+    """A record saved with zero cookies (establish() on a page nobody was
+    challenged on) must not ride the sliding SESSION_AUTH_TTL_SECONDS
+    ceiling to a fourteen-day "active" reading: an empty jar authenticates
+    nothing, regardless of how recently the record was written."""
+    m = _fresh()
+    state = _state([])
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    ttl = await m.get_auth_ttl_remaining("https://example.com")
+
+    assert ttl == 0.0
+
+
+@pytest.mark.asyncio
+async def test_get_storage_state_returns_none_for_a_freshly_saved_empty_cookie_jar():
+    """Mirrors the TTL check above at the storage_state boundary: an empty
+    jar must not be presented as usable state to callers deciding whether a
+    stored session justifies preferring the browser tier."""
+    m = _fresh()
+    state = _state([])
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    result = await m.get_storage_state("https://example.com")
+
+    assert result is None
+
+
 # ---------------------------------------------------------------------------
 # Legacy compat: save_flat_cookies / get_session_data
 # ---------------------------------------------------------------------------
