@@ -29,8 +29,8 @@ class TestSettingsDefaults:
         assert pytest.approx(120.0) == Settings().OCR_REQUEST_TIMEOUT
 
     def test_default_engine_cache_max_size(self):
-        # Then
-        assert Settings().ENGINE_CACHE_MAX_SIZE == 8
+        # Then — matches the two languages the Dockerfile actually pre-caches (en, pl)
+        assert Settings().ENGINE_CACHE_MAX_SIZE == 2
 
     def test_default_supported_languages_uses_paddleocr_native_codes(self):
         # Then. "japan"/"korean" are PaddleOCR's own codes for those languages. The

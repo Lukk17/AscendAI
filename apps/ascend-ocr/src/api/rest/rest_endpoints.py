@@ -1,6 +1,7 @@
 import time
+from typing import Annotated
 
-from fastapi import APIRouter, Request, UploadFile
+from fastapi import APIRouter, Form, Request, UploadFile
 
 from src.api.exception_handlers import FileSizeExceededError
 from src.api.limits import enforce_page_limit, enforce_pixel_ceiling, inspect_input
@@ -29,7 +30,7 @@ _SURFACE: str = "rest"
 async def process_ocr(
     request: Request,
     file: UploadFile,
-    lang: str | None = None,
+    lang: Annotated[str | None, Form()] = None,
 ) -> OcrJsonResponse:
     _ = request
     language: str = lang or settings.DEFAULT_LANGUAGE

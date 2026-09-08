@@ -104,7 +104,7 @@ meets or exceeds it; see "Warn, don't refuse" in
 - `DEFAULT_LANGUAGE` — default OCR language; must match `^[a-z]{2,5}$` (default `en`).
 - `MAX_FILE_SIZE_MB` — max source size, enforced on both REST upload and MCP download (default `50`).
 - `OCR_REQUEST_TIMEOUT` — absolute ceiling on one request in seconds, the larger of the two deadline inputs (default `120`).
-- `ENGINE_CACHE_MAX_SIZE` — max number of language engines kept resident; LRU eviction beyond this (default `8`).
+- `ENGINE_CACHE_MAX_SIZE` — max number of language engines kept resident; LRU eviction beyond this (default `2`, matching the two languages — `en`, `pl` — the Dockerfile pre-caches; a workload that alternates a third language reloads an engine on every switch instead of keeping it resident).
 - `MCP_FILE_URI_ROOT` — when set, enables `file://` URI scheme jailed to this absolute path. Unset by default ⇒ `file://` rejected.
 - `MCP_ALLOWED_HOSTS` — comma-separated hostnames that bypass the SSRF private-IP check. `host.docker.internal` reaches the object store on host ports 9070/9071 from inside the container. Default empty ⇒ strict block.
 - `MCP_DOWNLOAD_TIMEOUT_SECONDS` — total timeout for MCP HTTP fetch (default `30`).

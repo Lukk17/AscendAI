@@ -20,7 +20,7 @@ services:
         reservations:
           memory: 2g
         limits:
-          memory: 8g
+          memory: 10g
     environment:
       - DOCLING_SERVE_ENABLE_UI=1
       - DOCLING_SERVE_OCR_ENGINE=easyocr
@@ -67,7 +67,7 @@ services:
       - DEFAULT_LANGUAGE=en
       - MAX_FILE_SIZE_MB=50
       - OCR_REQUEST_TIMEOUT=300
-      - ENGINE_CACHE_MAX_SIZE=8
+      - ENGINE_CACHE_MAX_SIZE=2
       # SSRF guard: the host-published object store (Floci) is reached via
       # the host-bound localhost address (host.docker.internal:9070) per ADR-001.
       - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1

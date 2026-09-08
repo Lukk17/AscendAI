@@ -57,7 +57,11 @@ class Settings(BaseSettings):
     DEFAULT_LANGUAGE: str = Field(default="en", pattern=r"^[a-z]{2,6}$")
     MAX_FILE_SIZE_MB: int = Field(default=50, ge=1, le=1024)
     OCR_REQUEST_TIMEOUT: float = Field(default=120.0, gt=0)
-    ENGINE_CACHE_MAX_SIZE: int = Field(default=8, ge=1)
+    # Matches what the image actually ships: the Dockerfile builder stage only
+    # pre-caches "en" and "pl" (see Dockerfile's warm-up RUN instruction). A higher
+    # value is not wrong, just uncounted-for in the memory ceiling this container is
+    # sized against — see docs/architecture/arc42/07-deployment-view.md.
+    ENGINE_CACHE_MAX_SIZE: int = Field(default=2, ge=1)
     # "japan" and "korean" are PaddleOCR's own codes for those two languages, not the
     # ISO two-letter "ja"/"ko": the engine's model resolution table (see comment on
     # DEFAULT_LANGUAGE above) returns no model for "ja"/"ko" and raises immediately.

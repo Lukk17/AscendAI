@@ -46,7 +46,7 @@ OCR_DISPATCH_MARGIN_SECONDS` is how long a worker may run past its own expired b
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
 | DEFAULT_LANGUAGE                  | `en`                                          | Engine warmed during lifespan. Pattern `[a-z]{2,6}`.                                     |
 | SUPPORTED_LANGUAGES               | `en,pl,de,fr,es,it,pt,nl,ru,ch,japan,korean`  | Allowlist enforced by `OcrService._get_engine`.                                          |
-| ENGINE_CACHE_MAX_SIZE             | `8`                                           | LRU eviction kicks in past this language count.                                          |
+| ENGINE_CACHE_MAX_SIZE             | `2`                                           | LRU eviction kicks in past this language count. Matches the two languages (`en`, `pl`) the Dockerfile pre-caches; raising it keeps more languages resident but is not counted for in the container's memory ceiling (see 07-deployment-view.md). |
 | MAX_FILE_SIZE_MB                  | `50`                                          | Caps REST upload and MCP download.                                                       |
 
 ---
@@ -91,4 +91,4 @@ MCP_FILE_URI_ROOT=/tmp/ascend-ocr-uploads
 MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
 ```
 
-The repo's [.gitignore](../.gitignore) excludes `.env`. Commit a sanitised `.env.example` if a profile needs sharing.
+The repo's [.gitignore](../../../.gitignore) excludes `.env`. Commit a sanitised `.env.example` if a profile needs sharing.

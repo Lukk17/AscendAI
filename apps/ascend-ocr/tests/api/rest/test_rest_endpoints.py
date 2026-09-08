@@ -144,6 +144,41 @@ class TestOcrEndpoint:
         assert response.json()["filename"] == "test.png"
         assert response.json()["schema_version"] == "1"
 
+    @patch("src.api.rest.rest_endpoints.dispatch_ocr_request")
+    async def test_requested_language_form_field_reaches_dispatch(self, mock_dispatch, client):
+        # Given — a language other than DEFAULT_LANGUAGE, sent as the documented
+        # multipart form field, not as a query parameter
+        mock_dispatch.return_value = OcrResponseFactory.with_single_line(language="pl")
+
+        # When
+        response = await client.post(
+            "/v1/ocr",
+            files={"file": ("test.png", io.BytesIO(VALID_PNG_BYTES), "image/png")},
+            data={"lang": "pl"},
+        )
+
+        # Then
+        assert response.status_code == 200
+        assert mock_dispatch.call_args.args[2] == "pl"
+
+    @patch("src.api.rest.rest_endpoints.dispatch_ocr_request")
+    async def test_lang_query_parameter_is_ignored_in_favour_of_default(self, mock_dispatch, client):
+        # Given — `lang` sent as a query parameter rather than a multipart form field.
+        # FastAPI only binds a `Form()`-marked parameter from the request body, so this
+        # must be silently dropped and DEFAULT_LANGUAGE used instead, proving the bug
+        # (lang misclassified as a query parameter) cannot come back unnoticed.
+        mock_dispatch.return_value = OcrResponseFactory.with_single_line()
+
+        # When
+        response = await client.post(
+            "/v1/ocr?lang=pl",
+            files={"file": ("test.png", io.BytesIO(VALID_PNG_BYTES), "image/png")},
+        )
+
+        # Then
+        assert response.status_code == 200
+        assert mock_dispatch.call_args.args[2] == settings.DEFAULT_LANGUAGE
+
     @patch("src.api.rest.rest_endpoints.inject_trace_context")
     @patch("src.api.rest.rest_endpoints.dispatch_ocr_request")
     async def test_trace_context_is_forwarded_to_worker(self, mock_dispatch, mock_inject, client):

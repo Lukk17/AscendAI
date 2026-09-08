@@ -45,9 +45,16 @@ during a long OCR job.
 ### LRU engine cache with language allowlist
 
 The OCR engine for each language is expensive to construct (model weights are loaded into memory). `OcrService` keeps
-an `OrderedDict[str, PaddleOCR]` as an LRU cache capped at `ENGINE_CACHE_MAX_SIZE` (default 8, configured via env).
+an `OrderedDict[str, PaddleOCR]` as an LRU cache capped at `ENGINE_CACHE_MAX_SIZE` (default 2, configured via env).
 Access promotes an entry to the tail; eviction removes from the head. Languages not in `SUPPORTED_LANGUAGES` raise
 `ValueError` before any engine allocation, preventing unbounded memory use from caller-controlled language codes.
+
+The default of 2 matches what the Dockerfile actually pre-caches (`en`, `pl` — see its warm-up `RUN` instruction),
+not the full twelve-language `SUPPORTED_LANGUAGES` allowlist. The honest trade: a caller may request any of the
+twelve, but only two engines stay resident at once. A workload that alternates a third language on every call evicts
+and reconstructs an engine each time instead of keeping it warm, trading request latency for a memory ceiling the
+container can actually afford — see "Memory model and the single worker" in
+[07-deployment-view.md](07-deployment-view.md) for why that ceiling is tight even at this lower default.
 
 ---
 

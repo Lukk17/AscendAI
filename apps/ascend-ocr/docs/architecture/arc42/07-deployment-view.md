@@ -51,7 +51,7 @@ compose `healthcheck` stanza should be set). The operator should configure the l
 | `DEFAULT_LANGUAGE` | `en` | Language warmed up at startup; used when `lang` is absent from the request. |
 | `MAX_FILE_SIZE_MB` | `50` | Cap on uploaded or fetched file size in megabytes. |
 | `OCR_REQUEST_TIMEOUT` | `120` | Per-request OCR timeout in seconds (float). |
-| `ENGINE_CACHE_MAX_SIZE` | `8` | Maximum number of `PaddleOCR` engines held in the LRU cache. |
+| `ENGINE_CACHE_MAX_SIZE` | `2` | Maximum number of `PaddleOCR` engines held in the LRU cache. Matches the two languages (`en`, `pl`) the Dockerfile pre-caches; a workload that alternates a third language reloads an engine on every switch instead of keeping it resident. |
 | `SUPPORTED_LANGUAGES` | `en,pl,de,fr,es,it,pt,nl,ru,ch,japan,korean` | Allowlist of valid language codes. Requests for any other code are rejected. |
 | `MCP_FILE_URI_ROOT` | _(unset)_ | Enables `file://` support; URIs must resolve inside this directory. Unset = `file://` disabled. |
 | `MCP_ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `host.docker.internal` for the standard compose stack, since the S3-compatible object store is reached over the host-published endpoint. |
