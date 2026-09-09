@@ -1,9 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="compose [rebuild-recreate]" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
+  <configuration default="false" name="compose ascend-web-hunter [rebuild-recreate]" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
     <deployment type="docker-compose.yml">
       <settings>
         <option name="commandLineOptions" value="--build" />
-        <option name="sourceFilePath" value="compose.yaml" />
+        <option name="sourceFilePath" value="compose.ascend-web-hunter.yaml" />
         <option name="upForceRecreate" value="true" />
       </settings>
     </deployment>
