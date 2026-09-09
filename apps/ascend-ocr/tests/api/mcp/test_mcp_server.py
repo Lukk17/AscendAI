@@ -441,8 +441,13 @@ class TestPureHelpers:
         assert _is_within(str(tmp_path / "elsewhere"), str(tmp_path / "jail")) is False
 
     def test_is_within_false_on_value_error(self):
-        # Then
-        assert _is_within("C:\\a", "D:\\b") is False
+        # Given
+        # os.path.commonpath raises ValueError when the paths cannot be compared at all
+        # (e.g. different drives on Windows). Force that outcome directly instead of
+        # relying on a platform-specific path shape, so the branch is exercised on Linux too.
+        with patch("os.path.commonpath", side_effect=ValueError("paths don't have the same drive")):
+            # Then
+            assert _is_within("/a", "/b") is False
 
     def test_enforce_size_passes_within_cap(self):
         # When / Then

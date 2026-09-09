@@ -100,7 +100,13 @@ def test_executable_extensions_posix(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_executable_extensions_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    # PATHEXT is Windows-only and always semicolon-delimited there; the code
+    # splits it on os.pathsep, which is ";" on a real Windows host but ":" on
+    # POSIX. Simulating a Windows run means simulating that pairing fully,
+    # not just _is_windows(), otherwise the split delimiter comes from the
+    # real host running the test instead of the platform under test.
     monkeypatch.setattr(readiness_module, "_is_windows", lambda: True)
+    monkeypatch.setattr(os, "pathsep", ";")
     monkeypatch.setenv("PATHEXT", ".EXE;.BAT")
     assert readiness_module._executable_extensions() == [".EXE", ".BAT"]
 

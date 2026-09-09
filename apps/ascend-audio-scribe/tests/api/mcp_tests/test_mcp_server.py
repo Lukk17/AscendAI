@@ -375,10 +375,16 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(monkeypatch
     }
 
 
-async def test_streamable_http_transcribe_local_file_not_found(monkeypatch, asgi_client: AsyncClient):
-    # Mock download to return the non-existent path immediately
+async def test_streamable_http_transcribe_local_file_not_found(monkeypatch, tmp_path, asgi_client: AsyncClient):
+    # A drive-lettered "X:/nope.wav" is absolute on Windows but relative on
+    # POSIX (no drive concept there), so it doesn't fail for the same reason
+    # on both hosts. tmp_path is always a real, absolute, host-native path
+    # that just has no file at this name, so the pipeline fails identically
+    # everywhere: not found, not a parsing quirk.
+    missing_path = str(tmp_path / "nope.wav")
+
     async def _fake_download(uri: str) -> str:
-        return "X:/no/such/file.wav"
+        return missing_path
 
     monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
@@ -392,7 +398,7 @@ async def test_streamable_http_transcribe_local_file_not_found(monkeypatch, asgi
         "params": {
             "name": "transcribe_local",
             "arguments": {
-                "audio_uri": "file:///X:/no/such/file.wav",
+                "audio_uri": (tmp_path / "nope.wav").as_uri(),
                 "with_timestamps": True,
             },
         },
@@ -513,7 +519,7 @@ async def test_streamable_http_transcribe_openai_missing_api_key(monkeypatch, te
     assert "OPENAI_API_KEY is not configured" in text
 
 
-async def test_streamable_http_transcribe_openai_file_not_found(monkeypatch, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_openai_file_not_found(monkeypatch, tmp_path, asgi_client: AsyncClient):
     monkeypatch.setattr(mcp_server_module.settings, "OPENAI_API_KEY", "test")
 
     session_id = await _initialize_session(asgi_client)
@@ -526,7 +532,7 @@ async def test_streamable_http_transcribe_openai_file_not_found(monkeypatch, asg
         "params": {
             "name": "transcribe_openai",
             "arguments": {
-                "audio_uri": "file:///X:/nope.wav",
+                "audio_uri": (tmp_path / "nope.wav").as_uri(),
             },
         },
     }
@@ -669,13 +675,18 @@ async def test_streamable_http_transcribe_hf_missing_token(monkeypatch, temp_aud
     assert "HF_TOKEN is not configured" in text
 
 
-async def test_streamable_http_transcribe_hf_file_not_found(monkeypatch, asgi_client: AsyncClient):
+async def test_streamable_http_transcribe_hf_file_not_found(monkeypatch, tmp_path, asgi_client: AsyncClient):
     monkeypatch.setattr(mcp_server_module.settings, "HF_TOKEN", "test")
 
-    # Mock download to return the non-existent path immediately, avoiding real I/O or hangs
+    # A drive-lettered "X:/nope.wav" is absolute on Windows but relative on
+    # POSIX (no drive concept there), so it doesn't fail for the same reason
+    # on both hosts. tmp_path is always a real, absolute, host-native path
+    # that just has no file at this name, so the pipeline fails identically
+    # everywhere: not found, not a parsing quirk.
+    missing_path = str(tmp_path / "nope.wav")
+
     async def _fake_download(uri: str) -> str:
-        # Convert file URI to local path logic if needed, or just return the path for the test
-        return "X:/nope.wav"
+        return missing_path
 
     monkeypatch.setattr(mcp_server_module, "download_to_temp_async", _fake_download)
 
@@ -689,7 +700,7 @@ async def test_streamable_http_transcribe_hf_file_not_found(monkeypatch, asgi_cl
         "params": {
             "name": "transcribe_hf",
             "arguments": {
-                "audio_uri": "file:///X:/nope.wav",  # URI matches what we expect
+                "audio_uri": (tmp_path / "nope.wav").as_uri(),
             },
         },
     }
