@@ -142,11 +142,16 @@ async def _fetch_file(file_uri: str) -> tuple[bytes, str]:
             raise UnsafeUriError(f"Unsupported URI scheme: {scheme!r}")
 
 
-async def _read_jailed_file(url_path: str) -> tuple[bytes, str]:
-    root = settings.MCP_FILE_URI_ROOT
-    if not root:
-        raise UnsafeUriError("file:// access is disabled (MCP_FILE_URI_ROOT is unset)")
+def _validate_jailed_path(url_path: str, root: str) -> tuple[str, str]:
+    """Validate and resolve file path within the jail root (sync, runs in thread pool).
 
+    Returns:
+        Tuple of (resolved_path, basename) if valid.
+
+    Raises:
+        UnsafeUriError: if path escapes jail or scheme is invalid.
+        DownloadFailedError: if file does not exist.
+    """
     local_path = url2pathname(url_path)
     resolved = os.path.realpath(local_path)
     resolved_root = os.path.realpath(root)
@@ -157,12 +162,22 @@ async def _read_jailed_file(url_path: str) -> tuple[bytes, str]:
     if not os.path.isfile(resolved):
         raise DownloadFailedError(f"File not found: {url_path}")
 
-    async with aiofiles.open(resolved, "rb") as file_handle:
+    return resolved, os.path.basename(resolved)
+
+
+async def _read_jailed_file(url_path: str) -> tuple[bytes, str]:
+    root = settings.MCP_FILE_URI_ROOT
+    if not root:
+        raise UnsafeUriError("file:// access is disabled (MCP_FILE_URI_ROOT is unset)")
+
+    resolved_path, basename = await asyncio.to_thread(_validate_jailed_path, url_path, root)
+
+    async with aiofiles.open(resolved_path, "rb") as file_handle:
         file_bytes = await file_handle.read()
 
     _enforce_size(len(file_bytes))
 
-    return file_bytes, os.path.basename(resolved)
+    return file_bytes, basename
 
 
 async def _download_http(uri: str, parsed: ParseResult) -> tuple[bytes, str]:

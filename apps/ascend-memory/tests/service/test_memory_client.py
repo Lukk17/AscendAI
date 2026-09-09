@@ -84,9 +84,14 @@ def test_get_memory_client_re_checks_cache_after_acquiring_lock(
 
 
 def test_get_memory_client_returns_different_instances_per_provider(
+    monkeypatch: pytest.MonkeyPatch,
     mock_memory_service: Any,
 ) -> None:
     del mock_memory_service
+    from src.config import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "OPENAI_API_KEY", "sk-test-openai", raising=False)
+
     a = get_memory_client("lmstudio")
     b = get_memory_client("openai")
     assert a is not b
