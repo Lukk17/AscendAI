@@ -141,8 +141,11 @@ jobs:
             local FILE="$1"
             local CONTENT
             if ! CONTENT=$(git show "origin/${BASE_REF}:$FILE" 2>/dev/null); then
-              printf 'ERROR: %s does not exist at origin/%s. Cannot verify a version bump against a missing baseline.\n' "$FILE" "$BASE_REF" >&2
-              return 1
+              # File does not exist on the base branch. This is acceptable for newly added modules.
+              # Return a sentinel version to signal "no prior version"; still validate that
+              # the branch's changelog is present, parseable, and has content.
+              printf '0.0.0'
+              return 0
             fi
             printf '%s' "$CONTENT" | grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' || {
               printf 'ERROR: no "## [x.y.z]" version entry found in %s at origin/%s.\n' "$FILE" "$BASE_REF" >&2
@@ -171,7 +174,11 @@ jobs:
             HEAD_VERSION=$(head_version "$CHANGELOG") || return 1
             BASE_VERSION=$(base_version "$CHANGELOG") || return 1
 
-            printf '\n--- %s ---\nHEAD:   %s\n%s: %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF" "$BASE_VERSION"
+            if [ "$BASE_VERSION" = "0.0.0" ]; then
+              printf '\n--- %s ---\nHEAD:   %s\n%s: (new module, no prior version)\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF"
+            else
+              printf '\n--- %s ---\nHEAD:   %s\n%s: %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF" "$BASE_VERSION"
+            fi
 
             if [ "$HEAD_VERSION" = "$BASE_VERSION" ]; then
               printf 'ERROR: %s CHANGELOG version equals %s (%s). Add a new top entry before merging.\n' "$SERVICE" "$BASE_REF" "$HEAD_VERSION"
@@ -189,7 +196,11 @@ jobs:
               return 1
             fi
 
-            printf 'OK: %s %s > %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_VERSION"
+            if [ "$BASE_VERSION" = "0.0.0" ]; then
+              printf 'OK: %s %s (new module, first release)\n' "$SERVICE" "$HEAD_VERSION"
+            else
+              printf 'OK: %s %s > %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_VERSION"
+            fi
           }
 
           FAILED=0
