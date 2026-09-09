@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
-      ascend_ai_agent: ${{ steps.filter.outputs.ascend-ai-agent == 'true' || steps.filter.outputs.workflows == 'true' }}
-      ascend_ai_agent_changed: ${{ steps.filter.outputs.ascend-ai-agent }}
+      ascend_agent: ${{ steps.filter.outputs.ascend-agent == 'true' || steps.filter.outputs.workflows == 'true' }}
+      ascend_agent_changed: ${{ steps.filter.outputs.ascend-agent }}
       ascend_weather_mcp_changed: ${{ steps.filter.outputs.ascend-weather-mcp }}
       ascend_audio_scribe_changed: ${{ steps.filter.outputs.ascend-audio-scribe }}
       ascend_web_hunter_changed: ${{ steps.filter.outputs.ascend-web-hunter }}
@@ -35,7 +35,7 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            ascend-ai-agent:
+            ascend-agent:
               - 'apps/ascend-agent/**'
             ascend-weather-mcp:
               - 'apps/ascend-weather-mcp/**'
@@ -54,7 +54,7 @@ jobs:
         id: build-matrix
         run: |
           ALL_SERVICES='[
-            {"service":"ascend-ai-agent",    "language":"java",   "path":"apps/ascend-agent",    "python_version":""},
+            {"service":"ascend-agent",    "language":"java",   "path":"apps/ascend-agent",    "python_version":""},
             {"service":"ascend-weather-mcp",     "language":"java",   "path":"apps/ascend-weather-mcp",     "python_version":""},
             {"service":"ascend-audio-scribe",    "language":"python", "path":"apps/ascend-audio-scribe",    "python_version":"3.11"},
             {"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"},
@@ -63,7 +63,7 @@ jobs:
           ]'
 
           WORKFLOWS_CHANGED="${{ steps.filter.outputs.workflows }}"
-          ASCEND_AI_AGENT="${{ steps.filter.outputs.ascend-ai-agent }}"
+          ASCEND_AGENT="${{ steps.filter.outputs.ascend-agent }}"
           ASCEND_WEATHER_MCP="${{ steps.filter.outputs.ascend-weather-mcp }}"
           ASCEND_AUDIO_SCRIBE="${{ steps.filter.outputs.ascend-audio-scribe }}"
           ASCEND_WEB_HUNTER="${{ steps.filter.outputs.ascend-web-hunter }}"
@@ -74,7 +74,7 @@ jobs:
             MATRIX="{\"include\":$(echo "$ALL_SERVICES" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')}"
           else
             INCLUDE="[]"
-            if [ "$ASCEND_AI_AGENT"  = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ai-agent","language":"java","path":"apps/ascend-agent","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_AGENT"  = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-agent","language":"java","path":"apps/ascend-agent","python_version":""}); print(json.dumps(a))'); fi
             if [ "$ASCEND_WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-weather-mcp","language":"java","path":"apps/ascend-weather-mcp","python_version":""}); print(json.dumps(a))'); fi
             if [ "$ASCEND_AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-audio-scribe","language":"python","path":"apps/ascend-audio-scribe","python_version":"3.11"}); print(json.dumps(a))'); fi
             if [ "$ASCEND_WEB_HUNTER" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"}); print(json.dumps(a))'); fi
@@ -90,7 +90,7 @@ jobs:
     needs: changes
     if: >-
       (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
-      && (needs.changes.outputs.ascend_ai_agent_changed == 'true'
+      && (needs.changes.outputs.ascend_agent_changed == 'true'
         || needs.changes.outputs.ascend_weather_mcp_changed == 'true'
         || needs.changes.outputs.ascend_audio_scribe_changed == 'true'
         || needs.changes.outputs.ascend_web_hunter_changed == 'true'
@@ -193,7 +193,7 @@ jobs:
           }
 
           FAILED=0
-          if [ "${{ needs.changes.outputs.ascend_ai_agent_changed }}" = "true" ]; then check_service ascend-ai-agent apps/ascend-agent/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_agent_changed }}" = "true" ]; then check_service ascend-agent apps/ascend-agent/CHANGELOG.md || FAILED=1; fi
           if [ "${{ needs.changes.outputs.ascend_weather_mcp_changed }}" = "true" ]; then check_service ascend-weather-mcp apps/ascend-weather-mcp/CHANGELOG.md || FAILED=1; fi
           if [ "${{ needs.changes.outputs.ascend_audio_scribe_changed }}" = "true" ]; then check_service ascend-audio-scribe apps/ascend-audio-scribe/CHANGELOG.md || FAILED=1; fi
           if [ "${{ needs.changes.outputs.ascend_web_hunter_changed }}" = "true" ]; then check_service ascend-web-hunter apps/ascend-web-hunter/CHANGELOG.md || FAILED=1; fi
@@ -233,11 +233,11 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: ./gradlew --no-daemon build test
 
-      # ascend-ai-agent is the only Gradle module with a configured coverage
+      # ascend-agent is the only Gradle module with a configured coverage
       # floor (jacocoTestCoverageVerification, 80% instruction coverage).
       # ascend-weather-mcp has no such task, so nothing runs for it here.
-      - name: Enforce Jacoco coverage gate (ascend-ai-agent)
-        if: matrix.service == 'ascend-ai-agent'
+      - name: Enforce Jacoco coverage gate (ascend-agent)
+        if: matrix.service == 'ascend-agent'
         working-directory: ${{ matrix.path }}
         run: ./gradlew --no-daemon jacocoTestCoverageVerification
 
@@ -292,12 +292,12 @@ jobs:
           if-no-files-found: ignore
 
   integration-test:
-    name: Integration test (Testcontainers) ascend-ai-agent
+    name: Integration test (Testcontainers) ascend-agent
     needs: [changes, verify-changelog]
     if: >-
       !cancelled()
       && needs.verify-changelog.result != 'failure'
-      && needs.changes.outputs.ascend_ai_agent == 'true'
+      && needs.changes.outputs.ascend_agent == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -324,6 +324,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-results-ascend-ai-agent
+          name: integration-test-results-ascend-agent
           path: apps/ascend-agent/build/test-results/**/*.xml
           if-no-files-found: ignore

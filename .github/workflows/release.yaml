@@ -13,8 +13,8 @@ on:
         required: false
         default: ''
         type: string
-      release_ascend_ai_agent:
-        description: 'Release ascend-ai-agent (apps/ascend-agent/CHANGELOG.md version)'
+      release_ascend_agent:
+        description: 'Release ascend-agent (apps/ascend-agent/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
@@ -70,7 +70,7 @@ jobs:
         env:
           STACK_VERSION: ${{ inputs.stack_version }}
           CREATE_RELEASE: ${{ inputs.create_github_release }}
-          SEL_ASCEND_AI_AGENT:  ${{ inputs.release_ascend_ai_agent }}
+          SEL_ASCEND_AGENT:  ${{ inputs.release_ascend_agent }}
           SEL_ASCEND_WEATHER_MCP:      ${{ inputs.release_ascend_weather_mcp }}
           SEL_ASCEND_AUDIO_SCRIBE:     ${{ inputs.release_ascend_audio_scribe }}
           SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
@@ -81,7 +81,7 @@ jobs:
 
           # ── 1. Fail if zero apps selected ─────────────────────────────────
           SELECTED_COUNT=0
-          for VAR in "$SEL_ASCEND_AI_AGENT" "$SEL_ASCEND_WEATHER_MCP" "$SEL_ASCEND_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_HUNTER" "$SEL_ASCEND_MEMORY" "$SEL_ASCEND_OCR"; do
+          for VAR in "$SEL_ASCEND_AGENT" "$SEL_ASCEND_WEATHER_MCP" "$SEL_ASCEND_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_HUNTER" "$SEL_ASCEND_MEMORY" "$SEL_ASCEND_OCR"; do
             [ "$VAR" = "true" ] && SELECTED_COUNT=$((SELECTED_COUNT + 1))
           done
           if [ "$SELECTED_COUNT" -eq 0 ]; then
@@ -148,7 +148,7 @@ jobs:
             add_to_matrix "$service" "$path" "$CUR_VERSION" "$image_name"
           }
 
-          check_and_add "$SEL_ASCEND_AI_AGENT"     "ascend-agent"     "apps/ascend-agent"     "apps/ascend-agent/CHANGELOG.md"
+          check_and_add "$SEL_ASCEND_AGENT"     "ascend-agent"     "apps/ascend-agent"     "apps/ascend-agent/CHANGELOG.md"
           check_and_add "$SEL_ASCEND_WEATHER_MCP"  "ascend-weather-mcp"  "apps/ascend-weather-mcp"  "apps/ascend-weather-mcp/CHANGELOG.md"
           check_and_add "$SEL_ASCEND_AUDIO_SCRIBE" "ascend-audio-scribe" "apps/ascend-audio-scribe" "apps/ascend-audio-scribe/CHANGELOG.md"
           check_and_add "$SEL_ASCEND_WEB_HUNTER"   "ascend-web-hunter"   "apps/ascend-web-hunter"   "apps/ascend-web-hunter/CHANGELOG.md"
@@ -279,7 +279,7 @@ jobs:
         id: body
         env:
           STACK_VERSION: ${{ inputs.stack_version }}
-          SEL_ASCEND_AI_AGENT:   ${{ inputs.release_ascend_ai_agent }}
+          SEL_ASCEND_AGENT:   ${{ inputs.release_ascend_agent }}
           SEL_ASCEND_WEATHER_MCP:       ${{ inputs.release_ascend_weather_mcp }}
           SEL_ASCEND_AUDIO_SCRIBE:      ${{ inputs.release_ascend_audio_scribe }}
           SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
@@ -292,7 +292,7 @@ jobs:
             grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' "$1"
           }
 
-          V_ASCEND_AI_AGENT=$(read_changelog_version "apps/ascend-agent/CHANGELOG.md")
+          V_ASCEND_AGENT=$(read_changelog_version "apps/ascend-agent/CHANGELOG.md")
           V_ASCEND_WEATHER_MCP=$(read_changelog_version "apps/ascend-weather-mcp/CHANGELOG.md")
           V_ASCEND_AUDIO_SCRIBE=$(read_changelog_version "apps/ascend-audio-scribe/CHANGELOG.md")
           V_ASCEND_WEB_HUNTER=$(read_changelog_version "apps/ascend-web-hunter/CHANGELOG.md")
@@ -311,7 +311,7 @@ jobs:
             printf "### App versions\n\n"
             printf "| Service | Version | |\n"
             printf "|---|---|---|\n"
-            printf "| ascend-ai-agent | %s |%s |\n"    "${V_ASCEND_AI_AGENT}"   "$(label "$SEL_ASCEND_AI_AGENT")"
+            printf "| ascend-agent | %s |%s |\n"    "${V_ASCEND_AGENT}"   "$(label "$SEL_ASCEND_AGENT")"
             printf "| ascend-weather-mcp | %s |%s |\n"        "${V_ASCEND_WEATHER_MCP}"       "$(label "$SEL_ASCEND_WEATHER_MCP")"
             printf "| ascend-audio-scribe | %s |%s |\n"       "${V_ASCEND_AUDIO_SCRIBE}"      "$(label "$SEL_ASCEND_AUDIO_SCRIBE")"
             printf "| ascend-web-hunter | %s |%s |\n"  "${V_ASCEND_WEB_HUNTER}" "$(label "$SEL_ASCEND_WEB_HUNTER")"

@@ -1,4 +1,4 @@
-# Changelog — ascend-audio-scribe
+# Changelog: ascend-audio-scribe
 
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
@@ -7,6 +7,15 @@ version is the current one. The release workflow reads it for the image tag and 
 against re-publishing an already-released version, so keep it at the top and bump it
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
+
+## [0.9.1]
+
+### Fixed
+- Every command in the end-to-end specifications gained a Unix shell form beside the PowerShell
+  one, so the runner no longer improvises a translation on each run, and the requests those specs
+  drive assert response bodies rather than only a status code.
+- The readme pointed at a hand-maintained request file that has been removed. It points at the
+  shared Bruno collection that replaced it.
 
 ## [0.9.0]
 
