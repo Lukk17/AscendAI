@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
+from src.config.config import settings
 from src.transcription import huggingface_api_speach_to_text as mod
 
 
@@ -18,7 +19,7 @@ def _make_hf_http_error(message: str) -> mod.HfHubHTTPError:
 
 @pytest.fixture
 def hf_token(monkeypatch: pytest.MonkeyPatch) -> str:
-    monkeypatch.setenv("HF_TOKEN", "test-token")
+    monkeypatch.setattr(settings, "HF_TOKEN", "test-token")
     return "test-token"
 
 
@@ -44,8 +45,8 @@ def test_transcribe_single_chunk_http_error() -> None:
 
 
 def test_hf_transcript_missing_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    with pytest.raises(ValueError, match="HF_TOKEN"):
+    monkeypatch.setattr(settings, "HF_TOKEN", None)
+    with pytest.raises(ValueError, match="HF_TOKEN is not configured"):
         mod.hf_transcript("x.wav", "model", "hf-inference")
 
 

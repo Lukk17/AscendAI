@@ -60,9 +60,9 @@ def hf_transcript(
     files. No pydub decode of the full source.
     """
 
-    hf_token = os.environ.get("HF_TOKEN")
+    hf_token = settings.HF_TOKEN
     if not hf_token:
-        raise ValueError("HF_TOKEN environment variable not set!")
+        raise ValueError("HF_TOKEN is not configured on the server.")
 
     client = _get_client(provider, hf_token)
     logger.info(f"[HF] Parameters: model='{model}', provider='{provider}'")

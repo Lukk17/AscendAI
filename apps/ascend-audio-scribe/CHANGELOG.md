@@ -16,6 +16,10 @@ workflow does not read; if the two ever disagree, this file wins for release pur
   drive assert response bodies rather than only a status code.
 - The readme pointed at a hand-maintained request file that has been removed. It points at the
   shared Bruno collection that replaced it.
+- The Hugging Face transcription path read its token from the raw environment variable while the
+  guard that checks that path read the settings object. A token supplied through .env passed the
+  guard and then failed at the call. Both now read the settings object, making the credential one
+  source of truth, and a token in .env works end to end.
 
 ## [0.9.0]
 
