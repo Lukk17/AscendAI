@@ -3,7 +3,7 @@
 # Claude Code reads this file and pulls in all AGENTS.md content via @ imports below.
 
 @../AGENTS.md
-@../apps/ascend-ai-agent/AGENTS.md
+@../apps/ascend-agent/AGENTS.md
 @../apps/ascend-audio-scribe/AGENTS.md
 @../apps/ascend-web-hunter/AGENTS.md
 @../apps/ascend-memory/AGENTS.md

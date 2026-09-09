@@ -2,14 +2,14 @@
 
 ## MODIFIED Requirements
 
-### Requirement: ascend-ai-agent runs as a Compose service by default
+### Requirement: ascend-agent runs as a Compose service by default
 
-`compose.yaml` SHALL define an `ascend-ai-agent` service that builds from `./apps/ascend-ai-agent/Dockerfile`, publishes host port `9917` bound to the env-driven bind address (`"${EXPOSE_BIND:-127.0.0.1}:9917:9917"`, loopback by default), sets `extra_hosts: ["host.docker.internal:host-gateway"]`, declares `depends_on` on `ascend-memory`, `docling-serve`, and `unstructured-api` with `condition: service_healthy`, and has NO `profiles:` gating so that `docker compose up` starts it together with every other service. Public reachability SHALL go through the edge gateway (see the `production-deployment` capability), never through a direct all-interfaces binding of port 9917. A developer SHALL also be able to fall back to the host-mode workflow (`docker compose stop ascend-ai-agent` followed by `./gradlew bootRun` on the host) without a port conflict and without modifying the compose file.
+`compose.yaml` SHALL define an `ascend-agent` service that builds from `./apps/ascend-agent/Dockerfile`, publishes host port `9917` bound to the env-driven bind address (`"${EXPOSE_BIND:-127.0.0.1}:9917:9917"`, loopback by default), sets `extra_hosts: ["host.docker.internal:host-gateway"]`, declares `depends_on` on `ascend-memory`, `docling-serve`, and `unstructured-api` with `condition: service_healthy`, and has NO `profiles:` gating so that `docker compose up` starts it together with every other service. Public reachability SHALL go through the edge gateway (see the `production-deployment` capability), never through a direct all-interfaces binding of port 9917. A developer SHALL also be able to fall back to the host-mode workflow (`docker compose stop ascend-agent` followed by `./gradlew bootRun` on the host) without a port conflict and without modifying the compose file.
 
-#### Scenario: Default compose up starts ascend-ai-agent
+#### Scenario: Default compose up starts ascend-agent
 
 - **WHEN** a developer runs `docker compose up -d --build`
-- **THEN** `ascend-ai-agent` is built and started alongside every other compose service
+- **THEN** `ascend-agent` is built and started alongside every other compose service
 - **AND** `http://localhost:9917/actuator/health` responds with HTTP 200 once the container reports `healthy`
 
 #### Scenario: Port 9917 is not reachable from outside the host
@@ -20,7 +20,7 @@
 
 #### Scenario: Host-mode workflow remains available
 
-- **WHEN** the developer runs `docker compose stop ascend-ai-agent` and then `cd apps/ascend-ai-agent && ./gradlew bootRun` on the host
+- **WHEN** the developer runs `docker compose stop ascend-agent` and then `cd apps/ascend-agent && ./gradlew bootRun` on the host
 - **THEN** the host process binds port `9917` and serves prompts identically to the container
 - **AND** there is no port conflict because the `ascend-ai-agent` container has been stopped
 

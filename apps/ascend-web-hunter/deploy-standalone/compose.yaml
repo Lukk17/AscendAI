@@ -152,7 +152,7 @@ services:
           - ngrok-ascend-web-hunter
 
   ascend-web-hunter:
-    image: lukk17/ascend-web-hunter:v0.0.3
+    image: lukk17/ascend-ai-ascend-web-hunter:v0.0.3
     container_name: ascend-web-hunter
     hostname: ascend-web-hunter
     restart: unless-stopped

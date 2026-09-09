@@ -1,0 +1,94 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\rag-ingestion-run.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ingestion/run?embeddingProvider=openai",
+          "headers": {
+            "X-User-Id": "frostyRagTest",
+            "content-type": "multipart/form-data; boundary=--------------------------ae7896f40ccb86df3d4a1d94"
+          },
+          "data": {
+            "_overheadLength": 0,
+            "_valueLength": 0,
+            "_valuesToMeasure": [],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------ae7896f40ccb86df3d4a1d94",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Thu, 18 Jun 2026 12:47:01 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "indexed": 3,
+            "skipped": 0,
+            "failed": 0
+          },
+          "url": "http://localhost/api/v1/ingestion/run?embeddingProvider=openai",
+          "responseTime": 12776,
+          "duration": 12776,
+          "size": 36
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 12.8566753,
+        "name": "rag-ingestion-run",
+        "path": "ascend-agent\\testing\\rag-ingestion-run.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

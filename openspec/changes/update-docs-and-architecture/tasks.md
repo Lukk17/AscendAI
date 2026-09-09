@@ -9,7 +9,7 @@
 
 ## 2. ascend-ai-agent internal architecture
 
-- [ ] 2.1 Update `apps/ascend-ai-agent/docs/architecture/` component diagrams and internal arc42 for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management, connector)
+- [ ] 2.1 Update `apps/ascend-agent/docs/architecture/` component diagrams and internal arc42 for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management, connector)
 - [ ] 2.2 Update the module-level ADR index
 
 ## 3. Cross-cutting request-path diagrams

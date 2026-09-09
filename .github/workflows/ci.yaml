@@ -36,7 +36,7 @@ jobs:
         with:
           filters: |
             ascend-ai-agent:
-              - 'apps/ascend-ai-agent/**'
+              - 'apps/ascend-agent/**'
             ascend-weather-mcp:
               - 'apps/ascend-weather-mcp/**'
             ascend-audio-scribe:
@@ -54,7 +54,7 @@ jobs:
         id: build-matrix
         run: |
           ALL_SERVICES='[
-            {"service":"ascend-ai-agent",    "language":"java",   "path":"apps/ascend-ai-agent",    "python_version":""},
+            {"service":"ascend-ai-agent",    "language":"java",   "path":"apps/ascend-agent",    "python_version":""},
             {"service":"ascend-weather-mcp",     "language":"java",   "path":"apps/ascend-weather-mcp",     "python_version":""},
             {"service":"ascend-audio-scribe",    "language":"python", "path":"apps/ascend-audio-scribe",    "python_version":"3.11"},
             {"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"},
@@ -74,7 +74,7 @@ jobs:
             MATRIX="{\"include\":$(echo "$ALL_SERVICES" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')}"
           else
             INCLUDE="[]"
-            if [ "$ASCEND_AI_AGENT"  = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ai-agent","language":"java","path":"apps/ascend-ai-agent","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_AI_AGENT"  = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ai-agent","language":"java","path":"apps/ascend-agent","python_version":""}); print(json.dumps(a))'); fi
             if [ "$ASCEND_WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-weather-mcp","language":"java","path":"apps/ascend-weather-mcp","python_version":""}); print(json.dumps(a))'); fi
             if [ "$ASCEND_AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-audio-scribe","language":"python","path":"apps/ascend-audio-scribe","python_version":"3.11"}); print(json.dumps(a))'); fi
             if [ "$ASCEND_WEB_HUNTER" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"}); print(json.dumps(a))'); fi
@@ -193,7 +193,7 @@ jobs:
           }
 
           FAILED=0
-          if [ "${{ needs.changes.outputs.ascend_ai_agent_changed }}" = "true" ]; then check_service ascend-ai-agent apps/ascend-ai-agent/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_ai_agent_changed }}" = "true" ]; then check_service ascend-ai-agent apps/ascend-agent/CHANGELOG.md || FAILED=1; fi
           if [ "${{ needs.changes.outputs.ascend_weather_mcp_changed }}" = "true" ]; then check_service ascend-weather-mcp apps/ascend-weather-mcp/CHANGELOG.md || FAILED=1; fi
           if [ "${{ needs.changes.outputs.ascend_audio_scribe_changed }}" = "true" ]; then check_service ascend-audio-scribe apps/ascend-audio-scribe/CHANGELOG.md || FAILED=1; fi
           if [ "${{ needs.changes.outputs.ascend_web_hunter_changed }}" = "true" ]; then check_service ascend-web-hunter apps/ascend-web-hunter/CHANGELOG.md || FAILED=1; fi
@@ -317,7 +317,7 @@ jobs:
       # delay the fast unit-test signal for every other module. ubuntu-latest
       # ships a working Docker daemon, so no extra setup is needed here.
       - name: Gradle integration test (Testcontainers)
-        working-directory: apps/ascend-ai-agent
+        working-directory: apps/ascend-agent
         run: ./gradlew --no-daemon integrationTest
 
       - name: Upload integration test results
@@ -325,5 +325,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-results-ascend-ai-agent
-          path: apps/ascend-ai-agent/build/test-results/**/*.xml
+          path: apps/ascend-agent/build/test-results/**/*.xml
           if-no-files-found: ignore

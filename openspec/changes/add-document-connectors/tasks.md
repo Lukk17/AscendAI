@@ -15,7 +15,7 @@ Work that is not blocked (the data model, the Graph client, the throttling machi
 
 ## 1. Data model and migrations
 
-- [ ] 1.1 Add Liquibase changelog `apps/ascend-ai-agent/src/main/resources/db/changelog/02-connectors.xml` (wired into `db.changelog-master.yaml`) creating `connector`, `connector_sync_run`, `connector_sync_file_outcome`, and `connector_sync_cursor` per design D3, with tenant-scoped indexes, FK cascades from run to outcomes and connector to cursors and runs, and an index on `connector(enabled, last_successful_sync_at)` for the freshness check. Blocked by: `add-tenant-isolation` for the tenant key column type.
+- [ ] 1.1 Add Liquibase changelog `apps/ascend-agent/src/main/resources/db/changelog/02-connectors.xml` (wired into `db.changelog-master.yaml`) creating `connector`, `connector_sync_run`, `connector_sync_file_outcome`, and `connector_sync_cursor` per design D3, with tenant-scoped indexes, FK cascades from run to outcomes and connector to cursors and runs, and an index on `connector(enabled, last_successful_sync_at)` for the freshness check. Blocked by: `add-tenant-isolation` for the tenant key column type.
   verify: `./gradlew integrationTest` runs the changelog against a Testcontainers Postgres and the rollback drops all four tables cleanly; `liquibase status` reports no pending changesets after apply.
 - [ ] 1.2 Create JPA entities and Spring Data repositories for the four tables under `repository/` and `model/`, with enums for connector type, run trigger (`SCHEDULED`, `MANUAL`, `FRESHNESS_CHECK`), run status (`RUNNING`, `SUCCEEDED`, `PARTIAL`, `FAILED`), and file action (`ADDED`, `UPDATED`, `DELETED`, `SKIPPED`, `FAILED`).
   verify: repository slice test persists one connector with runs, outcomes, and a cursor, then reads each back with every enum value round-tripping.
@@ -101,7 +101,7 @@ Work that is not blocked (the data model, the Graph client, the throttling machi
 
 - [ ] 7.1 Author `docs/CONNECTORS.md`: connector concepts, the connector landing contract, the Azure app-registration walkthrough a customer admin performs (app registration, the `Sites.Read.All` or per-site `Sites.Selected` content grant, admin consent, client secret creation, and the explicit note that no directory permission is requested), connector API usage examples, the company-wide visibility statement a customer is told plainly, the freshness numbers including the default maximum sync age, throttling and first-sync expectations for large sites, and the named follow-on connectors (Google Drive, Confluence, network share) as out of scope.
   verify: a reviewer following only the document completes an app registration whose first sync lands documents retrievable by a caller of that tenant, with no step taken from outside the document.
-- [ ] 7.2 Link `docs/CONNECTORS.md` from the root `README.md` documentation map and add connector notes to root `AGENTS.md` and `apps/ascend-ai-agent/AGENTS.md`.
+- [ ] 7.2 Link `docs/CONNECTORS.md` from the root `README.md` documentation map and add connector notes to root `AGENTS.md` and `apps/ascend-agent/AGENTS.md`.
   verify: every link added resolves to an existing file, checked by following each one.
 - [ ] 7.3 Run `./gradlew test integrationTest` and fix failures.
   verify: both tasks report BUILD SUCCESSFUL and the coverage gate passes.

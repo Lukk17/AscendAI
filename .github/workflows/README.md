@@ -90,7 +90,7 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 |---|---|---|---|
 | `create_github_release` | boolean | yes | Default `true`. Untick to publish images only: no Git tag, no GitHub Release, no stack version consumed. |
 | `stack_version` | string | no | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. Required when `create_github_release` is ticked, ignored otherwise. |
-| `release_ascend_agent` | boolean | yes | Ship `ascend-ai-agent`. Default `false`. |
+| `release_ascend_ai_agent` | boolean | yes | Ship `ascend-ai-agent`. Default `false`. |
 | `release_ascend_weather_mcp` | boolean | yes | Ship `ascend-weather-mcp`. Default `false`. |
 | `release_ascend_audio_scribe` | boolean | yes | Ship `ascend-audio-scribe`. Default `false`. |
 | `release_ascend_web_hunter` | boolean | yes | Ship `ascend-web-hunter`. Default `false`. |
@@ -167,16 +167,16 @@ Each build is pushed to both registries under the same name, tagged `v<version>`
 
 | Service key | Docker Hub image | GHCR image |
 |---|---|---|
-| `ascend-ai-agent` | `lukk17/ascend-ai-agent` | `ghcr.io/lukk17/ascend-ai-agent` |
-| `ascend-weather-mcp` | `lukk17/ascend-weather-mcp` | `ghcr.io/lukk17/ascend-weather-mcp` |
-| `ascend-audio-scribe` | `lukk17/ascend-audio-scribe` | `ghcr.io/lukk17/ascend-audio-scribe` |
-| `ascend-web-hunter` | `lukk17/ascend-web-hunter` | `ghcr.io/lukk17/ascend-web-hunter` |
-| `ascend-memory` | `lukk17/ascend-memory` | `ghcr.io/lukk17/ascend-memory` |
-| `ascend-ocr` | `lukk17/ascend-ocr` | `ghcr.io/lukk17/ascend-ocr` |
+| `ascend-ai-agent` | `lukk17/ascend-ai-ascend-agent` | `ghcr.io/lukk17/ascend-ai-ascend-agent` |
+| `ascend-weather-mcp` | `lukk17/ascend-ai-ascend-weather-mcp` | `ghcr.io/lukk17/ascend-ai-ascend-weather-mcp` |
+| `ascend-audio-scribe` | `lukk17/ascend-ai-ascend-audio-scribe` | `ghcr.io/lukk17/ascend-ai-ascend-audio-scribe` |
+| `ascend-web-hunter` | `lukk17/ascend-ai-ascend-web-hunter` | `ghcr.io/lukk17/ascend-ai-ascend-web-hunter` |
+| `ascend-memory` | `lukk17/ascend-ai-ascend-memory` | `ghcr.io/lukk17/ascend-ai-ascend-memory` |
+| `ascend-ocr` | `lukk17/ascend-ai-ascend-ocr` | `ghcr.io/lukk17/ascend-ai-ascend-ocr` |
 
 The GHCR owner segment is hardcoded lowercase. `${{ github.repository_owner }}` would resolve to `Lukk17`, and GHCR rejects uppercase in image names.
 
-Note: the compose file refers to the OCR service as `ascend-ocr` (local build name), but its published image is `lukk17/ascend-ocr` — consistent with the service filter key and the spec.
+The workflow derives each published image name as `ascend-ai-${service}`, where `${service}` is the service filter key. The local build name (used in compose) omits the `lukk17/` registry prefix but includes the full image name, for example `ascend-ai-ascend-ocr:latest`.
 
 ### GHCR package visibility
 

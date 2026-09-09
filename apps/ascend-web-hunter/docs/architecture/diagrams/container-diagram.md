@@ -9,7 +9,7 @@ graph TB
     accTitle: ascend-web-hunter C4 Container Diagram
     accDescr: Shows ascend-web-hunter's position in the AscendAI platform, its callers, and its downstream service dependencies.
 
-    Agent["ascend-ai-agent<br/>(Spring Boot, Java 21)<br/>:9917"]
+    Agent["ascend-agent<br/>(Spring Boot, Java 21)<br/>:9917"]
     Human["Human operator<br/>(browser / VNC client)"]
 
     subgraph "ascend-web-hunter service — :7021"
@@ -83,7 +83,7 @@ sequenceDiagram
     accTitle: ascend-web-hunter extraction strategy escalation
     accDescr: Shows strategy escalation from the fast BeautifulSoup path through to the human NoVNC intervention.
 
-    participant Agent as ascend-ai-agent :9917
+    participant Agent as ascend-agent :9917
     participant MCP as web_read (mcp_server.py)
     participant Guard as is_safe_external_url
     participant WR as WebReader

@@ -1,0 +1,118 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\memory-test-retrieve.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ai/prompt",
+          "headers": {
+            "X-User-Id": "frostySemanticMemoryTest",
+            "content-type": "multipart/form-data; boundary=--------------------------b836113cfa05194419405b9d"
+          },
+          "data": {
+            "_overheadLength": 432,
+            "_valueLength": 58,
+            "_valuesToMeasure": [],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------b836113cfa05194419405b9d",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Mon, 01 Jun 2026 17:53:23 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "content": "Your name is **Luke** and you're a **software engineer**.",
+            "metadata": {
+              "id": "066cfa10823debf14e82d0654de287c1",
+              "model": "MiniMax-M2.7",
+              "rateLimit": {
+                "requestsLimit": 0,
+                "requestsRemaining": 0,
+                "requestsReset": "PT0S",
+                "tokensLimit": 0,
+                "tokensRemaining": 0,
+                "tokensReset": "PT0S"
+              },
+              "usage": {
+                "promptTokens": 2972,
+                "completionTokens": 76,
+                "totalTokens": 3048,
+                "nativeUsage": {
+                  "input_tokens": 2972,
+                  "output_tokens": 76,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0
+                }
+              },
+              "promptMetadata": [],
+              "empty": false,
+              "toolsUsed": []
+            }
+          },
+          "url": "http://localhost/api/v1/ai/prompt",
+          "responseTime": 3096,
+          "duration": 3096,
+          "size": 516
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 3.1988079,
+        "name": "memory-test-retrieve",
+        "path": "ascend-agent\\testing\\memory-test-retrieve.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

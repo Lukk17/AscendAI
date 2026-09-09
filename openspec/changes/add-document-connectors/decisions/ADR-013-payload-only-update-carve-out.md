@@ -2,7 +2,7 @@
 
 ## Status
 
-Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `apps/ascend-ai-agent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
 
 ## Deferral, 2026-09-05
 
@@ -32,7 +32,7 @@ A permission-only change takes a payload-only update, using the native Qdrant cl
 
 The carve-out is narrow and the narrowness is the whole argument for it. The path may set exactly four keys: `acl`, `acl_source`, `acl_version`, `acl_synced_at`. It may not create a point, may not delete a point, may not alter any other payload key, and may not trigger embedding. It carries the same tenant predicate every other vector-store operation carries.
 
-The native Qdrant client is already a declared dependency as `libs.qdrant.client` in `apps/ascend-ai-agent/build.gradle.kts`, so this is a second and narrower use of something already present, not a new dependency.
+The native Qdrant client is already a declared dependency as `libs.qdrant.client` in `apps/ascend-agent/build.gradle.kts`, so this is a second and narrower use of something already present, not a new dependency.
 
 ## Consequences
 

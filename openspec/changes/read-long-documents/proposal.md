@@ -24,7 +24,7 @@ The reason a larger ceiling is not the answer is that nobody can wait for it. A 
 consistent with the 47 to 100 s band recorded beside `OCR_PAGE_TIMEOUT_SECONDS` and with the 105 s per page the
 twenty page incident implies, so twenty five pages is about 37 minutes of work. The platform's own callers give up
 long before that: `app.ingestion.read-timeout` is 300000 ms in
-[application.yaml](../../../apps/ascend-ai-agent/src/main/resources/application.yaml), which is the client the chat
+[application.yaml](../../../apps/ascend-agent/src/main/resources/application.yaml), which is the client the chat
 attachment path uses through `AscendOcrClient`, and `spring.ai.mcp.client.request-timeout` is 300 s for every MCP
 server the agent talks to. Raise the ceiling to 4800 s and the service spends 75 minutes inferring pages for a
 caller who disconnected at 300 s, which is the incident the previous change exists to end, arriving through the

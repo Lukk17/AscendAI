@@ -21,14 +21,14 @@ For each selected app the workflow SHALL read the version already committed in t
 
 #### Scenario: Tag equals the manifest version
 
-- **WHEN** `apps/ascend-ai-agent/build.gradle.kts` declares `version = "1.3.0"` and `ascend-ai-agent` is selected for release
-- **THEN** the pushed image is tagged `lukk17/ascend-ai-agent:1.3.0`
-- **AND** `apps/ascend-ai-agent/build.gradle.kts` on disk is unchanged after the run
+- **WHEN** `apps/ascend-agent/build.gradle.kts` declares `version = "1.3.0"` and `ascend-ai-agent` is selected for release
+- **THEN** the pushed image is tagged `lukk17/ascend-ai-ascend-agent:1.3.0`
+- **AND** `apps/ascend-agent/build.gradle.kts` on disk is unchanged after the run
 
 #### Scenario: Python manifest version
 
 - **WHEN** `apps/ascend-audio-scribe/pyproject.toml` declares `[project] version = "0.2.1"` and `ascend-audio-scribe` is selected
-- **THEN** the pushed image is tagged `lukk17/ascend-audio-scribe:0.2.1`
+- **THEN** the pushed image is tagged `lukk17/ascend-ai-ascend-audio-scribe:0.2.1`
 - **AND** `apps/ascend-audio-scribe/pyproject.toml` on disk is unchanged after the run
 
 ### Requirement: Release makes no commits
@@ -54,7 +54,7 @@ For each selected app, the workflow SHALL compare the app's current manifest ver
 #### Scenario: Selected app correctly bumped proceeds
 
 - **WHEN** `ascend-weather-mcp` was `1.0.0` at the previous stack tag and its manifest now says `1.1.0`, and it is selected
-- **THEN** the guard passes and `lukk17/ascend-weather-mcp:1.1.0` is built and pushed
+- **THEN** the guard passes and `lukk17/ascend-ai-ascend-weather-mcp:1.1.0` is built and pushed
 
 #### Scenario: First release skips the guard
 
@@ -63,17 +63,17 @@ For each selected app, the workflow SHALL compare the app's current manifest ver
 
 ### Requirement: Released images are tagged version + latest
 
-Each selected app's image SHALL be pushed to Docker Hub at `lukk17/<service>:<manifest-version>` and also `lukk17/<service>:latest`. Unselected apps SHALL NOT have their `:latest` tag modified.
+Each selected app's image SHALL be pushed to Docker Hub at `lukk17/ascend-ai-<service>:<manifest-version>` and also `lukk17/ascend-ai-<service>:latest`, where the service identifier is the full service name (e.g., ascend-agent, ascend-audio-scribe, ascend-weather-mcp, ascend-memory, ascend-ocr, ascend-web-hunter). For example, ascend-agent publishes to `lukk17/ascend-ai-ascend-agent:<manifest-version>` and `lukk17/ascend-ai-ascend-agent:latest`. Unselected apps SHALL NOT have their `:latest` tag modified.
 
 #### Scenario: Released app updates latest
 
 - **WHEN** `ascend-ai-agent` is released at manifest version `1.3.0`
-- **THEN** both `lukk17/ascend-ai-agent:1.3.0` and `lukk17/ascend-ai-agent:latest` point at the new image
+- **THEN** both `lukk17/ascend-ai-ascend-agent:1.3.0` and `lukk17/ascend-ai-ascend-agent:latest` point at the new image
 
 #### Scenario: Unselected app latest untouched
 
 - **WHEN** `ascend-ocr` is not selected in a release
-- **THEN** `lukk17/ascend-ocr:latest` is unchanged by the run
+- **THEN** `lukk17/ascend-ai-ascend-ocr:latest` is unchanged by the run
 
 ### Requirement: Docker Hub authentication via repository secrets
 

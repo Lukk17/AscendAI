@@ -97,8 +97,8 @@ docker run -d --name ascend-web-hunter -p 7021:7021 -e SEARXNG_BASE_URL="http://
 ```
 
 Publishing is done by the [Release workflow](../../../.github/workflows/README.md) rather than by hand. It builds
-multi-arch and pushes `v<version>` and `latest` to both `lukk17/ascend-web-hunter` and
-`ghcr.io/lukk17/ascend-web-hunter`. The version comes from `[project].version` in `pyproject.toml`.
+multi-arch and pushes `v<version>` and `latest` to both `lukk17/ascend-ai-ascend-web-hunter` and
+`ghcr.io/lukk17/ascend-ai-ascend-web-hunter`. The version comes from `[project].version` in `pyproject.toml`.
 
 The Compose-orchestrated path (recommended) brings up SearXNG, FlareSolverr and the Ngrok bridge in one shot. Run it
 from the repository root so it goes into the `ascend-ai` project rather than creating a second project that fights over

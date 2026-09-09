@@ -3,10 +3,10 @@
 ```mermaid
 graph TB
     accTitle: AscendMemory C4 Container Diagram
-    accDescr: Shows AscendMemory and its direct dependencies: callers ascend-ai-agent and MCP clients, and external services Qdrant and the embedding provider.
+    accDescr: Shows AscendMemory and its direct dependencies: callers ascend-agent and MCP clients, and external services Qdrant and the embedding provider.
 
     subgraph "Callers"
-        AscendAiAgent["ascend-ai-agent\n(Spring Boot, Java 21)\n:9917"]
+        AscendAiAgent["ascend-agent\n(Spring Boot, Java 21)\n:9917"]
         MCPClient["MCP-capable Agent\n(any FastMCP client)"]
     end
 

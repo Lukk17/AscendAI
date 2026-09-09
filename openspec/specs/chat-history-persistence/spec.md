@@ -30,6 +30,6 @@ The `application.yaml` `app.memory.chat-history` section SHALL include a comment
 
 #### Scenario: Comment present in application.yaml
 
-- **WHEN** the file `apps/ascend-ai-agent/src/main/resources/application.yaml` is read
+- **WHEN** the file `apps/ascend-agent/src/main/resources/application.yaml` is read
 - **THEN** the `chat-history` block contains a comment that describes both the Redis TTL and that Postgres pruning is separate
 

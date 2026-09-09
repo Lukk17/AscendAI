@@ -9,7 +9,7 @@ graph TB
     accTitle: ascend-ocr C4 Container Diagram
     accDescr: Shows ascend-ocr's position in the AscendAI platform, its callers, and its downstream dependencies.
 
-    Agent["ascend-ai-agent<br/>(Spring Boot, Java 21)<br/>:9917"]
+    Agent["ascend-agent<br/>(Spring Boot, Java 21)<br/>:9917"]
     ObjectStore["S3-compatible object store<br/>:9070 (host.docker.internal)"]
 
     subgraph "ascend-ocr service — :7022"
@@ -47,9 +47,9 @@ prerequisite, not a compose service; locally it is provided by a self-hosted S3-
 ```mermaid
 sequenceDiagram
     accTitle: MCP ocr_process happy path via the S3-compatible object store
-    accDescr: Shows the full call chain from ascend-ai-agent through the SSRF guard, the object-store download, and the OCR engine.
+    accDescr: Shows the full call chain from ascend-agent through the SSRF guard, the object-store download, and the OCR engine.
 
-    participant Agent as ascend-ai-agent :9917
+    participant Agent as ascend-agent :9917
     participant MCP as ocr_process (mcp_server.py)
     participant Guard as _validate_host
     participant ObjectStore as Object store :9070 (host.docker.internal)

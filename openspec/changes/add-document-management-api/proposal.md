@@ -1,6 +1,6 @@
 ## Why
 
-The RAG knowledge base is write-only. The only ingestion endpoints are `POST /api/v1/ingestion/upload` (multipart to MinIO) and `POST /api/v1/ingestion/run` (synchronous full-bucket scan) in `apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/controller/IngestionController.java`; a grep for `@GetMapping` / `@DeleteMapping` / `@PutMapping` across `apps/ascend-ai-agent/src/main/java` returns zero matches. Three concrete consequences:
+The RAG knowledge base is write-only. The only ingestion endpoints are `POST /api/v1/ingestion/upload` (multipart to MinIO) and `POST /api/v1/ingestion/run` (synchronous full-bucket scan) in `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/controller/IngestionController.java`; a grep for `@GetMapping` / `@DeleteMapping` / `@PutMapping` across `apps/ascend-agent/src/main/java` returns zero matches. Three concrete consequences:
 
 1. **Nobody can see what is indexed.** The only ingestion state today is Spring Integration's `INT_METADATA_STORE` key-value table (`JdbcMetadataStore` bean in `config/AppConfig.java`, schema auto-created via `spring.integration.jdbc.initialize-schema: always`, not Liquibase-managed) holding opaque `manual-ingestion:<s3-key>:<etag>` dedupe markers. No document name, size, MIME type, status, chunk count, last-indexed timestamp, or failure reason exists anywhere.
 2. **Deleting or re-indexing a document means operating MinIO and Qdrant by hand.** There is no endpoint to remove a document's object from the `knowledge-base` bucket, its chunks from the `ascendai-768` / `ascendai-1536` collections, and its dedupe marker together. Re-ingest replaces old chunks (`ManualIngestionService.ingestIntoActiveCollection` calls `documentService.removeOldDocuments`), but only as a side effect of a full bucket scan.
@@ -39,9 +39,9 @@ The sibling changes `add-auth-and-identity` (ADMIN role) and `add-tenant-isolati
   - `service/ingestion/DocumentRegistryService.java`, `service/ingestion/DocumentDeletionService.java`, `service/ingestion/IngestionRunService.java`; refactor of `service/ingestion/ManualIngestionService.java`.
   - `repository/DocumentRepository.java`, `repository/DocumentIndexStateRepository.java`, `repository/IngestionRunRepository.java`; entities under `model/`; DTOs under `dto/`.
   - `service/storage/StorageService.java` gains `deleteFile` and `getObjectBytes` (today it only has `uploadFile`).
-- **Database**: new Liquibase changelog `apps/ascend-ai-agent/src/main/resources/db/changelog/02-document-management.xml` (tables `documents`, `document_index_state`, `ingestion_runs`) included from `db.changelog-master.yaml`.
+- **Database**: new Liquibase changelog `apps/ascend-agent/src/main/resources/db/changelog/02-document-management.xml` (tables `documents`, `document_index_state`, `ingestion_runs`) included from `db.changelog-master.yaml`.
 - **API**: one breaking change (`POST /api/v1/ingestion/run` response contract); five new endpoints.
-- **Docs / tooling**: `apps/ascend-ai-agent/AGENTS.md` endpoint notes; Bruno requests under `docs/api/request/AscendAI/ascend-agent/`.
+- **Docs / tooling**: `apps/ascend-agent/AGENTS.md` endpoint notes; Bruno requests under `docs/api/request/AscendAI/ascend-agent/`.
 - **Dependencies**: none new; uses existing Spring Data JPA, Liquibase, AWS SDK S3 client, Qdrant vector stores.
 - **Sibling coordination**: `add-auth-and-identity` guards the mutating endpoints; `add-tenant-isolation` adds the ownership column to `documents`; `add-document-connectors` builds on the registry's connector-friendly `source_type` / `origin_uri` fields.
 

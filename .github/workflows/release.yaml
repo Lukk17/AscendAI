@@ -14,7 +14,7 @@ on:
         default: ''
         type: string
       release_ascend_ai_agent:
-        description: 'Release ascend-ai-agent (apps/ascend-ai-agent/CHANGELOG.md version)'
+        description: 'Release ascend-ai-agent (apps/ascend-agent/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
@@ -126,8 +126,8 @@ jobs:
           MATRIX_INCLUDE="[]"
 
           add_to_matrix() {
-            local service="$1" path="$2" version="$3"
-            MATRIX_INCLUDE=$(echo "$MATRIX_INCLUDE" | python3 -c "import sys,json; a=json.load(sys.stdin); a.append({'service':'${service}','path':'${path}','version':'${version}'}); print(json.dumps(a))")
+            local service="$1" path="$2" version="$3" image_name="$4"
+            MATRIX_INCLUDE=$(echo "$MATRIX_INCLUDE" | python3 -c "import sys,json; a=json.load(sys.stdin); a.append({'service':'${service}','path':'${path}','version':'${version}','image_name':'${image_name}'}); print(json.dumps(a))")
           }
 
           check_and_add() {
@@ -143,11 +143,12 @@ jobs:
               exit 1
             fi
 
+            local image_name="ascend-ai-${service}"
             echo "${service}: ${CUR_VERSION}"
-            add_to_matrix "$service" "$path" "$CUR_VERSION"
+            add_to_matrix "$service" "$path" "$CUR_VERSION" "$image_name"
           }
 
-          check_and_add "$SEL_ASCEND_AI_AGENT"     "ascend-ai-agent"     "apps/ascend-ai-agent"     "apps/ascend-ai-agent/CHANGELOG.md"
+          check_and_add "$SEL_ASCEND_AI_AGENT"     "ascend-agent"     "apps/ascend-agent"     "apps/ascend-agent/CHANGELOG.md"
           check_and_add "$SEL_ASCEND_WEATHER_MCP"  "ascend-weather-mcp"  "apps/ascend-weather-mcp"  "apps/ascend-weather-mcp/CHANGELOG.md"
           check_and_add "$SEL_ASCEND_AUDIO_SCRIBE" "ascend-audio-scribe" "apps/ascend-audio-scribe" "apps/ascend-audio-scribe/CHANGELOG.md"
           check_and_add "$SEL_ASCEND_WEB_HUNTER"   "ascend-web-hunter"   "apps/ascend-web-hunter"   "apps/ascend-web-hunter/CHANGELOG.md"
@@ -197,8 +198,9 @@ jobs:
 
           SERVICE="${{ matrix.service }}"
           VERSION="${{ matrix.version }}"
-          DOCKERHUB_IMAGE="lukk17/${SERVICE}"
-          GHCR_IMAGE="ghcr.io/lukk17/${SERVICE}"
+          IMAGE_NAME="${{ matrix.image_name }}"
+          DOCKERHUB_IMAGE="lukk17/${IMAGE_NAME}"
+          GHCR_IMAGE="ghcr.io/lukk17/${IMAGE_NAME}"
 
           # Checked against both registries this stack publishes to. A tag
           # present on both is a completed prior release of this exact
@@ -252,10 +254,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            lukk17/${{ matrix.service }}:v${{ matrix.version }}
-            lukk17/${{ matrix.service }}:latest
-            ghcr.io/lukk17/${{ matrix.service }}:v${{ matrix.version }}
-            ghcr.io/lukk17/${{ matrix.service }}:latest
+            lukk17/${{ matrix.image_name }}:v${{ matrix.version }}
+            lukk17/${{ matrix.image_name }}:latest
+            ghcr.io/lukk17/${{ matrix.image_name }}:v${{ matrix.version }}
+            ghcr.io/lukk17/${{ matrix.image_name }}:latest
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
@@ -290,7 +292,7 @@ jobs:
             grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' "$1"
           }
 
-          V_ASCEND_AI_AGENT=$(read_changelog_version "apps/ascend-ai-agent/CHANGELOG.md")
+          V_ASCEND_AI_AGENT=$(read_changelog_version "apps/ascend-agent/CHANGELOG.md")
           V_ASCEND_WEATHER_MCP=$(read_changelog_version "apps/ascend-weather-mcp/CHANGELOG.md")
           V_ASCEND_AUDIO_SCRIBE=$(read_changelog_version "apps/ascend-audio-scribe/CHANGELOG.md")
           V_ASCEND_WEB_HUNTER=$(read_changelog_version "apps/ascend-web-hunter/CHANGELOG.md")

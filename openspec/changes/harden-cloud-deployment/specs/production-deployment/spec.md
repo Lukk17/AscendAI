@@ -4,7 +4,7 @@
 
 ### Requirement: The edge gateway is the only publicly bound service
 
-`compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-ai-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
+`compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
 
 #### Scenario: External port scan shows only 80 and 443
 
@@ -15,7 +15,7 @@
 #### Scenario: ascend-ai-agent is reachable through the gateway over TLS
 
 - **WHEN** a client sends `POST https://<ASCEND_DOMAIN>/api/v1/ai/prompt` with a valid request body
-- **THEN** the gateway terminates TLS and proxies the request to `ascend-ai-agent:9917`
+- **THEN** the gateway terminates TLS and proxies the request to `ascend-agent:9917`
 - **AND** the response is the same as a direct in-network call to ascend-ai-agent
 
 #### Scenario: Local dev gets a working TLS endpoint without a domain

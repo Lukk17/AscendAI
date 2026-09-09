@@ -51,7 +51,7 @@ graph TB
 
 | Service                                                    | Role                                                                                                                       | Tech Stack                                 | Communication                       |
 | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------- | :---------------------------------- |
-| **[ascend-ai-agent](../../../apps/ascend-ai-agent/AGENTS.md)**          | Central gateway: receives user prompts, routes to AI providers, assembles context (RAG + memory + history), dispatches MCP tool calls. | Java 21, Spring Boot 3.5, Spring AI 1.1    | REST API (in), MCP client (out)     |
+| **[ascend-ai-agent](../../../apps/ascend-agent/AGENTS.md)**          | Central gateway: receives user prompts, routes to AI providers, assembles context (RAG + memory + history), dispatches MCP tool calls. | Java 21, Spring Boot 3.5, Spring AI 1.1    | REST API (in), MCP client (out)     |
 | **[ascend-audio-scribe](../../../apps/ascend-audio-scribe/AGENTS.md)**          | Audio transcription: local (faster-whisper / GPU), OpenAI Whisper API, or HuggingFace. Supports multi-track Audacity projects. | Python 3.11, FastMCP                       | MCP server + REST API               |
 | **[ascend-weather-mcp](../../../apps/ascend-weather-mcp/AGENTS.md)**            | Current weather data provider.                                                                                             | Java 21, Spring Boot 3.5, Spring AI        | MCP server                          |
 | **[ascend-web-hunter](../../../apps/ascend-web-hunter/AGENTS.md)**  | Web search via SearXNG + multi-tiered content extraction with Cloudflare bypass.                                           | Python 3.12, FastMCP, Playwright           | MCP server + REST API               |
@@ -116,8 +116,8 @@ sequenceDiagram
 
 Each module has its own `AGENTS.md` with build instructions, architecture details, and conventions.
 
-- [ascend-ai-agent](../../../apps/ascend-ai-agent/AGENTS.md). Includes internal arc42 docs in
-  [apps/ascend-ai-agent/docs/architecture/](../../../apps/ascend-ai-agent/docs/architecture/).
+- [ascend-ai-agent](../../../apps/ascend-agent/AGENTS.md). Includes internal arc42 docs in
+  [apps/ascend-agent/docs/architecture/](../../../apps/ascend-agent/docs/architecture/).
 - [ascend-audio-scribe](../../../apps/ascend-audio-scribe/AGENTS.md)
 - [ascend-web-hunter](../../../apps/ascend-web-hunter/AGENTS.md)
 - [AscendMemory](../../../apps/ascend-memory/AGENTS.md)

@@ -13,7 +13,7 @@ Tasks are ordered so that everything which changes stored data lands before anyt
 
 ## 2. Tenant model and Liquibase migration [BACKFILL]
 
-- [ ] 2.1 Create `apps/ascend-ai-agent/src/main/resources/db/changelog/02-tenant-isolation.xml`: `tenants` table (`id VARCHAR(64) PK`, `display_name`, `created_at`), insert the reserved `default` row, register in `db.changelog-master.yaml`. Verify: booting against a fresh Postgres yields a `tenants` table containing exactly one row with `id = 'default'`.
+- [ ] 2.1 Create `apps/ascend-agent/src/main/resources/db/changelog/02-tenant-isolation.xml`: `tenants` table (`id VARCHAR(64) PK`, `display_name`, `created_at`), insert the reserved `default` row, register in `db.changelog-master.yaml`. Verify: booting against a fresh Postgres yields a `tenants` table containing exactly one row with `id = 'default'`.
 - [ ] 2.2 [BACKFILL] Same changelog: add `tenant_id VARCHAR(64)` to `chat_history` and `user_instructions` with `defaultValue='default'` (backfilling existing rows in the same statement), then add the NOT NULL constraints. Verify: against a database seeded with pre-tenant rows, every row reads `tenant_id = 'default'` and an insert omitting `tenant_id` is rejected by the constraint.
 - [ ] 2.3 Same changelog: change the `user_instructions` primary key to composite `(tenant_id, user_id)`, create index `idx_chat_history_tenant_user` on `chat_history(tenant_id, user_id)` and drop `idx_chat_history_user_id`. Verify: `pg_indexes` lists the composite index and no longer lists the single-column one, and two rows with the same `user_id` under different tenants both insert successfully.
 - [ ] 2.4 Add the `Tenant` JPA entity and `TenantRepository` under `model/` and `repository/`, and add `tenant_id` to the `ChatHistory` entity and the `UserInstruction` composite id. Verify: a repository integration test saves and reads back the same `user_id` under two tenants as two distinct rows.
@@ -78,8 +78,8 @@ Tasks are ordered so that everything which changes stored data lands before anyt
 
 ## 9. Decision records and documentation
 
-- [ ] 9.1 Move the three drafted records from `openspec/changes/add-tenant-isolation/decisions/` into `apps/ascend-ai-agent/docs/architecture/decisions/` as `ADR-010`, `ADR-011`, and `ADR-012`, keeping the numbering contiguous with the existing `ADR-001` through `ADR-009`. Verify: the three files exist at their new path, the numbers do not collide, and the design's decision-records table links resolve.
-- [ ] 9.2 Update `apps/ascend-ai-agent/AGENTS.md` (key dependencies, code conventions) with the two-axis filter, the single search call site, and the payload contract. Verify: a reader who has only that file can name both filter conjuncts and the class that owns the search.
+- [ ] 9.1 Move the three drafted records from `openspec/changes/add-tenant-isolation/decisions/` into `apps/ascend-agent/docs/architecture/decisions/` as `ADR-010`, `ADR-011`, and `ADR-012`, keeping the numbering contiguous with the existing `ADR-001` through `ADR-009`. Verify: the three files exist at their new path, the numbers do not collide, and the design's decision-records table links resolve.
+- [ ] 9.2 Update `apps/ascend-agent/AGENTS.md` (key dependencies, code conventions) with the two-axis filter, the single search call site, and the payload contract. Verify: a reader who has only that file can name both filter conjuncts and the class that owns the search.
 - [ ] 9.3 Update the `docs/api/request/AscendAI/` Bruno collection where object keys or identifiers changed shape. Verify: every request in the collection runs green against a live stack with an `acme`-tenant token.
 
 ## 10. Verification

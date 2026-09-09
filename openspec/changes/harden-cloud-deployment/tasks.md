@@ -10,7 +10,7 @@
 
 ## 2. Edge gateway
 
-- [ ] 2.1 Create `gateway/Caddyfile`: site block on `{$ASCEND_DOMAIN:localhost}`, reverse_proxy to `ascend-ai-agent:9917`, forwarded headers on, commented reserved routes for Keycloak (`/auth/*` path form and `auth.` subdomain form, per design D2)
+- [ ] 2.1 Create `gateway/Caddyfile`: site block on `{$ASCEND_DOMAIN:localhost}`, reverse_proxy to `ascend-agent:9917`, forwarded headers on, commented reserved routes for Keycloak (`/auth/*` path form and `auth.` subdomain form, per design D2)
 - [ ] 2.2 Add the `gateway` service to `compose.yaml`: pinned `caddy:2.x` image, ports `"80:80"` and `"443:443"` (all interfaces — the one exception to task 1.1), Caddyfile + cert-storage volume mounts, `ASCEND_DOMAIN` env, healthcheck, restart policy, logging anchor
 - [ ] 2.3 Add a commented, operator-gated Caddy route for Grafana (disabled by default per design D8)
 - [ ] 2.4 Verify locally: `docker compose up -d gateway` with `ASCEND_DOMAIN` unset serves `https://localhost` from Caddy's internal CA; `curl -k https://localhost/actuator/health` proxies through to ascend-ai-agent and returns 200
@@ -22,7 +22,7 @@
 
 - [ ] 3.1 Remove `secret_key` from `infra/searxng/settings.yml`; wire `SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set}` into the `searxng` service environment; document that the old committed value is compromised and every deployment generates a fresh one
 - [ ] 3.2 Grafana: set `GF_AUTH_ANONYMOUS_ENABLED=false`, drop `GF_AUTH_ANONYMOUS_ORG_ROLE`, add `GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}` and `GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}`
-- [ ] 3.3 Parameterize `apps/ascend-ai-agent/src/main/resources/application.yaml`: `app.s3.access-key`/`secret-key` → `${S3_ACCESS_KEY:admin}`/`${S3_SECRET_KEY:password}`, `spring.datasource.username`/`password` → `${POSTGRES_USER:postgres}`/`${POSTGRES_PASSWORD:local}`, `spring.data.redis.password` → `${REDIS_PASSWORD:}`, Qdrant API key → `${QDRANT_API_KEY:}`; mirror any docker-profile overrides in `application-docker.yaml`; pass the variables through the `ascend-ai-agent` compose environment
+- [ ] 3.3 Parameterize `apps/ascend-agent/src/main/resources/application.yaml`: `app.s3.access-key`/`secret-key` → `${S3_ACCESS_KEY:admin}`/`${S3_SECRET_KEY:password}`, `spring.datasource.username`/`password` → `${POSTGRES_USER:postgres}`/`${POSTGRES_PASSWORD:local}`, `spring.data.redis.password` → `${REDIS_PASSWORD:}`, Qdrant API key → `${QDRANT_API_KEY:}`; mirror any docker-profile overrides in `application-docker.yaml`; pass the variables through the `ascend-ai-agent` compose environment
 - [ ] 3.4 Wire `QDRANT_API_KEY` into the `ascend-memory` compose environment and `REDIS_PASSWORD` into the `ascend-web-hunter` `REDIS_URL`, both defaulting to today's unauthenticated local behavior
 - [ ] 3.5 Implement the ascend-ai-agent production-profile startup guard (design D3): a `@Configuration` validator active only under the `production` Spring profile that fails startup when any datastore credential equals its dev default, and logs a prominent warning when `SECURITY_ENABLED` is false; add a unit test asserting the guard's default-value constants match `application.yaml` and a test for the fail path
 - [ ] 3.6 Verify: `docker compose up` without `GRAFANA_ADMIN_PASSWORD` or `SEARXNG_SECRET` fails fast naming the variable; with them set the stack starts; `./gradlew test` passes; starting ascend-ai-agent with `SPRING_PROFILES_ACTIVE=production` and dev-default S3 credentials aborts startup
@@ -65,5 +65,5 @@
 - [ ] 9.1 Fresh-clone rehearsal: clean checkout, copy `.env.example` → `.env`, fill the two required secrets, `docker compose up -d --build` — full stack healthy, all documented `localhost:<port>` endpoints respond, Bruno smoke request to ascend-ai-agent succeeds
 - [ ] 9.2 From a second machine (or the VM's public interface), port-scan the host: only 80/443 open; direct connections to every internal service port fail; `https://<domain-or-localhost>` reaches ascend-ai-agent through the gateway
 - [ ] 9.3 Grafana requires login; Prometheus lifecycle endpoint rejected; repository grep confirms no committed working credential remains (old SearXNG key, `admin`/`password`, `postgres`/`local` as literals)
-- [ ] 9.4 Run the e2e suite (`apps/ascend-ai-agent/e2e/`) against the hardened local stack to confirm no capability regressed
+- [ ] 9.4 Run the e2e suite (`apps/ascend-agent/e2e/`) against the hardened local stack to confirm no capability regressed
 - [ ] 9.5 Keep `openspec/changes/harden-cloud-deployment/tasks.md` checkboxes current as work proceeds

@@ -22,7 +22,7 @@
 
 ### Requirement: Path-filtered matrix per service
 
-`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-ai-agent` → `apps/ascend-ai-agent/**`, `ascend-weather-mcp` → `apps/ascend-weather-mcp/**`, `ascend-audio-scribe` → `apps/ascend-audio-scribe/**`, `ascend-web-hunter` → `apps/ascend-web-hunter/**`, `ascend-memory` → `apps/ascend-memory/**`, `ascend-ocr` → `apps/ascend-ocr/**`.
+`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-ai-agent` → `apps/ascend-agent/**`, `ascend-weather-mcp` → `apps/ascend-weather-mcp/**`, `ascend-audio-scribe` → `apps/ascend-audio-scribe/**`, `ascend-web-hunter` → `apps/ascend-web-hunter/**`, `ascend-memory` → `apps/ascend-memory/**`, `ascend-ocr` → `apps/ascend-ocr/**`.
 
 #### Scenario: Docs-only PR runs zero matrix entries
 
@@ -33,10 +33,10 @@
 
 #### Scenario: Single-service PR runs only that service
 
-- **WHEN** a pull request changes a file under `apps/ascend-ai-agent/src/main/java/...`
+- **WHEN** a pull request changes a file under `apps/ascend-agent/src/main/java/...`
 - **THEN** the `changes` job emits `ascend-ai-agent: true` and all other services as `false`
 - **AND** only the `ascend-ai-agent` matrix entry executes
-- **AND** the entry runs `./gradlew --no-daemon build test` from `apps/ascend-ai-agent/`
+- **AND** the entry runs `./gradlew --no-daemon build test` from `apps/ascend-agent/`
 
 #### Scenario: Workflow-file change forces full matrix
 
@@ -52,7 +52,7 @@ For each Java service in the matrix, the workflow SHALL set up Eclipse Temurin J
 
 - **WHEN** the `ascend-ai-agent` matrix entry executes on a push following a prior successful run on the same branch
 - **THEN** `gradle/actions/setup-gradle@v3` restores the dependency cache from the prior run
-- **AND** `./gradlew --no-daemon build test` runs from `apps/ascend-ai-agent/`
+- **AND** `./gradlew --no-daemon build test` runs from `apps/ascend-agent/`
 - **AND** the build succeeds with the cache hit visible in the Gradle build scan output
 
 #### Scenario: Failing unit test fails the workflow

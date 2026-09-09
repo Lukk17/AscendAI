@@ -13,7 +13,7 @@ proves the text came from the OCR pipeline rather than memorised knowledge.
 
 | File | Used by | Distinctive content |
 | :--- | :--- | :--- |
-| `argent-saga-chronicles-page1.png` | `2-ocr-english-test.md`, `4-ocr-default-language-test.md`, `6-mcp-ocr-test.md` | Screenshot of page 1 of `apps/ascend-ai-agent/e2e/fixtures/argent-saga-chronicle.pdf`. Tests assert the extracted text contains `Argent Saga`, `Aenaria`, `Halen Veyr` (case-insensitive). |
+| `argent-saga-chronicles-page1.png` | `2-ocr-english-test.md`, `4-ocr-default-language-test.md`, `6-mcp-ocr-test.md` | Screenshot of page 1 of `apps/ascend-agent/e2e/fixtures/argent-saga-chronicle.pdf`. Tests assert the extracted text contains `Argent Saga`, `Aenaria`, `Halen Veyr` (case-insensitive). |
 | `argent-saga-chronicles-page1-polish.png` | `3-ocr-polish-test.md` | Polish translation of page 1, screenshotted from a text editor. Tests assert the extracted text contains `Saga Świetlna`, `Aenaria`, `Eklipsą`, and at least one Polish-specific accented character. |
 | `not-an-image.txt` | `12-ocr-unsupported-mime-test.md` | Plain-text file with no image/PDF magic bytes. Proves the magic-byte sniffer (`src/api/mime_sniffer.py`) rejects the upload even when the client lies about `Content-Type`. |
 
@@ -34,7 +34,7 @@ default (see [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transp
 
 To regenerate `argent-saga-chronicles-page1.png`:
 
-1. Open `apps/ascend-ai-agent/e2e/fixtures/argent-saga-chronicle.pdf` in any PDF viewer.
+1. Open `apps/ascend-agent/e2e/fixtures/argent-saga-chronicle.pdf` in any PDF viewer.
 2. Screenshot page 1 at a comfortable zoom level (>= 100 percent). Save as `argent-saga-chronicles-page1.png`.
 
 For the Polish version: the Polish translation lives in the commit message of the fixture-update commit. Paste it

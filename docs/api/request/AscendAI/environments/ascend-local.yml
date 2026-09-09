@@ -9,6 +9,6 @@ variables:
   - name: ocrFixtures
     value: ../../../../apps/ascend-ocr/e2e/fixtures
   - name: ascendAgentFixtures
-    value: ../../../../apps/ascend-ai-agent/e2e/fixtures
+    value: ../../../../apps/ascend-agent/e2e/fixtures
   - name: audioScribeFixtures
     value: ../../../../apps/ascend-audio-scribe/e2e/fixtures

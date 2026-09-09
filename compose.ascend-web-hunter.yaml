@@ -14,7 +14,7 @@ services:
   # ─── Search infrastructure ───
 
   searxng:
-    image: searxng/searxng:2026.8.14-094c33d40
+    image: searxng/searxng:2026.8.14-094c33d40@sha256:892cf809341915a4b7710d3c9045005b4c377d51335a089b6d4da0b28750788d
     container_name: searxng
     restart: unless-stopped
     logging: *default-logging
@@ -52,7 +52,7 @@ services:
           - searxng
 
   flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0@sha256:139dfee1c6f89249c8d665d1333a42e8ec74ec0a86bc6bb1c8461e10d3a66a47
     container_name: flaresolverr
     restart: unless-stopped
     logging: *default-logging
@@ -112,7 +112,7 @@ services:
   # cache, and GET /ready reports "degraded" rather than failing), so no
   # explicit wait is needed either way.
   redis:
-    image: redis:8.10.1-alpine
+    image: redis:8.10.1-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
     container_name: ascend-scrapper-redis
     restart: unless-stopped
     logging: *default-logging
@@ -144,7 +144,7 @@ services:
   # ─── Web search service ───
 
   ngrok-ascend-web-hunter:
-    image: ngrok/ngrok:3
+    image: ngrok/ngrok:3@sha256:07bd8fa758e73489d3ba5a2fc95d912e0b8359ebfca4a55886e2059c10020da4
     container_name: ngrok-ascend-web-hunter
     restart: unless-stopped
     logging: *default-logging
@@ -170,6 +170,7 @@ services:
     build:
       context: ./apps/ascend-web-hunter
       dockerfile: Dockerfile
+    image: ascend-ai-ascend-web-hunter:latest
     container_name: ascend-web-hunter
     hostname: ascend-web-hunter
     restart: unless-stopped

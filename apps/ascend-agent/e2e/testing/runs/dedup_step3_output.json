@@ -1,0 +1,134 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\rag-dedup-prompt.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ai/prompt",
+          "headers": {
+            "X-User-Id": "frostyRagDedupTest",
+            "content-type": "multipart/form-data; boundary=--------------------------78064f728f8a332b5e1e9819"
+          },
+          "data": {
+            "_overheadLength": 544,
+            "_valueLength": 102,
+            "_valuesToMeasure": [],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------78064f728f8a332b5e1e9819",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Thu, 18 Jun 2026 12:59:36 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "content": "# How to Make Pierogi: Two Recipe Comparison\n\nI found two lovely traditional recipes in your documents — **Babcia Helena's recipe** and **Maria's recipe**. Here's a full breakdown and comparison:\n\n---\n\n## 🥟 The Dough\n\n| Element | **Helena's Dough** | **Maria's Dough** |\n|---|---|---|\n| Flour | 500g all-purpose, sifted | Not specified by weight |\n| Liquid | 250ml lukewarm water | Not specified |\n| Egg | 1 large egg | (implied, not detailed) |\n| Fat | 1 tbsp sunflower oil | Not detailed |\n| Salt | Pinch of fine sea salt | Not detailed |\n| Kneading | **10 full minutes** by the clock | Not specified |\n| Resting | **30 minutes** under a damp linen towel | Rested (duration not specified) |\n| Thickness when rolled | Not specified | ~**2.5 mm** |\n| Cutter size | Not specified | ~**8 cm** rounds (water glass) |\n\n> **Helena's key insight:** Never skip the resting step — it relaxes the gluten and prevents the pierogi from falling apart during boiling.\n\n---\n\n## 🧅 The Fillings\n\nThese two recipes use **completely different fillings**, which is a great illustration of pierogi's versatility:\n\n| | **Helena's Filling** (Cabbage & Mushroom) | **Maria's Filling** (Potato & Cheese) |\n|---|---|---|\n| Base | 300g sauerkraut, drained & finely chopped | Boiled, mashed potatoes |\n| Protein/Dairy | — | Twaróg (Polish farmer's cheese) |\n| Mushroom | 50g dried porcini, soaked overnight | — |\n| Onion | 1 large yellow onion, diced | Diced onion, caramelised 10–12 min in butter |\n| Fat | 30g unsalted butter | Butter (from caramelising onion) |\n| Seasoning | Black pepper, fresh parsley | Salt, pepper, **marjoram** |\n| Texture preference | — | Coarsely mashed (fork, never a ricer!) |\n| Prep note | Mushrooms soaked **overnight** | Potatoes steamed after draining to remove moisture |\n\n---\n\n## 🍳 Assembly & Cooking\n\nBoth recipes share the same core assembly technique:\n\n- **Fill generously** — Maria explicitly warns that under-filling produces disappointing pierogi\n- Fold dough over filling, **pinch firmly** from one corner to the other\n- **Crimp with a fork** for a tight seal\n- Lay finished pierogi on a **flour-dusted linen towel**, not touching\n\n**Cooking (Maria's method, detailed):**\n1. Cook in batches in a wide pot of **well-salted boiling water**\n2. Add gently with a slotted spoon; stir once to prevent sticking\n3. They'll float after **2–3 minutes** — cook **3 more minutes** after they float\n4. Remove with a slotted spoon\n\n---\n\n## 🍽️ Serving\n\n| | **Helena** | **Maria** |\n|---|---|---|\n| Fresh | Not specified | Melted butter + sour cream |\n| Leftover | Not specified | Fried in **bacon fat** until crisp, served with eggs — considered the ideal next-day breakfast! |\n\n---\n\n## 🏆 Summary: Which Recipe to Follow?\n\n- **Choose Helena's** if you want a classic **cabbage & mushroom** (kapusta i grzyby) pierogi — earthy, savory, and traditional. Plan ahead since the porcini need an overnight soak.\n- **Choose Maria's** if you want the beloved **potato & cheese** (ruskie) filling — rich, comforting, and a crowd-pleaser. Her tips on texture and seasoning are especially detailed.\n\nBoth recipes emphasize **patience** — with the dough rest, the onion caramelisation, and careful assembly. That's the real secret ingredient! 🥟",
+            "metadata": {
+              "id": "msg_01XnsYgBsZ21a4jChqbr5p4n",
+              "model": "claude-sonnet-4-6",
+              "rateLimit": {
+                "requestsLimit": 0,
+                "requestsRemaining": 0,
+                "requestsReset": "PT0S",
+                "tokensLimit": 0,
+                "tokensRemaining": 0,
+                "tokensReset": "PT0S"
+              },
+              "usage": {
+                "promptTokens": 1426,
+                "completionTokens": 995,
+                "totalTokens": 2421,
+                "nativeUsage": {
+                  "input_tokens": 1426,
+                  "output_tokens": 995,
+                  "cache_creation_input_tokens": 3744,
+                  "cache_read_input_tokens": 0
+                }
+              },
+              "promptMetadata": [],
+              "empty": false,
+              "toolsUsed": []
+            },
+            "sources": [
+              {
+                "name": "Grandma Maria's pierogi recipe (e2e dedup fixture)",
+                "mimeType": "application/octet-stream",
+                "downloadUrl": "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-grandma.md?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260618T125936Z&X-Amz-SignedHeaders=host&X-Amz-Credential=admin%2F20260618%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Expires=900&X-Amz-Signature=a62f45a0558a855c21506e6b89c905cdf9d6cd699a790056015e7b442a1af7b7",
+                "expiresAt": "2026-06-18T13:14:36.886417440Z",
+                "sizeBytes": 4065
+              },
+              {
+                "name": "Babcia Helena's pierogi recipe (e2e dedup fixture)",
+                "mimeType": "application/octet-stream",
+                "downloadUrl": "http://localhost:9070/knowledge-base/markdown/dedup-pierogi-helena.md?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260618T125936Z&X-Amz-SignedHeaders=host&X-Amz-Credential=admin%2F20260618%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Expires=900&X-Amz-Signature=1dca1678dcaaa9411cd05e15cd4c629c430fec482e87df475bf555869b1d1b6e",
+                "expiresAt": "2026-06-18T13:14:36.886461417Z",
+                "sizeBytes": 3744
+              }
+            ]
+          },
+          "url": "http://localhost/api/v1/ai/prompt",
+          "responseTime": 20343,
+          "duration": 20343,
+          "size": 4874
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 20.4664539,
+        "name": "rag-dedup-prompt",
+        "path": "ascend-agent\\testing\\rag-dedup-prompt.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

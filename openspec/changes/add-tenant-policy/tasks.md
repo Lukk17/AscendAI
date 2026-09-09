@@ -33,5 +33,5 @@
 
 - [ ] 5.1 Add a policy section to `docs/SECURITY.md`: provider/model allow-lists, tool allow-lists and the exfiltration mitigation, deployment default and narrow-only overrides, the local-only sovereignty configuration
 - [ ] 5.2 Add Bruno requests for the policy API
-- [ ] 5.3 Note the policy API and the local-only configuration in `apps/ascend-ai-agent/AGENTS.md`
+- [ ] 5.3 Note the policy API and the local-only configuration in `apps/ascend-agent/AGENTS.md`
 - [ ] 5.4 Run `./gradlew test integrationTest`; all green

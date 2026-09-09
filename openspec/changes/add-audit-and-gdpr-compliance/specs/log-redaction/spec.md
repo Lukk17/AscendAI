@@ -22,7 +22,7 @@ ascend-ai-agent SHALL NOT write user prompt text or attached document content to
 
 #### Scenario: Stale logger name corrected
 
-- **WHEN** `apps/ascend-ai-agent/src/main/resources/application.yaml` is read
+- **WHEN** `apps/ascend-agent/src/main/resources/application.yaml` is read
 - **THEN** its `logging.level` block references `com.lukk.ascend.ai.agent` and contains no `com.lukk.ai.agent` entry
 
 ### Requirement: Platform-wide redaction convention covers all six services

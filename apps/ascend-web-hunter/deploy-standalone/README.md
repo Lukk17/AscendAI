@@ -206,7 +206,7 @@ docker compose pull ascend-web-hunter
 docker compose up -d ascend-web-hunter
 ```
 
-Published tags are listed at [hub.docker.com/r/lukk17/ascend-web-hunter/tags](https://hub.docker.com/r/lukk17/ascend-web-hunter/tags). The same images are published to `ghcr.io/lukk17/ascend-web-hunter` if you prefer GitHub's registry. Both are public and neither needs a login to pull.
+Published tags are listed at [hub.docker.com/r/lukk17/ascend-ai-ascend-web-hunter/tags](https://hub.docker.com/r/lukk17/ascend-ai-ascend-web-hunter/tags). The same images are published to `ghcr.io/lukk17/ascend-ai-ascend-web-hunter` if you prefer GitHub's registry. Both are public and neither needs a login to pull.
 
 Upstream images, SearXNG, FlareSolverr, and the bundled Redis, are pinned too. SearXNG ships a new build most days and its search engines break as the sites they scrape change, so it is worth bumping every few months even when nothing appears wrong.
 

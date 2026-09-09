@@ -8,7 +8,7 @@ services:
   # ─── Document processing services ───
 
   docling-serve:
-    image: quay.io/docling-project/docling-serve:v1.14.0
+    image: quay.io/docling-project/docling-serve:v1.14.0@sha256:b3fff85ccbe54c76a3fc318af603ad6d2cf7e143975fda7c6758b70d0f32b208
     container_name: docling-serve
     restart: unless-stopped
     ports:
@@ -31,7 +31,7 @@ services:
           - docling-serve
 
   unstructured-api:
-    image: downloads.unstructured.io/unstructured-io/unstructured-api:0.0.90
+    image: downloads.unstructured.io/unstructured-io/unstructured-api:0.0.90@sha256:54282d3a25f33fd6cf69bc45b3d37770f213593f58b6dfe5e85fe546376b2807
     container_name: unstructured-api
     restart: unless-stopped
     ports:
@@ -51,7 +51,7 @@ services:
     build:
       context: ./apps/ascend-ocr
       dockerfile: Dockerfile
-    image: ascend-ocr:local
+    image: ascend-ai-ascend-ocr:latest
     container_name: ascend-ocr
     hostname: ascend-ocr
     restart: unless-stopped
@@ -102,12 +102,13 @@ services:
 
   # ─── Application services ───
 
-  ascend-ai-agent:
+  ascend-agent:
     build:
-      context: ./apps/ascend-ai-agent
+      context: ./apps/ascend-agent
       dockerfile: Dockerfile
-    container_name: ascend-ai-agent
-    hostname: ascend-ai-agent
+    image: ascend-ai-ascend-agent:latest
+    container_name: ascend-agent
+    hostname: ascend-agent
     restart: unless-stopped
     ports:
       - "9917:9917"
@@ -137,12 +138,12 @@ services:
       # binding for nested Map<String,String> is awkward).
       - APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED=${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:-true}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=ascend-ai-agent
+      - OTEL_SERVICE_NAME=ascend-agent
       - OTEL_RESOURCE_ATTRIBUTES=service.version=1.0.0
     networks:
       default:
         aliases:
-          - ascend-ai-agent
+          - ascend-agent
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9917/actuator/health"]
       interval: 30s
@@ -164,6 +165,7 @@ services:
     build:
       context: ./apps/ascend-memory
       dockerfile: Dockerfile
+    image: ascend-ai-ascend-memory:latest
     container_name: ascend-memory
     hostname: ascend-memory
     restart: unless-stopped
@@ -222,7 +224,7 @@ services:
     build:
       context: ./apps/ascend-weather-mcp
       dockerfile: Dockerfile
-    # image: lukk17/ascend-weather-mcp:latest
+    image: ascend-ai-ascend-weather-mcp:latest
     container_name: ascend-weather-mcp
     hostname: ascend-weather-mcp
     restart: unless-stopped
@@ -249,7 +251,7 @@ services:
     build:
       context: ./apps/ascend-audio-scribe
       dockerfile: Dockerfile
-    # image: lukk17/ascend-audio-scribe:latest
+    image: ascend-ai-ascend-audio-scribe:latest
     container_name: ascend-audio-scribe
     hostname: ascend-audio-scribe
     restart: unless-stopped
@@ -312,6 +314,7 @@ services:
   container-metrics-exporter:
     build:
       context: ./infra/observability/container-metrics-exporter
+    image: ascend-ai-container-metrics-exporter:latest
     container_name: container-metrics-exporter
     hostname: container-metrics-exporter
     restart: unless-stopped
@@ -329,7 +332,7 @@ services:
           - container-metrics-exporter
 
   prometheus:
-    image: prom/prometheus:v2.55.1
+    image: prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
@@ -350,7 +353,7 @@ services:
           - prometheus
 
   grafana:
-    image: grafana/grafana:11.4.0
+    image: grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
@@ -371,7 +374,7 @@ services:
           - grafana
 
   loki:
-    image: grafana/loki:3.3.2
+    image: grafana/loki:3.3.2@sha256:8af2de1abbdd7aa92b27c9bcc96f0f4140c9096b507c77921ffddf1c6ad6c48f
     container_name: loki
     hostname: loki
     restart: unless-stopped
@@ -385,7 +388,7 @@ services:
           - loki
 
   vector:
-    image: timberio/vector:0.42.0-alpine
+    image: timberio/vector:0.42.0-alpine@sha256:913878963fdead8276686ff96831db994acc5c740447b2186da0d87c835d8375
     container_name: vector
     hostname: vector
     restart: unless-stopped
@@ -399,7 +402,7 @@ services:
           - vector
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.114.0
+    image: otel/opentelemetry-collector-contrib:0.114.0@sha256:37fa87091cfaaec7234a27e4e395a40c31c2bfaea97a349a4afef6d9e9681197
     container_name: otel-collector
     hostname: otel-collector
     restart: unless-stopped
@@ -412,7 +415,7 @@ services:
           - otel-collector
 
   tempo:
-    image: grafana/tempo:2.6.1
+    image: grafana/tempo:2.6.1@sha256:ef4384fce6e8ad22b95b243d8fc165628cda655376fd50e7850536ad89d71d50
     container_name: tempo
     hostname: tempo
     restart: unless-stopped

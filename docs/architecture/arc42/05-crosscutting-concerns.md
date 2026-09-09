@@ -5,7 +5,7 @@
 ### Multi-provider AI routing
 
 The ascend-ai-agent supports 5 AI providers with per-request selection. Model IDs below mirror the values wired in
-[apps/ascend-ai-agent/src/main/resources/application.yaml](../../../apps/ascend-ai-agent/src/main/resources/application.yaml) for chat
+[apps/ascend-agent/src/main/resources/application.yaml](../../../apps/ascend-agent/src/main/resources/application.yaml) for chat
 defaults, memory extraction, and history compaction. Any other model the provider accepts works at request time via
 the `model` form field; the values below are what ships out of the box.
 

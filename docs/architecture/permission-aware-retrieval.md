@@ -10,7 +10,7 @@ This document is the design. The decisions it depends on are recorded separately
 
 A company's documents are not uniformly readable by the company. The board deck is not for everyone, the salary bands are not for everyone, and the incident postmortem naming a customer is not for everyone. SharePoint and Google Drive already know this and enforce it on every file open. The moment those files are pulled into a vector store and answered over by a language model, that enforcement is gone unless something rebuilds it.
 
-Today nothing rebuilds it. [RagRetrievalService](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java) builds a `SearchRequest` from query, `topK`, and a similarity threshold of zero, with no filter of any kind, and every chunk in the collection is a candidate for every prompt. [SecurityConfig](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/config/SecurityConfig.java) ships with `app.security.enabled=false` and a `permitAll` chain, so there is not even a verified caller to filter against. [IngestionMetadataKeys](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/ingestion/IngestionMetadataKeys.java) records three keys, `source`, `type`, and `title`, and none of them says anything about who may read the chunk.
+Today nothing rebuilds it. [RagRetrievalService](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java) builds a `SearchRequest` from query, `topK`, and a similarity threshold of zero, with no filter of any kind, and every chunk in the collection is a candidate for every prompt. [SecurityConfig](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/SecurityConfig.java) ships with `app.security.enabled=false` and a `permitAll` chain, so there is not even a verified caller to filter against. [IngestionMetadataKeys](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/ingestion/IngestionMetadataKeys.java) records three keys, `source`, `type`, and `title`, and none of them says anything about who may read the chunk.
 
 The failure this produces is not a subtle one. Any person who can reach the agent can ask a question whose answer is drawn from any document in the corpus, and the model will answer it fluently, with a working download link to the source file attached.
 
@@ -101,7 +101,7 @@ Nothing in the identity plane is ever written into Qdrant. Nothing in the conten
 
 ### Payload contract
 
-Four fields go onto every chunk. They are added to [IngestionMetadataKeys](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/ingestion/IngestionMetadataKeys.java) alongside `source`, `type`, `title`, and the `tenant_id` key that [add-tenant-isolation](../../openspec/changes/add-tenant-isolation/) introduces.
+Four fields go onto every chunk. They are added to [IngestionMetadataKeys](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/ingestion/IngestionMetadataKeys.java) alongside `source`, `type`, `title`, and the `tenant_id` key that [add-tenant-isolation](../../openspec/changes/add-tenant-isolation/) introduces.
 
 | Field | Type | Meaning |
 | :--- | :--- | :--- |
@@ -150,7 +150,7 @@ The cap is 64 principals per list. A list that would exceed it is a capture fail
 
 This is the part that is easy to get wrong, because the wrong version passes a casual test. Post-filtering does not leak. It suppresses. So the first thing anyone checks, whether a caller can see a document they should not, comes back clean, and the design looks correct.
 
-Take a corpus where the caller may read only three chunks, and those three happen to rank sixth, seventh, and eighth for their question. `topK` is 5, which is the current default shape of the search in [RagRetrievalService](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java).
+Take a corpus where the caller may read only three chunks, and those three happen to rank sixth, seventh, and eighth for their question. `topK` is 5, which is the current default shape of the search in [RagRetrievalService](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java).
 
 | Rank | Score | Chunk | Caller permitted | Returned by post-filter | Returned by pre-filter |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -177,7 +177,7 @@ tenant_id == '<currentTenant>' AND acl IN <principalSet>
 
 Spring AI's `IN` operator against a keyword-array payload field maps to Qdrant's match-any semantics, which is exactly the set-intersection test this design needs: the chunk is a candidate when its `acl` contains at least one principal the caller holds. That translation is the one part of this design that depends on library behaviour rather than on our own code, so it is pinned by an integration test against a real Qdrant rather than assumed from the API shape.
 
-The existing Java-side threshold filtering and score logging in [RagRetrievalService](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java) stay exactly as they are. They operate on what Qdrant returned, and after this change what Qdrant returns is already permitted.
+The existing Java-side threshold filtering and score logging in [RagRetrievalService](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java) stay exactly as they are. They operate on what Qdrant returned, and after this change what Qdrant returns is already permitted.
 
 ---
 
@@ -320,7 +320,7 @@ None of this is built or tested against for this version. It is recorded so the 
 
 Somebody revokes a group's access to a document. The bytes do not change. This is the most common permission event in any real company, and the current pipeline is structurally incapable of noticing it.
 
-[ManualIngestionService](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/ingestion/ManualIngestionService.java) builds its deduplication marker as `manual-ingestion:<key>:<etag>` and skips the object when the marker already exists. The ETag is a hash of the content. Unchanged bytes produce an unchanged ETag, which produces a marker hit, which produces a skip. The revocation is never seen, and the chunks keep their old access list until something unrelated changes the file.
+[ManualIngestionService](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/ingestion/ManualIngestionService.java) builds its deduplication marker as `manual-ingestion:<key>:<etag>` and skips the object when the marker already exists. The ETag is a hash of the content. Unchanged bytes produce an unchanged ETag, which produces a marker hit, which produces a skip. The revocation is never seen, and the chunks keep their old access list until something unrelated changes the file.
 
 This is not only current behaviour. [add-document-connectors](../../openspec/changes/add-document-connectors/) writes it into a requirement. Its `document-connectors` capability contains a scenario titled "Unchanged file re-landed is a no-op", asserting that identical bytes mean the ETag dedup skips re-indexing and the Qdrant chunk count is unchanged. As a statement about re-embedding that is correct and desirable. As written it is a statement about the whole sync outcome, and in that reading it prescribes the bug: a file whose sharing changed and whose bytes did not is exactly a file that must not be a no-op.
 
@@ -332,7 +332,7 @@ The sync reads permissions rather than inferring them from the content feed. Mic
 
 There is a payload-only update path that does not re-embed. When `acl_version` differs and `contentVersion` does not, the run rewrites four payload fields on the existing points and stops. Re-embedding a 200-chunk document to change one keyword array is the difference between a revocation taking seconds and a revocation taking an hour, and during that hour the revoked group can still retrieve the document.
 
-Spring AI's `VectorStore` abstraction has no payload update operation. It offers `add` and `delete`, and `add` means embed. The payload-only path therefore uses the native Qdrant client's `setPayload` call. That client is already a declared dependency in [apps/ascend-ai-agent/build.gradle.kts](../../apps/ascend-ai-agent/build.gradle.kts) as `libs.qdrant.client`, so this introduces no new dependency, only a second and narrower use of one that is already there.
+Spring AI's `VectorStore` abstraction has no payload update operation. It offers `add` and `delete`, and `add` means embed. The payload-only path therefore uses the native Qdrant client's `setPayload` call. That client is already a declared dependency in [apps/ascend-agent/build.gradle.kts](../../apps/ascend-agent/build.gradle.kts) as `libs.qdrant.client`, so this introduces no new dependency, only a second and narrower use of one that is already there.
 
 ```mermaid
 flowchart TB
@@ -360,13 +360,13 @@ That branch needs a sync outcome the current model does not have. [add-document-
 
 Filtered retrieval is worthless if the link beside the answer was issued without the same check.
 
-[S3PresignedUrlService](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/S3PresignedUrlService.java) presigns whatever `SourceRef` list it is handed. Under this design that list comes from filtered retrieval, so in the ordinary case every reference is already permitted. Relying on that is the mistake. The reference list is assembled by `buildSourceRefs` in [RagRetrievalService](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java), passed across a service boundary, and will one day be reachable from a code path that did not filter, because that is what happens to every check that lives in only one place. The presigner therefore re-checks each reference against the caller's principal set itself, rather than trusting that retrieval filtered them.
+[S3PresignedUrlService](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/S3PresignedUrlService.java) presigns whatever `SourceRef` list it is handed. Under this design that list comes from filtered retrieval, so in the ordinary case every reference is already permitted. Relying on that is the mistake. The reference list is assembled by `buildSourceRefs` in [RagRetrievalService](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/RagRetrievalService.java), passed across a service boundary, and will one day be reachable from a code path that did not filter, because that is what happens to every check that lives in only one place. The presigner therefore re-checks each reference against the caller's principal set itself, rather than trusting that retrieval filtered them.
 
 A reference that fails the re-check is dropped from the response entirely. It is not returned as a source entry with the link omitted. That preserves the decision already taken in [add-tenant-isolation](../../openspec/changes/add-tenant-isolation/) design section 9 and [add-document-management-api](../../openspec/changes/add-document-management-api/) decision D8: every source entry that is returned always carries a non-blank `downloadUrl` and `expiresAt`, so a caller never has to implement two ways of fetching the same source. The existing implementation already has the right shape for this. `presign` returns an `Optional<SourceFile>` and empties are filtered out of the result list, so a refused reference disappears rather than degrading.
 
 A link that has already been issued stays valid for its remaining lifetime. Presigned URLs are self-contained: the signature encodes the object and the expiry, and nothing consults the application when the URL is fetched. Revoking somebody's access does not reach back and invalidate a link they were handed two minutes ago.
 
-That window is real and it is bounded by the presign time to live, which today defaults to 15 minutes and is clamped by [S3PresignedUrlService](../../apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/S3PresignedUrlService.java) to between one minute and one hour. The correct response is a short default and an honest disclosure, not an engineering effort to close it. Closing it means proxying every download through the agent so each fetch can be authorized, which collides directly with the settled decision that the presigned link is mandatory on every source entry. Trading a documented 15-minute window for a re-litigation of a closed decision is a bad trade.
+That window is real and it is bounded by the presign time to live, which today defaults to 15 minutes and is clamped by [S3PresignedUrlService](../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/rag/S3PresignedUrlService.java) to between one minute and one hour. The correct response is a short default and an honest disclosure, not an engineering effort to close it. Closing it means proxying every download through the agent so each fetch can be authorized, which collides directly with the settled decision that the presigned link is mandatory on every source entry. Trading a documented 15-minute window for a re-litigation of a closed decision is a bad trade.
 
 ---
 
@@ -445,7 +445,7 @@ A staleness sweep that empties access lists older than a maximum. If permission 
 
 ### Tests that tell this apart from a plausible imitation
 
-Every one of these asserts observable behaviour. None of them asserts a log line, in keeping with the contract in [apps/ascend-ai-agent/e2e/README.md](../../apps/ascend-ai-agent/e2e/README.md).
+Every one of these asserts observable behaviour. None of them asserts a log line, in keeping with the contract in [apps/ascend-agent/e2e/README.md](../../apps/ascend-agent/e2e/README.md).
 
 | Test | Passes only if |
 | :--- | :--- |

@@ -207,21 +207,21 @@ docker build -t ascend-audio-scribe:latest .
 Bash:
 
 ```bash
-docker tag ascend-audio-scribe:latest lukk17/ascend-audio-scribe:v0.0.1
+docker tag ascend-ai-ascend-audio-scribe:latest lukk17/ascend-ai-ascend-audio-scribe:v0.0.1
 ```
 
 ```bash
-docker push lukk17/ascend-audio-scribe:v0.0.1
+docker push lukk17/ascend-ai-ascend-audio-scribe:v0.0.1
 ```
 
 PowerShell:
 
 ```powershell
-docker tag ascend-audio-scribe:latest lukk17/ascend-audio-scribe:v0.0.1
+docker tag ascend-ai-ascend-audio-scribe:latest lukk17/ascend-ai-ascend-audio-scribe:v0.0.1
 ```
 
 ```powershell
-docker push lukk17/ascend-audio-scribe:v0.0.1
+docker push lukk17/ascend-ai-ascend-audio-scribe:v0.0.1
 ```
 
 **3. Run the container.** `--gpus all` is required for local transcription on the GPU. `-v ~/hf-cache:/hf-cache`

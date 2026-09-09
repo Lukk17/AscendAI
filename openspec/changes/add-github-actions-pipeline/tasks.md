@@ -41,7 +41,7 @@
 ## 5. Verification
 
 - [ ] 5.1 PR touching only `README.md` → zero matrix entries run
-- [ ] 5.2 PR touching `apps/ascend-ai-agent/` → only the `ascend-ai-agent` CI entry runs and passes
+- [ ] 5.2 PR touching `apps/ascend-agent/` → only the `ascend-ai-agent` CI entry runs and passes
 - [ ] 5.3 PR touching a Python service → only that CI entry runs and `pytest` executes
 - [ ] 5.4 Dispatch `Release` selecting an app whose manifest version was NOT bumped since the last `ascend-ai_*` tag → run fails in `prepare` naming the app, no push occurs
 - [ ] 5.5 Dispatch `Release` with `stack_version` and one bumped app selected → only that image pushes at its manifest version + `:latest`; a `ascend-ai_<stack_version>` tag + GitHub Release is created listing all six app versions; the default branch gains no workflow commit

@@ -22,10 +22,10 @@ AscendAI is a multi-module monorepo with Java and Python backend services but no
 
 ### 1. Module placement and naming
 
-The Flutter module lives at `AscendChat/` in the monorepo root, following the existing flat layout (`apps/ascend-ai-agent/`, `apps/ascend-audio-scribe/`, `apps/ascend-web-hunter/`, etc.). The `pubspec.yaml` project name is `ascend_chat`.
+The Flutter module lives at `AscendChat/` in the monorepo root, following the existing flat layout (`apps/ascend-agent/`, `apps/ascend-audio-scribe/`, `apps/ascend-web-hunter/`, etc.). The `pubspec.yaml` project name is `ascend_chat`.
 
 **Alternatives considered:**
-- Nested under `apps/ascend-ai-agent/frontend/`: rejected because ascend-ai-agent is a Gradle project and mixing Flutter build artifacts into it creates tooling conflicts.
+- Nested under `apps/ascend-agent/frontend/`: rejected because ascend-ai-agent is a Gradle project and mixing Flutter build artifacts into it creates tooling conflicts.
 - Separate repository: rejected because the OpenSpec workflow and agent instructions rely on monorepo-local changes.
 
 ### 2. State management with Riverpod

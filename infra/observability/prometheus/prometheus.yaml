@@ -8,14 +8,14 @@ scrape_configs:
 
   # ─── AscendAI application services ───
 
-  - job_name: ascend-ai-agent
+  - job_name: ascend-agent
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - ascend-ai-agent:9917
+          - ascend-agent:9917
     relabel_configs:
       - target_label: service
-        replacement: ascend-ai-agent
+        replacement: ascend-agent
 
   - job_name: ascend-weather-mcp
     metrics_path: /actuator/prometheus

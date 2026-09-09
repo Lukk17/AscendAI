@@ -46,5 +46,5 @@ and Architecture Decision Records (ADRs).
 ### Module-level architecture
 
 The ascend-ai-agent has its own detailed arc42 documentation in
-[apps/ascend-ai-agent/docs/architecture/](../../apps/ascend-ai-agent/docs/architecture/) covering internal class structure, component
+[apps/ascend-agent/docs/architecture/](../../apps/ascend-agent/docs/architecture/) covering internal class structure, component
 diagrams, and module-specific ADRs.

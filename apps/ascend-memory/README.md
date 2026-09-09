@@ -181,37 +181,37 @@ docker run -d --name ascend-memory -p 7020:7020 -e LMSTUDIO_BASE_URL="http://hos
 Bash:
 
 ```bash
-docker tag ascend-memory:latest lukk17/ascend-memory:v0.0.1
+docker tag ascend-ai-ascend-memory:latest lukk17/ascend-ai-ascend-memory:v0.0.1
 ```
 
 ```bash
-docker push lukk17/ascend-memory:v0.0.1
+docker push lukk17/ascend-ai-ascend-memory:v0.0.1
 ```
 
 ```bash
-docker tag ascend-memory:latest lukk17/ascend-memory:latest
+docker tag ascend-ai-ascend-memory:latest lukk17/ascend-ai-ascend-memory:latest
 ```
 
 ```bash
-docker push lukk17/ascend-memory:latest
+docker push lukk17/ascend-ai-ascend-memory:latest
 ```
 
 PowerShell:
 
 ```powershell
-docker tag ascend-memory:latest lukk17/ascend-memory:v0.0.1
+docker tag ascend-ai-ascend-memory:latest lukk17/ascend-ai-ascend-memory:v0.0.1
 ```
 
 ```powershell
-docker push lukk17/ascend-memory:v0.0.1
+docker push lukk17/ascend-ai-ascend-memory:v0.0.1
 ```
 
 ```powershell
-docker tag ascend-memory:latest lukk17/ascend-memory:latest
+docker tag ascend-ai-ascend-memory:latest lukk17/ascend-ai-ascend-memory:latest
 ```
 
 ```powershell
-docker push lukk17/ascend-memory:latest
+docker push lukk17/ascend-ai-ascend-memory:latest
 ```
 
 ---

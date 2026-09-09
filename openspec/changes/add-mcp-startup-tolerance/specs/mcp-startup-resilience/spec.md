@@ -102,7 +102,7 @@ MUST NOT appear in the banner.
 ### Requirement: Configuration uses Spring AI's built-in deferral flag
 
 The application SHALL set `spring.ai.mcp.client.initialized=false` in
-[application.yaml](../../../../../apps/ascend-ai-agent/src/main/resources/application.yaml). The project MUST NOT replace,
+[application.yaml](../../../../../apps/ascend-agent/src/main/resources/application.yaml). The project MUST NOT replace,
 override, or fork Spring AI's `McpClientAutoConfiguration` or `SyncMcpToolCallbackProvider` beans.
 
 #### Scenario: Spring AI version upgrade within the 1.1.x line

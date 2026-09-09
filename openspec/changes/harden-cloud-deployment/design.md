@@ -51,7 +51,7 @@ The change from `"9917:9917"` to `"${EXPOSE_BIND:-127.0.0.1}:9917:9917"` is beha
 
 - Automatic ACME (Let's Encrypt/ZeroSSL) with zero configuration beyond the domain name — the single-tenant-VM-per-customer model means one domain per deployment, Caddy's sweet spot.
 - `local_certs`/internal CA mode gives working self-signed TLS locally with the same Caddyfile, switched by the `ASCEND_DOMAIN` env var (a real domain triggers ACME; `localhost` triggers the internal CA).
-- Caddyfile routes: `/` → `ascend-ai-agent:9917`; a reserved route (e.g. `/auth/*` or an `auth.` subdomain — finalized when `add-auth-and-identity` lands Keycloak) → `keycloak:8080`; optional operator-gated route to Grafana (default: not routed, loopback + SSH tunnel only).
+- Caddyfile routes: `/` → `ascend-agent:9917`; a reserved route (e.g. `/auth/*` or an `auth.` subdomain — finalized when `add-auth-and-identity` lands Keycloak) → `keycloak:8080`; optional operator-gated route to Grafana (default: not routed, loopback + SSH tunnel only).
 - Caddy sets real `X-Forwarded-For` / `X-Forwarded-Proto` headers, which D6 relies on.
 
 **Alternatives considered:**

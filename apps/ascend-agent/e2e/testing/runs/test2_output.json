@@ -1,0 +1,132 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\image-description-prompt.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ai/prompt",
+          "headers": {
+            "X-User-Id": "frostyImageDescriptionTest",
+            "content-type": "multipart/form-data; boundary=--------------------------7be1e747eea4be18f17769dc"
+          },
+          "data": {
+            "_overheadLength": 578,
+            "_valueLength": 64,
+            "_valuesToMeasure": [
+              {
+                "fd": null,
+                "path": "D:\\Development\\projekty-IT\\AscendAI\\AscendAgent\\e2e\\fixtures\\image.png",
+                "flags": "r",
+                "mode": 438,
+                "end": null,
+                "bytesRead": 5895902,
+                "_events": {},
+                "_readableState": {
+                  "highWaterMark": 65536,
+                  "buffer": [],
+                  "bufferIndex": 0,
+                  "length": 0,
+                  "pipes": [],
+                  "awaitDrainWriters": null
+                },
+                "_eventsCount": 2
+              }
+            ],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------7be1e747eea4be18f17769dc",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Fri, 22 May 2026 18:32:17 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "content": "The image is a detailed, stylized digital illustration of an anime character with a strong, futuristic look.\n\n**Character and pose**\n- The character is shown from the chest up, facing forward, slightly leaning in with an intense, confident expression.\n- His eyes glow a bright, electric blue, with sharp, angular shapes that emphasize a determined, almost fierce gaze.\n- His mouth is curved into a subtle, self-assured smirk.\n\n**Hair and face**\n- He has very spiky, voluminous blond hair that radiates outward in thick, pointed tufts, typical of high-energy anime characters.\n- The hair is highly rendered with smooth gradients and bright highlights, giving it a glossy, almost metallic sheen.\n- Strong shadows fall across his face, splitting it into a brightly lit side and a darker, more dramatic side, emphasizing his cheekbones and jawline.\n- His eyebrows are angled downward toward the center, adding to the intense, focused expression.\n\n**Eyes and glow effects**\n- The irises and pupils are not clearly distinguished; instead, the eyes are solidly illuminated with neon blue light.\n- A similar blue light traces around his eyes, almost like a thin glowing outline, enhancing the sense of power or energy emanating from him.\n\n**Outfit and futuristic elements**\n- He wears a dark, high-collared jacket, slightly open at the front. The fabric appears thick and slightly padded, like a modern or tactical jacket.\n- Underneath, on his chest, is a bright, glowing, circuit-like design in neon blue. It looks like a futuristic energy core or armor plate integrated into his clothing.\n- The glowing chest pattern has geometric lines and shapes, almost like a stylized arc reactor or power conduit, and it casts a soft blue light onto his neck and the inside of the jacket.\n- The zipper of the jacket is visible on one side, with subtle metallic reflections.\n\n**Lighting and atmosphere**\n- The primary light source seems to come from below and in front, casting dramatic shadows upwards on his face and enhancing the three-dimensional look of his hair and features.\n- The neon blue elements (eyes and chest) act as secondary light sources, tinting nearby areas with a cool glow.\n- There’s a contrast between warm ambient light from the background and the cold, intense blue light on the character.\n\n**Background**\n- The background shows a cityscape at night, out of focus, with many small, scattered lights suggesting buildings and streets far below.\n- The sky above is dark, transitioning from deep blue to a lighter gradient near the horizon, dotted with a few faint stars.\n- On the right side, there are vertical lines of light that resemble illuminated skyscrapers or towers.\n- A streak or line of light appears horizontally in the distance, possibly a cloud edge lit by the city or a stylized atmospheric effect, adding to the cinematic feel.\n\n**Overall style and mood**\n- The art style is a blend of anime and high-end digital painting, with clean lines, strong cel-shading, and realistic lighting.\n- The mood is powerful and heroic, with a hint of menace or determination—like a character who has just powered up or is about to enter a battle.\n- The mix of neon tech elements and city-at-night backdrop gives the image a sci‑fi, cyberpunk‑inspired atmosphere.",
+            "metadata": {
+              "id": "",
+              "model": "",
+              "rateLimit": {
+                "requestsRemaining": 0,
+                "requestsReset": "PT0S",
+                "tokensLimit": 0,
+                "tokensRemaining": 0,
+                "tokensReset": "PT0S",
+                "requestsLimit": 0
+              },
+              "usage": {
+                "promptTokens": 0,
+                "completionTokens": 0,
+                "nativeUsage": {},
+                "totalTokens": 0
+              },
+              "promptMetadata": [],
+              "empty": true,
+              "toolsUsed": []
+            }
+          },
+          "url": "http://localhost/api/v1/ai/prompt",
+          "responseTime": 20717,
+          "duration": 20717,
+          "size": 4225
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 20.7910994,
+        "name": "image-description-prompt",
+        "path": "ascend-agent\\testing\\image-description-prompt.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

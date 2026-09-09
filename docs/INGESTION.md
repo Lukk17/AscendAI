@@ -17,7 +17,7 @@ Ingestion is split into two stages on purpose.
 You trigger Run manually by default. An auto-poller exists but is off out of the box
 (`app.ingestion.auto.enabled=false`) so the agent doesn't spend embedding tokens on every restart and you're never
 surprised by background ingestion costs. Set `app.ingestion.auto.enabled=true` in
-[application.yaml](../apps/ascend-ai-agent/src/main/resources/application.yaml) (or via env) to opt in.
+[application.yaml](../apps/ascend-agent/src/main/resources/application.yaml) (or via env) to opt in.
 
 ---
 
@@ -101,7 +101,7 @@ with that prefix.
   without touching the rest.
 
 Folder names come from `app.ingestion.folders.obsidian` and `app.ingestion.folders.documents` in
-[application.yaml](../apps/ascend-ai-agent/src/main/resources/application.yaml). The upload endpoint routes `.md` to
+[application.yaml](../apps/ascend-agent/src/main/resources/application.yaml). The upload endpoint routes `.md` to
 `obsidian/` and everything else to `documents/`.
 
 ---
@@ -118,7 +118,7 @@ app:
 ```
 
 It scans the bucket on a fixed interval (configurable in
-[application.yaml](../apps/ascend-ai-agent/src/main/resources/application.yaml)) and ingests anything new. Off by default to
+[application.yaml](../apps/ascend-agent/src/main/resources/application.yaml)) and ingests anything new. Off by default to
 keep startup fast and embedding spend predictable.
 
 ---
@@ -133,6 +133,6 @@ To force re-processing of files, see
 ### See also
 
 - [../README.md](../README.md). Monorepo overview, Quick Start, ports.
-- [../apps/ascend-ai-agent/README.md](../apps/ascend-ai-agent/README.md). RAG pipeline + agent endpoints.
+- [../apps/ascend-agent/README.md](../apps/ascend-agent/README.md). RAG pipeline + agent endpoints.
 - [DEPLOYMENT.md](DEPLOYMENT.md). Compose recipes.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Reset recipes when state gets stuck.

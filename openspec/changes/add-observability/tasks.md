@@ -10,10 +10,10 @@
 
 ## 2. Wire ascend-ai-agent (Spring Boot) — metrics
 
-- [x] 2.1 Add `org.springframework.boot:spring-boot-starter-actuator` and `io.micrometer:micrometer-registry-prometheus` to `apps/ascend-ai-agent/build.gradle.kts`
-- [x] 2.2 In `apps/ascend-ai-agent/src/main/resources/application.yaml`, add `management.endpoints.web.exposure.include: health,info,prometheus`, `management.endpoint.health.show-details: when-authorized`, `management.metrics.tags.service: ascend-ai-agent`, `management.metrics.tags.version: @project.version@`
+- [x] 2.1 Add `org.springframework.boot:spring-boot-starter-actuator` and `io.micrometer:micrometer-registry-prometheus` to `apps/ascend-agent/build.gradle.kts`
+- [x] 2.2 In `apps/ascend-agent/src/main/resources/application.yaml`, add `management.endpoints.web.exposure.include: health,info,prometheus`, `management.endpoint.health.show-details: when-authorized`, `management.metrics.tags.service: ascend-ai-agent`, `management.metrics.tags.version: @project.version@`
 - [x] 2.3 Enable `processResources` filtering for `application.yaml` in `build.gradle.kts` so `@project.version@` resolves at build time
-- [x] 2.4 Create `apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/config/MetricsConfig.java` with a `MeterRegistryCustomizer<MeterRegistry>` bean that applies common tags (`service`, `version`) globally
+- [x] 2.4 Create `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/MetricsConfig.java` with a `MeterRegistryCustomizer<MeterRegistry>` bean that applies common tags (`service`, `version`) globally
 - [x] 2.5 Add scrape job for ascend-ai-agent to `infra/observability/prometheus/prometheus.yaml`: `job_name: ascend-ai-agent`, `metrics_path: /actuator/prometheus`, `static_configs.targets: [host.docker.internal:9917]`
 - [ ] 2.6 Smoke test: hit `http://localhost:9917/actuator/prometheus`, confirm body contains `jvm_memory_used_bytes`, `gen_ai_client_token_usage_total` (after one prompt), and the `service="ascend-ai-agent"` tag appears on every line
 
@@ -72,7 +72,7 @@
 - [x] 9.2 Add `tempo` service to `compose.yaml` (image `grafana/tempo:2.x.x`, volume mount config, port `3200` docker-network only, OTLP `4317` docker-network only)
 - [x] 9.3 Create `infra/observability/otel-collector/otel-collector-config.yaml` with OTLP receivers (gRPC `:4317`, HTTP `:4318`), `batch` + `memory_limiter` processors, OTLP exporter to Tempo
 - [x] 9.4 Add `otel-collector` service to `compose.yaml` (image `otel/opentelemetry-collector-contrib:0.x.x`, volume mount config, ports `4317` + `4318` docker-network only)
-- [x] 9.5 In `apps/ascend-ai-agent/src/main/resources/application-docker.yaml`, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-ai-agent`, `OTEL_RESOURCE_ATTRIBUTES=service.version=@project.version@`
+- [x] 9.5 In `apps/ascend-agent/src/main/resources/application-docker.yaml`, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`, `OTEL_SERVICE_NAME=ascend-ai-agent`, `OTEL_RESOURCE_ATTRIBUTES=service.version=@project.version@`
 - [x] 9.6 Same for `apps/ascend-weather-mcp/src/main/resources/application-docker.yaml` with `OTEL_SERVICE_NAME=ascend-weather-mcp`
 - [ ] 9.7 Verify Spring AI's existing OTel integration emits spans for LLM/tool calls without further wiring (Spring AI 1.1 ships OTel auto-instrumentation when the OTel BOM is on the classpath via Spring AI's transitive deps)
 - [ ] 9.8 Smoke test: send one chat prompt via ascend-ai-agent → query Tempo via Grafana Explore: search by `service.name=ascend-ai-agent` → expect a single trace with spans for the LLM call

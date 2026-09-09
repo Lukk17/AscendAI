@@ -1,0 +1,118 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\prompt-cache-anthropic.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ai/prompt",
+          "headers": {
+            "X-User-Id": "frostyPromptCacheAnthropicTest",
+            "content-type": "multipart/form-data; boundary=--------------------------79abd8857fca5ff5ce67e19a"
+          },
+          "data": {
+            "_overheadLength": 432,
+            "_valueLength": 489,
+            "_valuesToMeasure": [],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------79abd8857fca5ff5ce67e19a",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Thu, 28 May 2026 15:46:11 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "content": "## Spring Boot Microservice Architecture\n\nA typical Spring Boot microservice is organized into three core layers — **Controller**, **Service**, and **Repository** — each with a distinct responsibility.\n\n**Controller Layer** exposes RESTful endpoints via `@RestController`, validates incoming HTTP requests, delegates business logic downstream, and serializes responses to JSON using Jackson.\n\n**Service Layer**, annotated with `@Service`, encapsulates all domain logic. Before hitting the database, it consults a **Redis** cache (via Spring Cache / `@Cacheable`) to serve frequent reads without incurring database round-trips. Cache misses fall through to the repository. For write operations that require downstream notification, the service publishes events to a **Kafka** topic using `KafkaTemplate`, decoupling producers from consumers and enabling reliable asynchronous processing.\n\n**Repository Layer** uses **Spring Data JPA** (`@Repository`) backed by a **PostgreSQL** datasource managed through HikariCP connection pooling. Entities are mapped with JPA annotations; Flyway handles schema migrations deterministically.\n\n**Cross-cutting concerns** are handled at the framework level:\n- **Logging** — SLF4J/Logback with structured JSON output, enriched by MDC fields (correlation ID, tenant).\n- **Metrics** — Micrometer exposes Prometheus-compatible `/actuator/metrics` endpoints.\n- **Distributed Tracing** — Micrometer Tracing (Brave/OpenTelemetry) propagates `trace-id` and `span-id` headers across service boundaries, enabling end-to-end observability in tools such as Zipkin or Jaeger.",
+            "metadata": {
+              "id": "msg_014MK4QQWnk9XaMgz9NzX791",
+              "model": "claude-sonnet-4-6",
+              "rateLimit": {
+                "requestsLimit": 0,
+                "requestsRemaining": 0,
+                "requestsReset": "PT0S",
+                "tokensLimit": 0,
+                "tokensRemaining": 0,
+                "tokensReset": "PT0S"
+              },
+              "usage": {
+                "promptTokens": 479,
+                "completionTokens": 373,
+                "totalTokens": 852,
+                "nativeUsage": {
+                  "input_tokens": 479,
+                  "output_tokens": 373,
+                  "cache_creation_input_tokens": 425,
+                  "cache_read_input_tokens": 2176
+                }
+              },
+              "promptMetadata": [],
+              "empty": false,
+              "toolsUsed": []
+            }
+          },
+          "url": "http://localhost/api/v1/ai/prompt",
+          "responseTime": 4884,
+          "duration": 4884,
+          "size": 2082
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 4.9472831,
+        "name": "prompt-cache-anthropic",
+        "path": "ascend-agent\\testing\\prompt-cache-anthropic.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

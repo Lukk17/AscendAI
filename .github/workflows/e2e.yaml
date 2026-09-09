@@ -279,7 +279,7 @@ jobs:
       # Qdrant is an external prerequisite in every AscendAI environment, not
       # a docker-compose service. Version pinned to match the Testcontainers
       # image ascend-ai-agent's own integration tests already use
-      # (apps/ascend-ai-agent/src/test/java/.../integration/TestcontainersBase.java).
+      # (apps/ascend-agent/src/test/java/.../integration/TestcontainersBase.java).
       qdrant:
         image: qdrant/qdrant:v1.13.0
         ports:

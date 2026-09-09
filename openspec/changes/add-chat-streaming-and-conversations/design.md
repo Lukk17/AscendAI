@@ -3,7 +3,7 @@
 ## Context
 
 The chat surface is a single blocking multipart endpoint, `POST /api/v1/ai/prompt` in
-`apps/ascend-ai-agent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java`. It resolves the userId from the
+`apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java`. It resolves the userId from the
 `X-User-Id` header (default `app.user.default-id`), delegates to `AscendChatService.prompt(...)`
 (`service/chat/AscendChatService.java`), which assembles system messages (`ChatContextAssembler`), loads history
 (`ChatHistoryService.loadHistory(userId)` → `PersistentChatMemory.get(userId, 100)`), executes the blocking

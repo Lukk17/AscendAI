@@ -148,7 +148,7 @@ This change owns the pseudo-group because it owns the tenant identifier that nam
 
 ## Decision records
 
-Three decisions in this change are architecturally significant, are not already recorded in the monorepo decision log (`docs/architecture/decisions/`, which covers the permission model itself as ADR-M004 through ADR-M009), and are drafted here for placement in `apps/ascend-ai-agent/docs/architecture/decisions/`:
+Three decisions in this change are architecturally significant, are not already recorded in the monorepo decision log (`docs/architecture/decisions/`, which covers the permission model itself as ADR-M004 through ADR-M009), and are drafted here for placement in `apps/ascend-agent/docs/architecture/decisions/`:
 
 | Draft | Records |
 | :--- | :--- |
@@ -156,7 +156,7 @@ Three decisions in this change are architecturally significant, are not already 
 | [ADR-011](decisions/ADR-011-single-similarity-search-call-site.md) | One method issues the similarity search, enforced by an architecture test (design decision 10) |
 | [ADR-012](decisions/ADR-012-fail-closed-on-missing-tenant-or-principals.md) | Fail closed on a missing tenant context or a missing principal set, with no fallback to the default tenant and no fallback to a tenant-only filter (design decision 2) |
 
-They are drafted inside this change folder so the change carries its own rationale, and task 9.1 moves them into `apps/ascend-ai-agent/docs/architecture/decisions/` when the change is implemented. Decisions 3, 6, and 7 (tenant slug format, key scoping, AscendMemory namespacing) stay design-local: they are settled here and nothing outside this change has to reason about them.
+They are drafted inside this change folder so the change carries its own rationale, and task 9.1 moves them into `apps/ascend-agent/docs/architecture/decisions/` when the change is implemented. Decisions 3, 6, and 7 (tenant slug format, key scoping, AscendMemory namespacing) stay design-local: they are settled here and nothing outside this change has to reason about them.
 
 ## Risks / Trade-offs
 

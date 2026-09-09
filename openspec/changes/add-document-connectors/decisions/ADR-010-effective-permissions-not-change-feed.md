@@ -2,7 +2,7 @@
 
 ## Status
 
-Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `apps/ascend-ai-agent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
 
 ## Deferral, 2026-09-05
 

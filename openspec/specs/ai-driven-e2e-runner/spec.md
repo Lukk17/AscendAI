@@ -6,9 +6,9 @@ Defines the contract that lets an AI agent (or a human) execute the ascend-ai-ag
 
 ## Requirements
 
-### Requirement: Numbered immutable specs under `apps/ascend-ai-agent/e2e/testing/`
+### Requirement: Numbered immutable specs under `apps/ascend-agent/e2e/testing/`
 
-The system SHALL ship one capability spec per testable behavior under `apps/ascend-ai-agent/e2e/testing/`, named `<N>-<feature>-test.md`. The number prefix orders specs by setup cost (smallest first). Each spec is immutable across runs — the runner never edits it. Every spec follows the fixed template: **What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures**.
+The system SHALL ship one capability spec per testable behavior under `apps/ascend-agent/e2e/testing/`, named `<N>-<feature>-test.md`. The number prefix orders specs by setup cost (smallest first). Each spec is immutable across runs — the runner never edits it. Every spec follows the fixed template: **What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures**.
 
 #### Scenario: Specs are number-prefixed and immutable
 
@@ -34,7 +34,7 @@ For every spec the system SHALL ship a paired `<N>-<feature>-tasks.template.md` 
 
 ### Requirement: Per-run records under `runs/` with timestamped filenames
 
-For each execution the runner SHALL copy the matching template to `apps/ascend-ai-agent/e2e/testing/runs/<UTC-timestamp>_<N>-<feature>-tasks.md` (ISO 8601 with colons replaced by hyphens, e.g. `2026-05-12T17-23-36`). All five tests of one sweep SHALL share the same timestamp so a sweep groups by filename. Run records are gitignored by default; operators MAY force-add specific runs as audit artifacts.
+For each execution the runner SHALL copy the matching template to `apps/ascend-agent/e2e/testing/runs/<UTC-timestamp>_<N>-<feature>-tasks.md` (ISO 8601 with colons replaced by hyphens, e.g. `2026-05-12T17-23-36`). All five tests of one sweep SHALL share the same timestamp so a sweep groups by filename. Run records are gitignored by default; operators MAY force-add specific runs as audit artifacts.
 
 #### Scenario: Sweep groups by shared timestamp
 
@@ -45,7 +45,7 @@ For each execution the runner SHALL copy the matching template to `apps/ascend-a
 #### Scenario: Runs are ignored by default
 
 - **WHEN** a runner produces a new run record
-- **THEN** `git status` does not list it as untracked because `apps/ascend-ai-agent/e2e/testing/runs/*` is gitignored (with `!.../runs/README.md` exception)
+- **THEN** `git status` does not list it as untracked because `apps/ascend-agent/e2e/testing/runs/*` is gitignored (with `!.../runs/README.md` exception)
 - **AND** the operator MAY `git add -f` a specific run record to ship it as an audit example
 
 ### Requirement: Behavior-only pass criteria — no log assertions
@@ -136,6 +136,6 @@ The five canonical capability tests SHALL be `1-weather-mcp-test.md` (MCP tool i
 
 #### Scenario: Capability matrix is documented in the e2e README
 
-- **WHEN** a contributor opens `apps/ascend-ai-agent/e2e/README.md`
+- **WHEN** a contributor opens `apps/ascend-agent/e2e/README.md`
 - **THEN** the capability table lists exactly these five entries with links to spec and template files
 - **AND** "what it proves" describes the observable behavior each test exercises

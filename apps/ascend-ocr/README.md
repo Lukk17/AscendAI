@@ -225,7 +225,7 @@ Build the image. First build is 5 to 15 minutes because the PaddlePaddle wheels 
 prefetched in the builder stage:
 
 ```bash
-docker build -t ascend-ocr:local ascend-ocr
+docker build -t ascend-ocr:latest ascend-ocr
 ```
 
 Start the service through compose:

@@ -30,7 +30,7 @@ There is no CI today. The maintainer builds and pushes Docker Hub images by hand
 
 ### D2 — CI: path-filtered matrix per service
 
-`ci.yaml` uses `dorny/paths-filter@v3` to compute one boolean per service from its directory (`apps/ascend-ai-agent/**`, `apps/ascend-audio-scribe/**`, …). The matrix `build` job skips an entry whose service was untouched. A change to `.github/workflows/**` forces all services to run via a `workflows` fallback filter. Result: a docs-only PR runs zero builds; a single-service PR runs one.
+`ci.yaml` uses `dorny/paths-filter@v3` to compute one boolean per service from its directory (`apps/ascend-agent/**`, `apps/ascend-audio-scribe/**`, …). The matrix `build` job skips an entry whose service was untouched. A change to `.github/workflows/**` forces all services to run via a `workflows` fallback filter. Result: a docs-only PR runs zero builds; a single-service PR runs one.
 
 ### D3 — CI: explicit Java/Python matrix entries
 

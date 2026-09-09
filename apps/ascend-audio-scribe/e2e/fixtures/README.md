@@ -15,7 +15,7 @@ knowledge.
 
 | File | Used by | Distinctive transcript |
 | :--- | :--- | :--- |
-| `meeting-clip.wav` | `2-transcribe-openai-test.md`, `3-transcribe-hf-test.md`, `5-mcp-transcribe-test.md` | _"I think we should defer the migration to Q3 because the contract with Acme renews then. Adam, can you confirm the renewal date by Friday?"_ Tests assert the transcript contains `Q3`, `Acme`, `Adam`, `Friday`, and `migration` (case-insensitive). 56880 bytes, same file as `apps/ascend-ai-agent/e2e/fixtures/meeting-clip.wav`. Despite the `.wav` extension, `ffprobe` shows it is actually a LAME-encoded MP3 elementary stream (starts with the MPEG sync word `0xfff3`, no RIFF header): mono, 24 kHz, 9.48 seconds, not the 16 kHz / ≤5 s mono WAV the specs used to claim. Both providers transcode it without issue. |
+| `meeting-clip.wav` | `2-transcribe-openai-test.md`, `3-transcribe-hf-test.md`, `5-mcp-transcribe-test.md` | _"I think we should defer the migration to Q3 because the contract with Acme renews then. Adam, can you confirm the renewal date by Friday?"_ Tests assert the transcript contains `Q3`, `Acme`, `Adam`, `Friday`, and `migration` (case-insensitive). 56880 bytes, same file as `apps/ascend-agent/e2e/fixtures/meeting-clip.wav`. Despite the `.wav` extension, `ffprobe` shows it is actually a LAME-encoded MP3 elementary stream (starts with the MPEG sync word `0xfff3`, no RIFF header): mono, 24 kHz, 9.48 seconds, not the 16 kHz / ≤5 s mono WAV the specs used to claim. Both providers transcode it without issue. |
 
 ## MCP fixture delivery
 

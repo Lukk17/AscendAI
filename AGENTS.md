@@ -146,13 +146,13 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 ## Architecture
 
 - **Monorepo-level**: System overview, service interactions, deployment, ADRs — in `docs/architecture/`
-- **ascend-ai-agent internals**: Component diagrams, internal arc42, module-specific ADRs — in `apps/ascend-ai-agent/docs/architecture/`
+- **ascend-ai-agent internals**: Component diagrams, internal arc42, module-specific ADRs — in `apps/ascend-agent/docs/architecture/`
 
 ## Monorepo Structure
 
 | Module | Tech Stack | Port | Role |
 |---|---|---|---|
-| [ascend-ai-agent](apps/ascend-ai-agent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
+| [ascend-ai-agent](apps/ascend-agent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
 | [ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
 | [ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
 | [AscendMemory](apps/ascend-memory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
@@ -215,8 +215,8 @@ docker compose up -d --build
 # 4. ascend-ai-agent is already running as a container on :9917 from step 2. Only run it on the
 #    host instead (IDE debugging, breakpoints) if you first stop that one container, since both
 #    fight over port 9917:
-#    docker compose stop ascend-ai-agent
-#    cd apps/ascend-ai-agent
+#    docker compose stop ascend-agent
+#    cd apps/ascend-agent
 #    ./gradlew bootRun
 
 # 5. Python services run via uvicorn or docker-compose
@@ -233,7 +233,7 @@ docker compose up -d --build
 
 ## End-to-End Test Suite
 
-Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-ai-agent/e2e/`](apps/ascend-ai-agent/e2e/README.md). Eleven numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-ai-agent/e2e/README.md`](apps/ascend-ai-agent/e2e/README.md) for the full contract and capability matrix.
+Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-agent/e2e/`](apps/ascend-agent/e2e/README.md). Eleven numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-agent/e2e/README.md`](apps/ascend-agent/e2e/README.md) for the full contract and capability matrix.
 
 ## IDE Compatibility
 

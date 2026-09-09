@@ -31,7 +31,7 @@ graph TB
     User["User"]
 
     subgraph "AscendAI Platform"
-        Agent["ascend-ai-agent<br/>REST API :9917<br/>Spring Boot · Java 21"]
+        Agent["ascend-agent<br/>REST API :9917<br/>Spring Boot · Java 21"]
 
         subgraph "MCP Tool Services"
             AudioScribe["ascend-audio-scribe<br/>:7017<br/>Audio Transcription"]
@@ -207,12 +207,12 @@ invoked during the turn):
 Two architecture entry points, depending on what you're after.
 
 - [Monorepo architecture](docs/architecture/README.md). System overview, service interactions, deployment, ADRs.
-- [ascend-ai-agent arc42](apps/ascend-ai-agent/docs/architecture/arc42/01-introduction-and-goals.md). Internals, component diagrams,
+- [ascend-ai-agent arc42](apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md). Internals, component diagrams,
   module ADRs.
 
 | Module                                                 | Stack                  | Port | Role                                                |
 | ------------------------------------------------------ | ---------------------- | ---- | --------------------------------------------------- |
-| **[ascend-ai-agent](apps/ascend-ai-agent/AGENTS.md)**               | Java 21 / Spring Boot  | 9917 | API gateway, multi-provider AI, RAG, MCP client     |
+| **[ascend-ai-agent](apps/ascend-agent/AGENTS.md)**               | Java 21 / Spring Boot  | 9917 | API gateway, multi-provider AI, RAG, MCP client     |
 | **[ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md)**               | Python / FastMCP       | 7017 | Audio transcription (Whisper / OpenAI / HF)         |
 | **[ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md)**       | Python / FastMCP       | 7021 | Web search and scraping via SearXNG                 |
 | **[AscendMemory](apps/ascend-memory/AGENTS.md)**             | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                     |
@@ -227,7 +227,7 @@ How a single prompt traverses the platform.
 sequenceDiagram
     autonumber
     participant U as User
-    participant A as ascend-ai-agent
+    participant A as ascend-agent
     participant R as Redis<br/>(short-term)
     participant M as AscendMemory<br/>(Mem0)
     participant Q as Qdrant<br/>(RAG)
@@ -289,7 +289,7 @@ variable. It has to be at least 32 characters, unique to this deployment, and no
 **2. Bring up the stack.**
 
 The main compose file pulls in [compose.ascend-web-hunter.yaml](compose.ascend-web-hunter.yaml) via `include:`,
-so a single `up` brings up the full stack (ascend-ai-agent + tool services + scrapper).
+so a single `up` brings up the full stack (ascend-agent + tool services + scrapper).
 
 Bash:
 
@@ -312,12 +312,12 @@ dependency.
 **4. Optional: run the agent on the host.**
 
 For active development with hot reload and an attached debugger, run the agent on the host instead of in the container.
-Stop the container first (`docker compose stop ascend-ai-agent`) so port 9917 is free.
+Stop the container first (`docker compose stop ascend-agent`) so port 9917 is free.
 
 Bash:
 
 ```bash
-cd apps/ascend-ai-agent
+cd apps/ascend-agent
 ```
 
 ```bash
@@ -327,7 +327,7 @@ cd apps/ascend-ai-agent
 PowerShell:
 
 ```powershell
-cd apps/ascend-ai-agent
+cd apps/ascend-agent
 ```
 
 ```powershell
@@ -349,7 +349,7 @@ For document ingestion see [docs/INGESTION.md](docs/INGESTION.md).
 ### Supported AI Providers
 
 Per-request selection across the providers below. Models listed are the ones currently wired in
-[application.yaml](apps/ascend-ai-agent/src/main/resources/application.yaml) (chat default, memory extraction, and history
+[application.yaml](apps/ascend-agent/src/main/resources/application.yaml) (chat default, memory extraction, and history
 compaction). Any model the provider accepts works at request time via the `model` form field; these are the values
 that ship with the agent.
 
@@ -374,7 +374,7 @@ the actual transport ascend-ai-agent uses today. The other surface is available 
 
 | Service                                          | Port    | Surfaces        | Used by ascend-ai-agent via | Role                                                                |
 | :----------------------------------------------- | :------ | :-------------- | :---------------------- | :------------------------------------------------------------------ |
-| **[ascend-ai-agent](apps/ascend-ai-agent/AGENTS.md)**         | `9917`  | REST            | (this is the agent)     | API gateway and orchestrator. `POST /api/v1/ai/prompt` is the entry.|
+| **[ascend-agent](apps/ascend-agent/AGENTS.md)**         | `9917`  | REST            | (this is the agent)     | API gateway and orchestrator. `POST /api/v1/ai/prompt` is the entry.|
 | **[AscendMemory](apps/ascend-memory/AGENTS.md)**       | `7020`  | REST + MCP      | REST                    | Semantic memory store (Mem0 + Qdrant). Search / insert per user.    |
 | **[ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md)**         | `7017`  | REST + MCP      | MCP (Streamable HTTP)   | Speech-to-text (faster-whisper / OpenAI / HF / Audacity merge).     |
 | **[ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md)** | `7021`  | REST + MCP      | MCP (Streamable HTTP)   | Web search + content extraction (SearXNG, Cloudflare, NoVNC).       |
@@ -423,7 +423,7 @@ Canonical index. Every doc the repo ships, in one place.
 | :-------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------- |
 | [docs/architecture/README.md](docs/architecture/README.md)                                                            | Monorepo architecture: system view, ADRs, deployment topology.        |
 | [docs/architecture/arc42/01-introduction-and-goals.md](docs/architecture/arc42/01-introduction-and-goals.md)          | Arc42 entry point for the platform.                                   |
-| [apps/ascend-ai-agent/docs/architecture/arc42/01-introduction-and-goals.md](apps/ascend-ai-agent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
+| [apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md](apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
 | [docs/architecture/permission-aware-retrieval.md](docs/architecture/permission-aware-retrieval.md)                     | How document access lists reach chunks and get enforced inside the vector search. |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
 | [apps/ascend-web-hunter/deploy-standalone/README.md](apps/ascend-web-hunter/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
@@ -435,7 +435,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
 | [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |
-| [apps/ascend-ai-agent/e2e/README.md](apps/ascend-ai-agent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
+| [apps/ascend-agent/e2e/README.md](apps/ascend-agent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
 | [docs/E2E_COST.md](docs/E2E_COST.md)                                                                                  | Token usage and per-provider pricing for the e2e suite; recalculate dollar cost when prices change. |
 | [docs/DEFECT_REGISTER.md](docs/DEFECT_REGISTER.md)                                                                    | Every defect found across the stack: what's fixed with its commit, what's still open, what was declined. |
 | [AGENTS.md](AGENTS.md)                                                                                                | Shared instructions for any AI coding agent operating in this repo.   |
