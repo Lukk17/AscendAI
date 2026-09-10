@@ -1,16 +1,16 @@
 ## 1. Log redaction (ships first — no dependencies)
 
-- [ ] 1.1 In `AscendAgent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java` (lines 90-97), replace the `Prompt: {}` argument with `PromptLength: {}` and `PromptSha256: {}` (SHA-256 hex of the prompt body); extract the digest helper to `util/`
-- [ ] 1.2 In `AscendAgent/src/main/resources/application.yaml` `logging.level`, replace the stale `com.lukk.ai.agent: DEBUG` entry with `com.lukk.ascend.ai.agent: DEBUG` (dev posture keeps DEBUG)
-- [ ] 1.3 Add a `logging.level` block to `AscendAgent/src/main/resources/application-docker.yaml` pinning `org.springframework.ai: INFO` and `com.lukk.ascend.ai.agent: INFO`
-- [ ] 1.4 Sweep AscendAgent service classes (`AscendChatService`, RAG, ingestion, memory packages) for log statements that pass prompt/document/memory content as arguments; convert offenders to length/count/hash form
-- [ ] 1.5 Sweep the four Python services (AudioScribe, AscendWebSearch, AscendMemory, PaddleOCR) for log statements emitting transcript, scraped-page, memory-text, or OCR content; fix any leakage found and note the clean files in the PR description
+- [ ] 1.1 In `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java` (lines 90-97), replace the `Prompt: {}` argument with `PromptLength: {}` and `PromptSha256: {}` (SHA-256 hex of the prompt body); extract the digest helper to `util/`
+- [ ] 1.2 In `apps/ascend-agent/src/main/resources/application.yaml` `logging.level`, replace the stale `com.lukk.ai.agent: DEBUG` entry with `com.lukk.ascend.ai.agent: DEBUG` (dev posture keeps DEBUG)
+- [ ] 1.3 Add a `logging.level` block to `apps/ascend-agent/src/main/resources/application-docker.yaml` pinning `org.springframework.ai: INFO` and `com.lukk.ascend.ai.agent: INFO`
+- [ ] 1.4 Sweep ascend-ai-agent service classes (`AscendChatService`, RAG, ingestion, memory packages) for log statements that pass prompt/document/memory content as arguments; convert offenders to length/count/hash form
+- [ ] 1.5 Sweep the four Python services (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr) for log statements emitting transcript, scraped-page, memory-text, or OCR content; fix any leakage found and note the clean files in the PR description
 - [ ] 1.6 Test (`PromptControllerLogRedactionTest`): capture logs via a ListAppender while calling the endpoint with a marker prompt; assert the marker string is absent and length + digest are present
 - [ ] 1.7 Test: with the `docker` profile active, assert the effective level for `org.springframework.ai` is INFO (LoggerContext inspection)
 
 ## 2. Audit schema and recorder
 
-- [ ] 2.1 Add Liquibase changelog `02-audit-and-erasure.xml` under `AscendAgent/src/main/resources/db/changelog/` creating `audit_log` per design D3 (columns, indexes on `occurred_at`, `(actor, occurred_at)`, `(action, occurred_at)`) with rollback block; register it in `db.changelog-master.yaml`
+- [ ] 2.1 Add Liquibase changelog `02-audit-and-erasure.xml` under `apps/ascend-agent/src/main/resources/db/changelog/` creating `audit_log` per design D3 (columns, indexes on `occurred_at`, `(actor, occurred_at)`, `(action, occurred_at)`) with rollback block; register it in `db.changelog-master.yaml`
 - [ ] 2.2 In the same changelog, create the append-only trigger rejecting UPDATE/DELETE on `audit_log`, with the session-config escape hatch for the retention path and the pseudonymization rewrite (design D2/D5)
 - [ ] 2.3 Create `model/AuditEntry.java`, `repository/AuditLogRepository.java` (insert + filtered page query), and the closed `AuditAction` enum with the eleven actions from the spec
 - [ ] 2.4 Create `service/audit/AuditRecorder.java` publishing a Spring application event, and `service/audit/AuditEventListener.java` (`@Async`) persisting it; on persistence failure log ERROR and increment Micrometer counter `audit.write.failed`; add a synchronous `recordNow(...)` path for erasure-lifecycle events
@@ -77,7 +77,7 @@
 ## 9. Documentation and verification
 
 - [ ] 9.1 Author `docs/COMPLIANCE.md`: audited action catalogue, how to serve an Article 17 erasure request and an Article 20 export request end-to-end (API calls + expected evidence), what survives erasure and why (pseudonymized audit rows), the log-redaction convention with allowed/forbidden examples for all six services, and the full retention matrix (Postgres chat 180d, audit 730d, Redis TTL, Loki 168h, Prometheus 72h, Tempo 168h, export-archive window, erasure-bounded stores)
-- [ ] 9.2 Link `docs/COMPLIANCE.md` from the root `README.md` documentation map and note the audit/erasure endpoints in `AscendAgent/AGENTS.md`
-- [ ] 9.3 Run `./gradlew test integrationTest` for AscendAgent and `pytest` for each swept Python service; all green
+- [ ] 9.2 Link `docs/COMPLIANCE.md` from the root `README.md` documentation map and note the audit/erasure endpoints in `apps/ascend-agent/AGENTS.md`
+- [ ] 9.3 Run `./gradlew test integrationTest` for ascend-ai-agent and `pytest` for each swept Python service; all green
 - [ ] 9.4 Manual verification against the live stack: one chat request → audit row queryable via `GET /api/v1/audit`; prompt body absent from `docker logs` and Loki; erasure of a seeded test user leaves zero residue (spot-check MinIO console, Qdrant collections, Redis keys, Postgres)
 - [ ] 9.5 Update `openspec/changes/add-audit-and-gdpr-compliance/tasks.md` checkboxes as work proceeds

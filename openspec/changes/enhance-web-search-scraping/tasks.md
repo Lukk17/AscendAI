@@ -39,7 +39,7 @@
 - [x] 6.3 Stop skipping challenge/login detection above 50 000 bytes; move the threshold to a named setting and scan a bounded prefix instead of failing open.
 - [x] 6.4 Make `ContentValidator` fail closed when the quality assessment errors.
 - [x] 6.5 Honour `PLAYWRIGHT_HEADLESS` in the Crawlee tier (remove hardcoded headed launch).
-- [x] 6.6 Gitignore `AscendWebSearch/src/storage/`, `git rm -r --cached` it, configure Crawlee with an out-of-tree storage dir and `purge_on_start=True`.
+- [x] 6.6 Gitignore `apps/ascend-web-hunter/src/storage/`, `git rm -r --cached` it, configure Crawlee with an out-of-tree storage dir and `purge_on_start=True`.
 
 ## 7. Caching and observability
 

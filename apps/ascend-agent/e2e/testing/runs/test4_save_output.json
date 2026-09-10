@@ -1,0 +1,113 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\memory-test-save.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ai/prompt",
+          "headers": {
+            "X-User-Id": "frostySemanticMemoryTest",
+            "content-type": "multipart/form-data; boundary=--------------------------f9642cb7469a0656d0a2bb2b"
+          },
+          "data": {
+            "_overheadLength": 432,
+            "_valueLength": 74,
+            "_valuesToMeasure": [],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------f9642cb7469a0656d0a2bb2b",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Fri, 22 May 2026 18:36:15 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "content": "Hi Luke! Good to meet you. Software engineering is a great field. How can I help you today?",
+            "metadata": {
+              "id": "",
+              "model": "",
+              "rateLimit": {
+                "requestsRemaining": 0,
+                "requestsReset": "PT0S",
+                "tokensLimit": 0,
+                "tokensRemaining": 0,
+                "tokensReset": "PT0S",
+                "requestsLimit": 0
+              },
+              "usage": {
+                "promptTokens": 0,
+                "completionTokens": 0,
+                "nativeUsage": {},
+                "totalTokens": 0
+              },
+              "promptMetadata": [],
+              "empty": true,
+              "toolsUsed": []
+            }
+          },
+          "url": "http://localhost/api/v1/ai/prompt",
+          "responseTime": 1742,
+          "duration": 1742,
+          "size": 817
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 1.8146225999999999,
+        "name": "memory-test-save",
+        "path": "ascend-agent\\testing\\memory-test-save.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

@@ -1,0 +1,88 @@
+# MCP tools/list discovery: e2e test
+
+## What this verifies
+
+- `POST /mcp` with a JSON-RPC `initialize` payload returns HTTP 200 and a response carrying the `Mcp-Session-Id`
+  header (FastMCP's session handshake).
+- `POST /mcp` with `method="tools/list"` (carrying the captured `Mcp-Session-Id` header) returns HTTP 200 and a
+  JSON-RPC response body whose `result.tools` array advertises the memory tools.
+- The advertised tool names include at least one entry matching `*insert*` and one matching `*search*`
+  (case-insensitive). This proves the MCP server is up, the FastMCP `@mcp.tool()` registrations are wired, and the
+  tool discovery contract works end-to-end.
+- **No Qdrant write occurs.** `tools/list` is a pure protocol probe.
+
+## Prerequisites
+
+Check Bruno CLI is installed.
+
+```bash
+bru --version
+```
+
+Expect a version string.
+
+Check the AscendMemory server is reachable and ready.
+
+```bash
+curl -fsS http://localhost:7020/health
+```
+
+Expect HTTP 200 with `{"status":"ok"}`.
+
+## Reset state
+
+None. `tools/list` is read-only.
+
+## Run
+
+```bash
+cd docs/api/request/AscendAI
+```
+
+**Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the
+response headers.
+
+**PowerShell:**
+
+```powershell
+curl.exe -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
+```
+
+**Unix:**
+
+```bash
+curl -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
+```
+
+Look for `Mcp-Session-Id: <session id>` in the response. The value is a 32 character hexadecimal session id without hyphens,
+as FastMCP emits it. Use that session id as the value of the `mcp_session_id` env-var in
+the next step.
+
+**Step 2.** Send the `tools/list` call with the captured session ID injected.
+
+```bash
+bru run "memory/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
+```
+
+## Post-run cleanup
+
+None. `tools/list` is a pure protocol probe; no `user_id` is ever touched and there is nothing to remove.
+
+## Expected
+
+The `initialize` call returns HTTP 200 with an `Mcp-Session-Id` response header whose value is a
+32 character hexadecimal session id without hyphens, as FastMCP emits it.
+
+The `mcp-list-tools.yml` call returns HTTP 200. The JSON-RPC `result` object matches:
+
+- `result.tools` is a non-empty array.
+- At least one entry's `name` contains the substring `"insert"` (case-insensitive).
+- At least one entry's `name` contains the substring `"search"` (case-insensitive).
+- Each entry has an `inputSchema` object with a non-empty `properties` object. `memory_insert`, `memory_search`, and
+  `memory_wipe` each advertise a `user_id` field (those three are user-scoped). `memory_delete` advertises a
+  `memory_id` field instead, and no `user_id` field, because it addresses a single memory by its own ID rather than
+  by user partition.
+
+## Fixtures
+
+None.

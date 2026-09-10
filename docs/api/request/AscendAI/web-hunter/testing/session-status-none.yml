@@ -1,0 +1,41 @@
+info:
+  name: session-status-none
+  type: http
+  seq: 16
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/status"
+  body:
+    type: json
+    # example.com never accumulates a session through the normal tiers (tier 1
+    # curl_cffi serves it directly, so the cookie-save path never fires for it),
+    # so this documents the "no session at all" branch.
+    data: |-
+      {
+        "url": "https://www.example.com/",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("no session ever stored: status=none, zero TTL, no last_validated", function () {
+            const b = res.getBody();
+            expect(b.url).to.equal("https://www.example.com/");
+            expect(b.status).to.equal("none");
+            expect(b.auth_ttl_remaining_seconds).to.equal(0);
+            expect(b.last_validated).to.be.null;
+            expect(b.profile).to.equal("default");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

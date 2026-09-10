@@ -1,7 +1,7 @@
 info:
   name: invalid-crlf-city
   type: http
-  seq: 9
+  seq: 10
 
 http:
   method: POST

@@ -1,0 +1,235 @@
+name: ascend-scrapper
+
+# Bounded container logs. Docker's json-file driver rotates at max-size and
+# deletes the oldest file past max-file, so each service is capped at 30 MB
+# regardless of uptime. Without this the log grows until the disk is full.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # ─── Search infrastructure ───
+
+  searxng:
+    image: searxng/searxng:2026.8.14-094c33d40@sha256:892cf809341915a4b7710d3c9045005b4c377d51335a089b6d4da0b28750788d
+    container_name: searxng
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      # Bound to loopback: only this host reaches it. ascend-web-hunter talks to
+      # it over the compose network by alias, so nothing outside needs the port.
+      # It stays published because config.py defaults to http://localhost:9020
+      # when the service runs natively instead of in a container.
+      - "127.0.0.1:9020:8080"
+    environment:
+      - "SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set in .env (at least 32 characters, unique to this deployment)}"
+    volumes:
+      # use_default_settings: true overlay so engine-suspension windows are
+      # seconds-to-minutes (not days) and JSON format is exposed for /ready.
+      # NOT mounted :ro because SearXNG's container init chowns the file at
+      # boot; a read-only mount makes the container restart-loop.
+      - ./infra/searxng/settings.yml:/etc/searxng/settings.yml
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    networks:
+      default:
+        aliases:
+          - searxng
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0@sha256:139dfee1c6f89249c8d665d1333a42e8ec74ec0a86bc6bb1c8461e10d3a66a47
+    container_name: flaresolverr
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      # Loopback only. FlareSolverr fetches any URL handed to it, so an
+      # all-interfaces binding is a request-forwarding primitive for anything
+      # else on the network. Published for the same native-run reason as above.
+      - "127.0.0.1:8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=UTC
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8191/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    networks:
+      default:
+        aliases:
+          - flaresolverr
+
+  # ─── Optional bundled Redis (profile: redis) ───
+
+  # Off by default: this machine already runs its own Redis as an external
+  # prerequisite (docs/architecture/memory-budget.md), reachable via
+  # host.docker.internal, which is what ascend-web-hunter's REDIS_URL
+  # default below still points at. This service exists so the standalone
+  # deploy-standalone bundle can ship the same definition and be
+  # self-contained on a host with no Redis of its own. Activate here only to
+  # test that bundle locally: `docker compose --profile redis up`, and set
+  # REDIS_URL=redis://redis:6379/0 to actually use it once it's running.
+  #
+  # container_name is NOT "redis" here, unlike every other service in this
+  # file: this host already runs a container by that exact name (the
+  # external prerequisite above), and Docker container names must be unique
+  # host-wide. The Compose service name and network alias stay "redis" so
+  # the internal DNS name in REDIS_URL still resolves.
+  #
+  # No depends_on from ascend-web-hunter onto this service: Compose refuses
+  # to resolve a depends_on that crosses a profile boundary (a service with
+  # no profile depending on one gated by a profile) unless the profile is
+  # active, which would break every default, profile-less run. Verified
+  # with `docker compose config` before writing this. ascend-web-hunter's
+  # own Redis client already tolerates Redis being absent or unreachable
+  # (src/reader/cloudflare/cookie_manager.py falls back to an in-memory
+  # cache, and GET /ready reports "degraded" rather than failing), so no
+  # explicit wait is needed either way.
+  redis:
+    image: redis:8.10.1-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+    container_name: ascend-scrapper-redis
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    deploy:
+      resources:
+        # This host's own external-prerequisite Redis peaks at 46 MiB
+        # (docs/architecture/memory-budget.md, memory.peak, 2026-09-06). 256M
+        # leaves headroom for session growth without touching the host's
+        # wider memory budget.
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    networks:
+      default:
+        aliases:
+          - redis
+
+  # ─── Web search service ───
+
+  ngrok-ascend-web-hunter:
+    image: ngrok/ngrok:3@sha256:07bd8fa758e73489d3ba5a2fc95d912e0b8359ebfca4a55886e2059c10020da4
+    container_name: ngrok-ascend-web-hunter
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: "http ascend-web-hunter:7900"
+    depends_on:
+      - ascend-web-hunter
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    networks:
+      default:
+        aliases:
+          - ngrok-ascend-web-hunter
+
+  ascend-web-hunter:
+    build:
+      context: ./apps/ascend-web-hunter
+      dockerfile: Dockerfile
+    image: ascend-ai-ascend-web-hunter:latest
+    container_name: ascend-web-hunter
+    hostname: ascend-web-hunter
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "7021:7021"
+    extra_hosts:
+      # Docker Desktop injects this name; Docker Engine on Linux does not.
+      # REDIS_URL below depends on it resolving to the container host.
+      - "host.docker.internal:host-gateway"
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080
+      - API_PORT=7021
+      - API_HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+      - SEARXNG_USER_AGENT=apps/ascend-web-hunter/1.0
+      - SEARXNG_X_REAL_IP=0.0.0.0
+      - SEARXNG_X_FORWARDED_FOR=0.0.0.0
+      - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
+      - VALIDATION_MIN_WORDS=10
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      - PUBLIC_VNC_URL=http://ngrok-ascend-web-hunter:4040/api/tunnels
+      # Defaults to this machine's own external-prerequisite Redis. Override
+      # to redis://redis:6379/0 to point at the optional bundled instance
+      # above once it's running (`docker compose --profile redis up`).
+      - REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
+      - NOVNC_TIMEOUT_SECONDS=600
+      # Optional here: unset means the NoVNC desktop accepts any client and the
+      # container logs a warning at boot. Port 7900 is not published locally,
+      # so only the ngrok tunnel can reach it. The homelab bundle requires it.
+      - VNC_PASSWORD=${VNC_PASSWORD:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=ascend-web-hunter
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.3
+    cap_add:
+      - SYS_ADMIN
+    shm_size: "2gb"
+    depends_on:
+      searxng:
+        condition: service_healthy
+      flaresolverr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7021/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        # /dev/shm is charged to this container's memory cgroup, so shm_size
+        # above consumes part of this ceiling. 4G leaves ~2G of working set
+        # for Chromium, Xvfb and the Python process once shm is full.
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    networks:
+      default:
+        aliases:
+          - ascend-web-hunter

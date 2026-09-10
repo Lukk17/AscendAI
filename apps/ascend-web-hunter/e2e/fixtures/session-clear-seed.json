@@ -1,0 +1,1 @@
+{"auth":{"storage_state":{"cookies":[{"name":"e2e-probe","value":"1","domain":".example.net","path":"/","expires":-1,"httpOnly":false,"secure":true,"sameSite":"Lax"}],"origins":[]},"user_agent":"e2e-session-clear-test/1.0","saved_at":1735689600}}

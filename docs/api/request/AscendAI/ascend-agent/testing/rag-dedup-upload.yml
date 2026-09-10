@@ -15,11 +15,11 @@ http:
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\dedup-pierogi-helena.md
+          - "{{ascendAgentFixtures}}/dedup-pierogi-helena.md"
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\dedup-pierogi-grandma.md
+          - "{{ascendAgentFixtures}}/dedup-pierogi-grandma.md"
 
 runtime:
   scripts:

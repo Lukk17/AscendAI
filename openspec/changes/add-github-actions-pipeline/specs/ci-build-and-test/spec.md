@@ -22,7 +22,7 @@
 
 ### Requirement: Path-filtered matrix per service
 
-`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-agent` → `AscendAgent/**`, `weather-mcp` → `WeatherMCP/**`, `audio-scribe` → `AudioScribe/**`, `ascend-web-search` → `AscendWebSearch/**`, `ascend-memory` → `AscendMemory/**`, `ascend-paddle-ocr` → `PaddleOCR/**`.
+`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when the workflow file itself has changed. Path filtering SHALL use `dorny/paths-filter@v3` with one filter per service: `ascend-ai-agent` → `apps/ascend-agent/**`, `ascend-weather-mcp` → `apps/ascend-weather-mcp/**`, `ascend-audio-scribe` → `apps/ascend-audio-scribe/**`, `ascend-web-hunter` → `apps/ascend-web-hunter/**`, `ascend-memory` → `apps/ascend-memory/**`, `ascend-ocr` → `apps/ascend-ocr/**`.
 
 #### Scenario: Docs-only PR runs zero matrix entries
 
@@ -33,10 +33,10 @@
 
 #### Scenario: Single-service PR runs only that service
 
-- **WHEN** a pull request changes a file under `AscendAgent/src/main/java/...`
-- **THEN** the `changes` job emits `ascend-agent: true` and all other services as `false`
-- **AND** only the `ascend-agent` matrix entry executes
-- **AND** the entry runs `./gradlew --no-daemon build test` from `AscendAgent/`
+- **WHEN** a pull request changes a file under `apps/ascend-agent/src/main/java/...`
+- **THEN** the `changes` job emits `ascend-ai-agent: true` and all other services as `false`
+- **AND** only the `ascend-ai-agent` matrix entry executes
+- **AND** the entry runs `./gradlew --no-daemon build test` from `apps/ascend-agent/`
 
 #### Scenario: Workflow-file change forces full matrix
 
@@ -48,34 +48,34 @@
 
 For each Java service in the matrix, the workflow SHALL set up Eclipse Temurin JDK 21 via `actions/setup-java@v4`, configure Gradle caching via `gradle/actions/setup-gradle@v3`, and run `./gradlew --no-daemon build test` from the service's subdirectory. The build SHALL fail if any unit test fails or if the Gradle build exits non-zero.
 
-#### Scenario: AscendAgent build runs with cached Gradle dependencies
+#### Scenario: ascend-ai-agent build runs with cached Gradle dependencies
 
-- **WHEN** the `ascend-agent` matrix entry executes on a push following a prior successful run on the same branch
+- **WHEN** the `ascend-ai-agent` matrix entry executes on a push following a prior successful run on the same branch
 - **THEN** `gradle/actions/setup-gradle@v3` restores the dependency cache from the prior run
-- **AND** `./gradlew --no-daemon build test` runs from `AscendAgent/`
+- **AND** `./gradlew --no-daemon build test` runs from `apps/ascend-agent/`
 - **AND** the build succeeds with the cache hit visible in the Gradle build scan output
 
 #### Scenario: Failing unit test fails the workflow
 
-- **WHEN** an `AscendAgent` unit test asserts incorrectly and `./gradlew test` exits non-zero
-- **THEN** the `ascend-agent` matrix entry fails
-- **AND** the test reports are uploaded as artifact `test-results-ascend-agent` via `actions/upload-artifact@v4` even though the entry failed
+- **WHEN** an `ascend-ai-agent` unit test asserts incorrectly and `./gradlew test` exits non-zero
+- **THEN** the `ascend-ai-agent` matrix entry fails
+- **AND** the test reports are uploaded as artifact `test-results-ascend-ai-agent` via `actions/upload-artifact@v4` even though the entry failed
 - **AND** because `strategy.fail-fast: false` is set, the other service matrix entries still run
 
 ### Requirement: Python services install editable with dev extras and run pytest
 
-For each Python service in the matrix, the workflow SHALL set up the per-service Python interpreter via `actions/setup-python@v5` with `cache: pip`, install the service in editable mode with dev extras (`pip install -e .[dev]`), and run `pytest` from the service's subdirectory. The build SHALL fail if any test fails or if pytest exits non-zero. Per-service Python versions: `AudioScribe`, `AscendMemory`, `PaddleOCR` use `3.11`; `AscendWebSearch` uses `3.12`.
+For each Python service in the matrix, the workflow SHALL set up the per-service Python interpreter via `actions/setup-python@v5` with `cache: pip`, install the service in editable mode with dev extras (`pip install -e .[dev]`), and run `pytest` from the service's subdirectory. The build SHALL fail if any test fails or if pytest exits non-zero. Per-service Python versions: `ascend-audio-scribe`, `AscendMemory`, `ascend-ocr` use `3.11`; `ascend-web-hunter` uses `3.12`.
 
-#### Scenario: AudioScribe matrix entry installs and tests
+#### Scenario: ascend-audio-scribe matrix entry installs and tests
 
-- **WHEN** the `audio-scribe` matrix entry executes
-- **THEN** `actions/setup-python@v5` installs Python 3.11 with pip caching keyed on `AudioScribe/pyproject.toml`
-- **AND** `pip install -e .[dev]` succeeds from `AudioScribe/`
-- **AND** `pytest` runs from `AudioScribe/` and exits zero
+- **WHEN** the `ascend-audio-scribe` matrix entry executes
+- **THEN** `actions/setup-python@v5` installs Python 3.11 with pip caching keyed on `apps/ascend-audio-scribe/pyproject.toml`
+- **AND** `pip install -e .[dev]` succeeds from `apps/ascend-audio-scribe/`
+- **AND** `pytest` runs from `apps/ascend-audio-scribe/` and exits zero
 
-#### Scenario: AscendWebSearch uses Python 3.12
+#### Scenario: ascend-web-hunter uses Python 3.12
 
-- **WHEN** the `ascend-web-search` matrix entry executes
+- **WHEN** the `ascend-web-hunter` matrix entry executes
 - **THEN** the setup-python step is configured with `python-version: '3.12'`
 - **AND** the resulting interpreter reports `Python 3.12.x` in the build log
 

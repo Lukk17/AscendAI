@@ -1,7 +1,9 @@
 # ingestion-correctness Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+Ingestion has to produce the right index, not merely a safe one. Re-uploading a document replaces the chunks already stored for that source instead of appending a second copy that inflates every later RAG context, an image-bearing prompt is refused with HTTP 400 when the selected provider and model cannot see images, and the Unstructured base URL resolves correctly whether the agent runs on the host or in a container, with the resolved value logged at boot.
+
 ## Requirements
 ### Requirement: HTTP-upload ingestion is idempotent
 
@@ -40,11 +42,11 @@ The default `app.unstructured.base-url` and the docker-profile override SHALL ea
 
 #### Scenario: Host-mode boot
 
-- **WHEN** AscendAgent runs as `./gradlew bootRun` against docker-compose services
+- **WHEN** ascend-ai-agent runs as `./gradlew bootRun` against docker-compose services
 - **THEN** the resolved Unstructured URL is `http://localhost:9080` and ingestion works for a DOCX upload
 
 #### Scenario: Container-mode boot
 
-- **WHEN** AscendAgent runs inside docker-compose with profile `docker`
+- **WHEN** ascend-ai-agent runs inside docker-compose with profile `docker`
 - **THEN** the resolved URL uses the docker-network service name and ingestion works
 

@@ -1,7 +1,7 @@
 ## Context
 
-AscendAgent's `application.yaml` currently configures three MCP servers (`audioscribe`, `weather`,
-`ascend-web-search`) under `spring.ai.mcp.client.streamable-http.connections`. Spring AI's
+ascend-ai-agent's `application.yaml` currently configures three MCP servers (`ascend-audio-scribe`, `weather`,
+`ascend-web-hunter`) under `spring.ai.mcp.client.streamable-http.connections`. Spring AI's
 `McpClientAutoConfiguration` reads this map and produces a `List<McpSyncClient>` bean. As part of that factory
 method, it iterates the list and calls `.initialize()` on each client, which performs the MCP `initialize` JSON-RPC
 handshake. The handshake is implemented as a reactive WebClient call with a `request-timeout` of 300s (current
@@ -152,7 +152,7 @@ timeouts continue to live where they already do. Operators don't have to re-lear
 
 1. Land the new code + config change on the existing branch
    `feat/agent-deploy-chat-history-caching-rag-attachments`. No DB migration, no data model change.
-2. Build + start AscendAgent locally with one MCP server intentionally shut down. Confirm: context refreshes,
+2. Build + start ascend-ai-agent locally with one MCP server intentionally shut down. Confirm: context refreshes,
    readiness banner shows the missing server with `[FAILED]`, prompt endpoint responds, the LLM can call tools
    from the surviving MCPs.
 3. Restart with all MCP servers up. Confirm: banner shows all `[Connected]`, full tool set advertised, behaviour

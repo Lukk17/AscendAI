@@ -6,3 +6,9 @@ variables:
     value: http
   - name: mcp_session_id
     value: ""
+  - name: ocrFixtures
+    value: ../../../../apps/ascend-ocr/e2e/fixtures
+  - name: ascendAgentFixtures
+    value: ../../../../apps/ascend-agent/e2e/fixtures
+  - name: audioScribeFixtures
+    value: ../../../../apps/ascend-audio-scribe/e2e/fixtures

@@ -2,7 +2,7 @@
 
 ## Why
 
-AscendAI's chat surface today is a single blocking call and a single eternal thread per user. `POST /api/v1/ai/prompt` (`AscendAgent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java`) holds the HTTP connection until the full LLM answer is assembled — 10-60 s on long RAG turns — and chat memory is keyed by `conversationId == userId` (`memory/PersistentChatMemory.java`, Redis key `chat:<userId>`, Postgres `chat_history.user_id`), so every user has exactly one conversation, forever, with no way to list it, name it, start a fresh one, or delete it.
+AscendAI's chat surface today is a single blocking call and a single eternal thread per user. `POST /api/v1/ai/prompt` (`apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java`) holds the HTTP connection until the full LLM answer is assembled — 10-60 s on long RAG turns — and chat memory is keyed by `conversationId == userId` (`memory/PersistentChatMemory.java`, Redis key `chat:<userId>`, Postgres `chat_history.user_id`), so every user has exactly one conversation, forever, with no way to list it, name it, start a fresh one, or delete it.
 
 The upcoming Flutter client (mobile + web — a separate future change; no UI is specced here) needs the two API primitives every modern chat product has:
 
@@ -38,11 +38,11 @@ Doing conversations now also unblocks the parallel changes: `add-tenant-isolatio
 
 ## Impact
 
-- **New code (AscendAgent)**: streaming controller method + SSE event DTOs (`controller/`, `dto/`), `ConversationController` + request/response DTOs, `Conversation` entity + `ConversationRepository` (`model/`, `repository/`), `ConversationService` (resolution, auto-title, delete cascade) in `service/`, streaming execution path beside `ChatExecutor` in `service/chat/`.
-- **Changed code (AscendAgent)**: `PromptController` (new `conversationId` field), `AscendChatService` / `ChatHistoryService` / `PersistentChatMemory` (conversation-id keying), `CustomMetadata` (additive `conversationId`), `ChatHistoryRepository` (conversation-keyed queries), `ChatHistoryCompactionService` (unchanged trigger logic, conversation-scoped ids flow through).
-- **Database**: new Liquibase changelog `02-conversations.xml` under `AscendAgent/src/main/resources/db/changelog/` — `conversations` table, `chat_history.conversation_id` column + backfill + FK + index.
+- **New code (ascend-ai-agent)**: streaming controller method + SSE event DTOs (`controller/`, `dto/`), `ConversationController` + request/response DTOs, `Conversation` entity + `ConversationRepository` (`model/`, `repository/`), `ConversationService` (resolution, auto-title, delete cascade) in `service/`, streaming execution path beside `ChatExecutor` in `service/chat/`.
+- **Changed code (ascend-ai-agent)**: `PromptController` (new `conversationId` field), `AscendChatService` / `ChatHistoryService` / `PersistentChatMemory` (conversation-id keying), `CustomMetadata` (additive `conversationId`), `ChatHistoryRepository` (conversation-keyed queries), `ChatHistoryCompactionService` (unchanged trigger logic, conversation-scoped ids flow through).
+- **Database**: new Liquibase changelog `02-conversations.xml` under `apps/ascend-agent/src/main/resources/db/changelog/` — `conversations` table, `chat_history.conversation_id` column + backfill + FK + index.
 - **Dependencies**: none new — Spring MVC supports `Flux<ServerSentEvent>` return types with Reactor already on the classpath via Spring AI.
-- **Docs / API collection**: `AscendAgent/AGENTS.md` API description, Bruno requests under `docs/api/request/AscendAI/ascend-agent/` for the stream endpoint and conversation CRUD.
+- **Docs / API collection**: `apps/ascend-agent/AGENTS.md` API description, Bruno requests under `docs/api/request/AscendAI/ascend-agent/` for the stream endpoint and conversation CRUD.
 - **Sibling changes**: identity stays `X-User-Id` until `add-auth-and-identity` lands (JWT-supplied userId slots into the same parameter); `tenant_id` column ships nullable and unused until `add-tenant-isolation`.
 - **Depends on `add-document-management-api`** (build-order): the `sources` event carries the registry `documentId` and the `/api/v1/documents/{id}/content` path from the presign-resolution amendment, so the document registry and the content endpoint from that change must be in place before this change's `sources` event is implemented. The `delta`/`done`/`error` events and the conversation model have no such dependency.
 - **Tests**: SSE integration test (delta + done event assertions), conversation CRUD + ownership tests, Liquibase migration test over pre-existing `chat_history` rows, regression test that the synchronous endpoint response is byte-compatible.

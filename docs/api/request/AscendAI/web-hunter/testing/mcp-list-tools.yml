@@ -1,0 +1,65 @@
+info:
+  name: mcp-list-tools
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {}
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("tools/list returns a non-empty tools array", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope.result.tools).to.be.an("array").that.is.not.empty;
+        });
+        test("web_search advertises query (required) and limit", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "web_search"; });
+            expect(tool, "web_search tool").to.be.an("object");
+            expect(tool.inputSchema.properties).to.have.property("query");
+            expect(tool.inputSchema.required).to.be.an("array").that.includes("query");
+            expect(tool.inputSchema.properties).to.have.property("limit");
+        });
+        test("web_read advertises url (required) and at least one optional extraction flag", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "web_read"; });
+            expect(tool, "web_read tool").to.be.an("object");
+            expect(tool.inputSchema.properties).to.have.property("url");
+            expect(tool.inputSchema.required).to.be.an("array").that.includes("url");
+            expect(Object.keys(tool.inputSchema.properties)).to.include.oneOf(["include_links", "link_filter", "heavy_mode"]);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

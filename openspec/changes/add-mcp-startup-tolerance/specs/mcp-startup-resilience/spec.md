@@ -2,7 +2,7 @@
 
 ### Requirement: Context refresh survives unreachable MCP servers
 
-The AscendAgent application context SHALL complete `refresh()` and serve traffic on
+The ascend-ai-agent application context SHALL complete `refresh()` and serve traffic on
 `POST /api/v1/ai/prompt` regardless of how many of the configured
 `spring.ai.mcp.client.streamable-http.connections` are unreachable at startup. A connection refused, a stalled
 handshake, or any other initialisation failure on one or more MCP clients MUST NOT propagate as a
@@ -10,21 +10,21 @@ handshake, or any other initialisation failure on one or more MCP clients MUST N
 
 #### Scenario: All configured MCP servers are reachable
 
-- **WHEN** AscendAgent starts with every configured `streamable-http` connection backed by a running MCP server
+- **WHEN** ascend-ai-agent starts with every configured `streamable-http` connection backed by a running MCP server
 - **THEN** the Spring context refreshes successfully
 - **AND** `POST /api/v1/ai/prompt` returns HTTP 200
 - **AND** the readiness banner reports every MCP server with `[Connected]`
 
 #### Scenario: One configured MCP server is unreachable
 
-- **WHEN** AscendAgent starts with one of the configured MCP servers down (TCP connection refused)
+- **WHEN** ascend-ai-agent starts with one of the configured MCP servers down (TCP connection refused)
 - **THEN** the Spring context refreshes successfully
 - **AND** `POST /api/v1/ai/prompt` returns HTTP 200
 - **AND** the readiness banner reports the down server with `[FAILED]` and the others with `[Connected]`
 
 #### Scenario: All configured MCP servers are unreachable
 
-- **WHEN** AscendAgent starts with every configured MCP server down
+- **WHEN** ascend-ai-agent starts with every configured MCP server down
 - **THEN** the Spring context refreshes successfully
 - **AND** `POST /api/v1/ai/prompt` returns HTTP 200
 - **AND** the readiness banner reports every MCP server with `[FAILED]`
@@ -81,7 +81,7 @@ The readiness-log banner emitted by `StartupLogConfig` on
 `AvailabilityChangeEvent<ReadinessState.ACCEPTING_TRAFFIC>` SHALL contain an `MCP servers:` section with one line
 per configured `streamable-http` connection. Each line MUST follow the format
 `<connection-name>: <url> [Connected | FAILED]` with the 4-space / 6-space indentation defined in
-[coding-standards](../../../.agents/skills/coding-standards/SKILL.md). The exception detail of failed clients
+[coding-standards](../../../../../.agents/skills/coding-standards/SKILL.md). The exception detail of failed clients
 MUST NOT appear in the banner.
 
 #### Scenario: Banner with mixed states
@@ -102,14 +102,14 @@ MUST NOT appear in the banner.
 ### Requirement: Configuration uses Spring AI's built-in deferral flag
 
 The application SHALL set `spring.ai.mcp.client.initialized=false` in
-[application.yaml](../../../AscendAgent/src/main/resources/application.yaml). The project MUST NOT replace,
+[application.yaml](../../../../../apps/ascend-agent/src/main/resources/application.yaml). The project MUST NOT replace,
 override, or fork Spring AI's `McpClientAutoConfiguration` or `SyncMcpToolCallbackProvider` beans.
 
 #### Scenario: Spring AI version upgrade within the 1.1.x line
 
 - **GIVEN** the project upgrades from Spring AI 1.1.5 to a later 1.1.x patch
 - **WHEN** the new patch ships
-- **THEN** the change requires no code edits to AscendAgent's MCP integration
+- **THEN** the change requires no code edits to ascend-ai-agent's MCP integration
 - **AND** the `initialized=false` flag continues to defer auto-config-driven init
 
 #### Scenario: Auto-built MCP clients still construct normally

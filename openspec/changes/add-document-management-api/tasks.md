@@ -1,6 +1,6 @@
 ## 1. Database schema and entities
 
-- [ ] 1.1 Create `AscendAgent/src/main/resources/db/changelog/02-document-management.xml` with tables `documents` (UUID pk, unique `object_key`, `display_name`, `size_bytes`, `mime_type`, `source_type`, `origin_uri` nullable, `status`, `failure_reason` nullable, `created_at`, `updated_at`), `document_index_state` (fk to documents, `collection_name`, `chunk_count`, `etag`, `last_indexed_at`, unique `(document_id, collection_name)`), and `ingestion_runs` (UUID pk, `state`, `scope_prefix` nullable, `document_id` nullable, `embedding_provider`, `indexed_count`, `skipped_count`, `failed_count`, `failures` JSONB, `requested_at`, `started_at` nullable, `finished_at` nullable); include indexes on `documents.status` and `ingestion_runs.requested_at`
+- [ ] 1.1 Create `apps/ascend-agent/src/main/resources/db/changelog/02-document-management.xml` with tables `documents` (UUID pk, unique `object_key`, `display_name`, `size_bytes`, `mime_type`, `source_type`, `origin_uri` nullable, `status`, `failure_reason` nullable, `created_at`, `updated_at`), `document_index_state` (fk to documents, `collection_name`, `chunk_count`, `etag`, `last_indexed_at`, unique `(document_id, collection_name)`), and `ingestion_runs` (UUID pk, `state`, `scope_prefix` nullable, `document_id` nullable, `embedding_provider`, `indexed_count`, `skipped_count`, `failed_count`, `failures` JSONB, `requested_at`, `started_at` nullable, `finished_at` nullable); include indexes on `documents.status` and `ingestion_runs.requested_at`
 - [ ] 1.2 Include the new changelog from `db.changelog-master.yaml`
 - [ ] 1.3 Add JPA entities `Document`, `DocumentIndexState`, `IngestionRun` under `model/` with status/state enums, and repositories `DocumentRepository`, `DocumentIndexStateRepository`, `IngestionRunRepository` under `repository/`
 - [ ] 1.4 Integration test (Testcontainers Postgres): Liquibase migration applies cleanly on an empty database and entities round-trip through the repositories
@@ -16,7 +16,7 @@
 - [ ] 3.1 Create `service/ingestion/IngestionRunService.java`: persist a `QUEUED` run, execute on a dedicated single-threaded executor, transition `QUEUED` → `RUNNING` → `COMPLETED`/`FAILED`, record counts and capped `{objectKey, reason}` failure entries, and expose run lookup + newest-first history with `limit` (default 20, max 100)
 - [ ] 3.2 Refactor `ManualIngestionService`: report per-object outcomes (indexed chunk count, skipped, failed with reason) to the run record and to `DocumentRegistryService`; replace the `metadataStore.putIfAbsent` dedupe and stale-marker cleanup in `processObject` with `document_index_state` ETag comparison per target collection (drop the `ConcurrentMetadataStore` dependency from this class; `IngestionPipelineConfig` untouched)
 - [ ] 3.2a Route every scanned object through `DocumentRouter.routeAndProcess` in `processObject` (close the bypass gap): remove any default/plain-parser fallback so scanned PDFs, Office files, images, and e-mail land on the same routed parse path as uploads and reindex
-- [ ] 3.2b Test: a `.docx` and a scanned PDF dropped into the bucket are ingested via `DocumentRouter` (Docling / PaddleOCR), not a raw/plain parser
+- [ ] 3.2b Test: a `.docx` and a scanned PDF dropped into the bucket are ingested via `DocumentRouter` (Docling / ascend-ocr), not a raw/plain parser
 - [ ] 3.3 Change `POST /api/v1/ingestion/run` in `IngestionController` to create a run and return 202 with `{runId}` and a `Location: /api/v1/ingestion/runs/{id}` header; remove the synchronous `ManualIngestionResult` response
 - [ ] 3.4 Add `GET /api/v1/ingestion/runs/{id}` (404 for unknown id) and `GET /api/v1/ingestion/runs` with run DTOs under `dto/`
 - [ ] 3.5 Add a startup sweep (`ApplicationReadyEvent`) marking leftover `QUEUED`/`RUNNING` runs as `FAILED` with an interrupted-by-restart reason
@@ -59,7 +59,7 @@
 
 ## 7. Documentation and API collection
 
-- [ ] 7.1 Update `AscendAgent/AGENTS.md`: document the new `/api/v1/documents` endpoints, the async `/api/v1/ingestion/run` contract, and the registry tables
+- [ ] 7.1 Update `apps/ascend-agent/AGENTS.md`: document the new `/api/v1/documents` endpoints, the async `/api/v1/ingestion/run` contract, and the registry tables
 - [ ] 7.2 Add Bruno requests under `docs/api/request/AscendAI/ascend-agent/`: list documents, document detail, delete document, reindex document, run ingestion (async), get run status, list runs; update the existing run-ingestion request for the 202 contract
-- [ ] 7.3 Update `AscendAgent/e2e/` specs that assert on the synchronous `/run` response (poll `GET /api/v1/ingestion/runs/{id}` instead) and note the change in `e2e/README.md` if the capability matrix mentions run semantics
+- [ ] 7.3 Update `apps/ascend-agent/e2e/` specs that assert on the synchronous `/run` response (poll `GET /api/v1/ingestion/runs/{id}` instead) and note the change in `e2e/README.md` if the capability matrix mentions run semantics
 - [ ] 7.4 Release note in the proposal-linked docs: first run after deploy backfills the registry and re-indexes existing objects once (one-time embedding cost); `POST /api/v1/ingestion/run` response contract is breaking

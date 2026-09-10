@@ -3,9 +3,9 @@
 # Claude Code reads this file and pulls in all AGENTS.md content via @ imports below.
 
 @../AGENTS.md
-@../AscendAgent/AGENTS.md
-@../AudioScribe/AGENTS.md
-@../AscendWebSearch/AGENTS.md
-@../AscendMemory/AGENTS.md
-@../WeatherMCP/AGENTS.md
-@../PaddleOCR/AGENTS.md
+@../apps/ascend-agent/AGENTS.md
+@../apps/ascend-audio-scribe/AGENTS.md
+@../apps/ascend-web-hunter/AGENTS.md
+@../apps/ascend-memory/AGENTS.md
+@../apps/ascend-weather-mcp/AGENTS.md
+@../apps/ascend-ocr/AGENTS.md

@@ -1,0 +1,61 @@
+info:
+  name: read-with-links
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: MCP-Session-Id
+      value: "{{mcp_session_id}}"
+    - name: MCP-Protocol-Version
+      value: "{{mcp_protocol_version}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": {
+          "name": "web_read",
+          "arguments": {
+            "url": "https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes",
+            "include_links": true,
+            "link_filter": "/job-offer/"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("web_read with include_links returns content with links map", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload).to.be.an("object");
+            expect(payload).to.have.property("status");
+            expect(payload.status).to.not.equal("error");
+            if (payload.status === "success") {
+                expect(payload).to.have.property("links_map");
+                expect(payload.links_map).to.be.an("object");
+            }
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

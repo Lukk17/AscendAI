@@ -33,6 +33,14 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("MCP tools/list returns success envelope with tools array", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope).to.have.property("result");
+            expect(envelope.result).to.have.property("tools");
+            expect(envelope.result.tools).to.be.an("array");
+        });
 
 settings:
   encodeUrl: true

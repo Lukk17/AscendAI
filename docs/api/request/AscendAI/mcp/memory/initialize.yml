@@ -29,18 +29,12 @@ http:
 runtime:
   scripts:
     - type: tests
-      code: "// Automatically extract header and save to collection variable\r
-
-        // pm.collectionVariables.set(\"mcp_session_id\", res.getHeader(\"MCP-Session-Id\"));\r
-
-        \r
-
+      code: "test(\"Status code is 200\", function () {\r
+        \    expect(res.getStatus()).to.equal(200);\r
+        });\r
         test(\"Session ID is set\", function () {\r
-
         \    expect(bru.getCollectionVar(\"mcp_session_id\")).to.not.be.undefined;\r
-
         \    expect(bru.getCollectionVar(\"mcp_session_id\")).to.not.be.empty;\r
-
         });"
 
 settings:

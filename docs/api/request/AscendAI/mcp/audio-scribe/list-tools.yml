@@ -33,6 +33,17 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("Audio scribe advertises expected transcription tools", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const toolNames = envelope.result.tools.map(function (t) { return t.name; });
+            expect(toolNames).to.include("transcribe_local");
+            expect(toolNames).to.include("transcribe_openai");
+            expect(toolNames).to.include("transcribe_hf");
+            expect(toolNames).to.include("transcribe_audacity");
+            expect(toolNames).to.include("health");
+        });
 
 settings:
   encodeUrl: true

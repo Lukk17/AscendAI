@@ -2,7 +2,7 @@
 
 ### Requirement: Append-only audit_log table records security-relevant events
 
-AscendAgent SHALL persist audit events to a Postgres table `audit_log` created via a Liquibase changelog, with columns for `occurred_at` (TIMESTAMPTZ), `actor`, `tenant` (nullable), `action`, `resource_type` (nullable), `resource_id` (nullable), `outcome`, `source_ip` (nullable), and a JSONB `details` payload. The table SHALL be append-only: a database-level trigger SHALL reject `UPDATE` and `DELETE` statements, except deletes issued through the retention job's sanctioned path and the pseudonymization rewrite performed by an erasure job.
+ascend-ai-agent SHALL persist audit events to a Postgres table `audit_log` created via a Liquibase changelog, with columns for `occurred_at` (TIMESTAMPTZ), `actor`, `tenant` (nullable), `action`, `resource_type` (nullable), `resource_id` (nullable), `outcome`, `source_ip` (nullable), and a JSONB `details` payload. The table SHALL be append-only: a database-level trigger SHALL reject `UPDATE` and `DELETE` statements, except deletes issued through the retention job's sanctioned path and the pseudonymization rewrite performed by an erasure job.
 
 #### Scenario: Ad-hoc mutation rejected by the database
 
@@ -61,7 +61,7 @@ Audit events SHALL be written through an `AuditRecorder` service (Spring applica
 
 ### Requirement: ADMIN-only audit query API with filters and pagination
 
-AscendAgent SHALL expose `GET /api/v1/audit` returning audit rows ordered by `occurred_at` descending, filterable by `actor`, `action`, `outcome`, and a `from`/`to` time window, paginated via `page` and `size` (size capped at 200). The endpoint SHALL require the ADMIN role (from `add-auth-and-identity`); non-admin callers receive HTTP 403.
+ascend-ai-agent SHALL expose `GET /api/v1/audit` returning audit rows ordered by `occurred_at` descending, filterable by `actor`, `action`, `outcome`, and a `from`/`to` time window, paginated via `page` and `size` (size capped at 200). The endpoint SHALL require the ADMIN role (from `add-auth-and-identity`); non-admin callers receive HTTP 403.
 
 #### Scenario: Admin filters by action and time window
 

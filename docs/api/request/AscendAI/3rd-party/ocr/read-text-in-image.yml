@@ -1,0 +1,46 @@
+info:
+  name: read-text-in-image
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:7022/v1/ocr
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: files
+        type: file
+        value:
+          - /C:/Users/Lukk/Desktop/test-image.pdf
+      - name: lang
+        type: text
+        value: pl
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("OCR endpoint returns extracted text from image", function () {
+            const body = res.getBody();
+            expect(body).to.be.a("string");
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("pages");
+            expect(data.pages).to.be.an("array");
+            if (data.pages.length > 0) {
+                expect(data.pages[0]).to.have.property("lines");
+                expect(data.pages[0].lines).to.be.an("array");
+            }
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

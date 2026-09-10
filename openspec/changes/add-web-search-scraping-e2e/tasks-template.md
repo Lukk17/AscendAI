@@ -1,6 +1,6 @@
 # Tiered web scraping: run tasks template
 
-Spec: [../6-tiered-scraping-test.md](../6-tiered-scraping-test.md)
+Spec: [test-spec.md](test-spec.md)
 
 Copy this file to `../runs/<UTC-timestamp>_6-tiered-scraping-tasks.md` before starting a run. Tick boxes as you go.
 Add anything you did beyond the spec under **Additional tasks I did**.
@@ -25,9 +25,9 @@ Add anything you did beyond the spec under **Additional tasks I did**.
 ### Run
 
 - [ ] `cd docs/api/request/AscendAI`.
-- [ ] Step 1 — `bru run "web-search/testing/extract-tier-static-wikipedia.yml" --env ascend-local` returned HTTP 200.
-- [ ] Step 2 — `bru run "web-search/testing/extract-tier-cloudflare.yml" --env ascend-local` returned HTTP 200.
-- [ ] Step 3 — `bru run "web-search/testing/extract-tier-js-quotes.yml" --env ascend-local` returned HTTP 200.
+- [ ] Step 1 — `bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local` returned HTTP 200.
+- [ ] Step 2 — `bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local` returned HTTP 200.
+- [ ] Step 3 — `bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local` returned HTTP 200.
 
 ### Expected
 

@@ -1,7 +1,7 @@
 info:
   name: forecast-warsaw-3d
   type: http
-  seq: 4
+  seq: 5
 
 http:
   method: POST
@@ -63,6 +63,9 @@ runtime:
             for (let i = 1; i < dates.length; i++) {
                 expect(dates[i] > dates[i - 1]).to.be.true;
             }
+            const todayUtc = new Date().toISOString().slice(0, 10);
+            const tomorrowUtc = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+            expect([todayUtc, tomorrowUtc]).to.include(dates[0]);
             expect(payload.temperatureUnit).to.equal("celsius");
             expect(payload.source).to.equal("open-meteo");
             expect(isNaN(Date.parse(payload.fetchedAt))).to.be.false;

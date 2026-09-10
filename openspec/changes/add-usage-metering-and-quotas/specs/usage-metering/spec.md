@@ -4,7 +4,7 @@
 
 ### Requirement: Every LLM-touching request persists a usage ledger row
 
-AscendAgent SHALL persist one usage ledger row in PostgreSQL for every completed LLM-touching request, recorded from the token-usage interception point (`PromptCacheStrategy.recordOutcome` for chat and memory-extraction, plus explicit recorder calls on the compaction and embedding paths). Each row SHALL contain: tenant id, user id, conversation id (nullable for non-chat request types), provider name, model name, prompt-token count, completion-token count, cached-token count, request type (one of `chat`, `compaction`, `memory-extraction`, `embedding`), and an occurred-at timestamp in UTC. The table SHALL be created by a Liquibase changelog referenced from `db.changelog-master.yaml`.
+ascend-ai-agent SHALL persist one usage ledger row in PostgreSQL for every completed LLM-touching request, recorded from the token-usage interception point (`PromptCacheStrategy.recordOutcome` for chat and memory-extraction, plus explicit recorder calls on the compaction and embedding paths). Each row SHALL contain: tenant id, user id, conversation id (nullable for non-chat request types), provider name, model name, prompt-token count, completion-token count, cached-token count, request type (one of `chat`, `compaction`, `memory-extraction`, `embedding`), and an occurred-at timestamp in UTC. The table SHALL be created by a Liquibase changelog referenced from `db.changelog-master.yaml`.
 
 #### Scenario: Chat turn writes a ledger row
 
@@ -29,7 +29,7 @@ AscendAgent SHALL persist one usage ledger row in PostgreSQL for every completed
 
 ### Requirement: Streamed responses record usage at stream completion
 
-When chat responses are streamed (per the `add-chat-streaming-and-conversations` change), AscendAgent SHALL record the usage ledger row in the stream-completion callback using the usage metadata available at stream end, carrying the usage context captured at request start.
+When chat responses are streamed (per the `add-chat-streaming-and-conversations` change), ascend-ai-agent SHALL record the usage ledger row in the stream-completion callback using the usage metadata available at stream end, carrying the usage context captured at request start.
 
 #### Scenario: Streamed chat turn still produces a ledger row
 
@@ -38,7 +38,7 @@ When chat responses are streamed (per the `add-chat-streaming-and-conversations`
 
 ### Requirement: Usage summaries are queryable via the usage API
 
-AscendAgent SHALL expose `GET /api/v1/usage` accepting `from`, `to`, `groupBy` (`day` or `month`), and `format` (`json` or `csv`). Results SHALL aggregate ledger rows into rows of: period, provider, model, request type, prompt tokens, completion tokens, cached tokens, and request count. A caller with role `USER` SHALL receive only their own usage; a caller with role `ADMIN` SHALL receive tenant-wide usage and MAY filter by `userId`.
+ascend-ai-agent SHALL expose `GET /api/v1/usage` accepting `from`, `to`, `groupBy` (`day` or `month`), and `format` (`json` or `csv`). Results SHALL aggregate ledger rows into rows of: period, provider, model, request type, prompt tokens, completion tokens, cached tokens, and request count. A caller with role `USER` SHALL receive only their own usage; a caller with role `ADMIN` SHALL receive tenant-wide usage and MAY filter by `userId`.
 
 #### Scenario: User queries own monthly usage
 

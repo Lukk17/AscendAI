@@ -1,0 +1,32 @@
+info:
+  name: health
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/health"
+  headers:
+    - name: accept
+      value: application/json
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: status is one of the documented enum values", function () {
+            const b = res.getBody();
+            expect(["ok", "warming-up"]).to.include(b.status);
+        });
+        test("response contract: version present", function () {
+            expect(res.getBody().version).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,127 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\prompt-cache-openai.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ai/prompt",
+          "headers": {
+            "X-User-Id": "frostyPromptCacheOpenaiTest",
+            "content-type": "multipart/form-data; boundary=--------------------------fd50618d4f5db1448e633c6d"
+          },
+          "data": {
+            "_overheadLength": 432,
+            "_valueLength": 475,
+            "_valuesToMeasure": [],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------fd50618d4f5db1448e633c6d",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Mon, 01 Jun 2026 18:39:19 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "content": "In a typical Spring Boot microservice architecture leveraging PostgreSQL for persistence, Redis for caching, and Kafka for asynchronous messaging, the system is organized into distinct layers. The Controller layer serves as the entry point for incoming HTTP requests, routing them to the appropriate endpoints. It delegates these requests to the Service layer, which encapsulates the business logic required to process the requests. The Service layer interacts with the Repository layer, which is responsible for data access and manipulation using PostgreSQL via Spring Data JPA, ensuring robust and efficient data persistence.\n\nDuring the request lifecycle, a request is first received by the Controller, which then calls the Service layer to process the business logic. The Service may interact with the Repository to fetch or save data in PostgreSQL. If applicable, it checks or updates the Redis cache to enhance performance by reducing database load. For asynchronous communication, the Service can publish messages to or consume messages from Kafka, facilitating real-time data processing and system decoupling.\n\nCross-cutting concerns such as logging, metrics, and tracing are seamlessly integrated into this architecture. Logging is handled using frameworks like SLF4J to provide detailed insights into system operations. Metrics collection is achieved using Micrometer, allowing integration with monitoring solutions like Prometheus. Tracing is implemented using Spring Cloud Sleuth, which enables tracking of requests across distributed systems for better observability and troubleshooting.",
+            "metadata": {
+              "id": "chatcmpl-Dm1pbXvP5QS2JlmA9Lo1ObXeirgv3",
+              "model": "gpt-4o-2024-08-06",
+              "rateLimit": {
+                "requestsLimit": 500,
+                "requestsRemaining": 499,
+                "requestsReset": "PT0.12S",
+                "tokensLimit": 30000,
+                "tokensRemaining": 28737,
+                "tokensReset": "PT8M46S"
+              },
+              "usage": {
+                "promptTokens": 2597,
+                "completionTokens": 273,
+                "totalTokens": 2870,
+                "nativeUsage": {
+                  "completion_tokens": 273,
+                  "prompt_tokens": 2597,
+                  "total_tokens": 2870,
+                  "prompt_tokens_details": {
+                    "audio_tokens": 0,
+                    "cached_tokens": 2432
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 0,
+                    "accepted_prediction_tokens": 0,
+                    "audio_tokens": 0,
+                    "rejected_prediction_tokens": 0
+                  }
+                }
+              },
+              "promptMetadata": [],
+              "empty": false,
+              "toolsUsed": []
+            }
+          },
+          "url": "http://localhost/api/v1/ai/prompt",
+          "responseTime": 4810,
+          "duration": 4810,
+          "size": 2253
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 4.9119150000000005,
+        "name": "prompt-cache-openai",
+        "path": "ascend-agent\\testing\\prompt-cache-openai.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

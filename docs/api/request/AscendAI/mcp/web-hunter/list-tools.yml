@@ -1,0 +1,52 @@
+info:
+  name: list-tools
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: MCP-Session-Id
+      value: "{{mcp_session_id}}"
+    - name: MCP-Protocol-Version
+      value: "{{mcp_protocol_version}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Web hunter advertises expected search and content reading tools", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const toolNames = envelope.result.tools.map(function (t) { return t.name; });
+            expect(toolNames).to.include("web_search");
+            expect(toolNames).to.include("web_read");
+            expect(toolNames).to.include("session_establish");
+            expect(toolNames).to.include("session_status");
+            expect(toolNames).to.include("session_clear");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,42 @@
+info:
+  name: session-establish
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/establish"
+  body:
+    type: json
+    # example.net is IANA-reserved for documentation/testing. Test 8 is the only
+    # other spec that touches this domain, and only its default-profile key, and
+    # only transiently. SessionManager.establish forwards the "e2e-establish"
+    # profile all the way to the capture path, so the record this call produces
+    # lands under session:example.net:e2e-establish, the key spec 10's reset and
+    # cleanup commands target.
+    data: |-
+      {
+        "url": "https://example.net",
+        "profile": "e2e-establish"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: login_required, echoed target, non-empty vnc_url", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("login_required");
+            expect(b.target).to.equal("https://example.net/");
+            expect(b.vnc_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

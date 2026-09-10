@@ -1,7 +1,9 @@
 # chat-history-persistence-toggle Specification
 
 ## Purpose
-TBD - created by archiving change add-chat-history-toggle. Update Purpose after archive.
+
+Each chat-history backend can be switched off on its own. The Redis cache and the Postgres archive have independent flags, both defaulting to on so an upgrade changes nothing, honoured on the read path and the write path alike and reported in the startup banner so an operator can confirm the mode without reading debug logs. This is what lets a privacy-sensitive deployment retain no transcript at all, or an ephemeral dev run skip the archive, while the semantic memory pipeline keeps working untouched.
+
 ## Requirements
 ### Requirement: Independent chat-history backend toggles
 

@@ -38,16 +38,29 @@ On every pull request, every push to `master`, and every manual dispatch, CI det
 
 When `.github/workflows/**` itself changes, every service runs regardless of whether its own directory changed. This ensures a workflow edit is always tested against the full matrix before merge.
 
+### Changelog version bump gate
+
+A new `verify-changelog` job runs on every `pull_request` and manual `workflow_dispatch` (never on `push: master`, since there is no meaningful base ref to diff against after the merge already happened). For each app whose directory changed in the diff, it compares the topmost `## [x.y.z]` entry in that app's `apps/<app>/CHANGELOG.md` at HEAD against the same file at the PR's base ref (or `master` for a manual dispatch with no PR). The check fails the job if:
+
+- the app's changelog does not exist, or has no `## [x.y.z]` entry, at HEAD or at the base ref
+- the HEAD version equals the base version (not bumped)
+- the HEAD version is not strictly greater than the base version by semver ordering (`sort -V`)
+- the top entry has no content beneath it (an empty bump)
+
+`build` and `integration-test` both declare `needs: [changes, verify-changelog]` with `!cancelled() && needs.verify-changelog.result != 'failure'` in their `if:`, so a changelog failure blocks the build/test jobs for the affected apps, and a *skipped* `verify-changelog` (for example on `push: master`, or when no app directory changed) does not block them.
+
+**Cost.** The gate fires on every change under `apps/<app>/**` for that app, including a documentation-only edit to that app's own `README.md` or a comment-only refactor, not only user-facing or deployable changes. A multi-app PR needs a changelog bump in every touched app. There is no check on changelog *quality* beyond "non-blank content beneath the entry" — a one-word bump satisfies it. This mirrors the tradeoff the Pharmacy monorepo's own `verify-version-bump` job accepts for the same reason: catching an unbumped release is worth the friction of an occasional forced bump on a trivial change.
+
 ### Per-service toolchain
 
 | Service | Language | Python version | Test command |
 |---|---|---|---|
-| `ascend-agent` | Java | — | `./gradlew --no-daemon build test` |
-| `weather-mcp` | Java | — | `./gradlew --no-daemon build test` |
-| `audio-scribe` | Python | 3.11 | `pytest` |
-| `ascend-web-search` | Python | 3.12 | `pytest` |
+| `ascend-ai-agent` | Java | — | `./gradlew --no-daemon build test` |
+| `ascend-weather-mcp` | Java | — | `./gradlew --no-daemon build test` |
+| `ascend-audio-scribe` | Python | 3.11 | `pytest` |
+| `ascend-web-hunter` | Python | 3.12 | `pytest` |
 | `ascend-memory` | Python | 3.11 | `pytest` |
-| `ascend-paddle-ocr` | Python | 3.11 | `pytest` |
+| `ascend-ocr` | Python | 3.11 | `pytest` |
 
 Java services use Eclipse Temurin 21 via `actions/setup-java@v4` and Gradle dependency caching via `gradle/actions/setup-gradle@v3`. Python services use `actions/setup-python@v5` with `cache: pip` and install with `pip install -e .[dev]`.
 
@@ -65,7 +78,8 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 
 ### Model summary
 
-- Per-app versions are the **source of truth** and live in each service's manifest. Developers bump them in PRs; the release workflow reads them and never writes them.
+- Each app's `CHANGELOG.md` is the **source of truth** for its release version: the release workflow reads the topmost `## [x.y.z]` entry and never writes to any file. The `version` line in `build.gradle.kts` / `pyproject.toml` is a cosmetic per-module label the release workflow does not read; if it disagrees with the changelog, the changelog wins for release purposes and nothing fails because of the mismatch.
+- Developers bump the changelog in PRs (enforced by `ci.yaml`'s `verify-changelog` job, see below); the release workflow only reads the result.
 - A release is initiated from **Actions → Release → Run workflow** in the GitHub UI.
 - Releasing is **selective**: you choose a `stack_version` and tick exactly the apps you want to ship. Unticked apps are not built and their images are untouched.
 - The workflow produces **zero commits**. The only refs created are the Git tag and the GitHub Release.
@@ -76,16 +90,16 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 |---|---|---|---|
 | `create_github_release` | boolean | yes | Default `true`. Untick to publish images only: no Git tag, no GitHub Release, no stack version consumed. |
 | `stack_version` | string | no | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. Required when `create_github_release` is ticked, ignored otherwise. |
-| `release_ascend_agent` | boolean | yes | Ship `ascend-agent`. Default `false`. |
-| `release_weather_mcp` | boolean | yes | Ship `weather-mcp`. Default `false`. |
-| `release_audio_scribe` | boolean | yes | Ship `audio-scribe`. Default `false`. |
-| `release_ascend_web_search` | boolean | yes | Ship `ascend-web-search`. Default `false`. |
+| `release_ascend_ai_agent` | boolean | yes | Ship `ascend-ai-agent`. Default `false`. |
+| `release_ascend_weather_mcp` | boolean | yes | Ship `ascend-weather-mcp`. Default `false`. |
+| `release_ascend_audio_scribe` | boolean | yes | Ship `ascend-audio-scribe`. Default `false`. |
+| `release_ascend_web_hunter` | boolean | yes | Ship `ascend-web-hunter`. Default `false`. |
 | `release_ascend_memory` | boolean | yes | Ship `ascend-memory`. Default `false`. |
-| `release_paddle_ocr` | boolean | yes | Ship `ascend-paddle-ocr`. Default `false`. |
+| `release_ascend_ocr` | boolean | yes | Ship `ascend-ocr`. Default `false`. |
 
 ### How to cut a release
 
-1. Open a PR for each app you intend to ship, bump its manifest `version` (see "Developer convention" below), and merge.
+1. Open a PR for each app you intend to ship, add a new top `## [x.y.z]` entry to its `CHANGELOG.md` (see "Developer convention" below), and merge.
 2. Go to **Actions → Release → Run workflow**.
 3. Enter the `stack_version` (e.g. `1.2.0`).
 4. Tick the checkboxes for each app you want to ship.
@@ -97,63 +111,55 @@ Untick `create_github_release` and leave `stack_version` blank. The `prepare` an
 
 Use this to ship an image without spending a stack version, for example when only one service has changed and the platform is not at a release point.
 
-One consequence to be aware of. The bump guard compares each selected service against its version at the most recent `ascend-ai_*` tag. An image-only run cuts no tag, so it does not move that baseline. Two image-only runs at the same manifest version will therefore both pass the guard and the second one overwrites the first one's image. Bump the manifest between image-only runs if you care about the tag being immutable.
+One consequence to be aware of. The per-registry guard (see "The bump guard" below) checks the exact `v<version>` tag on both registries, not any git tag. An image-only run publishes that version to both registries; a *second* image-only run at the same unchanged changelog version is now blocked outright, because the guard finds the tag on both registries and fails closed rather than overwriting. Bump the changelog before the next image-only run at the same app.
 
 ### The three jobs
 
-- **`prepare`**: validates inputs, checks the tag does not already exist when one is being cut, reads manifest versions, runs the bump guard. If anything fails, no login or push occurs.
-- **`build-and-push`**: for each selected app, logs in to Docker Hub and to GitHub Container Registry, builds a multi-arch image (`linux/amd64,linux/arm64`) once, and pushes it to four tags: `v<version>` and `latest` on each registry. Jobs are `fail-fast: false` so a single app failure does not abort the others.
-- **`release`**: skipped entirely when `create_github_release` is unticked. Otherwise, after all pushes succeed, it reads the current version of all six apps, composes a release body listing every app and marking which were shipped, and creates the Git tag `ascend-ai_<stack_version>` plus a GitHub Release via `softprops/action-gh-release@v2`. `generate_release_notes: true` appends the PR-title changelog since the previous tag automatically.
+- **`prepare`**: validates inputs, checks the stack tag does not already exist when one is being cut, and reads each selected app's current version from its `CHANGELOG.md`. If anything fails, no login or push occurs.
+- **`build-and-push`**: for each selected app, logs in to Docker Hub and to GitHub Container Registry, runs the per-registry bump guard (see below), builds a multi-arch image (`linux/amd64,linux/arm64`) once, and pushes it to four tags: `v<version>` and `latest` on each registry. Jobs are `fail-fast: false` so a single app failure does not abort the others.
+- **`release`**: skipped entirely when `create_github_release` is unticked. Otherwise, after all pushes succeed, it reads the current version of all six apps from their changelogs, composes a release body listing every app and marking which were shipped, and creates the Git tag `ascend-ai_<stack_version>` plus a GitHub Release via `softprops/action-gh-release@v2`. `generate_release_notes: true` appends the PR-title changelog since the previous tag automatically.
 
 ### Developer convention
 
-Bumping an app's `version` in its manifest within a PR is what makes that app eligible for the next release.
+Adding a new top `## [x.y.z]` entry to an app's `CHANGELOG.md` within a PR is what makes that app eligible for the next release. `ci.yaml`'s `verify-changelog` job enforces this on every PR that touches the app's directory (see the CI section above).
 
-- **Java services** (`AscendAgent`, `WeatherMCP`): edit the `version = "<x.y.z>"` line in `build.gradle.kts`.
-- **Python services** (`AudioScribe`, `AscendWebSearch`, `AscendMemory`, `PaddleOCR`): edit the `version = "<x.y.z>"` line in `[project]` section of `pyproject.toml`.
+The `version = "<x.y.z>"` line in `build.gradle.kts` / `pyproject.toml` is a separate, cosmetic label. Nothing enforces that it matches the changelog; keep it in step by convention if you want `./gradlew build` output or `pip show` to read sensibly, but the release workflow never reads it and a mismatch has no pipeline consequence.
 
-### Manifest version extractors
+### Changelog version extractor
 
-The `prepare` job reads versions with pinned extractors matched to the actual line shape in each file.
-
-Java (`build.gradle.kts`) — actual line shape: `version = "0.0.1"`
+Both `prepare` and `release` read versions with the same extractor, applied uniformly to all six apps regardless of language, matched to the actual line shape in every `CHANGELOG.md`: `## [0.0.1]`, optionally followed by ` - <date>`.
 
 ```
-grep -oP '(?<=^version = ")[^"]+' <path>/build.gradle.kts | head -1
+grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' <path>/CHANGELOG.md
 ```
-
-Python (`pyproject.toml`) — actual line shape under `[project]`: `version = "0.9.0"`
-
-```
-python3 -c "import tomllib; print(tomllib.load(open('<path>/pyproject.toml','rb'))['project']['version'])"
-```
-
-`tomllib` is part of the Python 3.11 standard library. The GitHub-hosted `ubuntu-latest` runner ships Python 3.12+, so no extra install is needed.
 
 ### The bump guard
 
-Before any login or push, the `prepare` job compares each selected app's current manifest version against its version at the most recent `ascend-ai_*` tag.
+The guard no longer looks at git history at all, which is what makes it immune to a module's path moving between releases (the previous git-tag-based guard was retired for exactly this reason — see the defect register). Instead, inside `build-and-push`, after logging in to both registries, each matrix leg checks whether `<image>:v<version>` already exists:
 
-If the versions match — the app was not bumped since the last stack release — the entire run fails immediately with a message naming the offending app. No image is pushed for any app, even those that were bumped.
+- **Found on both registries** — this exact version was already fully published. The job fails with a message to add a new `CHANGELOG.md` entry before releasing.
+- **Found on neither** — the normal case. The job proceeds to build and push.
+- **Found on exactly one** — treated as an incomplete previous publish (for example Docker Hub succeeded and GHCR failed on a transient auth or network error), not a failure. The job logs a warning and proceeds, completing the missing registry. This does not open a loophole for re-shipping changed code under an old version number, because `ci.yaml`'s `verify-changelog` job already refused to merge any module change without a version bump — a same-version re-run only ever rebuilds the same merged commit.
+- **Ambiguous** (the registry lookup itself failed, for example an auth or network error rather than a clean "not found") — the job fails closed rather than guessing.
 
 To fix a bump-guard failure:
 
 1. Open a PR for the failing app.
-2. Increment its `version` in the manifest.
+2. Add a new top `## [x.y.z]` entry to its `CHANGELOG.md`.
 3. Merge the PR.
 4. Re-dispatch the Release workflow with the same (or a new) `stack_version`.
 
-When no `ascend-ai_*` tag exists yet (first ever release), the guard is skipped entirely. All selected apps ship at their current manifest versions.
+There is no "first ever release, guard skipped" case anymore: a brand-new image name that has never been published passes on its own (found on neither registry), so the guard behaves identically on the very first release and on every one after it.
 
 ### Stack version uniqueness
 
 Each `stack_version` is cut once. If the tag `ascend-ai_<stack_version>` already exists, the workflow fails in `prepare` before any push. Choose a different `stack_version`.
 
-### The GitHub Release is the changelog
+### Where the changelog lives
 
-The GitHub Release body lists the current version of all six apps, marking which were released in that run. GitHub's auto-generated PR notes (`generate_release_notes: true`) add a summary of every merged PR since the previous `ascend-ai_*` tag.
+Each app carries its own committed `apps/<app>/CHANGELOG.md`, written by developers in the PR that ships the change, not by the release workflow — the workflow only ever reads these files and never edits them or creates commits. The per-app detail (what changed, in prose) lives there.
 
-No committed `CHANGELOG.md` is produced. The release workflow never edits files or creates commits.
+The GitHub Release body is a second, coarser record: it lists the current version of all six apps, marking which were shipped in that run. GitHub's auto-generated PR notes (`generate_release_notes: true`) add a summary of every merged PR since the previous `ascend-ai_*` tag on top of that.
 
 ### Image naming
 
@@ -161,16 +167,16 @@ Each build is pushed to both registries under the same name, tagged `v<version>`
 
 | Service key | Docker Hub image | GHCR image |
 |---|---|---|
-| `ascend-agent` | `lukk17/ascend-agent` | `ghcr.io/lukk17/ascend-agent` |
-| `weather-mcp` | `lukk17/weather-mcp` | `ghcr.io/lukk17/weather-mcp` |
-| `audio-scribe` | `lukk17/audio-scribe` | `ghcr.io/lukk17/audio-scribe` |
-| `ascend-web-search` | `lukk17/ascend-web-search` | `ghcr.io/lukk17/ascend-web-search` |
-| `ascend-memory` | `lukk17/ascend-memory` | `ghcr.io/lukk17/ascend-memory` |
-| `ascend-paddle-ocr` | `lukk17/ascend-paddle-ocr` | `ghcr.io/lukk17/ascend-paddle-ocr` |
+| `ascend-ai-agent` | `lukk17/ascend-ai-ascend-agent` | `ghcr.io/lukk17/ascend-ai-ascend-agent` |
+| `ascend-weather-mcp` | `lukk17/ascend-ai-ascend-weather-mcp` | `ghcr.io/lukk17/ascend-ai-ascend-weather-mcp` |
+| `ascend-audio-scribe` | `lukk17/ascend-ai-ascend-audio-scribe` | `ghcr.io/lukk17/ascend-ai-ascend-audio-scribe` |
+| `ascend-web-hunter` | `lukk17/ascend-ai-ascend-web-hunter` | `ghcr.io/lukk17/ascend-ai-ascend-web-hunter` |
+| `ascend-memory` | `lukk17/ascend-ai-ascend-memory` | `ghcr.io/lukk17/ascend-ai-ascend-memory` |
+| `ascend-ocr` | `lukk17/ascend-ai-ascend-ocr` | `ghcr.io/lukk17/ascend-ai-ascend-ocr` |
 
 The GHCR owner segment is hardcoded lowercase. `${{ github.repository_owner }}` would resolve to `Lukk17`, and GHCR rejects uppercase in image names.
 
-Note: the compose file refers to the PaddleOCR service as `ascend-paddle-ocr` (local build name), but its published image is `lukk17/ascend-paddle-ocr` — consistent with the service filter key and the spec.
+The workflow derives each published image name as `ascend-ai-${service}`, where `${service}` is the service filter key. The local build name (used in compose) omits the `lukk17/` registry prefix but includes the full image name, for example `ascend-ai-ascend-ocr:latest`.
 
 ### GHCR package visibility
 

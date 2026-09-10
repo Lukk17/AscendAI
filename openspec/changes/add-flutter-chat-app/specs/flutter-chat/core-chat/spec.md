@@ -1,6 +1,6 @@
 ## Purpose
 
-Provides the primary chat interface where users send prompts and receive streaming AI responses within a conversation, backed by the AscendAgent REST and server-sent events API.
+Provides the primary chat interface where users send prompts and receive streaming AI responses within a conversation, backed by the ascend-ai-agent REST and server-sent events API.
 
 ## ADDED Requirements
 
@@ -20,7 +20,7 @@ The app SHALL display messages in a scrollable, animated list using the `flutter
 - **THEN** the app SHALL fetch the next page of older messages from the conversation history endpoint and prepend them to the list without scroll position jump
 
 ### Requirement: User can send a text prompt
-The app SHALL allow the user to type a message in the composer and send it to the AscendAgent prompt endpoint.
+The app SHALL allow the user to type a message in the composer and send it to the ascend-ai-agent prompt endpoint.
 
 #### Scenario: Sending a text-only prompt
 - **WHEN** the user types a message and presses send
@@ -57,7 +57,7 @@ The app SHALL handle HTTP 4xx responses returned before any server-sent events b
 - **THEN** the app SHALL navigate back to the conversation list and display an error notification
 
 ### Requirement: Custom ChatController bridges the conversation API
-The app SHALL implement a custom `ChatController` (extending the `flutter_chat_core` `ChatController` interface) that persists messages through the AscendAgent conversation endpoints rather than in-memory only.
+The app SHALL implement a custom `ChatController` (extending the `flutter_chat_core` `ChatController` interface) that persists messages through the ascend-ai-agent conversation endpoints rather than in-memory only.
 
 #### Scenario: Controller loads initial messages
 - **WHEN** the chat screen initializes with a `conversationId`

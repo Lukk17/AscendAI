@@ -1,0 +1,42 @@
+info:
+  name: session-establish
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/establish"
+  body:
+    type: json
+    # Opens a real headful Playwright browser plus a NoVNC/ngrok tunnel for a
+    # human to complete login in, held by a background monitor for up to 10
+    # minutes. The most expensive request in this collection: do not run it
+    # casually, and never alongside another establish/clear call, since the
+    # capture always lands under the "default" profile regardless of the
+    # profile sent here.
+    data: |-
+      {
+        "url": "https://example.com",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: login_required, echoed target, non-empty vnc_url", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("login_required");
+            expect(b.target).to.equal("https://example.com/");
+            expect(b.vnc_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

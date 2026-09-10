@@ -2,7 +2,7 @@
 
 ### Requirement: Scheduled retention prunes Postgres chat data
 
-AscendAgent SHALL run a scheduled retention job that deletes `chat_history` and `user_instructions` rows older than a configurable window `app.retention.chat-history` (default `180d`). Deletes SHALL run in bounded batches so the job does not hold long table locks. The job SHALL log a per-run summary (rows deleted per table) and expose a Micrometer counter of deleted rows.
+ascend-ai-agent SHALL run a scheduled retention job that deletes `chat_history` and `user_instructions` rows older than a configurable window `app.retention.chat-history` (default `180d`). Deletes SHALL run in bounded batches so the job does not hold long table locks. The job SHALL log a per-run summary (rows deleted per table) and expose a Micrometer counter of deleted rows.
 
 #### Scenario: Expired chat rows removed
 

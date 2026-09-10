@@ -36,6 +36,11 @@ runtime:
             const content = res.getBody().content;
             expect(content).to.be.a("string").and.not.empty;
         });
+        test("Response references the seeded facts: Rex the beagle rescued from a Praga shelter", function () {
+            const lower = res.getBody().content.toLowerCase();
+            expect(lower).to.include("rex");
+            expect(lower).to.include("praga");
+        });
 
 settings:
   encodeUrl: true

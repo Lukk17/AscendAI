@@ -1,6 +1,6 @@
 # Observability
 
-AscendAI ships a full three-pillar observability stack (metrics, logs, traces) as always-on containers in `docker-compose.yaml`. This document explains what is collected, how to reach the dashboards, how to add your own instrumentation, and what to expect in terms of resource usage.
+AscendAI ships a full three-pillar observability stack (metrics, logs, traces) as always-on containers in `compose.yaml`. This document explains what is collected, how to reach the dashboards, how to add your own instrumentation, and what to expect in terms of resource usage.
 
 ---
 
@@ -12,13 +12,13 @@ AscendAI ships a full three-pillar observability stack (metrics, logs, traces) a
 | Logs | Vector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
 | Traces | OTel Collector + Tempo + Grafana | http://localhost:7078 → Explore → Tempo |
 
-All eight observability containers start automatically with `docker compose up`. There is no profile flag required — observability is always-on.
+All seven observability containers start automatically with `docker compose up`. There is no profile flag required — observability is always-on.
 
 ---
 
 ## How to Reach Grafana
 
-Open http://localhost:7078 in a browser. Grafana is configured with anonymous read-only Viewer access — no login required. The three datasources (Prometheus, Loki, Tempo) are provisioned at startup. The six dashboards below are loaded from `observability/grafana/dashboards/` and visible under the Dashboards menu immediately after the stack starts.
+Open http://localhost:7078 in a browser. Grafana is configured with anonymous read-only Viewer access — no login required. The three datasources (Prometheus, Loki, Tempo) are provisioned at startup. The six dashboards below are loaded from `infra/observability/grafana/dashboards/` and visible under the Dashboards menu immediately after the stack starts.
 
 ---
 
@@ -41,9 +41,9 @@ To jump directly to a dashboard: http://localhost:7078/d/<uid>
 
 ### Metrics
 
-Prometheus scrapes every 15 seconds. Scrape targets are in `observability/prometheus/prometheus.yaml`.
+Prometheus scrapes every 15 seconds. Scrape targets are in `infra/observability/prometheus/prometheus.yaml`.
 
-**Spring Boot services (AscendAgent :9917/actuator/prometheus, WeatherMCP :9998/actuator/prometheus)**
+**Spring Boot services (ascend-ai-agent :9917/actuator/prometheus, ascend-weather-mcp :9998/actuator/prometheus)**
 
 - All JVM metrics via Micrometer: `jvm_memory_used_bytes`, `jvm_gc_pause_seconds`, `jvm_threads_*`, etc.
 - HTTP request metrics: `http_server_requests_seconds_count/sum/max` with `uri`, `method`, `status` tags.
@@ -67,24 +67,24 @@ Prometheus scrapes every 15 seconds. Scrape targets are in `observability/promet
 
 Vector reads Docker container stdout/stderr via the Docker socket and ships to Loki with labels `service` (from `container_name`) and `source` (`docker`). No code changes are required in any service — they just write to stdout.
 
-To query logs in Grafana: Explore → Loki → `{service="ascend-agent"}`.
+To query logs in Grafana: Explore → Loki → `{service="ascend-ai-agent"}`.
 
-To filter by level: `{service="ascend-agent"} |= "WARN"`.
+To filter by level: `{service="ascend-ai-agent"} |= "WARN"`.
 
 ### Traces
 
 The OTel Collector receives OTLP on port 4317 (gRPC) and 4318 (HTTP) from all six application services. It batches and forwards to Tempo.
 
-- AscendAgent and WeatherMCP: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via docker-compose.yaml). No additional code is required.
+- ascend-ai-agent and ascend-weather-mcp: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via compose.yaml). No additional code is required.
 - Python services: OTel auto-instrumentation is activated when `OTEL_EXPORTER_OTLP_ENDPOINT` is set and the `opentelemetry-distro` package is installed and activated in `src/main.py`. FastAPI, httpx, and requests are auto-instrumented.
 
-To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-agent`.
+To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-ai-agent`.
 
 ---
 
 ## Metrics Inventory
 
-Every custom metric emitted by AscendAgent. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
+Every custom metric emitted by ascend-ai-agent. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
 
 | Metric (Spring notation) | Prometheus name | Type | Tags | Dashboards |
 |---|---|---|---|---|
@@ -246,10 +246,10 @@ These rules prevent Prometheus from accumulating millions of time-series (high c
 
 ## Token Cost Pricing Rates
 
-Token cost estimates in the L1 dashboard use hardcoded rates from `observability/grafana/dashboards/pricing.yaml`. When a provider changes its pricing:
+Token cost estimates in the L1 dashboard use hardcoded rates from `infra/observability/grafana/dashboards/pricing.yaml`. When a provider changes its pricing:
 
-1. Edit `observability/grafana/dashboards/pricing.yaml` with the new rates.
-2. Update the matching PromQL expressions in `observability/grafana/dashboards/token-cost.json` (the multiplier constants match the rates in `pricing.yaml`).
+1. Edit `infra/observability/grafana/dashboards/pricing.yaml` with the new rates.
+2. Update the matching PromQL expressions in `infra/observability/grafana/dashboards/token-cost.json` (the multiplier constants match the rates in `pricing.yaml`).
 3. Restart Grafana to reload the provisioned dashboard.
 
 ```bash
@@ -260,7 +260,7 @@ docker compose restart grafana
 
 ## Vector to Cloud Migration
 
-If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, edit `observability/vector/vector.toml`. The file contains commented-out sink blocks for each target. Uncomment the desired sink, set the required environment variable, and restart Vector.
+If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, edit `infra/observability/vector/vector.toml`. The file contains commented-out sink blocks for each target. Uncomment the desired sink, set the required environment variable, and restart Vector.
 
 ```bash
 docker compose restart vector
@@ -272,7 +272,7 @@ No service code changes are required. Vector handles the fan-out.
 
 ## Resource Usage
 
-At idle, the eight observability containers consume approximately:
+At idle, the seven observability containers consume approximately:
 
 | Container | RAM (idle) |
 |---|---|
@@ -282,9 +282,7 @@ At idle, the eight observability containers consume approximately:
 | vector | ~30 MB |
 | otel-collector | ~40 MB |
 | tempo | ~120 MB |
-| postgres-exporter | ~15 MB |
-| redis-exporter | ~10 MB |
-| **Total** | **~495 MB** |
+| **Total** | **~470 MB** |
 
 Disk retention is bounded:
 - Prometheus: 72 hours (`--storage.tsdb.retention.time=72h`), approximately 200 MB steady state under normal load.

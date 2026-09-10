@@ -1,0 +1,40 @@
+info:
+  name: session-clear-idempotent
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/clear"
+  body:
+    type: json
+    # example.com never accumulates a session through the normal tiers (tier 1
+    # curl_cffi serves it directly, so FlareSolverr's cookie-save path never
+    # fires for it), so this documents the deliberate no-op / idempotent path.
+    data: |-
+      {
+        "url": "https://example.com",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200 (idempotent, not an error)", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("clearing a session that never existed is a no-op, not an error", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("cleared");
+            expect(b.url).to.equal("https://example.com/");
+            expect(b.existed).to.equal(false);
+            expect(b.cleared_cache_entries).to.equal(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

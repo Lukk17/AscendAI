@@ -1,6 +1,6 @@
 ## Context
 
-AscendWebSearch runs a fixed escalation chain in `WebReader` (`src/reader/web_reader.py`): `1-beautifulsoup` and `2-trafilatura` over the shared `curl_cffi_fetcher`, then `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive`, and `6-novnc`. Session state lives in a `CookieManager` singleton keyed `session_cookies:{registrable_domain}` holding `{cookies, user_agent}` with a flat 7200s TTL, backed by Redis when `REDIS_URL` is reachable and an in-process dict otherwise. NoVNC's background monitor harvests `context.cookies()` every few seconds and saves them. Only `curl_cffi_fetcher` reads the session back; the browser tiers do not. The service is single-user and local; there is no auth layer and (per decision) none is being added.
+ascend-web-hunter runs a fixed escalation chain in `WebReader` (`src/reader/web_reader.py`): `1-beautifulsoup` and `2-trafilatura` over the shared `curl_cffi_fetcher`, then `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive`, and `6-novnc`. Session state lives in a `CookieManager` singleton keyed `session_cookies:{registrable_domain}` holding `{cookies, user_agent}` with a flat 7200s TTL, backed by Redis when `REDIS_URL` is reachable and an in-process dict otherwise. NoVNC's background monitor harvests `context.cookies()` every few seconds and saves them. Only `curl_cffi_fetcher` reads the session back; the browser tiers do not. The service is single-user and local; there is no auth layer and (per decision) none is being added.
 
 ## Goals / Non-Goals
 

@@ -35,73 +35,17 @@ http:
 runtime:
   scripts:
     - type: tests
-      code: "var rawText = JSON.stringify(res.getBody());\r
-
-        // Split by \"data: \" to handle Server-Sent Events\r
-
-        var chunks = rawText.split(\"data: \");\r
-
-        \r
-
-        var memoryId = null;\r
-
-        \r
-
-        for (var i = 0; i < chunks.length; i++) {\r
-
-        \    var chunk = chunks[i].trim();\r
-
-        \    if (chunk.length === 0) continue;\r
-
-        \    \r
-
-        \    try {\r
-
-        \        var jsonData = JSON.parse(chunk);\r
-
-        \        \r
-
-        \        if (jsonData.result && jsonData.result.structuredContent) {\r
-
-        \            // \"result\" -> \"structuredContent\" -> \"result\"\r
-
-        \            var memoryIds = jsonData.result.structuredContent.result;\r
-
-        \r
-
-        \            if (memoryIds && memoryIds.length > 0) {\r
-
-        \                memoryId = memoryIds[0].id; // Extract inner ID\r
-
-        \                \r
-
-        \                // Save to Collection Variable\r
-
-        //                 pm.collectionVariables.set(\"memoryId\", memoryId);\r
-
-        \                console.log(\"Extracted Memory ID: \" + memoryId);\r
-
-        \                break; // Found it, stop parsing\r
-
-        \            }\r
-
-        \        }\r
-
-        \    } catch (e) {\r
-
-        \        // Ignore non-JSON chunks (like \"event: message\")\r
-
-        \    }\r
-
-        }\r
-
-        \r
-
-        if (!memoryId) {\r
-
-        \    console.log(\"No memory ID found in stream response\");\r
-
-        }"
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("MCP insert-memory returns success envelope", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope).to.have.property("result");
+            expect(envelope.result).to.have.property("content");
+        });
 
 settings:
   encodeUrl: true

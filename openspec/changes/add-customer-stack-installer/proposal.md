@@ -9,14 +9,14 @@ This change turns the manual guide into a scripted, repeatable installer: infras
 - **Infrastructure as code (Terraform)**: a Terraform configuration that provisions a cloud VM, its DNS record for `ASCEND_DOMAIN`, firewall rules opening only 80/443 (the gateway's ports from `harden-cloud-deployment`), and the volumes/backups for the four data stores. Cloud-provider module boundaries kept clean so the target provider is a variable, not a rewrite.
 - **Bootstrap script**: a script (PowerShell and Bash variants) that generates strong values for every secret in `.env.example` (`harden-cloud-deployment` owns the variable list), assembles a complete `.env`, and refuses to proceed if any required secret is unset — no dev-default ever reaches production.
 - **Realm and first-tenant provisioning**: import the checked-in Keycloak realm export (`add-auth-and-identity`), then create the customer's first tenant and its initial `ADMIN` user through the tenant-administration API (`add-tenant-administration`), so a fresh stack lands with a usable admin account, not an empty Keycloak.
-- **Readiness smoke test**: a scripted check that the gateway serves TLS, AscendAgent is healthy behind it, a token can be acquired, and one authenticated request succeeds — the install fails loudly if any of these do not pass, rather than handing over a silently-broken stack.
-- **One entry point**: the installer drives the existing main `docker-compose.yaml` (no `-f` files, the hard owner constraint), so the installed stack is byte-identical to a hand-brought-up one, just automated.
+- **Readiness smoke test**: a scripted check that the gateway serves TLS, ascend-ai-agent is healthy behind it, a token can be acquired, and one authenticated request succeeds — the install fails loudly if any of these do not pass, rather than handing over a silently-broken stack.
+- **One entry point**: the installer drives the existing main `compose.yaml` (no `-f` files, the hard owner constraint), so the installed stack is byte-identical to a hand-brought-up one, just automated.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `stack-provisioning`: Terraform infrastructure (VM, DNS, gateway-only firewall, data-store volumes/backup) with a provider variable; the secret-generating bootstrap that assembles a complete production `.env` and fails on any unset required secret; realm import plus first-tenant/admin provisioning; and a readiness smoke test that fails the install on a broken stack — all driving the single main `docker-compose.yaml`.
+- `stack-provisioning`: Terraform infrastructure (VM, DNS, gateway-only firewall, data-store volumes/backup) with a provider variable; the secret-generating bootstrap that assembles a complete production `.env` and fails on any unset required secret; realm import plus first-tenant/admin provisioning; and a readiness smoke test that fails the install on a broken stack — all driving the single main `compose.yaml`.
 
 ### Modified Capabilities
 

@@ -1,0 +1,47 @@
+info:
+  name: read-v2
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # example.com is a stable, block-free canary: it clears through tier 1
+    # (curl_cffi) with no session or human intervention, so this is the one
+    # request that demonstrates the endpoint actually working. The Allegro
+    # target this used to point at returns 428 human_intervention_required
+    # without a pre-existing session, which made the canonical request for
+    # this endpoint a guaranteed failure. The Allegro case is real and worth
+    # keeping, so it lives on as testing/realworld/realworld-u-allegro-product.yml,
+    # which already asserts both the success and blocked branches.
+    data: |-
+      {
+          "url": "https://example.com/",
+          "include_links": false,
+          "heavy_mode": false
+      }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is success", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("content contains canary 'example domain'", function () {
+            const b = res.getBody();
+            const c = (b.content || b.text || b.markdown || "").toLowerCase();
+            expect(c).to.include("example domain");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

@@ -1,0 +1,42 @@
+info:
+  name: session-status-expired
+  type: http
+  seq: 17
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/status"
+  body:
+    type: json
+    # example.org is IANA-reserved for documentation/testing and touched by no
+    # other spec in this suite. The e2e reset step seeds a session record for it
+    # directly in Redis with a `saved_at` far older than SESSION_AUTH_TTL_SECONDS
+    # (14 days), so the auth TTL has already lapsed before this call runs.
+    data: |-
+      {
+        "url": "https://example.org",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("stale session: status=expired, zero TTL, no last_validated", function () {
+            const b = res.getBody();
+            expect(b.url).to.equal("https://example.org/");
+            expect(b.status).to.equal("expired");
+            expect(b.auth_ttl_remaining_seconds).to.equal(0);
+            expect(b.last_validated).to.be.null;
+            expect(b.profile).to.equal("default");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

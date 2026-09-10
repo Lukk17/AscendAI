@@ -2,7 +2,7 @@
 
 ### Requirement: Tenant-scoped user management API restricted to tenant admins
 
-AscendAgent SHALL expose `/api/v1/admin/users` supporting invite, list, role assignment/revocation, enable/disable, and remove, restricted to the tenant `ADMIN` role. The operated tenant SHALL be derived from the caller's authenticated token, never from a path or body parameter. Any attempt by a tenant admin to read or mutate a user outside their own tenant SHALL return HTTP 403, and a caller without `ADMIN` SHALL receive HTTP 403.
+ascend-ai-agent SHALL expose `/api/v1/admin/users` supporting invite, list, role assignment/revocation, enable/disable, and remove, restricted to the tenant `ADMIN` role. The operated tenant SHALL be derived from the caller's authenticated token, never from a path or body parameter. Any attempt by a tenant admin to read or mutate a user outside their own tenant SHALL return HTTP 403, and a caller without `ADMIN` SHALL receive HTTP 403.
 
 #### Scenario: Non-admin refused
 
@@ -16,7 +16,7 @@ AscendAgent SHALL expose `/api/v1/admin/users` supporting invite, list, role ass
 
 ### Requirement: Inviting a user provisions a Keycloak user and sends a set-password email
 
-An invite SHALL create a Keycloak user in the caller's tenant group with the default role `USER`, and SHALL trigger Keycloak's built-in set-password / verify-email action email so the invitee sets their own credentials. AscendAgent SHALL never receive or store the invitee's password. The invited user's token, once they log in, SHALL carry the caller's tenant as its `tenant` claim.
+An invite SHALL create a Keycloak user in the caller's tenant group with the default role `USER`, and SHALL trigger Keycloak's built-in set-password / verify-email action email so the invitee sets their own credentials. ascend-ai-agent SHALL never receive or store the invitee's password. The invited user's token, once they log in, SHALL carry the caller's tenant as its `tenant` claim.
 
 #### Scenario: Invite creates a least-privilege user and emails them
 

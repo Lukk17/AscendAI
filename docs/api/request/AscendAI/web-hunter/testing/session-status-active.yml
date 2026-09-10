@@ -1,0 +1,44 @@
+info:
+  name: session-status-active
+  type: http
+  seq: 18
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/status"
+  body:
+    type: json
+    # Same example.org key as session-status-expired.yml, re-seeded by the reset
+    # step with a fresh `saved_at` (current time) just before this call, so the
+    # auth TTL is still live.
+    data: |-
+      {
+        "url": "https://example.org",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("fresh session: status=active, TTL close to the 14-day ceiling, last_validated recent", function () {
+            const b = res.getBody();
+            expect(b.url).to.equal("https://example.org/");
+            expect(b.status).to.equal("active");
+            // SESSION_AUTH_TTL_SECONDS defaults to 1,209,600 (14 days); allow a
+            // few minutes of test-run slack below the ceiling.
+            expect(b.auth_ttl_remaining_seconds).to.be.above(1209000);
+            expect(b.last_validated).to.be.a("number");
+            expect(b.last_validated).to.be.above((Date.now() / 1000) - 300);
+            expect(b.profile).to.equal("default");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

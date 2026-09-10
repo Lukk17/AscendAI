@@ -125,7 +125,7 @@ bru --version
 
 Expect a version string.
 
-Check the AscendWebSearch server is reachable.
+Check the ascend-web-hunter server is reachable.
 
 ```powershell
 curl -fsS http://localhost:7021/health
@@ -170,7 +170,7 @@ cd docs/api/request/AscendAI
 Part 3, Call 1 — captcha blocked (main thread, first).
 
 ```powershell
-bru run "web-search/testing/captcha-clearance-blocked.yml" --env ascend-local
+bru run "web-hunter/testing/captcha-clearance-blocked.yml" --env ascend-local
 ```
 
 Part 3, Capture check — after you solve the challenge via the returned `vnc_url`.
@@ -184,29 +184,29 @@ Expect a JSON value whose `auth` entry contains a `_GRECAPTCHA` cookie.
 Part 2, Call 1 — login blocked (anonymous).
 
 ```powershell
-bru run "web-search/testing/auth-read-secure-anon.yml" --env ascend-local
+bru run "web-hunter/testing/auth-read-secure-anon.yml" --env ascend-local
 ```
 
 Part 2, Seed — scripted saucedemo login (harness not in the image; copy it in, then run).
 
 ```powershell
-docker cp AscendWebSearch/e2e/harness/seed_authenticated_session.py ascend-web-search:/tmp/seed.py
+docker cp apps/ascend-web-hunter/e2e/harness/seed_authenticated_session.py ascend-web-hunter:/tmp/seed.py
 ```
 
 ```powershell
-docker exec -e PYTHONPATH=/app -w /app ascend-web-search python /tmp/seed.py
+docker exec -e PYTHONPATH=/app -w /app ascend-web-hunter python /tmp/seed.py
 ```
 
 Part 2, Call 2 — after login.
 
 ```powershell
-bru run "web-search/testing/auth-read-secure.yml" --env ascend-local
+bru run "web-hunter/testing/auth-read-secure.yml" --env ascend-local
 ```
 
 Part 1 — the real-world matrix (parallel-safe across runners).
 
 ```powershell
-bru run "web-search/testing/realworld" --env ascend-local
+bru run "web-hunter/testing/realworld" --env ascend-local
 ```
 
 ## Expected
@@ -228,7 +228,7 @@ The login-and-seed harness is a Playwright script under `e2e/harness/`.
 
 ## Concurrency
 
-- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains, `saucedemo.com` (`e2e` profile),
+- **Mutates:** Redis — ascend-web-hunter session store, keys for the matrix domains, `saucedemo.com` (`e2e` profile),
   and `google.com` (`default` profile, the reCAPTCHA demo).
 - **Conflicts with:** test 6 and any test sharing a target domain's session key. Part 3 targets `google.com`, which no
   matrix row touches, so there is no overlap. Within this test, Part 2's sequence (anon → seed → authed) is **strictly

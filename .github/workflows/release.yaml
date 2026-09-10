@@ -14,32 +14,32 @@ on:
         default: ''
         type: string
       release_ascend_agent:
-        description: 'Release ascend-agent (AscendAgent/build.gradle.kts version)'
+        description: 'Release ascend-agent (apps/ascend-agent/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
-      release_weather_mcp:
-        description: 'Release weather-mcp (WeatherMCP/build.gradle.kts version)'
+      release_ascend_weather_mcp:
+        description: 'Release ascend-weather-mcp (apps/ascend-weather-mcp/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
-      release_audio_scribe:
-        description: 'Release audio-scribe (AudioScribe/pyproject.toml version)'
+      release_ascend_audio_scribe:
+        description: 'Release ascend-audio-scribe (apps/ascend-audio-scribe/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
-      release_ascend_web_search:
-        description: 'Release ascend-web-search (AscendWebSearch/pyproject.toml version)'
+      release_ascend_web_hunter:
+        description: 'Release ascend-web-hunter (apps/ascend-web-hunter/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
       release_ascend_memory:
-        description: 'Release ascend-memory (AscendMemory/pyproject.toml version)'
+        description: 'Release ascend-memory (apps/ascend-memory/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
-      release_paddle_ocr:
-        description: 'Release ascend-paddle-ocr (PaddleOCR/pyproject.toml version)'
+      release_ascend_ocr:
+        description: 'Release ascend-ocr (apps/ascend-ocr/CHANGELOG.md version)'
         required: true
         type: boolean
         default: false
@@ -70,18 +70,18 @@ jobs:
         env:
           STACK_VERSION: ${{ inputs.stack_version }}
           CREATE_RELEASE: ${{ inputs.create_github_release }}
-          SEL_ASCEND_AGENT:     ${{ inputs.release_ascend_agent }}
-          SEL_WEATHER_MCP:      ${{ inputs.release_weather_mcp }}
-          SEL_AUDIO_SCRIBE:     ${{ inputs.release_audio_scribe }}
-          SEL_ASCEND_WEB_SEARCH: ${{ inputs.release_ascend_web_search }}
+          SEL_ASCEND_AGENT:  ${{ inputs.release_ascend_agent }}
+          SEL_ASCEND_WEATHER_MCP:      ${{ inputs.release_ascend_weather_mcp }}
+          SEL_ASCEND_AUDIO_SCRIBE:     ${{ inputs.release_ascend_audio_scribe }}
+          SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
           SEL_ASCEND_MEMORY:    ${{ inputs.release_ascend_memory }}
-          SEL_PADDLE_OCR:       ${{ inputs.release_paddle_ocr }}
+          SEL_ASCEND_OCR:       ${{ inputs.release_ascend_ocr }}
         run: |
           set -euo pipefail
 
           # ── 1. Fail if zero apps selected ─────────────────────────────────
           SELECTED_COUNT=0
-          for VAR in "$SEL_ASCEND_AGENT" "$SEL_WEATHER_MCP" "$SEL_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_SEARCH" "$SEL_ASCEND_MEMORY" "$SEL_PADDLE_OCR"; do
+          for VAR in "$SEL_ASCEND_AGENT" "$SEL_ASCEND_WEATHER_MCP" "$SEL_ASCEND_AUDIO_SCRIBE" "$SEL_ASCEND_WEB_HUNTER" "$SEL_ASCEND_MEMORY" "$SEL_ASCEND_OCR"; do
             [ "$VAR" = "true" ] && SELECTED_COUNT=$((SELECTED_COUNT + 1))
           done
           if [ "$SELECTED_COUNT" -eq 0 ]; then
@@ -106,95 +106,54 @@ jobs:
             echo "::notice::create_github_release is unticked. Images will be published with no git tag and no GitHub Release, and no stack version is consumed."
           fi
 
-          # ── 3. Find previous stack tag ────────────────────────────────────
-          PREV_TAG=$(git tag -l 'ascend-ai_*' | sort -V | tail -n1)
-          if [ -z "$PREV_TAG" ]; then
-            echo "No previous ascend-ai_* tag found — this is the first release. Bump guard skipped."
-          else
-            echo "Previous stack tag: ${PREV_TAG}"
-          fi
-
-          # ── 4. Read current manifest versions ─────────────────────────────
+          # ── 3. Read current versions from each app's CHANGELOG.md ─────────
           #
-          # Java: version = "<x.y.z>" on a line in build.gradle.kts
-          #   Actual line shape (both services): `version = "0.0.1"`
-          #   Extractor: grep -oP '(?<=^version = ")[^"]+' on the file
-          #
-          # Python: [project].version in pyproject.toml
-          #   Actual line shape: `version = "0.9.0"`
-          #   Extractor: python3 -c "import tomllib; print(tomllib.load(open(...,'rb'))['project']['version'])"
+          # Every app's CHANGELOG.md carries its version in the topmost entry,
+          # shape: `## [0.0.1]` optionally followed by ` - <date>`. The
+          # changelog is the source of truth the release workflow reads; the
+          # `version` in build.gradle.kts / pyproject.toml is a cosmetic
+          # per-module label the release workflow never reads, and the two
+          # are allowed to disagree with no pipeline consequence. The actual
+          # "was this bumped" guard runs later, per app, against the
+          # registries themselves (see build-and-push) rather than against
+          # git history, so it cannot break when a module's path moves.
 
-          read_java_version() {
-            local manifest="$1"
-            grep -oP '(?<=^version = ")[^"]+' "$manifest" | head -1
+          read_changelog_version() {
+            local changelog="$1"
+            grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' "$changelog"
           }
 
-          read_python_version() {
-            local manifest="$1"
-            python3 -c "import tomllib; print(tomllib.load(open('${manifest}','rb'))['project']['version'])"
-          }
-
-          read_prev_java_version() {
-            local prev_tag="$1" manifest_path="$2"
-            git show "${prev_tag}:${manifest_path}" | grep -oP '(?<=^version = ")[^"]+' | head -1
-          }
-
-          read_prev_python_version() {
-            local prev_tag="$1" manifest_path="$2"
-            git show "${prev_tag}:${manifest_path}" | python3 -c "import sys,tomllib; print(tomllib.load(sys.stdin.buffer)['project']['version'])"
-          }
-
-          # ── 5. Bump guard + matrix construction ───────────────────────────
           MATRIX_INCLUDE="[]"
 
           add_to_matrix() {
-            local service="$1" path="$2" language="$3" version="$4"
-            MATRIX_INCLUDE=$(echo "$MATRIX_INCLUDE" | python3 -c "import sys,json; a=json.load(sys.stdin); a.append({'service':'${service}','path':'${path}','language':'${language}','version':'${version}'}); print(json.dumps(a))")
+            local service="$1" path="$2" version="$3" image_name="$4"
+            MATRIX_INCLUDE=$(echo "$MATRIX_INCLUDE" | python3 -c "import sys,json; a=json.load(sys.stdin); a.append({'service':'${service}','path':'${path}','version':'${version}','image_name':'${image_name}'}); print(json.dumps(a))")
           }
 
           check_and_add() {
-            local selected="$1" service="$2" path="$3" language="$4" manifest="$5"
+            local selected="$1" service="$2" path="$3" changelog="$4"
 
             if [ "$selected" != "true" ]; then
               return
             fi
 
-            if [ "$language" = "java" ]; then
-              CUR_VERSION=$(read_java_version "$manifest")
-            else
-              CUR_VERSION=$(read_python_version "$manifest")
-            fi
-
+            CUR_VERSION=$(read_changelog_version "$changelog") || true
             if [ -z "$CUR_VERSION" ]; then
-              echo "::error::Could not read version from ${manifest} for service ${service}."
+              echo "::error::Could not read a '## [x.y.z]' version entry from ${changelog} for service ${service}."
               exit 1
             fi
 
-            if [ -n "$PREV_TAG" ]; then
-              if [ "$language" = "java" ]; then
-                PREV_VERSION=$(read_prev_java_version "$PREV_TAG" "$manifest")
-              else
-                PREV_VERSION=$(read_prev_python_version "$PREV_TAG" "$manifest")
-              fi
-
-              if [ -z "$PREV_VERSION" ]; then
-                echo "::warning::Could not read ${service} version at ${PREV_TAG} — treating as unbumped would be a false negative; assuming bumped."
-              elif [ "$CUR_VERSION" = "$PREV_VERSION" ]; then
-                echo "::error::${service} version is still ${CUR_VERSION} (unchanged since ${PREV_TAG}). Bump the version in ${manifest} before releasing ${service}."
-                exit 1
-              fi
-            fi
-
+            local image_name="ascend-ai-${service}"
             echo "${service}: ${CUR_VERSION}"
-            add_to_matrix "$service" "$path" "$language" "$CUR_VERSION"
+            add_to_matrix "$service" "$path" "$CUR_VERSION" "$image_name"
           }
 
-          check_and_add "$SEL_ASCEND_AGENT"      "ascend-agent"     "AscendAgent"    "java"   "AscendAgent/build.gradle.kts"
-          check_and_add "$SEL_WEATHER_MCP"        "weather-mcp"      "WeatherMCP"     "java"   "WeatherMCP/build.gradle.kts"
-          check_and_add "$SEL_AUDIO_SCRIBE"       "audio-scribe"     "AudioScribe"    "python" "AudioScribe/pyproject.toml"
-          check_and_add "$SEL_ASCEND_WEB_SEARCH"  "ascend-web-search" "AscendWebSearch" "python" "AscendWebSearch/pyproject.toml"
-          check_and_add "$SEL_ASCEND_MEMORY"      "ascend-memory"    "AscendMemory"   "python" "AscendMemory/pyproject.toml"
-          check_and_add "$SEL_PADDLE_OCR"         "ascend-paddle-ocr"       "PaddleOCR"      "python" "PaddleOCR/pyproject.toml"
+          check_and_add "$SEL_ASCEND_AGENT"     "ascend-agent"     "apps/ascend-agent"     "apps/ascend-agent/CHANGELOG.md"
+          check_and_add "$SEL_ASCEND_WEATHER_MCP"  "ascend-weather-mcp"  "apps/ascend-weather-mcp"  "apps/ascend-weather-mcp/CHANGELOG.md"
+          check_and_add "$SEL_ASCEND_AUDIO_SCRIBE" "ascend-audio-scribe" "apps/ascend-audio-scribe" "apps/ascend-audio-scribe/CHANGELOG.md"
+          check_and_add "$SEL_ASCEND_WEB_HUNTER"   "ascend-web-hunter"   "apps/ascend-web-hunter"   "apps/ascend-web-hunter/CHANGELOG.md"
+          check_and_add "$SEL_ASCEND_MEMORY"       "ascend-memory"       "apps/ascend-memory"       "apps/ascend-memory/CHANGELOG.md"
+          check_and_add "$SEL_ASCEND_OCR"          "ascend-ocr"          "apps/ascend-ocr"          "apps/ascend-ocr/CHANGELOG.md"
 
           MATRIX="{\"include\":${MATRIX_INCLUDE}}"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -233,6 +192,61 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Guard against re-publishing an already-released version
+        run: |
+          set -euo pipefail
+
+          SERVICE="${{ matrix.service }}"
+          VERSION="${{ matrix.version }}"
+          IMAGE_NAME="${{ matrix.image_name }}"
+          DOCKERHUB_IMAGE="lukk17/${IMAGE_NAME}"
+          GHCR_IMAGE="ghcr.io/lukk17/${IMAGE_NAME}"
+
+          # Checked against both registries this stack publishes to. A tag
+          # present on both is a completed prior release of this exact
+          # version — fail and ask for a new CHANGELOG.md entry. Present on
+          # neither is the normal case — proceed. Present on exactly one is
+          # treated as an incomplete prior publish (for example Docker Hub
+          # succeeded and GHCR failed on a transient auth/network error) and
+          # is completed rather than blocked, since the code a bumped
+          # CHANGELOG.md entry would gate is unchanged either way — the
+          # pull-request changelog check already refuses to merge module
+          # changes without a version bump, so nothing here re-ships altered
+          # content under an old version number.
+          check_tag() {
+            local image="$1"
+            local output status
+            set +e
+            output=$(docker manifest inspect "${image}:v${VERSION}" 2>&1)
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              printf 'found\n'
+              return 0
+            fi
+
+            if printf '%s' "${output}" | grep -qiE 'no such manifest|manifest unknown|not found'; then
+              printf 'absent\n'
+              return 0
+            fi
+
+            printf '::error::Could not determine whether %s:v%s exists (auth/network error). Failing closed without pushing.\n%s\n' "${image}" "${VERSION}" "${output}" >&2
+            return 1
+          }
+
+          DOCKERHUB_STATE=$(check_tag "${DOCKERHUB_IMAGE}")
+          GHCR_STATE=$(check_tag "${GHCR_IMAGE}")
+
+          if [ "${DOCKERHUB_STATE}" = "found" ] && [ "${GHCR_STATE}" = "found" ]; then
+            echo "::error::${SERVICE} v${VERSION} already exists on both registries. Add a new CHANGELOG.md entry before releasing."
+            exit 1
+          fi
+
+          if [ "${DOCKERHUB_STATE}" = "found" ] || [ "${GHCR_STATE}" = "found" ]; then
+            echo "::warning::${SERVICE} v${VERSION} already exists on one registry only (dockerhub=${DOCKERHUB_STATE}, ghcr=${GHCR_STATE}). Treating this as an incomplete previous publish and completing it on both registries."
+          fi
+
       - name: Build and push ${{ matrix.service }}
         uses: docker/build-push-action@v6
         with:
@@ -240,10 +254,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            lukk17/${{ matrix.service }}:v${{ matrix.version }}
-            lukk17/${{ matrix.service }}:latest
-            ghcr.io/lukk17/${{ matrix.service }}:v${{ matrix.version }}
-            ghcr.io/lukk17/${{ matrix.service }}:latest
+            lukk17/${{ matrix.image_name }}:v${{ matrix.version }}
+            lukk17/${{ matrix.image_name }}:latest
+            ghcr.io/lukk17/${{ matrix.image_name }}:v${{ matrix.version }}
+            ghcr.io/lukk17/${{ matrix.image_name }}:latest
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
@@ -265,29 +279,25 @@ jobs:
         id: body
         env:
           STACK_VERSION: ${{ inputs.stack_version }}
-          SEL_ASCEND_AGENT:      ${{ inputs.release_ascend_agent }}
-          SEL_WEATHER_MCP:       ${{ inputs.release_weather_mcp }}
-          SEL_AUDIO_SCRIBE:      ${{ inputs.release_audio_scribe }}
-          SEL_ASCEND_WEB_SEARCH: ${{ inputs.release_ascend_web_search }}
+          SEL_ASCEND_AGENT:   ${{ inputs.release_ascend_agent }}
+          SEL_ASCEND_WEATHER_MCP:       ${{ inputs.release_ascend_weather_mcp }}
+          SEL_ASCEND_AUDIO_SCRIBE:      ${{ inputs.release_ascend_audio_scribe }}
+          SEL_ASCEND_WEB_HUNTER: ${{ inputs.release_ascend_web_hunter }}
           SEL_ASCEND_MEMORY:     ${{ inputs.release_ascend_memory }}
-          SEL_PADDLE_OCR:        ${{ inputs.release_paddle_ocr }}
+          SEL_ASCEND_OCR:        ${{ inputs.release_ascend_ocr }}
         run: |
           set -euo pipefail
 
-          read_java_version() {
-            grep -oP '(?<=^version = ")[^"]+' "$1" | head -1
+          read_changelog_version() {
+            grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' "$1"
           }
 
-          read_python_version() {
-            python3 -c "import tomllib; print(tomllib.load(open('$1','rb'))['project']['version'])"
-          }
-
-          V_ASCEND_AGENT=$(read_java_version "AscendAgent/build.gradle.kts")
-          V_WEATHER_MCP=$(read_java_version "WeatherMCP/build.gradle.kts")
-          V_AUDIO_SCRIBE=$(read_python_version "AudioScribe/pyproject.toml")
-          V_ASCEND_WEB_SEARCH=$(read_python_version "AscendWebSearch/pyproject.toml")
-          V_ASCEND_MEMORY=$(read_python_version "AscendMemory/pyproject.toml")
-          V_PADDLE_OCR=$(read_python_version "PaddleOCR/pyproject.toml")
+          V_ASCEND_AGENT=$(read_changelog_version "apps/ascend-agent/CHANGELOG.md")
+          V_ASCEND_WEATHER_MCP=$(read_changelog_version "apps/ascend-weather-mcp/CHANGELOG.md")
+          V_ASCEND_AUDIO_SCRIBE=$(read_changelog_version "apps/ascend-audio-scribe/CHANGELOG.md")
+          V_ASCEND_WEB_HUNTER=$(read_changelog_version "apps/ascend-web-hunter/CHANGELOG.md")
+          V_ASCEND_MEMORY=$(read_changelog_version "apps/ascend-memory/CHANGELOG.md")
+          V_ASCEND_OCR=$(read_changelog_version "apps/ascend-ocr/CHANGELOG.md")
 
           label() {
             local flag="$1"
@@ -301,12 +311,12 @@ jobs:
             printf "### App versions\n\n"
             printf "| Service | Version | |\n"
             printf "|---|---|---|\n"
-            printf "| ascend-agent | %s |%s |\n"       "${V_ASCEND_AGENT}"      "$(label "$SEL_ASCEND_AGENT")"
-            printf "| weather-mcp | %s |%s |\n"        "${V_WEATHER_MCP}"       "$(label "$SEL_WEATHER_MCP")"
-            printf "| audio-scribe | %s |%s |\n"       "${V_AUDIO_SCRIBE}"      "$(label "$SEL_AUDIO_SCRIBE")"
-            printf "| ascend-web-search | %s |%s |\n"  "${V_ASCEND_WEB_SEARCH}" "$(label "$SEL_ASCEND_WEB_SEARCH")"
+            printf "| ascend-agent | %s |%s |\n"    "${V_ASCEND_AGENT}"   "$(label "$SEL_ASCEND_AGENT")"
+            printf "| ascend-weather-mcp | %s |%s |\n"        "${V_ASCEND_WEATHER_MCP}"       "$(label "$SEL_ASCEND_WEATHER_MCP")"
+            printf "| ascend-audio-scribe | %s |%s |\n"       "${V_ASCEND_AUDIO_SCRIBE}"      "$(label "$SEL_ASCEND_AUDIO_SCRIBE")"
+            printf "| ascend-web-hunter | %s |%s |\n"  "${V_ASCEND_WEB_HUNTER}" "$(label "$SEL_ASCEND_WEB_HUNTER")"
             printf "| ascend-memory | %s |%s |\n"      "${V_ASCEND_MEMORY}"     "$(label "$SEL_ASCEND_MEMORY")"
-            printf "| ascend-paddle-ocr | %s |%s |\n"         "${V_PADDLE_OCR}"        "$(label "$SEL_PADDLE_OCR")"
+            printf "| ascend-ocr | %s |%s |\n"         "${V_ASCEND_OCR}"        "$(label "$SEL_ASCEND_OCR")"
             printf "\nApps marked **(released)** had their images built and pushed in this run. All others carry their previous image.\n"
             printf "\n---\n"
           } > release-body.md

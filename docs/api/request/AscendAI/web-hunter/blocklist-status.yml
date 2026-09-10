@@ -1,0 +1,29 @@
+info:
+  name: blocklist-status
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/blocklist/status"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: rule_count, loaded_at, age_seconds typed", function () {
+            const b = res.getBody();
+            expect(b.rule_count).to.be.a("number");
+            expect(b.loaded_at).to.be.a("string");
+            expect(b.age_seconds).to.be.a("number");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

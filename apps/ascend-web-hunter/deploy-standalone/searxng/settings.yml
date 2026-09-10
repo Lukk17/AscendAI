@@ -1,0 +1,47 @@
+# SearXNG settings overlay for AscendAI.
+#
+# `use_default_settings: true` inherits everything from the upstream
+# image's /usr/local/searxng/searx/settings.yml and lets us patch only
+# what we need. Without this we would have to maintain a full 72KB
+# copy of the upstream defaults.
+#
+# Reason for each override is documented inline. Adjust by editing this
+# file, then `docker compose up -d --build searxng`.
+
+use_default_settings: true
+
+general:
+  instance_name: "AscendAI SearXNG"
+
+search:
+  # Defaults are 24h for access-denied / CAPTCHA and 15 days (!) for
+  # Cloudflare CAPTCHA. On a residential IP that one engine going
+  # offline cascades into the meta-search returning empty for half a
+  # week. Drop them to recovery windows in seconds-to-minutes so a
+  # transient block doesn't kill the e2e suite for days.
+  suspended_times:
+    SearxEngineAccessDenied: 60
+    SearxEngineCaptcha: 60
+    SearxEngineTooManyRequests: 30
+    cf_SearxEngineCaptcha: 120
+    cf_SearxEngineAccessDenied: 60
+    recaptcha_SearxEngineCaptcha: 120
+  # Default is `[html]`. Enabling json lets the readiness probe in
+  # /ready (and the e2e prereq) parse responses programmatically
+  # instead of grepping HTML for an article tag.
+  formats:
+    - html
+    - json
+
+server:
+  # SearXNG's per-IP rate limiter assumes a public-facing instance
+  # behind a CDN. Internal callers from ascend-web-hunter share the
+  # docker-network IP, so the limiter trips them in lockstep. Keep
+  # it off; we already rate-limit upstream in ascend-web-hunter.
+  limiter: false
+  public_instance: false
+  # `secret_key` is deliberately absent. SearXNG reads it from the
+  # SEARXNG_SECRET environment variable (searx/settings_defaults.py),
+  # which compose sources from .env. It has no default, so the container
+  # refuses to boot when the variable is unset. The value that used to
+  # live here was committed to a public repository and is compromised.

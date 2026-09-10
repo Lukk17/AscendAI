@@ -2,7 +2,7 @@
 
 ### Requirement: Tenant lifecycle API restricted to platform operators
 
-AscendAgent SHALL expose `/api/v1/admin/tenants` supporting create, list, get, suspend, resume, and delete, restricted to the `PLATFORM_ADMIN` realm role. A caller lacking `PLATFORM_ADMIN` (including a tenant `ADMIN`) SHALL receive HTTP 403. Tenant ids SHALL match the slug format `[a-z0-9-]{1,64}` defined by `add-tenant-isolation`; a create request with an invalid or already-used id SHALL be rejected with HTTP 400 or 409 respectively.
+ascend-ai-agent SHALL expose `/api/v1/admin/tenants` supporting create, list, get, suspend, resume, and delete, restricted to the `PLATFORM_ADMIN` realm role. A caller lacking `PLATFORM_ADMIN` (including a tenant `ADMIN`) SHALL receive HTTP 403. Tenant ids SHALL match the slug format `[a-z0-9-]{1,64}` defined by `add-tenant-isolation`; a create request with an invalid or already-used id SHALL be rejected with HTTP 400 or 409 respectively.
 
 #### Scenario: Non-platform-admin refused
 

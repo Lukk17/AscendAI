@@ -2,9 +2,9 @@
 
 ## Context
 
-AscendWebSearch escalates reads through curl_cffi → FlareSolverr → Playwright → Crawlee with NoVNC for human intervention. `enhance-web-search-scraping` already added session replay into every tier, coherent fingerprints (`src/reader/fingerprint.py`), an optional proxy seam (`src/proxy/proxy_provider.py`), read caching, per-domain metrics, and circuit breakers. FlareSolverr's only job is solving the Cloudflare challenge and returning cookies; a patched stealth browser both solves the challenge and renders the page, so the middle tiers can collapse. Patchright is a drop-in Playwright replacement (patched Chromium); Camoufox is a hardened Firefox driven through Playwright — both free and self-hosted.
+ascend-web-hunter escalates reads through curl_cffi → FlareSolverr → Playwright → Crawlee with NoVNC for human intervention. `enhance-web-search-scraping` already added session replay into every tier, coherent fingerprints (`src/reader/fingerprint.py`), an optional proxy seam (`src/proxy/proxy_provider.py`), read caching, per-domain metrics, and circuit breakers. FlareSolverr's only job is solving the Cloudflare challenge and returning cookies; a patched stealth browser both solves the challenge and renders the page, so the middle tiers can collapse. Patchright is a drop-in Playwright replacement (patched Chromium); Camoufox is a hardened Firefox driven through Playwright — both free and self-hosted.
 
-Extraction returns trafilatura output with a readability fallback: a single main-content blob, no embedded structured data, no schema-guided output, and linked PDFs/images are ignored even though the platform runs Docling, PaddleOCR, and AudioScribe.
+Extraction returns trafilatura output with a readability fallback: a single main-content blob, no embedded structured data, no schema-guided output, and linked PDFs/images are ignored even though the platform runs Docling, ascend-ocr, and ascend-audio-scribe.
 
 ## Goals / Non-Goals
 
@@ -36,11 +36,11 @@ Parse JSON-LD, OpenGraph, and microdata first and return them as structured fiel
 
 ### D4 — Schema-guided extraction with self-healing recipes
 
-A schema mode: the caller supplies a JSON schema; the service returns validated JSON. The first extraction for a domain asks the LLM to emit CSS/XPath selectors alongside the values, and the selectors are persisted as a recipe. Later extractions replay the cheap selectors and skip the model; on drift (empty or type-mismatched fields against the schema) the recipe is regenerated. The LLM call targets a configurable OpenAI-compatible endpoint, so it can be a local model, AscendAgent's provider proxy (tenant-policy-aware, keeps data on-prem), or a cloud provider — the service stays decoupled and sovereign by default.
+A schema mode: the caller supplies a JSON schema; the service returns validated JSON. The first extraction for a domain asks the LLM to emit CSS/XPath selectors alongside the values, and the selectors are persisted as a recipe. Later extractions replay the cheap selectors and skip the model; on drift (empty or type-mismatched fields against the schema) the recipe is regenerated. The LLM call targets a configurable OpenAI-compatible endpoint, so it can be a local model, ascend-ai-agent's provider proxy (tenant-policy-aware, keeps data on-prem), or a cloud provider — the service stays decoupled and sovereign by default.
 
 ### D5 — Route non-HTML into the existing platform services
 
-Linked PDFs → Docling, image-heavy pages / linked images → PaddleOCR, linked audio → AudioScribe, over HTTP to the services the compose stack already runs. This is configuration (service URLs), not new parsing code, and gives the scraper document-understanding depth no standalone competitor ships.
+Linked PDFs → Docling, image-heavy pages / linked images → ascend-ocr, linked audio → ascend-audio-scribe, over HTTP to the services the compose stack already runs. This is configuration (service URLs), not new parsing code, and gives the scraper document-understanding depth no standalone competitor ships.
 
 ## Risks / Trade-offs
 

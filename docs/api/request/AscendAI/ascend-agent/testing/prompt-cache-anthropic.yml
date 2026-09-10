@@ -33,13 +33,18 @@ http:
         value: openai
 
 runtime:
+  variables:
+    - name: promptCacheStep
+      value: "1"
   scripts:
     - type: tests
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("cache_control was accepted (creation or read observed)", function () {
+        test("Step 1 proves cache_control was accepted, step 2 proves a cache read", function () {
+            const step = String(bru.getEnvVar("promptCacheStep") || bru.getRequestVar("promptCacheStep"));
+            expect(["1", "2"], "promptCacheStep").to.include(step);
             const body = res.getBody();
             expect(body.content).to.be.a("string").and.not.empty;
             const usage = body.metadata.usage;
@@ -48,7 +53,11 @@ runtime:
             expect(nativeUsage).to.be.an("object");
             expect(nativeUsage.cache_creation_input_tokens).to.be.a("number");
             expect(nativeUsage.cache_read_input_tokens).to.be.a("number");
-            expect(nativeUsage.cache_creation_input_tokens > 0 || nativeUsage.cache_read_input_tokens > 0).to.be.true;
+            if (step === "2") {
+                expect(nativeUsage.cache_read_input_tokens).to.be.above(0);
+            } else {
+                expect(nativeUsage.cache_creation_input_tokens > 0 || nativeUsage.cache_read_input_tokens > 0).to.be.true;
+            }
         });
 
 settings:

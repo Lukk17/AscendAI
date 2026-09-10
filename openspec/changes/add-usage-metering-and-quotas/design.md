@@ -2,7 +2,7 @@
 
 ## Context
 
-Every LLM call in AscendAgent already funnels through one observation point: `PromptCacheStrategy.recordOutcome(userId, chatResponse)` is called by `service/chat/ChatExecutor.java` (line 95) and `service/memory/SemanticMemoryExtractor.java` (line 100), and every strategy implementation delegates to `service/cache/GenAiTokenUsageRecorder.java`, which reads `ChatResponse.getMetadata().getUsage()` and increments the aggregate `gen_ai.client.token.usage` Micrometer counter. That counter has no user/tenant tags and Prometheus retention is 72h, so it cannot back billing. The compaction path (`memory/ChatHistoryCompactionService.java`) and the embedding path call providers without passing through `recordOutcome` at all.
+Every LLM call in ascend-ai-agent already funnels through one observation point: `PromptCacheStrategy.recordOutcome(userId, chatResponse)` is called by `service/chat/ChatExecutor.java` (line 95) and `service/memory/SemanticMemoryExtractor.java` (line 100), and every strategy implementation delegates to `service/cache/GenAiTokenUsageRecorder.java`, which reads `ChatResponse.getMetadata().getUsage()` and increments the aggregate `gen_ai.client.token.usage` Micrometer counter. That counter has no user/tenant tags and Prometheus retention is 72h, so it cannot back billing. The compaction path (`memory/ChatHistoryCompactionService.java`) and the embedding path call providers without passing through `recordOutcome` at all.
 
 Provider clients are built **once at startup**: `service/provider/ChatModelResolver.initializeProviders()` (`@PostConstruct`) constructs one `OpenAiChatModel` / `AnthropicChatModel` per enabled provider from `AiProviderProperties`, with the API key baked into the `OpenAiApi` / `AnthropicApi` instance. BYOK therefore cannot be a per-request option tweak; it needs per-tenant client instances.
 
@@ -13,7 +13,7 @@ This change **depends on** two siblings and re-specifies neither:
 
 A third sibling, `add-chat-streaming-and-conversations`, will make chat responses streamable; usage metadata for a streamed call is only complete when the stream finishes, which constrains where the ledger write can happen.
 
-Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelog-master.yaml`), Redis (already a hard prerequisite, used for chat history), and the `add-observability` Grafana stack with provisioned dashboards under `observability/grafana/dashboards/`.
+Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelog-master.yaml`), Redis (already a hard prerequisite, used for chat history), and the `add-observability` Grafana stack with provisioned dashboards under `infra/observability/grafana/dashboards/`.
 
 ## Goals / Non-Goals
 
@@ -21,15 +21,15 @@ Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelo
 
 - One durable, queryable usage row per LLM-touching request, attributable to tenant + user, precise enough to invoice from.
 - Hard token budgets (tenant/month, user/day) enforced before money is spent, with a soft-warning event ahead of cut-off.
-- Request-rate limits that hold across AscendAgent replicas.
+- Request-rate limits that hold across ascend-ai-agent replicas.
 - Per-tenant provider keys that never leave the server in plaintext once written, with clean fallback to the deployment's global keys.
-- All enforcement lives in AscendAgent (the gateway); downstream Python services stay untouched.
+- All enforcement lives in ascend-ai-agent (the gateway); downstream Python services stay untouched.
 
 **Non-Goals:**
 
 - Payment processing, invoicing documents, price-to-currency conversion in the API (the Grafana token-cost dashboard already handles $ via `pricing.yaml`).
 - Authentication, role model, or tenant modelling (owned by the sibling changes).
-- Rate limiting inside AscendMemory / AscendWebSearch / AudioScribe themselves — they are only reachable through the gateway or trusted service calls.
+- Rate limiting inside AscendMemory / ascend-web-hunter / ascend-audio-scribe themselves — they are only reachable through the gateway or trusted service calls.
 - Predictive cost estimation (pre-counting prompt tokens before the provider call).
 
 ## Decisions
@@ -71,7 +71,7 @@ Tenant budget window = calendar month UTC; user budget window = calendar day UTC
 Placement:
 
 - Chat (`POST /api/v1/ai/prompt`) and ingestion upload (`POST /api/v1/ingestion/upload`): a `HandlerInterceptor` keyed by `{userId}` and `{tenantId}` per endpoint group, registered ahead of controller execution.
-- Web-search tool invocations happen **inside** a chat turn (MCP tool callback), not on their own HTTP endpoint, so the interceptor cannot see them; the tool-callback wrapper around the AscendWebSearch MCP tools consumes from a dedicated `web-search` bucket and surfaces a tool-level "rate limited, retry after Ns" result to the model instead of a 429 (the enclosing chat request already passed its own limit).
+- Web-search tool invocations happen **inside** a chat turn (MCP tool callback), not on their own HTTP endpoint, so the interceptor cannot see them; the tool-callback wrapper around the ascend-web-hunter MCP tools consumes from a dedicated `web-search` bucket and surfaces a tool-level "rate limited, retry after Ns" result to the model instead of a 429 (the enclosing chat request already passed its own limit).
 
 Both a user bucket and a tenant bucket must have capacity; the stricter one wins. On rejection: `429`, `Retry-After` from Bucket4j's nanos-to-wait, and the standard error body. **Fail-open** when Redis is unreachable (WARN + `rate_limit.redis_unavailable` metric): availability of chat outranks limit precision, and the quota gate (D4, Postgres-backed rebuild) still bounds total spend.
 
@@ -101,7 +101,7 @@ Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL te
 
 - `GenAiTokenUsageRecorder` gains `tenant` and `request_type` tags on `gen_ai.client.token.usage` (bounded cardinality: tenants are operator-created, request types are a closed set of four).
 - New counters: `usage.ledger.write_failed`, `usage.quota.rejected{scope}`, `usage.quota.warning{scope}`, `rate_limit.rejected{scope,endpoint}`, `rate_limit.redis_unavailable`.
-- One new provisioned dashboard `observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users, quota-consumption gauges, 429 rates.
+- One new provisioned dashboard `infra/observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users, quota-consumption gauges, 429 rates.
 
 ## Risks / Trade-offs
 

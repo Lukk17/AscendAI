@@ -2,11 +2,11 @@
 
 ### Requirement: Architecture docs and diagrams reflect the shipped topology
 
-The monorepo architecture docs (`docs/architecture/`) and the AscendAgent internal architecture docs SHALL depict the end-state topology: the edge gateway as the only public surface, Keycloak as the identity provider, the tenant boundary across every data plane, and the connector/crawl paths into RAG. The C4 diagrams SHALL be text-based (Mermaid) and SHALL match the shipped compose topology and endpoint set.
+The monorepo architecture docs (`docs/architecture/`) and the ascend-ai-agent internal architecture docs SHALL depict the end-state topology: the edge gateway as the only public surface, Keycloak as the identity provider, the tenant boundary across every data plane, and the connector/crawl paths into RAG. The C4 diagrams SHALL be text-based (Mermaid) and SHALL match the shipped compose topology and endpoint set.
 
 #### Scenario: Container diagram shows the gateway and identity provider
 
-- **WHEN** the C4 container diagram is reviewed against the shipped `docker-compose.yaml`
+- **WHEN** the C4 container diagram is reviewed against the shipped `compose.yaml`
 - **THEN** it shows the gateway as the only public entry point and Keycloak as the identity provider
 - **AND** no service other than the gateway is shown as publicly reachable
 

@@ -7,9 +7,9 @@
 - [ ] 1.3 Add/refresh ADRs for the load-bearing decisions: gateway-only surface, presign resolution to the agent content endpoint, tenant model, tenant administration, per-tenant policy, scraper tier-ladder restructure
 - [ ] 1.4 Verify each diagram against the shipped compose topology and endpoint set
 
-## 2. AscendAgent internal architecture
+## 2. ascend-ai-agent internal architecture
 
-- [ ] 2.1 Update `AscendAgent/docs/architecture/` component diagrams and internal arc42 for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management, connector)
+- [ ] 2.1 Update `apps/ascend-agent/docs/architecture/` component diagrams and internal arc42 for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management, connector)
 - [ ] 2.2 Update the module-level ADR index
 
 ## 3. Cross-cutting request-path diagrams

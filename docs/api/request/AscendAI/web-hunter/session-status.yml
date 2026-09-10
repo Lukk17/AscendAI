@@ -1,0 +1,40 @@
+info:
+  name: session-status
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/status"
+  body:
+    type: json
+    # www.example.com never accumulates a session through the normal tiers
+    # (tier 1 curl_cffi serves it directly, so the cookie-save path never
+    # fires for it), so this documents the baseline "no session" response.
+    data: |-
+      {
+        "url": "https://www.example.com/",
+        "profile": "default"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: url, status, auth_ttl_remaining_seconds, last_validated, profile typed", function () {
+            const b = res.getBody();
+            expect(b.url).to.equal("https://www.example.com/");
+            expect(b.status).to.be.a("string");
+            expect(b.auth_ttl_remaining_seconds).to.be.a("number");
+            expect(b.profile).to.equal("default");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

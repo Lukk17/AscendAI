@@ -4,15 +4,15 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-        files: ^PaddleOCR/
+        files: ^apps/ascend-ocr/
       - id: ruff-format
-        files: ^PaddleOCR/
+        files: ^apps/ascend-ocr/
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.18.2
     hooks:
       - id: mypy
-        files: ^PaddleOCR/src/
+        files: ^apps/ascend-ocr/src/
         additional_dependencies:
           - pydantic==2.13.4
           - pydantic-settings==2.14.1

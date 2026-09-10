@@ -31,13 +31,13 @@ graph TB
     User["User"]
 
     subgraph "AscendAI Platform"
-        Agent["AscendAgent<br/>REST API :9917<br/>Spring Boot · Java 21"]
+        Agent["ascend-agent<br/>REST API :9917<br/>Spring Boot · Java 21"]
 
         subgraph "MCP Tool Services"
-            AudioScribe["AudioScribe<br/>:7017<br/>Audio Transcription"]
-            Weather["WeatherMCP<br/>:9998<br/>Weather Data"]
-            WebSearch["AscendWebSearch<br/>:7021<br/>Web Search"]
-            PaddleOCR["PaddleOCR<br/>:7022<br/>OCR"]
+            AudioScribe["ascend-audio-scribe<br/>:7017<br/>Audio Transcription"]
+            Weather["ascend-weather-mcp<br/>:9998<br/>Weather Data"]
+            WebHunter["ascend-web-hunter<br/>:7021<br/>Web Search"]
+            PaddleOCR["ascend-ocr<br/>:7022<br/>OCR"]
         end
 
         Memory["AscendMemory<br/>:7020<br/>Semantic Memory"]
@@ -58,7 +58,7 @@ graph TB
     User -->|"REST"| Agent
     Agent -->|"MCP"| AudioScribe
     Agent -->|"MCP"| Weather
-    Agent -->|"MCP"| WebSearch
+    Agent -->|"MCP"| WebHunter
     Agent -->|"MCP"| PaddleOCR
     Agent -->|"REST"| Memory
     Agent -.-> Local
@@ -104,9 +104,9 @@ conversations actually accumulate knowledge.
   dimensions (768 / 1536).
 - **Semantic memory via Mem0.** Long-lived, user-scoped memories searchable across sessions through the AscendMemory
   service.
-- **MCP tool servers.** First-class integrations for audio transcription ([AudioScribe](AudioScribe/AGENTS.md)), web
-  search ([AscendWebSearch](AscendWebSearch/AGENTS.md) + SearXNG), weather ([WeatherMCP](WeatherMCP/AGENTS.md)), and OCR
-  ([PaddleOCR](PaddleOCR/AGENTS.md)).
+- **MCP tool servers.** First-class integrations for audio transcription ([ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md)), web
+  search ([ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md) + SearXNG), weather ([ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md)), and OCR
+  ([ascend-ocr](apps/ascend-ocr/AGENTS.md)).
 - **Document ingestion to object storage.** Drop files (Markdown, PDF, DOCX) into a bucket and the pipeline parses them via
   Docling / Unstructured and indexes them automatically.
 - **Hybrid chat history.** Redis for the active context window, PostgreSQL for durable long-term archives and
@@ -207,17 +207,17 @@ invoked during the turn):
 Two architecture entry points, depending on what you're after.
 
 - [Monorepo architecture](docs/architecture/README.md). System overview, service interactions, deployment, ADRs.
-- [AscendAgent arc42](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md). Internals, component diagrams,
+- [ascend-ai-agent arc42](apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md). Internals, component diagrams,
   module ADRs.
 
 | Module                                                 | Stack                  | Port | Role                                                |
 | ------------------------------------------------------ | ---------------------- | ---- | --------------------------------------------------- |
-| **[AscendAgent](AscendAgent/AGENTS.md)**               | Java 21 / Spring Boot  | 9917 | API gateway, multi-provider AI, RAG, MCP client     |
-| **[AudioScribe](AudioScribe/AGENTS.md)**               | Python / FastMCP       | 7017 | Audio transcription (Whisper / OpenAI / HF)         |
-| **[AscendWebSearch](AscendWebSearch/AGENTS.md)**       | Python / FastMCP       | 7021 | Web search and scraping via SearXNG                 |
-| **[AscendMemory](AscendMemory/AGENTS.md)**             | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                     |
-| **[WeatherMCP](WeatherMCP/AGENTS.md)**                 | Java / Spring Boot     | 9998 | Weather data MCP server                             |
-| **[PaddleOCR](PaddleOCR/AGENTS.md)**                   | Python / FastMCP       | 7022 | OCR service                                         |
+| **[ascend-ai-agent](apps/ascend-agent/AGENTS.md)**               | Java 21 / Spring Boot  | 9917 | API gateway, multi-provider AI, RAG, MCP client     |
+| **[ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md)**               | Python / FastMCP       | 7017 | Audio transcription (Whisper / OpenAI / HF)         |
+| **[ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md)**       | Python / FastMCP       | 7021 | Web search and scraping via SearXNG                 |
+| **[AscendMemory](apps/ascend-memory/AGENTS.md)**             | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                     |
+| **[ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md)** | Java / Spring Boot     | 9998 | Weather data MCP server                             |
+| **[ascend-ocr](apps/ascend-ocr/AGENTS.md)**                 | Python / FastMCP       | 7022 | OCR service                                         |
 
 #### Request flow
 
@@ -227,7 +227,7 @@ How a single prompt traverses the platform.
 sequenceDiagram
     autonumber
     participant U as User
-    participant A as AscendAgent
+    participant A as ascend-agent
     participant R as Redis<br/>(short-term)
     participant M as AscendMemory<br/>(Mem0)
     participant Q as Qdrant<br/>(RAG)
@@ -288,8 +288,8 @@ variable. It has to be at least 32 characters, unique to this deployment, and no
 
 **2. Bring up the stack.**
 
-The main compose file pulls in [ascend-scrapper.docker-compose.yaml](ascend-scrapper.docker-compose.yaml) via `include:`,
-so a single `up` brings up the full stack (AscendAgent + tool services + scrapper).
+The main compose file pulls in [compose.ascend-web-hunter.yaml](compose.ascend-web-hunter.yaml) via `include:`,
+so a single `up` brings up the full stack (ascend-agent + tool services + scrapper).
 
 Bash:
 
@@ -301,20 +301,6 @@ PowerShell:
 
 ```powershell
 docker compose up -d --build
-```
-
-Optional, bring up only the web-scraping stack as its own Docker Desktop group.
-
-Bash:
-
-```bash
-docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
-```
-
-PowerShell:
-
-```powershell
-docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
 ```
 
 **3. Ensure PostgreSQL has the `ascend_ai` database** (user `postgres`, password `local`).
@@ -331,7 +317,7 @@ Stop the container first (`docker compose stop ascend-agent`) so port 9917 is fr
 Bash:
 
 ```bash
-cd AscendAgent
+cd apps/ascend-agent
 ```
 
 ```bash
@@ -341,12 +327,19 @@ cd AscendAgent
 PowerShell:
 
 ```powershell
-cd AscendAgent
+cd apps/ascend-agent
 ```
 
 ```powershell
 ./gradlew bootRun
 ```
+
+**5. Optional: point IntelliJ at each module's Python interpreter.**
+
+The committed `.idea/` project opens with the right module layout, but a Python interpreter is registered per user,
+not per project, so a fresh clone has none. Open each of `apps/ascend-audio-scribe`, `apps/ascend-web-hunter`,
+`apps/ascend-memory`, and `apps/ascend-ocr` in turn; IntelliJ detects the module's own `.venv/` at its root and offers
+to use it. Accept the offer once per module.
 
 For advanced compose flags, per-service rebuilds, and production notes see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 For document ingestion see [docs/INGESTION.md](docs/INGESTION.md).
@@ -356,7 +349,7 @@ For document ingestion see [docs/INGESTION.md](docs/INGESTION.md).
 ### Supported AI Providers
 
 Per-request selection across the providers below. Models listed are the ones currently wired in
-[application.yaml](AscendAgent/src/main/resources/application.yaml) (chat default, memory extraction, and history
+[application.yaml](apps/ascend-agent/src/main/resources/application.yaml) (chat default, memory extraction, and history
 compaction). Any model the provider accepts works at request time via the `model` form field; these are the values
 that ship with the agent.
 
@@ -376,31 +369,31 @@ Override per request with the `provider` and `model` form fields, or globally vi
 
 #### AscendAI services
 
-Each service ships both REST and MCP surfaces (except WeatherMCP, MCP-only). The "Used by AscendAgent via" column shows
-the actual transport AscendAgent uses today. The other surface is available for direct external use.
+Each service ships both REST and MCP surfaces (except ascend-weather-mcp, MCP-only). The "Used by ascend-ai-agent via" column shows
+the actual transport ascend-ai-agent uses today. The other surface is available for direct external use.
 
-| Service                                          | Port    | Surfaces        | Used by AscendAgent via | Role                                                                |
+| Service                                          | Port    | Surfaces        | Used by ascend-ai-agent via | Role                                                                |
 | :----------------------------------------------- | :------ | :-------------- | :---------------------- | :------------------------------------------------------------------ |
-| **[AscendAgent](AscendAgent/AGENTS.md)**         | `9917`  | REST            | (this is the agent)     | API gateway and orchestrator. `POST /api/v1/ai/prompt` is the entry.|
-| **[AscendMemory](AscendMemory/AGENTS.md)**       | `7020`  | REST + MCP      | REST                    | Semantic memory store (Mem0 + Qdrant). Search / insert per user.    |
-| **[AudioScribe](AudioScribe/AGENTS.md)**         | `7017`  | REST + MCP      | MCP (Streamable HTTP)   | Speech-to-text (faster-whisper / OpenAI / HF / Audacity merge).     |
-| **[AscendWebSearch](AscendWebSearch/AGENTS.md)** | `7021`  | REST + MCP      | MCP (Streamable HTTP)   | Web search + content extraction (SearXNG, Cloudflare, NoVNC).       |
-| **[PaddleOCR](PaddleOCR/AGENTS.md)**             | `7022`  | REST + MCP      | MCP (Streamable HTTP)   | Image OCR.                                                          |
-| **[WeatherMCP](WeatherMCP/AGENTS.md)**           | `9998`  | MCP only (SSE)  | MCP (SSE)               | Weather data tool (reference Spring AI MCP server).                 |
+| **[ascend-agent](apps/ascend-agent/AGENTS.md)**         | `9917`  | REST            | (this is the agent)     | API gateway and orchestrator. `POST /api/v1/ai/prompt` is the entry.|
+| **[AscendMemory](apps/ascend-memory/AGENTS.md)**       | `7020`  | REST + MCP      | REST                    | Semantic memory store (Mem0 + Qdrant). Search / insert per user.    |
+| **[ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md)**         | `7017`  | REST + MCP      | MCP (Streamable HTTP)   | Speech-to-text (faster-whisper / OpenAI / HF / Audacity merge).     |
+| **[ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md)** | `7021`  | REST + MCP      | MCP (Streamable HTTP)   | Web search + content extraction (SearXNG, Cloudflare, NoVNC).       |
+| **[ascend-ocr](apps/ascend-ocr/AGENTS.md)**           | `7022`  | REST + MCP      | MCP (Streamable HTTP)   | Image OCR.                                                          |
+| **[ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md)** | `9998`  | MCP only (SSE)  | MCP (SSE)               | Weather data tool (reference Spring AI MCP server).                 |
 
 #### Support services (in-stack, deployed via compose)
 
 | Service                 | Port    | Default credentials | Role                                                        |
 | :---------------------- | :------ | :------------------ | :---------------------------------------------------------- |
-| **SearXNG**             | `9020` (loopback) | `SEARXNG_SECRET`  | Privacy-respecting meta-search; backend for AscendWebSearch.|
-| **FlareSolverr**        | `8191` (loopback) | (none)            | Cloudflare bypass proxy used by AscendWebSearch.            |
-| **ngrok (web-search)**  | (none)  | `NGROK_AUTHTOKEN`   | Public tunnel to AscendWebSearch's NoVNC for remote CAPTCHA intervention. |
+| **SearXNG**             | `9020` (loopback) | `SEARXNG_SECRET`  | Privacy-respecting meta-search; backend for ascend-web-hunter.|
+| **FlareSolverr**        | `8191` (loopback) | (none)            | Cloudflare bypass proxy used by ascend-web-hunter.            |
+| **ngrok (web-hunter)**  | (none)  | `NGROK_AUTHTOKEN`   | Public tunnel to ascend-web-hunter's NoVNC for remote CAPTCHA intervention. |
 | **Docling Serve**       | `5001`  | (none)              | PDF / DOCX to structured JSON (used by ingestion pipeline). |
 | **Unstructured API**    | `9080`  | (none)              | Generic document parsing fallback for ingestion.            |
 
 #### Observability stack (in-stack, deployed via compose)
 
-Full setup and usage in [observability/README.md](observability/README.md).
+Full setup and usage in [infra/observability/README.md](infra/observability/README.md).
 
 | Service             | Port            | Exposed       | Role                                                                 |
 | :------------------ | :-------------- | :------------ | :------------------------------------------------------------------ |
@@ -430,19 +423,21 @@ Canonical index. Every doc the repo ships, in one place.
 | :-------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------- |
 | [docs/architecture/README.md](docs/architecture/README.md)                                                            | Monorepo architecture: system view, ADRs, deployment topology.        |
 | [docs/architecture/arc42/01-introduction-and-goals.md](docs/architecture/arc42/01-introduction-and-goals.md)          | Arc42 entry point for the platform.                                   |
-| [AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md](AscendAgent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
+| [apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md](apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
+| [docs/architecture/permission-aware-retrieval.md](docs/architecture/permission-aware-retrieval.md)                     | How document access lists reach chunks and get enforced inside the vector search. |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
-| [AscendWebSearch/deploy-standalone/README.md](AscendWebSearch/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
+| [apps/ascend-web-hunter/deploy-standalone/README.md](apps/ascend-web-hunter/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
 | [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and release workflows, image naming, registries, package visibility. |
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / object store / PostgreSQL / Redis reset recipes.             |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)                                                                        | Metrics, logs, traces — what is collected, dashboards, how to instrument. |
-| [observability/README.md](observability/README.md)                                                                   | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
+| [infra/observability/README.md](infra/observability/README.md)                                                       | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
 | [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |
-| [AscendAgent/e2e/README.md](AscendAgent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
+| [apps/ascend-agent/e2e/README.md](apps/ascend-agent/e2e/README.md)                                                                | End-to-end capability tests, fixtures, Bruno collection.              |
 | [docs/E2E_COST.md](docs/E2E_COST.md)                                                                                  | Token usage and per-provider pricing for the e2e suite; recalculate dollar cost when prices change. |
+| [docs/DEFECT_REGISTER.md](docs/DEFECT_REGISTER.md)                                                                    | Every defect found across the stack: what's fixed with its commit, what's still open, what was declined. |
 | [AGENTS.md](AGENTS.md)                                                                                                | Shared instructions for any AI coding agent operating in this repo.   |
 | [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and Release workflow operator notes: secrets, bump convention, how to cut a release. |
 

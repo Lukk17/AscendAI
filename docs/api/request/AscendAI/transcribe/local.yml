@@ -8,14 +8,14 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7017/api/v1/transcribe/local"
   headers:
     - name: accept
-      value: application/json
+      value: text/markdown
   body:
     type: multipart-form
     data:
       - name: file
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AudioScribe\e2e\fixtures\meeting-clip.wav
+          - "{{audioScribeFixtures}}/meeting-clip.wav"
       - name: model
         type: text
         value: Systran/faster-whisper-large-v3
@@ -34,6 +34,15 @@ runtime:
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
+        });
+        test("Content-Type starts with text/markdown", function () {
+            expect(res.getHeader("content-type")).to.match(/^text\/markdown/);
+        });
+        test("Content-Disposition names transcript_local.md", function () {
+            expect(res.getHeader("content-disposition")).to.equal("attachment; filename=\"transcript_local.md\"");
+        });
+        test("Transcript body is not empty", function () {
+            expect(String(res.getBody()).trim().length).to.be.at.least(1);
         });
 
 settings:

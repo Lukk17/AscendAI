@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
-### Requirement: AscendAgent validates JWTs as an OAuth2 resource server
+### Requirement: ascend-ai-agent validates JWTs as an OAuth2 resource server
 
-AscendAgent SHALL act as an OAuth2 resource server: every request to a protected endpoint MUST carry an `Authorization: Bearer <JWT>` header, and the JWT SHALL be validated (signature via the issuer's JWKS, `iss`, `exp`, `nbf`) against the OIDC issuer configured at `spring.security.oauth2.resourceserver.jwt.issuer-uri`. Requests with a missing, expired, malformed, or wrongly-signed token SHALL be rejected with HTTP 401. The validation logic SHALL contain no issuer-specific code beyond the role-claim mapping, so that swapping Keycloak for any OIDC-compliant identity provider (Entra ID, Google, Auth0) requires only an issuer-uri configuration change.
+ascend-ai-agent SHALL act as an OAuth2 resource server: every request to a protected endpoint MUST carry an `Authorization: Bearer <JWT>` header, and the JWT SHALL be validated (signature via the issuer's JWKS, `iss`, `exp`, `nbf`) against the OIDC issuer configured at `spring.security.oauth2.resourceserver.jwt.issuer-uri`. Requests with a missing, expired, malformed, or wrongly-signed token SHALL be rejected with HTTP 401. In the shipped deployment that issuer is the platform's own Keycloak realm, and it is the same issuer for every customer. Where a customer has opted into corporate sign-on, their own identity provider is brokered behind that realm rather than validated here. The validation logic SHALL contain no issuer-specific code beyond the role-claim mapping, so that a deployment choosing to validate a different OIDC-compliant issuer's tokens directly needs only an issuer-uri configuration change.
 
 #### Scenario: Request without a token is rejected
 
@@ -22,7 +22,7 @@ AscendAgent SHALL act as an OAuth2 resource server: every request to a protected
 
 ### Requirement: Endpoint authorization matrix with USER and ADMIN roles
 
-AscendAgent SHALL enforce role-based authorization in the security filter chain. Roles SHALL be mapped from the token's `realm_access.roles` claim when present, else a top-level `roles` claim, to Spring authorities `ROLE_USER` / `ROLE_ADMIN`. The matrix SHALL be: `POST /api/v1/ai/prompt` and `POST /api/v1/ingestion/upload` require `USER` or `ADMIN`; `POST /api/v1/ingestion/run` requires `ADMIN`; any other non-public endpoint requires authentication. A caller with a valid token but an insufficient role SHALL receive HTTP 403.
+ascend-ai-agent SHALL enforce role-based authorization in the security filter chain. Roles SHALL be mapped from the token's `realm_access.roles` claim when present, else a top-level `roles` claim, to Spring authorities `ROLE_USER` / `ROLE_ADMIN`. The matrix SHALL be: `POST /api/v1/ai/prompt` and `POST /api/v1/ingestion/upload` require `USER` or `ADMIN`; `POST /api/v1/ingestion/run` requires `ADMIN`; any other non-public endpoint requires authentication. A caller with a valid token but an insufficient role SHALL receive HTTP 403.
 
 #### Scenario: USER can chat and upload
 
@@ -42,7 +42,7 @@ AscendAgent SHALL enforce role-based authorization in the security filter chain.
 
 ### Requirement: Public infrastructure and documentation endpoints under the secured posture
 
-Under the secured posture, AscendAgent SHALL permit unauthenticated access ONLY to: `/actuator/health`, `/actuator/prometheus`, `/v3/api-docs/**`, `/swagger-ui/**`, and `/swagger-ui.html`. All other actuator endpoints SHALL remain unavailable to unauthenticated callers. Swagger UI pages SHALL load without a token, but API calls issued from Swagger's "Try it out" SHALL be subject to the same 401/403 rules as any other client.
+Under the secured posture, ascend-ai-agent SHALL permit unauthenticated access ONLY to: `/actuator/health`, `/actuator/prometheus`, `/v3/api-docs/**`, `/swagger-ui/**`, and `/swagger-ui.html`. All other actuator endpoints SHALL remain unavailable to unauthenticated callers. Swagger UI pages SHALL load without a token, but API calls issued from Swagger's "Try it out" SHALL be subject to the same 401/403 rules as any other client.
 
 #### Scenario: Health and metrics scrape without a token
 
@@ -57,13 +57,19 @@ Under the secured posture, AscendAgent SHALL permit unauthenticated access ONLY 
 
 ### Requirement: Dev profile preserves the open local workflow
 
-When the Spring profile `dev` is active, AscendAgent SHALL permit all requests without a token and SHALL synthesize an identity from `app.user.default-id` carrying both `USER` and `ADMIN` roles, so local single-user runs and the Bruno collection work without an identity provider. The agent SHALL log a WARN at startup stating that authentication is disabled. The default and `docker` postures SHALL require JWTs. The legacy `app.security.enabled` flag and the `app.security.user` HTTP Basic block SHALL be removed.
+When the Spring profile `dev` is active, ascend-ai-agent SHALL permit all requests without a token and SHALL synthesize an identity from `app.user.default-id` carrying both `USER` and `ADMIN` roles and a principal set of `tenant:everyone:default` and `local:group:dev-all`, so local single-user runs and the Bruno collection work without an identity provider and a locally-ingested corpus is actually retrievable. The agent SHALL log a WARN at startup stating that authentication is disabled. The default and `docker` postures SHALL require JWTs. The legacy `app.security.enabled` flag and the `app.security.user` HTTP Basic block SHALL be removed.
 
 #### Scenario: Dev profile accepts tokenless requests
 
 - **WHEN** the agent starts with profile `dev` and `POST /api/v1/ai/prompt` is called with no `Authorization` header
 - **THEN** the request succeeds and is processed under the `app.user.default-id` identity
 - **AND** the startup log contains a WARN that security is disabled
+
+#### Scenario: The dev identity carries a usable principal set
+
+- **WHEN** the agent starts with profile `dev` and a request is processed
+- **THEN** the synthesized identity's principal set contains `tenant:everyone:default` and `local:group:dev-all`
+- **AND** it is not empty
 
 #### Scenario: HTTP Basic path is gone
 

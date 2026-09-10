@@ -19,6 +19,14 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("memory_wipe returns success status with message", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("status");
+            expect(data.status).to.equal("success");
+            expect(data).to.have.property("message");
+            expect(data.message).to.include("wiped");
+        });
 
 settings:
   encodeUrl: true

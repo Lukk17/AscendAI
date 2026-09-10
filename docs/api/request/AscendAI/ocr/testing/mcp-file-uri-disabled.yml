@@ -1,0 +1,53 @@
+info:
+  name: mcp-file-uri-disabled
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+          "name": "ocr_process",
+          "arguments": {
+            "file_uri": "file:///etc/passwd",
+            "lang": "en"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200 (JSON-RPC envelope)", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("JSON-RPC error frame (UNSAFE_URI - file:// disabled)", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const hasError = envelope.error || (envelope.result && envelope.result.isError);
+            expect(hasError).to.be.ok;
+            expect(envelope.result.content[0].text).to.include("UNSAFE_URI");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -146,18 +146,18 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 ## Architecture
 
 - **Monorepo-level**: System overview, service interactions, deployment, ADRs — in `docs/architecture/`
-- **AscendAgent internals**: Component diagrams, internal arc42, module-specific ADRs — in `AscendAgent/docs/architecture/`
+- **ascend-ai-agent internals**: Component diagrams, internal arc42, module-specific ADRs — in `apps/ascend-agent/docs/architecture/`
 
 ## Monorepo Structure
 
 | Module | Tech Stack | Port | Role |
 |---|---|---|---|
-| [AscendAgent](AscendAgent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
-| [AudioScribe](AudioScribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
-| [AscendWebSearch](AscendWebSearch/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
-| [AscendMemory](AscendMemory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
-| [WeatherMCP](WeatherMCP/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9998 | MCP server for weather data |
-| [PaddleOCR](PaddleOCR/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7022 | OCR service using PaddleOCR |
+| [ascend-ai-agent](apps/ascend-agent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
+| [ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
+| [ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
+| [AscendMemory](apps/ascend-memory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
+| [ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9998 | MCP server for weather data |
+| [ascend-ocr](apps/ascend-ocr/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7022 | OCR service using PaddleOCR |
 
 ## External Prerequisites
 
@@ -172,65 +172,90 @@ These services must be running before starting docker-compose. In production the
 
 ## Docker Compose Services
 
-Compose is split into two project files so each forms its own group in Docker Desktop when run standalone:
+Compose is split into two project files. The second is reached only through the main file's `include:`, so every command runs against the main file with no `-f` flag and the merge puts both stacks in one Docker Desktop group:
 
-- **`docker-compose.yaml`** (project `ascend-ai`) — main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
-- **`ascend-scrapper.docker-compose.yaml`** (project `ascend-scrapper`) — web-scraping stack. Self-contained; can be run on its own with `docker compose -f ascend-scrapper.docker-compose.yaml up`.
+- **`compose.yaml`** (project `ascend-ai`) — main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
+- **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) — web-scraping stack, pulled in by the main file's `include:`.
 
-`SEARXNG_SECRET` is mandatory in `.env` for either invocation. Compose names the missing variable and refuses to start without it, and SearXNG will not boot without it either. It must be at least 32 characters, unique per deployment, and never the literal `ultrasecretkey`.
+Both files use the same four fixed container names, `searxng`, `flaresolverr`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
 
-A third, separate artifact exists for deploying the web-search stack to a machine of its own: [`AscendWebSearch/deploy-standalone/`](AscendWebSearch/deploy-standalone/README.md). It pulls published images instead of building, targets Docker Engine on Linux, and is not `include:`-d by anything. It carries a byte-identical copy of `searxng/settings.yml` plus its own `.env.example`, and both must be updated in the same commit as their root counterparts. The intended differences between it and the development stack are listed in its README.
+```bash
+docker compose down
+```
 
-### `ascend-ai` (docker-compose.yaml)
+```bash
+docker compose -f compose.ascend-web-hunter.yaml up -d
+```
+
+To go back to the main stack:
+
+```bash
+docker compose -f compose.ascend-web-hunter.yaml down
+```
+
+```bash
+docker compose up -d
+```
+
+`SEARXNG_SECRET` is mandatory in `.env`. Compose names the missing variable and refuses to start without it, and SearXNG will not boot without it either. It must be at least 32 characters, unique per deployment, and never the literal `ultrasecretkey`.
+
+A third, separate artifact exists for deploying the web-search stack to a machine of its own: [`apps/ascend-web-hunter/deploy-standalone/`](apps/ascend-web-hunter/deploy-standalone/README.md). It pulls published images instead of building, targets Docker Engine on Linux, and is not `include:`-d by anything. It carries a byte-identical copy of `infra/searxng/settings.yml` plus its own `.env.example`, and both must be updated in the same commit as their root counterparts. The intended differences between it and the development stack are listed in its README.
+
+### `ascend-ai` (compose.yaml)
 
 | Service | Port | Purpose |
 |---|---|---|
 | Docling Serve | 5001 | Document conversion service |
 | Unstructured API | 9080 | Document parsing for RAG pipeline |
 | AscendMemory | 7020 | Semantic memory REST + MCP |
-| PaddleOCR | 7022 | OCR REST + MCP |
-| WeatherMCP | 9998 | Weather MCP |
-| AudioScribe | 7017 | Audio transcription MCP |
+| ascend-ocr | 7022 | OCR REST + MCP |
+| ascend-weather-mcp | 9998 | Weather MCP |
+| ascend-audio-scribe | 7017 | Audio transcription MCP |
 
-### `ascend-scrapper` (ascend-scrapper.docker-compose.yaml)
+### `ascend-scrapper` (compose.ascend-web-hunter.yaml)
 
 | Service | Port | Purpose |
 |---|---|---|
 | SearXNG | 9020 (bound to 127.0.0.1) | Privacy-respecting meta search engine |
 | FlareSolverr | 8191 (bound to 127.0.0.1) | Cloudflare bypass proxy for web scraping |
-| AscendWebSearch | 7021 | Web search & scraping MCP |
-| ngrok-ascend-web-search | – | Ngrok tunnel for NoVNC CAPTCHA intervention |
+| ascend-web-hunter | 7021 | Web search & scraping MCP |
+| ngrok-ascend-web-hunter | – | Ngrok tunnel for NoVNC CAPTCHA intervention |
 
 ## How to Build and Run
 
 ```bash
 # 1. Ensure external prerequisites are running (PostgreSQL :5432, Redis :6379, Qdrant :6333, S3-compatible object storage :9070)
 
-# 2. Start application and support services (the main file pulls in ascend-scrapper via `include:`)
+# 2. Start application and support services, including ascend-ai-agent itself, as containers
+#    (the main file pulls in ascend-scrapper via `include:`)
 docker compose up -d --build
-
-# Or bring up just the scrapper stack as its own Docker Desktop group:
-# docker compose -f ascend-scrapper.docker-compose.yaml up -d --build
 
 # 3. Ensure PostgreSQL has database 'ascend_ai' (user: postgres, password: local)
 
-# 4. Run the AscendAgent
-cd AscendAgent && ./gradlew bootRun
+# 4. ascend-ai-agent is already running as a container on :9917 from step 2. Only run it on the
+#    host instead (IDE debugging, breakpoints) if you first stop that one container, since both
+#    fight over port 9917:
+#    docker compose stop ascend-agent
+#    cd apps/ascend-agent
+#    ./gradlew bootRun
 
 # 5. Python services run via uvicorn or docker-compose
 ```
 
 ## Cross-Module Conventions
 
-- **Java modules** (AscendAgent, WeatherMCP): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.5.
-- **Python modules** (AudioScribe, AscendWebSearch, AscendMemory, PaddleOCR): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
+- **Java modules** (ascend-ai-agent, ascend-weather-mcp): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.5.
+- **Python modules** (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
+- **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) — never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
 - All services expose a `/health` endpoint for Docker healthchecks.
-- All services are containerized with Dockerfiles and wired through `docker-compose.yaml` (with `ascend-scrapper.docker-compose.yaml` included for the web-scraping stack).
-- MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the AscendAgent.
+- All services are containerized with Dockerfiles and wired through `compose.yaml` (with `compose.ascend-web-hunter.yaml` included for the web-scraping stack).
+- MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the ascend-ai-agent.
 
 ## End-to-End Test Suite
 
-Capability-level e2e tests for the AscendAgent live in [`AscendAgent/e2e/`](AscendAgent/e2e/README.md). Five numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`AscendAgent/e2e/README.md`](AscendAgent/e2e/README.md) for the full contract and capability matrix.
+Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-agent/e2e/`](apps/ascend-agent/e2e/README.md). Eleven numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-agent/e2e/README.md`](apps/ascend-agent/e2e/README.md) for the full contract and capability matrix.
+
+Before running any end-to-end test, in any of the six suites, ask the owner which run scenario from [`docs/E2E_RUN_SCENARIOS.md`](docs/E2E_RUN_SCENARIOS.md) they want. Always ask, and never assume one: the scenarios differ in which compose project is up, whether LM Studio must answer, whether a human needs to be at the keyboard, and how many specs run.
 
 ## IDE Compatibility
 
@@ -242,7 +267,7 @@ Ensure exact matching of existing indentation and formatting for the diff viewer
 In addition to the generic skill list above, this project relies on these domain-specific skills. Invoke them before starting work in the matching area:
 
 - `/springboot-patterns` or `/java-coding-standards` for Java/Spring Boot work
-- `/python-patterns` or `/python-testing` for Python work
+- `/python-patterns` for Python work
 - `/docker-patterns` for Docker/compose changes
 - `/api-design` for REST API design
 - `/git-workflow` for branching and commit conventions

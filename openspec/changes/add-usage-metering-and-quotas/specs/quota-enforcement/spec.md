@@ -4,7 +4,7 @@
 
 ### Requirement: Token budgets are enforced before the provider call
 
-AscendAgent SHALL enforce a per-tenant monthly token budget and a per-user daily token budget on every LLM-touching request, evaluated **before** the provider call. Budget windows are calendar month and calendar day in UTC. Platform-wide default budgets SHALL be configurable in `application.yaml` (`app.usage.quotas.*`), with per-tenant overrides stored in a Liquibase-managed quota configuration table. A request whose tenant or user budget is already met or exceeded SHALL be rejected with HTTP `429`.
+ascend-ai-agent SHALL enforce a per-tenant monthly token budget and a per-user daily token budget on every LLM-touching request, evaluated **before** the provider call. Budget windows are calendar month and calendar day in UTC. Platform-wide default budgets SHALL be configurable in `application.yaml` (`app.usage.quotas.*`), with per-tenant overrides stored in a Liquibase-managed quota configuration table. A request whose tenant or user budget is already met or exceeded SHALL be rejected with HTTP `429`.
 
 #### Scenario: Exhausted user budget rejects the request pre-call
 
@@ -51,7 +51,7 @@ The quota gate SHALL read per-window Redis counters incremented at ledger-write 
 
 ### Requirement: Soft-warning threshold emits an observable event once per window
 
-When recorded usage crosses a configurable warning threshold (default 80%) of a tenant or user budget, AscendAgent SHALL log one WARN line and increment `usage.quota.warning{scope}` exactly once per (scope, window).
+When recorded usage crosses a configurable warning threshold (default 80%) of a tenant or user budget, ascend-ai-agent SHALL log one WARN line and increment `usage.quota.warning{scope}` exactly once per (scope, window).
 
 #### Scenario: Crossing 80% fires exactly one warning
 

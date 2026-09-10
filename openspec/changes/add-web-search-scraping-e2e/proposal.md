@@ -2,7 +2,7 @@
 
 ## Why
 
-The AscendWebSearch read path escalates across four extraction tiers — `curl_cffi` (fast static HTTP),
+The ascend-web-hunter read path escalates across four extraction tiers — `curl_cffi` (fast static HTTP),
 FlareSolverr (Cloudflare WAF bypass), Playwright (client-side-rendered pages), and NoVNC (human CAPTCHA
 intervention). Today the e2e suite proves only the cheapest tier: test 3 reads `example.com`, a plain static page
 that the `curl_cffi` tier satisfies on its own. The Cloudflare, JavaScript-rendering, and CAPTCHA tiers — the
@@ -46,12 +46,12 @@ it takes the highest number and runs **last**.
 
 ## Fixtures needed
 
-None. The AscendWebSearch read tool takes a URL string argument, not an uploaded file; the "fixtures" here are the
+None. The ascend-web-hunter read tool takes a URL string argument, not an uploaded file; the "fixtures" here are the
 live external URLs declared in the tier table of the test-spec.
 
 ## Concurrency profile
 
-- **Mutates:** Redis — AscendWebSearch session / cookie cache, keys for this test's target domains
+- **Mutates:** Redis — ascend-web-hunter session / cookie cache, keys for this test's target domains
   (`en.wikipedia.org`, the Cloudflare target, `quotes.toscrape.com`, and any real-world category sites added
   later). The extraction pipeline writes per-domain session cookies on a successful fetch.
 - **Conflicts with:** any other test that reads or scrapes the same target URLs and may flush their Redis keys —
@@ -62,14 +62,14 @@ live external URLs declared in the tier table of the test-spec.
 
 ## API client invocation
 
-Bruno requests under `docs/api/request/AscendAI/web-search/testing/`, one per gated tier (created when this change
+Bruno requests under `docs/api/request/AscendAI/web-hunter/testing/`, one per gated tier (created when this change
 is applied):
 
 - `extract-tier-static-wikipedia.yml` — `POST /api/v2/web/read` for the Wikipedia article.
 - `extract-tier-cloudflare.yml` — `POST /api/v2/web/read` for the Cloudflare-challenged URL.
 - `extract-tier-js-quotes.yml` — `POST /api/v2/web/read` for the JS-rendered page.
 
-Run individually or via Bruno directory mode against `web-search/testing` with `--env ascend-local`.
+Run individually or via Bruno directory mode against `web-hunter/testing` with `--env ascend-local`.
 
 ## Number assignment
 
@@ -129,7 +129,7 @@ environment, never commit creds.
 
 ### Concurrency profile
 
-- **Mutates:** Redis — AscendWebSearch session store, keys for the matrix domains and the `e2e` profile of the
+- **Mutates:** Redis — ascend-web-hunter session store, keys for the matrix domains and the `e2e` profile of the
   login site.
 - **Conflicts with:** test 6 and any test sharing a target domain's session key. Each before/after pair (Part 2:
   anon → seed → authed; Part 3: blocked → human solve → after) is strictly ordered; Part 3 runs first on the main
@@ -138,7 +138,7 @@ environment, never commit creds.
 
 ### API client invocation
 
-Bruno requests under `docs/api/request/AscendAI/web-search/testing/`: the `realworld/` matrix (one per Part-1 row),
+Bruno requests under `docs/api/request/AscendAI/web-hunter/testing/`: the `realworld/` matrix (one per Part-1 row),
 `captcha-clearance-blocked.yml` (Part 3 Call 1), and `auth-read-secure-anon.yml` / `auth-read-secure.yml` (Part 2).
 Plus the Playwright harness `e2e/harness/seed_authenticated_session.py` (Part 2 scripted saucedemo login) and a Redis
 `GET session:google.com:default` capture check (Part 3, after the human solve). Part 3 needs no harness — the human

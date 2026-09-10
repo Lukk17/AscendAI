@@ -20,6 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
+      ascend_agent: ${{ steps.filter.outputs.ascend-agent == 'true' || steps.filter.outputs.workflows == 'true' }}
+      ascend_agent_changed: ${{ steps.filter.outputs.ascend-agent }}
+      ascend_weather_mcp_changed: ${{ steps.filter.outputs.ascend-weather-mcp }}
+      ascend_audio_scribe_changed: ${{ steps.filter.outputs.ascend-audio-scribe }}
+      ascend_web_hunter_changed: ${{ steps.filter.outputs.ascend-web-hunter }}
+      ascend_memory_changed: ${{ steps.filter.outputs.ascend-memory }}
+      ascend_ocr_changed: ${{ steps.filter.outputs.ascend-ocr }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,17 +36,17 @@ jobs:
         with:
           filters: |
             ascend-agent:
-              - 'AscendAgent/**'
-            weather-mcp:
-              - 'WeatherMCP/**'
-            audio-scribe:
-              - 'AudioScribe/**'
-            ascend-web-search:
-              - 'AscendWebSearch/**'
+              - 'apps/ascend-agent/**'
+            ascend-weather-mcp:
+              - 'apps/ascend-weather-mcp/**'
+            ascend-audio-scribe:
+              - 'apps/ascend-audio-scribe/**'
+            ascend-web-hunter:
+              - 'apps/ascend-web-hunter/**'
             ascend-memory:
-              - 'AscendMemory/**'
-            ascend-paddle-ocr:
-              - 'PaddleOCR/**'
+              - 'apps/ascend-memory/**'
+            ascend-ocr:
+              - 'apps/ascend-ocr/**'
             workflows:
               - '.github/workflows/**'
 
@@ -47,41 +54,171 @@ jobs:
         id: build-matrix
         run: |
           ALL_SERVICES='[
-            {"service":"ascend-agent",    "language":"java",   "path":"AscendAgent",    "python_version":""},
-            {"service":"weather-mcp",     "language":"java",   "path":"WeatherMCP",     "python_version":""},
-            {"service":"audio-scribe",    "language":"python", "path":"AudioScribe",    "python_version":"3.11"},
-            {"service":"ascend-web-search","language":"python","path":"AscendWebSearch","python_version":"3.12"},
-            {"service":"ascend-memory",   "language":"python", "path":"AscendMemory",   "python_version":"3.11"},
-            {"service":"ascend-paddle-ocr",      "language":"python", "path":"PaddleOCR",      "python_version":"3.11"}
+            {"service":"ascend-agent",    "language":"java",   "path":"apps/ascend-agent",    "python_version":""},
+            {"service":"ascend-weather-mcp",     "language":"java",   "path":"apps/ascend-weather-mcp",     "python_version":""},
+            {"service":"ascend-audio-scribe",    "language":"python", "path":"apps/ascend-audio-scribe",    "python_version":"3.11"},
+            {"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"},
+            {"service":"ascend-memory",   "language":"python", "path":"apps/ascend-memory",   "python_version":"3.11"},
+            {"service":"ascend-ocr",      "language":"python", "path":"apps/ascend-ocr",      "python_version":"3.11"}
           ]'
 
           WORKFLOWS_CHANGED="${{ steps.filter.outputs.workflows }}"
           ASCEND_AGENT="${{ steps.filter.outputs.ascend-agent }}"
-          WEATHER_MCP="${{ steps.filter.outputs.weather-mcp }}"
-          AUDIO_SCRIBE="${{ steps.filter.outputs.audio-scribe }}"
-          ASCEND_WEB_SEARCH="${{ steps.filter.outputs.ascend-web-search }}"
+          ASCEND_WEATHER_MCP="${{ steps.filter.outputs.ascend-weather-mcp }}"
+          ASCEND_AUDIO_SCRIBE="${{ steps.filter.outputs.ascend-audio-scribe }}"
+          ASCEND_WEB_HUNTER="${{ steps.filter.outputs.ascend-web-hunter }}"
           ASCEND_MEMORY="${{ steps.filter.outputs.ascend-memory }}"
-          PADDLE_OCR="${{ steps.filter.outputs.ascend-paddle-ocr }}"
+          ASCEND_OCR="${{ steps.filter.outputs.ascend-ocr }}"
 
           if [ "$WORKFLOWS_CHANGED" = "true" ]; then
             MATRIX="{\"include\":$(echo "$ALL_SERVICES" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')}"
           else
             INCLUDE="[]"
-            if [ "$ASCEND_AGENT"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-agent","language":"java","path":"AscendAgent","python_version":""}); print(json.dumps(a))'); fi
-            if [ "$WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"weather-mcp","language":"java","path":"WeatherMCP","python_version":""}); print(json.dumps(a))'); fi
-            if [ "$AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"audio-scribe","language":"python","path":"AudioScribe","python_version":"3.11"}); print(json.dumps(a))'); fi
-            if [ "$ASCEND_WEB_SEARCH" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-search","language":"python","path":"AscendWebSearch","python_version":"3.12"}); print(json.dumps(a))'); fi
-            if [ "$ASCEND_MEMORY"    = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-memory","language":"python","path":"AscendMemory","python_version":"3.11"}); print(json.dumps(a))'); fi
-            if [ "$PADDLE_OCR"       = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-paddle-ocr","language":"python","path":"PaddleOCR","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_AGENT"  = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-agent","language":"java","path":"apps/ascend-agent","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_WEATHER_MCP"      = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-weather-mcp","language":"java","path":"apps/ascend-weather-mcp","python_version":""}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_AUDIO_SCRIBE"     = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-audio-scribe","language":"python","path":"apps/ascend-audio-scribe","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_WEB_HUNTER" = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-web-hunter","language":"python","path":"apps/ascend-web-hunter","python_version":"3.12"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_MEMORY"    = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-memory","language":"python","path":"apps/ascend-memory","python_version":"3.11"}); print(json.dumps(a))'); fi
+            if [ "$ASCEND_OCR"       = "true" ]; then INCLUDE=$(echo "$INCLUDE" | python3 -c 'import sys,json; a=json.load(sys.stdin); a.append({"service":"ascend-ocr","language":"python","path":"apps/ascend-ocr","python_version":"3.11"}); print(json.dumps(a))'); fi
             MATRIX="{\"include\":$INCLUDE}"
           fi
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
+  verify-changelog:
+    name: Verify changelog version bump
+    needs: changes
+    if: >-
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+      && (needs.changes.outputs.ascend_agent_changed == 'true'
+        || needs.changes.outputs.ascend_weather_mcp_changed == 'true'
+        || needs.changes.outputs.ascend_audio_scribe_changed == 'true'
+        || needs.changes.outputs.ascend_web_hunter_changed == 'true'
+        || needs.changes.outputs.ascend_memory_changed == 'true'
+        || needs.changes.outputs.ascend_ocr_changed == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Resolve the comparison base ref
+        id: base
+        run: |
+          set -euo pipefail
+
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+          if [ -z "${BASE_REF}" ]; then
+            # No pull request event, for example a manual dispatch: compare against master.
+            BASE_REF="master"
+          fi
+          echo "ref=${BASE_REF}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the base ref tip
+        run: git fetch --depth=1 origin "${{ steps.base.outputs.ref }}"
+
+      - name: Verify changelog version bumps for changed apps
+        env:
+          BASE_REF: ${{ steps.base.outputs.ref }}
+        run: |
+          set -euo pipefail
+
+          head_version() {
+            local FILE="$1"
+            if [ ! -f "$FILE" ]; then
+              printf 'ERROR: %s does not exist at HEAD.\n' "$FILE" >&2
+              return 1
+            fi
+            grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' "$FILE" || {
+              printf 'ERROR: no "## [x.y.z]" version entry found in %s at HEAD.\n' "$FILE" >&2
+              return 1
+            }
+          }
+
+          base_version() {
+            local FILE="$1"
+            local CONTENT
+            if ! CONTENT=$(git show "origin/${BASE_REF}:$FILE" 2>/dev/null); then
+              # File does not exist on the base branch. This is acceptable for newly added modules.
+              # Return a sentinel version to signal "no prior version"; still validate that
+              # the branch's changelog is present, parseable, and has content.
+              printf '0.0.0'
+              return 0
+            fi
+            printf '%s' "$CONTENT" | grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' || {
+              printf 'ERROR: no "## [x.y.z]" version entry found in %s at origin/%s.\n' "$FILE" "$BASE_REF" >&2
+              return 1
+            }
+          }
+
+          top_entry_has_content() {
+            local FILE="$1"
+            awk '
+              /^##[[:space:]]*\[[0-9]+\.[0-9]+\.[0-9]+\]/ {
+                if (seen) { exit }
+                seen = 1
+                next
+              }
+              seen && /^##[[:space:]]/ { exit }
+              seen { print }
+            ' "$FILE" | grep -qv '^[[:space:]]*$'
+          }
+
+          check_service() {
+            local SERVICE="$1"
+            local CHANGELOG="$2"
+            local HEAD_VERSION BASE_VERSION LOWER
+
+            HEAD_VERSION=$(head_version "$CHANGELOG") || return 1
+            BASE_VERSION=$(base_version "$CHANGELOG") || return 1
+
+            if [ "$BASE_VERSION" = "0.0.0" ]; then
+              printf '\n--- %s ---\nHEAD:   %s\n%s: (new module, no prior version)\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF"
+            else
+              printf '\n--- %s ---\nHEAD:   %s\n%s: %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF" "$BASE_VERSION"
+            fi
+
+            if [ "$HEAD_VERSION" = "$BASE_VERSION" ]; then
+              printf 'ERROR: %s CHANGELOG version equals %s (%s). Add a new top entry before merging.\n' "$SERVICE" "$BASE_REF" "$HEAD_VERSION"
+              return 1
+            fi
+
+            LOWER=$(printf '%s\n%s\n' "$BASE_VERSION" "$HEAD_VERSION" | sort -V | head -1)
+            if [ "$LOWER" != "$BASE_VERSION" ]; then
+              printf 'ERROR: %s HEAD version %s is not greater than %s %s.\n' "$SERVICE" "$HEAD_VERSION" "$BASE_REF" "$BASE_VERSION"
+              return 1
+            fi
+
+            if ! top_entry_has_content "$CHANGELOG"; then
+              printf 'ERROR: %s CHANGELOG top entry %s has no content beneath it. Describe the change before merging.\n' "$SERVICE" "$HEAD_VERSION"
+              return 1
+            fi
+
+            if [ "$BASE_VERSION" = "0.0.0" ]; then
+              printf 'OK: %s %s (new module, first release)\n' "$SERVICE" "$HEAD_VERSION"
+            else
+              printf 'OK: %s %s > %s\n' "$SERVICE" "$HEAD_VERSION" "$BASE_VERSION"
+            fi
+          }
+
+          FAILED=0
+          if [ "${{ needs.changes.outputs.ascend_agent_changed }}" = "true" ]; then check_service ascend-agent apps/ascend-agent/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_weather_mcp_changed }}" = "true" ]; then check_service ascend-weather-mcp apps/ascend-weather-mcp/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_audio_scribe_changed }}" = "true" ]; then check_service ascend-audio-scribe apps/ascend-audio-scribe/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_web_hunter_changed }}" = "true" ]; then check_service ascend-web-hunter apps/ascend-web-hunter/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_memory_changed }}" = "true" ]; then check_service ascend-memory apps/ascend-memory/CHANGELOG.md || FAILED=1; fi
+          if [ "${{ needs.changes.outputs.ascend_ocr_changed }}" = "true" ]; then check_service ascend-ocr apps/ascend-ocr/CHANGELOG.md || FAILED=1; fi
+          exit "$FAILED"
+
   build:
     name: Build & test ${{ matrix.service }}
-    needs: changes
-    if: ${{ fromJSON(needs.changes.outputs.matrix).include[0] != null }}
+    needs: [changes, verify-changelog]
+    if: >-
+      !cancelled()
+      && needs.verify-changelog.result != 'failure'
+      && fromJSON(needs.changes.outputs.matrix).include[0] != null
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -107,6 +244,14 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: ./gradlew --no-daemon build test
 
+      # ascend-agent is the only Gradle module with a configured coverage
+      # floor (jacocoTestCoverageVerification, 80% instruction coverage).
+      # ascend-weather-mcp has no such task, so nothing runs for it here.
+      - name: Enforce Jacoco coverage gate (ascend-agent)
+        if: matrix.service == 'ascend-agent'
+        working-directory: ${{ matrix.path }}
+        run: ./gradlew --no-daemon jacocoTestCoverageVerification
+
       # ── Python steps ───────────────────────────────────────────────────────
       - name: Set up Python ${{ matrix.python_version }}
         if: matrix.language == 'python'
@@ -120,10 +265,30 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: pip install -e .[dev]
 
-      - name: Run pytest
+      - name: Ruff lint
         if: matrix.language == 'python'
         working-directory: ${{ matrix.path }}
+        run: ruff check .
+
+      - name: Mypy type check
+        if: matrix.language == 'python'
+        working-directory: ${{ matrix.path }}
+        run: mypy src
+
+      # ascend-audio-scribe and ascend-ocr already bake --cov-fail-under=100
+      # into their own pytest addopts, so plain `pytest` enforces it.
+      - name: Run pytest
+        if: matrix.language == 'python' && matrix.service != 'ascend-web-hunter' && matrix.service != 'ascend-memory'
+        working-directory: ${{ matrix.path }}
         run: pytest
+
+      # ascend-web-hunter and ascend-memory declare fail_under=100 in
+      # [tool.coverage.report] but do not bake it into pytest addopts, so the
+      # coverage flags must be passed explicitly to actually enforce it.
+      - name: Run pytest with coverage gate
+        if: matrix.service == 'ascend-web-hunter' || matrix.service == 'ascend-memory'
+        working-directory: ${{ matrix.path }}
+        run: pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 
       # ── Artifact upload (always) ────────────────────────────────────────────
       - name: Upload test results
@@ -135,4 +300,41 @@ jobs:
             ${{ matrix.path }}/build/test-results/**/*.xml
             ${{ matrix.path }}/.pytest_cache
             ${{ matrix.path }}/test-results
+          if-no-files-found: ignore
+
+  integration-test:
+    name: Integration test (Testcontainers) ascend-agent
+    needs: [changes, verify-changelog]
+    if: >-
+      !cancelled()
+      && needs.verify-changelog.result != 'failure'
+      && needs.changes.outputs.ascend_agent == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java (Temurin 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Runs in a separate job, in parallel with the fast unit-test matrix
+      # above, rather than as an extra step in it: Testcontainers pulls and
+      # boots Postgres, Redis and Qdrant images, which is slow and would
+      # delay the fast unit-test signal for every other module. ubuntu-latest
+      # ships a working Docker daemon, so no extra setup is needed here.
+      - name: Gradle integration test (Testcontainers)
+        working-directory: apps/ascend-agent
+        run: ./gradlew --no-daemon integrationTest
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-ascend-agent
+          path: apps/ascend-agent/build/test-results/**/*.xml
           if-no-files-found: ignore

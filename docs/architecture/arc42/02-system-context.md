@@ -9,12 +9,12 @@ graph TB
     User["User / Client"]
 
     subgraph "AscendAI Platform"
-        Agent["AscendAgent"]
-        AudioScribe["AudioScribe"]
-        Weather["WeatherMCP"]
-        WebSearch["AscendWebSearch"]
+        Agent["ascend-ai-agent"]
+        AudioScribe["ascend-audio-scribe"]
+        Weather["ascend-weather-mcp"]
+        WebHunter["ascend-web-hunter"]
         Memory["AscendMemory"]
-        PaddleOCR["PaddleOCR"]
+        PaddleOCR["ascend-ocr"]
     end
 
     subgraph "AI Providers"
@@ -42,7 +42,7 @@ graph TB
     User -->|"REST API"| Agent
     Agent -->|"MCP"| AudioScribe
     Agent -->|"MCP"| Weather
-    Agent -->|"MCP"| WebSearch
+    Agent -->|"MCP"| WebHunter
     Agent -->|"MCP"| PaddleOCR
     Agent -->|"REST"| Memory
     Agent --> Postgres
@@ -56,8 +56,8 @@ graph TB
     Agent -.->|"per-request"| Anthropic
     Agent -.->|"per-request"| Gemini
     Agent -.->|"per-request"| MiniMax
-    WebSearch --> SearXNG
-    WebSearch --> FlareSolverr
+    WebHunter --> SearXNG
+    WebHunter --> FlareSolverr
     Memory --> Qdrant
 ```
 

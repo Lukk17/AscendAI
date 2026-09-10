@@ -14,6 +14,11 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("memory endpoint returns valid response with status", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("status");
+        });
 
 settings:
   encodeUrl: true

@@ -1,6 +1,6 @@
 ## Context
 
-AscendAgent is the only service with a Postgres connection and the only place all five data stores (Postgres, Redis, MinIO, Qdrant, AscendMemory) are already wired as clients — so both the audit trail and the erasure orchestrator live there. Current state, verified:
+ascend-ai-agent is the only service with a Postgres connection and the only place all five data stores (Postgres, Redis, MinIO, Qdrant, AscendMemory) are already wired as clients — so both the audit trail and the erasure orchestrator live there. Current state, verified:
 
 - No audit table, recorder, or query API exists anywhere.
 - `PromptController.java:90-97` logs the full prompt at INFO. `application.yaml:397-404` sets `org.springframework.ai: DEBUG` (real content leak via Spring AI's advisor/model logging) and `com.lukk.ai.agent: DEBUG` (stale logger name — actual package is `com.lukk.ascend.ai.agent`, so this line is a no-op and the app effectively logs at root INFO). `application-docker.yaml` has **no** `logging:` block, so the DEBUG leak carries into the container posture. Vector ships all container stdout to Loki (168h retention).
@@ -51,7 +51,7 @@ GDPR Article 17(3)(b) permits retaining data needed for legal obligations; an au
 
 ### D6 — Prompt redaction at the source, levels fixed in the docker profile
 
-Three layers: a) `PromptController` logs `promptLength` + `promptSha256` instead of the body (the hash lets support correlate a user-reported prompt with logs without storing content); b) `application-docker.yaml` gains a `logging.level` block pinning `org.springframework.ai: INFO` and `com.lukk.ascend.ai.agent: INFO` (also fixing the stale `com.lukk.ai.agent` logger name in base `application.yaml`); c) a redaction convention in `docs/COMPLIANCE.md`: user-supplied content (prompts, documents, transcripts, memory text, scraped pages, OCR output) is never a log argument — log lengths, counts, hashes, ids. The Python services are swept against this convention (AscendMemory's REST layer spot-checked clean already; AudioScribe/AscendWebSearch/PaddleOCR to verify). DEBUG for AI packages remains available in the local dev profile — redaction is a posture of the shipped profiles, not a removal of debuggability.
+Three layers: a) `PromptController` logs `promptLength` + `promptSha256` instead of the body (the hash lets support correlate a user-reported prompt with logs without storing content); b) `application-docker.yaml` gains a `logging.level` block pinning `org.springframework.ai: INFO` and `com.lukk.ascend.ai.agent: INFO` (also fixing the stale `com.lukk.ai.agent` logger name in base `application.yaml`); c) a redaction convention in `docs/COMPLIANCE.md`: user-supplied content (prompts, documents, transcripts, memory text, scraped pages, OCR output) is never a log argument — log lengths, counts, hashes, ids. The Python services are swept against this convention (AscendMemory's REST layer spot-checked clean already; apps/ascend-audio-scribe/apps/ascend-web-hunter/ascend-ocr to verify). DEBUG for AI packages remains available in the local dev profile — redaction is a posture of the shipped profiles, not a removal of debuggability.
 
 ### D7 — Retention as an in-app scheduled job, not a cron container
 

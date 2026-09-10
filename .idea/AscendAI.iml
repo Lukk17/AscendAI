@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-memory/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-memory/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-web-hunter/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-web-hunter/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-audio-scribe/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-audio-scribe/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-ocr/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/ascend-ocr/tests" isTestSource="true" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/ascend-memory/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/ascend-web-hunter/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/ascend-audio-scribe/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/ascend-ocr/.venv" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

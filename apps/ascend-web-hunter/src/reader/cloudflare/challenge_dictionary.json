@@ -1,0 +1,30 @@
+{
+  "waf_script_signatures": [
+    "arkoselabs.com",
+    "recaptcha/api.js",
+    "hcaptcha.com/1/api.js",
+    "perimeterx.net"
+  ],
+  "waf_strict_phrases": [
+    "Prove your humanity",
+    "Pardon Our Interruption",
+    "Please verify you are a human",
+    "Checking if the site connection is secure",
+    "Just a moment...",
+    "Attention Required!",
+    "DataDome CAPTCHA",
+    "Please enable JS and disable any ad blocker",
+    "Sorry, we just need to make sure you're not a robot",
+    "Potwierdź, że nie jesteś robotem"
+  ],
+  "waf_structural_markers": [
+    "/errors_page/validateCaptcha"
+  ],
+  "login_title_patterns": [
+    "sign in",
+    "log in",
+    "login",
+    "sign into",
+    "create account"
+  ]
+}

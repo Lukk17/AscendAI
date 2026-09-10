@@ -1,6 +1,6 @@
 ## Purpose
 
-Allows users to select which AI provider and model to use for each prompt, exposing the multi-provider routing capability of the AscendAgent backend.
+Allows users to select which AI provider and model to use for each prompt, exposing the multi-provider routing capability of the ascend-ai-agent backend.
 
 ## ADDED Requirements
 

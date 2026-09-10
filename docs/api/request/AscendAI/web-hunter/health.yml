@@ -1,0 +1,27 @@
+info:
+  name: health
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/health"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("web-hunter endpoint returns response", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(typeof data).to.equal("object");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

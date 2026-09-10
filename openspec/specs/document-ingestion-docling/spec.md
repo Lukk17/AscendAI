@@ -1,15 +1,17 @@
 # document-ingestion-docling Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+ascend-ai-agent converts uploaded documents through `docling-serve`, and this capability pins how it addresses that service. The client posts multipart files to the real conversion endpoint, the shipped defaults work against the `docling-serve` instance in the monorepo compose file with no overrides, the earlier wrong path is normalised with a warning instead of silently returning 404, and the fully resolved upload URL is logged at startup so a misconfiguration surfaces at boot rather than at the first user request.
+
 ## Requirements
 ### Requirement: Docling client targets the correct upload endpoint
 
-The Docling client SHALL POST multipart files to the `/v1/convert/file` endpoint of `docling-serve`. The default configuration SHALL work out of the box against the `docling-serve` instance defined in the monorepo `docker-compose.yaml` (port 5001).
+The Docling client SHALL POST multipart files to the `/v1/convert/file` endpoint of `docling-serve`. The default configuration SHALL work out of the box against the `docling-serve` instance defined in the monorepo `compose.yaml` (port 5001).
 
 #### Scenario: Default configuration round-trips
 
-- **WHEN** AscendAgent boots with no overrides for `app.docling.base-url` or `app.docling.api-path` and `docling-serve` is running on `http://localhost:5001`
+- **WHEN** ascend-ai-agent boots with no overrides for `app.docling.base-url` or `app.docling.api-path` and `docling-serve` is running on `http://localhost:5001`
 - **THEN** the resolved Docling URL is `http://localhost:5001/v1/convert/file?to_formats=json`
 - **AND** a multipart POST to that URL succeeds (HTTP 200) for a valid PDF
 
@@ -31,6 +33,6 @@ The Docling client SHALL log the fully-resolved upload URL at startup so misconf
 
 #### Scenario: Boot-time log
 
-- **WHEN** AscendAgent finishes startup
+- **WHEN** ascend-ai-agent finishes startup
 - **THEN** the logs contain a single INFO line of the form `[DoclingClient] Configured upload endpoint: <fully-resolved-url>`
 

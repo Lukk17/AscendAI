@@ -1,6 +1,6 @@
 ## 1. Database — conversations schema and backfill
 
-- [ ] 1.1 Create `AscendAgent/src/main/resources/db/changelog/02-conversations.xml` and register it in `db.changelog-master.yaml`: changeset creating `conversations` (`id` UUID PK, `tenant_id` VARCHAR(255) nullable, `user_id` VARCHAR(255) not null, `title` VARCHAR(255) not null, `created_at` / `updated_at` TIMESTAMP not null) plus index on `user_id`
+- [ ] 1.1 Create `apps/ascend-agent/src/main/resources/db/changelog/02-conversations.xml` and register it in `db.changelog-master.yaml`: changeset creating `conversations` (`id` UUID PK, `tenant_id` VARCHAR(255) nullable, `user_id` VARCHAR(255) not null, `title` VARCHAR(255) not null, `created_at` / `updated_at` TIMESTAMP not null) plus index on `user_id`
 - [ ] 1.2 Changeset adding nullable `chat_history.conversation_id` (UUID)
 - [ ] 1.3 Backfill changeset (SQL): insert one `conversations` row per distinct `chat_history.user_id` (title `Imported conversation`, `created_at` = MIN(created_at), `updated_at` = MAX(created_at), id via `gen_random_uuid()`), then `UPDATE chat_history SET conversation_id = c.id FROM conversations c WHERE chat_history.user_id = c.user_id`
 - [ ] 1.4 Constraint changesets (separate from backfill): `NOT NULL` on `conversation_id`, FK to `conversations.id`, index `idx_chat_history_conversation_id`; add `rollback` blocks to every changeset in 1.1-1.4
@@ -56,7 +56,7 @@
 
 ## 8. Documentation and API collection
 
-- [ ] 8.1 Update `AscendAgent/AGENTS.md`: document `/api/v1/ai/prompt/stream` (event schema), the `conversationId` field, and the `/api/v1/conversations` API in the architecture/API sections
+- [ ] 8.1 Update `apps/ascend-agent/AGENTS.md`: document `/api/v1/ai/prompt/stream` (event schema), the `conversationId` field, and the `/api/v1/conversations` API in the architecture/API sections
 - [ ] 8.2 Add Bruno requests under `docs/api/request/AscendAI/ascend-agent/`: stream prompt (with SSE note), list conversations, create, get messages, rename, delete
-- [ ] 8.3 Add an ADR in `AscendAgent/docs/architecture/decisions/` recording the SSE-endpoint-over-content-negotiation and conversation-resolution decisions
+- [ ] 8.3 Add an ADR in `apps/ascend-agent/docs/architecture/decisions/` recording the SSE-endpoint-over-content-negotiation and conversation-resolution decisions
 - [ ] 8.4 Update `openspec/changes/add-chat-streaming-and-conversations/tasks.md` checkboxes as work proceeds

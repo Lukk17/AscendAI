@@ -1,7 +1,7 @@
 info:
   name: transcribe-local-timestamped
   type: http
-  seq: 6
+  seq: 7
 
 http:
   method: POST
@@ -40,6 +40,24 @@ runtime:
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
+        });
+        test("transcribe_local with timestamps returns success envelope with timestamped segments", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.status).to.equal("success");
+            expect(payload).to.have.property("source");
+            expect(payload.source).to.equal("local");
+            expect(payload).to.have.property("language");
+            expect(payload.language).to.equal("en");
+            expect(payload).to.have.property("transcription");
+            expect(payload.transcription).to.be.an("array");
+            if (payload.transcription.length > 0) {
+                expect(payload.transcription[0]).to.have.property("text");
+                expect(payload.transcription[0]).to.have.property("timestamp");
+                expect(payload.transcription[0].timestamp).to.be.an("array");
+            }
         });
 
 settings:

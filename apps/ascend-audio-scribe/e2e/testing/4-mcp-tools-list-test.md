@@ -1,0 +1,88 @@
+# MCP tools/list contract: e2e test
+
+## What this verifies
+
+- The MCP `initialize` handshake against `POST /mcp` returns HTTP 200 with an `Mcp-Session-Id` header containing a
+  non-empty 32 character hexadecimal session id without hyphens.
+- A subsequent `tools/list` JSON-RPC call with the captured `Mcp-Session-Id` returns HTTP 200.
+- The JSON-RPC `result.tools` array advertises **at least** the four transcribe tools (`transcribe_local`,
+  `transcribe_openai`, `transcribe_hf`, `transcribe_audacity`) plus `health`.
+- Each transcribe tool's `inputSchema.properties` advertises `audio_uri` as a required parameter.
+- `transcribe_local` and `transcribe_audacity` also advertise `model`, `language` (optional).
+- `transcribe_openai` advertises `model`, `language` (optional).
+- `transcribe_hf` advertises `model`, `hf_provider` (optional).
+- No external API (OpenAI, Hugging Face) is invoked. `tools/list` is a pure protocol probe — running the test
+  without `OPENAI_API_KEY` / `HF_TOKEN` still passes; the tool definitions are advertised regardless of which
+  providers are configured.
+
+## Prerequisites
+
+Check Bruno CLI is installed.
+
+```bash
+bru --version
+```
+
+Expect a version string.
+
+Check the ascend-audio-scribe server is reachable.
+
+```bash
+curl -fsS http://localhost:7017/health
+```
+
+Expect HTTP 200 with `{"status":"ok","service":"ascend-audio-scribe"}`.
+
+## Reset state
+
+None. `tools/list` is read-only and writes no persisted state.
+
+## Run
+
+```bash
+cd docs/api/request/AscendAI
+```
+
+**Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the response headers.
+
+**PowerShell:**
+
+```powershell
+curl.exe -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
+```
+
+**Unix:**
+
+```bash
+curl -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
+```
+
+Look for `Mcp-Session-Id: <session id>` in the response. The value is a 32 character hexadecimal session id without hyphens,
+as FastMCP emits it. Use that session id as the value of the `mcp_session_id` env-var in the next step(s).
+
+**Step 2.** Send the tool call(s) with the captured session ID injected:
+
+```bash
+bru run "transcribe/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
+```
+
+## Expected
+
+Step 1 returns HTTP 200. The response carries an `Mcp-Session-Id` header whose value is a non-empty string (FastMCP
+emits a 32 character hexadecimal session id without hyphens).
+
+Step 2 returns HTTP 200. The JSON-RPC `result.tools` array satisfies:
+
+- Length is at least 5.
+- Contains entries with `name` equal to each of `transcribe_local`, `transcribe_openai`, `transcribe_hf`,
+  `transcribe_audacity`, `health`.
+- Every transcribe entry's `inputSchema.properties` includes `audio_uri`.
+- `transcribe_openai` entry's `inputSchema.properties` includes `model` and `language`.
+- `transcribe_hf` entry's `inputSchema.properties` includes `model` and `hf_provider`.
+- `transcribe_local` entry's `inputSchema.properties` includes `model`, `language`, `with_timestamps`.
+- `transcribe_audacity` entry's `inputSchema.properties` includes `provider`, `model`, `language`.
+- Every transcribe entry's `description` is a non-empty string.
+
+## Fixtures
+
+None.

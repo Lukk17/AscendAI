@@ -1,0 +1,50 @@
+info:
+  name: clearance-reuse
+  type: http
+  seq: 21
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Spec 12 Call 2: read the same Cloudflare-protected page under a different address after
+    # Call 1 stored the clearance under session:scrapingcourse.com:default. The query string
+    # misses the reader's five-minute in-memory read cache, so this read has to go through the
+    # site again. No profile field, so the read resolves to the default profile Call 1 stored
+    # under. With the clearance reused this answers 200 success faster than the cold read and
+    # never a 428.
+    data: |-
+      {
+        "url": "https://www.scrapingcourse.com/cloudflare-challenge?reuse=1",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("reuse: HTTP 200, no intervention", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("reuse: status is success (stored clearance reused)", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("reuse: a content-carrying field holds at least 50 characters", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            const contentField = ["content", "text", "markdown"].find(function (field) { return typeof data[field] === "string"; });
+            expect(contentField, "content-carrying string field").to.be.a("string");
+            expect(data[contentField].length).to.be.at.least(50);
+        });
+        test("reuse: the body carries no vnc_url", function () {
+            expect(res.getBody()).to.not.have.property("vnc_url");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

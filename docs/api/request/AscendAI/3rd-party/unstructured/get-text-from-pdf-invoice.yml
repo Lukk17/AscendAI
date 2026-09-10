@@ -49,6 +49,14 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("document extraction returns structured content", function () {
+            const body = res.getBody();
+            expect(body).to.be.a("string");
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            expect(data).to.have.property("result");
+            expect(data.result).to.be.an("array");
+            expect(data.result.length).to.be.at.least(1);
+        });
 
 settings:
   encodeUrl: true

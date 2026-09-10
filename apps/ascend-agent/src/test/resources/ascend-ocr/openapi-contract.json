@@ -1,0 +1,230 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "PaddleOCR",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/v1/ocr": {
+            "post": {
+                "summary": "Run OCR on an uploaded file",
+                "operationId": "process_ocr_v1_ocr_post",
+                "parameters": [
+                    {
+                        "name": "lang",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Lang"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_process_ocr_v1_ocr_post"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "summary": "Health Check",
+                "operationId": "health_check_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HealthResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "summary": "Readiness Check",
+                "operationId": "readiness_check_ready_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReadinessResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Body_process_ocr_v1_ocr_post": {
+                "properties": {
+                    "file": {
+                        "type": "string",
+                        "contentMediaType": "application/octet-stream",
+                        "title": "File"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "file"
+                ],
+                "title": "Body_process_ocr_v1_ocr_post"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "HealthResponse": {
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ok",
+                            "warming-up"
+                        ],
+                        "title": "Status",
+                        "default": "ok"
+                    },
+                    "version": {
+                        "type": "string",
+                        "title": "Version"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "version"
+                ],
+                "title": "HealthResponse"
+            },
+            "ReadinessResponse": {
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ready",
+                            "not-ready"
+                        ],
+                        "title": "Status"
+                    },
+                    "version": {
+                        "type": "string",
+                        "title": "Version"
+                    },
+                    "engine_warm": {
+                        "type": "boolean",
+                        "title": "Engine Warm"
+                    },
+                    "accepting_work": {
+                        "type": "boolean",
+                        "title": "Accepting Work"
+                    },
+                    "queue_depth": {
+                        "type": "integer",
+                        "minimum": 0.0,
+                        "title": "Queue Depth"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status",
+                    "version",
+                    "engine_warm",
+                    "accepting_work",
+                    "queue_depth"
+                ],
+                "title": "ReadinessResponse"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        }
+    }
+}

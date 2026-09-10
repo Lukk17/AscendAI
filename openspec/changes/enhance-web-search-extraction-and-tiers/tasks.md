@@ -24,19 +24,19 @@
 
 ## 4. Schema-guided extraction and self-healing recipes
 
-- [ ] 4.1 Add a schema-extraction read mode (REST + MCP): caller supplies a JSON schema, service returns schema-valid JSON via a configurable OpenAI-compatible endpoint (`EXTRACTION_LLM_BASE_URL` / model — local, AscendAgent proxy, or cloud)
+- [ ] 4.1 Add a schema-extraction read mode (REST + MCP): caller supplies a JSON schema, service returns schema-valid JSON via a configurable OpenAI-compatible endpoint (`EXTRACTION_LLM_BASE_URL` / model — local, ascend-ai-agent proxy, or cloud)
 - [ ] 4.2 On first extraction per domain, persist LLM-emitted CSS/XPath selectors as a recipe (store with TTL); replay selectors on subsequent extractions and skip the model
 - [ ] 4.3 Validate every replay against the caller's schema; on drift (empty/type-mismatched fields) regenerate the recipe
 - [ ] 4.4 Tests: schema extraction returns schema-valid JSON; second call for the same domain is model-free (recipe replay); induced drift regenerates the recipe
 
 ## 5. Non-HTML routing and output formats
 
-- [ ] 5.1 Route linked PDFs to Docling, image-heavy pages / linked images to PaddleOCR, linked audio to AudioScribe (service URLs from config); merge extracted text into the result
+- [ ] 5.1 Route linked PDFs to Docling, image-heavy pages / linked images to ascend-ocr, linked audio to ascend-audio-scribe (service URLs from config); merge extracted text into the result
 - [ ] 5.2 Add full-page screenshot and extracted-tables-as-rows to the selectable output formats
 - [ ] 5.3 Tests: a page linking a PDF yields Docling-extracted text; a table page yields structured rows; screenshot output returns image bytes
 
 ## 6. Documentation
 
-- [ ] 6.1 Update `AscendWebSearch/AGENTS.md`: new tier ladder, extraction modes, output formats, config variables
+- [ ] 6.1 Update `apps/ascend-web-hunter/AGENTS.md`: new tier ladder, extraction modes, output formats, config variables
 - [ ] 6.2 ADRs for the tier restructure (FlareSolverr retirement) and the self-healing recipe model
-- [ ] 6.3 Run `pytest` for AscendWebSearch; all green
+- [ ] 6.3 Run `pytest` for ascend-web-hunter; all green

@@ -26,16 +26,25 @@ and Architecture Decision Records (ADRs).
 
 ---
 
+### Design documents
+
+| Document                                                            | Description                                                                                      |
+| :------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------- |
+| [Permission-aware retrieval](permission-aware-retrieval.md)         | How access lists reach chunks, how the filter runs inside the vector search, and what goes stale. |
+| [Memory budget across the stack](memory-budget.md)                  | Idle and peak memory per service, the sum of configured limits against the host, and the realistic worst case. |
+
+---
+
 ### Architecture Decision Records
 
 | Index                                  | Description                                              |
 | :------------------------------------- | :------------------------------------------------------- |
-| [ADR Index](decisions/README.md)       | All monorepo-level and AscendAgent-specific ADRs.        |
+| [ADR Index](decisions/README.md)       | All monorepo-level and ascend-ai-agent-specific ADRs.        |
 
 ---
 
 ### Module-level architecture
 
-The AscendAgent has its own detailed arc42 documentation in
-[AscendAgent/docs/architecture/](../../AscendAgent/docs/architecture/) covering internal class structure, component
+The ascend-ai-agent has its own detailed arc42 documentation in
+[apps/ascend-agent/docs/architecture/](../../apps/ascend-agent/docs/architecture/) covering internal class structure, component
 diagrams, and module-specific ADRs.

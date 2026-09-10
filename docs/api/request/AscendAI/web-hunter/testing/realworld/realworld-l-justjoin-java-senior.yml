@@ -1,0 +1,44 @@
+info:
+  name: realworld-l-justjoin-java-senior
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns valid status code (200 or 428)", function () {
+            const st = res.getStatus();
+            expect([200, 428]).to.include(st);
+        });
+        test("body status field is success or human-intervention (never error)", function () {
+            const st = res.getStatus();
+            const b = res.getBody() || {};
+            if (st === 200) {
+                expect(b.status).to.equal("success");
+                const content = b.content || b.text || b.markdown || "";
+                expect(content.length, "success must carry content").to.be.at.least(1);
+            } else {
+                expect(b.status).to.equal("human_intervention_required");
+                expect(b.vnc_url).to.be.a("string").and.not.empty;
+            }
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

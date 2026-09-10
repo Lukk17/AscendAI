@@ -1,7 +1,9 @@
 # chat-history-persistence Specification
 
 ## Purpose
-TBD - created by archiving change fix-ascend-agent-bugs. Update Purpose after archive.
+
+Short-term chat history lives in Redis and has to stay bounded there. The configured `app.memory.chat-history.ttl` applies to every key `PersistentChatMemory` writes and is refreshed on each write, so an abandoned conversation ages out while an active one does not expire mid-session. The Postgres archive sits deliberately outside this TTL under a separate retention policy, and the configuration file is required to say so.
+
 ## Requirements
 ### Requirement: Redis chat-history honors the configured TTL
 
@@ -28,6 +30,6 @@ The `application.yaml` `app.memory.chat-history` section SHALL include a comment
 
 #### Scenario: Comment present in application.yaml
 
-- **WHEN** the file `AscendAgent/src/main/resources/application.yaml` is read
+- **WHEN** the file `apps/ascend-agent/src/main/resources/application.yaml` is read
 - **THEN** the `chat-history` block contains a comment that describes both the Redis TTL and that Postgres pruning is separate
 

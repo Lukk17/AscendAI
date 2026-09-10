@@ -8,8 +8,8 @@
 graph TB
     subgraph "Developer Machine (Host)"
         LMStudio["LM Studio :1234"]
-        Agent["AscendAgent :9917<br/>(java -jar)"]
-        Weather["WeatherMCP :9998<br/>(java -jar)"]
+        Agent["ascend-agent :9917<br/>(java -jar)"]
+        Weather["ascend-weather-mcp :9998<br/>(java -jar)"]
     end
 
     subgraph "External Prerequisites"
@@ -19,19 +19,19 @@ graph TB
         S3["S3-compatible storage :9070/9071"]
     end
 
-    subgraph "Compose project: ascend-ai (docker-compose.yaml)"
-        AudioScribe["AudioScribe :7017"]
+    subgraph "Compose project: ascend-ai (compose.yaml)"
+        AudioScribe["ascend-audio-scribe :7017"]
         Memory["AscendMemory :7020"]
-        PaddleOCR["PaddleOCR :7022"]
+        PaddleOCR["ascend-ocr :7022"]
         Docling["Docling :5001"]
         Unstructured["Unstructured :9080"]
     end
 
-    subgraph "Compose project: ascend-scrapper (ascend-scrapper.docker-compose.yaml)"
-        WebSearch["AscendWebSearch :7021"]
+    subgraph "Compose project: ascend-scrapper (compose.ascend-web-hunter.yaml)"
+        WebHunter["ascend-web-hunter :7021"]
         SearXNG["SearXNG :9020"]
         Flare["FlareSolverr :8191"]
-        Ngrok["ngrok-ascend-web-search"]
+        Ngrok["ngrok-ascend-web-hunter"]
     end
 
     subgraph "Cloud (Optional)"
@@ -48,7 +48,7 @@ graph TB
     Agent --> S3
     Agent --> AudioScribe
     Agent --> Weather
-    Agent --> WebSearch
+    Agent --> WebHunter
     Agent --> Memory
     Agent --> PaddleOCR
     Agent --> Docling
@@ -57,8 +57,8 @@ graph TB
     Agent -.-> Gemini
     Agent -.-> Anthropic
     Agent -.-> MiniMax
-    WebSearch --> SearXNG
-    WebSearch --> Flare
+    WebHunter --> SearXNG
+    WebHunter --> Flare
     Memory --> Qdrant
 ```
 
@@ -68,13 +68,13 @@ graph TB
 
 | Service           | Port(s)         | Type                  | Runs in                |
 | :---------------- | :-------------- | :-------------------- | :--------------------- |
-| AscendAgent       | 9917            | Main API gateway      | Host JVM               |
-| WeatherMCP        | 9998            | MCP server            | Host JVM               |
+| ascend-agent       | 9917            | Main API gateway      | Host JVM               |
+| ascend-weather-mcp | 9998            | MCP server            | Host JVM               |
 | LM Studio         | 1234            | Local LLM             | Host                   |
-| AudioScribe       | 7017            | MCP server            | Docker                 |
-| AscendWebSearch   | 7021            | MCP server            | Docker                 |
+| ascend-audio-scribe       | 7017            | MCP server            | Docker                 |
+| ascend-web-hunter   | 7021            | MCP server            | Docker                 |
 | AscendMemory      | 7020            | REST + MCP            | Docker                 |
-| PaddleOCR         | 7022            | MCP server            | Docker                 |
+| ascend-ocr        | 7022            | MCP server            | Docker                 |
 | Docling Serve     | 5001            | Document conversion   | Docker                 |
 | Unstructured API  | 9080            | Document parsing      | Docker                 |
 | SearXNG           | 9020            | Meta search           | Docker                 |
@@ -89,10 +89,9 @@ graph TB
 ### Prerequisites
 
 External services must be running before `docker compose up`. The main file
-[docker-compose.yaml](../../../docker-compose.yaml) (project `ascend-ai`) uses `include:` to pull in
-[ascend-scrapper.docker-compose.yaml](../../../ascend-scrapper.docker-compose.yaml) (project `ascend-scrapper`), so a
-single command brings up the full stack. Running the scrapper file directly
-(`docker compose -f ascend-scrapper.docker-compose.yaml up`) keeps it as its own Docker Desktop group.
+[compose.yaml](../../../compose.yaml) (project `ascend-ai`) uses `include:` to pull in
+[compose.ascend-web-hunter.yaml](../../../compose.ascend-web-hunter.yaml) (project `ascend-scrapper`), so a
+single command brings up the full stack.
 
 | Service     | Purpose                                                | Cloud equivalent                |
 | :---------- | :----------------------------------------------------- | :------------------------------ |

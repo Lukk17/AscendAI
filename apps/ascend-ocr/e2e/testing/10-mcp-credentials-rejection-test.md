@@ -1,0 +1,73 @@
+# MCP credentials-in-URI rejection: e2e test
+
+## What this verifies
+
+The MCP tool rejects URIs containing `userinfo` (e.g. `http://user:pass@host/...`) before any DNS lookup or
+HTTP fetch — closes the credential-leakage class flagged in the security audit.
+
+## Prerequisites
+
+```bash
+bru --version
+```
+
+```bash
+curl -fsS http://localhost:7022/health
+```
+
+Check `jq` is installed. Only the Unix form of step 3 needs it. The PowerShell form parses the run output with
+`ConvertFrom-Json` and needs nothing extra. The command is identical in both shells.
+
+```bash
+jq --version
+```
+
+Expect a version string such as `jq-1.7`.
+
+## Reset state
+
+None.
+
+## Run
+
+**Step 1.** Open an MCP session per spec 8 and capture `Mcp-Session-Id`.
+
+**Step 2.** Send the credentials probe, writing the run output to a file so the response frame can be read back.
+
+Windows:
+```powershell
+bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>" -o "$env:TEMP\ocr-creds-run.json" -f json
+```
+
+Unix:
+```bash
+bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>" -o "/tmp/ocr-creds-run.json" -f json
+```
+
+**Step 3.** Print the response frame the service sent back.
+
+Windows:
+```powershell
+(Get-Content "$env:TEMP\ocr-creds-run.json" -Raw | ConvertFrom-Json)[0].results[0].response.data
+```
+
+Unix:
+```bash
+jq '.[0].results[0].response.data' < /tmp/ocr-creds-run.json
+```
+
+Bruno's console output shows the status and its own test results but never the response body, so step 3 is what
+makes the body assertions below checkable.
+
+## Expected
+
+- Step 2 returns HTTP 200 carrying a JSON-RPC error envelope referencing `UNSAFE_URI`.
+- The frame printed by step 3 does NOT contain `user:pass`, `pass@`, or the offending URI in any form. The service
+  refuses the URI without echoing the submitted credentials back to the caller.
+
+The second assertion replaces an earlier check that grepped `docker logs ascend-ocr` for `user:pass`. That
+check broke the suite's behaviour-only contract, and it could not prove what it claimed: `docker logs` shows only
+what is still in the container's current buffer at the moment you run it, so a clean grep is equally consistent
+with "the credentials were never written" and with "they were written and the line has since rotated out" or "this
+deployment's log level never emitted that line". Response-body content is the leak path a caller can actually
+observe, and it is the one this suite can assert on.

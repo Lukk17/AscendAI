@@ -1,7 +1,9 @@
 # chat-history-compaction Specification
 
 ## Purpose
-TBD - created by archiving change add-chat-history-compaction. Update Purpose after archive.
+
+Long conversations are summarised rather than re-sent in full or truncated away. Once a conversation crosses a configurable turn count or a configurable fraction of the provider context window, older turns are replaced by a model-written summary, so the cost of a turn stops growing linearly while the arc of the conversation survives. The capability covers the trigger thresholds, idempotent re-compaction, the cheap per-provider compaction model and its per-request override, the summary format and its length cap, asynchronous execution that never fails the user's turn, and how compaction behaves under the chat-history backend toggles.
+
 ## Requirements
 ### Requirement: Compaction trigger threshold is configurable
 

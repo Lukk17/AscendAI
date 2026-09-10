@@ -2,13 +2,13 @@
 
 - [ ] 1.1 Create the `AscendChat/` directory at the repo root and run `flutter create` with project name `ascend_chat`, targeting Android, iOS, web, Windows, macOS, and Linux
 - [ ] 1.2 Add `flutter_chat_ui: ^2.11.1`, `flutter_chat_core: ^2.9.0`, `flutter_riverpod: ^2.6.1`, `go_router: ^14.8.1`, `http: ^1.3.0`, `file_picker: ^8.3.7`, `shared_preferences: ^2.5.3`, and `url_launcher: ^6.3.1` to `pubspec.yaml` with pinned caret versions
-- [ ] 1.3 Create the `AscendChat/AGENTS.md` file with module-level agent instructions referencing Flutter skills and the AscendAgent API
+- [ ] 1.3 Create the `AscendChat/AGENTS.md` file with module-level agent instructions referencing Flutter skills and the ascend-ai-agent API
 - [ ] 1.4 Set up the source directory structure: `lib/src/api/`, `lib/src/chat/`, `lib/src/conversations/`, `lib/src/config/`, `lib/src/theme/`, `lib/src/widgets/`
 - [ ] 1.5 Verify the project compiles with `flutter build web` and `flutter analyze` passes with zero issues
 
 ## 2. Configuration and API Client
 
-- [ ] 2.1 Create `AppConfig` class in `lib/src/config/` that reads the AscendAgent base URL from environment variable `ASCEND_API_URL` (default `http://localhost:9917`) and the default user ID from `ASCEND_USER_ID` (default `user1`)
+- [ ] 2.1 Create `AppConfig` class in `lib/src/config/` that reads the ascend-ai-agent base URL from environment variable `ASCEND_API_URL` (default `http://localhost:9917`) and the default user ID from `ASCEND_USER_ID` (default `user1`)
 - [ ] 2.2 Implement `AscendApiClient` in `lib/src/api/` with methods for: `sendPromptStream()` returning a `Stream` of typed SSE events, `listConversations()`, `createConversation()`, `getConversationMessages()`, `renameConversation()`, `deleteConversation()`
 - [ ] 2.3 Implement the platform-conditional SSE parser that reads the chunked HTTP response body line-by-line and emits typed `SseEvent` objects (`DeltaEvent`, `SourcesEvent`, `DoneEvent`, `ErrorEvent`)
 - [ ] 2.4 Implement the web-specific SSE client using `dart:html` `EventSource` behind a conditional import
@@ -73,8 +73,8 @@
 ## 9. Containerization and Compose Integration
 
 - [ ] 9.1 Create a multi-stage `AscendChat/Dockerfile`: first stage uses the pinned Flutter SDK image to run `flutter build web --release`, second stage uses a pinned `nginx:alpine` image to serve the build output
-- [ ] 9.2 Create `AscendChat/nginx.conf` with a single-page-app fallback (try_files to `index.html`) and API reverse proxy from `/api/` to the AscendAgent container
-- [ ] 9.3 Add the `ascend-chat` service to `docker-compose.yaml` with port mapping (default 3000), dependency on AscendAgent, and a health check
+- [ ] 9.2 Create `AscendChat/nginx.conf` with a single-page-app fallback (try_files to `index.html`) and API reverse proxy from `/api/` to the ascend-ai-agent container
+- [ ] 9.3 Add the `ascend-chat` service to `compose.yaml` with port mapping (default 3000), dependency on ascend-ai-agent, and a health check
 - [ ] 9.4 Verify the containerized build runs end-to-end: `docker compose build ascend-chat` succeeds and the web app loads at `http://localhost:3000`
 
 ## 10. Testing and Verification
@@ -86,4 +86,4 @@
 - [ ] 10.5 Write unit tests for `AscendApiClient` with mocked HTTP responses
 - [ ] 10.6 Run `flutter test` and verify all tests pass
 - [ ] 10.7 Run `flutter analyze` and verify zero issues
-- [ ] 10.8 Update the root `README.md` monorepo structure table and `docker-compose.yaml` services table with the new `AscendChat` module
+- [ ] 10.8 Update the root `README.md` monorepo structure table and `compose.yaml` services table with the new `AscendChat` module

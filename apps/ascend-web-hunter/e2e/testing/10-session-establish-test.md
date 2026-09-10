@@ -1,0 +1,157 @@
+# Session establish: e2e test
+
+## What this verifies
+
+`POST /api/v2/web/session/establish` is the proactive counterpart to the passive NoVNC capture other reads fall
+back to: it opens the NoVNC flow for a `url` on demand and always returns HTTP 200 with a `vnc_url` a human can open
+to complete a login or captcha, without waiting for that human to act. This test asserts the immediate, synchronous
+contract:
+
+- HTTP 200, body `status="login_required"`, `target` equal to the (pydantic-normalised) request URL, and a
+  non-empty `vnc_url` string.
+
+## Two behaviours this spec found live, not assumed
+
+A first draft of this spec assumed the call writes no session record at all until a human or scripted login
+resolves the background monitor. Running it against the live service on port 7021 disproved that within seconds:
+`session:example.net:default` existed, holding an empty-cookie record, well before any human could have acted. Two
+things explain it, both confirmed by reading the code the monitor actually runs:
+
+1. **The requested `profile` reaches the capture path.** `SessionManager.establish` threads `profile` all the way
+   through: `NoVNCStrategy(effective_profile)`, `_monitor_for_cookies(url, intervention_type, self.profile)`, and
+   every `save_storage_state(url, storage_state, user_agent, profile)` call inside the monitor's poll loop, each
+   falling back to `settings.SESSION_DEFAULT_PROFILE` only when the caller supplied none, the same rule `status()`
+   and `clear()` already use. Covered by
+   `tests/session/test_session_manager.py::test_establish_forwards_named_profile_to_novnc_strategy` and
+   `::test_establish_defaults_profile_when_none_given`.
+
+   *Corrected observation, not a new feature:* this spec originally found the opposite here.
+   `SessionManager.establish`'s second parameter was named `_profile`, the leading underscore marking it unused, so
+   every capture landed under the default profile regardless of what the caller asked for. That has since been
+   fixed in the codebase. This bullet was rewritten on 2026-09-08 to match the code as it stands, not the code this
+   spec first ran against.
+2. **The captcha-branch "cleared" check does not require a challenge to have existed.**
+   `ChallengeDetector.is_content_accepted` — "the single shared decision point... before the NoVNC monitor declares
+   a challenge cleared" — returns true for any response that is not a recognised block page and has real content.
+   An ordinary, never-challenged page satisfies that on its very first poll (`NOVNC_COOKIE_SYNC_POLL_SECONDS`,
+   5 seconds by default), so `establish()` against a plain URL captures whatever cookies exist — often none — as
+   though a challenge had just been solved.
+
+(1) has since been fixed, independently of this spec, and the bullet above is corrected to match. (2) is unchanged:
+whether an unchallenged page being "cleared" instantly is the right behaviour is still an open design question for
+the owner, not something this spec decides. Between this spec's original run and the 2026-09-08 correction, an
+unrelated commit added a gate to the same "cleared" check that required a block to have been observed first in the
+same monitor run. That gate silently broke the contract this spec asserts below, so `session/establish` stopped
+writing any record for an unchallenged page like `example.net`. The regression was found and reverted, so
+behaviour (2) and the `EXISTS` assertion below again match a live run. This spec still only documents behaviour: it
+targets `example.net` (not the `example.com` key tests 3, 8, and 9 depend on being sessionless) and cleans up the
+record its own call creates.
+
+## Why this spec is not "free" the way 1, 4, 8, and 9 are
+
+Every other cheap ascend-web-hunter spec either touches no external process at all or only Redis. This one is
+different: `SessionManager.establish` launches a real headful Chromium browser through Playwright and hands it to
+NoVNC, then starts a background monitor task (`_monitor_for_cookies`) that polls the page for up to
+`NOVNC_TIMEOUT_SECONDS` (600 seconds / 10 minutes by default) before giving up and closing the browser on its own —
+or, per the finding above, stops within one poll cycle once it decides the page is "cleared." Nothing in this test
+asks a human to act; the response assertions are satisfiable immediately, and even the Redis assertion below only
+needs a short, bounded wait, not the full 10-minute ceiling. But when the monitor does not resolve this quickly (a
+genuinely challenged or slow-loading target), the call still leaves a live, resource-consuming browser + VNC
+session running in the background for up to 10 minutes. Running this spec back to back without letting a previous
+run's monitor finish will stack multiple live headful browsers in the same container. Treat it as the highest
+per-run resource cost in this module's suite, higher than test 6 or 7's Playwright/FlareSolverr usage, even though —
+like every other ascend-web-hunter spec — it makes no call to any priced LLM or embedding provider and so still
+belongs in the cost-free set in dollar terms.
+
+## Prerequisites
+
+Check Bruno CLI is installed.
+
+```bash
+bru --version
+```
+
+Expect a version string.
+
+Check the ascend-web-hunter server is reachable.
+
+```bash
+curl -fsS http://localhost:7021/health
+```
+
+Expect HTTP 200 with `{"status":"ok"}`.
+
+Check Redis is reachable from the host's Docker context (this test seeds nothing but does inspect and clean up a
+key the call itself creates).
+
+```bash
+docker exec redis redis-cli PING
+```
+
+Expect `PONG`.
+
+## Reset state
+
+Confirm `example.net` currently carries no session under the `e2e-establish` profile the request sends. The
+request's `profile` is forwarded to the capture path since the 2026-09-08 fix described above, so the record this
+call creates lands under `session:example.net:e2e-establish`. No other spec touches that key (test 8 only touches
+the same domain's `default`-profile key, and only transiently during its own run).
+
+```bash
+docker exec redis redis-cli EXISTS "session:example.net:e2e-establish"
+```
+
+Expect `0`. If it returns `1`, a previous run of this spec did not clean up. Delete it before continuing.
+
+```bash
+docker exec redis redis-cli DEL "session:example.net:e2e-establish"
+```
+
+## Run
+
+Move into the Bruno collection root first.
+
+```bash
+cd docs/api/request/AscendAI
+```
+
+```bash
+bru run "web-hunter/testing/session-establish.yml" --env ascend-local
+```
+
+## Expected
+
+- HTTP 200. Body `status` equals `"login_required"`, `target` equals `"https://example.net/"`, `vnc_url` is a
+  non-empty string.
+- Wait 15 seconds for the background monitor's first poll cycle (`NOVNC_COOKIE_SYNC_POLL_SECONDS` is 5 seconds by
+  default; 15 gives a safe margin over browser launch + navigation), then confirm the capture the "Two behaviours"
+  section above describes actually happened:
+
+  ```bash
+  docker exec redis redis-cli EXISTS "session:example.net:e2e-establish"
+  ```
+
+  Expect `1` — this is the documented current behaviour, not a defect this spec is trying to catch.
+
+- Clean up the record this test created, so `example.net` is sessionless again for test 8 or a repeat of this test:
+
+  ```bash
+  docker exec redis redis-cli DEL "session:example.net:e2e-establish"
+  ```
+
+  ```bash
+  docker exec redis redis-cli EXISTS "session:example.net:e2e-establish"
+  ```
+
+  Expect `0`.
+
+## Concurrency
+
+Do not run this test in parallel with test 8 ([8-session-clear-test.md](8-session-clear-test.md)). This test writes
+`session:example.net:e2e-establish`, not the `session:example.net:default` key test 8 seeds and clears, but test 8
+compares a scan of `session:*` before and after its run, so the key this test creates would appear in that scan and
+fail test 8's comparison. Safe to run in parallel with everything else in the suite.
+
+## Fixtures
+
+None.

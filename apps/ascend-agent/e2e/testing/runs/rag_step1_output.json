@@ -1,0 +1,152 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "ascend-agent\\testing\\rag-ingestion-upload.yml"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:9917/api/v1/ingestion/upload",
+          "headers": {
+            "X-User-Id": "frostyRagTest",
+            "content-type": "multipart/form-data; boundary=--------------------------8e2a6772e4897dcdab7ef655"
+          },
+          "data": {
+            "_overheadLength": 555,
+            "_valueLength": 0,
+            "_valuesToMeasure": [
+              {
+                "fd": null,
+                "path": "D:\\Development\\projekty-IT\\AscendAI\\AscendAgent\\e2e\\fixtures\\markdown-canary.md",
+                "flags": "r",
+                "mode": 438,
+                "end": null,
+                "bytesRead": 44,
+                "_events": {},
+                "_readableState": {
+                  "highWaterMark": 65536,
+                  "buffer": [],
+                  "bufferIndex": 0,
+                  "length": 0,
+                  "pipes": [],
+                  "awaitDrainWriters": null
+                },
+                "_eventsCount": 2
+              },
+              {
+                "fd": null,
+                "path": "D:\\Development\\projekty-IT\\AscendAI\\AscendAgent\\e2e\\fixtures\\banana-price-poland.pdf",
+                "flags": "r",
+                "mode": 438,
+                "end": null,
+                "bytesRead": 20123,
+                "_events": {},
+                "_readableState": {
+                  "highWaterMark": 65536,
+                  "buffer": [],
+                  "bufferIndex": 0,
+                  "length": 0,
+                  "pipes": [],
+                  "awaitDrainWriters": null
+                },
+                "_eventsCount": 2
+              },
+              {
+                "fd": null,
+                "path": "D:\\Development\\projekty-IT\\AscendAI\\AscendAgent\\e2e\\fixtures\\pierogi-recipe.docx",
+                "flags": "r",
+                "mode": 438,
+                "end": null,
+                "bytesRead": 13563,
+                "_events": {},
+                "_readableState": {
+                  "highWaterMark": 65536,
+                  "buffer": [],
+                  "bufferIndex": 0,
+                  "length": 0,
+                  "pipes": [],
+                  "awaitDrainWriters": null
+                },
+                "_eventsCount": 2
+              }
+            ],
+            "writable": false,
+            "readable": true,
+            "dataSize": 0,
+            "maxDataSize": 2097152,
+            "pauseStreams": true,
+            "_released": true,
+            "_streams": [],
+            "_currentStream": null,
+            "_insideLoop": false,
+            "_pendingNext": false,
+            "_boundary": "--------------------------8e2a6772e4897dcdab7ef655",
+            "_events": {},
+            "_eventsCount": 3
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "date": "Thu, 18 Jun 2026 12:46:17 GMT",
+            "keep-alive": "timeout=60",
+            "connection": "keep-alive"
+          },
+          "data": {
+            "uploaded": [
+              "markdown/markdown-canary.md",
+              "documents/banana-price-poland.pdf",
+              "documents/pierogi-recipe.docx"
+            ],
+            "failures": []
+          },
+          "url": "http://localhost/api/v1/ingestion/upload",
+          "responseTime": 439,
+          "duration": 439,
+          "size": 126
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.5694992,
+        "name": "rag-ingestion-upload",
+        "path": "ascend-agent\\testing\\rag-ingestion-upload.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 1,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

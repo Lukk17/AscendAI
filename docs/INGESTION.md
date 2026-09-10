@@ -17,7 +17,7 @@ Ingestion is split into two stages on purpose.
 You trigger Run manually by default. An auto-poller exists but is off out of the box
 (`app.ingestion.auto.enabled=false`) so the agent doesn't spend embedding tokens on every restart and you're never
 surprised by background ingestion costs. Set `app.ingestion.auto.enabled=true` in
-[application.yaml](../AscendAgent/src/main/resources/application.yaml) (or via env) to opt in.
+[application.yaml](../apps/ascend-agent/src/main/resources/application.yaml) (or via env) to opt in.
 
 ---
 
@@ -25,7 +25,7 @@ surprised by background ingestion costs. Set `app.ingestion.auto.enabled=true` i
 
 1. Open [http://localhost:9071](http://localhost:9071).
 2. Log in with `admin` / `password`. The object store does not validate credentials, so any value works.
-3. Click **Buckets** then select `knowledge-base`. If it doesn't exist, AscendAgent creates it on startup, or you can
+3. Click **Buckets** then select `knowledge-base`. If it doesn't exist, ascend-ai-agent creates it on startup, or you can
    create it manually.
 4. Click **Object Browser** then **Upload** and pick file(s) or folder(s).
    - **Markdown.** `.md` files (best if exported from Obsidian).
@@ -47,9 +47,9 @@ curl.exe -X POST "http://localhost:9917/api/v1/ingestion/run?embeddingProvider=l
 
 ---
 
-### Option 2: CLI via AscendAgent
+### Option 2: CLI via ascend-ai-agent
 
-Upload files through the AscendAgent's API. The agent routes them to the correct folder (`obsidian/` or `documents/`).
+Upload files through the ascend-ai-agent's API. The agent routes them to the correct folder (`obsidian/` or `documents/`).
 
 Bash:
 
@@ -81,7 +81,7 @@ curl.exe -X POST "http://localhost:9917/api/v1/ingestion/run?embeddingProvider=l
 
 ### What happens during Run
 
-1. AscendAgent scans `knowledge-base` (optionally narrowed by `prefix=obsidian/` or `documents/`).
+1. ascend-ai-agent scans `knowledge-base` (optionally narrowed by `prefix=obsidian/` or `documents/`).
 2. Markdown files are parsed in-process; other formats are sent to Unstructured / Docling for conversion.
 3. Chunks are embedded with the requested provider (`lmstudio` and `gemini` go to 768 dims, `openai` goes to 1536
    dims) and stored in the matching Qdrant collection (`ascendai-768` or `ascendai-1536`).
@@ -101,7 +101,7 @@ with that prefix.
   without touching the rest.
 
 Folder names come from `app.ingestion.folders.obsidian` and `app.ingestion.folders.documents` in
-[application.yaml](../AscendAgent/src/main/resources/application.yaml). The upload endpoint routes `.md` to
+[application.yaml](../apps/ascend-agent/src/main/resources/application.yaml). The upload endpoint routes `.md` to
 `obsidian/` and everything else to `documents/`.
 
 ---
@@ -118,7 +118,7 @@ app:
 ```
 
 It scans the bucket on a fixed interval (configurable in
-[application.yaml](../AscendAgent/src/main/resources/application.yaml)) and ingests anything new. Off by default to
+[application.yaml](../apps/ascend-agent/src/main/resources/application.yaml)) and ingests anything new. Off by default to
 keep startup fast and embedding spend predictable.
 
 ---
@@ -133,6 +133,6 @@ To force re-processing of files, see
 ### See also
 
 - [../README.md](../README.md). Monorepo overview, Quick Start, ports.
-- [../AscendAgent/README.md](../AscendAgent/README.md). RAG pipeline + agent endpoints.
+- [../apps/ascend-agent/README.md](../apps/ascend-agent/README.md). RAG pipeline + agent endpoints.
 - [DEPLOYMENT.md](DEPLOYMENT.md). Compose recipes.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Reset recipes when state gets stuck.

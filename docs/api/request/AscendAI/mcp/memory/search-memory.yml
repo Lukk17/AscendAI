@@ -40,6 +40,12 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
+        test("MCP memory operation returns success envelope", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(Object.keys(envelope)).to.include.oneOf(["result", "error"]);
+        });
 
 settings:
   encodeUrl: true

@@ -1,0 +1,41 @@
+info:
+  name: captcha-clearance-blocked
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Spec 11 Call 1: read the democaptcha hCaptcha demo form with NO session stored. The page
+    # carries the hcaptcha.com/1/api.js script signature from challenge_dictionary.json, so every
+    # automated tier reports a challenge and the scraper escalates to NoVNC, returning a vnc_url
+    # for a human to tick the widget and submit the form.
+    data: |-
+      {
+        "url": "https://democaptcha.com/demo-form-eng/hcaptcha.html",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("blocked: HTTP 428 Precondition Required (intervention contract)", function () {
+            expect(res.getStatus()).to.equal(428);
+        });
+        test("blocked: human intervention required", function () {
+            expect(res.getBody().status).to.equal("human_intervention_required");
+        });
+        test("blocked: a vnc_url is returned for the human to solve", function () {
+            expect(res.getBody().vnc_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

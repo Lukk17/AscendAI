@@ -1,0 +1,82 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: ascend-ai-local
+
+scrape_configs:
+
+  # ─── AscendAI application services ───
+
+  - job_name: ascend-agent
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - ascend-agent:9917
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-agent
+
+  - job_name: ascend-weather-mcp
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - ascend-weather-mcp:9998
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-weather-mcp
+
+  - job_name: ascend-memory
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ascend-memory:7020
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-memory
+
+  - job_name: ascend-audio-scribe
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ascend-audio-scribe:7017
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-audio-scribe
+
+  - job_name: ascend-web-hunter
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ascend-web-hunter:7021
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-web-hunter
+
+  - job_name: ascend-ocr
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ascend-ocr:7022
+    relabel_configs:
+      - target_label: service
+        replacement: ascend-ocr
+
+  # ─── Container runtime (cgroup memory vs. limit) ───
+
+  - job_name: container-metrics-exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - container-metrics-exporter:8080
+
+  # ─── Data stores (native metrics) ───
+
+  - job_name: qdrant
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:6333
+    relabel_configs:
+      - target_label: service
+        replacement: qdrant

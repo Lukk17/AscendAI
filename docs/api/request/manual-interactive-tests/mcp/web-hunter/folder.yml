@@ -1,0 +1,14 @@
+info:
+  name: web-hunter
+  type: folder
+  seq: 1
+
+request:
+  variables:
+    - name: mcp_session_id
+      value: ""
+  auth: inherit
+
+docs:
+  content: Manual interactive tests for ascend-web-hunter MCP Server.
+  type: text/markdown

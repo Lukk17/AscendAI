@@ -21,13 +21,13 @@
 
 ## 4. Readiness smoke test
 
-- [ ] 4.1 Create `deploy/smoke-test.sh` and `deploy/smoke-test.ps1`: verify gateway TLS, AscendAgent health behind the gateway, token acquisition for the seeded admin, and one authenticated round-trip
+- [ ] 4.1 Create `deploy/smoke-test.sh` and `deploy/smoke-test.ps1`: verify gateway TLS, ascend-ai-agent health behind the gateway, token acquisition for the seeded admin, and one authenticated round-trip
 - [ ] 4.2 Exit non-zero and name the failing check on any failure; the installer treats this as a hard gate
 - [ ] 4.3 Test: the smoke test passes on a healthy stack and fails visibly when the gateway or agent is down
 
 ## 5. Orchestration over the single compose file
 
-- [ ] 5.1 The installer runs `docker compose up` against the main `docker-compose.yaml` with no `-f` flags (owner constraint); ordered infra → bootstrap → compose up → realm/tenant → smoke test
+- [ ] 5.1 The installer runs `docker compose up` against the main `compose.yaml` with no `-f` flags (owner constraint); ordered infra → bootstrap → compose up → realm/tenant → smoke test
 - [ ] 5.2 End-to-end rehearsal on a throwaway target: infra provisioned, secrets generated, stack healthy, first tenant/admin usable, smoke test green
 
 ## 6. Documentation

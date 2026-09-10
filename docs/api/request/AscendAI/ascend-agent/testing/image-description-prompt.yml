@@ -18,7 +18,7 @@ http:
       - name: image
         type: file
         value:
-          - D:\Development\projekty-IT\AscendAI\AscendAgent\e2e\fixtures\image.png
+          - "{{ascendAgentFixtures}}/image.png"
         contentType: file
       - name: embeddingProvider
         type: text

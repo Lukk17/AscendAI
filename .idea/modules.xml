@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/AscendAI.iml" filepath="$PROJECT_DIR$/.idea/AscendAI.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-agent_main.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-agent_main.iml" group="ascend-agent" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-agent_test.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-agent_test.iml" group="ascend-agent" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-audio-scribe/ascend-audio-scribe.iml" filepath="$PROJECT_DIR$/apps/ascend-audio-scribe/ascend-audio-scribe.iml" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-memory/ascend-memory.iml" filepath="$PROJECT_DIR$/apps/ascend-memory/ascend-memory.iml" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-ocr/ascend-ocr.iml" filepath="$PROJECT_DIR$/apps/ascend-ocr/ascend-ocr.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ascend-weather-mcp_main.iml" filepath="$PROJECT_DIR$/.idea/modules/ascend-weather-mcp_main.iml" group="ascend-weather-mcp" />
+      <module fileurl="file://$PROJECT_DIR$/apps/ascend-web-hunter/ascend-web-hunter.iml" filepath="$PROJECT_DIR$/apps/ascend-web-hunter/ascend-web-hunter.iml" />
+    </modules>
+  </component>
+</project>

@@ -1,15 +1,17 @@
 # ascend-agent-containerization Specification
 
 ## Purpose
-TBD - created by archiving change add-ascend-agent-dockerfile. Update Purpose after archive.
-## Requirements
-### Requirement: AscendAgent ships a multi-stage Dockerfile
 
-`AscendAgent/Dockerfile` SHALL define a two-stage build. The `builder` stage SHALL use `eclipse-temurin:21-jdk-alpine` and produce a Spring Boot fat jar via `./gradlew --no-daemon bootJar -x test`. The runtime stage SHALL use `eclipse-temurin:21-jre-alpine`, copy the bootJar from the builder, run as a non-root user, expose port `9917`, and use `ENTRYPOINT ["java","-jar","/app/app.jar"]` in exec form so Linux signals propagate to the JVM.
+ascend-agent ships as a reproducible container image and runs as a service in the monorepo compose stack, so a single compose bring-up starts the whole platform including the gateway rather than leaving the gateway to be started by hand on the host. The capability covers the multi-stage build and its JRE-only non-root runtime, the container healthcheck, the compose service entry, container-mode parity through the `docker` Spring profile, provider API keys arriving as runtime environment from a developer-local `.env` instead of being baked into the image, reaching host-only prerequisites over `host.docker.internal`, and the pruned build context.
+
+## Requirements
+### Requirement: ascend-agent ships a multi-stage Dockerfile
+
+`apps/ascend-agent/Dockerfile` SHALL define a two-stage build. The `builder` stage SHALL use `eclipse-temurin:21-jdk-alpine` and produce a Spring Boot fat jar via `./gradlew --no-daemon bootJar -x test`. The runtime stage SHALL use `eclipse-temurin:21-jre-alpine`, copy the bootJar from the builder, run as a non-root user, expose port `9917`, and use `ENTRYPOINT ["java","-jar","/app/app.jar"]` in exec form so Linux signals propagate to the JVM.
 
 #### Scenario: Image builds successfully
 
-- **WHEN** a developer runs `docker build -t ascend-agent:dev ./AscendAgent` against a clean checkout
+- **WHEN** a developer runs `docker build -t ascend-agent:dev ./apps/ascend-agent` against a clean checkout
 - **THEN** the build completes without errors
 - **AND** the resulting image base layer is `eclipse-temurin:21-jre-alpine` (verified via `docker image inspect`)
 - **AND** the image total size is under 300 MB
@@ -21,14 +23,14 @@ TBD - created by archiving change add-ascend-agent-dockerfile. Update Purpose af
 
 #### Scenario: Dependency layer is reused on code-only changes
 
-- **WHEN** a developer edits a Java source file under `AscendAgent/src/main/java/` and rebuilds the image
+- **WHEN** a developer edits a Java source file under `apps/ascend-agent/src/main/java/` and rebuilds the image
 - **AND** `build.gradle.kts` and `settings.gradle.kts` are unchanged
 - **THEN** the `RUN ./gradlew --no-daemon dependencies` layer is served from the Docker build cache
 - **AND** only the `COPY src/` layer and the `bootJar` layer are rebuilt
 
 ### Requirement: Container exposes a healthcheck
 
-The Dockerfile SHALL declare a `HEALTHCHECK` that probes `http://localhost:9917/actuator/health` so that Docker can mark the container `healthy` once the application is ready to serve requests. The matching `docker-compose.yaml` `ascend-agent` service SHALL declare an equivalent healthcheck with the same URL and a 30-second interval. Spring Boot Actuator is already on the AscendAgent classpath and exposure is already scoped to `management.endpoints.web.exposure.include: health` in `application.yaml`; no other actuator endpoints SHALL be exposed by this change.
+The Dockerfile SHALL declare a `HEALTHCHECK` that probes `http://localhost:9917/actuator/health` so that Docker can mark the container `healthy` once the application is ready to serve requests. The matching `compose.yaml` `ascend-agent` service SHALL declare an equivalent healthcheck with the same URL and a 30-second interval. Spring Boot Actuator is already on the ascend-agent classpath and exposure is already scoped to `management.endpoints.web.exposure.include: health` in `application.yaml`; no other actuator endpoints SHALL be exposed by this change.
 
 #### Scenario: Container reaches healthy state
 
@@ -47,11 +49,11 @@ The Dockerfile SHALL declare a `HEALTHCHECK` that probes `http://localhost:9917/
 - **THEN** the response is HTTP 404
 - **AND** `GET http://localhost:9917/actuator/health` returns HTTP 200
 
-### Requirement: AscendAgent runs as a Compose service by default
+### Requirement: ascend-agent runs as a Compose service by default
 
-`docker-compose.yaml` SHALL define an `ascend-agent` service that builds from `./AscendAgent/Dockerfile`, maps host port `9917` to container port `9917`, sets `extra_hosts: ["host.docker.internal:host-gateway"]`, declares `depends_on: [ascend-memory, docling-serve, unstructured-api]`, and has NO `profiles:` gating so that `docker compose up` starts it together with every other service. A developer SHALL also be able to fall back to the host-mode workflow (`docker compose stop ascend-agent` followed by `./gradlew bootRun` on the host) without a port conflict and without modifying the compose file.
+`compose.yaml` SHALL define an `ascend-agent` service that builds from `./apps/ascend-agent/Dockerfile`, maps host port `9917` to container port `9917`, sets `extra_hosts: ["host.docker.internal:host-gateway"]`, declares `depends_on: [ascend-memory, docling-serve, unstructured-api]`, and has NO `profiles:` gating so that `docker compose up` starts it together with every other service. A developer SHALL also be able to fall back to the host-mode workflow (`docker compose stop ascend-agent` followed by `./gradlew bootRun` on the host) without a port conflict and without modifying the compose file.
 
-#### Scenario: Default compose up starts AscendAgent
+#### Scenario: Default compose up starts ascend-agent
 
 - **WHEN** a developer runs `docker compose up -d --build`
 - **THEN** `ascend-agent` is built and started alongside every other compose service
@@ -59,21 +61,21 @@ The Dockerfile SHALL declare a `HEALTHCHECK` that probes `http://localhost:9917/
 
 #### Scenario: Host-mode workflow remains available
 
-- **WHEN** the developer runs `docker compose stop ascend-agent` and then `cd AscendAgent && ./gradlew bootRun` on the host
+- **WHEN** the developer runs `docker compose stop ascend-agent` and then `cd apps/ascend-agent && ./gradlew bootRun` on the host
 - **THEN** the host process binds port `9917` and serves prompts identically to the container
 - **AND** there is no port conflict because the `ascend-agent` container has been stopped
 
 ### Requirement: Container-mode parity is delivered via the `docker` Spring profile
 
-The `ascend-agent` compose entry SHALL set `SPRING_PROFILES_ACTIVE=docker` to activate `AscendAgent/src/main/resources/application-docker.yaml`. That profile SHALL override every URL and host that defaults to `localhost` in `application.yaml` so AscendAgent works correctly from inside the container without any further env-var configuration by the operator. The profile SHALL cover at minimum:
+The `ascend-agent` compose entry SHALL set `SPRING_PROFILES_ACTIVE=docker` to activate `apps/ascend-agent/src/main/resources/application-docker.yaml`. That profile SHALL override every URL and host that defaults to `localhost` in `application.yaml` so ascend-agent works correctly from inside the container without any further env-var configuration by the operator. The profile SHALL cover at minimum:
 
 - `app.unstructured.base-url` → the in-network `unstructured-api` service URL.
 - `app.docling.base-url` → the in-network `docling-serve` service URL.
-- `app.paddleocr.base-url` → the in-network `ascend-paddle-ocr` service URL.
+- `app.ascend-ocr.base-url` → the in-network `ascend-ocr` service URL.
 - `app.memory.semantic.base-url` → the in-network `ascend-memory` service URL.
 - `app.s3.endpoint`, `spring.datasource.url`, `spring.data.redis.host`, `spring.ai.vectorstore.qdrant.host` → `host.docker.internal` (since the S3-compatible object store, Postgres, Redis, and Qdrant are external host prerequisites).
 - `spring.ai.openai.base-url`, `app.ai.providers.lmstudio.base-url`, `app.embedding.providers.lmstudio.base-url` → `http://host.docker.internal:1234` for LM Studio reachability.
-- `spring.ai.mcp.client.streamable-http.connections.{audioscribe,weather,ascend-web-search}.url` → the in-network MCP service URLs.
+- `spring.ai.mcp.client.streamable-http.connections.{ascend-audio-scribe,weather,ascend-web-hunter}.url` → the in-network MCP service URLs.
 
 The object store is Floci (`floci/floci:2.0.1`), reached on host port `9070`, which maps to the emulator's internal AWS edge port `4566`. It runs in a compose project owned by a different repository and SHALL NOT be defined as a service in any compose file in this repository. The agent therefore reaches it through `host.docker.internal:9070` from inside the container and `localhost:9070` from the host, and there is no in-network service name for it.
 
@@ -82,7 +84,7 @@ The compose `environment:` block SHALL NOT duplicate these URLs as `${KEY}` over
 #### Scenario: Container resolves in-network services via the docker profile
 
 - **WHEN** `ascend-agent` starts with `SPRING_PROFILES_ACTIVE=docker`
-- **THEN** boot logs show no `ConnectException` / `UnknownHostException` when contacting `ascend-memory`, `docling-serve`, `unstructured-api`, `audio-scribe`, `weather-mcp`, or `ascend-web-search`
+- **THEN** boot logs show no `ConnectException` / `UnknownHostException` when contacting `ascend-memory`, `docling-serve`, `unstructured-api`, `ascend-audio-scribe`, `ascend-weather-mcp`, or `ascend-web-hunter`
 - **AND** an MCP tool call routed via streamable-http succeeds without the operator setting any URL env vars
 
 #### Scenario: Container reaches host PostgreSQL and Redis via the docker profile
@@ -93,7 +95,7 @@ The compose `environment:` block SHALL NOT duplicate these URLs as `${KEY}` over
 
 #### Scenario: No compose file defines the object store
 
-- **WHEN** a reviewer greps `docker-compose.yaml` and `ascend-scrapper.docker-compose.yaml` for a service definition of the object store
+- **WHEN** a reviewer greps `compose.yaml` and `compose.ascend-web-hunter.yaml` for a service definition of the object store
 - **THEN** neither file defines a `minio` service nor a `floci` service
 - **AND** `AGENTS.md` lists the object store under external prerequisites on ports `9070` / `9071`
 
@@ -104,7 +106,7 @@ The compose `environment:` block SHALL NOT duplicate these URLs as `${KEY}` over
 
 ### Requirement: Provider API keys flow as runtime env from `.env`, never baked into the image
 
-Provider API keys are runtime-only. The `ascend-agent` compose entry SHALL pass `OPENAI_API_KEY`, `ASCEND_ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and `MINIMAX_API_KEY` through `environment:` in the form `KEY=${KEY}`, sourced from a developer-local `.env` file at the repository root. No API key SHALL appear as an `ARG` or `ENV` in the Dockerfile, and no API key SHALL appear as a hardcoded value in `docker-compose.yaml`.
+Provider API keys are runtime-only. The `ascend-agent` compose entry SHALL pass `OPENAI_API_KEY`, `ASCEND_ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and `MINIMAX_API_KEY` through `environment:` in the form `KEY=${KEY}`, sourced from a developer-local `.env` file at the repository root. No API key SHALL appear as an `ARG` or `ENV` in the Dockerfile, and no API key SHALL appear as a hardcoded value in `compose.yaml`.
 
 #### Scenario: Compose reads provider keys from `.env`
 
@@ -119,12 +121,12 @@ Provider API keys are runtime-only. The `ascend-agent` compose entry SHALL pass 
 
 ### Requirement: A `.env.example` documents the secrets compose consumes
 
-The repository SHALL ship a committed `.env.example` file at the monorepo root, next to `docker-compose.yaml`. The file SHALL list every `${KEY}` variable referenced by `docker-compose.yaml` and `ascend-scrapper.docker-compose.yaml` with empty values (all are secrets), and SHALL include a one-line comment above each variable explaining its purpose and which service consumes it. The actual `.env` file SHALL be excluded by `.gitignore` so it is never committed.
+The repository SHALL ship a committed `.env.example` file at the monorepo root, next to `compose.yaml`. The file SHALL list every `${KEY}` variable referenced by `compose.yaml` and `compose.ascend-web-hunter.yaml` with empty values (all are secrets), and SHALL include a one-line comment above each variable explaining its purpose and which service consumes it. The actual `.env` file SHALL be excluded by `.gitignore` so it is never committed.
 
 #### Scenario: `.env.example` is committed and complete
 
 - **WHEN** a reviewer opens `.env.example`
-- **THEN** every `${KEY}` reference present in `docker-compose.yaml` or `ascend-scrapper.docker-compose.yaml` appears in `.env.example` on its own line
+- **THEN** every `${KEY}` reference present in `compose.yaml` or `compose.ascend-web-hunter.yaml` appears in `.env.example` on its own line
 - **AND** every variable has an empty value (no leaked secret)
 - **AND** a one-line comment above each variable identifies the consuming service
 
@@ -140,14 +142,14 @@ The `ascend-agent` Compose service SHALL declare `extra_hosts: ["host.docker.int
 #### Scenario: Container reaches host PostgreSQL
 
 - **WHEN** the host runs PostgreSQL on port 5432 with database `ascend_ai`
-- **AND** AscendAgent starts via `docker compose up` with `SPRING_PROFILES_ACTIVE=docker`
+- **AND** ascend-agent starts via `docker compose up` with `SPRING_PROFILES_ACTIVE=docker`
 - **THEN** boot logs show no `ConnectException` against PostgreSQL
 - **AND** Liquibase migrations run successfully against the host database
 
 #### Scenario: Container reaches the host object store
 
 - **WHEN** the host runs Floci with its AWS edge published on port 9070
-- **AND** AscendAgent starts via `docker compose up` with `SPRING_PROFILES_ACTIVE=docker`
+- **AND** ascend-agent starts via `docker compose up` with `SPRING_PROFILES_ACTIVE=docker`
 - **THEN** the startup banner reports the S3 check as reachable
 - **AND** the `knowledge-base` bucket exists after startup
 
@@ -155,14 +157,14 @@ The `ascend-agent` Compose service SHALL declare `extra_hosts: ["host.docker.int
 
 - **WHEN** the host runs LM Studio on port 1234
 - **AND** the developer sends a prompt with `provider=lmstudio`
-- **THEN** AscendAgent forwards the request to the host LM Studio successfully and returns a 200 response
+- **THEN** ascend-agent forwards the request to the host LM Studio successfully and returns a 200 response
 ### Requirement: Build context is pruned via `.dockerignore`
 
-`AscendAgent/.dockerignore` SHALL exclude build artifacts (`build/`, `.gradle/`), IDE files (`.idea/`, `.vscode/`, `*.iml`), logs, OS metadata, documentation (`docs/`, `e2e/`, `README.md`, `AGENTS.md`), and any local secret files (`.env`, `.env.local`, `.env.*.local`) from the Docker build context, so the image is small, builds are fast, and host-only artifacts cannot leak into image layers.
+`apps/ascend-agent/.dockerignore` SHALL exclude build artifacts (`build/`, `.gradle/`), IDE files (`.idea/`, `.vscode/`, `*.iml`), logs, OS metadata, documentation (`docs/`, `e2e/`, `README.md`, `AGENTS.md`), and any local secret files (`.env`, `.env.local`, `.env.*.local`) from the Docker build context, so the image is small, builds are fast, and host-only artifacts cannot leak into image layers.
 
 #### Scenario: Build context excludes host artifacts
 
-- **WHEN** the Docker daemon prepares the build context for `docker build ./AscendAgent`
-- **THEN** the context tarball does NOT contain `AscendAgent/build/`, `AscendAgent/.gradle/`, any `.iml` file, any `.idea/` directory, or any `.env*` file
+- **WHEN** the Docker daemon prepares the build context for `docker build ./apps/ascend-agent`
+- **THEN** the context tarball does NOT contain `apps/ascend-agent/build/`, `apps/ascend-agent/.gradle/`, any `.iml` file, any `.idea/` directory, or any `.env*` file
 - **AND** the build context size is under 50 MB on a clean checkout
 

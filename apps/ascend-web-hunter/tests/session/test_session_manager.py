@@ -1,0 +1,261 @@
+"""Tests for SessionManager (task 3.1-3.2)."""
+
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from src.api.exceptions import HumanInterventionRequiredException
+from src.session.session_manager import SessionManager
+
+
+@pytest.fixture
+def mgr() -> SessionManager:
+    return SessionManager()
+
+
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_status_returns_none_when_no_session(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+        new=AsyncMock(return_value=0.0),
+    ):
+        with patch(
+            "src.session.session_manager.cookie_manager._load_record",
+            new=AsyncMock(return_value=None),
+        ):
+            info = await mgr.status("https://example.com")
+
+    assert info.status == "none"
+    assert info.auth_ttl_remaining == 0.0
+
+
+@pytest.mark.asyncio
+async def test_status_returns_expired_when_record_exists_but_ttl_zero(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+        new=AsyncMock(return_value=0.0),
+    ):
+        with patch(
+            "src.session.session_manager.cookie_manager._load_record",
+            new=AsyncMock(return_value={"auth": {"saved_at": 0}}),
+        ):
+            info = await mgr.status("https://example.com")
+
+    assert info.status == "expired"
+
+
+@pytest.mark.asyncio
+async def test_status_returns_active_when_ttl_positive(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+        new=AsyncMock(return_value=86400.0),
+    ):
+        with patch(
+            "src.session.session_manager.cookie_manager._load_record",
+            new=AsyncMock(return_value={"auth": {"saved_at": 1_000_000.0}}),
+        ):
+            info = await mgr.status("https://example.com")
+
+    assert info.status == "active"
+    assert info.auth_ttl_remaining == 86400.0
+    assert info.last_validated == 1_000_000.0
+
+
+@pytest.mark.asyncio
+async def test_status_returns_active_with_no_auth_key_in_record(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+        new=AsyncMock(return_value=86400.0),
+    ):
+        with patch(
+            "src.session.session_manager.cookie_manager._load_record",
+            new=AsyncMock(return_value={"cookies": []}),
+        ):
+            info = await mgr.status("https://example.com")
+
+    assert info.status == "active"
+    assert info.last_validated is None
+
+
+@pytest.mark.asyncio
+async def test_status_does_not_report_active_for_a_freshly_saved_empty_cookie_jar(mgr: SessionManager):
+    """establish() legitimately writes a record with zero cookies for a page
+    nobody was challenged on (see NoVNCStrategy's monitor). status() must not
+    read that record's timestamp alone as grounds to report an active
+    session with the full sliding ceiling remaining -- an empty jar
+    authenticates nothing. Exercises the real CookieManager, not a mock, so
+    the fix is proven where it lives (the read side), not merely asserted."""
+    from src.reader.cloudflare.cookie_manager import CookieManager
+
+    CookieManager._instance = None
+    fresh_cookie_manager = CookieManager()
+    fresh_cookie_manager._memory_store = {}
+    fresh_cookie_manager.redis_client = None
+    await fresh_cookie_manager.save_storage_state(
+        "https://empty-jar.example.com", {"cookies": [], "origins": []}, "UA"
+    )
+
+    with (
+        patch(
+            "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+            new=fresh_cookie_manager.get_auth_ttl_remaining,
+        ),
+        patch(
+            "src.session.session_manager.cookie_manager._load_record",
+            new=fresh_cookie_manager._load_record,
+        ),
+    ):
+        info = await mgr.status("https://empty-jar.example.com")
+
+    assert info.status != "active"
+
+
+def test_session_info_to_dict(mgr: SessionManager):
+    from src.session.session_manager import SessionInfo
+
+    info = SessionInfo(status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="work")
+    d = info.to_dict()
+    assert d["status"] == "active"
+    assert d["auth_ttl_remaining_seconds"] == 3600.0
+    assert d["profile"] == "work"
+
+
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_validate_returns_false_when_ttl_expired(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+        new=AsyncMock(return_value=0.0),
+    ):
+        result = await mgr.validate("https://example.com")
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_validate_returns_false_when_no_cookies(mgr: SessionManager):
+    with (
+        patch(
+            "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+            new=AsyncMock(return_value=86400.0),
+        ),
+        patch(
+            "src.session.session_manager.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [], "origins": []}),
+        ),
+    ):
+        result = await mgr.validate("https://example.com")
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_validate_slides_ttl_on_success(mgr: SessionManager):
+    with (
+        patch(
+            "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+            new=AsyncMock(return_value=86400.0),
+        ),
+        patch(
+            "src.session.session_manager.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "session_id", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.session.session_manager.cookie_manager.slide_auth_ttl",
+            new=AsyncMock(),
+        ) as mock_slide,
+    ):
+        result = await mgr.validate("https://example.com")
+
+    assert result is True
+    mock_slide.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_clear_delegates_to_cookie_manager_and_returns_existed(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.clear_session",
+        new=AsyncMock(return_value=True),
+    ) as mock_clear:
+        result = await mgr.clear("https://example.com", "work")
+
+    assert result is True
+    mock_clear.assert_awaited_once_with("https://example.com", "work")
+
+
+@pytest.mark.asyncio
+async def test_clear_is_idempotent_when_nothing_stored(mgr: SessionManager):
+    with patch(
+        "src.session.session_manager.cookie_manager.clear_session",
+        new=AsyncMock(return_value=False),
+    ):
+        result = await mgr.clear("https://never-stored.example.com")
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_establish_returns_vnc_url(mgr: SessionManager):
+    exc = HumanInterventionRequiredException("http://vnc:7900", "login")
+    with patch(
+        "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+        new=AsyncMock(side_effect=exc),
+    ):
+        result = await mgr.establish("https://example.com/login")
+
+    assert result == "http://vnc:7900"
+
+
+@pytest.mark.asyncio
+async def test_establish_forwards_named_profile_to_novnc_strategy(mgr: SessionManager):
+    """The profile argument must reach the browser strategy, not be silently
+    discarded: establish() with profile="work" must construct NoVNCStrategy
+    with that profile."""
+    exc = HumanInterventionRequiredException("http://vnc:7900", "captcha")
+    with patch(
+        "src.reader.strategies.novnc_strategy.NoVNCStrategy.__init__",
+        return_value=None,
+    ) as mock_init:
+        with patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(side_effect=exc),
+        ):
+            result = await mgr.establish("https://example.com", "work")
+
+    assert result == "http://vnc:7900"
+    mock_init.assert_called_once_with("work")
+
+
+@pytest.mark.asyncio
+async def test_establish_defaults_profile_when_none_given(mgr: SessionManager):
+    """No profile given falls back to the configured default, matching status()/clear()."""
+    exc = HumanInterventionRequiredException("http://vnc:7900", "captcha")
+    with patch(
+        "src.reader.strategies.novnc_strategy.NoVNCStrategy.__init__",
+        return_value=None,
+    ) as mock_init:
+        with patch(
+            "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+            new=AsyncMock(side_effect=exc),
+        ):
+            await mgr.establish("https://example.com")
+
+    mock_init.assert_called_once_with("default")
+
+
+@pytest.mark.asyncio
+async def test_establish_raises_runtime_error_when_no_intervention(mgr: SessionManager):
+    with patch(
+        "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+        new=AsyncMock(return_value=""),
+    ):
+        with pytest.raises(RuntimeError, match="NoVNC flow did not surface a VNC URL"):
+            await mgr.establish("https://example.com/login")
