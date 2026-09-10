@@ -177,6 +177,26 @@ Compose is split into two project files. The second is reached only through the 
 - **`compose.yaml`** (project `ascend-ai`) — main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
 - **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) — web-scraping stack, pulled in by the main file's `include:`.
 
+Both files use the same four fixed container names, `searxng`, `flaresolverr`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
+
+```bash
+docker compose down
+```
+
+```bash
+docker compose -f compose.ascend-web-hunter.yaml up -d
+```
+
+To go back to the main stack:
+
+```bash
+docker compose -f compose.ascend-web-hunter.yaml down
+```
+
+```bash
+docker compose up -d
+```
+
 `SEARXNG_SECRET` is mandatory in `.env`. Compose names the missing variable and refuses to start without it, and SearXNG will not boot without it either. It must be at least 32 characters, unique per deployment, and never the literal `ultrasecretkey`.
 
 A third, separate artifact exists for deploying the web-search stack to a machine of its own: [`apps/ascend-web-hunter/deploy-standalone/`](apps/ascend-web-hunter/deploy-standalone/README.md). It pulls published images instead of building, targets Docker Engine on Linux, and is not `include:`-d by anything. It carries a byte-identical copy of `infra/searxng/settings.yml` plus its own `.env.example`, and both must be updated in the same commit as their root counterparts. The intended differences between it and the development stack are listed in its README.

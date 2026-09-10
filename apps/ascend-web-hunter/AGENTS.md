@@ -91,6 +91,32 @@ Two compose files run this service and they are deliberately different:
 The full list of intended differences is in [deploy-standalone/README.md](deploy-standalone/README.md). Anything not on that list should be
 identical in both files.
 
+The development file and the main stack (`../../compose.yaml`, project `ascend-ai`, which pulls the development file in through
+`include:`) use the same four fixed container names, `searxng`, `flaresolverr`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`,
+so only one of the two projects runs at a time. Switching means `docker compose down` on the project you leave, which removes its
+containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create
+its containers with a name conflict. Running the development file alone (project `ascend-scrapper`) on a host without its own
+Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in the root `.env`, which the root `.env.example`
+documents as commented-out lines. To leave the main stack and start this stack alone, from the repo root:
+
+```bash
+docker compose down
+```
+
+```bash
+docker compose -f compose.ascend-web-hunter.yaml up -d
+```
+
+To go back to the main stack:
+
+```bash
+docker compose -f compose.ascend-web-hunter.yaml down
+```
+
+```bash
+docker compose up -d
+```
+
 **Sync rule.** [`deploy-standalone/searxng/settings.yml`](deploy-standalone/searxng/settings.yml) is a byte-identical copy of
 `../../infra/searxng/settings.yml`, so `diff` between them is the whole check. When you change one, change the other in the same
 commit. The same applies to environment variables: a new variable in the scrapper stack goes into the root
