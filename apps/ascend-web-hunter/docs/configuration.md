@@ -62,6 +62,32 @@ corrupt file there is a packaging defect and the service refuses to start. `BLOC
 
 ---
 
+### Extraction
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `READABILITY_FALLBACK_MIN_CHARS` | `200` | Absolute floor on the trafilatura result below which readability-lxml runs and the longer of the two is returned, applied after the recall pass below. See [ADR-007](architecture/decisions/ADR-007-structured-output-and-readability-fallback.md) |
+| `CONTENT_RECALL_FALLBACK_RATIO` | `0.75` | Length of trafilatura's precision pass divided by the page's plain text length (BeautifulSoup `get_text` after noise tags are removed) below which a second pass runs with `favor_recall=True`. The longer of the two passes is returned. `0` never runs the second pass, `1` always runs it. See [ADR-009](architecture/decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) |
+
+The default is derived from measurements, because no published source gives a ratio of extracted text to page
+text. Trafilatura's own documentation says to reach for `favor_recall` "when parts of your documents are missing"
+and that results "vary on link lists, galleries, or catalogs" (its Python usage and troubleshooting pages), and its
+benchmark page scores recall mode at precision 0.899 and recall 0.939 against 0.906 and 0.943 for the default on an
+article corpus, so recall mode is not a free upgrade. Trafilatura's internal fallback rules compare two extractions
+against each other, never against the whole page: readability replaces its own output only when at least twice as
+long, jusText only when three times as long. Mozilla Readability's `charThreshold` is an absolute 500 characters.
+On 2026-09-10 the precision pass covered 0.90 to 1.00 of the plain text on nine article pages (gnu.org,
+peps.python.org, the docs.python.org tutorial, the kernel.org coding style guide, paulgraham.com, danluu.com, MDN,
+keepachangelog.com, trafilatura's own documentation) and 0.19 to 0.87 on twelve same-day news articles (Guardian,
+Ars Technica, TechCrunch, The Verge, BBC, Wired), where the recall pass returned the same text or, on one Ars
+Technica article, 1924 characters against 8956. On the pages where the precision pass dropped real content it
+covered 0.13 to 0.17 (three books.toscrape.com listings, where the recall pass restored every title) and 0.61
+(quotes.toscrape.com page 2, where it restored 29 dropped lines). 0.75 is the midpoint between the highest measured
+defective ratio, 0.61, and the lowest ratio at which the precision pass was already complete, 0.90. The second pass
+cost 25 to 33 milliseconds on 50 to 390 kilobyte pages, and because the longer result wins it cannot lose content.
+
+---
+
 ### Browser and CAPTCHA infrastructure
 
 | Variable | Default | Purpose |

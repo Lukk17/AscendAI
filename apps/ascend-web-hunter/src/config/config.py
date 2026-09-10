@@ -217,6 +217,17 @@ class Settings(BaseSettings):
             "fallback is attempted.  The higher-scoring result (by character count) is returned."
         ),
     )
+    CONTENT_RECALL_FALLBACK_RATIO: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Ratio of trafilatura's precision-mode output length to the page's plain text length "
+            "(BeautifulSoup get_text after noise tags are removed) below which a second trafilatura "
+            "pass runs with favor_recall=True. The longer of the two passes is returned. 0 never runs "
+            "the recall pass, 1 always runs it."
+        ),
+    )
 
     # Group 7 — Caching: read-result cache TTL
     READ_CACHE_TTL_SECONDS: int = Field(

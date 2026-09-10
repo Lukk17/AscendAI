@@ -10,5 +10,6 @@
 | [ADR-006](ADR-006-proxy-seam-and-fingerprint.md) | Outbound proxy seam and browser fingerprint rotation. | Accepted |
 | [ADR-007](ADR-007-structured-output-and-readability-fallback.md) | Structured article output (`output_format=structured`) and readability-lxml fallback for thin extractions. | Accepted |
 | [ADR-008](ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, loaded from disk only, refreshed solely via `POST /api/v1/blocklist/refresh`. | Accepted |
+| [ADR-009](ADR-009-recall-pass-for-thin-precision-extractions.md) | A trafilatura recall pass when the precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (0.75) of the page's plain text, longer result wins. | Accepted |
 
 For monorepo-level decisions see [`../../../../../docs/architecture/decisions/`](../../../../../docs/architecture/decisions/).

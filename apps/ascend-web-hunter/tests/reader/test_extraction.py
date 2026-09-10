@@ -1,8 +1,19 @@
 """Tests for structured extraction and readability fallback (tasks 5.1, 5.2)."""
 
+from pathlib import Path
 from unittest.mock import patch
 
-from src.reader.extraction import extract_structured, extract_text_with_fallback
+import trafilatura
+
+from src.reader.extraction import (
+    _extract_text_with_recall_fallback,
+    extract_structured,
+    extract_text_with_fallback,
+)
+
+_FIXTURES = Path(__file__).parent.parent / "fixtures"
+_BOOKS_LISTING_HTML = (_FIXTURES / "books_toscrape_index.html").read_text(encoding="utf-8")
+_ARTICLE_HTML = (_FIXTURES / "gnu_free_sw_article.html").read_text(encoding="utf-8")
 
 _GOOD_HTML = """
 <html>
@@ -153,3 +164,85 @@ def test_extract_structured_prefers_readability_when_it_scores_higher() -> None:
         result = extract_structured(_GOOD_HTML)
     assert result["source"] == "readability"
     assert result["content"] == long_read["content"]
+
+
+def test_extract_text_with_fallback_returns_listing_titles_through_recall_pass() -> None:
+    """The books listing loses every title in precision mode and the recall pass restores them."""
+    result = extract_text_with_fallback(_BOOKS_LISTING_HTML)
+    assert "Tipping the Velvet" in result
+    assert "Sharp Objects" in result
+    assert "£51.77" in result
+
+
+def test_extract_text_with_fallback_precision_pass_alone_drops_listing_titles() -> None:
+    """With the ratio at 0 the recall pass never runs and the listing comes back as prices only."""
+    with patch("src.reader.extraction.settings.CONTENT_RECALL_FALLBACK_RATIO", 0.0):
+        result = extract_text_with_fallback(_BOOKS_LISTING_HTML)
+    assert "Tipping the Velvet" not in result
+    assert "£51.77" in result
+
+
+def test_extract_text_with_fallback_article_page_uses_precision_pass_only() -> None:
+    """An article page clears the ratio on the first pass, so trafilatura runs exactly once."""
+    with patch("src.reader.extraction.trafilatura.extract", wraps=trafilatura.extract) as extract:
+        result = extract_text_with_fallback(_ARTICLE_HTML)
+    assert "The four essential freedoms" in result
+    extract.assert_called_once_with(_ARTICLE_HTML, favor_recall=False)
+
+
+def test_extract_text_with_fallback_keeps_precision_pass_when_recall_pass_is_not_longer() -> None:
+    """A recall pass that returns less than the precision pass is discarded."""
+    passes = ["precision text", "short"]
+    with (
+        patch("src.reader.extraction.trafilatura.extract", side_effect=passes) as extract,
+        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 0),
+    ):
+        result = extract_text_with_fallback(_GOOD_HTML)
+    assert result == "precision text"
+    assert extract.call_count == 2
+    assert extract.call_args_list[1].kwargs == {"favor_recall": True}
+
+
+def test_recall_pass_is_skipped_when_the_page_has_no_text() -> None:
+    """A page whose plain text is empty never triggers the second pass, and no division happens."""
+    with patch("src.reader.extraction.trafilatura.extract", return_value=None) as extract:
+        result = _extract_text_with_recall_fallback("<html><body><script>1</script></body></html>")
+    assert result == ""
+    extract.assert_called_once()
+
+
+def test_extract_structured_returns_listing_titles_through_recall_pass() -> None:
+    """The structured path shares the two-pass rule, so the books listing keeps its titles there too."""
+    result = extract_structured(_BOOKS_LISTING_HTML)
+    assert result["source"] == "trafilatura"
+    assert "Tipping the Velvet" in result["content"]
+    assert "Sharp Objects" in result["content"]
+
+
+def test_extract_structured_keeps_precision_pass_when_recall_pass_fails() -> None:
+    """A recall pass that yields nothing leaves the precision pass in place."""
+    precision_json = '{"text": "precision text", "title": "t", "author": "", "date": "", "sitename": ""}'
+    passes = [precision_json, None]
+    with (
+        patch("src.reader.extraction.trafilatura.extract", side_effect=passes) as extract,
+        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 0),
+    ):
+        result = extract_structured(_GOOD_HTML)
+    assert result["content"] == "precision text"
+    assert result["title"] == "t"
+    assert extract.call_count == 2
+    assert extract.call_args_list[0].kwargs["favor_recall"] is False
+    assert extract.call_args_list[1].kwargs["favor_recall"] is True
+
+
+def test_extract_structured_uses_recall_pass_when_precision_pass_fails() -> None:
+    """A precision pass that yields nothing is replaced by a recall pass that yields content."""
+    recall_json = '{"text": "recall text", "title": "t", "author": "", "date": "", "sitename": ""}'
+    passes = [None, recall_json]
+    with (
+        patch("src.reader.extraction.trafilatura.extract", side_effect=passes),
+        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 0),
+    ):
+        result = extract_structured(_GOOD_HTML)
+    assert result["content"] == "recall text"
+    assert result["source"] == "trafilatura"

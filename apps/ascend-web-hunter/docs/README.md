@@ -26,6 +26,11 @@ docs/
 | [ADR-002](architecture/decisions/ADR-002-cloudflare-cookie-persistence-redis.md) | Cloudflare cookie persistence in Redis with 2-hour TTL and in-process fallback. |
 | [ADR-003](architecture/decisions/ADR-003-novnc-ngrok-captcha-intervention.md) | NoVNC + Ngrok for human CAPTCHA and login-wall intervention. Dynamic URL extraction from Ngrok API. |
 | [ADR-004](architecture/decisions/ADR-004-searxng-meta-search-backend.md) | SearXNG as the sole meta-search backend. Privacy-first, self-hosted, no per-query API key. |
+| [ADR-005](architecture/decisions/ADR-005-strategy-budget-and-singleton-chromium.md) | READ_TOTAL_BUDGET=90s strategy chain deadline, singleton Chromium in lifespan, escalation recursion guard. |
+| [ADR-006](architecture/decisions/ADR-006-proxy-seam-and-fingerprint.md) | Outbound proxy seam and browser fingerprint rotation. |
+| [ADR-007](architecture/decisions/ADR-007-structured-output-and-readability-fallback.md) | Structured article output (`output_format=structured`) and readability-lxml fallback for thin extractions. |
+| [ADR-008](architecture/decisions/ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, loaded from disk only, refreshed solely via `POST /api/v1/blocklist/refresh`. |
+| [ADR-009](architecture/decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) | A trafilatura recall pass when the precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (0.75) of the page's plain text, longer result wins. |
 
 The [architecture/decisions/README.md](architecture/decisions/README.md) lists the same set with status flags.
 
