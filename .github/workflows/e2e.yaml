@@ -194,7 +194,7 @@ jobs:
         run: docker logs ascend-ocr
 
   ascend-web-hunter:
-    name: e2e / ascend-web-hunter (10 of 11 free specs)
+    name: e2e / ascend-web-hunter (11 of 12 free specs)
     runs-on: ubuntu-latest
     services:
       # Redis is an external prerequisite in every AscendAI environment, not
@@ -221,10 +221,10 @@ jobs:
       - name: Install Bruno CLI
         run: npm install -g @usebruno/cli
 
-      # Spec 11 (captcha-solve-and-reuse) is excluded: it requires a human to
+      # Spec 11 (captcha-solve-and-capture) is excluded: it requires a human to
       # tick the hCaptcha widget on the democaptcha demo form through NoVNC
-      # (the captured hmt_id cookie is the proof) before its reuse read can
-      # run, and cannot run unattended on a hosted runner.
+      # (the captured hmt_id cookie is the proof), and cannot run unattended
+      # on a hosted runner.
       - name: Run free e2e specs
         working-directory: docs/api/request/AscendAI
         run: |
@@ -281,6 +281,19 @@ jobs:
           # accept either terminal verdict, so this runs the folder once with
           # no retry loop, matching the spec's own best-effort rows.
           bru run "web-hunter/testing/realworld" --env ascend-local
+
+          # Spec 12: clearance-reuse. Same Cloudflare-protected site as spec 6,
+          # so it runs after it. The spec's own Reset state drops the stored
+          # session and the reader's in-process read cache for the domain, so
+          # Call 1 goes through FlareSolverr and stores a fresh clearance
+          # instead of being answered from the cache spec 6 just filled. Redis
+          # is a job service here with no fixed container name, so the session
+          # clear endpoint, which drops both, stands in for the spec's
+          # docker exec delete. Call 2 reads the same page under a different
+          # address and must reuse the clearance.
+          curl -fsS -X POST http://localhost:7021/api/v2/web/session/clear -H "Content-Type: application/json" -d '{"url":"https://www.scrapingcourse.com/cloudflare-challenge","profile":"default"}'
+          bru run "web-hunter/testing/clearance-cold.yml" --env ascend-local
+          bru run "web-hunter/testing/clearance-reuse.yml" --env ascend-local
 
           # Spec 8: session-clear
           bru run "web-hunter/testing/session-clear-existing.yml" --env ascend-local

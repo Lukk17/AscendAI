@@ -75,10 +75,16 @@ be run on its own.
     real headful Playwright browser that can be held by a background monitor for up to 10 minutes. Highest per-run
     resource cost in this module's suite; do not run in parallel with test 8 or with itself; see the spec's own
     cost note.
-11. [11-captcha-solve-and-reuse-test.md](11-captcha-solve-and-reuse-test.md). Human-solved hCaptcha on the
-    democaptcha demo form, proven by the `hmt_id` cookie a human's checkbox click sets, followed by a second read of
-    the same page that must answer HTTP 200 with `status="success"` because the stored session is reused. A second
-    428 is a FAIL and a product defect. Runs last of all, alone, on the main session, and only on a human's go.
+11. [11-captcha-solve-and-capture-test.md](11-captcha-solve-and-capture-test.md). Human-solved hCaptcha on the
+    democaptcha demo form, proven by the `hmt_id` cookie a human's checkbox click sets and captured under
+    `session:democaptcha.com:default`. Asserts the capture only, since the form renders its widget on every load and
+    a second read of it can never show reuse (register A60). Runs last of all, alone, on the main session, and only
+    on a human's go.
+12. [12-clearance-reuse-test.md](12-clearance-reuse-test.md). Stored Cloudflare clearance reused on a second read
+    of the same site, fully automated: a cold read of `scrapingcourse.com` stores `cf_clearance`, and a read of the
+    same page under a different address must answer HTTP 200 with `status="success"` faster than the cold read,
+    never a 428. A 428 is a FAIL and register defect A61 until its fix lands. Runs after test 6, which reads the
+    same site, and not alongside tests 6, 7, 8 or 10. Twelve specs in all, eleven of them automated.
 
 ## Cross-cutting conventions
 

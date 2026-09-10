@@ -13,8 +13,8 @@ Two things, both against **real sites** (no mocks):
    content. Proves the auth session is **stored and reused**.
 
 The human-solved hCaptcha that used to be Part 3 of this spec is spec 11
-([11-captcha-solve-and-reuse-test.md](11-captcha-solve-and-reuse-test.md)), which also asserts that the captured
-session is reused. This spec has no human step and runs fully automated.
+([11-captcha-solve-and-capture-test.md](11-captcha-solve-and-capture-test.md)), which asserts the capture that
+solve leaves behind. This spec has no human step and runs fully automated.
 
 ### Contract (how the service signals each verdict)
 
@@ -111,8 +111,8 @@ is the signal to reconcile the contract — not a licence to widen the accept-se
 holds a headful browser for `NOVNC_TIMEOUT_SECONDS` (600 s by default). Because u is best-effort, an intervention is a
 valid recorded verdict and **no human is expected to solve it**: record the `vnc_url` in the run record, leave the
 monitor to time out, and do not stall the sweep waiting on a human. The mandatory print-and-wait rule lives in
-spec 11 ([11-captcha-solve-and-reuse-test.md](11-captcha-solve-and-reuse-test.md)), whose whole point is the human
-solve.
+spec 11 ([11-captcha-solve-and-capture-test.md](11-captcha-solve-and-capture-test.md)), whose whole point is the
+human solve.
 
 **Dependency on the pending anti-bot fix.** Rows v, w, x and y assert behaviour the currently deployed build does not
 have on the interstitial path: a live probe of each locale's `/errors/validateCaptcha` through

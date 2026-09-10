@@ -32,7 +32,8 @@ apps/ascend-web-hunter/e2e/
     ├── 8-session-clear-test.md
     ├── 9-session-status-test.md
     ├── 10-session-establish-test.md
-    ├── 11-captcha-solve-and-reuse-test.md
+    ├── 11-captcha-solve-and-capture-test.md
+    ├── 12-clearance-reuse-test.md
     ├── templates/                       # run-record templates (immutable), one per spec
     │   ├── README.md
     │   ├── 1-invalid-input-tasks.template.md
@@ -45,7 +46,8 @@ apps/ascend-web-hunter/e2e/
     │   ├── 8-session-clear-tasks.template.md
     │   ├── 9-session-status-tasks.template.md
     │   ├── 10-session-establish-tasks.template.md
-    │   └── 11-captcha-solve-and-reuse-tasks.template.md
+    │   ├── 11-captcha-solve-and-capture-tasks.template.md
+    │   └── 12-clearance-reuse-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<capability>-tasks.md   # one per executed test (gitignored)
@@ -61,8 +63,10 @@ FlareSolverr plus outbound HTTPS to real sites for a per-tier regression sweep (
 needs no egress either but launches a real headful Playwright browser held by a background monitor for up to 10
 minutes — see its own spec for why that keeps it out of the cheap tier despite not touching SearXNG, FlareSolverr,
 or any external site. Spec `11` needs FlareSolverr, NoVNC and a human to tick the hCaptcha widget on the democaptcha
-demo form, then proves the captured session is reused on a second read of the same page, so it runs last and only on
-a human's go.
+demo form, and asserts the capture that solve leaves behind, so it runs last and only on a human's go. Spec `12`
+needs FlareSolverr and outbound HTTPS to one Cloudflare-protected site, and proves the stored clearance is reused on
+a second read of that site with no human, so it runs after spec `6`, which reads the same site. Twelve specs in all,
+eleven of them automated.
 
 The Bruno collection isn't here. It lives at the **repo root** under
 `docs/api/request/AscendAI/web-hunter/testing/` so it stays a portable API client artifact. Each spec references
@@ -118,16 +122,18 @@ pipeline plus an in-process blocklist. The execution constraints:
 | Domain-scoped Redis session key, no egress | 8 | Mutates only `session:example.net:default`, seeded and removed by the test itself. Conflicts with test 10, which writes `session:example.net:e2e-establish` as a side effect of `session/establish` (see test 10's own spec): a different key, but one that would appear in the `session:*` scan this test compares before and after. Also conflicts with test 3: test 3's read of `example.com` populates the same per-domain read cache that test 8's idempotent-clear call for `example.com` asserts is empty (`cleared_cache_entries=0`), so running them together fails that assertion. Safe in parallel with 1, 2, 4, 5, 9. Its final "no collateral damage" check compares the whole `session:*` key set against a pre-test baseline. That comparison is meaningful only when test 8 runs in isolation, since any test that mutates any session key while it is running, not only test 3 or 10, makes it fail. |
 | Domain-scoped Redis session key, no egress | 9 | Mutates only `session:example.org:default`, seeded twice and removed by the test itself. No overlap with test 8's or test 10's `example.net` key or any other test's domains. Safe in parallel with 1, 2, 4, 5, 8, 10. |
 | `session:example.net:e2e-establish`, plus a long-lived background browser | 10 | `session/establish` was assumed to write no session record until this spec was run live against port 7021, which showed otherwise within 15 seconds: the monitor's "cleared" check accepts any unchallenged page, so it captures an (often empty) session on the very first poll, as though a challenge had just been solved. See the spec's "Two behaviours this spec found live, not assumed" section. This test writes `session:example.net:e2e-establish` and cleans the key up itself. That is not the key test 8 seeds and clears, but test 8 compares a scan of `session:*` before and after its run, so this key would appear in that scan and fail it. It also leaves a real headful Playwright browser + NoVNC monitor running in the `ascend-web-hunter` container for up to 10 minutes after its own assertions pass if the monitor does not resolve within one poll cycle. Avoid running it back to back with itself for the same reason. |
-| Human-in-the-loop, must run on the main session | 11 | Call 1's read of the democaptcha hCaptcha demo form surfaces a `vnc_url` a human must open, and Call 2 then proves the captured session is reused (HTTP 200, `status="success"`, never a second 428). It cannot be delegated to a fanned-out subagent whose output is never shown to the user. Mutates `session:democaptcha.com:default` and holds the single shared NoVNC browser while the human window is open, so it conflicts with any spec that opens that window (test 7's row u, test 10) and with test 7's `session:*` flush. Runs alone, last, and only on a human's go. |
+| Human-in-the-loop, must run on the main session | 11 | Call 1's read of the democaptcha hCaptcha demo form surfaces a `vnc_url` a human must open, and the capture check then proves the solve left `session:democaptcha.com:default` behind with the `hmt_id` cookie. Reuse is not asserted here, that is test 12's job. It cannot be delegated to a fanned-out subagent whose output is never shown to the user. Mutates `session:democaptcha.com:default` and holds the single shared NoVNC browser while the human window is open, so it conflicts with any spec that opens that window (test 7's row u, test 10) and with test 7's `session:*` flush. Runs alone, last, and only on a human's go. |
+| Domain-scoped Redis session key, shared with test 6, fully automated | 12 | Mutates `session:scrapingcourse.com:default` and the reader's in-process read cache for that domain, the same site and key test 6's Cloudflare row writes, so it must not run alongside test 6 and runs after it. Its key would appear in the `session:*` scan tests 8 and 10 compare, so it must not run alongside them either, and test 7's reset flushes every `session:*` key, which would wipe the capture between its two calls. On the A61 failure path its Call 2 opens the single shared NoVNC browser. Safe in parallel with 1, 2, 3, 4, 5, 9. No human. |
 
 Recommended layout: run test 1 first (offline, fail-fast on validator bugs without burning egress), then tests
 2, 4, 5, 9 in parallel or sequential (none needs FlareSolverr or Playwright), then test 6 (highest egress cost,
-needs FlareSolverr and Playwright), then test 7 (also FlareSolverr and Playwright, fully automated now, after test 6
-because its reset flushes every `session:*` key), then tests 8 and 10 one at a time (never together: test 10's
-`session:example.net:e2e-establish` key would appear in the `session:*` scan test 8 compares before and after), with
-test 10 last of the two, since its assertions finish in seconds but the background browser it can leave running
-should not overlap with a repeat of itself either. Test 11 runs last of all, alone, and only on a human's go, because
-its human solve needs the main session and the single NoVNC browser.
+needs FlareSolverr and Playwright), then test 12 (after test 6 because both write `session:scrapingcourse.com:default`,
+and before test 7 because test 7's reset would wipe its capture), then test 7 (also FlareSolverr and Playwright, fully
+automated now, after test 6 because its reset flushes every `session:*` key), then tests 8 and 10 one at a time (never
+together: test 10's `session:example.net:e2e-establish` key would appear in the `session:*` scan test 8 compares
+before and after), with test 10 last of the two, since its assertions finish in seconds but the background browser it
+can leave running should not overlap with a repeat of itself either. Test 11 runs last of all, alone, and only on a
+human's go, because its human solve needs the main session and the single NoVNC browser.
 
 ## Prerequisites before any test
 
@@ -189,7 +195,8 @@ Numbered by setup cost. Easiest first.
 | 8  | [testing/8-session-clear-test.md](testing/8-session-clear-test.md) | `POST /api/v2/web/session/clear`, the operator-recovery path for a poisoned session. A session seeded directly in Redis for `example.net` is removed (`existed=true`, key gone from Redis afterward). A call against `example.com`, which never carried one, is a documented no-op (HTTP 200, `existed=false`, not a 404 or 500). No FlareSolverr, Playwright, or human needed, so it is the cheapest test in the suite alongside 1 and 4. Do not run in parallel with test 10: its `session:example.net:e2e-establish` key would appear in the `session:*` scan this test compares before and after. |
 | 9  | [testing/9-session-status-test.md](testing/9-session-status-test.md) | `POST /api/v2/web/session/status` across all three states its own type declares: `none` for a URL that never carried a session, `expired` for one seeded with a `saved_at` outside the 14-day auth TTL, and `active` for the same key re-seeded with a fresh `saved_at`. Redis-only, no egress — same cost tier as 1, 4, and 8. |
 | 10 | [testing/10-session-establish-test.md](testing/10-session-establish-test.md) | `POST /api/v2/web/session/establish`, the proactive counterpart to passive NoVNC capture. Asserts the immediate response (`status="login_required"`, echoed `target`, non-empty `vnc_url`), plus a live-verified finding this spec documents rather than assumes: the background monitor's "cleared" check accepts any unchallenged page, so it captures an (often empty) session on the very first poll, about 15 seconds in, even though nobody solved a challenge. Makes no priced call and needs no human, but launches a real headful Playwright browser that can be held by a background monitor for up to 10 minutes, the highest per-run resource cost in this module's suite. Do not run in parallel with test 8 (the `session:example.net:e2e-establish` key this test writes would appear in the `session:*` scan test 8 compares before and after) or with itself. See the spec's own cost note. |
-| 11 | [testing/11-captcha-solve-and-reuse-test.md](testing/11-captcha-solve-and-reuse-test.md) | Human-solved hCaptcha and session reuse on the democaptcha demo form (`https://democaptcha.com/demo-form-eng/hcaptcha.html`), whose `hcaptcha.com/1/api.js` script is a block signature for every automated tier. Call 1 with no session answers HTTP 428, `status="human_intervention_required"` and a `vnc_url` the main agent prints for the human. After the human ticks the widget and submits the form through NoVNC, `session:democaptcha.com:default` holds the `hmt_id` cookie hCaptcha sets on the checkbox click (proof a human acted, not that the image task was solved). Call 2 then reads the same page again and must answer HTTP 200 with `status="success"` and at least 50 characters of content, never a second 428, because the reader routes a read of a site with a stored session onto the browser tier with the saved cookies (`_prefer_browser` and `_has_stored_session` in `src/reader/web_reader.py`). A 428 on Call 2 is a FAIL and a product defect to register, not an environment problem. Runs alone, last, main session only, on a human's go. |
+| 11 | [testing/11-captcha-solve-and-capture-test.md](testing/11-captcha-solve-and-capture-test.md) | Human-solved hCaptcha and its capture on the democaptcha demo form (`https://democaptcha.com/demo-form-eng/hcaptcha.html`), whose `hcaptcha.com/1/api.js` script is a block signature for every automated tier. Call 1 with no session answers HTTP 428, `status="human_intervention_required"` and a `vnc_url` the main agent prints for the human. After the human ticks the widget and submits the form through NoVNC, `session:democaptcha.com:default` holds the `hmt_id` cookie hCaptcha sets on the checkbox click (proof a human acted, not that the image task was solved). Reuse of the capture is not asserted here: the form renders its widget on every load, so a second read of it can never show reuse (register A60), and spec 12 proves reuse on a site whose wall disappears once the clearance is stored. Runs alone, last, main session only, on a human's go. |
+| 12 | [testing/12-clearance-reuse-test.md](testing/12-clearance-reuse-test.md) | Stored Cloudflare clearance reused on a second read of the same site, fully automated. Call 1 reads `https://www.scrapingcourse.com/cloudflare-challenge` with no stored session and must answer HTTP 200, `status="success"` and at least 50 characters of content (measured 2026-09-10: `3-flaresolverr` in 25.2 seconds), leaving `session:scrapingcourse.com:default` behind with a `cf_clearance` cookie in its `waf` entry. Call 2 reads the same page as `?reuse=1`, a different address so the reader's five-minute in-memory read cache cannot answer it, and must answer HTTP 200, `status="success"`, at least 50 characters of content, no `vnc_url`, never a 428, and faster than Call 1. Both calls' `mode` and duration go into the run record. A 428 on Call 2 is a FAIL and is register defect A61 until its fix lands. Runs after test 6, which reads the same site, and not alongside tests 6, 7, 8 or 10. No human. |
 
 ## Adding a new test
 

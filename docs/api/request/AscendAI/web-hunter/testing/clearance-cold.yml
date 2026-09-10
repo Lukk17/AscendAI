@@ -1,0 +1,44 @@
+info:
+  name: clearance-cold
+  type: http
+  seq: 20
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Spec 12 Call 1: read a genuine Cloudflare challenge page with NO session stored. The curl
+    # tier is blocked, FlareSolverr solves the challenge, and the reader stores the site's
+    # session under session:scrapingcourse.com:default with cf_clearance in its waf entry.
+    data: |-
+      {
+        "url": "https://www.scrapingcourse.com/cloudflare-challenge",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("cold: HTTP 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("cold: status is success (challenge solved by an automated tier)", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("cold: a content-carrying field holds at least 50 characters", function () {
+            const body = res.getBody();
+            const data = typeof body === "string" ? JSON.parse(body) : body;
+            const contentField = ["content", "text", "markdown"].find(function (field) { return typeof data[field] === "string"; });
+            expect(contentField, "content-carrying string field").to.be.a("string");
+            expect(data[contentField].length).to.be.at.least(50);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

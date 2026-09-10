@@ -11,10 +11,10 @@ suite READMEs own spec content, fixtures, and each suite's own parallel groups: 
 scenario to pick, which specs that scenario runs or skips, and the cross-suite scheduling that only exists once
 more than one suite's runners share a host.
 
-The repository ships 52 specs total across the six suites (11 + 5 + 6 + 12 + 7 + 11). No single scenario below runs
-all 52 with nobody at the keyboard, because one spec (`ascend-web-hunter` spec 11) needs a human to solve an
-hCaptcha challenge through NoVNC. Scenario 4 is the only one that runs every spec, and it needs a human present for
-that one spec.
+The repository ships 53 specs total across the six suites (11 + 5 + 6 + 12 + 7 + 12). No single scenario below runs
+all 53 with nobody at the keyboard, because one spec (`ascend-web-hunter` spec 11, `11-captcha-solve-and-capture`)
+needs a human to solve an hCaptcha challenge through NoVNC. Scenario 4 is the only one that runs every spec, and it
+needs a human present for that one spec.
 
 ---
 
@@ -32,12 +32,12 @@ attention waiting for a step that scenario never reaches.
 
 | Scenario | Stack | LM Studio | Human at keyboard | Spec count |
 | :------- | :---- | :-------- | :----------------- | :--------- |
-| 1 | Full (`ascend-ai`, includes the scraping stack) | Off | No | 47 |
-| 2 | Full (`ascend-ai`, includes the scraping stack) | On | No | 51 |
-| 3 | Full (`ascend-ai`, includes the scraping stack) | Off | Yes | 48 |
-| 4 | Full (`ascend-ai`, includes the scraping stack) | On | Yes | 52 |
-| 5 | Scraping only (`ascend-scrapper`) | Not applicable | Yes | 11 |
-| 6 | Scraping only (`ascend-scrapper`) | Not applicable | No | 10 |
+| 1 | Full (`ascend-ai`, includes the scraping stack) | Off | No | 48 |
+| 2 | Full (`ascend-ai`, includes the scraping stack) | On | No | 52 |
+| 3 | Full (`ascend-ai`, includes the scraping stack) | Off | Yes | 49 |
+| 4 | Full (`ascend-ai`, includes the scraping stack) | On | Yes | 53 |
+| 5 | Scraping only (`ascend-scrapper`) | Not applicable | Yes | 12 |
+| 6 | Scraping only (`ascend-scrapper`) | Not applicable | No | 11 |
 
 ---
 
@@ -108,8 +108,8 @@ already holds that name). Every `docker exec redis ...` command a web-hunter spe
 | ascend-memory | 1, 4 | 2 |
 | ascend-ocr | 1-12 | 12 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-10 | 10 |
-| Total | | 47 |
+| ascend-web-hunter | 1-10, 12 | 11 |
+| Total | | 48 |
 
 ### Skipped specs
 
@@ -125,9 +125,10 @@ already holds that name). Every `docker exec redis ...` command a web-hunter spe
    [Global ordering rules](#global-ordering-rules) for the measured cost of breaking this rule.
 3. Weather spec 7 runs last within the weather suite, because it restarts the `ascend-weather-mcp` container.
 4. Memory runs only specs 1 and 4 in this scenario.
-5. Web-hunter's own chain: spec 1, then specs 2, 4, 5, 9 in parallel, then spec 6, then spec 7 (fully automated,
-   its `409 novnc_busy` rows retried per its own `Retry-After` rule), then spec 3, then spec 8, then spec 10 alone.
-   Web-hunter stops at spec 10 in this scenario.
+5. Web-hunter's own chain: spec 1, then specs 2, 4, 5, 9 in parallel, then spec 6, then spec 12 (same site as spec
+   6, and before spec 7 because spec 7's reset would wipe its capture), then spec 7 (fully automated, its
+   `409 novnc_busy` rows retried per its own `Retry-After` rule), then spec 3, then spec 8, then spec 10 alone.
+   Spec 11 does not run in this scenario.
 
 ---
 
@@ -151,8 +152,8 @@ Same as [Scenario 1](#scenario-1-automated-full-stack-lm-studio-off), except:
 | ascend-memory | 1-6 | 6 |
 | ascend-ocr | 1-12 | 12 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-10 | 10 |
-| Total | | 51 |
+| ascend-web-hunter | 1-10, 12 | 11 |
+| Total | | 52 |
 
 ### Skipped specs
 
@@ -185,8 +186,8 @@ Same as [Scenario 1](#scenario-1-automated-full-stack-lm-studio-off), except:
 | ascend-memory | 1, 4 | 2 |
 | ascend-ocr | 1-12 | 12 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-11 | 11 |
-| Total | | 48 |
+| ascend-web-hunter | 1-12 | 12 |
+| Total | | 49 |
 
 ### Skipped specs
 
@@ -196,11 +197,11 @@ Same as [Scenario 1](#scenario-1-automated-full-stack-lm-studio-off), except:
 
 Same as [Scenario 1's run order](#run-order) through web-hunter's spec 10, then one more step:
 
-6. Spec 11 runs last across the entire sweep, after every other suite and web-hunter's own specs 1 through 10 have
-   finished. The runner posts the exact `vnc_url` string from spec 11's Call 1 response into the chat verbatim,
-   waits for the human to confirm they solved the hCaptcha challenge and submitted the form, only then checks
-   `session:democaptcha.com:default` in Redis for the `hmt_id` cookie (the capture check), and only after that
-   check passes runs Call 2, the reuse read.
+6. Spec 11 (`11-captcha-solve-and-capture`) runs last across the entire sweep, after every other suite and
+   web-hunter's own specs 1 through 10 and 12 have finished. The runner posts the exact `vnc_url` string from spec
+   11's Call 1 response into the chat verbatim, waits for the human to confirm they solved the hCaptcha challenge
+   and submitted the form, and only then checks `session:democaptcha.com:default` in Redis for the `hmt_id` cookie
+   (the capture check), which closes the spec. Reuse is proven by spec 12 earlier in the chain, with no human.
 
 ---
 
@@ -222,8 +223,8 @@ Same as [Scenario 2](#scenario-2-automated-full-stack-lm-studio-on), except:
 | ascend-memory | 1-6 | 6 |
 | ascend-ocr | 1-12 | 12 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-11 | 11 |
-| Total | | 52 |
+| ascend-web-hunter | 1-12 | 12 |
+| Total | | 53 |
 
 ### Skipped specs
 
@@ -233,7 +234,7 @@ None. This is the only scenario that runs every spec the repository ships.
 
 Same as [Scenario 2's run order](#run-order-1) through web-hunter's spec 10, then the same closing step as
 [Scenario 3's step 6](#run-order-2): spec 11 last, human-gated, `vnc_url` pasted verbatim, human confirmation
-before the capture check and before the reuse read.
+before the capture check.
 
 ---
 
@@ -259,8 +260,8 @@ before the capture check and before the reuse read.
 
 | Suite | Specs run | Count |
 | :---- | :-------- | :---- |
-| ascend-web-hunter | 1-11 | 11 |
-| Total | | 11 |
+| ascend-web-hunter | 1-12 | 12 |
+| Total | | 12 |
 
 ### Skipped specs
 
@@ -269,12 +270,13 @@ None. Only the web-hunter suite runs in this scenario, and it runs in full.
 ### Run order
 
 Web-hunter's own chain, unmodified by any cross-suite constraint since no other suite is running: spec 1, then
-specs 2, 4, 5, 9 in parallel, then spec 6, then spec 7 (fully automated, its `409 novnc_busy` rows retried per its
-own `Retry-After` rule), then spec 3, then spec 8, then spec 10 alone, then spec 11 last, human-gated. The runner
-posts the exact `vnc_url` string from spec 11's Call 1 response into the chat verbatim, waits for the human to
-confirm they solved the hCaptcha challenge and submitted the form, only then checks
-`session:democaptcha.com:default` in Redis for the `hmt_id` cookie (the capture check), and only after that check
-passes runs Call 2, the reuse read.
+specs 2, 4, 5, 9 in parallel, then spec 6, then spec 12 (same site as spec 6, and before spec 7 because spec 7's
+reset would wipe its capture), then spec 7 (fully automated, its `409 novnc_busy` rows retried per its own
+`Retry-After` rule), then spec 3, then spec 8, then spec 10 alone, then spec 11 (`11-captcha-solve-and-capture`)
+last, human-gated. The runner posts the exact `vnc_url` string from spec 11's Call 1 response into the chat
+verbatim, waits for the human to confirm they solved the hCaptcha challenge and submitted the form, and only then
+checks `session:democaptcha.com:default` in Redis for the `hmt_id` cookie (the capture check), which closes the
+spec.
 
 ---
 
@@ -292,8 +294,8 @@ Same as [Scenario 5](#scenario-5-human-captcha-scraping-compose-only), except:
 
 | Suite | Specs run | Count |
 | :---- | :-------- | :---- |
-| ascend-web-hunter | 1-10 | 10 |
-| Total | | 10 |
+| ascend-web-hunter | 1-10, 12 | 11 |
+| Total | | 11 |
 
 ### Skipped specs
 
@@ -301,7 +303,8 @@ Same as [Scenario 5](#scenario-5-human-captcha-scraping-compose-only), except:
 
 ### Run order
 
-Web-hunter's own chain, same as [Scenario 5's run order](#run-order-4) through spec 10. Spec 11 does not run.
+Web-hunter's own chain, same as [Scenario 5's run order](#run-order-4) through spec 10, with spec 12 in its place
+after spec 6. Spec 11 does not run.
 
 ---
 
@@ -327,9 +330,10 @@ These apply whenever more than one suite's runners share the host, which is ever
 - Memory specs 2, 3, 5, and 6 run only when LM Studio is answering, because they default to the `lmstudio`
   embedding provider (`apps/ascend-memory/AGENTS.md`, `MEM0_DEFAULT_PROVIDER=lmstudio`).
 - Web-hunter's own chain never breaks inside a full-stack sweep: spec 1, then specs 2, 4, 5, 9 in parallel, then
-  spec 6, then spec 7 (fully automated, its busy rows retried per its own rule), then spec 3, then spec 8, then
-  spec 10 alone, then spec 11 last and only on the human's go, with the `vnc_url` pasted verbatim into the chat and
-  the human confirming before the capture check and the reuse read.
+  spec 6, then spec 12 (same site as spec 6, before spec 7's `session:*` flush), then spec 7 (fully automated, its
+  busy rows retried per its own rule), then spec 3, then spec 8, then spec 10 alone, then spec 11
+  (`11-captcha-solve-and-capture`) last and only on the human's go, with the `vnc_url` pasted verbatim into the
+  chat and the human confirming before the capture check.
 
 The practical shape this produces: a "parallel lane" holding up to 5 runners across the five non-exclusive suites
 plus web-hunter's own non-exclusive specs, and a "quarantine lane" for the eight exclusivity specs that the
@@ -341,7 +345,7 @@ parallel lane pauses for and resumes after.
 
 A full automated sweep across every suite, measured on 2026-09-10 with five parallel runners, covered 46 specs and
 took about two hours wall-clock end to end. This figure is reported as measured on that date rather than
-reconciled against today's six-suite total of 52 (or any single scenario's spec count above): the suites have
+reconciled against today's six-suite total of 53 (or any single scenario's spec count above): the suites have
 since been corrected and extended (see the `07469b9` and `23597ac` commits), so a spec added or corrected after
 2026-09-10 is not represented in that two-hour figure.
 
@@ -357,6 +361,6 @@ since been corrected and extended (see the `07469b9` and `23597ac` commits), so 
 | [apps/ascend-memory/e2e/README.md](../apps/ascend-memory/e2e/README.md) | ascend-memory's 6 specs and its provider dependency |
 | [apps/ascend-ocr/e2e/README.md](../apps/ascend-ocr/e2e/README.md) | ascend-ocr's 12 specs and the engine-bound exclusivity rule |
 | [apps/ascend-weather-mcp/e2e/README.md](../apps/ascend-weather-mcp/e2e/README.md) | ascend-weather-mcp's 7 specs |
-| [apps/ascend-web-hunter/e2e/README.md](../apps/ascend-web-hunter/e2e/README.md) | ascend-web-hunter's 11 specs, including the human-gated spec 11 |
+| [apps/ascend-web-hunter/e2e/README.md](../apps/ascend-web-hunter/e2e/README.md) | ascend-web-hunter's 12 specs, including the human-gated spec 11 and the automated reuse proof in spec 12 |
 | [.agents/skills/e2e-runbooks/SKILL.md](../.agents/skills/e2e-runbooks/SKILL.md) | The general spec / tasks-template / runs methodology and the default concurrency cap |
 | [docs/E2E_COST.md](E2E_COST.md) | Per-provider dollar cost of a sweep, rolled up from each run record's token fields |

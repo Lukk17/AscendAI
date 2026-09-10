@@ -1,4 +1,4 @@
-# CAPTCHA solve and session reuse: e2e test
+# CAPTCHA solve and capture: e2e test
 
 ## What this verifies
 
@@ -9,21 +9,18 @@ Two things, both against the real democaptcha hCaptcha demo form (no mocks), wit
    `hcaptcha.com/1/api.js` script is one of the block signatures in `src/reader/cloudflare/challenge_dictionary.json`,
    so every automated tier reports a challenge (measured on 2026-09-10: 26 seconds from the request to the NoVNC
    monitor starting) and the scraper escalates to NoVNC for a human to act.
-2. Session reuse. After the human solves the widget and submits the form in the NoVNC browser, the monitor captures
-   the page's session under `session:democaptcha.com:default`, and a second read of the same URL answers HTTP 200,
-   `status="success"` and a content-carrying field of at least 50 characters, with no 428. This is the whole point of
-   the spec: the reader routes a read of a site with a stored session onto the browser tier with the saved cookies.
-   `WebReader._prefer_browser` in `src/reader/web_reader.py` returns true when `WebReader._has_stored_session` finds a
-   storage state for the URL and profile, and `_select_strategies` then runs only the Playwright, Crawlee and NoVNC
-   strategies, so the saved cookies ride along on the first attempt. If Call 2 answers 428, the verdict is FAIL and
-   the finding is a product defect to register in `docs/DEFECT_REGISTER.md`, not an environment problem.
+2. Capture. After the human solves the widget and submits the form in the NoVNC browser, the monitor captures the
+   page's session under `session:democaptcha.com:default`, and that record holds an auth cookie named `hmt_id`
+   (domain `api.hcaptcha.com`). hCaptcha sets `hmt_id` when the checkbox is clicked, so its presence proves a human
+   acted in the NoVNC window. It does not prove the image task was solved: the monitor also clears on a Submit with
+   the widget unsolved, because the failure page has enough words and carries no block script. A research pass
+   found no public page that both escalates through the tiers and sets a cookie only on a successful solve, so this
+   is the accepted trade.
 
-Between the two calls, a capture check confirms what the human solve left behind: `session:democaptcha.com:default`
-holds an auth cookie named `hmt_id` (domain `api.hcaptcha.com`). hCaptcha sets `hmt_id` when the checkbox is clicked,
-so its presence proves a human acted in the NoVNC window. It does not prove the image task was solved: the monitor
-also clears on a Submit with the widget unsolved, because the failure page has enough words and carries no block
-script. A research pass found no public page that both escalates through the tiers and sets a cookie only on a
-successful solve, so this is the accepted trade, and Call 2 is what turns the capture into a proof of reuse.
+Reuse of the captured session is not asserted here. It is proven by spec 12
+([12-clearance-reuse-test.md](12-clearance-reuse-test.md)) on a site whose wall disappears once the clearance is
+stored, because the democaptcha form renders its widget on every load, so a second read of it carries the block
+signature whatever cookies the browser holds (measured 2026-09-10, register A60).
 
 Google's reCAPTCHA v2 demo was the previous target and was dropped because its script stays in the DOM after the
 solve, so the monitor can never declare that address cleared, and its `_GRECAPTCHA` cookie appears on a bare load, so
@@ -109,8 +106,8 @@ Expect `0`.
 
 > Execution model: this whole test is run by the main agent on the main session, never by an `e2e-runner`
 > subagent, whose output is not shown to the user. Call 1 returns a `vnc_url`. The main agent prints that `vnc_url`
-> verbatim in the chat and waits for you to solve the challenge in the NoVNC browser before the capture check and
-> Call 2. See "Human-intervention forwarding (mandatory)" above.
+> verbatim in the chat and waits for you to solve the challenge in the NoVNC browser before the capture check. See
+> "Human-intervention forwarding (mandatory)" above.
 
 Move into the Bruno collection root first.
 
@@ -137,13 +134,6 @@ docker exec redis redis-cli GET "session:democaptcha.com:default"
 
 Expect a JSON value whose `auth` entry contains an `hmt_id` cookie.
 
-4. Call 2, reuse. Read the same URL again with no profile, so the read resolves to the `default` profile the monitor
-   captured under.
-
-```bash
-bru run "web-hunter/testing/captcha-clearance-reuse.yml" --env ascend-local
-```
-
 ## Expected
 
 - Call 1: HTTP `428`, `status="human_intervention_required"`, `vnc_url` is a non-empty string. The main agent
@@ -151,10 +141,6 @@ bru run "web-hunter/testing/captcha-clearance-reuse.yml" --env ascend-local
 - Capture check: `session:democaptcha.com:default` exists and its `auth` entry carries a cookie named `hmt_id`. On
   the 2026-09-10 solve the `auth` entry also carried `evod95wg4` (democaptcha.com) and `__cflb` (api.hcaptcha.com),
   and the `waf` entry carried `__cf_bm` (.hcaptcha.com), none of which are asserted.
-- Call 2: HTTP `200`, `status="success"`, and one of `content`, `text` or `markdown` is a string of at least 50
-  characters. No `428`. A `428` on Call 2 is a FAIL, and the finding goes into `docs/DEFECT_REGISTER.md` as a
-  product defect in the stored-session routing (`_prefer_browser` and `_has_stored_session` in
-  `src/reader/web_reader.py`), not into the run record as an environment problem.
 - Clean up the record this test created, so the next run starts blocked again. The command is identical in
   PowerShell and Unix shells.
 
@@ -170,7 +156,7 @@ bru run "web-hunter/testing/captcha-clearance-reuse.yml" --env ascend-local
 
 ## Fixtures
 
-None, and no secrets: the captcha is human-solved. The URL is hardcoded in the two Bruno requests.
+None, and no secrets: the captcha is human-solved. The URL is hardcoded in the Bruno request.
 
 ## Concurrency
 
@@ -179,5 +165,5 @@ None, and no secrets: the captcha is human-solved. The URL is hardcoded in the t
   solves it).
 - Conflicts with: any spec that opens the human window (test 7's row u, test 10, and any read that escalates to
   NoVNC), because the service holds one shared browser and answers `409` `novnc_busy` while it is held, and any test
-  that flushes `session:*` (test 7's reset), which would wipe the capture between the two calls.
+  that flushes `session:*` (test 7's reset), which would wipe the capture before the capture check.
 - Serial: true. Runs alone, last in the sweep, and only on a human's go, with the human on the main session.
