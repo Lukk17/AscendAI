@@ -9,7 +9,7 @@ jacoco {
     toolVersion = libs.versions.jacoco.get()
 }
 
-version = "0.0.1"
+version = "0.0.3"
 
 java {
     toolchain {

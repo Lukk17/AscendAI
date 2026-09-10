@@ -47,7 +47,7 @@ cd docs/api/request/AscendAI
 
 Windows:
 ```powershell
-curl.exe -fsS -i -X POST http://localhost:9998/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+curl.exe -fsS -i -X POST http://localhost:9998/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 Unix:
@@ -92,8 +92,10 @@ Each response body's `result` content matches:
 - `fetchedAt` is a valid ISO-8601 instant.
 
 No outbound HTTPS request to `*.open-meteo.com` is made — this is an internal property the spec does not directly
-assert (since the runner is black-box), but a steady-state run takes < 50 ms per call. A duration > 500 ms suggests
-the validator was bypassed and Open-Meteo was actually called; investigate before declaring PASS.
+assert (since the runner is black-box), but a steady-state raw `curl` call measures about 210 ms (208 to 223 ms
+across three calls on 2026-09-09). Bruno's own reported durations add harness overhead on top of that (343 to
+838 ms on the same day) and are not the figure to compare. A raw `curl` duration > 500 ms suggests the validator
+was bypassed and Open-Meteo was actually called. Investigate before declaring PASS.
 
 ## Fixtures
 

@@ -8,7 +8,7 @@ AscendMemory is a semantic memory service that provides REST API and MCP server 
 
 - **Language**: Python 3.11
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.1.0
+- **Version**: 0.1.2
 - **Docker Base**: `python:3.11-slim`
 
 ## Build & Run Commands

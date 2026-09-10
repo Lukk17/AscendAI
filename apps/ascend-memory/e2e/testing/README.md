@@ -17,7 +17,8 @@ Every `<N>-<capability>-test.md` file is the **immutable spec** for one test and
    `POST /api/v1/memory/wipe?user_id=...`. Tests 1 and 4 need no reset (neither ever reaches mem0).
 4. **Run.** One or more numbered steps. Each step is a single Bruno CLI invocation. MCP tests have an additional
    first step: a `curl.exe` call to `/mcp` carrying the `initialize` JSON-RPC method, capturing the response's
-   `Mcp-Session-Id` header so subsequent Bruno requests can inject it as `--env-var mcp_session_id=<uuid>`.
+   `Mcp-Session-Id` header (a 32 character hexadecimal session id without hyphens, as FastMCP emits it) so
+   subsequent Bruno requests can inject it as `--env-var mcp_session_id=<session id>`.
 5. **Post-run cleanup.** One command per code block, wiping every `user_id` the run wrote through
    `POST /api/v1/memory/wipe?user_id=...`, so the test leaves the system exactly as it found it. Tests 1 and 4 write
    nothing and so have nothing to clean up. The section sits next to `Run` in the spec because that is where the

@@ -31,7 +31,7 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 - [ ] Each `location`, `temperature`, `weatherCode`, `wind`, `observedAt` is `null`
 - [ ] Each `source` equals `"open-meteo"`
 - [ ] Each `fetchedAt` is a valid ISO-8601 instant
-- [ ] Per-call duration < 500 ms (proxy for "validator short-circuited; no upstream call")
+- [ ] Per-call raw `curl` duration < 500 ms, about 210 ms at steady state, Bruno's reported duration adds harness overhead and is not the figure to compare (proxy for "validator short-circuited, no upstream call")
 
 ### Verdict
 

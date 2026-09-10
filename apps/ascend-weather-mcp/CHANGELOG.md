@@ -8,6 +8,21 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `build.gradle.kts` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.0.3]
+
+### Fixed
+- End-to-end spec 1 claimed a steady-state latency under 50 milliseconds. Three raw curl calls
+  measured 208 to 223 milliseconds, so the spec now states the measured 210 millisecond figure
+  and keeps the 500 millisecond investigate-before-pass threshold against a raw curl call.
+- The PowerShell form of the MCP specs' JSON-body curl.exe blocks failed on pwsh 7.6.5 with a
+  nested brace error and HTTP 400. Those blocks pass the body single-quoted now.
+- The version in build.gradle.kts lagged this changelog at 0.0.1, and the advertised MCP server
+  version in application.yaml was a hardcoded copy of it. The build file says 0.0.3 and the yaml
+  reads the build version through the placeholder line 17 already used.
+- The forecast Bruno request never checked that the first forecast date is today or tomorrow in
+  UTC, which end-to-end spec 4 requires. It does now. The two current-weather requests were checked
+  against spec 7 in the same pass and already asserted the country code and the coordinate bands.
+
 ## [0.0.2]
 
 ### Fixed

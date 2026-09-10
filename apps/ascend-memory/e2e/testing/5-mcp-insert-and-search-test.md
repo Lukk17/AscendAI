@@ -60,7 +60,7 @@ response headers.
 **PowerShell:**
 
 ```powershell
-curl.exe -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+curl.exe -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 **Unix:**
@@ -69,19 +69,20 @@ curl.exe -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application
 curl -fsS -i -X POST http://localhost:7020/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
-Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in
+Look for `Mcp-Session-Id: <session id>` in the response. The value is a 32 character hexadecimal session id without hyphens,
+as FastMCP emits it. Use that session id as the value of the `mcp_session_id` env-var in
 the next steps.
 
 **Step 2.** Insert the canary memory via MCP.
 
 ```bash
-bru run "memory/testing/mcp-insert.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
+bru run "memory/testing/mcp-insert.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
 ```
 
 **Step 3.** Search via MCP for a semantically related query.
 
 ```bash
-bru run "memory/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
+bru run "memory/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
 ```
 
 ## Post-run cleanup
@@ -99,7 +100,8 @@ Expect HTTP 200 with `{"status":"success", ...}`.
 
 ## Expected
 
-The `initialize` call returns HTTP 200 with an `Mcp-Session-Id: <uuid>` response header.
+The `initialize` call returns HTTP 200 with an `Mcp-Session-Id` response header whose value is a
+32 character hexadecimal session id without hyphens, as FastMCP emits it.
 
 `mcp-insert.yml` returns HTTP 200. The JSON-RPC response body has a `result` object (no `error` field). The
 `result.content` (FastMCP's structured tool return) describes ≥ 1 memory operation — the array is non-empty.

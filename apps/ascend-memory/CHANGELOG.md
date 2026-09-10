@@ -8,6 +8,18 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.1.2]
+
+### Fixed
+- The MCP specs and templates described the session id as a UUID. The value is a 32 character
+  hexadecimal id without hyphens, and the wording now says so.
+- The PowerShell form of the MCP specs' JSON-body curl.exe blocks failed on pwsh 7.6.5 with a
+  nested brace error and HTTP 400. Those blocks pass the body single-quoted now.
+- The version in pyproject.toml and AGENTS.md lagged this changelog at 0.1.0. Both say 0.1.2.
+- The MCP tools/list Bruno request only checked the four tool names, while end-to-end spec 4
+  requires each tool to advertise a non-empty input schema, user_id on the three user-scoped tools
+  and memory_id without user_id on memory_delete. The script asserts all of that now.
+
 ## [0.1.1]
 
 ### Fixed
