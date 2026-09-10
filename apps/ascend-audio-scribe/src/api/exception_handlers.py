@@ -15,6 +15,13 @@ class FileSizeExceededError(Exception):
     rather than 400 (Validation Failed)."""
 
 
+class UpstreamProviderError(Exception):
+    """Raised when an upstream transcription provider's HTTP call fails
+    (timeout, 5xx, connection reset). Distinct from ValueError so it maps to
+    502 (Bad Gateway) rather than 400 (Bad Request): the caller's input was
+    fine, the provider was unavailable."""
+
+
 def value_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """Map ValueError (e.g. unsafe URI, missing field, empty input) to 400 with
     an RFC 7807 problem document. The exception detail is safe to surface here
@@ -59,6 +66,31 @@ def file_size_error_handler(request: Request, exc: Exception) -> JSONResponse:
             "type": f"{_PROBLEM_TYPE_BASE}/file-too-large",
             "title": "File Too Large",
             "status": status.HTTP_413_CONTENT_TOO_LARGE,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+        },
+    )
+
+
+def upstream_provider_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """502 for a transcription provider's own HTTP call failing (timeout,
+    5xx, connection reset). The exception message is authored by the
+    service and names the provider; it never echoes the provider's raw
+    response, which could carry an upstream URL or auth detail.
+
+    Signature accepts `Exception` to satisfy Starlette's typing for
+    `add_exception_handler`; runtime registration restricts dispatch to
+    `UpstreamProviderError` via the handler-registration key."""
+
+    logger.warning(f"UpstreamProviderError on {request.method} {request.url}: {exc}")
+
+    return JSONResponse(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        media_type=PROBLEM_JSON,
+        content={
+            "type": f"{_PROBLEM_TYPE_BASE}/upstream-provider",
+            "title": "Upstream Provider Failed",
+            "status": status.HTTP_502_BAD_GATEWAY,
             "detail": str(exc),
             "instance": str(request.url.path),
         },

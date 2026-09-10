@@ -6,8 +6,10 @@ from starlette.types import Scope
 from src.api.exception_handlers import (
     PROBLEM_JSON,
     FileSizeExceededError,
+    UpstreamProviderError,
     file_size_error_handler,
     global_exception_handler,
+    upstream_provider_error_handler,
     value_error_handler,
 )
 
@@ -36,6 +38,17 @@ def test_file_size_error_handler_returns_413_problem_json() -> None:
     body = response.body.decode()
     assert "too big" in body
     assert "/file-too-large" in body
+
+
+def test_upstream_provider_error_handler_returns_502_problem_json() -> None:
+    response = upstream_provider_error_handler(
+        _make_request(), UpstreamProviderError("Hugging Face upstream call failed for model 'x'.")
+    )
+    assert response.status_code == 502
+    assert response.media_type == PROBLEM_JSON
+    body = response.body.decode()
+    assert "Hugging Face upstream call failed" in body
+    assert "/upstream-provider" in body
 
 
 def test_global_exception_handler_redacts_detail() -> None:

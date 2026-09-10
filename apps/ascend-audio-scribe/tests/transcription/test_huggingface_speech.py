@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
+from src.api.exception_handlers import UpstreamProviderError
 from src.config.config import settings
 from src.transcription import huggingface_api_speach_to_text as mod
 
@@ -40,7 +41,7 @@ def test_transcribe_single_chunk_returns_text() -> None:
 def test_transcribe_single_chunk_http_error() -> None:
     client = MagicMock()
     client.automatic_speech_recognition.side_effect = _make_hf_http_error("boom")
-    with pytest.raises(ValueError, match="Hugging Face"):
+    with pytest.raises(UpstreamProviderError, match="Hugging Face upstream call failed"):
         mod._transcribe_single_chunk(client, "x.wav", "model")
 
 
@@ -122,6 +123,24 @@ def test_hf_transcript_oserror_passthrough(
     del hf_token
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunksRaises(OSError("ffmpeg crashed")))
     with pytest.raises(OSError, match="ffmpeg crashed"):
+        mod.hf_transcript("a.wav", "m", "hf-inference")
+
+
+def test_hf_transcript_upstream_error_passthrough(
+    hf_token: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A provider HTTP failure inside the per-chunk loop must surface as
+    `UpstreamProviderError`, not get rewrapped into the generic
+    `RuntimeError("unexpected error")` path."""
+
+    del hf_token
+    client = MagicMock()
+    client.automatic_speech_recognition.side_effect = _make_hf_http_error("boom")
+    monkeypatch.setattr(mod, "_get_client", lambda *_a: client)
+    chunk = tmp_path / "c.wav"
+    chunk.write_bytes(b"x")
+    monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(chunk)]))
+    with pytest.raises(mod.UpstreamProviderError, match="Hugging Face upstream call failed"):
         mod.hf_transcript("a.wav", "m", "hf-inference")
 
 

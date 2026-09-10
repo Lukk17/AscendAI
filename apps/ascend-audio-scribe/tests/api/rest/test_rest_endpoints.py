@@ -20,6 +20,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.exception_handlers import UpstreamProviderError
 from src.main import app
 
 if TYPE_CHECKING:
@@ -229,6 +230,26 @@ def test_openai_endpoint_stream_error(monkeypatch: pytest.MonkeyPatch, client: T
     assert "error" in body
 
 
+def test_openai_endpoint_stream_upstream_error(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    import src.api.rest.rest_endpoints as rest
+
+    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(
+        rest,
+        "openai_speech_transcription",
+        MagicMock(
+            side_effect=UpstreamProviderError("OpenAI upstream call failed for model 'whisper-1'.")
+        ),
+    )
+    with client.stream(
+        "POST", "/api/v1/transcribe/openai", files=_multipart(), data={"stream": "true"}
+    ) as response:
+        body = response.read().decode()
+    assert "OpenAI upstream call failed for model 'whisper-1'." in body
+
+
 def test_openai_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
     import src.api.rest.rest_endpoints as rest
 
@@ -238,6 +259,20 @@ def test_openai_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: Tes
     )
     response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
     assert response.status_code == 400
+
+
+def test_openai_endpoint_upstream_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    import src.api.rest.rest_endpoints as rest
+
+    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(
+        rest,
+        "openai_speech_transcription",
+        MagicMock(side_effect=UpstreamProviderError("OpenAI upstream call failed for model 'whisper-1'.")),
+    )
+    response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
+    assert response.status_code == 502
+    assert response.json()["type"].endswith("/upstream-provider")
 
 
 # --- /hf -----------------------------------------------------------------
@@ -300,6 +335,26 @@ def test_hf_endpoint_stream_error(monkeypatch: pytest.MonkeyPatch, client: TestC
     assert "error" in body
 
 
+def test_hf_endpoint_stream_upstream_error(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    import src.api.rest.rest_endpoints as rest
+
+    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(
+        rest,
+        "hf_speech_transcription",
+        MagicMock(
+            side_effect=UpstreamProviderError(
+                "Hugging Face upstream call failed for model 'openai/whisper-large-v3'."
+            )
+        ),
+    )
+    with client.stream(
+        "POST", "/api/v1/transcribe/hf", files=_multipart(), data={"stream": "true"}
+    ) as response:
+        body = response.read().decode()
+    assert "Hugging Face upstream call failed for model 'openai/whisper-large-v3'." in body
+
+
 def test_hf_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
     import src.api.rest.rest_endpoints as rest
 
@@ -307,6 +362,20 @@ def test_hf_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestCli
     monkeypatch.setattr(rest, "hf_speech_transcription", MagicMock(side_effect=RuntimeError("boom")))
     response = client.post("/api/v1/transcribe/hf", files=_multipart(), data={"stream": "false"})
     assert response.status_code == 500
+
+
+def test_hf_endpoint_upstream_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    import src.api.rest.rest_endpoints as rest
+
+    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(
+        rest,
+        "hf_speech_transcription",
+        MagicMock(side_effect=UpstreamProviderError("Hugging Face upstream call failed for model 'x'.")),
+    )
+    response = client.post("/api/v1/transcribe/hf", files=_multipart(), data={"stream": "false"})
+    assert response.status_code == 502
+    assert response.json()["type"].endswith("/upstream-provider")
 
 
 # --- /audacity -----------------------------------------------------------

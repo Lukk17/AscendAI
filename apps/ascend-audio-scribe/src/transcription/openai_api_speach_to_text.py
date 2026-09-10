@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from openai import APIError, OpenAI
 
+from src.api.exception_handlers import UpstreamProviderError
 from src.config.config import settings
 from src.transcription.audio_chunker import chunked_audio
 
@@ -79,8 +80,8 @@ def _segments_from_response(response: Any) -> list[dict[str, Any]]:
 def _transcribe_single_chunk(
     audio_chunk_path: str, model: str, language: str, with_timestamps: bool
 ) -> list[dict[str, Any]] | str:
-    """Per-chunk OpenAI call. Raises ValueError on APIError so the router
-    can map it to a 400/RFC 7807 envelope."""
+    """Per-chunk OpenAI call. Raises UpstreamProviderError on APIError so the
+    router can map it to a 502/RFC 7807 envelope."""
 
     client = _get_client()
     try:
@@ -94,10 +95,7 @@ def _transcribe_single_chunk(
         return text
     except APIError as exc:
         logger.exception(f"OpenAI API error for model '{model}'")
-        raise ValueError(
-            "OpenAI API failed to process an audio chunk. It may be an invalid model "
-            "or the API may be unavailable."
-        ) from exc
+        raise UpstreamProviderError(f"OpenAI upstream call failed for model '{model}'.") from exc
 
 
 def _derive_chunk_seconds() -> int:

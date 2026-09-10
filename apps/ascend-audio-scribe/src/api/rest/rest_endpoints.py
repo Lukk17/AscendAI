@@ -28,6 +28,7 @@ from src.adapters.download_file_manager import (
     store_transcript,
 )
 from src.adapters.file_service import cleanup_temp_file, save_upload_to_temp_async
+from src.api.exception_handlers import UpstreamProviderError
 from src.config.config import settings
 from src.observability.metrics import (
     TRANSCRIPTION_DURATION_SECONDS,
@@ -150,8 +151,13 @@ def _complete_event(file_id: str, source: str, model: str, language: str) -> dic
 
 
 def _error_event(exc: Exception) -> dict[str, Any]:
-    message = str(exc) if isinstance(exc, ValueError) else INTERNAL_ERROR_MESSAGE
-    return {"type": SSE_ERROR, "message": message}
+    """`ValueError` and `UpstreamProviderError` messages are service-authored
+    and safe to surface verbatim. Anything else falls back to the generic
+    message so an unexpected exception's own text never reaches the client."""
+
+    if isinstance(exc, (ValueError, UpstreamProviderError)):
+        return {"type": SSE_ERROR, "message": str(exc)}
+    return {"type": SSE_ERROR, "message": INTERNAL_ERROR_MESSAGE}
 
 
 async def _drain_progress_queue(

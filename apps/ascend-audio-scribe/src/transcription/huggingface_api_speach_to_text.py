@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from huggingface_hub import InferenceClient
 from huggingface_hub.errors import HfHubHTTPError
 
+from src.api.exception_handlers import UpstreamProviderError
 from src.config.config import settings
 from src.transcription.audio_chunker import chunked_audio
 
@@ -44,7 +45,9 @@ def _transcribe_single_chunk(client: InferenceClient, audio_chunk_path: str, mod
         return text
     except HfHubHTTPError as exc:
         logger.exception(f"Hugging Face API error for model '{model}'")
-        raise ValueError("Hugging Face API failed to process an audio chunk.") from exc
+        raise UpstreamProviderError(
+            f"Hugging Face upstream call failed for model '{model}'."
+        ) from exc
 
 
 def hf_transcript(
@@ -105,7 +108,7 @@ def hf_transcript(
                         "message": f"Chunk {chunk_num}/{num_chunks} complete in {elapsed:.2f}s",
                         "data": {"chunk": chunk_num, "total": num_chunks, "elapsed_s": round(elapsed, 2)},
                     })
-    except (ValueError, OSError):
+    except (ValueError, OSError, UpstreamProviderError):
         # Service-authored exceptions propagate as-is; the global RFC 7807
         # handler maps them to 400 / 502 / etc.
         raise

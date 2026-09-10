@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from contextlib import AsyncExitStack, asynccontextmanager
+from importlib.metadata import version as get_package_version
 from typing import TYPE_CHECKING
 
 import uvicorn
@@ -13,8 +14,10 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from src.adapters.download_file_manager import run_cleanup_loop
 from src.api.exception_handlers import (
     FileSizeExceededError,
+    UpstreamProviderError,
     file_size_error_handler,
     global_exception_handler,
+    upstream_provider_error_handler,
     value_error_handler,
 )
 from src.api.mcp.mcp_server import mcp
@@ -31,6 +34,8 @@ if TYPE_CHECKING:
 
 setup_logging()
 logger = logging.getLogger("ascend-audio-scribe")
+
+SERVICE_VERSION: str = get_package_version("ascend-audio-scribe")
 
 
 def _configure_otel() -> None:
@@ -88,7 +93,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="ascend-audio-scribe",
         description="A dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models.",
-        version="0.9.0",
+        version=SERVICE_VERSION,
         lifespan=lifespan,
     )
 
@@ -96,6 +101,7 @@ def create_app() -> FastAPI:
     app.add_middleware(ForceJSONUTF8Middleware)
 
     app.add_exception_handler(FileSizeExceededError, file_size_error_handler)
+    app.add_exception_handler(UpstreamProviderError, upstream_provider_error_handler)
     app.add_exception_handler(ValueError, value_error_handler)
     app.add_exception_handler(Exception, global_exception_handler)
 

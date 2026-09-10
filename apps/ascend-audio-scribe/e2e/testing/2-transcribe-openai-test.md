@@ -42,11 +42,13 @@ Expect `present`. Never `printenv` the raw value. This check proves the variable
 Check outbound HTTPS to OpenAI works from the ascend-audio-scribe container.
 
 ```bash
-docker exec ascend-audio-scribe curl -fsS -o /dev/null -w "%{http_code}\n" https://api.openai.com/v1/models
+docker exec ascend-audio-scribe curl -sS -o /dev/null -w "%{http_code}\n" https://api.openai.com/v1/models
 ```
 
-Expect HTTP 200 (when the key is valid) or HTTP 401 (when the key is unset/invalid — confirms egress works even if
-the key check itself failed).
+Expect HTTP 401. The probe sends no Authorization header, so OpenAI answers 401 whatever state the key is in. The
+probe deliberately omits `-f`, which would turn that 401 into exit code 22 and hide the status the prose asks for.
+The probe proves egress only: the container can reach the OpenAI API over HTTPS. The key itself is proven by the Run
+step, whose request carries the key and only returns a transcript when the key is valid.
 
 Check the canary fixture is present.
 

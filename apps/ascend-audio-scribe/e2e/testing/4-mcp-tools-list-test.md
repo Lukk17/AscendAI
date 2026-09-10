@@ -3,7 +3,7 @@
 ## What this verifies
 
 - The MCP `initialize` handshake against `POST /mcp` returns HTTP 200 with an `Mcp-Session-Id` header containing a
-  non-empty UUID.
+  non-empty 32 character hexadecimal session id without hyphens.
 - A subsequent `tools/list` JSON-RPC call with the captured `Mcp-Session-Id` returns HTTP 200.
 - The JSON-RPC `result.tools` array advertises **at least** the four transcribe tools (`transcribe_local`,
   `transcribe_openai`, `transcribe_hf`, `transcribe_audacity`) plus `health`.
@@ -48,7 +48,7 @@ cd docs/api/request/AscendAI
 **PowerShell:**
 
 ```powershell
-curl.exe -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+curl.exe -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 **Unix:**
@@ -57,18 +57,19 @@ curl.exe -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application
 curl -fsS -i -X POST http://localhost:7017/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
-Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in the next step(s).
+Look for `Mcp-Session-Id: <session id>` in the response. The value is a 32 character hexadecimal session id without hyphens,
+as FastMCP emits it. Use that session id as the value of the `mcp_session_id` env-var in the next step(s).
 
 **Step 2.** Send the tool call(s) with the captured session ID injected:
 
 ```bash
-bru run "transcribe/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
+bru run "transcribe/testing/mcp-list-tools.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
 ```
 
 ## Expected
 
 Step 1 returns HTTP 200. The response carries an `Mcp-Session-Id` header whose value is a non-empty string (FastMCP
-emits a UUID).
+emits a 32 character hexadecimal session id without hyphens).
 
 Step 2 returns HTTP 200. The JSON-RPC `result.tools` array satisfies:
 

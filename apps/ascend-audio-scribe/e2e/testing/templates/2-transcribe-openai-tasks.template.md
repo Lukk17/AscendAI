@@ -11,7 +11,7 @@ Copy this file to `../runs/<UTC-timestamp>_2-transcribe-openai-tasks.md` before 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-audio-scribe `/health` returns HTTP 200 with `{"status":"ok","service":"ascend-audio-scribe"}`
 - [ ] `docker exec ascend-audio-scribe sh -c '[ -n "$OPENAI_API_KEY" ] && echo present || echo missing'` prints `present`
-- [ ] ascend-audio-scribe container can reach `https://api.openai.com/v1/models` (HTTP 200 or 401)
+- [ ] ascend-audio-scribe container can reach `https://api.openai.com/v1/models` (HTTP 401, the probe carries no key and proves egress only)
 - [ ] `apps/ascend-audio-scribe/e2e/fixtures/meeting-clip.wav` exists and is at least 1 KB
 
 ### Reset state

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from openai import APIError
 
+from src.api.exception_handlers import UpstreamProviderError
 from src.transcription import openai_api_speach_to_text as mod
 
 
@@ -104,7 +105,7 @@ def test_transcribe_single_chunk_api_error(
     chunk.write_bytes(b"x")
     api_err = APIError("boom", request=MagicMock(), body=None)
     fake_openai_client.audio.transcriptions.create.side_effect = api_err
-    with pytest.raises(ValueError, match="OpenAI API"):
+    with pytest.raises(UpstreamProviderError, match="OpenAI upstream call failed"):
         mod._transcribe_single_chunk(str(chunk), "whisper-1", "en", with_timestamps=False)
 
 
@@ -118,6 +119,18 @@ def test_openai_transcript_under_limit_uses_direct_call(
 
     result = mod.openai_transcript(str(f), "whisper-1", "en")
     assert result == "direct"
+
+
+def test_openai_transcript_upstream_error_propagates(
+    fake_openai_client: MagicMock, tmp_path: Path
+) -> None:
+    f = tmp_path / "small.wav"
+    f.write_bytes(b"x" * 100)
+    api_err = APIError("boom", request=MagicMock(), body=None)
+    fake_openai_client.audio.transcriptions.create.side_effect = api_err
+
+    with pytest.raises(UpstreamProviderError, match="OpenAI upstream call failed"):
+        mod.openai_transcript(str(f), "whisper-1", "en")
 
 
 def test_openai_transcript_with_chunking_text(

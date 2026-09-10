@@ -8,6 +8,28 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.9.2]
+
+### Fixed
+- An upstream provider failure, such as a gateway timeout from the hosted inference endpoint, was
+  answered with 400 as though the caller had sent a bad request. Both hosted providers now answer
+  502 through a dedicated upstream exception.
+- The egress probe in end-to-end spec 2 told the runner to expect 200 from a request that carries
+  no key and therefore always answers 401. The prose now says 401, that the probe proves egress
+  only, and that the key itself is proven by the run step.
+- The PowerShell form of the MCP specs' JSON-body curl.exe blocks failed on pwsh 7.6.5 with a
+  nested brace error and HTTP 400. Those blocks pass the body single-quoted now.
+- The three transcribe Bruno requests asserted JSON keys on the markdown file the endpoints
+  return. They assert the markdown attachment contract now.
+- The three transcribe Bruno requests sent an accept header of application/json while the
+  endpoints answer text/markdown. The header now asks for text/markdown.
+- The version in pyproject.toml and the FastAPI application lagged this changelog at 0.9.0. Both
+  say 0.9.2, and the FastAPI application now reads its version from the installed package
+  metadata at import time instead of a hardcoded literal, so pyproject.toml is the only place
+  the version lives.
+- The egress probe in end-to-end spec 2 still passed -f to curl, which turns the 401 the prose
+  expects into exit code 22 and hides the status. The probe drops -f and prints the status.
+
 ## [0.9.1]
 
 ### Fixed

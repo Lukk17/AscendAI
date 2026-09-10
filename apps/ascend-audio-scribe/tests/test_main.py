@@ -1,4 +1,5 @@
 import sys
+from importlib.metadata import version as get_package_version
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -58,6 +59,10 @@ def test_health_returns_200() -> None:
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
+
+
+def test_app_version_matches_installed_package_metadata() -> None:
+    assert app.version == get_package_version("ascend-audio-scribe")
 
 
 def test_metrics_returns_prometheus_payload() -> None:
