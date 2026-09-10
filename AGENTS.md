@@ -255,6 +255,8 @@ docker compose up -d --build
 
 Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-agent/e2e/`](apps/ascend-agent/e2e/README.md). Eleven numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-agent/e2e/README.md`](apps/ascend-agent/e2e/README.md) for the full contract and capability matrix.
 
+Before running any end-to-end test, in any of the six suites, ask the owner which run scenario from [`docs/E2E_RUN_SCENARIOS.md`](docs/E2E_RUN_SCENARIOS.md) they want. Always ask, and never assume one: the scenarios differ in which compose project is up, whether LM Studio must answer, whether a human needs to be at the keyboard, and how many specs run.
+
 ## IDE Compatibility
 
 Always output file edits using strict SEARCH/REPLACE blocks.

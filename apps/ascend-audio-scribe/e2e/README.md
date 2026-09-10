@@ -7,6 +7,8 @@ persisted database, no Redis, no Qdrant, no object store; the only state it keep
 cache. Where a test could be polluted by leftover `.md` files, the reset step is to delete `/tmp/transcript_*.md`
 inside the container.
 
+Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+
 ## What's here
 
 ```text

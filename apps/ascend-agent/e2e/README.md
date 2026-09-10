@@ -4,6 +4,8 @@ The manual / AI-runnable e2e suite for ascend-ai-agent. Each test exercises one 
 stack and asserts only **observable behaviour**. HTTP status codes, response-body content, persisted state in the
 object store, Qdrant, and Postgres. Logs are diagnostic, not pass criteria.
 
+Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+
 ---
 
 ### What's here

@@ -6,6 +6,8 @@ JSON-RPC response body shape and content. The only persisted state ascend-weathe
 it has no database, no Redis, no Qdrant, no object store. Where a test requires a cold cache, the reset step is to restart
 the container.
 
+Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+
 ## What's here
 
 ```text

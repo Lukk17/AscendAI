@@ -7,6 +7,8 @@ ascend-web-hunter keeps no per-user state beyond a Redis-backed session cache ke
 the search path itself is stateless. Where a test needs reproducible upstream conditions, the reset step calls
 the appropriate Redis key wipe.
 
+Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+
 ## What's here
 
 ```text

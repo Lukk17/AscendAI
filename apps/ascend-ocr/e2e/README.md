@@ -6,6 +6,8 @@ codes, response body shape, and extracted text substrings. ascend-ocr holds no p
 state is the warmed OCR engine cache, which is initialised at startup and keyed by language. Where a test requires a
 cold engine for a previously unseen language, the reset step is to restart the container.
 
+Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+
 ## What's here
 
 ```text

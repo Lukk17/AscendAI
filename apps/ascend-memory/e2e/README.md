@@ -9,6 +9,8 @@ AscendMemory holds user-scoped memories in Qdrant via mem0ai. Reset for these te
 `user_id`(s) the test touches via `POST /api/v1/memory/wipe?user_id=...` — never restarting the container or wiping
 all users.
 
+Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+
 ## What's here
 
 ```text
