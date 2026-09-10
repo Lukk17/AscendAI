@@ -131,6 +131,6 @@ inputs.
 
 ## Relevant Skills
 
-- `/python-patterns`, `/python-testing`
+- `/python-patterns`
 - `/api-design`, `/docker-patterns`
 - `/security-review` (URL handling, SSRF, jail)

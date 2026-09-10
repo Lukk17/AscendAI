@@ -133,6 +133,6 @@ commit. The same applies to environment variables: a new variable in the scrappe
 
 ## Relevant Skills
 
-- `/python-patterns`, `/python-testing`
+- `/python-patterns`
 - `/api-design`, `/docker-patterns`
 - `/security-review` (web scraping, input validation)

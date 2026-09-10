@@ -108,5 +108,5 @@ something this service reads or writes to.
 
 ## Relevant Skills
 
-- `/python-patterns`, `/python-testing`
+- `/python-patterns`
 - `/api-design`, `/docker-patterns`

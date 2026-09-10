@@ -110,7 +110,7 @@ Defaults match `application.yaml`. Any other model the provider accepts works at
 
 ## Relevant Skills
 
-- `/springboot-patterns`, `/springboot-security`, `/springboot-tdd`, `/springboot-verification`
-- `/java-coding-standards`, `/jpa-patterns`
+- `/springboot-patterns`
+- `/java-coding-standards`
 - `/api-design`, `/database-migrations`
 - `/docker-patterns`, `/deployment-patterns`

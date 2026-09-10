@@ -267,7 +267,7 @@ Ensure exact matching of existing indentation and formatting for the diff viewer
 In addition to the generic skill list above, this project relies on these domain-specific skills. Invoke them before starting work in the matching area:
 
 - `/springboot-patterns` or `/java-coding-standards` for Java/Spring Boot work
-- `/python-patterns` or `/python-testing` for Python work
+- `/python-patterns` for Python work
 - `/docker-patterns` for Docker/compose changes
 - `/api-design` for REST API design
 - `/git-workflow` for branching and commit conventions
