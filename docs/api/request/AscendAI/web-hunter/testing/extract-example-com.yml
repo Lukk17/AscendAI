@@ -23,10 +23,15 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("extract returns structured content", function () {
+        test("read of example.com succeeds and carries the canary phrase", function () {
             const body = res.getBody();
             const data = typeof body === "string" ? JSON.parse(body) : body;
-            expect(data).to.have.property("status").or.have.property("content").or.have.property("text");
+            expect(data.url).to.equal("https://www.example.com/");
+            expect(data.status).to.equal("success");
+            const contentField = ["content", "text", "markdown"].find(function (field) { return typeof data[field] === "string"; });
+            expect(contentField, "content-carrying string field").to.be.a("string");
+            expect(data[contentField].length).to.be.at.least(50);
+            expect(data[contentField].toLowerCase()).to.include("example domain");
         });
 
 settings:

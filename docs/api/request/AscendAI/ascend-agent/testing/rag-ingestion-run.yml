@@ -33,16 +33,21 @@ http:
     type: multipart-form
 
 runtime:
+  variables:
+    - name: ragMinIndexed
+      value: "1"
   scripts:
     - type: tests
       code: |-
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("Ingestion indexes the freshly uploaded fixtures with no failures", function () {
+        test("Ingestion indexes at least ragMinIndexed fixtures with no failures", function () {
+            const minIndexed = Number(bru.getEnvVar("ragMinIndexed") || bru.getRequestVar("ragMinIndexed"));
+            expect(Number.isInteger(minIndexed) && minIndexed >= 1, "ragMinIndexed is a positive integer").to.be.true;
             const body = res.getBody();
             expect(body.indexed).to.be.a("number");
-            expect(body.indexed).to.be.at.least(1);
+            expect(body.indexed).to.be.at.least(minIndexed);
             expect(body.failed).to.equal(0);
         });
 

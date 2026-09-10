@@ -8,7 +8,7 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7017/api/v1/transcribe/hf"
   headers:
     - name: accept
-      value: application/json
+      value: text/markdown
   body:
     type: multipart-form
     data:
@@ -31,11 +31,14 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("transcription endpoint returns status and content", function () {
-            const body = res.getBody();
-            const data = typeof body === "string" ? JSON.parse(body) : body;
-            expect(data).to.have.property("status");
-            expect(data).to.have.property("transcription").or.have.property("segments").or.have.property("transcript");
+        test("Content-Type starts with text/markdown", function () {
+            expect(res.getHeader("content-type")).to.match(/^text\/markdown/);
+        });
+        test("Content-Disposition names transcript_hf.md", function () {
+            expect(res.getHeader("content-disposition")).to.equal("attachment; filename=\"transcript_hf.md\"");
+        });
+        test("Transcript body is not empty", function () {
+            expect(String(res.getBody()).trim().length).to.be.at.least(1);
         });
 
 settings:

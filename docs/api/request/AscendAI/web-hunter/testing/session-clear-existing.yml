@@ -30,6 +30,8 @@ runtime:
             expect(b.status).to.equal("cleared");
             expect(b.url).to.equal("https://example.net/");
             expect(b.existed).to.equal(true);
+            expect(Number.isInteger(b.cleared_cache_entries)).to.be.true;
+            expect(b.cleared_cache_entries).to.be.at.least(0);
         });
 
 settings:

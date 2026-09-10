@@ -37,13 +37,26 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("MCP endpoint returns valid envelope or result", function () {
+        test("web_search returns 1 to 3 results with title, http(s) url and content", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
-            if (dataLine) {
-                const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
-                expect(envelope).to.have.property("result").or.have.property("error");
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const result = envelope.result;
+            expect(result, "result").to.be.an("object");
+            expect(result.isError === undefined || result.isError === false, "result.isError").to.be.true;
+            let hits = result.structuredContent && result.structuredContent.result;
+            if (!Array.isArray(hits)) {
+                const textEntry = result.content.find(function (entry) { return entry.type === "text"; });
+                expect(textEntry, "text content entry").to.be.an("object");
+                hits = JSON.parse(textEntry.text);
             }
+            expect(hits).to.be.an("array");
+            expect(hits.length).to.be.within(1, 3);
+            hits.forEach(function (hit) {
+                expect(hit.title).to.be.a("string").and.not.empty;
+                expect(hit.url).to.be.a("string").and.match(/^https?:\/\//);
+                expect(hit.content).to.be.a("string");
+            });
         });
 
 settings:

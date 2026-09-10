@@ -8,12 +8,12 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/establish"
   body:
     type: json
-    # example.net is IANA-reserved for documentation/testing; test 8 is the only
-    # other spec that touches its default-profile key, and only transiently. The
-    # "e2e-establish" profile is sent to match the endpoint's documented request
-    # shape, but SessionManager.establish never forwards it to the capture path
-    # (see the spec's "Two behaviours this spec found live, not assumed" section),
-    # so any resulting capture lands under the default profile regardless.
+    # example.net is IANA-reserved for documentation/testing. Test 8 is the only
+    # other spec that touches this domain, and only its default-profile key, and
+    # only transiently. SessionManager.establish forwards the "e2e-establish"
+    # profile all the way to the capture path, so the record this call produces
+    # lands under session:example.net:e2e-establish, the key spec 10's reset and
+    # cleanup commands target.
     data: |-
       {
         "url": "https://example.net",

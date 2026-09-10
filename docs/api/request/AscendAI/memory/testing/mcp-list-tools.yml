@@ -35,11 +35,35 @@ runtime:
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
-            const toolNames = envelope.result.tools.map(function (t) { return t.name; });
+            const tools = envelope.result.tools;
+            expect(tools).to.be.an("array").that.is.not.empty;
+            const toolNames = tools.map(function (t) { return t.name; });
             expect(toolNames).to.include("memory_insert");
             expect(toolNames).to.include("memory_search");
             expect(toolNames).to.include("memory_delete");
             expect(toolNames).to.include("memory_wipe");
+        });
+        test("Every tool advertises a non-empty inputSchema.properties object", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            envelope.result.tools.forEach(function (tool) {
+                expect(tool.inputSchema, tool.name + " inputSchema").to.be.an("object");
+                expect(tool.inputSchema.properties, tool.name + " inputSchema.properties").to.be.an("object");
+                expect(Object.keys(tool.inputSchema.properties), tool.name + " inputSchema.properties").to.not.be.empty;
+            });
+        });
+        test("The user-scoped tools advertise user_id and memory_delete advertises memory_id instead", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const byName = {};
+            envelope.result.tools.forEach(function (tool) { byName[tool.name] = tool; });
+            ["memory_insert", "memory_search", "memory_wipe"].forEach(function (name) {
+                expect(byName[name].inputSchema.properties, name + " inputSchema.properties").to.have.property("user_id");
+            });
+            expect(byName.memory_delete.inputSchema.properties).to.have.property("memory_id");
+            expect(byName.memory_delete.inputSchema.properties).to.not.have.property("user_id");
         });
 
 settings:

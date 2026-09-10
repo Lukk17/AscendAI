@@ -1,0 +1,46 @@
+info:
+  name: rag-prompt-banana-price
+  type: http
+  seq: 18
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+  headers:
+    - name: X-User-Id
+      value: frostyRagTest
+  body:
+    type: multipart-form
+    data:
+      - name: prompt
+        type: text
+        value: What was the retail price of bananas in Poland in October 2026?
+      - name: embeddingProvider
+        type: text
+        value: openai
+      - name: provider
+        type: text
+        value: minimax
+      - name: model
+        type: text
+        value: MiniMax-M2.7
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Answer carries the PDF fixture's banana price and is not a refusal", function () {
+            const content = res.getBody().content;
+            expect(content).to.be.a("string").and.not.empty;
+            expect(content).to.include("6.49");
+            expect(content.toLowerCase()).to.not.include("i don't have that document");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -22,10 +22,26 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("search returns results or error status", function () {
+        test("search returns a JSON array of 1 to 3 results", function () {
             const body = res.getBody();
             const data = typeof body === "string" ? JSON.parse(body) : body;
-            expect(data).to.have.property("status").or.have.property("results").or.have.property("query");
+            expect(data).to.be.an("array");
+            expect(data.length).to.be.within(1, 3);
+        });
+        test("every result carries title, url and content", function () {
+            const data = res.getBody();
+            data.forEach(function (entry) {
+                expect(entry.title).to.be.a("string").and.not.empty;
+                expect(entry.url).to.be.a("string").and.match(/^https?:\/\//);
+                expect(entry.content).to.be.a("string");
+            });
+        });
+        test("at least one result mentions openstreetmap", function () {
+            const data = res.getBody();
+            const hit = data.some(function (entry) {
+                return (entry.title + " " + entry.content).toLowerCase().includes("openstreetmap");
+            });
+            expect(hit).to.equal(true);
         });
 
 settings:

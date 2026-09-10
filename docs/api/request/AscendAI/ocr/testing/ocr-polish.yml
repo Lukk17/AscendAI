@@ -37,8 +37,8 @@ runtime:
         test("At least one page", function () {
             expect(res.getBody().pages.length).to.be.greaterThan(0);
         });
-        test("language is a non-empty string", function () {
-            expect(res.getBody().language).to.be.a("string").and.not.empty;
+        test("language is pl", function () {
+            expect(res.getBody().language).to.equal("pl");
         });
         test("Extracted text carries the Polish canary substring", function () {
             const body = res.getBody();

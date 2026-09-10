@@ -16,6 +16,7 @@ http:
         type: file
         value:
           - "{{ocrFixtures}}/not-an-image.txt"
+        contentType: image/png
   auth: inherit
 
 runtime:

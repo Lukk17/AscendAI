@@ -56,11 +56,10 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("endpoint returns response body with data", function () {
+        test("endpoint returns a JSON object with a non-empty content string", function () {
             const body = res.getBody();
-            expect(body).to.be.a("string");
-            const data = typeof body === "string" ? JSON.parse(body) : body;
-            expect(typeof data).to.equal("object");
+            expect(body).to.be.an("object");
+            expect(body.content).to.be.a("string").and.not.empty;
         });
 
 settings:
