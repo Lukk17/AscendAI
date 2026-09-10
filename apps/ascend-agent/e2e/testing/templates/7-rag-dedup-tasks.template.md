@@ -28,7 +28,7 @@ Copy this file to `runs/<UTC-timestamp>_7-rag-dedup-tasks.md` before starting a 
 ### Run
 
 - [ ] Step 1: sent `rag-dedup-upload.yml`, HTTP 200
-- [ ] Step 2: sent `rag-ingestion-run.yml`, HTTP 200 with `indexed >= 2`
+- [ ] Step 2: sent `rag-ingestion-run.yml` with `--env-var "ragMinIndexed=2"`, HTTP 200 with `indexed >= 2`
 - [ ] Step 3: sent `rag-dedup-prompt.yml`, HTTP 200
 
 ### Expected

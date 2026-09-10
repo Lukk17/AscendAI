@@ -107,6 +107,21 @@ POST /api/v1/ingestion/run
 
 ---
 
+### Docling client
+
+Retries a single-page conversion call up to `app.docling.retry-attempts` times (default two) on a
+transport-level failure (connection reset, read timeout) before propagating. HTTP 4xx/5xx responses are
+never retried (see ADR-009).
+
+| Key                           | Default                   | Description                                                                            |
+| :----------------------------- | :------------------------- | :--------------------------------------------------------------------------------------- |
+| `app.docling.base-url`        | `http://localhost:5001`   | Base URL of the Docling Serve instance used for document and per-page PDF conversion.    |
+| `app.docling.api-path`        | `/v1/convert/file`        | Path appended to the base URL for the conversion endpoint.                               |
+| `app.docling.retry-attempts`  | `2`                       | Retries after a transport-level failure on a single conversion call.                     |
+| `app.docling.retry-delay`     | `500ms`                   | Fixed delay between a failed attempt and its retry.                                      |
+
+---
+
 ### Core Spring Boot settings
 
 Beyond providers, these YAML keys cover the rest of the agent's deployment surface. Override via the standard Spring

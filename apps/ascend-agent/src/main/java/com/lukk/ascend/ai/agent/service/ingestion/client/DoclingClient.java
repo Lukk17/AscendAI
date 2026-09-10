@@ -3,6 +3,7 @@ package com.lukk.ascend.ai.agent.service.ingestion.client;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lukk.ascend.ai.agent.config.properties.DoclingProperties;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
 import com.lukk.ascend.ai.agent.service.ingestion.IngestionMetadataKeys;
 import com.lukk.ascend.ai.agent.util.NamedByteArrayResource;
@@ -15,10 +16,10 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,21 +42,21 @@ public class DoclingClient {
     private static final String LEGACY_PATH = "/v1/convert";
     private static final String CORRECT_PATH = "/v1/convert/file";
 
-    private static final int MAX_ATTEMPTS = 3;
-    private static final long RETRY_BACKOFF_MILLIS = 500L;
-
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final DoclingProperties doclingProperties;
     private final String doclingBaseUrl;
     private final String doclingApiPath;
 
     public DoclingClient(
             @Qualifier("ingestionRestClient") RestClient restClient,
             ObjectMapper objectMapper,
+            DoclingProperties doclingProperties,
             @Value("${app.docling.base-url:http://localhost:5001}") String doclingBaseUrl,
             @Value("${app.docling.api-path:/v1/convert/file}") String doclingApiPath) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
+        this.doclingProperties = doclingProperties;
         this.doclingBaseUrl = doclingBaseUrl;
         this.doclingApiPath = normalizePath(doclingApiPath);
     }
@@ -95,22 +96,34 @@ public class DoclingClient {
     }
 
     private String postWithRetry(MultiValueMap<String, Object> body, String filename) {
-        ResourceAccessException lastFailure = null;
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            if (attempt > 1) {
-                sleepBeforeRetry();
-            }
+        int maxAttempts = Math.max(1, doclingProperties.getRetryAttempts() + 1);
+        RestClientException lastFailure = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 return sendConversionRequest(body);
-            } catch (ResourceAccessException e) {
-                lastFailure = e;
-                log.warn("[DoclingClient] Transient failure calling Docling for {} (attempt {}/{}): {}",
-                        filename, attempt, MAX_ATTEMPTS, e.getMessage());
             } catch (RestClientException e) {
-                throw new IngestionException("Failed to process document with Docling: " + filename, e);
+                lastFailure = e;
+                if (attempt == maxAttempts || !isTransportFailure(e)) {
+                    break;
+                }
+                log.warn("[DoclingClient] Transient failure calling Docling for page {}, retrying (attempt {}/{}): {}",
+                        filename, attempt, maxAttempts, e.getMessage());
+                sleepBeforeRetry();
             }
         }
         throw new IngestionException("Failed to process document with Docling: " + filename, lastFailure);
+    }
+
+    private boolean isTransportFailure(Throwable exception) {
+        Throwable cause = exception.getCause();
+        while (cause != null) {
+            if (cause instanceof IOException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private String sendConversionRequest(MultiValueMap<String, Object> body) {
@@ -124,7 +137,7 @@ public class DoclingClient {
 
     private void sleepBeforeRetry() {
         try {
-            Thread.sleep(RETRY_BACKOFF_MILLIS);
+            Thread.sleep(doclingProperties.getRetryDelay().toMillis());
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             throw new IngestionException("Interrupted while retrying Docling call", ie);

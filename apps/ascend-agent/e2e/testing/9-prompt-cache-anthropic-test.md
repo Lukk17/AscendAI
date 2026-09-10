@@ -53,14 +53,14 @@ bru run "ascend-agent/testing/prompt-cache-anthropic.yml" --env ascend-local
 
 Capture response 1's `metadata.usage`. Note `nativeUsage.cache_creation_input_tokens` (expected: > 0, Anthropic charges to write the cache entry on the first call).
 
-Step 2. Second prompt within ~5 minutes (cache hit expected).
+Step 2. Second prompt within ~5 minutes (cache hit expected). The request's `promptCacheStep` variable defaults to 1, which accepts a cache write or a cache read. Pass 2 so the script asserts `cache_read_input_tokens > 0` specifically.
 
 ```bash
 cd docs/api/request/AscendAI
 ```
 
 ```bash
-bru run "ascend-agent/testing/prompt-cache-anthropic.yml" --env ascend-local
+bru run "ascend-agent/testing/prompt-cache-anthropic.yml" --env ascend-local --env-var "promptCacheStep=2"
 ```
 
 Capture response 2's `metadata.usage`. Note `nativeUsage.cache_read_input_tokens` (expected: > 0 and equal-ish to step-1's `nativeUsage.cache_creation_input_tokens`).

@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.ingestion.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lukk.ascend.ai.agent.config.properties.DoclingProperties;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,12 +11,16 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.document.Document;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +43,9 @@ class DoclingClientTest {
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    private DoclingProperties doclingProperties;
 
     @InjectMocks
     private DoclingClient doclingClient;
@@ -73,7 +81,7 @@ class DoclingClientTest {
     }
 
     @Test
-    @DisplayName("process throws IngestionException when the REST client call fails")
+    @DisplayName("process throws IngestionException when the REST client call fails with a non-transport error")
     void process_WhenRestClientFails_ThenThrowsIngestionException() {
         // given
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
@@ -85,7 +93,7 @@ class DoclingClientTest {
         when(bodySpecMock.body(any(Object.class))).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenThrow(new RestClientException("Connection Refused"));
 
-        // then: a non-connection RestClientException must fail fast, never retry
+        // then: a non-transport RestClientException must fail fast, never retry
         assertThatThrownBy(() -> doclingClient.process(BYTES, FILENAME))
                 .isInstanceOf(IngestionException.class)
                 .hasMessageContaining("Failed to process document with Docling");
@@ -116,9 +124,12 @@ class DoclingClientTest {
     }
 
     @Test
-    @DisplayName("process retries on a transient connection failure and succeeds once the upstream recovers")
+    @DisplayName("process retries on transient connection failures and succeeds once the upstream recovers")
     void process_WhenTransientConnectionFailureThenRecovers_ThenSucceedsOnRetry() {
         // given: Docling Serve worker dies mid-request twice, then a respawned worker completes the call
+        when(doclingProperties.getRetryAttempts()).thenReturn(2);
+        when(doclingProperties.getRetryDelay()).thenReturn(Duration.ZERO);
+
         String jsonResponse = "{ \"document\": { \"md_content\": \"Recovered text\" } }";
 
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
@@ -145,9 +156,12 @@ class DoclingClientTest {
     }
 
     @Test
-    @DisplayName("process throws IngestionException after exhausting bounded retries on repeated transient connection failures")
-    void process_WhenConnectionFailsOnEveryAttempt_ThenThrowsIngestionExceptionAfterBoundedRetries() {
+    @DisplayName("process throws the original exception type after every retry also fails with a transport error")
+    void process_WhenConnectionFailsOnEveryAttempt_ThenPropagatesOriginalExceptionAfterBoundedRetries() {
         // given: every attempt hits a dying Docling Serve worker
+        when(doclingProperties.getRetryAttempts()).thenReturn(2);
+        when(doclingProperties.getRetryDelay()).thenReturn(Duration.ZERO);
+
         RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
 
@@ -164,5 +178,30 @@ class DoclingClientTest {
                 .hasMessageContaining("Failed to process document with Docling")
                 .hasCauseInstanceOf(ResourceAccessException.class);
         verify(restClient, times(3)).post();
+    }
+
+    @Test
+    @DisplayName("process does not retry an HTTP error response carrying a body")
+    void process_WhenHttpErrorResponse_ThenDoesNotRetry() {
+        // given: even with retries configured, a 422 response is a completed exchange, not a transport failure
+        when(doclingProperties.getRetryAttempts()).thenReturn(2);
+
+        RestClient.RequestBodyUriSpec postMock = mock(RestClient.RequestBodyUriSpec.class);
+        RestClient.RequestBodySpec bodySpecMock = mock(RestClient.RequestBodySpec.class);
+
+        when(restClient.post()).thenReturn(postMock);
+        when(postMock.uri(anyString())).thenReturn(bodySpecMock);
+        when(bodySpecMock.contentType(MediaType.MULTIPART_FORM_DATA)).thenReturn(bodySpecMock);
+        when(bodySpecMock.body(any(Object.class))).thenReturn(bodySpecMock);
+        when(bodySpecMock.retrieve()).thenThrow(HttpClientErrorException.create(
+                HttpStatus.UNPROCESSABLE_ENTITY, "Unprocessable Entity", HttpHeaders.EMPTY,
+                "{\"detail\":\"invalid file\"}".getBytes(), null));
+
+        // then
+        assertThatThrownBy(() -> doclingClient.process(BYTES, FILENAME))
+                .isInstanceOf(IngestionException.class)
+                .hasMessageContaining("Failed to process document with Docling")
+                .hasCauseInstanceOf(HttpClientErrorException.class);
+        verify(restClient, times(1)).post();
     }
 }

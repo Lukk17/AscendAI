@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.ingestion.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lukk.ascend.ai.agent.config.properties.DoclingProperties;
 import com.lukk.ascend.ai.agent.exception.IngestionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ class DoclingClientResponseParsingTest {
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    private DoclingProperties doclingProperties;
 
     @InjectMocks
     private DoclingClient client;

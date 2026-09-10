@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.chat;
 import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
+import com.lukk.ascend.ai.agent.service.provider.ToolCallTracker;
 
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
@@ -61,6 +62,9 @@ class ChatExecutorBranchCoverageTest {
 
     @Spy
     private io.micrometer.core.instrument.MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+    @Mock
+    private ToolCallTracker toolCallTracker;
 
     @InjectMocks
     private ChatExecutor chatExecutor;

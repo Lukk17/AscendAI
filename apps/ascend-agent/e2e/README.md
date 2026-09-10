@@ -123,17 +123,20 @@ groups.
 | **A — RAG suite** | 5, 6, 7 | Share the object-store bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. Each spec is **symmetrically hermetic**: `Reset state` (pre) drops its own artifacts before running, `Post-run cleanup` (post) drops them again after. No spec reaches into another spec's state. | **Strict serial: 5 → 6 → 7.** |
 | **B — fast tests** | 1, 2, 3, 4 | Unique user-ids; no RAG / object-store writes. Single-prompt or two-prompt flows. | Sequential within one agent, or parallel across multiple agents — either works. |
 | **C — cache + compaction** | 8, 9, 10, 11 | Unique user-ids; isolated chat-history slots. Tests 10 / 11 apply their own seed scripts before running. | Sequential within one agent, or parallel — either works. |
+| Docling-bound: run alone, no runner of any suite active | 3, 5, 6, 7 | Cross-cutting constraint on top of the groups. Spec 3 converts a PDF inline through docling-serve and specs 5, 6 and 7 ingest PDF and DOCX through it. docling's worker is single-threaded per page, so any other runner on the host, from this suite or from any other module's sweep, competes for the core it runs on: the OCR suite measured the same single-threaded effect on 2026-09-10, 59.2 seconds on a quiet host against 160.9 seconds on a loaded one for one fixture. docling also peaks close to its own compose memory limit (defect register A3 and A38), so a second runner costs memory headroom as well as time. | Each of the four runs alone. Start one only when nothing else is running anywhere, and start nothing else until it has returned. |
 
 The three groups themselves are fully independent: no user-id overlap, no object-store / Qdrant collision (groups B and C
-don't touch the RAG layer at all). So the suggested execution layout is **three agents running in parallel**, one per
-group:
+don't touch the RAG layer at all). The docling-bound rule is what stops them all running at once, so the suggested
+execution layout is two agents in parallel first, then the docling-bound specs one at a time:
 
-- **Agent A**: tests 5 → 6 → 7 (sequential within agent).
-- **Agent B**: tests 1, 2, 3, 4 (sequential within agent, can be reordered).
-- **Agent C**: tests 8, 9, 10, 11 (sequential within agent, can be reordered).
+- Agent B: tests 1, 2, 4 (sequential within agent, can be reordered), in parallel with Agent C.
+- Agent C: tests 8, 9, 10, 11 (sequential within agent, can be reordered), in parallel with Agent B.
+- Then, alone, one at a time, with no other runner of any suite active: test 3, then tests 5 → 6 → 7 in that
+  order (Group A's strict serial chain is unchanged).
 
-Total wall-clock ≈ max of the three group durations. In recent sweeps that bottomed out around the RAG group at
-~13 minutes; the other two groups finish in 3-5 minutes.
+Total wall-clock is the B / C phase plus the sum of the four docling-bound specs. In recent sweeps the RAG chain alone
+came in around ~13 minutes on a quiet host, and groups B and C finish in 3-5 minutes. Do not start another module's sweep
+while a docling-bound spec is in flight, and do not start a docling-bound spec while one is running elsewhere.
 
 A single-process sequential run is also valid for debugging — just run tests 1 through 11 in numeric order. The
 parallel layout only matters when you care about wall-clock.
@@ -143,6 +146,7 @@ parallel layout only matters when you care about wall-clock.
 - Share `X-User-Id: frosty` (or any other id) across two specs. The old "all default to frosty" convention is
   removed; cross-test pollution will surface as flaky memory / chat-history assertions.
 - Run two ingestion-runs concurrently. Group A's strict sequential ordering exists to avoid this.
+- Run a docling-bound spec (3, 5, 6, 7) while any other runner, of this suite or any other, is active on the host.
 
 ---
 

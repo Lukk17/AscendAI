@@ -115,7 +115,9 @@ The response body's `content` field is NOT a refusal like "the document context 
 
 ## Concurrency
 
-- **Mutates:** Postgres `chat_history` (user_id=`frostySummarizationTest`); Redis keys `chat:frostySummarizationTest` and `user:frostySummarizationTest:instructions`; Qdrant collections `ascend_memory_*` (user-scoped: `frostySummarizationTest`, written by the background memory extractor on any prompt)
-- **Conflicts with:** none
-- **Serial:** false
-- **Hermetic contract:** Self-cleaning. `Reset state` (pre) and `Post-run cleanup` (post) both remove every row, key and vector point this spec's user id could carry. The PDF travels inline on the prompt request, so no object-store key and no `int_metadata_store` row is created.
+Docling-bound. This spec runs alone: no runner of any suite active while it is in flight, from this suite or from any other module's sweep. Start it only when nothing else is running anywhere, and start nothing else until it has returned. The PDF is converted inline through docling-serve. docling's worker is single-threaded per page, so any other runner on the host competes for the core it runs on (the OCR suite measured that effect on 2026-09-10: 59.2 seconds on a quiet host against 160.9 seconds on a loaded one for one fixture), and docling peaks close to its own compose memory limit (defect register A3 and A38), so a second runner costs memory headroom as well as time. See [`apps/ascend-agent/e2e/README.md`](../README.md) "Parallelism and execution order".
+
+- Mutates: Postgres `chat_history` (user_id=`frostySummarizationTest`), Redis keys `chat:frostySummarizationTest` and `user:frostySummarizationTest:instructions`, Qdrant collections `ascend_memory_*` (user-scoped: `frostySummarizationTest`, written by the background memory extractor on any prompt)
+- Conflicts with: none on shared state. Runs alone anyway, per the rule above.
+- Serial: true
+- Hermetic contract: Self-cleaning. `Reset state` (pre) and `Post-run cleanup` (post) both remove every row, key and vector point this spec's user id could carry. The PDF travels inline on the prompt request, so no object-store key and no `int_metadata_store` row is created.

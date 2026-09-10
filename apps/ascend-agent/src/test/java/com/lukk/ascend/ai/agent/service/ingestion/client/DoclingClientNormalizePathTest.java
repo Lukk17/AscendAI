@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.ingestion.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lukk.ascend.ai.agent.config.properties.DoclingProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -22,7 +23,7 @@ class DoclingClientNormalizePathTest {
     @Test
     void normalizePath_WhenLegacyEndpoint_ThenAutoCorrects() {
         // given
-        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "/v1/convert");
+        DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/v1/convert");
 
         // then
         assertThat((String) ReflectionTestUtils.getField(client, "doclingApiPath"))
@@ -33,7 +34,7 @@ class DoclingClientNormalizePathTest {
     @Test
     void normalizePath_WhenMissingLeadingSlash_ThenAddsIt() {
         // given
-        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "v1/convert/file");
+        DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "v1/convert/file");
 
         // then
         assertThat((String) ReflectionTestUtils.getField(client, "doclingApiPath"))
@@ -44,7 +45,7 @@ class DoclingClientNormalizePathTest {
     @Test
     void normalizePath_WhenTrailingSlash_ThenStripsIt() {
         // given
-        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "/v1/convert/file/");
+        DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/v1/convert/file/");
 
         // then
         assertThat((String) ReflectionTestUtils.getField(client, "doclingApiPath"))
@@ -55,7 +56,7 @@ class DoclingClientNormalizePathTest {
     @Test
     void normalizePath_WhenNull_ThenReturnsCorrectDefault() {
         // given
-        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", null);
+        DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", null);
 
         // then
         assertThat((String) ReflectionTestUtils.getField(client, "doclingApiPath"))
@@ -66,7 +67,7 @@ class DoclingClientNormalizePathTest {
     @Test
     void normalizePath_PreservesCustomPath_WhenAlreadyValid() {
         // given
-        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "/custom/path");
+        DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/custom/path");
 
         // then
         assertThat((String) ReflectionTestUtils.getField(client, "doclingApiPath"))
@@ -77,7 +78,7 @@ class DoclingClientNormalizePathTest {
     @Test
     void normalizePath_WhenSingleSlash_ThenKeepsSlash() {
         // given — length == 1 -> trimmed.length() > 1 is false -> trailing slash NOT stripped -> "/" returned
-        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "/");
+        DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/");
 
         // then
         assertThat((String) ReflectionTestUtils.getField(client, "doclingApiPath"))
@@ -88,7 +89,7 @@ class DoclingClientNormalizePathTest {
     @Test
     void logConfiguredEndpoint_DoesNotThrow() {
         // given
-        DoclingClient client = new DoclingClient(restClient, objectMapper, "http://docling", "/v1/convert/file");
+        DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/v1/convert/file");
 
         // then — package-private invoked via reflection to cover the @PostConstruct line
         ReflectionTestUtils.invokeMethod(client, "logConfiguredEndpoint");

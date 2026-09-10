@@ -8,6 +8,35 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `build.gradle.kts` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.1.1]
+
+### Fixed
+- A page conversion that docling closed mid-request failed the whole document, even though the
+  same call succeeded on an immediate retry. The client already retried on one transport
+  exception, but a connection the server dropped mid-request surfaced as a different exception
+  with a socket error underneath and was not retried. The retry now recognises that case too,
+  defaults to two attempts, and the retry count and the delay between attempts are
+  configurable.
+- The version in build.gradle.kts and the MCP client version in application.yaml lagged this
+  changelog at 0.0.1. The build file says 0.1.1 and the yaml reads the build version through the
+  placeholder line 17 already used.
+- The semantic-memory end-to-end spec required a single stored point to hold both seeded facts,
+  while the memory service stores one atomic fact per point, and the Anthropic prompt-cache
+  template demanded a cold cache write where the spec prose accepts a warm read too. Both now
+  assert what the spec prose describes.
+- metadata.toolsUsed was always empty for MCP tools the agent executed internally, because the
+  executor read the tool calls off the final assistant message after Spring AI had already
+  resolved them, so the per-tool metrics never incremented either. toolsUsed now reports the tools
+  the call actually executed.
+- End-to-end spec 5 told the runner to edit the RAG prompt request between runs to switch
+  prompts. The three prompts are three requests now, each asserting its own fixture's canary. The
+  ingestion-run request shared by specs 5, 6 and 7 and the Anthropic prompt-cache request shared
+  by both steps of spec 9 take their per-spec minimum and step from a command-line variable, so
+  each spec asserts its own number without editing the collection.
+- The docling-bound end-to-end specs 3, 5, 6 and 7 could interleave with other runners. Each runs
+  alone now, with no runner of any suite active, because docling's worker is single-threaded and
+  peaks close to its memory limit. The README table and each spec's Concurrency section say so.
+
 ## [0.1.0]
 
 ### Fixed

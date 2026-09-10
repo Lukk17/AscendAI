@@ -9,6 +9,7 @@ import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -34,6 +35,7 @@ public class ChatModelResolver {
     private static final long DEFAULT_READ_TIMEOUT_SECONDS = 60L;
 
     private final AiProviderProperties aiProviderProperties;
+    private final ToolCallTracker toolCallTracker;
     private final Map<String, ChatModel> chatModels = new LinkedHashMap<>();
 
     @PostConstruct
@@ -92,6 +94,7 @@ public class ChatModelResolver {
         return OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
                 .defaultOptions(options)
+                .toolCallingManager(new TrackingToolCallingManager(ToolCallingManager.builder().build(), toolCallTracker))
                 .build();
     }
 
@@ -111,6 +114,7 @@ public class ChatModelResolver {
         return AnthropicChatModel.builder()
                 .anthropicApi(anthropicApi)
                 .defaultOptions(options)
+                .toolCallingManager(new TrackingToolCallingManager(ToolCallingManager.builder().build(), toolCallTracker))
                 .build();
     }
 

@@ -80,6 +80,8 @@ app:
   docling:
     base-url: "http://localhost:5001"
     api-path: "/v1/convert/file"
+    retry-attempts: 2
+    retry-delay: 500ms
 
   ascend-ocr:
     base-url: "http://localhost:7022"
@@ -373,7 +375,7 @@ spring:
       client:
         enabled: true
         name: AscendAI-Agent
-        version: 0.0.1
+        version: "@project.version@"
         initialized: false
         request-timeout: 300s
         type: SYNC

@@ -31,7 +31,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 - [ ] After step 1: HTTP 200
 - [ ] After step 1: Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` returns ≥ 1 point
-- [ ] After step 1: at least one Qdrant point's payload contains both `Luke` and `software engineer`
+- [ ] After step 1: across all Qdrant points returned for `frostySemanticMemoryTest`, the payloads together contain `Luke` and `software engineer` (mem0 stores one atomic fact per point, so no single point has to hold both)
 - [ ] After step 3: HTTP 200
 - [ ] After step 3: Response `content` contains `Luke`
 - [ ] After step 3: Response `content` contains `software engineer`

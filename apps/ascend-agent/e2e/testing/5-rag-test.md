@@ -132,30 +132,39 @@ cd docs/api/request/AscendAI
 bru run "ascend-agent/testing/rag-ingestion-upload.yml" --env ascend-local
 ```
 
-Step 2. Trigger ingestion (no prefix → scans the whole bucket). Wait for HTTP 200 and a non-zero `indexed` count before continuing.
+Step 2. Trigger ingestion (no prefix → scans the whole bucket). The request's `ragMinIndexed` variable defaults to 1 because specs 6 and 7 share it, so pass this spec's own minimum of 3 on the command line. Wait for HTTP 200 and `indexed` of at least 3 before continuing.
 
 ```bash
 cd docs/api/request/AscendAI
 ```
 
 ```bash
-bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
+bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local --env-var "ragMinIndexed=3"
 ```
 
-Step 3. Send the RAG prompt. The Bruno request saves three alternative `prompt=` rows on the same field; only one is enabled by default. Run the request once with the current default, then edit the YAML to enable the next prompt row (and disable the previous) and re-run. Do this once per fixture for full coverage.
+Step 3. Send the three RAG prompts, one request per fixture. Each request carries its own assertion for that fixture's canary, so nothing in the collection is edited between calls. Run them in order and wait for each to finish before starting the next.
 
 ```bash
 cd docs/api/request/AscendAI
 ```
 
+Step 3a, the markdown fixture (`What is the Ascend canary phrase?`).
+
 ```bash
-bru run "ascend-agent/testing/rag-prompt.yml" --env ascend-local
+bru run "ascend-agent/testing/rag-prompt-markdown-canary.yml" --env ascend-local
 ```
 
-The three prompts saved in the request:
-- `What is the Ascend canary phrase?` (markdown fixture)
-- `What was the retail price of bananas in Poland in October 2026?` (PDF fixture)
-- `How long should I rest the pierogi dough according to Babcia Helena's recipe?` (DOCX fixture)
+Step 3b, the PDF fixture (`What was the retail price of bananas in Poland in October 2026?`).
+
+```bash
+bru run "ascend-agent/testing/rag-prompt-banana-price.yml" --env ascend-local
+```
+
+Step 3c, the DOCX fixture (`How long should I rest the pierogi dough according to Babcia Helena's recipe?`).
+
+```bash
+bru run "ascend-agent/testing/rag-prompt-pierogi-recipe.yml" --env ascend-local
+```
 
 ## Post-run cleanup
 
@@ -241,10 +250,12 @@ For each of step 3a/3b/3c the response is NOT a refusal like "I don't have that 
 
 ## Concurrency
 
-- **Mutates:** object-store bucket `knowledge-base` (`markdown/markdown-canary.md`, `documents/banana-price-poland.pdf`, `documents/pierogi-recipe.docx`); Qdrant collection `ascendai-1536` (filtered by these `source` values); Qdrant collections `ascend_memory_*` (user-scoped: `frostyRagTest`, written by the background memory extractor on any prompt); Postgres `int_metadata_store` (rows for these object keys); Postgres `chat_history` (user_id=`frostyRagTest`); Redis keys `chat:frostyRagTest` and `user:frostyRagTest:instructions`
-- **Conflicts with:** `6-attach-sources`, `7-rag-dedup` (share Qdrant `ascendai-1536` and object-store bucket `knowledge-base`)
-- **Serial:** false
-- **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) touch the same set: this spec's own fixtures, the `frostyRagTest` user-id's chat/Redis/memory state. Never reaches into other Group A specs' artifacts.
+Docling-bound. This spec runs alone: no runner of any suite active while it is in flight, from this suite or from any other module's sweep. Start it only when nothing else is running anywhere, and start nothing else until it has returned. The PDF and DOCX fixtures are ingested through docling-serve. docling's worker is single-threaded per page, so any other runner on the host competes for the core it runs on (the OCR suite measured that effect on 2026-09-10: 59.2 seconds on a quiet host against 160.9 seconds on a loaded one for one fixture), and docling peaks close to its own compose memory limit (defect register A3 and A38), so a second runner costs memory headroom as well as time. See [`apps/ascend-agent/e2e/README.md`](../README.md) "Parallelism and execution order".
+
+- Mutates: object-store bucket `knowledge-base` (`markdown/markdown-canary.md`, `documents/banana-price-poland.pdf`, `documents/pierogi-recipe.docx`), Qdrant collection `ascendai-1536` (filtered by these `source` values), Qdrant collections `ascend_memory_*` (user-scoped: `frostyRagTest`, written by the background memory extractor on any prompt), Postgres `int_metadata_store` (rows for these object keys), Postgres `chat_history` (user_id=`frostyRagTest`), Redis keys `chat:frostyRagTest` and `user:frostyRagTest:instructions`
+- Conflicts with: `6-attach-sources`, `7-rag-dedup` (share Qdrant `ascendai-1536` and object-store bucket `knowledge-base`)
+- Serial: true
+- Hermetic contract: Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) touch the same set: this spec's own fixtures, the `frostyRagTest` user-id's chat/Redis/memory state. Never reaches into other Group A specs' artifacts.
 
 ## Optional: attach source files
 
@@ -252,7 +263,7 @@ The `attachSources=true` form field opts the response into a `sources` array of 
 
 Run this section immediately after Run step 3, while the three fixtures are still ingested, and before the Post-run cleanup section above. Every call below sends this spec's own user id, `frostyRagTest`, so the Post-run cleanup commands already remove the chat-history rows and Redis keys the section writes. Nothing extra is needed afterwards, and the same cleanup stays correct when the section is skipped. Earlier revisions of this spec sent `user1` here, which no cleanup covered and which collides with the configured default user id, so those rows survived every run.
 
-The three flags after the prompt mirror the enabled rows in `rag-prompt.yml` and are not optional. Omitting `embeddingProvider` returns HTTP 400 with `Unknown embedding provider: 'null'`, and sending `embeddingProvider=openai` without `provider=minimax` returns HTTP 400 because the default chat provider expects 768-dim embeddings while the RAG collection is the 1536-dim `ascendai-1536`.
+The three flags after the prompt mirror the rows in the three `rag-prompt-*.yml` requests and are not optional. Omitting `embeddingProvider` returns HTTP 400 with `Unknown embedding provider: 'null'`, and sending `embeddingProvider=openai` without `provider=minimax` returns HTTP 400 because the default chat provider expects 768-dim embeddings while the RAG collection is the 1536-dim `ascendai-1536`.
 
 Send a prompt with the flag set.
 

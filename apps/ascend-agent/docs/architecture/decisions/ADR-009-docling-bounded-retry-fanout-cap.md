@@ -31,6 +31,6 @@ Both changes were verified together across five consecutive clean end-to-end run
 
 ## Related
 
-- `DoclingClient.MAX_ATTEMPTS`, `DoclingClient.RETRY_BACKOFF_MILLIS`, `DoclingClient.postWithRetry`
+- `DoclingProperties.retryAttempts` (`app.docling.retry-attempts`), `DoclingProperties.retryDelay` (`app.docling.retry-delay`), `DoclingClient.postWithRetry`
 - `DocumentRouter.pdfParallelPages` (`app.document-router.pdf-parallel-pages`, default 4)
 - Commit `0748356` ("test(e2e): run the full suite and fix what it exposed")

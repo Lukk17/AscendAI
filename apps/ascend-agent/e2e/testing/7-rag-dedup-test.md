@@ -72,14 +72,14 @@ cd docs/api/request/AscendAI
 bru run "ascend-agent/testing/rag-dedup-upload.yml" --env ascend-local
 ```
 
-Step 2. Trigger ingestion.
+Step 2. Trigger ingestion. The request's `ragMinIndexed` variable defaults to 1 because specs 5 and 6 share it, so pass this spec's own minimum of 2 on the command line.
 
 ```bash
 cd docs/api/request/AscendAI
 ```
 
 ```bash
-bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local
+bru run "ascend-agent/testing/rag-ingestion-run.yml" --env ascend-local --env-var "ragMinIndexed=2"
 ```
 
 Step 3. Send the dedup prompt with `attachSources=true`.
@@ -156,7 +156,9 @@ Expect `{"status":"success","message":"All memories wiped for user frostyRagDedu
 
 ## Concurrency
 
-- **Mutates:** object-store bucket `knowledge-base` (`markdown/dedup-pierogi-helena.md`, `markdown/dedup-pierogi-grandma.md`); Qdrant collection `ascendai-1536` (dedup `source` filters); Qdrant collections `ascend_memory_*` (user-scoped: `frostyRagDedupTest`, written by the background memory extractor on any prompt); Postgres `int_metadata_store` (dedup keys); Postgres `chat_history` (user_id=`frostyRagDedupTest`); Redis keys `chat:frostyRagDedupTest` and `user:frostyRagDedupTest:instructions`
-- **Conflicts with:** `5-rag`, `6-attach-sources` (share Qdrant `ascendai-1536` and object-store bucket `knowledge-base`)
-- **Serial:** false
-- **Hermetic contract:** Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) only touch this spec's own fixtures + user-id; never reaches into other Group A specs' artifacts. Relies on specs 5 and 6 honouring their own post-run cleanup contracts.
+Docling-bound. This spec runs alone: no runner of any suite active while it is in flight, from this suite or from any other module's sweep. Start it only when nothing else is running anywhere, and start nothing else until it has returned. The ingestion run goes through docling-serve for any PDF or DOCX the bucket holds, and it scans the whole bucket. docling's worker is single-threaded per page, so any other runner on the host competes for the core it runs on (the OCR suite measured that effect on 2026-09-10: 59.2 seconds on a quiet host against 160.9 seconds on a loaded one for one fixture), and docling peaks close to its own compose memory limit (defect register A3 and A38), so a second runner costs memory headroom as well as time. See [`apps/ascend-agent/e2e/README.md`](../README.md) "Parallelism and execution order".
+
+- Mutates: object-store bucket `knowledge-base` (`markdown/dedup-pierogi-helena.md`, `markdown/dedup-pierogi-grandma.md`), Qdrant collection `ascendai-1536` (dedup `source` filters), Qdrant collections `ascend_memory_*` (user-scoped: `frostyRagDedupTest`, written by the background memory extractor on any prompt), Postgres `int_metadata_store` (dedup keys), Postgres `chat_history` (user_id=`frostyRagDedupTest`), Redis keys `chat:frostyRagDedupTest` and `user:frostyRagDedupTest:instructions`
+- Conflicts with: `5-rag`, `6-attach-sources` (share Qdrant `ascendai-1536` and object-store bucket `knowledge-base`)
+- Serial: true
+- Hermetic contract: Self-cleaning. Both `Reset state` (pre) and `Post-run cleanup` (post) only touch this spec's own fixtures + user-id, never reaches into other Group A specs' artifacts. Relies on specs 5 and 6 honouring their own post-run cleanup contracts.

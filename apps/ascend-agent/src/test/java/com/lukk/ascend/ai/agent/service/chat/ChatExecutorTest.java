@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.chat;
 import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
+import com.lukk.ascend.ai.agent.service.provider.ToolCallTracker;
 
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.exception.AiGenerationException;
@@ -8,6 +9,7 @@ import com.lukk.ascend.ai.agent.service.cache.NoopPromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategy;
 import com.lukk.ascend.ai.agent.service.cache.PromptCacheStrategyResolver;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +67,9 @@ class ChatExecutorTest {
     @Spy
     private io.micrometer.core.instrument.MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
+    @Mock
+    private ToolCallTracker toolCallTracker;
+
     @InjectMocks
     private ChatExecutor chatExecutor;
 
@@ -75,13 +80,14 @@ class ChatExecutorTest {
     }
 
     @Test
-    @DisplayName("execute returns AiResponse with empty tools list when no tool calls are present")
+    @DisplayName("execute returns AiResponse with empty tools list when no tool was executed")
     void execute_WhenValidInput_ThenReturnsAiResponse() {
         // given
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);
+        when(toolCallTracker.drain()).thenReturn(List.of());
 
-        ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE, null);
+        ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
         when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
 
@@ -95,15 +101,14 @@ class ChatExecutorTest {
     }
 
     @Test
-    @DisplayName("execute returns tool names in metadata when the model invoked tools")
-    void execute_WhenToolsInvoked_ThenReturnsToolsInMetadata() {
+    @DisplayName("execute reports the tool name once and increments its metric when a tool was executed")
+    void execute_WhenToolsInvoked_ThenReturnsToolsInMetadataAndRecordsMetric() {
         // given
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);
+        when(toolCallTracker.drain()).thenReturn(List.of(TestConstants.TEST_TOOL_NAME));
 
-        AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall(
-                "1", TestConstants.TEST_TOOL_NAME, TestConstants.TEST_TOOL_NAME, "{}");
-        ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE, List.of(toolCall));
+        ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
         when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
 
@@ -113,6 +118,13 @@ class ChatExecutorTest {
         // then
         assertThat(result.content()).isEqualTo(EXPECTED_RESPONSE);
         assertThat(result.metadata().toolsUsed()).containsExactly(TestConstants.TEST_TOOL_NAME);
+
+        Timer toolTimer = meterRegistry.find("mcp.tool.duration")
+                .tag("tool", TestConstants.TEST_TOOL_NAME)
+                .tag("outcome", "ok")
+                .timer();
+        assertThat(toolTimer).isNotNull();
+        assertThat(toolTimer.count()).isEqualTo(1L);
     }
 
     @Test
@@ -123,7 +135,7 @@ class ChatExecutorTest {
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);
 
         MockMultipartFile image = new MockMultipartFile("file", "cat.png", "image/png", "img_data".getBytes());
-        ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE, null);
+        ChatResponse mockResponse = createMockChatResponse(EXPECTED_RESPONSE);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
         when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
 
@@ -142,7 +154,7 @@ class ChatExecutorTest {
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new FunctionToolCallback[0]);
 
-        ChatResponse mockResponse = createMockChatResponse(thinkingText, null);
+        ChatResponse mockResponse = createMockChatResponse(thinkingText);
         when(chatModel.call(any(Prompt.class))).thenReturn(mockResponse);
         when(chatResponseContentResolver.resolveContent(mockResponse)).thenReturn(EXPECTED_RESPONSE);
 
@@ -185,12 +197,9 @@ class ChatExecutorTest {
                 .hasMessageContaining("Received null response from ChatClient");
     }
 
-    private ChatResponse createMockChatResponse(String content, List<AssistantMessage.ToolCall> toolCalls) {
+    private ChatResponse createMockChatResponse(String content) {
         AssistantMessage assistantMessage = mock(AssistantMessage.class);
         when(assistantMessage.getText()).thenReturn(content);
-        if (toolCalls != null && !toolCalls.isEmpty()) {
-            when(assistantMessage.getToolCalls()).thenReturn(toolCalls);
-        }
 
         Generation generation = mock(Generation.class);
         when(generation.getOutput()).thenReturn(assistantMessage);

@@ -23,13 +23,12 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Run
 
 - [ ] Step 1: sent `prompt-cache-anthropic.yml` (cache-miss / cache-write call), HTTP 200, captured `usage`
-- [ ] Step 2: sent `prompt-cache-anthropic.yml` again within 5 minutes, HTTP 200, captured `usage`
+- [ ] Step 2: sent `prompt-cache-anthropic.yml` again within 5 minutes with `--env-var "promptCacheStep=2"`, HTTP 200, captured `usage`
 
 ### Expected
 
 - [ ] Step 1: HTTP 200
-- [ ] Step 1: `usage.nativeUsage.cache_creation_input_tokens > 0` (write to ephemeral cache)
-- [ ] Step 1: `usage.nativeUsage.cache_read_input_tokens == 0` (or absent)
+- [ ] Step 1: `usage.nativeUsage.cache_creation_input_tokens > 0` OR `usage.nativeUsage.cache_read_input_tokens > 0` (a true cold start pays a cache write, a warm cache from an identical prompt within the last ~5 minutes shows a read instead, either proves the `cache_control` directive was accepted)
 - [ ] Step 2: HTTP 200
 - [ ] Step 2: `usage.nativeUsage.cache_read_input_tokens > 0`
 

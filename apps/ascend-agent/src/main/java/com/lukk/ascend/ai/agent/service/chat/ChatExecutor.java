@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.service.chat;
 import com.lukk.ascend.ai.agent.service.provider.ChatResponseContentResolver;
 import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
+import com.lukk.ascend.ai.agent.service.provider.ToolCallTracker;
 
 import com.lukk.ascend.ai.agent.dto.AiResponse;
 import com.lukk.ascend.ai.agent.dto.CustomMetadata;
@@ -13,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -32,7 +32,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -48,17 +47,20 @@ public class ChatExecutor {
     private final ChatResponseContentResolver chatResponseContentResolver;
     private final PromptCacheStrategyResolver cacheStrategyResolver;
     private final MeterRegistry meterRegistry;
+    private final ToolCallTracker toolCallTracker;
 
     public ChatExecutor(ChatModelResolver chatModelResolver,
                         ToolCallbackProvider toolCallbackProvider,
                         ChatResponseContentResolver chatResponseContentResolver,
                         PromptCacheStrategyResolver cacheStrategyResolver,
-                        MeterRegistry meterRegistry) {
+                        MeterRegistry meterRegistry,
+                        ToolCallTracker toolCallTracker) {
         this.chatModelResolver = chatModelResolver;
         this.toolCallbackProvider = toolCallbackProvider;
         this.chatResponseContentResolver = chatResponseContentResolver;
         this.cacheStrategyResolver = cacheStrategyResolver;
         this.meterRegistry = meterRegistry;
+        this.toolCallTracker = toolCallTracker;
     }
 
     public AiResponse execute(String userId, String systemText, String userText, List<Message> history,
@@ -95,7 +97,7 @@ public class ChatExecutor {
         strategy.recordOutcome(userId, chatResponse);
 
         String content = chatResponseContentResolver.resolveContent(chatResponse);
-        List<String> toolsUsed = extractToolsUsed(chatResponse);
+        List<String> toolsUsed = toolCallTracker.drain();
         recordToolMetrics(toolsUsed, OUTCOME_OK);
 
         return new AiResponse(content, new CustomMetadata(chatResponse.getMetadata(), toolsUsed));
@@ -104,6 +106,7 @@ public class ChatExecutor {
     private ChatResponse invoke(String userId, AssembledSystemMessages systemMessages, String userText,
                                 List<Message> history, MultipartFile image, String provider, String model,
                                 ChatOptions options) {
+        toolCallTracker.reset();
         ChatClient chatClient = buildChatClient(provider, model, options);
 
         List<Message> allMessages = new ArrayList<>();
@@ -227,20 +230,4 @@ public class ChatExecutor {
         }
     }
 
-    List<String> extractToolsUsed(ChatResponse chatResponse) {
-        try {
-            List<AssistantMessage.ToolCall> toolCalls = chatResponse.getResult().getOutput().getToolCalls();
-            if (toolCalls.isEmpty()) {
-                return List.of();
-            }
-
-            return toolCalls.stream()
-                    .map(AssistantMessage.ToolCall::name)
-                    .distinct()
-                    .collect(Collectors.toList());
-
-        } catch (Exception e) {
-            return List.of();
-        }
-    }
 }

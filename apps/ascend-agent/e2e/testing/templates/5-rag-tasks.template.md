@@ -30,10 +30,10 @@ Copy this file to `runs/<UTC-timestamp>_5-rag-tasks.md` before starting a run. T
 ### Run
 
 - [ ] Step 1: sent `rag-ingestion-upload.yml` and waited for HTTP 200 with three uploaded keys
-- [ ] Step 2: sent `rag-ingestion-run.yml` and waited for HTTP 200 with `indexed >= 3`
-- [ ] Step 3a: sent `rag-prompt.yml` for the markdown-canary prompt
-- [ ] Step 3b: enabled the next `prompt=` row, sent `rag-prompt.yml` for the banana-price prompt
-- [ ] Step 3c: enabled the next `prompt=` row, sent `rag-prompt.yml` for the pierogi-recipe prompt
+- [ ] Step 2: sent `rag-ingestion-run.yml` with `--env-var "ragMinIndexed=3"` and waited for HTTP 200 with `indexed >= 3`
+- [ ] Step 3a: sent `rag-prompt-markdown-canary.yml` (markdown-canary prompt)
+- [ ] Step 3b: sent `rag-prompt-banana-price.yml` (banana-price prompt)
+- [ ] Step 3c: sent `rag-prompt-pierogi-recipe.yml` (pierogi-recipe prompt)
 
 ### Expected
 

@@ -6,26 +6,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
-import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class ChatExecutorImageTest {
 
-    private final ChatExecutor chatExecutor = new ChatExecutor(null, null, null, null, new SimpleMeterRegistry());
+    private final ChatExecutor chatExecutor = new ChatExecutor(null, null, null, null, new SimpleMeterRegistry(), null);
 
     static Stream<Arguments> mimeResolutionCases() {
         return Stream.of(
@@ -104,35 +98,4 @@ class ChatExecutorImageTest {
         assertThat(resolved).isEqualTo(org.springframework.util.MimeTypeUtils.IMAGE_JPEG);
     }
 
-    @DisplayName("extract tools used returns empty list when chat response get result throws")
-    @Test
-    void extractToolsUsed_ReturnsEmptyList_WhenChatResponseGetResultThrows() {
-        // given
-        ChatResponse chatResponse = mock(ChatResponse.class);
-        when(chatResponse.getResult()).thenThrow(new IllegalStateException("ChatResponse internals unavailable"));
-
-        // when
-        List<String> tools = chatExecutor.extractToolsUsed(chatResponse);
-
-        // then
-        assertThat(tools).isEmpty();
-    }
-
-    @DisplayName("extract tools used returns empty list when tool call names throw")
-    @Test
-    void extractToolsUsed_ReturnsEmptyList_WhenToolCallNamesThrow() {
-        // given
-        ChatResponse chatResponse = mock(ChatResponse.class);
-        Generation generation = mock(Generation.class);
-        AssistantMessage assistant = mock(AssistantMessage.class);
-        when(chatResponse.getResult()).thenReturn(generation);
-        when(generation.getOutput()).thenReturn(assistant);
-        when(assistant.getToolCalls()).thenThrow(new RuntimeException("tool calls unavailable"));
-
-        // when
-        List<String> tools = chatExecutor.extractToolsUsed(chatResponse);
-
-        // then
-        assertThat(tools).isEmpty();
-    }
 }

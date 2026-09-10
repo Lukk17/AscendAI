@@ -154,13 +154,13 @@ Wait ~5 seconds after step 1 returns before running the Qdrant scroll. Mem0 writ
 sleep 5
 ```
 
-After the wait, a Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` on the active `ascend_memory_*` collection returns at least one point whose payload mentions Luke and software engineer:
+After the wait, a Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` on the active `ascend_memory_*` collection returns points whose payloads, taken together, mention Luke and software engineer:
 
 ```bash
 curl -sS -X POST http://localhost:6333/collections/ascend_memory_1536/points/scroll -H "Content-Type: application/json" -d '{"filter":{"must":[{"key":"user_id","match":{"value":"frostySemanticMemoryTest"}}]},"limit":5,"with_payload":true,"with_vector":false}'
 ```
 
-The point count returned by that scroll is ≥ 1, and at least one point's `payload.data` (or equivalent payload field) contains `Luke` AND `software engineer`.
+The point count returned by that scroll is ≥ 1, and across all points returned for user `frostySemanticMemoryTest` the `payload.data` fields (or equivalent payload field) together contain `Luke` and `software engineer`. Mem0 stores one atomic fact per point, so the two facts may sit in separate points and no single point has to hold both.
 
 After step 3 the Bruno output shows HTTP 200.
 

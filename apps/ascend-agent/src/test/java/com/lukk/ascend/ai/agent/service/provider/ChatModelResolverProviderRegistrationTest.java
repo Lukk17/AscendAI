@@ -18,7 +18,7 @@ class ChatModelResolverProviderRegistrationTest {
         AiProviderProperties props = new AiProviderProperties();
         props.setDefaultProvider("openai");
         props.setProviders(Map.of());
-        ChatModelResolver resolver = new ChatModelResolver(props);
+        ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
         resolver.initializeProviders();
 
         // then
@@ -40,7 +40,7 @@ class ChatModelResolverProviderRegistrationTest {
         AiProviderProperties props = new AiProviderProperties();
         props.setDefaultProvider("openai");
         props.setProviders(Map.of("openai", disabled));
-        ChatModelResolver resolver = new ChatModelResolver(props);
+        ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
         resolver.initializeProviders();
 
         // then — provider was disabled, so resolving it should throw
@@ -61,7 +61,7 @@ class ChatModelResolverProviderRegistrationTest {
         AiProviderProperties props = new AiProviderProperties();
         props.setDefaultProvider("custom");
         props.setProviders(Map.of("custom", config));
-        ChatModelResolver resolver = new ChatModelResolver(props);
+        ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
 
         // then
         assertThatThrownBy(resolver::initializeProviders)
@@ -83,7 +83,7 @@ class ChatModelResolverProviderRegistrationTest {
         AiProviderProperties props = new AiProviderProperties();
         props.setDefaultProvider("openai");
         props.setProviders(Map.of("openai", config));
-        ChatModelResolver resolver = new ChatModelResolver(props);
+        ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
         resolver.initializeProviders();
 
         // when — blank provider falls back to defaultProvider="openai"
@@ -107,7 +107,7 @@ class ChatModelResolverProviderRegistrationTest {
         AiProviderProperties props = new AiProviderProperties();
         props.setDefaultProvider("openai");
         props.setProviders(Map.of("openai", config));
-        ChatModelResolver resolver = new ChatModelResolver(props);
+        ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
 
         // then — HTTP/1.1 branch is exercised without throwing
         resolver.initializeProviders();
@@ -127,7 +127,7 @@ class ChatModelResolverProviderRegistrationTest {
         AiProviderProperties props = new AiProviderProperties();
         props.setDefaultProvider("anthropic");
         props.setProviders(Map.of("anthropic", config));
-        ChatModelResolver resolver = new ChatModelResolver(props);
+        ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
 
         // then — default timeout branch exercised without throwing
         resolver.initializeProviders();
