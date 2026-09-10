@@ -23,9 +23,10 @@ session is reused. This spec has no human step and runs fully automated.
   `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
 - **hard-fail** — a non-2xx the SSRF / host guard fail-closes with (e.g. HTTP `400` for an unresolvable host).
 - busy, not a verdict: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
-  meaning another row's NoVNC intervention still holds the single shared browser. The runner waits the
-  `Retry-After` seconds the response carries and re-runs that row, up to 3 attempts in total, and records each
-  attempt and the `holder_url` from each 409 body in the run record. Only after the third 409 is the row a FAIL.
+  meaning another row's NoVNC intervention still holds the single shared browser. The runner reads the
+  `Retry-After` header and the `holder_url` from the folder run's JSON output file (see Run), waits that many
+  seconds, and re-runs only that row's own request file, up to 3 attempts in total, recording each attempt and
+  the `holder_url` from each 409 body in the run record. Only after the third 409 is the row a FAIL.
 
 ### Part 1 — Real-world URL matrix (single-call verdict)
 
@@ -217,20 +218,38 @@ Part 2, Call 2 — after login.
 bru run "web-hunter/testing/auth-read-secure.yml" --env ascend-local
 ```
 
-Part 1 — the real-world matrix (parallel-safe across runners).
+Part 1, the real-world matrix (parallel-safe across runners). A folder run prints only pass or fail per request,
+never a response body or header, so it writes its full results to a file. That file is where a `409` row's
+`Retry-After` header and `holder_url` are read from.
+
+PowerShell:
+
+```powershell
+bru run "web-hunter/testing/realworld" --env ascend-local -o "$env:TEMP\realworld-run.json" -f json
+```
+
+Unix:
 
 ```bash
-bru run "web-hunter/testing/realworld" --env ascend-local
+bru run "web-hunter/testing/realworld" --env ascend-local -o "/tmp/realworld-run.json" -f json
 ```
+
+Part 1, retry of a busy row. For each entry in that JSON whose response is HTTP `409` with `status="novnc_busy"`,
+read the `Retry-After` header and the body's `holder_url` from the entry, wait the `Retry-After` seconds, then
+re-run only that row's own request file (`web-hunter/testing/realworld/realworld-<row>-<site>.yml`, for example
+`realworld-u-allegro-product.yml`) with the same `-o <file> -f json` flags into its own file, up to 3 attempts in
+total. Record each attempt and each 409 body's `holder_url` in the run record. The row is a FAIL only after its
+third 409.
 
 ## Expected
 
 - **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly — a–e are `200`/`success` (+ canary where
   noted), q is the `400` hard-fail. Best-effort rows each return a valid terminal verdict (`200`/`success`/content
   **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed. A `409` with
-  `status="novnc_busy"` is not a verdict: the runner waits the response's `Retry-After` seconds and re-runs the row,
-  up to 3 attempts in total, records each attempt and each 409 body's `holder_url` in the run record, and fails the
-  row only on the third 409.
+  `status="novnc_busy"` is not a verdict: the runner reads its `Retry-After` header and `holder_url` from the
+  folder run's JSON output file, waits the `Retry-After` seconds, and re-runs only that row's own request file,
+  up to 3 attempts in total, records each attempt and each 409 body's `holder_url` in the run record, and fails
+  the row only on the third 409.
 - **Part 1, retail anti-bot rows (u, v, w, x, y):** a valid terminal verdict as above, and on the success branch the
   `content` contains the row's product-identity canary (`er-cbn1` for u, `B09D14YFR9` for v, `9780132350884` for
   w/x/y) and none of the row's interstitial / block-page markers. A `200`/`success` carrying an interstitial fails

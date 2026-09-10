@@ -31,6 +31,11 @@ purposes.
   the suite README now have the runner wait the response's `Retry-After` seconds and re-run the row,
   up to 3 attempts in total, recording each attempt and each 409 body's `holder_url`, with the row
   failing only on its third 409.
+- End-to-end spec 7 ran the Part 1 matrix as a plain folder run, whose console output shows only pass or
+  fail per request and never a response body or header, so a `409` `novnc_busy` row's `Retry-After` and
+  `holder_url` could not be read without re-running the request by hand. The folder run now writes its
+  full results with Bruno's `-o <file> -f json`, the retry rule reads both values from that file and
+  re-runs only the busy row's own request file after the wait, and the template's retry line matches.
 - End-to-end spec 6 stripped script blocks with a sed flag GNU sed does not have. The Unix form
   uses perl now.
 - End-to-end spec 8 reset Redis only, so the in-process read cache spec 3 fills survived into the

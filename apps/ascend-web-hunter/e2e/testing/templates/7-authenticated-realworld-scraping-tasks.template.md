@@ -44,7 +44,7 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 - [ ] q `this-domain-does-not-exist-xyzzy.invalid` → **gated**: HTTP 400, `status != "success"`.
 - [ ] s `linkedin.com/jobs/...` → valid terminal verdict recorded.
 - [ ] t `secure.indeed.com/auth?...` → valid terminal verdict recorded.
-- [ ] Any Part 1 row that answered `409`/`novnc_busy` was re-run after waiting its `Retry-After` seconds, up to 3 attempts in total, with each attempt and each 409 body's `holder_url` recorded under Additional tasks I did. Such a row is a FAIL only after its third 409.
+- [ ] Any Part 1 row that answered `409`/`novnc_busy` had its `Retry-After` and `holder_url` read from the folder run's JSON output file, and only that row's own request file was re-run after waiting the `Retry-After` seconds, up to 3 attempts in total, with each attempt and each 409 body's `holder_url` recorded under Additional tasks I did. Such a row is a FAIL only after its third 409.
 
 ### Part 1 — retail anti-bot rows (content-gated: a success MUST be the requested product page)
 
