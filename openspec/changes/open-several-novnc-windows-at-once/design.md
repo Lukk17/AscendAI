@@ -348,3 +348,9 @@ caller reported, find the window it opened, and find the capture it eventually p
 2. Whether the intervention listing should also report the flows that finished recently, with their outcome, so a
    human who solved a window can confirm the capture landed without reading Redis directly. Deliberately not built
    here. The e2e suite reads the session key directly, which is a stronger check.
+3. On 2026-09-10 the headed NoVNC browser cleared the scrapingcourse.com Cloudflare wall on its own, with nobody at
+   the keyboard, twice within three minutes, while headless FlareSolverr and headless Playwright stealth could not,
+   and the clearance the headed browser captured (`produced_by` `6-novnc`, `cf_clearance` present, same user agent)
+   did not replay through headless Playwright. Whether an unattended headed slot should become an automated tier
+   before the human is asked, and whether a clearance produced by a headed browser must be replayed by a headed
+   browser, is left to this change's implementation to measure.

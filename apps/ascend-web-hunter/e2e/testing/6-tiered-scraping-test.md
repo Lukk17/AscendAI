@@ -14,6 +14,17 @@ rotate WAFs and go down, so refine it as real targets are discovered.
 | 4 | NoVNC — hard CAPTCHA | *TBD* | human solves CAPTCHA, content returned | **no — manual / best-effort** |
 | 5–8 | real-world categories | *TBD* (job board, news article, product page, docs page) | per-site, defined when added | no — added later |
 
+Row 2's target, scrapingcourse.com, rates the caller's address. After several challenge solves from one address in a
+day it can refuse headless browsers for a while: measured on 2026-09-10, FlareSolverr timed out on the "Just a moment"
+page after 58 seconds three times in a row between 16:43 and 16:52 UTC while it cleared nowsecure.nl in 14 seconds,
+and it cleared scrapingcourse.com again in 17 seconds at 17:31 UTC. A row 2 failure with that FlareSolverr log line is
+a cool-down case, not a stack defect: rerun the spec after about 40 minutes, and do not probe the address in between,
+because every attempt counts against the rating. The FlareSolverr log line to look for is this one, verbatim:
+
+```text
+Error: Error solving the challenge. Timeout after 58.0 seconds.
+```
+
 - `POST /api/v2/web/read` returns HTTP 200 with `status="success"` and a non-empty content field
   (`content` / `text` / `markdown`) for each gated row (1, 2, 3).
 - **Row 1 (static):** the content field, lowercased, contains `"web scraping"`.
