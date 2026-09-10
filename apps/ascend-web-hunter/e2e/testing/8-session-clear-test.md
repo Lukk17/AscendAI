@@ -15,8 +15,13 @@ Both calls are asserted on response body plus persisted Redis state, never on lo
 ## Concurrency
 
 Do not run this test in parallel with test 10
-([10-session-establish-test.md](10-session-establish-test.md)) — both mutate `session:example.net:default`. Safe to
-run in parallel with everything else in the suite.
+([10-session-establish-test.md](10-session-establish-test.md)). Test 10 writes `session:example.net:e2e-establish`,
+a different key from the `session:example.net:default` this test seeds and clears, but this test compares a scan of
+`session:*` before and after its run, so test 10's key would appear in that scan and fail the comparison. Also do
+not run this test in parallel with test 3 ([3-read-example-com-test.md](3-read-example-com-test.md)): test 3's read
+of `example.com` populates the same per-domain read cache that this test's idempotent-clear call for `example.com`
+asserts is empty (`cleared_cache_entries=0`), so running them together fails that assertion. Safe to run in
+parallel with tests 1, 2, 4, 5, and 9.
 
 ## Prerequisites
 
@@ -64,15 +69,37 @@ continuing.
 docker exec redis redis-cli DEL "session:example.net:default"
 ```
 
-Seed a session record for `example.net` so the "existing session" call has something real to remove. The fixture
-[fixtures/session-clear-seed.json](../fixtures/session-clear-seed.json) holds the same JSON shape
-`CookieManager.save_storage_state` produces, so the test needs no login flow, no FlareSolverr, and no human — it
-only needs a record to exist under the key the service reads. Copy it into the `redis` container first (piping
-JSON through a PowerShell or bash pipe into `redis-cli -x` mangles it — PowerShell prepends a BOM, bash treats a
-bare quoted string as a command — a file + shell redirection avoids both).
+Prime the no-op path. Call the session clear endpoint once for `https://example.com/`, with the same endpoint and
+body shape call 2 below sends. This empties the service's in-process per-domain read cache, which spec 3 fills
+when it reads `example.com` and which the Redis deletes above cannot reach, so the call under test is a true no-op
+and reports `cleared_cache_entries` equal to `0`.
+
+PowerShell:
+
+```powershell
+curl.exe -fsS -X POST http://localhost:7021/api/v2/web/session/clear -H "Content-Type: application/json" -d '{"url":"https://example.com","profile":"default"}'
+```
+
+Unix:
 
 ```bash
-docker cp apps/ascend-web-hunter/e2e/fixtures/session-clear-seed.json redis:/tmp/session-clear-seed.json
+curl -fsS -X POST http://localhost:7021/api/v2/web/session/clear -H "Content-Type: application/json" -d '{"url":"https://example.com","profile":"default"}'
+```
+
+Expect HTTP 200 with `existed` equal to `false`. A non-zero `cleared_cache_entries` here is the priming doing its
+job, not a failure.
+
+Seed a session record for `example.net` so the "existing session" call has something real to remove. The fixture
+[fixtures/session-clear-seed.json](../fixtures/session-clear-seed.json) holds the same JSON shape
+`CookieManager.save_storage_state` produces, so the test needs no login flow, no FlareSolverr, and no human. It
+only needs a record to exist under the key the service reads. Copy it into the `redis` container first. Piping
+JSON through a PowerShell or bash pipe into `redis-cli -x` mangles it (PowerShell prepends a BOM, and bash treats
+a bare quoted string as a command), and a file plus shell redirection avoids both. The path below is relative to
+the Bruno collection root `docs/api/request/AscendAI`, the working directory the Run section moves into, and it is
+the same in both shells.
+
+```bash
+docker cp ../../../../apps/ascend-web-hunter/e2e/fixtures/session-clear-seed.json redis:/tmp/session-clear-seed.json
 ```
 
 ```bash

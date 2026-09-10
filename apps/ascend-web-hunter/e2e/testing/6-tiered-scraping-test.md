@@ -74,7 +74,7 @@ means something. Strip inline `<script>` blocks first, then look for the phrase.
 **Unix:**
 
 ```bash
-curl -fsS "https://quotes.toscrape.com/js/" | sed 's/<script[^>]*>.*<\/script>//gs' | grep -c "The world as we have created it"
+curl -fsS "https://quotes.toscrape.com/js/" | perl -0777 -pe 's/<script[^>]*>.*?<\/script>//gs' | grep -c "The world as we have created it"
 ```
 
 Expect `False`.

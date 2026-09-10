@@ -9,6 +9,38 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
+## [0.0.5]
+
+### Fixed
+- End-to-end spec 6 stripped script blocks with a sed flag GNU sed does not have. The Unix form
+  uses perl now.
+- End-to-end spec 8 reset Redis only, so the in-process read cache spec 3 fills survived into the
+  call under test, and its docker cp path did not resolve from the Bruno collection root. The
+  reset primes the clear endpoint first, and the path is relative to the collection root.
+- End-to-end spec 10 named the default-profile session key while the request sends the
+  e2e-establish profile, which the service forwards, so its reset and cleanup never touched the
+  key the run created. The spec, its template and the request comment now name the e2e-establish
+  key.
+- The MCP specs and templates described the session id as a UUID. The value is a 32 character
+  hexadecimal id without hyphens, and the wording now says so.
+- The PowerShell form of the MCP specs' JSON-body curl.exe blocks failed on pwsh 7.6.5 with a
+  nested brace error and HTTP 400. Those blocks pass the body single-quoted now.
+- End-to-end specs 8 and 10 still said both mutate the default-profile key. They name the real
+  keys now, and state that spec 8's before-and-after scan of session:* is why the two must not run
+  together.
+- End-to-end spec 1 claimed each rejection returns in under 200 milliseconds. Bruno measured 325
+  to 362 milliseconds on 2026-09-10, so the spec states that range and keeps the 2 second gate.
+- The MCP tools/list, MCP web_search, read and session-clear Bruno requests asserted less than
+  their specs: an envelope with any result or error, any object with a status key, and a clear
+  without its cache count. They assert the tool schemas spec 4 lists, the 1 to 3 result entries
+  with title, http(s) url and content spec 5 lists, the url, success status, content length and
+  canary phrase spec 3 lists, and the four session-clear fields spec 8 lists.
+- End-to-end spec 8's own Concurrency section said it was safe to run in parallel with everything
+  else in the suite, contradicting that same section's test 10 conflict and the suite README's
+  test 3 conflict. It now names both.
+- The version in pyproject.toml, AGENTS.md and the constraints document lagged this changelog at
+  0.0.3. All three say 0.0.5.
+
 ## [0.0.4]
 
 ### Fixed

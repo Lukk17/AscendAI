@@ -8,7 +8,7 @@ ascend-web-hunter is an MCP server and REST API for web search and content extra
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.0.3
+- **Version**: 0.0.5
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands

@@ -64,8 +64,9 @@ The three calls return:
 - `search-overlong-query.yml` — HTTP 400. The JSON body's `detail` field contains the substring
   `"query exceeds maximum length"`.
 
-Per-call duration is small (< 200 ms each) because no upstream is contacted. A duration > 2 s suggests the
-validator was bypassed and SearXNG was actually called; investigate before declaring PASS.
+Per-call duration measured through Bruno on 2026-09-10 was 325 to 362 ms each, with no upstream contacted. A
+duration > 2 s suggests the validator was bypassed and SearXNG was actually called. Investigate before declaring
+PASS.
 
 ## Fixtures
 

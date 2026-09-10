@@ -17,12 +17,12 @@ Copy this file to `../runs/<UTC-timestamp>_4-mcp-tools-list-tasks.md` before sta
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7021/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
-- [ ] Send `mcp-list-tools.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
+- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7021/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header, capture the session id (32 character hexadecimal session id without hyphens)
+- [ ] Send `mcp-list-tools.yml` via `bru run` with `--env-var "mcp_session_id=<captured session id>"` and wait for HTTP 200
 
 ### Expected
 
-- [ ] Step 1: response header `Mcp-Session-Id` is a UUID
+- [ ] Step 1: response header `Mcp-Session-Id` is a 32 character hexadecimal session id without hyphens
 - [ ] Step 2: HTTP 200; `result.tools` is a non-empty array
 - [ ] Some entry has `name="web_search"` with `inputSchema.required` containing `"query"` and `properties` advertising `query` and `limit`
 - [ ] Some entry has `name="web_read"` with `inputSchema.required` containing `"url"` and `properties` advertising `url` plus at least one of `include_links` / `link_filter` / `heavy_mode`

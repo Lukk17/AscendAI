@@ -17,8 +17,8 @@ Every `<N>-<capability>-test.md` file is the **immutable spec** for one test and
    Most ascend-web-hunter tests do not need reset (REST search is stateless against the host; SearXNG owns its own
    cache). The v2 read tests can optionally flush the per-URL Redis session key.
 4. **Run.** One or more numbered steps. Each step is a single Bruno CLI invocation. MCP-path tests start with a
-   `curl` POST to `/mcp` for the `initialize` handshake, capture the `Mcp-Session-Id` UUID, then pass it into
-   subsequent Bruno calls via `--env-var "mcp_session_id=<uuid>"`. Steps wait for HTTP 200 before continuing.
+   `curl` POST to `/mcp` for the `initialize` handshake, capture the `Mcp-Session-Id` value (a 32 character hexadecimal session id without hyphens, as
+   FastMCP emits it), then pass it into subsequent Bruno calls via `--env-var "mcp_session_id=<session id>"`. Steps wait for HTTP 200 before continuing.
 5. **Expected.** Observable-behaviour assertions verified after each step: HTTP status codes, JSON response shape
    (array length, presence of `title` / `url` / `content` keys), MCP `tools/list` enumeration, MCP `tools/call`
    payload contents. NOT log substrings.

@@ -14,8 +14,8 @@ Copy this file to `../runs/<UTC-timestamp>_10-session-establish-tasks.md` before
 
 ### Reset state
 
-- [ ] `session:example.net:default` returns `0` from `EXISTS` (deleted a leftover key first if a prior run of this
-      test or test 8 did not clean up)
+- [ ] `session:example.net:e2e-establish` returns `0` from `EXISTS` (deleted a leftover key first if a prior run of
+      this test did not clean up)
 
 ### Run
 
@@ -24,9 +24,9 @@ Copy this file to `../runs/<UTC-timestamp>_10-session-establish-tasks.md` before
 ### Expected
 
 - [ ] Body: `status="login_required"`, `target="https://example.net/"`, `vnc_url` non-empty string
-- [ ] Waited 15 seconds, then `session:example.net:default` returned `1` from `EXISTS` (the documented capture
+- [ ] Waited 15 seconds, then `session:example.net:e2e-establish` returned `1` from `EXISTS` (the documented capture
       behaviour, not a defect this test is trying to catch)
-- [ ] Deleted `session:example.net:default`; `EXISTS` now returns `0`
+- [ ] Deleted `session:example.net:e2e-establish`, `EXISTS` now returns `0`
 - [ ] Did not run this test concurrently with test 8
 
 ### Verdict

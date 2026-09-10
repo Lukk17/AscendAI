@@ -16,6 +16,8 @@ Copy this file to `../runs/<UTC-timestamp>_8-session-clear-tasks.md` before star
 
 - [ ] `session:example.net:default` and `session:example.com:default` both return `0` from `EXISTS` (deleted
       `example.net`'s leftover key first if a prior run did not clean up)
+- [ ] Primed the no-op path: `POST /api/v2/web/session/clear` for `https://example.com/` returned HTTP 200 with
+      `existed=false` (empties the in-process read cache spec 3 fills, which the Redis deletes cannot reach)
 - [ ] Copied `fixtures/session-clear-seed.json` into the `redis` container
 - [ ] Seeded `session:example.net:default` via `redis-cli -x SETEX ... < /tmp/session-clear-seed.json`, got `OK`
 - [ ] Confirmed `session:example.net:default` now returns `1` from `EXISTS`

@@ -92,18 +92,19 @@ Expect `PONG`.
 
 ## Reset state
 
-Confirm `example.net` currently carries no session (IANA-reserved documentation domain; test 8 is the only other
-spec that touches its `default`-profile key, and only transiently during its own run).
+Confirm `example.net` currently carries no session under the `e2e-establish` profile the request sends. The
+request's `profile` is forwarded to the capture path since the 2026-09-08 fix described above, so the record this
+call creates lands under `session:example.net:e2e-establish`. No other spec touches that key (test 8 only touches
+the same domain's `default`-profile key, and only transiently during its own run).
 
 ```bash
-docker exec redis redis-cli EXISTS "session:example.net:default"
+docker exec redis redis-cli EXISTS "session:example.net:e2e-establish"
 ```
 
-Expect `0`. If it returns `1`, a previous run of this spec (or of test 8) did not clean up — delete it before
-continuing.
+Expect `0`. If it returns `1`, a previous run of this spec did not clean up. Delete it before continuing.
 
 ```bash
-docker exec redis redis-cli DEL "session:example.net:default"
+docker exec redis redis-cli DEL "session:example.net:e2e-establish"
 ```
 
 ## Run
@@ -127,7 +128,7 @@ bru run "web-hunter/testing/session-establish.yml" --env ascend-local
   section above describes actually happened:
 
   ```bash
-  docker exec redis redis-cli EXISTS "session:example.net:default"
+  docker exec redis redis-cli EXISTS "session:example.net:e2e-establish"
   ```
 
   Expect `1` — this is the documented current behaviour, not a defect this spec is trying to catch.
@@ -135,20 +136,21 @@ bru run "web-hunter/testing/session-establish.yml" --env ascend-local
 - Clean up the record this test created, so `example.net` is sessionless again for test 8 or a repeat of this test:
 
   ```bash
-  docker exec redis redis-cli DEL "session:example.net:default"
+  docker exec redis redis-cli DEL "session:example.net:e2e-establish"
   ```
 
   ```bash
-  docker exec redis redis-cli EXISTS "session:example.net:default"
+  docker exec redis redis-cli EXISTS "session:example.net:e2e-establish"
   ```
 
   Expect `0`.
 
 ## Concurrency
 
-Do not run this test in parallel with test 8 ([8-session-clear-test.md](8-session-clear-test.md)) — both mutate
-`session:example.net:default`, and this test's capture races test 8's own seed/clear sequence on the same key. Safe
-to run in parallel with everything else in the suite.
+Do not run this test in parallel with test 8 ([8-session-clear-test.md](8-session-clear-test.md)). This test writes
+`session:example.net:e2e-establish`, not the `session:example.net:default` key test 8 seeds and clears, but test 8
+compares a scan of `session:*` before and after its run, so the key this test creates would appear in that scan and
+fail test 8's comparison. Safe to run in parallel with everything else in the suite.
 
 ## Fixtures
 
