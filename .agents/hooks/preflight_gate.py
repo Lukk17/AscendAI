@@ -39,9 +39,23 @@ session. The one deliberate exception is the repository-boundary helpers
 (_resolves_inside_repo, _path_exists_in_repo): a path they cannot resolve
 fails toward True, which denies rather than allows, because the whole point
 of those helpers is to decide what Rule A protects.
+
+Rule A protects a project, not the whole filesystem, and the boundary is
+every root in _roots(): the process working directory, the project root the
+payload names in its cwd field, and the gate's own on-disk location two
+parents up. That last one counts only while it really is a project. The
+user-level install in docs/GLOBAL_SETUP.md puts this script under the home
+directory, where two parents up is the home directory itself, so it is
+dropped there and only the project the session is in stays protected.
+
+Rule A exempts exactly one path, TASK_LIST_NAME at the project root. The main
+thread owns the task list, so it keeps writing that one file directly.
+
+Arguments are scanned by hand rather than with argparse, because argparse
+exits 2 on a usage error and 2 is the deny code in the plain format (see
+docs/hooks-contract.md).
 """
 
-import argparse
 import io
 import json
 import re
@@ -91,6 +105,13 @@ _APPLY_PATCH_FILE_RE = re.compile(
 # until one is verified; adding it here is the whole follow-up once it is.
 RESEARCH_FORMATS = frozenset({"claude"})
 RESEARCH_TOOLS = {"webfetch", "websearch"}
+
+FORMATS = ("claude", "codex", "copilot", "plain")
+
+# The one file Rule A never protects, at the project root only. The main
+# thread keeps the task list itself, so .agents/hooks/task_list_sync.py and
+# the model both write it without delegating.
+TASK_LIST_NAME = "tasks.md"
 
 
 class AgentTree(NamedTuple):
@@ -189,6 +210,26 @@ def _agent_type(payload: Dict[str, Any]) -> str:
     return ""
 
 
+# The project root the payload named, or None while no payload has been read.
+# Claude Code, Codex and the runner envelope all send the open project as cwd,
+# and it is the only root that still names the project once the gate is
+# installed under the user's home directory instead of inside a project. Set
+# only through _decide, which clears it again once the call has been decided.
+_PAYLOAD_ROOT: Optional[Path] = None
+
+
+def _payload_root(payload: Dict[str, Any]) -> Optional[Path]:
+    value = payload.get("cwd")
+
+    if not isinstance(value, str) or not value.strip():
+        return None
+
+    try:
+        return Path(value.strip().replace("\\", "/"))
+    except (OSError, ValueError):
+        return None
+
+
 def _direct_target(tool_input: Dict[str, Any]) -> str:
     for key in PATH_KEYS:
         value = tool_input.get(key)
@@ -225,6 +266,20 @@ def _apply_patch_candidates(tool_input: Dict[str, Any]) -> List[str]:
 # redirection is quoted prose.
 
 _MAX_NESTING = 3
+
+# Directories a `cd` inside the command moved to, or None while the command
+# has not changed directory yet. Every relative path after that `cd` resolves
+# against these instead of against the repository roots, so
+# `cd C:/Users/me/notes && printf x >> MEMORY.md` writes outside the
+# repository and is allowed, while `cd tools && printf x >> gen_subagents.py`
+# still resolves inside and is denied. It is a tuple rather than one path
+# because a relative destination is resolved against every root in _roots(),
+# and a target counts as inside when any one of those landings places it
+# inside. A subshell, meaning a parenthesised group or a single pipeline
+# stage, gets the value put back when it ends, because the real shell's own
+# directory is untouched by what the child did. Set only through
+# _shell_targets, which clears it again once the command has been read.
+_CD_BASE: Optional[Tuple[Path, ...]] = None
 
 _QUOTED_LITERAL_RE = re.compile(r"""['"]([^'"]*)['"]""")
 _ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*=")
@@ -436,8 +491,16 @@ class _ShellParseError(Exception):
 
 
 class ShellSegment(NamedTuple):
-    argv: Tuple[str, ...]
-    redirects: Tuple[str, ...]
+    """One command in a lexed line, or a marker for a grouping token.
+
+    A segment with a `control` of "(", ")" or "|" carries no argv: it records
+    where a subshell begins and ends, which is what stops a `cd` inside one
+    from moving the base for everything after it.
+    """
+
+    argv: Tuple[str, ...] = ()
+    redirects: Tuple[str, ...] = ()
+    control: str = ""
 
 
 def _read_double_quoted(text: str, index: int) -> Tuple[str, int]:
@@ -599,8 +662,14 @@ def _lex(command: str) -> List[ShellSegment]:
             index = length if end < 0 else end
             continue
 
-        if char in ";()":
+        if char == ";":
             end_segment()
+            index += 1
+            continue
+
+        if char in "()":
+            end_segment()
+            segments.append(ShellSegment(control=char))
             index += 1
             continue
 
@@ -617,7 +686,13 @@ def _lex(command: str) -> List[ShellSegment]:
 
         if char == "|":
             end_segment()
-            index += 2 if command.startswith("||", index) else 1
+
+            if command.startswith("||", index):
+                index += 2
+                continue
+
+            segments.append(ShellSegment(control="|"))
+            index += 1
             continue
 
         if char == ">":
@@ -1074,8 +1149,17 @@ def _segment_targets(tokens: List[str], depth: int, powershell: bool = False) ->
         # A nested shell invocation is judged by its own name, not inherited
         # from the outer one: `bash -c "pwsh -Command '...'"` must switch the
         # null-device gate on for the nested segment even though the outer
-        # tool was Bash, and the reverse must switch it back off.
-        return _command_targets(nested, depth + 1, name in _POWERSHELL_SHELLS)
+        # tool was Bash, and the reverse must switch it back off. Its `cd` is
+        # its own too: the outer shell's directory is unchanged when the child
+        # exits, so the base is put back rather than left where the child
+        # moved it.
+        global _CD_BASE
+        saved = _CD_BASE
+
+        try:
+            return _command_targets(nested, depth + 1, name in _POWERSHELL_SHELLS)
+        finally:
+            _CD_BASE = saved
 
     if name == "find":
         return _find_targets(rest, depth, powershell)
@@ -1096,20 +1180,103 @@ def _segment_targets(tokens: List[str], depth: int, powershell: bool = False) ->
     return targets
 
 
+def _enter_directory(operands: List[str]) -> None:
+    """Move the resolution base to the directory a `cd` segment named.
+
+    A relative destination is resolved against every base the command is
+    standing in, which starts as every repository root, so a session started
+    in a subdirectory still lands somewhere the boundary check can see. A
+    destination that is not a directory on disk is dropped rather than
+    trusted, because the real shell refuses that `cd` and stays where it was,
+    which leaves the roots to decide the rest of the command.
+    """
+    global _CD_BASE
+
+    candidates = _operands(operands)
+
+    if not candidates:
+        return
+
+    target = Path(candidates[-1].replace("\\", "/"))
+    bases = _CD_BASE if _CD_BASE is not None else tuple(_roots())
+    landings: List[Path] = []
+
+    for base in bases:
+        try:
+            resolved = (target if target.is_absolute() else (base / target)).resolve(strict=False)
+        except (OSError, ValueError):
+            continue
+
+        if resolved.is_dir() and resolved not in landings:
+            landings.append(resolved)
+
+    _CD_BASE = tuple(landings) or None
+
+
+def _in_pipeline(segments: List[ShellSegment], position: int) -> bool:
+    """True when a pipe borders this segment, whose stage is a subshell."""
+    before = segments[position - 1].control if position else ""
+    after = segments[position + 1].control if position + 1 < len(segments) else ""
+
+    return "|" in (before, after)
+
+
 def _command_targets(command: str, depth: int = 0, powershell: bool = False) -> List[str]:
     """Every write target this command touches, as far as the text reveals it."""
     if depth > _MAX_NESTING:
         return []
 
-    targets: List[str] = []
+    global _CD_BASE
 
-    for segment in _lex(command):
+    targets: List[str] = []
+    segments = _lex(command)
+    groups: List[Optional[Tuple[Path, ...]]] = []
+
+    for position, segment in enumerate(segments):
+        if segment.control == "(":
+            groups.append(_CD_BASE)
+            continue
+
+        if segment.control == ")":
+            if groups:
+                _CD_BASE = groups.pop()
+            continue
+
+        if segment.control:
+            continue
+
         targets += _sourced(list(segment.redirects), powershell)
 
-        if segment.argv:
-            targets += _segment_targets(list(segment.argv), depth, powershell)
+        if not segment.argv:
+            continue
+
+        argv = list(segment.argv)
+        saved = _CD_BASE
+
+        if _program_name(argv[0]) == "cd":
+            _enter_directory(argv[1:])
+        else:
+            targets += _segment_targets(argv, depth, powershell)
+
+        # Each stage of a pipeline runs in its own subshell, so a `cd` in one
+        # of them dies with the stage instead of moving the base for what
+        # comes after the pipeline.
+        if _in_pipeline(segments, position):
+            _CD_BASE = saved
 
     return targets
+
+
+def _shell_targets(command: str, powershell: bool = False) -> List[str]:
+    """Read one shell command from the start, with `cd` followed as it goes."""
+    global _CD_BASE
+
+    _CD_BASE = None
+
+    try:
+        return _command_targets(command, powershell=powershell)
+    finally:
+        _CD_BASE = None
 
 
 def _is_null_device(target: str, powershell: bool = False) -> bool:
@@ -1129,22 +1296,27 @@ def _resolves_inside_repo(target: str) -> bool:
     (see AGENTS.md "Required opening move"), and that guarantee has broken
     silently once before, which would turn every file above a stray working
     directory into a writable target. A relative path is therefore resolved
-    against, and checked against, every root in _roots() (the gate's
-    invocation directory and the gate's own on-disk location two parents up,
-    the same two-root treatment _read_agent_definition already uses), and it
-    counts as inside when it resolves inside any one of them. A `cd` inside
-    the command itself is not simulated, and an unresolvable path fails
-    toward True: failing safe here means denying, not allowing.
+    against, and checked against, every root in _roots() (the invocation
+    directory, the project root the payload named, and the gate's own
+    location two parents up while that is a project rather than a home
+    directory), and it counts as inside when it resolves inside any one of
+    them. Once the command has changed directory the bases are those
+    directories instead (see _CD_BASE), and the roots stay the boundary
+    being tested. An
+    unresolvable path fails toward True: failing safe here means denying, not
+    allowing.
     """
     path = Path(target.replace("\\", "/"))
+    roots = _roots()
+    bases = _CD_BASE if _CD_BASE is not None else tuple(roots)
 
-    for root in _roots():
+    for base in bases:
         try:
-            resolved = (path if path.is_absolute() else (root / path)).resolve(strict=False)
+            resolved = (path if path.is_absolute() else (base / path)).resolve(strict=False)
         except (OSError, ValueError):
             return True
 
-        if resolved.is_relative_to(root):
+        if any(resolved.is_relative_to(root) for root in roots):
             return True
 
     return False
@@ -1158,12 +1330,35 @@ def _path_exists_in_repo(candidate: str) -> bool:
     _resolves_inside_repo.
     """
     path = Path(candidate.replace("\\", "/"))
+    bases = _CD_BASE if _CD_BASE is not None else tuple(_roots())
 
-    for root in _roots():
+    for base in bases:
         try:
-            if (path if path.is_absolute() else (root / path)).resolve(strict=False).exists():
+            if (path if path.is_absolute() else (base / path)).resolve(strict=False).exists():
                 return True
         except (OSError, ValueError):
+            return True
+
+    return False
+
+
+def _is_task_list(target: str) -> bool:
+    """True for TASK_LIST_NAME sitting directly in a repository root.
+
+    The main thread owns the task list, so Rule A steps aside for that one
+    path. A same-named file in a subdirectory is an ordinary target.
+    """
+    path = Path(target.replace("\\", "/"))
+    roots = _roots()
+    bases = _CD_BASE if _CD_BASE is not None else tuple(roots)
+
+    for base in bases:
+        try:
+            resolved = (path if path.is_absolute() else (base / path)).resolve(strict=False)
+        except (OSError, ValueError):
+            continue
+
+        if any(resolved == root / TASK_LIST_NAME for root in roots):
             return True
 
     return False
@@ -1177,12 +1372,15 @@ def _is_write_target(target: str, powershell: bool = False) -> bool:
     documentation and configuration included: see AGENTS.md "Required
     opening move" for why the earlier per-extension exemption was removed,
     and for why the check stops at the repository boundary and never treats
-    the null device as a write.
+    the null device as a write. The root task list is the one exemption.
     """
     if not target:
         return False
 
     if _is_null_device(target, powershell):
+        return False
+
+    if _is_task_list(target):
         return False
 
     if target in _WILDCARD_PATHSPECS:
@@ -1191,11 +1389,62 @@ def _is_write_target(target: str, powershell: bool = False) -> bool:
     return _resolves_inside_repo(target)
 
 
+def _install_root() -> Optional[Path]:
+    """The directory the gate was installed into, two parents up from itself.
+
+    A project keeps the script at <project>/.agents/hooks/preflight_gate.py,
+    and the user-level install in docs/GLOBAL_SETUP.md puts the same three
+    directories under the home directory instead. Either way this is where
+    the rest of the installation, the agent trees Rule B reads included,
+    sits beside it.
+    """
+    try:
+        return Path(__file__).resolve().parents[2]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _script_root() -> Optional[Path]:
+    """The install root, but only while it is a project rather than a home.
+
+    Under the user-level install the install root is the user's home
+    directory, or something above it. That is not a project, and keeping it
+    as one would make Rule A deny every main-thread write anywhere the user
+    keeps files, so it is dropped there and the session's own project decides
+    the boundary alone. A home directory the interpreter cannot name leaves
+    the root in place, which is the behaviour every project install has had
+    all along.
+    """
+    root = _install_root()
+
+    if root is None:
+        return None
+
+    try:
+        home = Path.home().resolve()
+    except (OSError, ValueError, RuntimeError):
+        return root
+
+    return None if home.is_relative_to(root) else root
+
+
 def _roots() -> List[Path]:
+    """Every directory Rule A treats as a project root.
+
+    Path comparison carries the platform's own case rule, so a Windows root
+    matches whatever case the payload or the shell spelled it in.
+    """
     roots: List[Path] = []
 
-    for candidate in (Path.cwd(), Path(__file__).resolve().parents[2]):
-        resolved = candidate.resolve()
+    for candidate in (Path.cwd(), _PAYLOAD_ROOT, _script_root()):
+        if candidate is None:
+            continue
+
+        try:
+            resolved = candidate.resolve()
+        except (OSError, ValueError):
+            continue
+
         if resolved not in roots:
             roots.append(resolved)
 
@@ -1203,10 +1452,23 @@ def _roots() -> List[Path]:
 
 
 def _read_agent_definition(agent_type: str) -> Optional[str]:
+    """The definition text for one subagent name, or None when there is none.
+
+    Rule B looks in every project root and in the install root as well. The
+    install root is not a project boundary, so Rule A drops it, but it is
+    where a user-level install keeps its agent trees, and Rule B has to find
+    them there.
+    """
     if not agent_type or "/" in agent_type or "\\" in agent_type or ".." in agent_type:
         return None
 
-    for root in _roots():
+    roots = _roots()
+    install = _install_root()
+
+    if install is not None and install not in roots:
+        roots.append(install)
+
+    for root in roots:
         for tree in AGENT_TREES:
             path = root / tree.directory / (agent_type + tree.extension)
             if path.is_file():
@@ -1283,6 +1545,17 @@ def _declares_skills(text: str) -> bool:
 
 def _decide(payload: Dict[str, Any], fmt: str, subagent_flag: bool) -> Optional[str]:
     """Return a deny reason, or None to allow."""
+    global _PAYLOAD_ROOT
+
+    _PAYLOAD_ROOT = _payload_root(payload)
+
+    try:
+        return _apply_rules(payload, fmt, subagent_flag)
+    finally:
+        _PAYLOAD_ROOT = None
+
+
+def _apply_rules(payload: Dict[str, Any], fmt: str, subagent_flag: bool) -> Optional[str]:
     identity = _caller_identity(payload, fmt, subagent_flag)
 
     if identity == _UNKNOWN:
@@ -1342,7 +1615,7 @@ def _decide(payload: Dict[str, Any], fmt: str, subagent_flag: bool) -> Optional[
             return None
 
         try:
-            targets = _command_targets(command, powershell=tool in _POWERSHELL_SHELLS)
+            targets = _shell_targets(command, powershell=tool in _POWERSHELL_SHELLS)
         except _ShellParseError:
             return None
 
@@ -1374,16 +1647,34 @@ def _emit(reason: str, fmt: str, real_stderr: Optional[TextIO] = None) -> int:
 
 
 def _parse_args(argv: Optional[List[str]]) -> Tuple[str, bool]:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--format",
-        required=True,
-        choices=("claude", "codex", "copilot", "plain"),
-    )
-    parser.add_argument("--subagent", action="store_true")
-    args, _unknown = parser.parse_known_args(argv)
+    """Read --format and --subagent by hand, never through argparse.
 
-    return args.format, args.subagent
+    argparse exits 2 on a usage error, and 2 is the deny code in the plain
+    format, so a stray flag would read as a block (docs/hooks-contract.md).
+    An unknown or missing format returns "", which main() turns into an
+    allow.
+    """
+    tokens = list(argv if argv is not None else sys.argv[1:])
+    fmt = ""
+    subagent = False
+    index = 0
+
+    while index < len(tokens):
+        token = tokens[index]
+
+        if token == "--format" and index + 1 < len(tokens):
+            fmt = tokens[index + 1]
+            index += 2
+            continue
+
+        if token.startswith("--format="):
+            fmt = token.split("=", 1)[1]
+        elif token == "--subagent":
+            subagent = True
+
+        index += 1
+
+    return (fmt if fmt in FORMATS else ""), subagent
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -1391,9 +1682,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     sys.stderr = io.StringIO()
 
     try:
-        try:
-            fmt, subagent_flag = _parse_args(argv)
-        except SystemExit:
+        fmt, subagent_flag = _parse_args(argv)
+
+        if not fmt:
             return 0
 
         try:

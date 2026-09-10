@@ -67,8 +67,8 @@ out/
 # e2e manual test run records — ephemeral, one per sweep. Keep the README,
 # ignore the timestamped run files. Move a particular run into version control
 # manually if you want it as an audit artifact.
-apps/ascend-ai-agent/e2e/testing/runs/*
-!apps/ascend-ai-agent/e2e/testing/runs/README.md
+apps/ascend-agent/e2e/testing/runs/*
+!apps/ascend-agent/e2e/testing/runs/README.md
 apps/ascend-weather-mcp/e2e/testing/runs/*
 !apps/ascend-weather-mcp/e2e/testing/runs/README.md
 apps/ascend-memory/e2e/testing/runs/*

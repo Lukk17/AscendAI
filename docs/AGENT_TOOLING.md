@@ -1,119 +1,290 @@
-# Agent Standards & OpenSpec
+# Agent Standards and OpenSpec
 
-This project imports a central set of AI agent standards from a shared repo:
+This project imports a central set of AI agent standards from a shared repository:
 
-- **Skills** in [.agents/skills/](../.agents/skills/): reusable procedural guidance loaded by all four supported
-  agents.
-- **Subagents** in [.claude/agents/](../.claude/agents/) and [.opencode/agents/](../.opencode/agents/): specialised
-  agent definitions the main session delegates to.
-- **Instructions** in [AGENTS.md](../AGENTS.md): shared rules auto-read by Kilo Code, OpenCode, and Codex CLI;
-  imported into Claude Code via [.claude/CLAUDE.md](../.claude/CLAUDE.md).
-- **OpenSpec** scaffold for spec-driven feature work.
+- Skills in [.agents/skills/](../.agents/skills/): reusable procedural guidance. Codex, OpenCode, Kilo Code, and
+  every GitHub Copilot surface read this directory natively. Claude Code reaches it through a symlink. Each skill
+  carries standard front matter (`name`, `description`, and optionally `license` or `compatibility`) per the open
+  [Agent Skills specification](https://agentskills.io/specification), and its description names the phrases that
+  should trigger it.
+- Subagents generated into [.claude/agents/](../.claude/agents/) (Claude markdown),
+  [.agents/agents/](../.agents/agents/) (OpenCode markdown, shared by OpenCode and Kilo Code through symlinks),
+  [.codex/agents/](../.codex/agents/) (TOML), and [.github/agents/](../.github/agents/) (`*.agent.md`).
+- Instructions in [AGENTS.md](../AGENTS.md): shared rules read natively by Codex, OpenCode, Kilo Code, and GitHub
+  Copilot, and imported into Claude Code through [.claude/CLAUDE.md](../.claude/CLAUDE.md).
+- A preflight gate in [.agents/hooks/preflight_gate.py](../.agents/hooks/preflight_gate.py), one shared rule wired
+  into every agent's hook surface, that actually blocks work rather than just asking for it, plus three hooks beside
+  it in [.agents/hooks/](../.agents/hooks/): a reply formatting check, a markdown lint pass after an edit, and a
+  task-list mirror that keeps the session plan alive across a compaction.
+- MCP servers in five real config files, one per agent surface.
+- OpenSpec, optional, for spec-driven feature work.
 
 ---
 
-### Agent standards import
+### Importing the standards
 
-The central AI standards are imported into this project via Git selective checkout. Only the production-ready folders
-and template files are pulled in. The remote is configured as read-only: its push URL is set to an invalid address so
-updates can be pulled but pushes are blocked.
+The standards arrive through a Git selective checkout. Only production-ready folders and the one template file are
+pulled. The remote is read-only: its push URL is set to an invalid address, so you can pull updates but never push.
 
-#### Step 1, initial setup
+#### Step 0, prerequisites
 
-Enable symlink support in Git (globally, or just for this repo):
+Git pulls the files. Python 3 runs the hooks: every script in [.agents/hooks/](../.agents/hooks/) is Python, and
+every wiring throws a failed call away so a broken hook can never break a session, which means a missing interpreter
+reads as an allow. The gate is then wired and disarmed, silently. Check it before you rely on it. PowerShell:
 
-```shell
-git config --global core.symlinks true
+```powershell
+python --version
 ```
 
-```shell
+Unix shell:
+
+```bash
+python3 --version
+```
+
+Node is needed only for OpenCode and Kilo Code, whose gate adapter is
+[.agents/plugin/hooks.js](../.agents/plugin/hooks.js), loaded by their own runtime. The other three agents need none.
+
+Windows also needs symlinks. Three paths in this setup are symlinks (`.claude/skills`, `.opencode/agents`,
+`.kilo/agents`). Without symlink support git writes them as ordinary text files holding the target path, and the
+agents that depend on them silently see nothing. Turn on Developer Mode (Settings, System, For developers), then tell
+git to honour symlinks, from inside the project you are importing into. PowerShell:
+
+```powershell
 git config core.symlinks true
 ```
 
-Add the read-only remote and extract the standards:
+Unix shell:
+
+```bash
+git config core.symlinks true
+```
+
+Adding `--global` to that command sets it for every repository on the machine, including clones you have not made
+yet, which is the form to use if you import the standards into more than one project.
+
+#### Step 1, initial import
+
+Add the read-only remote. PowerShell or Unix shell, same command:
 
 ```bash
 git remote add agent-standards https://github.com/Lukk17/agent-standards
 ```
 
+Block pushes to it:
+
 ```bash
 git remote set-url --push agent-standards no_push
 ```
+
+Fetch:
 
 ```bash
 git fetch agent-standards
 ```
 
+Pull the production-ready paths:
+
 ```bash
-git checkout agent-standards/master -- .agents .claude .opencode .codex docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/AGENTS-UPDATE.md
+git checkout agent-standards/master -- .agents .claude .opencode .kilo .codex .github/agents .github/hooks .vscode/mcp.json .mcp.json .github/mcp.json opencode.json docs/AGENT_TOOLING.md docs/MCP_SETUP.md docs/GLOBAL_SETUP.md docs/AGENTS-UPDATE.md AGENTS.md.example
 ```
 
-Commit the imported files when you're ready.
+Rename the one template. PowerShell:
 
-What this pulls:
+```powershell
+Rename-Item AGENTS.md.example AGENTS.md
+```
 
-- [.agents/skills/](../.agents/skills/): canonical skill files.
-- [.claude/CLAUDE.md](../.claude/CLAUDE.md), [.claude/skills/](../.claude/skills/) (symlink),
-  [.claude/agents/](../.claude/agents/): Claude Code wiring plus generated subagent files.
-- [.opencode/agents/](../.opencode/agents/): OpenCode subagent files, also read natively by Kilo Code.
-- [.codex/skills/](../.codex/skills/) (symlink): Codex skill discovery path.
-- [docs/AGENT_TOOLING.md](AGENT_TOOLING.md): this document, kept in sync with the central repo.
-- [docs/MCP_SETUP.md](MCP_SETUP.md): human-side MCP setup guide (env vars, keys, OS-specific commands).
-- [docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md): the per-OS selective update procedure, kept in sync with the central
-  repo (it refreshes itself).
+Unix shell:
 
-What this does **not** pull:
+```bash
+mv AGENTS.md.example AGENTS.md
+```
 
-- `subagents/` (canonical templates) and `tools/` (generator) live only in the agent-standards repo and are never
-  imported into consumer projects.
+Then ignore the agent task list. `.agents/hooks/task_list_sync.py` mirrors the live session task list into `tasks.md`
+at the project root so the plan survives a compaction, and that file is per-session working state rather than shared
+history. PowerShell:
 
-Create your own `AGENTS.md` at the repo root by copying from upstream or editing from scratch to define your project's agent conventions.
+```powershell
+Add-Content .gitignore "`n/tasks.md"
+```
+
+Unix shell:
+
+```bash
+printf '\n/tasks.md\n' >> .gitignore
+```
+
+That is the whole setup. Commit when you are ready.
+
+What you just pulled:
+
+- [.agents/skills/](../.agents/skills/), the canonical skills, plus [.agents/agents/](../.agents/agents/), the shared
+  OpenCode-format subagents, [.agents/hooks/](../.agents/hooks/), the four hook scripts, and
+  [.agents/plugin/hooks.js](../.agents/plugin/hooks.js), the OpenCode and Kilo adapter for the gate.
+- [.claude/](../.claude/): the `CLAUDE.md` bridge, the `skills` symlink, the generated `agents/` tree, and
+  `settings.json` carrying the Claude Code hooks.
+- `.opencode/agents` and `.kilo/agents`: symlinks into [.agents/agents/](../.agents/agents/). One tree, two agents.
+- [.codex/](../.codex/): the generated TOML custom agents and `config.toml`, which holds both the Codex MCP servers
+  and the Codex gate hooks inline.
+- [.github/agents/](../.github/agents/) and [.github/hooks/preflight.json](../.github/hooks/preflight.json): Copilot
+  subagents and its hook configuration.
+- [.mcp.json](../.mcp.json), [opencode.json](../opencode.json), [.vscode/mcp.json](../.vscode/mcp.json), and
+  [.github/mcp.json](../.github/mcp.json): the remaining MCP config files. These are real files, ready to use, not
+  templates.
+- The shipped documents: [AGENT_TOOLING.md](AGENT_TOOLING.md), [MCP_SETUP.md](MCP_SETUP.md),
+  [GLOBAL_SETUP.md](GLOBAL_SETUP.md), and [AGENTS-UPDATE.md](AGENTS-UPDATE.md), plus
+  [AGENTS.md.example](../AGENTS.md.example) to rename.
+
+What you did not pull, and never will: the `subagents/` canonical source and the `tools/` generator. Both stay
+upstream.
+
+Verify the symlinks survived before you go further. PowerShell:
+
+```powershell
+Get-Item .claude/skills, .opencode/agents, .kilo/agents | Select-Object Name, LinkType, Target
+```
+
+Unix shell:
+
+```bash
+ls -l .claude/skills .opencode/agents .kilo/agents
+```
+
+If any of them came through as a small text file instead of a link, go back to Step 0 and redo the checkout.
 
 #### Step 2, pulling future updates
 
-This project ships [docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md) from upstream. It holds the per-OS update commands and
-refreshes itself on every run, so it stays current with the central repo.
+[docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md) ships from upstream, holds the per-shell update commands, and refreshes
+itself on every run. Open it and run the block for your shell. It refreshes the shipped documents, all four hook
+scripts and the plugin, the Copilot hook file, and only the skills and subagents already present in your tree.
+Nothing new appears behind your back.
 
-Open [docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md) and run the commands for your shell (Unix bash/zsh or PowerShell).
-They:
+It deliberately leaves your `AGENTS.md`, your five MCP config files, `.claude/settings.json`, and `.claude/CLAUDE.md`
+alone. Those are yours. When you do want an upstream change in one of the configuration files, each shell section of
+that document ends with a diff command and a checkout for all five, and
+[what this skips](AGENTS-UPDATE.md#what-this-skips-and-why) names which half of each file is yours.
 
-- Refresh the shipped docs: [AGENT_TOOLING.md](AGENT_TOOLING.md), [MCP_SETUP.md](MCP_SETUP.md), and
-  [AGENTS-UPDATE.md](AGENTS-UPDATE.md) itself.
-- Enumerate the skills already in [.agents/skills/](../.agents/skills/) and pull only those.
-- Enumerate the subagents already in [.claude/agents/](../.claude/agents/) and
-  [.opencode/agents/](../.opencode/agents/) and pull only those.
+---
 
-Commit the refreshed files when ready.
+### The preflight gate
 
-Files intentionally NOT touched by the update: the symlinked skill directories
-([.claude/skills/](../.claude/skills/), [.codex/skills/](../.codex/skills/)), [.claude/CLAUDE.md](../.claude/CLAUDE.md),
-and your customised `AGENTS.md`. These are personal config set once at initial setup.
+The `## Required opening move` section of [AGENTS.md](../AGENTS.md) is the canonical rule: before code work, name the
+skills and subagents that own the task and invoke them, or say none apply and why. A rule read once at session start
+loses its grip over a long session, so the gate is also enforced mechanically.
 
-If [docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md) is missing (the project was imported before this doc shipped), pull it
-with a one-off `git checkout agent-standards/master -- docs/AGENTS-UPDATE.md`, then use it for every later refresh.
+One shared script does the deciding, [.agents/hooks/preflight_gate.py](../.agents/hooks/preflight_gate.py). It reads
+the hook payload and denies three things:
+
+- A write of any file that resolves inside the repository working tree, coming straight from the main thread.
+  Markdown, configuration, and the docs tree carry no exemption any more, so the main thread delegates every source,
+  doc, and config change to a subagent that owns the area. A relative path is resolved against whatever a leading
+  `cd` in the command moved to, so changing directory first does not get a write past it. A write outside the
+  repository, the null device, `tasks.md` at the project root, and switching a git branch stay allowed, so the main
+  thread keeps full use of git and keeps ownership of its own task list.
+- Any tool call, not only an edit, from a subagent whose own definition declares no skills. Spawn a specialist that
+  names its skills instead.
+- A web fetch or web search called straight from the main thread, on the one format whose payload names that tool
+  today, Claude Code. Spawn a subagent to do the research and report back instead.
+
+Caller identity is a tri-state, not a boolean: a subagent, the main thread, or unknown, when a format's own payload
+carries nothing that could tell the two apart. None of the three rules fires on an unknown caller, because denying
+blind would block a legitimate subagent as often as it blocks the main thread. Every error path also allows the
+call, because a gate that breaks a session is worse than no gate.
+
+Each agent wires that same script through its own hook surface:
+
+| Agent | Where the hooks live | What it can stop |
+| --- | --- | --- |
+| Claude Code | [.claude/settings.json](../.claude/settings.json) | blocks the tool call, injects the gate at session start and every turn, lints markdown after an edit, blocks a reply on `Stop` and `SubagentStop`, and mirrors the task list |
+| Codex | inline `[[hooks.*]]` tables in [.codex/config.toml](../.codex/config.toml) | blocks the tool call, injects the gate every turn and on subagent start, runs the formatting check on `Stop`, and seeds the task list at session start |
+| OpenCode | plugin [.agents/plugin/hooks.js](../.agents/plugin/hooks.js), declared in [opencode.json](../opencode.json) | blocks the tool call |
+| Kilo Code | the same plugin, the same declaration | blocks the tool call |
+| GitHub Copilot | [.github/hooks/preflight.json](../.github/hooks/preflight.json) | fires on the tool call but always allows, caller identity is always unknown there; injects the gate once per session and on subagent start |
+
+Only Claude Code has task events, so `tasks.md` is written from them there and merely injected at session start
+elsewhere. Nothing has a task-updated event, so the hook writes only `open` and `done` and the model sets
+`in progress` and `blocked` by editing the file, which is why that one path is exempt from the write rule above.
+
+Every one of those wirings anchors the gate at the project root before calling it. A session started in a subdirectory
+used to resolve the relative script path to nothing, and Python exits 2 when it cannot open the file it was handed,
+which is the deny code, so the gate blocked every tool call instead of allowing them. Claude Code uses
+`${CLAUDE_PROJECT_DIR}`, Codex resolves the git root, Copilot sets `"cwd": "."`, and the plugin takes the runtime's
+`worktree`. A missing or broken script now allows: the three JSON formats deny with exit 0 on stdout and never use a
+non-zero exit, so any non-zero exit is an error and is thrown away, and the plugin reads each hook file before spawning
+it.
+
+Two limits are worth knowing before you trust the gate too far. GitHub Copilot's pre-tool payload carries no agent
+identifier at all, so caller identity there resolves to unknown and none of the three rules ever fires on
+`preToolUse`: that surface runs with the gate entirely unenforced, not merely weaker. OpenCode and Kilo Code have no
+event that can block a reply, so on those two the enforcement is the pre-tool block plus per-agent tool permissions
+and nothing after the fact. Claude Code is the only surface that can stop a finished reply.
+
+Codex loads its whole `.codex/` layer, hooks included, only after you trust the project once.
 
 ---
 
 ### Subagents
 
-Subagents are specialised agents the main session delegates to. They live in [.claude/agents/](../.claude/agents/) and
-[.opencode/agents/](../.opencode/agents/). Kilo Code reads [.opencode/agents/](../.opencode/agents/) natively, so
-OpenCode and Kilo share the same directory. Codex CLI has no per-agent file mechanism; it sees
-[AGENTS.md](../AGENTS.md) plus skills only.
+Subagents are specialised agents the main session delegates to. One canonical file per agent fans out to four trees:
+[.claude/agents/](../.claude/agents/) in Claude markdown, [.agents/agents/](../.agents/agents/) in OpenCode markdown,
+[.codex/agents/](../.codex/agents/) in TOML, and [.github/agents/](../.github/agents/) as `*.agent.md`. OpenCode and
+Kilo Code both read the OpenCode format and both follow symlinks when scanning an agent directory, so `.opencode/agents`
+and `.kilo/agents` are symlinks into the shared tree rather than two more copies. Claude Code, Codex, and Copilot each
+need their own format, which is why the other three trees exist at all.
 
-These files are **generated artifacts**. Do not hand-edit them. Your changes will be overwritten on the next pull. To
-modify a subagent permanently, change its canonical source in the agent-standards repo (`subagents/<name>.md`), run
-`python tools/gen_subagents.py` there, and re-import via Step 2.
+These are generated artifacts. Do not hand-edit them, your changes vanish on the next pull. To change a subagent
+for good, edit its canonical source in the agent-standards repository (`subagents/<name>.md`), run
+`python tools/gen_subagents.py` there, and re-import through Step 2.
 
-The catalogue covers code review, architecture, debugging, stack experts (Java, Python, Flutter, Angular,
-React/Next.js), DevOps, databases, APIs, security, design, accessibility, docs, content, and legal. List the active
-set with `ls .claude/agents/` or browse the canonical sources in the agent-standards repo.
+The catalogue covers code review, architecture, debugging, stack specialists (Java, Python, Flutter, Angular, React
+and Next.js), DevOps, databases, APIs, security, design, accessibility, documentation, content, and legal drafting.
+
+List what you have. PowerShell:
+
+```powershell
+Get-ChildItem .agents/agents -Name
+```
+
+Unix shell:
+
+```bash
+ls .agents/agents
+```
+
+---
+
+### GitHub Copilot
+
+Copilot reads this setup natively across its surfaces, so it needs no bridge instruction file.
+
+- Skills: read from [.agents/skills/](../.agents/skills/) natively in VS Code, the JetBrains plugin, the CLI, and
+  the cloud agent. No symlink, no copy.
+- Subagents: [.github/agents/](../.github/agents/) as `*.agent.md`, generated from the same canonical sources as
+  every other tree.
+- Instructions: [AGENTS.md](../AGENTS.md) is read natively by VS Code agent mode, the CLI, and the cloud agent.
+  The JetBrains plugin reads it in agent mode too, per the March 2026 JetBrains changelog, even though GitHub's own
+  published support matrix still leaves JetBrains out of the `AGENTS.md` column. The behaviour is real, the
+  documentation is behind. Add a `.github/copilot-instructions.md` yourself only if you target Copilot code review or
+  the editors that read nothing else (Visual Studio, Xcode, Eclipse).
+- MCP: Copilot in VS Code reads [.vscode/mcp.json](../.vscode/mcp.json), key `servers`. The Copilot CLI reads its
+  own [.github/mcp.json](../.github/mcp.json), key `mcpServers` but no substitution syntax. The CLI's own
+  documentation also names the project [.mcp.json](../.mcp.json) Claude Code uses as a valid source, and when both
+  exist and name the same server, as all eight do here, the CLI's precedence rule makes `.mcp.json` win, so see
+  [MCP_SETUP.md](MCP_SETUP.md#the-cli-mcpjson-and-why-a-fifth-file-exists) before assuming `.github/mcp.json` is the
+  file actually in effect. The JetBrains plugin reads a global file only, and the cloud agent takes JSON pasted into
+  a repository settings page. Both manual blocks are in [MCP_SETUP.md](MCP_SETUP.md).
+- Preflight: [.github/hooks/preflight.json](../.github/hooks/preflight.json), camelCase events, injecting the gate
+  on `sessionStart` and `subagentStart` and blocking on `preToolUse`. The pre-tool payload carries no agent
+  identifier, so caller identity there resolves to unknown and none of the gate's rules ever fires on that hook: this
+  surface runs entirely unenforced rather than merely weaker. Copilot in JetBrains fires only six events, has no
+  subagent event, and reads hook configuration only from `.github/hooks/`.
 
 ---
 
 ### Invoking skills
 
-Skills are invoked from inside the agent shell using slash syntax. Examples:
+Skills are invoked from inside the agent shell with slash syntax:
 
 ```text
 /code-reviewer
@@ -127,206 +298,194 @@ Skills are invoked from inside the agent shell using slash syntax. Examples:
 /coding-standards
 ```
 
-Depending on the agent UI, slash commands may appear as `/name` or `/name.md` in the autocomplete menu. Use whichever
-your agent shows.
-
-The full catalogue lives in [.agents/skills/](../.agents/skills/) (one directory per skill, each holding a
-`SKILL.md`).
+Depending on the agent, the autocomplete may show `/name` or `/name.md`. Use whichever form yours offers. The full
+catalogue is [.agents/skills/](../.agents/skills/), one directory per skill, each holding a `SKILL.md`.
 
 ---
 
 ### MCP servers
 
-Two config files define the default MCP servers: `.mcp.json` (Claude Code) and `opencode.json` (OpenCode plus Kilo Code).
+Five real config files ship the same eight servers, one per agent surface:
 
-Full human setup (prerequisites, key acquisition, environment-variable export per OS, Claude Desktop and Codex CLI
-global configs, verification, and the full default-server list) lives in [MCP_SETUP.md](MCP_SETUP.md). The AI agent
-does not run that setup; a person configures the machine once.
+| File | Schema key | Serves |
+| --- | --- | --- |
+| [.mcp.json](../.mcp.json) | `mcpServers` | Claude Code |
+| [opencode.json](../opencode.json) | `mcp` | OpenCode and Kilo Code |
+| [.codex/config.toml](../.codex/config.toml) | `[mcp_servers.*]` | Codex |
+| [.vscode/mcp.json](../.vscode/mcp.json) | `servers` | GitHub Copilot in VS Code |
+| [.github/mcp.json](../.github/mcp.json) | `mcpServers` | the GitHub Copilot CLI |
+
+Only the file name, the schema key, the `type` value, and the environment-variable syntax differ between them.
+Nothing needs renaming, they arrive ready to use. The Copilot CLI also reads the project `.mcp.json` above, and its
+own precedence rule makes that file win whenever both name the same server, which is true for all eight servers
+here, so [.github/mcp.json](../.github/mcp.json) ships correct and is currently shadowed, see
+[MCP_SETUP.md](MCP_SETUP.md#the-cli-mcpjson-and-why-a-fifth-file-exists) for the measurement. Two Copilot surfaces
+get no file at all, the JetBrains plugin because it reads a global path only, and the cloud agent because its
+configuration lives in a repository settings page.
+
+Kilo Code accepts `opencode.json` as a project config filename, which is how one file serves both it and OpenCode.
+Kilo is unforgiving about substitution in that file. A `{env:VAR}` anywhere in project-level config makes it reject
+the file outright, taking the MCP servers and the `plugin` array that declares the preflight gate with it, so the
+shipped file carries no references at all. Local servers inherit their tokens from the environment that started the
+agent. The Context7 API key cannot be inherited, since it is an HTTP header, so `context7` ships unauthenticated on
+the free tier and a paid key goes in your own global config. Details in [MCP_SETUP.md](MCP_SETUP.md).
+
+The full human setup, prerequisites, key acquisition, environment variables per operating system, the two manual
+Copilot blocks, and verification, lives in [MCP_SETUP.md](MCP_SETUP.md). A person does that once per machine, not the
+agent.
 
 ---
 
 ### OpenSpec integration
 
-OpenSpec installs skills and commands into each agent's native directories.
+OpenSpec is a spec-driven workflow: propose a change, let the agent write the tasks, apply them, then archive the
+result into living specifications. It is optional, and it is entirely a consumer concern. The agent-standards
+repository ships no `openspec-*` skills of its own.
 
-#### How symlinks work with OpenSpec
+#### Initialising it
 
-The [.claude/skills/](../.claude/skills/) and [.codex/skills/](../.codex/skills/) directories are symlinked to [.agents/skills/](../.agents/skills/). Kilo Code reads [.agents/skills/](../.agents/skills/) natively without a symlink. When `openspec init` writes skills to any of the symlinked directories, they land in [.agents/skills/](../.agents/skills/), the canonical location read by every agent.
+Install it globally. PowerShell:
 
-Commands are tool-specific (different formats per agent) and cannot be centralised. OpenSpec writes them into each
-tool's native commands directory, which is expected.
+```powershell
+npm install -g @fission-ai/openspec@latest
+```
 
-#### Initialising OpenSpec
-
-After running Step 1:
+Unix shell:
 
 ```bash
 npm install -g @fission-ai/openspec@latest
 ```
 
-```bash
-openspec init --tools "claude,opencode,codex"
+Initialise with the vendor-neutral target, and only that one. PowerShell:
+
+```powershell
+openspec init --tools agents
 ```
 
-Kilo Code users who want OpenSpec slash-workflows specifically for Kilo can run a separate init pass:
+Unix shell:
 
 ```bash
-openspec init --tools kilocode
+openspec init --tools agents
 ```
 
-That will create a `.kilocode/workflows/` directory in your project. The agent-standards repo itself does not ship a
-`.kilocode/` directory; Kilo Code reads skills from [.agents/skills/](../.agents/skills/) and subagents from
-[.opencode/agents/](../.opencode/agents/) natively.
+`--tools agents` writes OpenSpec's skills into `.agents/skills/` and creates no per-tool directories. That single
+target covers every agent here, because Codex, OpenCode, Kilo Code, and Copilot all read `.agents/skills/` natively
+and Claude Code reaches the same files through its `.claude/skills` symlink. Any per-tool target would fragment a
+layout built to have exactly one skills directory.
 
-What `openspec init` creates:
+Avoid `--tools kilocode` in particular. OpenSpec 1.10.0 still hardcodes the old `.kilocode` directory for its Kilo
+target, and Kilo Code has since moved its configuration root to `.kilo`, so that target writes into a directory
+nothing reads.
+
+What the init creates:
 
 ```text
 openspec/
-  config.yaml              # OpenSpec project config
-  specs/                   # Living documentation of your system
-  changes/                 # Active feature work
-    archive/               # Completed changes
-
-# Skills (via symlinks, all land in .agents/skills/):
+  config.yaml              OpenSpec project config
+  specs/                   living documentation of your system
+  changes/                 active feature work
+    archive/               completed changes
 .agents/skills/openspec-workflow/SKILL.md
 .agents/skills/openspec-specs/SKILL.md
-
-# Commands (tool-specific, not symlinked):
-.claude/commands/opsx/propose.md
-.opencode/commands/opsx-propose.md
 ```
 
-Restart your IDE and terminal after initialisation.
+Restart your editor and terminal afterwards so the new skills are picked up.
 
-#### Optional: install a custom schema for e2e capability tests
+Slash-command names still vary per agent, because command formats genuinely differ between tools. Agents that read
+flat command files show `/opsx-propose.md`; agents with native skill integration show `/opsx:propose`. Use whichever
+appears in your autocomplete.
 
-For projects that want spec-driven end-to-end capability tests through OpenSpec's lifecycle
-(`/opsx:new` → `/opsx:continue` → `/opsx:apply`), install the
-[`e2e-runbooks`](https://github.com/Lukk17/openspec-schemas/tree/master/e2e-runbooks) schema from the
-companion repo. OpenSpec has no schema-install CLI yet, so copy the bundle into the project's `openspec/schemas/`
-directory.
+#### Optional, a custom schema for end-to-end capability tests
 
-Linux / macOS:
+For projects that want spec-driven end-to-end capability tests inside the OpenSpec lifecycle, install the
+[e2e-runbooks](https://github.com/Lukk17/openspec-schemas/tree/master/openspec/schemas/e2e-runbooks) schema from the
+companion repository. OpenSpec has no schema-install command yet, so you fetch the bundle straight into
+`openspec/schemas/`, which is the same path it occupies upstream, so nothing has to be moved afterwards. Your project
+has to be a git repository with OpenSpec already initialised, and both commands run from the project root.
 
-```bash
-git clone --depth 1 https://github.com/Lukk17/openspec-schemas /tmp/lukk17-schemas
-```
-
-```bash
-cp -r /tmp/lukk17-schemas/e2e-runbooks openspec/schemas/
-```
-
-```bash
-rm -rf /tmp/lukk17-schemas
-```
-
-Windows (PowerShell 7+):
+Fetch the schema from `master`. Its only tag, `v0.1.0`, predates the move to `openspec/schemas/` and still keeps the
+bundle at the repository root, so the tag and the path below do not line up. PowerShell:
 
 ```powershell
-git clone --depth 1 https://github.com/Lukk17/openspec-schemas $env:TEMP\lukk17-schemas
+git fetch --depth 1 https://github.com/Lukk17/openspec-schemas master
 ```
 
-```powershell
-Copy-Item -Recurse $env:TEMP\lukk17-schemas\e2e-runbooks openspec\schemas\
-```
-
-```powershell
-Remove-Item -Recurse -Force $env:TEMP\lukk17-schemas
-```
-
-Use it per-change:
+Unix shell:
 
 ```bash
-openspec new --schema e2e-runbooks "add ascend-weather-mcp capability test"
+git fetch --depth 1 https://github.com/Lukk17/openspec-schemas master
 ```
 
-Or set as the project default in `openspec/config.yaml`:
+Write only the schema directory into your tree. PowerShell:
+
+```powershell
+git checkout FETCH_HEAD -- openspec/schemas/e2e-runbooks
+```
+
+Unix shell:
+
+```bash
+git checkout FETCH_HEAD -- openspec/schemas/e2e-runbooks
+```
+
+The 13 files land in your working tree and staged at the same time. Review with `git diff --staged`, then commit. To
+upgrade later, re-run the same pair.
+
+Use it for one change. The `change` subcommand is required and `--schema` is an option on it. PowerShell:
+
+```powershell
+openspec new change "add-weather-mcp-test" --schema e2e-runbooks
+```
+
+Unix shell:
+
+```bash
+openspec new change "add-weather-mcp-test" --schema e2e-runbooks
+```
+
+Or make it the project default in `openspec/config.yaml` and drive it with `/opsx:propose`:
 
 ```yaml
 default_schema: e2e-runbooks
 ```
 
-The methodology behind the schema is documented in the [`e2e-runbooks` skill](../.agents/skills/e2e-runbooks/SKILL.md);
-the schema operationalises the same methodology for OpenSpec users. Either works alone, both reinforce each other.
-
-#### Tool directories reference
-
-| Tool        | Skills written to                                          | Commands written to                                                         |
-| ----------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Claude Code | `.claude/skills/openspec-*/` → `.agents/skills/`           | `.claude/commands/opsx/*.md`                                                |
-| Kilo Code   | reads `.agents/skills/` natively (no symlink needed)       | `.kilocode/workflows/opsx-*.md` (only if you ran `--tools kilocode`)        |
-| OpenCode    | `.opencode/skills/openspec-*/` → `.agents/skills/`         | `.opencode/commands/opsx-*.md`                                              |
-| Codex       | `.codex/skills/openspec-*/` → `.agents/skills/`            | `$CODEX_HOME/prompts/opsx-*.md`                                             |
-
-#### Command syntax variations
-
-OpenSpec generates files for two agent architectures:
-
-- **Standalone Markdown commands**: agents that read flat files show commands with extensions
-  (e.g. `/opsx-propose.md`).
-- **Agent skills**: agents that parse semantic `SKILL.md` metadata or have native integration use slash syntax
-  (e.g. `/opsx:propose`).
-
-Use whichever form appears in your agent's autocomplete menu.
+The methodology behind the schema is documented in the
+[e2e-runbooks skill](../.agents/skills/e2e-runbooks/SKILL.md). Either works alone, and they reinforce each other.
 
 ---
 
 ### OpenSpec workflow
 
-#### 0. Run the coding agent
+Start the agent:
 
-```shell
+```bash
 claude
 ```
 
-#### 1. Propose a change
+Propose a change:
 
 ```text
 /opsx:propose add dark mode support
 ```
 
-```text
-/opsx-propose.md add dark mode support
-```
-
-The agent creates the proposal, design, and implementation tasks under `openspec/changes/`.
-
-#### 2. Apply the code
-
-Review the generated `tasks.md` (edit directly or have the agent revise it).
-
-Then:
+The agent writes the proposal, the design, and the task list under `openspec/changes/`. Review the generated
+`tasks.md`, edit it directly or have the agent revise it, then apply:
 
 ```text
 /opsx:apply
 ```
 
-```text
-/opsx-apply.md
-```
-
-The agent writes the code and checks off boxes in `tasks.md`.
-
-#### 3. Verify and refine
-
-If bugs occur or tests fail, pass logs back:
+The agent writes the code and ticks the boxes in `tasks.md`. When something breaks, hand the evidence back:
 
 ```text
 /opsx:verify The toggle button is invisible on mobile. Fix it.
 ```
 
-```text
-/opsx-verify.md The toggle button is invisible on mobile. Fix it.
-```
-
-#### 4. Archive the change
+Archive when it is done:
 
 ```text
 /opsx:archive
 ```
 
-```text
-/opsx-archive.md
-```
-
-The agent merges delta specs into `openspec/specs/` and moves the change folder to `openspec/changes/archive/`.
+The agent merges the delta specifications into `openspec/specs/` and moves the change folder into
+`openspec/changes/archive/`.
