@@ -6,7 +6,14 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.reader.cloudflare.cookie_manager import CookieManager, _split_storage_state
+from src.reader.cloudflare.cookie_manager import (
+    PRODUCED_BY_FLARESOLVERR,
+    PRODUCED_BY_LOGIN_SEED,
+    PRODUCED_BY_NOVNC,
+    PRODUCED_BY_UNKNOWN,
+    CookieManager,
+    _split_storage_state,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -513,3 +520,118 @@ def test_redis_configured_but_unreachable_logs_fallback(caplog: pytest.LogCaptur
         m = CookieManager()
     assert m.redis_client is None
     assert any("in-memory fallback" in r.message or "unreachable" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# produced_by: who captured a stored session (A61)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_save_storage_state_writes_produced_by_on_auth_and_waf_entries():
+    m = _fresh()
+    state = _state([_cookie("li_at"), _cookie("cf_clearance")])
+    await m.save_storage_state("https://example.com", state, "UA", produced_by=PRODUCED_BY_FLARESOLVERR)
+
+    domain = m._get_domain("https://example.com")
+    record = m._memory_store[f"{domain}:default"]
+    assert record["auth"]["produced_by"] == PRODUCED_BY_FLARESOLVERR
+    assert record["waf"]["produced_by"] == PRODUCED_BY_FLARESOLVERR
+
+
+@pytest.mark.asyncio
+async def test_save_flat_cookies_passes_produced_by_through():
+    m = _fresh()
+    await m.save_flat_cookies(
+        "https://example.com", {"cf_clearance": "abc"}, "UA", produced_by=PRODUCED_BY_FLARESOLVERR
+    )
+
+    producer = await m.get_stored_session_producer("https://example.com")
+    assert producer == PRODUCED_BY_FLARESOLVERR
+
+
+@pytest.mark.asyncio
+async def test_get_stored_session_producer_prefers_waf_entry_when_valid():
+    m = _fresh()
+    state = _state([_cookie("li_at")])
+    await m.save_storage_state("https://example.com", state, "UA", produced_by=PRODUCED_BY_LOGIN_SEED)
+    waf_state = _state([_cookie("cf_clearance")])
+    await m.save_storage_state("https://example.com", waf_state, "UA", produced_by=PRODUCED_BY_FLARESOLVERR)
+
+    producer = await m.get_stored_session_producer("https://example.com")
+    assert producer == PRODUCED_BY_FLARESOLVERR
+
+
+@pytest.mark.asyncio
+async def test_get_stored_session_producer_falls_back_to_auth_when_no_waf_entry():
+    m = _fresh()
+    state = _state([_cookie("li_at")])
+    await m.save_storage_state("https://example.com", state, "UA", produced_by=PRODUCED_BY_LOGIN_SEED)
+
+    producer = await m.get_stored_session_producer("https://example.com")
+    assert producer == PRODUCED_BY_LOGIN_SEED
+
+
+@pytest.mark.asyncio
+async def test_get_stored_session_producer_falls_back_to_auth_when_waf_expired():
+    """save_storage_state always replaces the whole auth sub-entry with the
+    current call's split, so the auth entry that must survive here has to be
+    written *after* the waf entry, with a state that carries no WAF cookie of
+    its own -- the same way a real NoVNC login capture, which never inherits
+    FlareSolverr's clearance (a fresh browser context, see novnc_strategy.py),
+    leaves an untouched WAF entry from an earlier FlareSolverr save."""
+    m = _fresh()
+    waf_only_state = _state([_cookie("cf_clearance")])
+    await m.save_storage_state(
+        "https://example.com", waf_only_state, "UA", produced_by=PRODUCED_BY_FLARESOLVERR
+    )
+    auth_only_state = _state([_cookie("li_at")])
+    await m.save_storage_state("https://example.com", auth_only_state, "UA", produced_by=PRODUCED_BY_NOVNC)
+
+    domain = m._get_domain("https://example.com")
+    m._memory_store[f"{domain}:default"]["waf"]["saved_at"] = time.time() - 99_999
+
+    with patch("src.config.config.settings.SESSION_WAF_TTL_SECONDS", 1):
+        producer = await m.get_stored_session_producer("https://example.com")
+
+    assert producer == PRODUCED_BY_NOVNC
+
+
+@pytest.mark.asyncio
+async def test_get_stored_session_producer_reports_unknown_for_a_record_missing_the_field():
+    """A record saved before this field existed (or by a caller that omitted it)
+    still reports a producer, distinct from None, so routing can tell "stored
+    session, unknown origin" apart from "no stored session at all"."""
+    m = _fresh()
+    state = _state([_cookie("cf_clearance")])
+    await m.save_storage_state("https://example.com", state, "UA")
+
+    producer = await m.get_stored_session_producer("https://example.com")
+    assert producer == PRODUCED_BY_UNKNOWN
+
+
+@pytest.mark.asyncio
+async def test_get_stored_session_producer_returns_none_when_no_stored_session():
+    m = _fresh()
+    producer = await m.get_stored_session_producer("https://never-stored.example.com")
+    assert producer is None
+
+
+@pytest.mark.asyncio
+async def test_get_stored_session_producer_returns_none_when_both_entries_expired():
+    m = _fresh()
+    state = _state([_cookie("li_at"), _cookie("cf_clearance")])
+    await m.save_storage_state("https://example.com", state, "UA", produced_by=PRODUCED_BY_FLARESOLVERR)
+
+    domain = m._get_domain("https://example.com")
+    record = m._memory_store[f"{domain}:default"]
+    record["auth"]["saved_at"] = time.time() - 999_999
+    record["waf"]["saved_at"] = time.time() - 999_999
+
+    with (
+        patch("src.config.config.settings.SESSION_AUTH_TTL_SECONDS", 1),
+        patch("src.config.config.settings.SESSION_WAF_TTL_SECONDS", 1),
+    ):
+        producer = await m.get_stored_session_producer("https://example.com")
+
+    assert producer is None

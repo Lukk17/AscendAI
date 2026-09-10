@@ -3,6 +3,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.api.exceptions import ChallengeDetectedException, HumanInterventionRequiredException
+from src.reader.cloudflare.cookie_manager import (
+    PRODUCED_BY_FLARESOLVERR,
+    PRODUCED_BY_LOGIN_SEED,
+    PRODUCED_BY_NOVNC,
+    PRODUCED_BY_UNKNOWN,
+)
 from src.reader.web_reader import WebReader
 
 _ARTICLE_HTML = (
@@ -97,6 +103,130 @@ async def test_read_routes_browser_first_when_stored_session_exists():
     ):
         result = await WebReader().read("http://test.com")
     assert result["mode"] == "4-playwright_stealth"
+
+
+@pytest.mark.asyncio
+async def test_read_routes_flaresolverr_first_when_producer_is_flaresolverr():
+    """A61: a clearance FlareSolverr earned must be replayed by FlareSolverr
+    first, not skipped straight to the browser tiers."""
+    with (
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.reader.web_reader.cookie_manager.get_stored_session_producer",
+            new=AsyncMock(return_value=PRODUCED_BY_FLARESOLVERR),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value="playwright must not run when FlareSolverr already succeeded"),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+    ):
+        result = await WebReader().read("http://test.com")
+    assert result["mode"] == PRODUCED_BY_FLARESOLVERR
+
+
+@pytest.mark.parametrize(
+    "producer",
+    [PRODUCED_BY_NOVNC, PRODUCED_BY_LOGIN_SEED, PRODUCED_BY_UNKNOWN],
+    ids=["novnc", "login-seed", "unknown-or-legacy-record"],
+)
+@pytest.mark.asyncio
+async def test_read_routes_browser_first_and_skips_flaresolverr_for_non_flaresolverr_producers(producer):
+    """A61: a clearance the browser itself earned (NoVNC, a login seed), or a
+    stored session with no recorded producer at all (a pre-fix record, or a
+    caller that omitted the field), must not be replayed through
+    FlareSolverr — the browser tiers stay first, exactly like today."""
+    flaresolverr_mock = AsyncMock(return_value="flaresolverr must not run for this producer")
+    beautifulsoup_mock = AsyncMock(return_value="cheap tiers must not run when a session is stored")
+    with (
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "li_at", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.reader.web_reader.cookie_manager.get_stored_session_producer",
+            new=AsyncMock(return_value=producer),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
+            new=flaresolverr_mock,
+        ),
+        patch(
+            "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
+            new=beautifulsoup_mock,
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+    ):
+        result = await WebReader().read("http://test.com")
+    assert result["mode"] == "4-playwright_stealth"
+    flaresolverr_mock.assert_not_awaited()
+    beautifulsoup_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first():
+    """heavy_mode is an explicit caller preference and takes priority over
+    producer-based routing, even when a FlareSolverr-produced clearance is
+    stored: no FlareSolverr replay, straight to the browser tiers."""
+    producer_mock = AsyncMock(return_value=PRODUCED_BY_FLARESOLVERR)
+    with (
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.reader.web_reader.cookie_manager.get_stored_session_producer",
+            new=producer_mock,
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+    ):
+        result = await WebReader().read("http://test.com", heavy_mode=True)
+    assert result["mode"] == "4-playwright_stealth"
+    producer_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flaresolverr():
+    raw_html = (
+        "<html><body>This is filler text to pass the ten word minimum validation limit "
+        "<a href='https://example.com/job1'>Job</a></body></html>"
+    )
+    with (
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.reader.web_reader.cookie_manager.get_stored_session_producer",
+            new=AsyncMock(return_value=PRODUCED_BY_FLARESOLVERR),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
+            new=AsyncMock(return_value=raw_html),
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value="playwright must not run when FlareSolverr already succeeded"),
+        ),
+    ):
+        result = await WebReader().read_with_links("http://test.com")
+    assert result["status"] == "success"
+    assert result["mode"] == PRODUCED_BY_FLARESOLVERR
 
 
 @pytest.mark.asyncio

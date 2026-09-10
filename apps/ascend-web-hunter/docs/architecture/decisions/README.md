@@ -11,5 +11,6 @@
 | [ADR-007](ADR-007-structured-output-and-readability-fallback.md) | Structured article output (`output_format=structured`) and readability-lxml fallback for thin extractions. | Accepted |
 | [ADR-008](ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, loaded from disk only, refreshed solely via `POST /api/v1/blocklist/refresh`. | Accepted |
 | [ADR-009](ADR-009-recall-pass-for-thin-precision-extractions.md) | A trafilatura recall pass when the precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (0.75) of the page's plain text, longer result wins. | Accepted |
+| [ADR-010](ADR-010-producer-aware-session-replay.md) | Every session record names the tier that produced it; a FlareSolverr-produced clearance is replayed by FlareSolverr first, everything else keeps routing to the browser tiers. | Accepted |
 
 For monorepo-level decisions see [`../../../../../docs/architecture/decisions/`](../../../../../docs/architecture/decisions/).

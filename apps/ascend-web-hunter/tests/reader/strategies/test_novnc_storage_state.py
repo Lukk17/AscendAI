@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC
+
 
 @pytest.mark.asyncio
 async def test_novnc_monitor_saves_storage_state_not_cookies():
@@ -56,6 +58,7 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
     mock_save.assert_awaited()
     # Confirm storage_state was called, not cookies
     context.storage_state.assert_awaited()
+    assert mock_save.call_args.args[-1] == PRODUCED_BY_NOVNC
 
 
 @pytest.mark.asyncio
@@ -105,6 +108,7 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
     mock_save.assert_awaited_once()
     saved_state = mock_save.await_args.args[1]
     assert any(c["name"] == "cf_clearance" for c in saved_state["cookies"])
+    assert mock_save.await_args.args[-1] == PRODUCED_BY_NOVNC
 
 
 @pytest.mark.asyncio

@@ -47,7 +47,7 @@ SERVICES: tuple[LoginService, ...] = (
 async def _seed_service(service: LoginService) -> None:
     from playwright.async_api import async_playwright
 
-    from src.reader.cloudflare.cookie_manager import cookie_manager
+    from src.reader.cloudflare.cookie_manager import PRODUCED_BY_LOGIN_SEED, cookie_manager
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
@@ -67,6 +67,7 @@ async def _seed_service(service: LoginService) -> None:
         storage_state=storage_state,
         user_agent=user_agent,
         profile="e2e",
+        produced_by=PRODUCED_BY_LOGIN_SEED,
     )
     sys.stdout.write(f"[seed] {service.name}: session seeded under profile 'e2e'.\n")
 

@@ -19,7 +19,7 @@ from src.observability.metrics import (
     STRATEGY_DURATION_SECONDS,
 )
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
-from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, cookie_manager
 from src.reader.extraction import extract_structured, extract_text_with_fallback
 from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
@@ -69,7 +69,7 @@ class WebReader:
         return {
             "1-beautifulsoup": BeautifulSoupStrategy(self._get_random_user_agent, profile),
             "2-trafilatura": TrafilaturaStrategy(self._get_random_user_agent, profile),
-            "3-flaresolverr": FlareSolverrStrategy(profile),
+            PRODUCED_BY_FLARESOLVERR: FlareSolverrStrategy(profile),
             "4-playwright_stealth": PlaywrightStrategy(
                 self._get_random_user_agent, self.url_validator, profile
             ),
@@ -99,10 +99,19 @@ class WebReader:
     def _get_random_user_agent(self) -> str:
         return random.choice(self.user_agents)
 
-    def _select_strategies(
+    @staticmethod
+    def _browser_tiers(strategies: dict[str, BaseStrategy]) -> dict[str, BaseStrategy]:
+        return {
+            "4-playwright_stealth": strategies["4-playwright_stealth"],
+            "5-crawlee_adaptive": strategies["5-crawlee_adaptive"],
+            NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME],
+        }
+
+    async def _select_strategies(
         self,
         url: str,
         prefer_browser: bool,
+        heavy_mode: bool,
         profile: str | None = None,
     ) -> dict[str, BaseStrategy]:
         strategies = self._build_strategies(profile)
@@ -113,14 +122,18 @@ class WebReader:
             )
             return {NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME]}
 
-        if prefer_browser:
-            return {
-                "4-playwright_stealth": strategies["4-playwright_stealth"],
-                "5-crawlee_adaptive": strategies["5-crawlee_adaptive"],
-                NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME],
-            }
+        if not prefer_browser:
+            return strategies
 
-        return strategies
+        if not heavy_mode:
+            producer = await cookie_manager.get_stored_session_producer(url, profile)
+            if producer == PRODUCED_BY_FLARESOLVERR:
+                return {
+                    PRODUCED_BY_FLARESOLVERR: strategies[PRODUCED_BY_FLARESOLVERR],
+                    **self._browser_tiers(strategies),
+                }
+
+        return self._browser_tiers(strategies)
 
     async def _has_stored_session(self, url: str, profile: str | None) -> bool:
         return await cookie_manager.get_storage_state(url, profile) is not None
@@ -211,7 +224,7 @@ class WebReader:
 
         logger.info("Reading URL: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
         prefer_browser = await self._prefer_browser(url, heavy_mode, profile)
-        strategies_to_run = self._select_strategies(url, prefer_browser, profile)
+        strategies_to_run = await self._select_strategies(url, prefer_browser, heavy_mode, profile)
         started_at = time.perf_counter()
         budget_exhausted = False
 
@@ -258,7 +271,7 @@ class WebReader:
 
         logger.info("Reading URL with links: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
         prefer_browser = await self._prefer_browser(url, heavy_mode, profile)
-        strategies_to_run = self._select_strategies(url, prefer_browser, profile)
+        strategies_to_run = await self._select_strategies(url, prefer_browser, heavy_mode, profile)
         started_at = time.perf_counter()
         budget_exhausted = False
 

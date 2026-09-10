@@ -1,7 +1,7 @@
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, TypeGuard
 from urllib.parse import urlparse
 
 import redis.asyncio as redis
@@ -16,6 +16,20 @@ logger = logging.getLogger(__name__)
 # snapshot. cache_dir=None means in-memory only so we don't write to a default
 # platform-dependent directory.
 _TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
+
+# `produced_by` values written by every code path that saves a session, and read back
+# by WebReader to decide whether a stored clearance can be replayed by the tier that
+# earned it. The FlareSolverr and NoVNC values match the WebReader strategy names so a
+# stored producer can be looked up directly as a strategy key.
+PRODUCED_BY_FLARESOLVERR = "3-flaresolverr"
+PRODUCED_BY_NOVNC = "6-novnc"
+PRODUCED_BY_LOGIN_SEED = "login-seed"
+
+# Reported for a still-valid entry that predates the produced_by field, or whose
+# caller omitted it. Distinct from None, which means no valid stored session exists
+# at all; both cases end up routed the same way (browser tiers first), but only one
+# of them actually has cookies worth replaying.
+PRODUCED_BY_UNKNOWN = "unknown"
 
 
 def _is_waf_cookie(name: str) -> bool:
@@ -171,6 +185,15 @@ class CookieManager:
     def _memory_key(domain: str, profile: str) -> str:
         return f"{domain}:{profile}"
 
+    @staticmethod
+    def _waf_entry_is_valid(waf_entry: dict[str, Any] | None) -> TypeGuard[dict[str, Any]]:
+        if not waf_entry:
+            return False
+
+        saved_at = float(waf_entry.get("saved_at", 0) or 0)
+
+        return (time.time() - saved_at) < settings.SESSION_WAF_TTL_SECONDS
+
     async def get_storage_state(
         self,
         url: str,
@@ -183,7 +206,6 @@ class CookieManager:
         if record is None:
             return None
 
-        now = time.time()
         auth_entry = record.get("auth")
         waf_entry = record.get("waf")
 
@@ -192,13 +214,43 @@ class CookieManager:
 
         if auth_entry and self._auth_ttl_remaining_from_entry(auth_entry) > 0:
             auth_state = auth_entry.get("storage_state")
-        if waf_entry and (now - waf_entry.get("saved_at", 0)) < settings.SESSION_WAF_TTL_SECONDS:
+        if self._waf_entry_is_valid(waf_entry):
             waf_state = waf_entry.get("storage_state")
 
         if auth_state is None and waf_state is None:
             return None
 
         return _merge_storage_states(auth_state, waf_state)
+
+    async def get_stored_session_producer(
+        self,
+        url: str,
+        profile: str | None = None,
+    ) -> str | None:
+        """Return the tier that produced the currently-valid stored session, or None.
+
+        Prefers the WAF entry's producer, since that is the challenge clearance a
+        tier would need to replay; falls back to the auth entry's producer when
+        only an auth-only session (a seeded login, or a captcha solve that carried
+        no WAF cookie) is stored. Returns `PRODUCED_BY_UNKNOWN` for a valid entry
+        saved before this field existed or by a caller that omitted it, and None
+        only when no valid stored session exists at all.
+        """
+        domain = self._get_domain(url)
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        record = await self._load_record(domain, effective_profile)
+        if record is None:
+            return None
+
+        waf_entry = record.get("waf")
+        if self._waf_entry_is_valid(waf_entry):
+            return waf_entry.get("produced_by") or PRODUCED_BY_UNKNOWN
+
+        auth_entry = record.get("auth")
+        if auth_entry and self._auth_ttl_remaining_from_entry(auth_entry) > 0:
+            return auth_entry.get("produced_by") or PRODUCED_BY_UNKNOWN
+
+        return None
 
     async def get_flat_cookies(
         self,
@@ -237,8 +289,14 @@ class CookieManager:
         storage_state: dict[str, Any],
         user_agent: str,
         profile: str | None = None,
+        produced_by: str | None = None,
     ) -> None:
-        """Persist a full Playwright storage_state, split into auth/WAF sub-records."""
+        """Persist a full Playwright storage_state, split into auth/WAF sub-records.
+
+        `produced_by` names the tier that captured *storage_state* (see the
+        `PRODUCED_BY_*` constants), so a later read can decide whether the stored
+        clearance can be replayed by the tier that earned it.
+        """
         domain = self._get_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         auth_state, waf_state = _split_storage_state(storage_state)
@@ -253,12 +311,14 @@ class CookieManager:
             "storage_state": auth_state,
             "user_agent": user_agent,
             "saved_at": now,
+            "produced_by": produced_by,
         }
         if waf_state["cookies"]:
             record["waf"] = {
                 "storage_state": waf_state,
                 "user_agent": user_agent,
                 "saved_at": now,
+                "produced_by": produced_by,
             }
 
         await self._save_record(domain, effective_profile, record)
@@ -306,6 +366,7 @@ class CookieManager:
         cookies: dict[str, str],
         user_agent: str,
         profile: str | None = None,
+        produced_by: str | None = None,
     ) -> None:
         """Convert a flat cookie dict to Playwright storage_state format and persist."""
         playwright_cookies = [
@@ -322,7 +383,7 @@ class CookieManager:
             for name, value in cookies.items()
         ]
         storage_state: dict[str, Any] = {"cookies": playwright_cookies, "origins": []}
-        await self.save_storage_state(url, storage_state, user_agent, profile)
+        await self.save_storage_state(url, storage_state, user_agent, profile, produced_by)
 
     # ---------------------------------------------------------------------------
     # Backward compat alias used by the old get_session_data callers
@@ -354,9 +415,10 @@ class CookieManager:
         user_agent: str,
         _ttl_seconds: int = 7200,
         profile: str | None = None,
+        produced_by: str | None = None,
     ) -> None:
         """Legacy: accept flat cookie dict and persist via save_flat_cookies."""
-        await self.save_flat_cookies(url, cookies, user_agent, profile)
+        await self.save_flat_cookies(url, cookies, user_agent, profile, produced_by)
 
     async def clear_session(
         self,

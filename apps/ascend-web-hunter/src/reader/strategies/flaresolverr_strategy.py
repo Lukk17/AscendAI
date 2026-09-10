@@ -8,7 +8,7 @@ from src.circuit_breaker.breaker import flaresolverr_breaker
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
-from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, cookie_manager
 from src.reader.strategies.base_strategy import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,9 @@ class FlareSolverrStrategy(BaseStrategy):
                     # Previously gated on cf_clearance presence, which silently
                     # discarded all LinkedIn auth cookies (li_at, JSESSIONID, etc.).
                     if cookie_dict:
-                        await cookie_manager.save_flat_cookies(url, cookie_dict, user_agent, self.profile)
+                        await cookie_manager.save_flat_cookies(
+                            url, cookie_dict, user_agent, self.profile, PRODUCED_BY_FLARESOLVERR
+                        )
 
                     if ChallengeDetector.is_login_required(html):
                         logger.warning("FlareSolverrStrategy: Login wall detected on %s", url)

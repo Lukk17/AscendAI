@@ -11,7 +11,7 @@ from src.config.config import settings
 from src.observability.domain_label import domain_label
 from src.observability.metrics import STRATEGY_ATTEMPTS_TOTAL
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
-from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC, cookie_manager
 from src.reader.fingerprint import get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
 
@@ -123,7 +123,7 @@ async def _poll_captcha(
     cleared = ChallengeDetector.is_content_accepted(200, page_content)
     if cleared or _has_clearance_cookie(storage_state):
         user_agent = await page.evaluate("navigator.userAgent")
-        await cookie_manager.save_storage_state(url, storage_state, user_agent, profile)
+        await cookie_manager.save_storage_state(url, storage_state, user_agent, profile, PRODUCED_BY_NOVNC)
         logger.info("NoVNC Strategy: captcha solved for %s, captured session and stopping", url)
 
         return True, page_blocked
@@ -135,7 +135,7 @@ async def _poll_login(page: Any, url: str, storage_state: dict[str, Any], profil
     """Run one login-branch poll. Returns whether the login has resolved."""
     current_url = page.url or ""
     user_agent = await page.evaluate("navigator.userAgent")
-    await cookie_manager.save_storage_state(url, storage_state, user_agent, profile)
+    await cookie_manager.save_storage_state(url, storage_state, user_agent, profile, PRODUCED_BY_NOVNC)
     if not ChallengeDetector.is_login_redirect_url(current_url) and current_url != url:
         logger.info("NoVNC Strategy: login resolved (now at %s), stopping monitor", current_url)
 

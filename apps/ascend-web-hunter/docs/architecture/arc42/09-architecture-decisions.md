@@ -15,6 +15,7 @@
 | [ADR-007](../decisions/ADR-007-structured-output-and-readability-fallback.md) | Structured output and readability-lxml fallback | Accepted | readability-lxml fallback adds latency on genuinely empty pages |
 | [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, refreshed only on operator request | Accepted | Vendored file goes stale silently until someone calls refresh or rebuilds the image |
 | [ADR-009](../decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) | Recall pass when the precision extraction is thin against the page | Accepted | A length ratio cannot tell dropped content from sidebars, so some news articles pay a second pass for no gain |
+| [ADR-010](../decisions/ADR-010-producer-aware-session-replay.md) | Route a stored session by who produced it | Accepted | Only FlareSolverr has a special-cased branch; a future WAF-cookie-earning tier needs its own |
 
 ---
 

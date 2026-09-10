@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.api.exceptions import ChallengeDetectedException
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR
 from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 
 
@@ -78,6 +79,34 @@ async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empt
     ):
         await FlareSolverrStrategy().extract("http://test.com")
     mock_save.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer():
+    """A96/A61: the record saved after a solve must name FlareSolverr as the
+    producer, so a later read can replay it through the tier that earned it."""
+    session = _make_session(
+        {
+            "status": "ok",
+            "solution": {
+                "response": "<html><body>Cleared</body></html>",
+                "cookies": [{"name": "cf_clearance", "value": "abc"}],
+                "userAgent": "UA",
+            },
+        }
+    )
+    with (
+        patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.cookie_manager.save_flat_cookies",
+            new=AsyncMock(),
+        ) as mock_save,
+        patch("src.reader.strategies.flaresolverr_strategy.trafilatura.extract", return_value="Cleared"),
+    ):
+        await FlareSolverrStrategy().extract("http://test.com")
+
+    mock_save.assert_awaited_once()
+    assert mock_save.call_args.args[-1] == PRODUCED_BY_FLARESOLVERR
 
 
 @pytest.mark.asyncio

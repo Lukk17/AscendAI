@@ -12,6 +12,8 @@ purposes.
 ## [0.0.5]
 
 ### Changed
+- End-to-end spec 11 keeps only the human captcha solve and its capture, and the new automated spec 12
+  proves a stored Cloudflare clearance is reused on a second read of the same site.
 - End-to-end spec 7 mixed two automated parts with a human captcha part that asserted only that a
   session was saved. The human part is spec 11 now: it reads the democaptcha hCaptcha demo form to
   get the NoVNC intervention, has the human solve it, checks the captured hmt_id cookie, then reads
@@ -20,6 +22,14 @@ purposes.
   login reuse and is fully automated.
 
 ### Fixed
+- A stored WAF clearance forced every later read straight to the browser tiers, so a clearance
+  FlareSolverr earned was handed to Playwright instead, which a Cloudflare challenge does not
+  recognise, and the read ended at the human window. Every session record now names the tier that
+  produced it (`produced_by`, written by the FlareSolverr strategy and the NoVNC monitor), and the
+  reader replays a FlareSolverr-produced clearance through FlareSolverr first before falling back to
+  the browser tiers as before. A record with no producer (written before this change, or by a caller
+  that has not adopted the field yet) keeps today's behaviour: browser tiers first. See
+  [ADR-010](docs/architecture/decisions/ADR-010-producer-aware-session-replay.md).
 - The text reader returned prices and stock lines and no book titles from `https://books.toscrape.com/`:
   trafilatura's default precision pass yielded 319 characters of a page whose plain text is 1851. When the
   precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (default 0.75) of the page's plain text, a
