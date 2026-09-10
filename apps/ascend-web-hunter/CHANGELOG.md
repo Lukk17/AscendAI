@@ -11,7 +11,26 @@ purposes.
 
 ## [0.0.5]
 
+### Changed
+- End-to-end spec 7 mixed two automated parts with a human captcha part that asserted only that a
+  session was saved. The human part is spec 11 now: it reads the democaptcha hCaptcha demo form to
+  get the NoVNC intervention, has the human solve it, checks the captured hmt_id cookie, then reads
+  the same page again and requires HTTP 200 with status success, so the saved session is proven
+  reused and a second 428 is a product defect. Spec 7 keeps the real-world matrix and the saucedemo
+  login reuse and is fully automated.
+
 ### Fixed
+- The text reader returned prices and stock lines and no book titles from `https://books.toscrape.com/`:
+  trafilatura's default precision pass yielded 319 characters of a page whose plain text is 1851. When the
+  precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (default 0.75) of the page's plain text, a
+  second pass now runs with `favor_recall=True` and the longer result is returned, 1143 characters with every
+  title on that page. Article pages, measured at 0.90 of the plain text or more, stay on the single pass. The
+  derivation is in [ADR-009](docs/architecture/decisions/ADR-009-recall-pass-for-thin-precision-extractions.md).
+- End-to-end spec 7 treated a `409` `novnc_busy` answer on a Part 1 row as a verdict, though it only
+  means another row's NoVNC intervention still holds the shared browser. The spec, its template and
+  the suite README now have the runner wait the response's `Retry-After` seconds and re-run the row,
+  up to 3 attempts in total, recording each attempt and each 409 body's `holder_url`, with the row
+  failing only on its third 409.
 - End-to-end spec 6 stripped script blocks with a sed flag GNU sed does not have. The Unix form
   uses perl now.
 - End-to-end spec 8 reset Redis only, so the in-process read cache spec 3 fills survived into the
@@ -40,6 +59,11 @@ purposes.
   test 3 conflict. It now names both.
 - The version in pyproject.toml, AGENTS.md and the constraints document lagged this changelog at
   0.0.3. All three say 0.0.5.
+- End-to-end spec 7 Part 3 targeted Google's reCAPTCHA v2 demo, whose script stays in the DOM after
+  the solve so the NoVNC monitor could never declare that address cleared, and asserted a
+  _GRECAPTCHA cookie that appears on a bare load. Part 3, its template and the Bruno request target
+  the democaptcha hCaptcha demo form, and the capture check asserts the hmt_id cookie, which proves
+  a human acted in the window and not that the image task was solved.
 
 ## [0.0.4]
 

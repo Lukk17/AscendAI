@@ -8,12 +8,13 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
   body:
     type: json
-    # Part 3 Call 1 — read the Google reCAPTCHA v2 demo with NO session stored. The widget
-    # always requires a human click and cannot be auto-passed or solved by FlareSolverr, so the
-    # scraper escalates to NoVNC and returns a vnc_url for a human to solve the reCAPTCHA.
+    # Spec 11 Call 1: read the democaptcha hCaptcha demo form with NO session stored. The page
+    # carries the hcaptcha.com/1/api.js script signature from challenge_dictionary.json, so every
+    # automated tier reports a challenge and the scraper escalates to NoVNC, returning a vnc_url
+    # for a human to tick the widget and submit the form.
     data: |-
       {
-        "url": "https://www.google.com/recaptcha/api2/demo",
+        "url": "https://democaptcha.com/demo-form-eng/hcaptcha.html",
         "include_links": false,
         "heavy_mode": false
       }

@@ -62,8 +62,8 @@ be run on its own.
 6. [6-tiered-scraping-test.md](6-tiered-scraping-test.md). Per-tier regression sweep (`curl_cffi` static,
    FlareSolverr Cloudflare, Playwright JS-rendered) against real sites.
 7. [7-authenticated-realworld-scraping-test.md](7-authenticated-realworld-scraping-test.md). Real-world URL matrix
-   plus automated saucedemo login-reuse plus human-solved reCAPTCHA capture. **Runs last; Part 3 needs a human on
-   the main session.**
+   plus automated saucedemo login-reuse. Two parts, both automated, no human step. Runs after test 6 because its
+   reset flushes every `session:*` key.
 8. [8-session-clear-test.md](8-session-clear-test.md). `POST /api/v2/web/session/clear` against a seeded and an
    unseeded session. Redis-only, no egress — cheapest test in the suite alongside 1 and 4. Do not run in parallel
    with test 10.
@@ -75,6 +75,10 @@ be run on its own.
     real headful Playwright browser that can be held by a background monitor for up to 10 minutes. Highest per-run
     resource cost in this module's suite; do not run in parallel with test 8 or with itself; see the spec's own
     cost note.
+11. [11-captcha-solve-and-reuse-test.md](11-captcha-solve-and-reuse-test.md). Human-solved hCaptcha on the
+    democaptcha demo form, proven by the `hmt_id` cookie a human's checkbox click sets, followed by a second read of
+    the same page that must answer HTTP 200 with `status="success"` because the stored session is reused. A second
+    428 is a FAIL and a product defect. Runs last of all, alone, on the main session, and only on a human's go.
 
 ## Cross-cutting conventions
 

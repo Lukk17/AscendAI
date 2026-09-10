@@ -1,8 +1,8 @@
-# Real-world + authenticated + human-captcha scraping: e2e test
+# Real-world + authenticated scraping: e2e test
 
 ## What this verifies
 
-Three things, all against **real sites** (no mocks):
+Two things, both against **real sites** (no mocks):
 
 1. **A categorized real-world URL matrix** — each URL asserts its **expected verdict** (`success` / `intervention` /
    `hard-fail`). Stable canaries are **gated** (must match); live sites are **best-effort** (the response must be a
@@ -11,12 +11,10 @@ Three things, all against **real sites** (no mocks):
 2. **Login → session reuse** (automated, saucedemo) — a **2-call before/after**: read the page **(1) blocked** (no
    session) returns no logged-in content, then **(2) after** a scripted login + session seed returns logged-in
    content. Proves the auth session is **stored and reused**.
-3. **CAPTCHA human-solve + capture** (human, reCAPTCHA v2, runs **first**) — read **blocked** returns HTTP 428 + a
-   human-intervention `vnc_url`; the human solves the reCAPTCHA in the NoVNC browser; we then assert the solved
-   session (the `_GRECAPTCHA` cookie reCAPTCHA sets on interaction) was **captured into the session store**. The
-   Google reCAPTCHA v2 demo is used because it always requires a human click — it can't be auto-passed by a headful
-   browser or solved by FlareSolverr — so it reliably needs a human, and a captured `_GRECAPTCHA` cookie proves one
-   acted.
+
+The human-solved hCaptcha that used to be Part 3 of this spec is spec 11
+([11-captcha-solve-and-reuse-test.md](11-captcha-solve-and-reuse-test.md)), which also asserts that the captured
+session is reused. This spec has no human step and runs fully automated.
 
 ### Contract (how the service signals each verdict)
 
@@ -24,14 +22,10 @@ Three things, all against **real sites** (no mocks):
 - **intervention** — HTTP `428 Precondition Required`, body `status="human_intervention_required"` + a non-empty
   `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
 - **hard-fail** — a non-2xx the SSRF / host guard fail-closes with (e.g. HTTP `400` for an unresolvable host).
-
-### Why Part 3 asserts capture, not cross-request reuse
-
-A reCAPTCHA token (and a WAF clearance like a Cloudflare `cf_clearance`) is single-use or bound to the exact browser
-fingerprint (TLS/JA3, headful build) and IP that solved it. The human solves it in the NoVNC browser, but a later read
-runs in a different browser context, so it is not reusable. Cross-request reuse is therefore not meaningfully
-observable. **Capture** (the solved session landing in the session store) is the deterministic, real signal that the
-human-intervention path works. (Contrast Part 2: an app session cookie is not fingerprint-bound, so it reuses cleanly.)
+- busy, not a verdict: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
+  meaning another row's NoVNC intervention still holds the single shared browser. The runner waits the
+  `Retry-After` seconds the response carries and re-runs that row, up to 3 attempts in total, and records each
+  attempt and the `holder_url` from each 409 body in the run record. Only after the third 409 is the row a FAIL.
 
 ### Part 1 — Real-world URL matrix (single-call verdict)
 
@@ -115,8 +109,9 @@ is the signal to reconcile the contract — not a licence to widen the accept-se
 **Intervention handling on these rows.** Row u returns `428` on most runs, and each `428` spawns a NoVNC monitor that
 holds a headful browser for `NOVNC_TIMEOUT_SECONDS` (600 s by default). Because u is best-effort, an intervention is a
 valid recorded verdict and **no human is expected to solve it**: record the `vnc_url` in the run record, leave the
-monitor to time out, and do not stall the sweep waiting on a human. The mandatory
-"print the `vnc_url` and wait" rule applies to Part 3, whose whole point is the human solve.
+monitor to time out, and do not stall the sweep waiting on a human. The mandatory print-and-wait rule lives in
+spec 11 ([11-captcha-solve-and-reuse-test.md](11-captcha-solve-and-reuse-test.md)), whose whole point is the human
+solve.
 
 **Dependency on the pending anti-bot fix.** Rows v, w, x and y assert behaviour the currently deployed build does not
 have on the interstitial path: a live probe of each locale's `/errors/validateCaptcha` through
@@ -142,35 +137,6 @@ the login-reuse behavior in CI.
   and content containing an **auth-only product description** (e.g. `"ringspun combed cotton"`, `"quarter-zip fleece"`,
   `"lighting modes"`) — present only on the logged-in inventory. The stored session is **reused** through the browser
   tier. (Product *titles* like "Sauce Labs Backpack" are stripped by extraction, so the markers are descriptions.)
-
-### Part 3 — CAPTCHA human-solve + capture (reCAPTCHA v2, HUMAN, runs FIRST)
-
-`https://www.google.com/recaptcha/api2/demo` always renders the reCAPTCHA v2 "I'm not a robot" widget. A headful
-browser cannot auto-pass it (the checkbox needs a human click) and FlareSolverr cannot solve it, so the scraper
-escalates to NoVNC and a human solves the reCAPTCHA — reliably exercising the human-solve path that a Cloudflare or
-DataDome target no longer does (the scraper now auto-passes those).
-
-- **Call 1 — blocked:** read `https://www.google.com/recaptcha/api2/demo` with **no** session. Expect HTTP **428
-  Precondition Required**, `status="human_intervention_required"` with a non-empty `vnc_url`.
-- **Human solve (main thread, first):** the runner **must print the `vnc_url` verbatim into the chat** (see
-  "Human-intervention forwarding" below). The human opens it and solves the reCAPTCHA in the NoVNC browser (click the
-  checkbox, solve any image challenge). The monitor captures the cleared session under `session:google.com:default`.
-- **Capture check:** assert the session store now holds the solved session — `session:google.com:default` exists with
-  a `_GRECAPTCHA` cookie in its `auth` entry. reCAPTCHA sets `_GRECAPTCHA` only on interaction, and the widget can't be
-  auto-passed, so its presence is deterministic proof a human solved it. (Cross-request *reuse* is not asserted — see
-  "Why Part 3 asserts capture, not cross-request reuse".)
-
-#### Human-intervention forwarding (mandatory)
-
-Any call in this test that returns `status="human_intervention_required"` returns a `vnc_url` that **a human must
-open**. The agent driving the test **must print that `vnc_url` verbatim into the chat** the moment it is received,
-then **wait** for the human to confirm they solved it before the capture check.
-
-Because a fanned-out `e2e-runner` subagent's output is **never shown to the user**, Part 3 (and any intervention this
-test surfaces that a human must act on) **must be run by the main agent/session**, not delegated to a subagent. The
-automated, no-human parts — the Part 1 matrix and Part 2 (saucedemo) — may still fan out across parallel runners. If
-Part 3 is ever delegated despite this, the **main agent must re-print the subagent's `vnc_url` to the user**;
-otherwise the human never receives the link and the test stalls forever.
 
 ## Prerequisites
 
@@ -198,8 +164,7 @@ curl -fsS http://localhost:8191/
 
 Expect HTTP 200.
 
-Part 2 (saucedemo) and Part 3 (captcha) need **no credentials**: saucedemo's public demo credentials are hardcoded
-in the harness, and the human types nothing for the captcha (they solve it in the NoVNC browser).
+Part 2 (saucedemo) needs no credentials: saucedemo's public demo credentials are hardcoded in the harness.
 
 ## Reset state
 
@@ -220,31 +185,15 @@ docker exec redis redis-cli --scan --pattern "session:*" | while read key; do do
 
 ## Run
 
-> Execution model: **Part 3 (human captcha) is run by the main agent on the main session, FIRST** — never delegate it
-> to an `e2e-runner` subagent, whose output is not shown to the user. Call 1 returns a `vnc_url`; the main agent
-> **prints that `vnc_url` verbatim in the chat** and waits for you to solve the challenge in the NoVNC browser before
-> the capture check. The Part 1 matrix rows and Part 2 (automated saucedemo) may fan out across parallel e2e-runner
-> agents while you solve Part 3. See "Human-intervention forwarding (mandatory)" under Part 3.
+> Execution model: every step is automated, so the Part 1 matrix rows and Part 2 (saucedemo) may fan out across
+> parallel e2e-runner agents. Part 2's three steps stay in order on one runner. A row that answers 428 is recorded,
+> its monitor left to time out, and no human is asked to act (see "Intervention handling on these rows" above).
 
 Move into the Bruno collection root first.
 
 ```bash
 cd docs/api/request/AscendAI
 ```
-
-Part 3, Call 1 — captcha blocked (main thread, first).
-
-```bash
-bru run "web-hunter/testing/captcha-clearance-blocked.yml" --env ascend-local
-```
-
-Part 3, Capture check — after you solve the challenge via the returned `vnc_url`.
-
-```bash
-docker exec redis redis-cli GET "session:google.com:default"
-```
-
-Expect a JSON value whose `auth` entry contains a `_GRECAPTCHA` cookie.
 
 Part 2, Call 1 — login blocked (anonymous).
 
@@ -278,20 +227,21 @@ bru run "web-hunter/testing/realworld" --env ascend-local
 
 - **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly — a–e are `200`/`success` (+ canary where
   noted), q is the `400` hard-fail. Best-effort rows each return a valid terminal verdict (`200`/`success`/content
-  **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed.
+  **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed. A `409` with
+  `status="novnc_busy"` is not a verdict: the runner waits the response's `Retry-After` seconds and re-runs the row,
+  up to 3 attempts in total, records each attempt and each 409 body's `holder_url` in the run record, and fails the
+  row only on the third 409.
 - **Part 1, retail anti-bot rows (u, v, w, x, y):** a valid terminal verdict as above, and on the success branch the
   `content` contains the row's product-identity canary (`er-cbn1` for u, `B09D14YFR9` for v, `9780132350884` for
   w/x/y) and none of the row's interstitial / block-page markers. A `200`/`success` carrying an interstitial fails
   the row.
 - **Part 2 — login reuse:** Call 1 (anon) content has **no** auth-only inventory markers; Call 2 (after login)
   returns `status="success"` with an auth-only product description.
-- **Part 3 — human-solve capture:** Call 1 returns HTTP `428`, `status="human_intervention_required"` + a `vnc_url`;
-  after the human solve, `session:google.com:default` holds a `_GRECAPTCHA` cookie in its `auth` entry.
 
 ## Fixtures
 
-None — and **no secrets**: saucedemo's credentials are its public demo values, hardcoded in the harness; the captcha
-is human-solved (no credentials); LinkedIn/indeed are intervention-only. URLs, selectors, and markers are hardcoded
+None — and **no secrets**: saucedemo's credentials are its public demo values, hardcoded in the harness;
+LinkedIn/indeed are intervention-only. URLs, selectors, and markers are hardcoded
 in the harness and Bruno requests, except the five retail anti-bot rows (u, v, w, x, y), whose target URLs come from
 the collection variables `scrap_url_allegro`, `scrap_url_amazon`, `scrap_url_amazon_com`, `scrap_url_amazon_uk` and
 `scrap_url_amazon_se` in `docs/api/request/AscendAI/web-hunter/folder.yml`. Swapping a listing that goes out of stock
@@ -300,10 +250,11 @@ The login-and-seed harness is a Playwright script under `e2e/harness/`.
 
 ## Concurrency
 
-- **Mutates:** Redis — ascend-web-hunter session store, keys for the matrix domains (including `allegro.pl`,
-  `amazon.pl`, `amazon.com`, `amazon.co.uk` and `amazon.se` from the retail anti-bot rows), `saucedemo.com`
-  (`e2e` profile), and `google.com` (`default` profile, the reCAPTCHA demo).
-- **Conflicts with:** test 6 and any test sharing a target domain's session key. Part 3 targets `google.com`, which no
-  matrix row touches, so there is no overlap. Within this test, Part 2's sequence (anon → seed → authed) is **strictly
-  ordered**, and Part 3's human solve runs first on the main session.
-- **Serial:** false vs non-overlapping tests; Part 3's human solve runs first on the main session.
+- Mutates: Redis, the ascend-web-hunter session store, keys for the matrix domains (including `allegro.pl`,
+  `amazon.pl`, `amazon.com`, `amazon.co.uk` and `amazon.se` from the retail anti-bot rows) and `saucedemo.com`
+  (`e2e` profile).
+- Conflicts with: test 6 and any test sharing a target domain's session key, and test 11, because this spec's reset
+  flushes every `session:*` key (which would wipe test 11's democaptcha capture between its two calls) and row u's
+  428 holds the single NoVNC browser test 11's human needs. Within this test, Part 2's sequence (anon, then seed,
+  then authed) is strictly ordered.
+- Serial: false vs non-overlapping tests. No human step, so every part may fan out across e2e-runner subagents.

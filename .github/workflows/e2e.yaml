@@ -194,7 +194,7 @@ jobs:
         run: docker logs ascend-ocr
 
   ascend-web-hunter:
-    name: e2e / ascend-web-hunter (7 of 8 free specs)
+    name: e2e / ascend-web-hunter (10 of 11 free specs)
     runs-on: ubuntu-latest
     services:
       # Redis is an external prerequisite in every AscendAI environment, not
@@ -221,9 +221,10 @@ jobs:
       - name: Install Bruno CLI
         run: npm install -g @usebruno/cli
 
-      # Spec 7 (authenticated-realworld-scraping) is excluded: it requires a
-      # human to solve a reCAPTCHA challenge through NoVNC and cannot run
-      # unattended on a hosted runner.
+      # Spec 11 (captcha-solve-and-reuse) is excluded: it requires a human to
+      # tick the hCaptcha widget on the democaptcha demo form through NoVNC
+      # (the captured hmt_id cookie is the proof) before its reuse read can
+      # run, and cannot run unattended on a hosted runner.
       - name: Run free e2e specs
         working-directory: docs/api/request/AscendAI
         run: |
@@ -263,6 +264,23 @@ jobs:
           bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local
           bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local
           bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local
+
+          # Spec 7 Part 2: authenticated-realworld-scraping, login to session
+          # reuse. Call 1 confirms the login wall with no session.
+          bru run "web-hunter/testing/auth-read-secure-anon.yml" --env ascend-local
+
+          # Seed the saucedemo session. The harness is not in the image, so
+          # copy it in, then run it inside the container.
+          docker cp ../../../../apps/ascend-web-hunter/e2e/harness/seed_authenticated_session.py ascend-web-hunter:/tmp/seed.py
+          docker exec -e PYTHONPATH=/app -w /app ascend-web-hunter python /tmp/seed.py
+
+          # Call 2 reads the same page again after the seeded login.
+          bru run "web-hunter/testing/auth-read-secure.yml" --env ascend-local
+
+          # Spec 7 Part 1: the real-world URL matrix folder. Best-effort rows
+          # accept either terminal verdict, so this runs the folder once with
+          # no retry loop, matching the spec's own best-effort rows.
+          bru run "web-hunter/testing/realworld" --env ascend-local
 
           # Spec 8: session-clear
           bru run "web-hunter/testing/session-clear-existing.yml" --env ascend-local

@@ -1,4 +1,4 @@
-# Real-world + authenticated + human-captcha scraping: run tasks template
+# Real-world + authenticated scraping: run tasks template
 
 Spec: [../7-authenticated-realworld-scraping-test.md](../7-authenticated-realworld-scraping-test.md)
 
@@ -16,14 +16,6 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 ### Reset state
 
 - [ ] Flushed Redis `session:*` keys so the before/after pairs start genuinely blocked.
-
-### Part 3 — CAPTCHA human-solve + capture (HUMAN, run by the MAIN agent, FIRST on the main session)
-
-- [ ] Run by the **main agent** (NOT a fanned-out e2e-runner subagent — its output never reaches the user).
-- [ ] Call 1 (blocked): `captcha-clearance-blocked.yml` → HTTP 428, `status="human_intervention_required"` + non-empty `vnc_url`.
-- [ ] Main agent **printed the `vnc_url` verbatim in the chat** for the human to open.
-- [ ] Human solve: opened the `vnc_url`, solved the reCAPTCHA in the NoVNC browser; confirmed back to the agent.
-- [ ] Capture check: `docker exec redis redis-cli GET "session:google.com:default"` → JSON whose `auth` entry contains a `_GRECAPTCHA` cookie.
 
 ### Part 2 — Login session reuse (saucedemo, AUTOMATED)
 
@@ -52,6 +44,7 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 - [ ] q `this-domain-does-not-exist-xyzzy.invalid` → **gated**: HTTP 400, `status != "success"`.
 - [ ] s `linkedin.com/jobs/...` → valid terminal verdict recorded.
 - [ ] t `secure.indeed.com/auth?...` → valid terminal verdict recorded.
+- [ ] Any Part 1 row that answered `409`/`novnc_busy` was re-run after waiting its `Retry-After` seconds, up to 3 attempts in total, with each attempt and each 409 body's `holder_url` recorded under Additional tasks I did. Such a row is a FAIL only after its third 409.
 
 ### Part 1 — retail anti-bot rows (content-gated: a success MUST be the requested product page)
 
@@ -82,7 +75,7 @@ Duration:
 
 ## Additional tasks I did
 
-<!-- Record each best-effort row's actual verdict + serving tier, how long the Part 3 human solve took, and any
+<!-- Record each best-effort row's actual verdict + serving tier and any
 tier the pipeline escalated to unexpectedly. For the retail anti-bot rows (u, v, w, x, y) also record which branch
 fired per row, and for any FAIL whether the cause was a missing product canary, a tripped interstitial marker, or
 both — a success carrying an interstitial is the defect these rows exist to catch, not a flaky site. -->
