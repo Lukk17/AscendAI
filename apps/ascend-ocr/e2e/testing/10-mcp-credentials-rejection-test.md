@@ -15,6 +15,15 @@ bru --version
 curl -fsS http://localhost:7022/health
 ```
 
+Check `jq` is installed. Only the Unix form of step 3 needs it. The PowerShell form parses the run output with
+`ConvertFrom-Json` and needs nothing extra. The command is identical in both shells.
+
+```bash
+jq --version
+```
+
+Expect a version string such as `jq-1.7`.
+
 ## Reset state
 
 None.
@@ -27,12 +36,12 @@ None.
 
 Windows:
 ```powershell
-bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>" -o "$env:TEMP\ocr-creds-run.json" -f json
+bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>" -o "$env:TEMP\ocr-creds-run.json" -f json
 ```
 
 Unix:
 ```bash
-bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>" -o "/tmp/ocr-creds-run.json" -f json
+bru run "ocr/testing/mcp-credentials-in-uri.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>" -o "/tmp/ocr-creds-run.json" -f json
 ```
 
 **Step 3.** Print the response frame the service sent back.

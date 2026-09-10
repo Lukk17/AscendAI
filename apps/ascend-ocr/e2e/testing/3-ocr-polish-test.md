@@ -86,17 +86,12 @@ bru run "ocr/testing/ocr-polish.yml" --env ascend-local
 
 ## Concurrency
 
-**Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
+Engine-bound. This spec runs alone: no runner of any suite active while it is in flight, from this suite or from any other module's sweep, not even a reject-fast spec of this suite. Start it only when nothing else is running anywhere, and start nothing else until it has returned.
 
-Same constraint as spec 2, roughly 60 to 110 s of full round trip per call on this deployment's 4-core CPU
-allocation. See spec 2's Concurrency section for the measured baseline and how engine time separates from round
-trip. On top of that there is a one-time cost: the Polish engine is NOT pre-warmed at container startup (only
-`DEFAULT_LANGUAGE`, currently `en`, warms during the lifespan). The first `lang=pl` request triggers an in-request
-model load that adds further latency, which is part of why this spec measured 99.9 s of round trip during the
-2026-09-03 sweep while four other module suites were hitting the same host. That model load has never been timed on
-its own. Combined with concurrent calls on other engine specs the timeout window is exhausted before the first
-response is produced. Run sequentially.
+The reason is the engine, not the fixture. `ocr_service.process_file` invokes PaddleOCR's blocking `engine.predict` inside the OCR worker process, and the engine is single-threaded (defect register A47), so inference runs at one core's speed and any other runner on the host competes for that core. Measured on 2026-09-10 with the English fixture: 59.2 seconds of round trip on a quiet host, 160.9 seconds on a loaded one, past the 150 second per-page budget compose sets. A loaded host turns a passing run into a timeout, so raising the budget is not the fix.
 
-Safe to run in parallel with: reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12). Unsafe with: 2, 3, 4, 6.
+On top of that there is a one-time cost: the Polish engine is not pre-warmed at container startup (only `DEFAULT_LANGUAGE`, currently `en`, warms during the lifespan). The first `lang=pl` request triggers an in-request model load that adds further latency, which is part of why this spec measured 99.9 s of round trip during the 2026-09-03 sweep. That model load has never been timed on its own.
 
-See [`apps/ascend-ocr/e2e/testing/README.md`](README.md) "Execution order".
+Unsafe with everything: the other engine-bound specs (2, 3, 4, 6) and the reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12) alike.
+
+See [`apps/ascend-ocr/e2e/README.md`](../README.md) "Parallelism and execution order" and [`apps/ascend-ocr/e2e/testing/README.md`](README.md) "Execution order".

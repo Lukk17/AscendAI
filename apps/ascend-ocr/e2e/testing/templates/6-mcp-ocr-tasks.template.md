@@ -23,8 +23,8 @@ Copy this file to `../runs/<UTC-timestamp>_6-mcp-ocr-tasks.md` before starting a
 
 ### Run
 
-- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
-- [ ] Send `mcp-ocr.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` and wait for HTTP 200
+- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header, capture the session id (32 character hexadecimal session id without hyphens)
+- [ ] Send `mcp-ocr.yml` via `bru run` with `--env-var "mcp_session_id=<captured session id>"` and wait for HTTP 200
 
 ### Expected
 

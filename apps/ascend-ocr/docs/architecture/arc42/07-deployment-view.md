@@ -54,7 +54,7 @@ compose `healthcheck` stanza should be set). The operator should configure the l
 | `ENGINE_CACHE_MAX_SIZE` | `2` | Maximum number of `PaddleOCR` engines held in the LRU cache. Matches the two languages (`en`, `pl`) the Dockerfile pre-caches; a workload that alternates a third language reloads an engine on every switch instead of keeping it resident. |
 | `SUPPORTED_LANGUAGES` | `en,pl,de,fr,es,it,pt,nl,ru,ch,japan,korean` | Allowlist of valid language codes. Requests for any other code are rejected. |
 | `MCP_FILE_URI_ROOT` | _(unset)_ | Enables `file://` support; URIs must resolve inside this directory. Unset = `file://` disabled. |
-| `MCP_ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `host.docker.internal` for the standard compose stack, since the S3-compatible object store is reached over the host-published endpoint. |
+| `MCP_ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `host.docker.internal,localhost,127.0.0.1` for the standard compose stack, since the S3-compatible object store is reached over the host-published endpoint. |
 | `MCP_DOWNLOAD_TIMEOUT_SECONDS` | `30` | Total timeout for the `aiohttp` download session. |
 | `OCR_WORKER_COUNT` | `1` | Inference workers and admission-gate permits, from one setting. See "Memory model and the single worker" below. |
 | `OCR_PAGE_TIMEOUT_SECONDS` | `120` | Per-page allowance, checked between pages inside the worker. |
@@ -65,8 +65,9 @@ compose `healthcheck` stanza should be set). The operator should configure the l
 | `OCR_SCRATCH_DIR` | `<system temp>/ascend-ocr-scratch` | Worker upload scratch directory, swept of stale files by every fresh worker and at startup. |
 
 The `compose.yaml` service block sets `API_PORT`, `API_HOST`, `LOG_LEVEL`, `DEFAULT_LANGUAGE`,
-`MAX_FILE_SIZE_MB`, and `OCR_REQUEST_TIMEOUT` explicitly. `MCP_ALLOWED_HOSTS` is not set in the default compose
-configuration and must be added manually to run the MCP e2e tests. See
+`MAX_FILE_SIZE_MB`, `OCR_REQUEST_TIMEOUT` (300), and `OCR_PAGE_TIMEOUT_SECONDS` (150) explicitly. It also sets
+`MCP_ALLOWED_HOSTS` to `host.docker.internal,localhost,127.0.0.1` and `MCP_DOWNLOAD_TIMEOUT_SECONDS` to 30, which is
+what lets the MCP e2e tests reach the host-published object store without any manual addition. See
 [e2e/testing/6-mcp-ocr-test.md](../../../e2e/testing/6-mcp-ocr-test.md).
 
 ---

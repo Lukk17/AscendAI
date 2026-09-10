@@ -124,7 +124,7 @@ cd docs/api/request/AscendAI
 
 Windows:
 ```powershell
-curl.exe -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"0.1.0\"}}}"
+curl.exe -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 Unix:
@@ -132,12 +132,13 @@ Unix:
 curl -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
-Look for `Mcp-Session-Id: <uuid>` in the response. Use that UUID as the value of the `mcp_session_id` env-var in the next step.
+Look for `Mcp-Session-Id: <session id>` in the response. The value is a 32 character hexadecimal session id without hyphens,
+as FastMCP emits it. Use that session id as the value of the `mcp_session_id` env-var in the next step.
 
 **Step 2.** Send the `tools/call` with the captured session ID injected:
 
 ```bash
-bru run "ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID from step 1>"
+bru run "ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
 ```
 
 ## Post-run cleanup
@@ -173,19 +174,15 @@ it, so deleting the bucket would break them.
 
 ## Concurrency
 
-**Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
+Engine-bound. This spec runs alone: no runner of any suite active while it is in flight, from this suite or from any other module's sweep, not even a reject-fast spec of this suite. Start it only when nothing else is running anywhere, and start nothing else until it has returned.
 
-The MCP path mirrors the REST path once the URL is resolved: `ocr_service.process_file` invokes PaddleOCR's
-blocking `engine.predict` inside the OCR worker process. CPU contention with another engine spec running at the same
-moment exhausts `OCR_REQUEST_TIMEOUT=300` and the JSON-RPC envelope returns `result.isError=true` instead of the
-expected `result.content[0]` payload.
+The reason is the engine, not the fixture. `ocr_service.process_file` invokes PaddleOCR's blocking `engine.predict` inside the OCR worker process, and the engine is single-threaded (defect register A47), so inference runs at one core's speed and any other runner on the host competes for that core. Measured on 2026-09-10 with the English fixture: 59.2 seconds of round trip on a quiet host, 160.9 seconds on a loaded one, past the 150 second per-page budget compose sets. A loaded host turns a passing run into a timeout, so raising the budget is not the fix.
 
-Safe to run in parallel with reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12). Unsafe with 2, 3, 4, 6.
+The MCP path mirrors the REST path once the URL is resolved. Under contention the JSON-RPC envelope returns `result.isError=true` instead of the expected `result.content[0]` payload.
 
-- **Mutates:** object-store bucket `e2e-fixtures` (object key `argent-saga-chronicles-page1.png`). `Reset state`
-  uploads that key and `Post-run cleanup` deletes it again, so the spec leaves no object behind. The bucket itself is
-  created if absent and is never deleted, because other specs seed their own fixtures into it.
-- **Conflicts with:** any future test that also writes `e2e-fixtures/argent-saga-chronicles-page1.png` — none
-  currently exist.
+- Mutates: object-store bucket `e2e-fixtures` (object key `argent-saga-chronicles-page1.png`). `Reset state` uploads that key and `Post-run cleanup` deletes it again, so the spec leaves no object behind. The bucket itself is created if absent and is never deleted, because other specs seed their own fixtures into it.
+- Conflicts with: any future test that also writes `e2e-fixtures/argent-saga-chronicles-page1.png`. None currently exist.
 
-See [`apps/ascend-ocr/e2e/testing/README.md`](README.md) "Execution order".
+Unsafe with everything: the other engine-bound specs (2, 3, 4, 6) and the reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12) alike.
+
+See [`apps/ascend-ocr/e2e/README.md`](../README.md) "Parallelism and execution order" and [`apps/ascend-ocr/e2e/testing/README.md`](README.md) "Execution order".

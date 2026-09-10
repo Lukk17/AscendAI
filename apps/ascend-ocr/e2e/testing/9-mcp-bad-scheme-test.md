@@ -24,7 +24,7 @@ None.
 Open MCP session per spec 8, then:
 
 ```bash
-bru run "ocr/testing/mcp-bad-scheme.yml" --env ascend-local --env-var "mcp_session_id=<paste UUID>"
+bru run "ocr/testing/mcp-bad-scheme.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>"
 ```
 
 ## Expected

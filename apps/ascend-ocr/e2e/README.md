@@ -99,13 +99,16 @@ ascend-ocr holds no per-user state — only the warmed-engine cache keyed by lan
 
 | Constraint | Tests | Why |
 | :--- | :--- | :--- |
-| **Engine-bound: run one at a time** | 2, 3, 4, 6 | Each invokes PaddleOCR's blocking `engine.predict` inside the OCR worker process, CPU-only on the container's 4-core budget. A single call measures 60 to 110 seconds of full round trip, the upper end when other module suites are hitting the same host (84.3, 99.9 and 105.6 seconds for specs 4, 3 and 2 during the 2026-09-03 sweep). Running two concurrently saturates every core and risks exhausting `OCR_REQUEST_TIMEOUT=300`. Safe to interleave with any reject-fast spec, never with each other. |
-| **Reject-fast: safe in parallel** | 1, 5, 7, 8, 9, 10, 11, 12 | Each returns before any `engine.predict` call (FastAPI validation, `tools/list`, `/ready`, an MCP guard rejection, or the magic-byte sniffer), finishing in well under 2 seconds. Safe to run all eight in parallel up to the runner's default cap of 5 concurrent. |
-| **Cold engine for new language** | none today | All shipped models (`en`, `pl`) are pre-cached at image build time and warmed at startup; the first call for a known language does not pay an engine-load cost. Add a reset row here if a future test exercises a language outside the pre-cached set. |
+| Engine-bound: run one at a time | 2, 3, 4, 6 | Each invokes PaddleOCR's blocking `engine.predict` inside the OCR worker process, CPU-only on the container's 4-core budget. A single call measures 60 to 110 seconds of full round trip, the upper end when other module suites are hitting the same host (84.3, 99.9 and 105.6 seconds for specs 4, 3 and 2 during the 2026-09-03 sweep). Running two concurrently saturates every core and risks exhausting `OCR_REQUEST_TIMEOUT=300`. Never with each other, and the next row says what else must be idle. |
+| Engine-bound: run alone, no runner of any suite active | 2, 3, 4, 6 | The engine is single-threaded (defect register A47), so inference runs at one core's speed and any other runner on the host, from this suite or from any other module's sweep, competes for that core. Measured on 2026-09-10 with the same English fixture: 59.2 seconds on a quiet host, 160.9 seconds on a loaded one, past the 150 second per-page budget compose sets. A loaded host turns a passing spec into a timeout, so raising the budget is not the fix. Start one of these four only when nothing else is running anywhere, not even a reject-fast spec of this suite, and start nothing else until it has returned. |
+| Reject-fast: safe in parallel | 1, 5, 7, 8, 9, 10, 11, 12 | Each returns before any `engine.predict` call (FastAPI validation, `tools/list`, `/ready`, an MCP guard rejection, or the magic-byte sniffer), finishing in well under 2 seconds. Safe to run all eight in parallel up to the runner's default cap of 5 concurrent. |
+| Cold engine for new language | none today | All shipped models (`en`, `pl`) are pre-cached at image build time and warmed at startup; the first call for a known language does not pay an engine-load cost. Add a reset row here if a future test exercises a language outside the pre-cached set. |
 
 Recommended layout: dispatch all 8 reject-fast specs in parallel first (runner cap of 5, queue 3; usually under 90
-seconds in aggregate), then dispatch the 4 engine specs sequentially, one at a time. See
-[testing/README.md](testing/README.md) "Execution order" for the canonical fan-out shape and measured timings.
+seconds in aggregate), wait for every one of them to return, then dispatch the 4 engine specs one at a time with no
+other runner active anywhere on the host, from this suite or from any other module's sweep, and hold every other
+suite's sweep until the last engine spec has returned. See [testing/README.md](testing/README.md) "Execution order"
+for the canonical fan-out shape and measured timings.
 
 ## Prerequisites before any test
 

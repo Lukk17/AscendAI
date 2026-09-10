@@ -1,4 +1,5 @@
 import io
+from importlib.metadata import version as get_package_version
 from unittest.mock import patch
 
 import pytest
@@ -35,7 +36,7 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert "version" in data
+        assert data["version"] == get_package_version("ascend-ocr")
 
 
 class TestReadyEndpoint:

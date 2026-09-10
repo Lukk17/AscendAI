@@ -19,6 +19,6 @@
 
 | Constraint | Impact |
 | :--- | :--- |
-| No separate release cadence | ascend-ocr ships with the rest of the monorepo. There is no independent versioning of the container image beyond the `0.1.0` tag in `pyproject.toml`. |
+| No separate release cadence | ascend-ocr ships with the rest of the monorepo. There is no independent versioning of the container image beyond the `0.2.1` tag in `pyproject.toml`. |
 | No external public traffic | The service runs inside the docker-compose network. Port `7022` is exposed on the host for development only. In a cloud deployment it would sit behind a private load balancer. |
 | Secrets handled by the host | No secrets manager integration. API keys and config are injected as environment variables at container start. |

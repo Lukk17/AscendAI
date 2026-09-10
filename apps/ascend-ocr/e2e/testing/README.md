@@ -71,14 +71,18 @@ ascend-ai-agent, ascend-web-hunter, AscendMemory and WeatherMCP suites were exer
 Running two engine specs at the same time saturates every core and pushes individual calls past even that band,
 and `asyncio.wait_for` has far less headroom against `OCR_REQUEST_TIMEOUT=300` than the old 5-to-15-second
 assumption implied: the entire engine batch still risks `HTTP 500 INTERNAL_ERROR` or, in the MCP case,
-`result.isError=true`. **Engine specs run one at a time.** It is fine to interleave them with reject-fast specs.
+`result.isError=true`. Engine specs run one at a time, and each runs alone: no runner of any suite active
+while one is in flight, not even a reject-fast spec of this suite. The engine is single-threaded, so any other
+runner on the host competes for the one core inference uses. Measured on 2026-09-10 with the same English fixture:
+59.2 seconds on a quiet host, 160.9 seconds on a loaded one, past the 150 second per-page budget.
 
 Canonical fan-out shape for the full suite from a fresh container:
 
 1. Dispatch all 8 reject-fast specs in parallel (runner default cap of 5; queue 3).
-2. Once those settle (usually under 90 seconds in aggregate), dispatch the 4 engine specs **sequentially**, one at
-   a time. Each takes roughly 60 to 110 seconds of round trip on the documented 4-core budget, the upper end when
-   other module suites are running against the same host.
+2. Once those settle (usually under 90 seconds in aggregate), dispatch the 4 engine specs sequentially, one at
+   a time, with nothing else running anywhere on the host and every other module's sweep held until the last one
+   returns. Each takes roughly 60 to 110 seconds of round trip on the documented 4-core budget on a quiet host, and
+   a loaded host more than doubles that.
 
 Total wall-clock with this shape on a 4-core, 12 GB container: roughly 7 to 10 minutes for 12 specs, the upper end under a concurrent multi-module sweep.
 

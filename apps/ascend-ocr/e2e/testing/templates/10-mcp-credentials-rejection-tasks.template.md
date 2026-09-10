@@ -10,6 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_10-mcp-credentials-rejection-tasks.md
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
+- [ ] `jq --version` returns a version (needed by the Unix form of step 3 only, the PowerShell form uses `ConvertFrom-Json`)
 
 ### Reset state
 
@@ -17,8 +18,8 @@ Copy this file to `../runs/<UTC-timestamp>_10-mcp-credentials-rejection-tasks.md
 
 ### Run
 
-- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header; capture the UUID
-- [ ] Step 2: send `mcp-credentials-in-uri.yml` via `bru run` with `--env-var "mcp_session_id=<captured UUID>"` plus `-o "/tmp/ocr-creds-run.json" -f json` (or `$env:TEMP\...` on Windows), and wait for HTTP 200
+- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header, capture the session id (32 character hexadecimal session id without hyphens)
+- [ ] Step 2: send `mcp-credentials-in-uri.yml` via `bru run` with `--env-var "mcp_session_id=<captured session id>"` plus `-o "/tmp/ocr-creds-run.json" -f json` (or `$env:TEMP\...` on Windows), and wait for HTTP 200
 - [ ] Step 3: print the captured response frame with `jq '.[0].results[0].response.data' < /tmp/ocr-creds-run.json` on Unix or the `Get-Content` / `ConvertFrom-Json` one-liner on Windows
 
 ### Expected

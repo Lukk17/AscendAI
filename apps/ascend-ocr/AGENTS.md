@@ -8,7 +8,7 @@ ascend-ocr is an OCR (Optical Character Recognition) service that wraps the Padd
 
 - **Language**: Python 3.11
 - **Framework**: FastAPI + Uvicorn, FastMCP 3.3.1
-- **Version**: 0.1.0
+- **Version**: 0.2.1
 - **Key Libraries**: PaddlePaddle 3.3.1, PaddleOCR 3.6.0, Pillow 12.2.0, aiohttp 3.13.5
 - **Docker Base**: `python:3.11-slim` (multi-stage build with pre-cached models)
 

@@ -67,6 +67,7 @@ services:
       - DEFAULT_LANGUAGE=en
       - MAX_FILE_SIZE_MB=50
       - OCR_REQUEST_TIMEOUT=300
+      - OCR_PAGE_TIMEOUT_SECONDS=150
       - ENGINE_CACHE_MAX_SIZE=2
       # SSRF guard: the host-published object store (Floci) is reached via
       # the host-bound localhost address (host.docker.internal:9070) per ADR-001.

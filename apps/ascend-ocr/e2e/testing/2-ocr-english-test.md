@@ -68,31 +68,20 @@ bru run "ocr/ocr.yml" --env ascend-local
 
 ## Fixtures
 
-- [`apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png`](../fixtures/argent-saga-chronicles-page1.png) — black `Argent Saga / Aenaria / Halen Veyr` text on
-  a white background, single line, ~120 pt sans-serif font.
+- [`apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png`](../fixtures/argent-saga-chronicles-page1.png), a screenshot of page 1 of
+  `apps/ascend-agent/e2e/fixtures/argent-saga-chronicle.pdf`: black body-size sans-serif text on a white background, a
+  title line, two bold part headings and about 30 wrapped body lines of prose. The canary words `Argent Saga`,
+  `Aenaria` and `Halen Veyr` sit in the title and the first paragraph, so the response carries roughly 30 text
+  lines, not one.
 
 ## Concurrency
 
-**Engine-bound. Must run sequentially relative to other engine specs (2, 3, 4, 6).**
+Engine-bound. This spec runs alone: no runner of any suite active while it is in flight, from this suite or from any other module's sweep, not even a reject-fast spec of this suite. Start it only when nothing else is running anywhere, and start nothing else until it has returned.
 
-This spec calls `ocr_service.process_file` which invokes PaddleOCR's blocking `engine.predict` inside
-the OCR worker process. PaddleOCR inference on this deployment is CPU-only, capped to the container's 4-core CPU
-allocation, and the cost splits into two figures worth keeping apart.
+The reason is the engine, not the fixture. `ocr_service.process_file` invokes PaddleOCR's blocking `engine.predict` inside the OCR worker process, and the engine is single-threaded (defect register A47), so inference runs at one core's speed and any other runner on the host competes for that core. Measured on 2026-09-10 with the English fixture: 59.2 seconds of round trip on a quiet host, 160.9 seconds on a loaded one, past the 150 second per-page budget compose sets. A loaded host turns a passing run into a timeout, so raising the budget is not the fix.
 
-Engine time, the `processing_time_seconds` the service reports for itself, measured 57.1 s and 72.4 s on isolated
-calls against this 212 KB fixture on 2026-09-03.
+Engine time, the `processing_time_seconds` the service reports for itself, measured 57.1 s and 72.4 s on isolated calls against this 212 KB fixture on 2026-09-03, and full round trip 60.7 s and 82.1 s the same day. Plan for about 60 to 110 s per call on a quiet host and read anything above that as host load, not as a hang.
 
-Full round trip (upload plus inference plus response) is longer and moves with host load. Isolated calls the same
-day came in at 60.7 s and 82.1 s. During the full 2026-09-03 sweep, with the ascend-ai-agent, ascend-web-hunter,
-AscendMemory and WeatherMCP suites hitting the same host at the same time, the three engine-bound specs measured
-84.3 s (spec 4), 99.9 s (spec 3) and 105.6 s (spec 2). Plan for 60 to 110 s per engine-bound call and read the
-upper end as normal under concurrent load, not as a hang.
+Unsafe with everything: the other engine-bound specs (2, 3, 4, 6) and the reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12) alike.
 
-Two or more engine specs running at the same time saturate all cores and push individual calls past even that
-range. The `asyncio.wait_for` window (`OCR_REQUEST_TIMEOUT=300`) has far less headroom than a 5 to 15 s baseline
-would suggest, so contention still risks `HTTP 500 INTERNAL_ERROR` instead of the expected 200.
-
-Safe to run in parallel with: reject-fast specs that never reach the engine (specs 1, 5, 7, 8, 9, 10, 11, 12).
-Unsafe to run in parallel with: any of specs 2, 3, 4, 6.
-
-See [`apps/ascend-ocr/e2e/testing/README.md`](README.md) "Execution order" section for the canonical fan-out shape.
+See [`apps/ascend-ocr/e2e/README.md`](../README.md) "Parallelism and execution order" and [`apps/ascend-ocr/e2e/testing/README.md`](README.md) "Execution order".

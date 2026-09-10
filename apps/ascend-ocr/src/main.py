@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
+from importlib.metadata import version as get_package_version
 from typing import Literal
 
 import uvicorn
@@ -29,7 +30,7 @@ from src.service.ocr_service import (
 
 logger = logging.getLogger("uvicorn")
 
-SERVICE_VERSION: str = "0.1.0"
+SERVICE_VERSION: str = get_package_version("ascend-ocr")
 
 
 def create_app() -> FastAPI:
