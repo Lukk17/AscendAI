@@ -88,7 +88,9 @@ async def test_read_post_with_include_links(client: AsyncClient):
             json={"url": "http://unit.com/", "include_links": True, "link_filter": "/a"},
         )
     assert resp.status_code == 200
-    mock_read.assert_awaited_once_with("http://unit.com/", "/a", heavy_mode=False, profile=None)
+    mock_read.assert_awaited_once_with(
+        "http://unit.com/", "/a", heavy_mode=False, profile=None, output_format="text", tier=None
+    )
 
 
 @pytest.mark.asyncio
@@ -107,7 +109,9 @@ async def test_read_post_heavy_mode_forwarded(client: AsyncClient):
             json={"url": "http://unit.com/", "heavy_mode": True},
         )
     assert resp.status_code == 200
-    mock_read.assert_awaited_once_with("http://unit.com/", heavy_mode=True, profile=None)
+    mock_read.assert_awaited_once_with(
+        "http://unit.com/", heavy_mode=True, profile=None, output_format="text", tier=None
+    )
 
 
 # ---------------------------------------------------------------------------

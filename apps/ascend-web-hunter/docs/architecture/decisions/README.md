@@ -12,5 +12,7 @@
 | [ADR-008](ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, loaded from disk only, refreshed solely via `POST /api/v1/blocklist/refresh`. | Accepted |
 | [ADR-009](ADR-009-recall-pass-for-thin-precision-extractions.md) | A trafilatura recall pass when the precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (0.75) of the page's plain text, longer result wins. | Accepted |
 | [ADR-010](ADR-010-producer-aware-session-replay.md) | Every session record names the tier that produced it; a FlareSolverr-produced clearance is replayed by FlareSolverr first, everything else keeps routing to the browser tiers. | Accepted |
+| [ADR-011](ADR-011-caller-selectable-starting-tier.md) | A caller may name the tier the escalation chain starts at; escalation continues from there, and a login-redirect URL still outranks it. | Accepted |
+| [ADR-012](ADR-012-connect-time-address-pinning.md) | The in-process fetch connects to the address its own SSRF lookup validated, via CURLOPT_RESOLVE; the browser and out-of-process tiers keep pre-dispatch validation as residual risk. | Accepted |
 
 For monorepo-level decisions see [`../../../../../docs/architecture/decisions/`](../../../../../docs/architecture/decisions/).

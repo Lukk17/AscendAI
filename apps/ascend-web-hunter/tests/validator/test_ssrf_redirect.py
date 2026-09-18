@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.validator.url_validator import is_safe_external_url, validate_redirect_chain
+from src.validator.url_validator import PinnedHost, is_safe_external_url
 
 
 def _addr(ip: str) -> tuple:
@@ -37,39 +37,6 @@ def test_rejects_link_local_aws_imds():
 
 def test_rejects_non_http_scheme():
     assert is_safe_external_url("ftp://example.com") is False
-
-
-# ---------------------------------------------------------------------------
-# validate_redirect_chain
-# ---------------------------------------------------------------------------
-
-
-def test_redirect_chain_all_safe():
-    hop1 = MagicMock()
-    hop1.url = "https://example.com/page1"
-    hop2 = MagicMock()
-    hop2.url = "https://example.com/page2"
-
-    with patch("src.validator.url_validator.socket.getaddrinfo", return_value=[_addr("93.184.216.34")]):
-        assert validate_redirect_chain([hop1, hop2]) is True
-
-
-def test_redirect_chain_private_ip_rejected():
-    hop = MagicMock()
-    hop.url = "http://192.168.0.1/secret"
-
-    with patch("src.validator.url_validator.socket.getaddrinfo", return_value=[_addr("192.168.0.1")]):
-        assert validate_redirect_chain([hop]) is False
-
-
-def test_redirect_chain_empty_is_safe():
-    assert validate_redirect_chain([]) is True
-
-
-def test_redirect_chain_hop_without_url_is_safe():
-    hop = MagicMock()
-    hop.url = ""
-    assert validate_redirect_chain([hop]) is True
 
 
 # ---------------------------------------------------------------------------
@@ -107,8 +74,12 @@ async def test_curl_cffi_fetcher_blocks_redirect_to_private_ip():
             new=AsyncMock(return_value=None),
         ),
         patch(
-            "src.reader.strategies.curl_cffi_fetcher.is_safe_external_url",
-            side_effect=lambda url: url != "http://192.168.1.1/secret",
+            "src.reader.strategies.curl_cffi_fetcher.pin_safe_host",
+            side_effect=lambda url: (
+                None
+                if url == "http://192.168.1.1/secret"
+                else PinnedHost(host="example.com", port=443, addresses=("93.184.216.34",))
+            ),
         ),
     ):
         result = await fetch_with_curl_cffi("https://example.com", lambda: "UA", "test")

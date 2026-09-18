@@ -97,7 +97,7 @@ async def test_auth_ttl_expiry_hides_auth_cookies_but_waf_remains():
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
     await m.save_storage_state("https://linkedin.com", state, "UA")
 
-    domain = m._get_domain("https://linkedin.com")
+    domain = m.registrable_domain("https://linkedin.com")
     record = m._memory_store[f"{domain}:default"]
     # Expire auth by backdating saved_at
     record["auth"]["saved_at"] = time.time() - 99_999
@@ -118,7 +118,7 @@ async def test_waf_ttl_expiry_hides_cf_clearance_but_auth_remains():
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
     await m.save_storage_state("https://example.com", state, "UA")
 
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     record = m._memory_store[f"{domain}:default"]
     record["waf"]["saved_at"] = time.time() - 99_999
 
@@ -177,7 +177,7 @@ async def test_slide_auth_ttl_updates_saved_at():
     state = _state([_cookie("token")])
     await m.save_storage_state("https://example.com", state, "UA")
 
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     before = m._memory_store[f"{domain}:default"]["auth"]["saved_at"]
 
     # Artificially age the entry
@@ -219,7 +219,7 @@ async def test_get_auth_ttl_remaining_reports_zero_once_the_only_hard_cookie_exp
     state = _state([_cookie("session-username", expires=expired_at)])
     await m.save_storage_state("https://saucedemo.com", state, "UA", profile="e2e")
 
-    domain = m._get_domain("https://saucedemo.com")
+    domain = m.registrable_domain("https://saucedemo.com")
     m._memory_store[f"{domain}:e2e"]["auth"]["saved_at"] = saved_at
 
     ttl = await m.get_auth_ttl_remaining("https://saucedemo.com", "e2e")
@@ -235,7 +235,7 @@ async def test_get_storage_state_hides_auth_once_the_only_hard_cookie_expired():
     state = _state([_cookie("session-username", expires=expired_at)])
     await m.save_storage_state("https://saucedemo.com", state, "UA", profile="e2e")
 
-    domain = m._get_domain("https://saucedemo.com")
+    domain = m.registrable_domain("https://saucedemo.com")
     m._memory_store[f"{domain}:e2e"]["auth"]["saved_at"] = saved_at
 
     result = await m.get_storage_state("https://saucedemo.com", "e2e")
@@ -394,7 +394,7 @@ async def test_get_storage_state_returns_none_when_both_ttls_expired() -> None:
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
     await m.save_storage_state("https://example.com", state, "UA")
 
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     record = m._memory_store[f"{domain}:default"]
     record["auth"]["saved_at"] = time.time() - 999_999
     record["waf"]["saved_at"] = time.time() - 999_999
@@ -444,7 +444,7 @@ async def test_get_user_agent_returns_none_when_no_auth_entry() -> None:
     """When the stored record has no auth or waf sub-entry, get_user_agent returns None."""
     m = _fresh()
     # Save a record with neither auth nor waf (edge case: empty record)
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     m._memory_store[f"{domain}:default"] = {}  # no auth, no waf keys
 
     result = await m.get_user_agent("https://example.com")
@@ -481,7 +481,7 @@ async def test_save_storage_state_merges_with_existing_record() -> None:
 async def test_slide_auth_ttl_no_op_when_no_auth_entry() -> None:
     """slide_auth_ttl is a no-op when the domain has no auth entry (line 238 return)."""
     m = _fresh()
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     m._memory_store[f"{domain}:default"] = {"waf": {"saved_at": time.time()}}  # no "auth"
 
     await m.slide_auth_ttl("https://example.com")  # must not raise
@@ -533,7 +533,7 @@ async def test_save_storage_state_writes_produced_by_on_auth_and_waf_entries():
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
     await m.save_storage_state("https://example.com", state, "UA", produced_by=PRODUCED_BY_FLARESOLVERR)
 
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     record = m._memory_store[f"{domain}:default"]
     assert record["auth"]["produced_by"] == PRODUCED_BY_FLARESOLVERR
     assert record["waf"]["produced_by"] == PRODUCED_BY_FLARESOLVERR
@@ -588,7 +588,7 @@ async def test_get_stored_session_producer_falls_back_to_auth_when_waf_expired()
     auth_only_state = _state([_cookie("li_at")])
     await m.save_storage_state("https://example.com", auth_only_state, "UA", produced_by=PRODUCED_BY_NOVNC)
 
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     m._memory_store[f"{domain}:default"]["waf"]["saved_at"] = time.time() - 99_999
 
     with patch("src.config.config.settings.SESSION_WAF_TTL_SECONDS", 1):
@@ -623,7 +623,7 @@ async def test_get_stored_session_producer_returns_none_when_both_entries_expire
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
     await m.save_storage_state("https://example.com", state, "UA", produced_by=PRODUCED_BY_FLARESOLVERR)
 
-    domain = m._get_domain("https://example.com")
+    domain = m.registrable_domain("https://example.com")
     record = m._memory_store[f"{domain}:default"]
     record["auth"]["saved_at"] = time.time() - 999_999
     record["waf"]["saved_at"] = time.time() - 999_999

@@ -168,6 +168,8 @@ surface.
 | Condition | HTTP status | Response |
 | :--- | :--- | :--- |
 | `HumanInterventionRequiredException` | 428 | `{status, intervention_type, vnc_url, message}` |
+| Stored session for the target no longer validates | 200 | `{url, content: "", status: "session_expired", profile, message}` |
+| `output_format=structured` asked for with `include_links` | 400 | `{detail: "output_format=structured is not available with include_links ..."}` |
 | `httpx.HTTPError` (external service) | 503 | `{detail, error}` |
 | `BlocklistValidationError` (empty refresh result) | 502 | RFC 7807 problem+json |
 | `BlocklistRefreshThrottledError` (refresh cooldown) | 429 | RFC 7807 problem+json, `Retry-After` header |

@@ -1,19 +1,37 @@
 import logging
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urljoin
 
-from curl_cffi import requests
+from curl_cffi import CurlOpt, requests
 
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
-from src.validator.url_validator import is_safe_external_url
+from src.validator.url_validator import pin_safe_host
 
 logger = logging.getLogger(__name__)
 
 _MAX_REDIRECTS = 10
+
+
+def _pin_session_to(session: Any, url: str) -> bool:
+    """Pin the session's next connect to the addresses validated for *url*.
+
+    libcurl consults CURLOPT_RESOLVE before the system resolver, so the socket
+    opens against an address the SSRF guard authorised in the same lookup.
+    Returns False when the host resolves to anything non-public, in which case
+    no request may be issued for it at all.
+    """
+    pinned = pin_safe_host(url)
+    if pinned is None:
+        return False
+
+    session.curl_options[CurlOpt.RESOLVE] = pinned.curl_resolve_entries()
+
+    return True
 
 
 async def fetch_with_curl_cffi(
@@ -29,7 +47,11 @@ async def fetch_with_curl_cffi(
     on transport errors.
 
     Redirects are followed manually so each hop can be re-validated with the SSRF
-    guard before proceeding, closing the DNS-rebinding TOCTOU window.
+    guard before proceeding. A relative `Location` is resolved against the URL of
+    the hop that returned it, per RFC 9110 section 10.2.2, and the resolved
+    absolute URL then faces the same validation an absolute one does. The initial
+    URL and every hop are pinned to the addresses that same validation resolved,
+    so the connection cannot land on a second, rebound answer.
     """
     flat_cookies = await cookie_manager.get_flat_cookies(url, profile)
     stored_ua = await cookie_manager.get_user_agent(url, profile)
@@ -45,6 +67,12 @@ async def fetch_with_curl_cffi(
             extra_kwargs: dict[str, Any] = {}
             if curl_proxies is not None:
                 extra_kwargs["proxies"] = curl_proxies
+
+            if not _pin_session_to(session, url):
+                logger.warning("%s: SSRF guard refused %s", strategy_label, url)
+
+                return ""
+
             response = await session.get(
                 url,
                 headers=headers,
@@ -54,16 +82,23 @@ async def fetch_with_curl_cffi(
                 **extra_kwargs,
             )
 
-            # Follow up to _MAX_REDIRECTS hops, validating each Location before fetching.
+            # Follow up to _MAX_REDIRECTS hops, resolving and validating each Location
+            # against the URL of the hop that returned it before fetching.
             hops = 0
+            current_url = url
             while response.status_code in (301, 302, 303, 307, 308) and hops < _MAX_REDIRECTS:
                 location = response.headers.get("location", "")
                 if not location:
                     break
 
-                if not is_safe_external_url(location):
+                hop_url = urljoin(current_url, location)
+
+                if not _pin_session_to(session, hop_url):
                     logger.warning(
-                        "%s: SSRF guard blocked redirect to %s from %s", strategy_label, location, url
+                        "%s: SSRF guard blocked redirect to %s from %s",
+                        strategy_label,
+                        hop_url,
+                        current_url,
                     )
                     return ""
 
@@ -71,13 +106,14 @@ async def fetch_with_curl_cffi(
                 if curl_proxies is not None:
                     hop_kwargs["proxies"] = curl_proxies
                 response = await session.get(
-                    location,
+                    hop_url,
                     headers=headers,
                     cookies=flat_cookies,
                     timeout=settings.EXTRACT_TIMEOUT,
                     allow_redirects=False,
                     **hop_kwargs,
                 )
+                current_url = hop_url
                 hops += 1
 
             if ChallengeDetector.is_login_required(response.text):

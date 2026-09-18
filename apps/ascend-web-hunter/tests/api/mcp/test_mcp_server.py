@@ -58,7 +58,9 @@ async def test_mcp_web_read_calls_read_when_include_links_false():
         result = await web_read("http://mcp.com")
 
     assert result == mock_content
-    mock_read.assert_awaited_once_with("http://mcp.com", heavy_mode=False, profile=None)
+    mock_read.assert_awaited_once_with(
+        "http://mcp.com", heavy_mode=False, profile=None, output_format="text", tier=None
+    )
 
 
 @pytest.mark.asyncio
@@ -79,7 +81,9 @@ async def test_mcp_web_read_calls_read_with_links_when_include_links_true():
         result = await web_read("http://mcp.com", include_links=True, link_filter="/job/")
 
     assert result["status"] == "success"
-    mock_read.assert_awaited_once_with("http://mcp.com", "/job/", heavy_mode=False, profile=None)
+    mock_read.assert_awaited_once_with(
+        "http://mcp.com", "/job/", heavy_mode=False, profile=None, output_format="text", tier=None
+    )
 
 
 @pytest.mark.asyncio

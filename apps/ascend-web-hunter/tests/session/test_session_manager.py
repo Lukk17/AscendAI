@@ -23,8 +23,8 @@ async def test_status_returns_none_when_no_session(mgr: SessionManager):
         new=AsyncMock(return_value=0.0),
     ):
         with patch(
-            "src.session.session_manager.cookie_manager._load_record",
-            new=AsyncMock(return_value=None),
+            "src.session.session_manager.cookie_manager.has_session_record",
+            new=AsyncMock(return_value=False),
         ):
             info = await mgr.status("https://example.com")
 
@@ -39,8 +39,8 @@ async def test_status_returns_expired_when_record_exists_but_ttl_zero(mgr: Sessi
         new=AsyncMock(return_value=0.0),
     ):
         with patch(
-            "src.session.session_manager.cookie_manager._load_record",
-            new=AsyncMock(return_value={"auth": {"saved_at": 0}}),
+            "src.session.session_manager.cookie_manager.has_session_record",
+            new=AsyncMock(return_value=True),
         ):
             info = await mgr.status("https://example.com")
 
@@ -54,8 +54,8 @@ async def test_status_returns_active_when_ttl_positive(mgr: SessionManager):
         new=AsyncMock(return_value=86400.0),
     ):
         with patch(
-            "src.session.session_manager.cookie_manager._load_record",
-            new=AsyncMock(return_value={"auth": {"saved_at": 1_000_000.0}}),
+            "src.session.session_manager.cookie_manager.get_auth_saved_at",
+            new=AsyncMock(return_value=1_000_000.0),
         ):
             info = await mgr.status("https://example.com")
 
@@ -71,8 +71,8 @@ async def test_status_returns_active_with_no_auth_key_in_record(mgr: SessionMana
         new=AsyncMock(return_value=86400.0),
     ):
         with patch(
-            "src.session.session_manager.cookie_manager._load_record",
-            new=AsyncMock(return_value={"cookies": []}),
+            "src.session.session_manager.cookie_manager.get_auth_saved_at",
+            new=AsyncMock(return_value=None),
         ):
             info = await mgr.status("https://example.com")
 
@@ -104,8 +104,8 @@ async def test_status_does_not_report_active_for_a_freshly_saved_empty_cookie_ja
             new=fresh_cookie_manager.get_auth_ttl_remaining,
         ),
         patch(
-            "src.session.session_manager.cookie_manager._load_record",
-            new=fresh_cookie_manager._load_record,
+            "src.session.session_manager.cookie_manager.has_session_record",
+            new=fresh_cookie_manager.has_session_record,
         ),
     ):
         info = await mgr.status("https://empty-jar.example.com")

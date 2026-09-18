@@ -44,7 +44,7 @@ graph TB
 | Interface | Direction | Protocol | Description |
 | :--- | :--- | :--- | :--- |
 | REST `GET /api/v1/web/search` | Inbound | HTTP/JSON | Search by query string; returns list of `{title, url, content}`. |
-| REST `POST /api/v2/web/read` | Inbound | HTTP/JSON | Extract content from a URL; optional `include_links`, `heavy_mode`. |
+| REST `POST /api/v2/web/read` | Inbound | HTTP/JSON | Extract content from a URL; optional `include_links`, `heavy_mode`, `profile`, `output_format`, `tier`. |
 | MCP `web_search` tool | Inbound | MCP / Streamable HTTP | Same as REST search; used by ascend-ai-agent. |
 | MCP `web_read` tool | Inbound | MCP / Streamable HTTP | Same as REST read; used by ascend-ai-agent. |
 | SearXNG `GET /search` | Outbound | HTTP/HTML | Fetches search results. Parsed with BeautifulSoup. |

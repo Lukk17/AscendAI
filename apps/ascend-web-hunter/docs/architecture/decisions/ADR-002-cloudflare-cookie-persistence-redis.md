@@ -26,7 +26,7 @@ data to Redis under the key `session_cookies:{apex_domain}` with a default TTL o
 
 Domain normalisation strips subdomains to the apex (`www.linkedin.com` becomes `linkedin.com`) so that cookies
 acquired on the login subdomain are reused when the same crawl later visits a content subdomain of the same
-site. The normalisation is in `_get_domain` (`src/reader/cloudflare/cookie_manager.py:40-62`) and uses
+site. The normalisation is in `registrable_domain` (`src/reader/cloudflare/cookie_manager.py:125-138`) and uses
 `tldextract` against the Public Suffix List, so ccTLDs like `co.uk`, `com.au`, `gov.pl` resolve to the correct
 registrable domain (`example.co.uk` stays as `example.co.uk`, not `co.uk`). The previous naive
 last-two-labels heuristic let one tenant's NoVNC-set cookies overwrite another's under a shared ccTLD; that
@@ -83,7 +83,7 @@ start of every request and inject the stored cookies and User-Agent into the out
 
 ### Risks
 - **Non-PSL hostnames**: Internal addresses (`localhost`, `intranet-host`) have no recognised PSL suffix.
-  `_get_domain` falls back to using the raw host as the key, which is safe but cannot collapse subdomain
+  `registrable_domain` falls back to using the raw host as the key, which is safe but cannot collapse subdomain
   variants on internal networks.
 - **TTL mismatch**: Cloudflare may shorten or lengthen its clearance window without notice. A 2-hour TTL that
   outlives the actual clearance lifespan sends expired cookies. The downstream effect is a Cloudflare challenge
@@ -91,7 +91,7 @@ start of every request and inject the stored cookies and User-Agent into the out
 
 ## Related
 
-- `src/reader/cloudflare/cookie_manager.py` — `CookieManager`, `_get_domain`, `get_session_data`,
+- `src/reader/cloudflare/cookie_manager.py` — `CookieManager`, `registrable_domain`, `get_session_data`,
   `save_session_data`.
 - `src/reader/strategies/beautifulsoup_strategy.py:29-37` — reads and injects cached session data.
 - `src/reader/strategies/trafilatura_strategy.py:27-36` — reads and injects cached session data.

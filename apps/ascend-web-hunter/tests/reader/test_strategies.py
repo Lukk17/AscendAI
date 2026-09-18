@@ -50,7 +50,7 @@ def patch_cookies_none():
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_returns_html(patch_cookies_none):
+async def test_curl_cffi_fetcher_returns_html(patch_cookies_none, pinned_public_host):
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     with patch(
         "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
@@ -61,7 +61,7 @@ async def test_curl_cffi_fetcher_returns_html(patch_cookies_none):
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_uses_cached_cookies():
+async def test_curl_cffi_fetcher_uses_cached_cookies(pinned_public_host):
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     with (
         patch(
@@ -85,7 +85,7 @@ async def test_curl_cffi_fetcher_uses_cached_cookies():
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none):
+async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none, pinned_public_host):
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     with (
         patch(
@@ -103,7 +103,7 @@ async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none):
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_raises_on_waf_block(patch_cookies_none):
+async def test_curl_cffi_fetcher_raises_on_waf_block(patch_cookies_none, pinned_public_host):
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     with (
         patch(
@@ -135,7 +135,7 @@ async def test_curl_cffi_fetcher_returns_empty_on_transport_error(patch_cookies_
 
 
 @pytest.mark.asyncio
-async def test_beautifulsoup_extract_strips_noise(patch_cookies_none):
+async def test_beautifulsoup_extract_strips_noise(patch_cookies_none, pinned_public_host):
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     strategy = BeautifulSoupStrategy(lambda: "ua")
     with patch(

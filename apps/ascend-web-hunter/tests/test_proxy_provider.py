@@ -26,7 +26,7 @@ def test_proxy_enabled_when_url_set() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_injects_proxy_when_configured() -> None:
+async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_host) -> None:
     """When proxy_provider.for_curl_cffi() returns a dict, it is passed to the HTTP session."""
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
 
@@ -70,7 +70,7 @@ async def test_curl_cffi_fetcher_injects_proxy_when_configured() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop() -> None:
+async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_host) -> None:
     """When a redirect occurs, the proxy dict is forwarded to the hop request too."""
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
 
@@ -106,7 +106,6 @@ async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop() -> None:
             "src.reader.strategies.curl_cffi_fetcher.proxy_provider.for_curl_cffi", return_value=proxy_dict
         ),
         patch("src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession", return_value=session),
-        patch("src.reader.strategies.curl_cffi_fetcher.is_safe_external_url", return_value=True),
         patch(
             "src.reader.strategies.curl_cffi_fetcher.ChallengeDetector.is_login_required", return_value=False
         ),
@@ -217,7 +216,7 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_follows_redirect_without_proxy() -> None:
+async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_host) -> None:
     """When there is no proxy and a redirect occurs, the hop request is made without proxies."""
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
 
@@ -249,7 +248,6 @@ async def test_curl_cffi_fetcher_follows_redirect_without_proxy() -> None:
         ),
         patch("src.reader.strategies.curl_cffi_fetcher.proxy_provider.for_curl_cffi", return_value=None),
         patch("src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession", return_value=session),
-        patch("src.reader.strategies.curl_cffi_fetcher.is_safe_external_url", return_value=True),
         patch(
             "src.reader.strategies.curl_cffi_fetcher.ChallengeDetector.is_login_required", return_value=False
         ),
@@ -265,7 +263,7 @@ async def test_curl_cffi_fetcher_follows_redirect_without_proxy() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location() -> None:
+async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location(pinned_public_host) -> None:
     """When a redirect response has no Location header, the loop breaks immediately."""
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
 
