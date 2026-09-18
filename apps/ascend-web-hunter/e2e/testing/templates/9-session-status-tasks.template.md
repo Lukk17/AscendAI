@@ -18,12 +18,16 @@ Copy this file to `../runs/<UTC-timestamp>_9-session-status-tasks.md` before sta
       `example.org`'s leftover key first if a prior run did not clean up)
 - [ ] Copied `fixtures/session-status-expired-seed.json` into the `redis` container
 - [ ] Seeded `session:example.org:default` via `redis-cli -x SETEX ... < /tmp/session-status-expired-seed.json`, got `OK`
+- [ ] Removed the copied seed file: `docker exec redis sh -c "rm /tmp/session-status-expired-seed.json"` left nothing
+      behind in the container's `/tmp`
 
 ### Run
 
 - [ ] Sent `session-status-none.yml` via `bru run` and got HTTP 200
 - [ ] Sent `session-status-expired.yml` via `bru run` and got HTTP 200
 - [ ] Generated a fresh `saved_at` JSON and re-seeded `session:example.org:default`, got `OK`
+- [ ] Removed the copied active seed: `docker exec redis sh -c "rm /tmp/session-status-active-seed.json"` left nothing
+      behind in the container's `/tmp`
 - [ ] Sent `session-status-active.yml` via `bru run` and got HTTP 200
 
 ### Expected

@@ -90,6 +90,22 @@ docker exec redis redis-cli PING
 
 Expect `PONG`.
 
+Check the process-wide NoVNC flow lock is free. The service holds one shared headful browser, so any NoVNC flow
+started earlier in the same sweep, whether by another spec that escalates to the NoVNC tier or by a previous run of
+this test, makes this test's own call return HTTP 409 with `status="novnc_busy"` until that flow's window closes.
+The live browser is the observable form of a held lock, because the monitor closes that browser and releases the
+lock in the same teardown block.
+
+```bash
+docker exec ascend-web-hunter pgrep -fa "remote-debugging-port=9222"
+```
+
+Expect no output and a non-zero exit status, which means no NoVNC flow is in flight and the lock is free. A printed
+process line means one still is: wait 30 seconds, run the check again, and start the Run section only once it comes
+back empty. The wait is bounded, because a holding flow's lease expires 630 seconds after it acquired the lock
+(`NOVNC_TIMEOUT_SECONDS` is 600 in the container and `_NOVNC_LOCK_LEASE_GRACE_SECONDS` adds 30), and the next call
+reclaims it.
+
 ## Reset state
 
 Confirm `example.net` currently carries no session under the `e2e-establish` profile the request sends. The

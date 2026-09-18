@@ -21,6 +21,8 @@ Copy this file to `../runs/<UTC-timestamp>_8-session-clear-tasks.md` before star
 - [ ] Copied `fixtures/session-clear-seed.json` into the `redis` container
 - [ ] Seeded `session:example.net:default` via `redis-cli -x SETEX ... < /tmp/session-clear-seed.json`, got `OK`
 - [ ] Confirmed `session:example.net:default` now returns `1` from `EXISTS`
+- [ ] Removed the copied seed file: `docker exec redis sh -c "rm /tmp/session-clear-seed.json"` left nothing behind
+      in the container's `/tmp`
 
 ### Run
 

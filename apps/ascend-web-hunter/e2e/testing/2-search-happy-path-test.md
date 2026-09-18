@@ -52,7 +52,7 @@ $json = curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | C
 **Unix:**
 
 ```bash
-curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | python3 -c "import json, sys; d = json.load(sys.stdin); print(f\"{len(d.get('results', []))} results, {len(d.get('unresponsive_engines', []))} blocked engines\")"
+curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | "$(command -v python3 || command -v python)" -c "import json, sys; d = json.load(sys.stdin); print(f\"{len(d.get('results', []))} results, {len(d.get('unresponsive_engines', []))} blocked engines\")"
 ```
 
 Expect a non-zero results count. If results is `0` and the unresponsive-engines list shows access-denied /

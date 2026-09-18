@@ -78,6 +78,17 @@ docker exec redis sh -c "redis-cli -x SETEX 'session:example.org:default' 120960
 
 Expect `OK`.
 
+Remove the copied seed file now that the record is in Redis. Nothing after this point reads it, and leaving the
+copy in the container would carry one run's state into the next. The `sh -c` wrapper is the same guard the seed
+command above uses, and here it keeps the container path intact, because Git Bash on Windows rewrites a bare
+`/tmp/...` argument into a host path before Docker ever sees it.
+
+```bash
+docker exec redis sh -c "rm /tmp/session-status-expired-seed.json"
+```
+
+Expect no output.
+
 ## Run
 
 Move into the Bruno collection root first.
@@ -135,6 +146,15 @@ docker exec redis sh -c "redis-cli -x SETEX 'session:example.org:default' 120960
 ```
 
 Expect `OK`.
+
+Remove this copy too, now that the record is in Redis, for the same reason and behind the same `sh -c` guard as
+the expired seed in Reset state.
+
+```bash
+docker exec redis sh -c "rm /tmp/session-status-active-seed.json"
+```
+
+Expect no output.
 
 Call 3 — `example.org` again, now inside its TTL window (the `active` branch).
 

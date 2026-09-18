@@ -198,7 +198,7 @@ makes the `mode` assertion checkable.
 **Unix:**
 
 ```bash
-python3 -c "import json, sys; d = json.load(open('/tmp/js-quotes-run.json')); print(d[0]['results'][0]['response']['data']['mode'])"
+"$(command -v python3 || command -v python)" -c "import json, sys; d = json.load(open(sys.argv[1])); print(d[0]['results'][0]['response']['data']['mode'])" /tmp/js-quotes-run.json
 ```
 
 ## Expected

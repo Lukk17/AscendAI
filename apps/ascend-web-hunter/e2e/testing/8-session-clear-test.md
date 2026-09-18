@@ -114,6 +114,17 @@ docker exec redis redis-cli EXISTS "session:example.net:default"
 
 Expect `1`.
 
+Remove the copied seed file now that the record is in Redis. Nothing after this point reads `/tmp`, and leaving the
+copy in the container would carry one run's state into the next. The `sh -c` wrapper is the same guard the seed
+command above uses, and here it keeps the container path intact, because Git Bash on Windows rewrites a bare
+`/tmp/...` argument into a host path before Docker ever sees it.
+
+```bash
+docker exec redis sh -c "rm /tmp/session-clear-seed.json"
+```
+
+Expect no output.
+
 ## Run
 
 Move into the Bruno collection root first.
