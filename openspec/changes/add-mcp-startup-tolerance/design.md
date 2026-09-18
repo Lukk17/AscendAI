@@ -102,26 +102,49 @@ for a cold-started container.
 
 **Alternative: reuse `request-timeout`.** Rejected. 300 s on a refused localhost connection is unbearable.
 
-### Decision 4: filter tool callbacks via a wrapper bean, not via per-callback null-checks
+### Decision 4: filter tool callbacks via a wrapper bean, and remove the unfiltered one from the context
 
 The advertised tool set must be a function of the initialised-client set. Spring AI's `SyncMcpToolCallbackProvider`
 takes `List<McpSyncClient>` and returns tool callbacks from all of them, including uninitialised clients (which
 would throw `IllegalStateException` on first tool call).
 
-The fix: wrap `SyncMcpToolCallbackProvider` with a `FilteredToolCallbackProvider` (`@Primary` bean) that asks the
-`McpClientStatusRegistry` for the set of `CONNECTED` clients and only delegates to those. The auto-built provider
-stays in the context; the wrapper masks the broken slice.
+The fix: a `FilteredToolCallbackProvider` (`@Primary` bean) that asks the `McpClientStatusRegistry` for the set of
+`CONNECTED` clients and builds a fresh `SyncMcpToolCallbackProvider` per connected client.
+
+Leaving Spring AI's auto-built `mcpToolCallbacks` bean in the context alongside it was the original plan and it is
+not safe. `@Primary` only governs single-value injection, so a `List<ToolCallbackProvider>` injection point would
+collect the unfiltered bean as well, and a dead server's tools would reach the model through it. Verified against
+the running context: with `toolcallback.enabled: true` the context holds two `ToolCallbackProvider` beans, the
+filtered wrapper and `org.springframework.ai.mcp.SyncMcpToolCallbackProvider`. The project therefore sets
+`spring.ai.mcp.client.toolcallback.enabled: false`, which switches off `McpToolCallbackAutoConfiguration` through
+its own documented property, and `McpStartupToleranceIT` asserts the resulting bean set.
 
 **Alternative: filter inside `ChatExecutor`.** Pushes the responsibility downstream and into the request hot
 path. The auto-build-then-filter pattern keeps the static tool-discovery surface honest at startup time, which is
 where it belongs.
 
+### Decision 4a: recover a stale session once, then demote the client
+
+The registry records boot-time state, and an MCP server can go away afterwards. A forgotten session surfaces as a
+runtime exception from `listTools()`. The provider reconnects that client once and retries discovery, bounded by
+`app.mcp.startup.init-timeout`. Two things make that safe under concurrency and over time:
+
+- The reconnect is serialised per client behind a `ReentrantLock` plus a generation counter read before discovery
+  is attempted, so two concurrent prompts cannot drive `initialize()` on the same client and the loser of the race
+  skips the handshake the winner already completed.
+- A client whose reconnect or retry still fails is recorded `FAILED`, so it drops out of the connected set instead
+  of costing every later request two failed tool listings plus an initialise attempt.
+
 ### Decision 5: registry holds connection state as an immutable enum, no timestamps
 
-`McpClientStatus { CONNECTED, FAILED, DISABLED }`. No `lastAttemptAt`, no retry counter. Banner shows
+`McpClientStatus { CONNECTED, FAILED }`. No `lastAttemptAt`, no retry counter. Banner shows
 `[Connected]` or `[FAILED]` only, matching the `coding-standards` skill format
 (`<url> [Connected | Warning (status=N) | FAILED]`). When operators need detail, they look at the DEBUG log entry
 the initialiser emits on failure.
+
+A third `DISABLED` constant was specified and then dropped: when `spring.ai.mcp.client.enabled=false` there is no
+client bean and no initialiser, so nothing could ever record it, and the banner arm rendering it was dead code.
+`entries()` returns an immutable snapshot, so a read accessor cannot be used to mutate the registry.
 
 ### Decision 6: configuration shape stays the same
 
@@ -167,6 +190,7 @@ timeouts continue to live where they already do. Operators don't have to re-lear
 - (Resolved during this design) Wrapper bean vs. patching the auto-config provider? **Chose `@Primary` wrapper.**
 - (Still open) Should `McpClientStatusRegistry` be exposed via `/actuator/mcp` so a downstream health probe can
   read it? **Punted to a follow-up change** — the readiness banner covers the operator-visibility ask for now.
-- (Still open) Should there be a single `Connection` aggregate state on the banner ("MCP: 2/3 connected") in
-  addition to per-server lines? **Punted** — the per-server lines are the authoritative view; aggregate is a UX
-  nicety, easy to add later.
+- (Resolved at code review) Should there be a single `Connection` aggregate state on the banner
+  ("MCP: 2/3 connected") in addition to per-server lines? **Kept.** The `Aggregate: N/M connected` line shipped and
+  was verified during the smoke tests, so the banner-section spec scenario was amended to describe three
+  per-connection lines plus the counter rather than three lines total.

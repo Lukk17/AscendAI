@@ -21,14 +21,19 @@ every MCP server before ascend-ai-agent, which is fragile in local dev and unwor
   `List<McpSyncClient>`, calls `.initialize()` on each one inside a bounded try/catch, and records per-client status
   in a new `McpClientStatusRegistry` bean.
 - Add `McpClientStatusRegistry` with one entry per configured connection: `name`, `url`, `state`
-  (`CONNECTED | FAILED | DISABLED`), optional `errorMessage` (kept off the banner, available at DEBUG).
+  (`CONNECTED | FAILED`). Reads return an immutable snapshot. Failure detail stays out of the registry and is
+  logged by the initialiser at `DEBUG`.
 - Extend [StartupLogConfig](../../../apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/StartupLogConfig.java)
   to render a dedicated `MCP servers:` section in the readiness banner, reading from the registry: one line per
-  connection, format `<name>: <url> [Connected | FAILED]`. Replaces the current single-line `MCP tools:` summary.
+  connection, format `<name>: <url> [Connected | FAILED]`, plus one `Aggregate: N/M connected` counter line.
+  Replaces the current single-line `MCP tools:` summary.
 - Filter `ToolCallbackProvider` advertised tools to only those from initialized clients. The current
   `SyncMcpToolCallbackProvider` lists tools from every `McpSyncClient` regardless of state; for uninitialized
-  clients this throws on first use. The fix is a wrapper bean that delegates to the auto-built provider but skips
-  callbacks whose owning client is not in `CONNECTED` state.
+  clients this throws on first use. The fix is a `@Primary` wrapper bean that discovers tools per `CONNECTED`
+  client, plus `spring.ai.mcp.client.toolcallback.enabled: false` so Spring AI's own unfiltered provider bean never
+  enters the context and `@Primary` is not the only thing standing between the model and a dead server's tools.
+- Recover a session that went stale after boot: one reconnect-and-retry per client per request, serialised per
+  client, with a client that still fails demoted to `FAILED` in the registry.
 - Document the new behaviour in
   [apps/ascend-agent/docs/architecture/arc42/08-crosscutting-concepts.md](../../../apps/ascend-agent/docs/architecture/arc42/08-crosscutting-concepts.md)
   under "Model Context Protocol (MCP)": startup tolerance is now part of the design, not an emergent property.
@@ -62,20 +67,33 @@ its own.)
 - `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/mcp/McpClientStartupInitializer.java`: new file.
 - `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/mcp/McpClientStatusRegistry.java`: new file.
 - `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/mcp/FilteredToolCallbackProvider.java`: new file
-  (wraps the Spring AI auto-built provider, filters by status).
+  (discovers tools per CONNECTED client, filters by status).
+- `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/mcp/FallbackToolCallbackProvider.java`: new file
+  (empty provider when the MCP client is switched off).
+- `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/mcp/McpConnectionNames.java`: new file
+  (connection-name resolution shared by the initialiser and the filtered provider).
+- `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/properties/McpStartupProperties.java`: new file
+  (`app.mcp.startup.init-timeout`).
 - `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/StartupLogConfig.java`: extend to render the new
   `MCP servers:` section. Keep the rest of the readiness-banner contract intact.
 
 **Tests**
 
+- New unit tests `McpClientStartupInitializerTest`, `McpClientStatusRegistryTest`, `McpConnectionNamesTest`, and
+  `FilteredToolCallbackProviderTest`: the init loop, per-client failure isolation, the timeout branch and its
+  wall-clock bound, URL resolution, `FAILED` recording, the registry snapshot contract, connection-name resolution,
+  and the reconnect path including its per-client serialisation.
 - New integration test `McpStartupToleranceIT` under
-  `apps/ascend-agent/src/test/java/com/lukk/ascend/ai/agent/integration/`: boots context with one valid `streamable-http`
-  connection pointing at a Testcontainers-stubbed MCP server and one invalid connection pointing at an unbound
-  localhost port. Asserts context refresh succeeds, the registry contains one `CONNECTED` and one `FAILED` entry,
-  the `FilteredToolCallbackProvider` advertises only the working client's tools, and the readiness banner emits
-  the expected `MCP servers:` section.
-- Extend the existing `StartupBannerIT` to assert the new section layout (skill 4-space indent, `[Connected]` /
-  `[FAILED]` markers, one URL per line).
+  `apps/ascend-agent/src/test/java/com/lukk/ascend/ai/agent/integration/`: boots the context with every configured
+  connection redirected at an unbound localhost port. Asserts context refresh succeeds, the registry holds one
+  entry per connection keyed by the bare connection name and carrying its configured URL, every entry is `FAILED`,
+  the filtered provider advertises nothing, the context holds no unfiltered MCP provider bean, and
+  `POST /api/v1/ai/prompt` returns 200 with the chat model stubbed.
+- New integration test `McpStartupTimeoutIT`: one connection points at a server that accepts the TCP connection and
+  never answers, with `app.mcp.startup.init-timeout=200ms`. Asserts the connection was accepted, the client is
+  recorded `FAILED`, and no tools are advertised.
+- Extend the existing `StartupBannerIT` to assert the real `MCP servers:` line format, the aligned URL column, the
+  `Aggregate: N/M connected` line, and the absence of the old `MCP tools:` summary.
 
 **Docs**
 

@@ -380,7 +380,7 @@ spring:
         request-timeout: 300s
         type: SYNC
         toolcallback:
-          enabled: true
+          enabled: false
         streamable-http:
           connections:
             ascend-audio-scribe:

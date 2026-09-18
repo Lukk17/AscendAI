@@ -38,6 +38,27 @@ clients throw `IllegalStateException` when `listTools()` is called. The `Filtere
 (`@Primary`) holds the full `List<McpSyncClient>` and the `McpClientStatusRegistry`. At `getToolCallbacks()` time it
 builds a fresh `SyncMcpToolCallbackProvider` over only the `CONNECTED` clients.
 
+`@Primary` alone is not enough. It governs single-value injection, so a `List<ToolCallbackProvider>` injection point
+would still collect Spring AI's own `mcpToolCallbacks` bean and see every client's tools, filtered or not. The
+project therefore sets `spring.ai.mcp.client.toolcallback.enabled=false`, which switches off
+`McpToolCallbackAutoConfiguration` entirely and leaves `FilteredToolCallbackProvider` as the only
+`ToolCallbackProvider` bean in the context. `McpStartupToleranceIT` asserts that bean set, so a later re-enable is
+caught by a failing test rather than by a silently unfiltered tool list.
+
+`FallbackToolCallbackProvider` supplies an empty provider when `spring.ai.mcp.client.enabled=false`. Its condition
+mirrors `FilteredToolCallbackProvider`'s rather than using `@ConditionalOnMissingBean`, because bean-level
+`@ConditionalOnMissingBean` is only order-guaranteed inside auto-configuration, not inside a plain
+`@Configuration` class.
+
+## Stale sessions after startup
+
+The registry records boot-time state, and an MCP server can die afterwards. A stale session surfaces as a runtime
+exception from `listTools()`, so the provider reconnects the client once and retries discovery. That reconnect is
+serialised per client behind a lock plus a generation counter, so two concurrent prompts cannot both drive
+`initialize()` on the same client, and the second one skips the handshake the first already completed. A client that
+still fails after the retry is demoted to `FAILED` in the registry, which drops it out of the connected set so later
+requests stop paying for a dead server.
+
 This client-list filter approach avoids a fragile callback-to-client reverse lookup. The Spring AI 1.1.5
 `SyncMcpToolCallback` class does not expose its owning client publicly; any reverse lookup would require reflection
 or reliance on the tool-name format, both of which are brittle across Spring AI versions.
@@ -45,8 +66,11 @@ or reliance on the tool-name format, both of which are brittle across Spring AI 
 The `McpSyncClient.getClientInfo()` method returns `McpSchema.Implementation`, whose `title()` field contains the
 bare connection name as set by `McpClientAutoConfiguration.connectedClientName()`. The connection name is
 `"<spring.ai.mcp.client.name> - <connectionKey>"` as the `name()` field and the bare `<connectionKey>` as
-`title()`. The `FilteredToolCallbackProvider` and `McpClientStartupInitializer` both use `getClientInfo().title()`
-as the lookup key against `McpStreamableHttpClientProperties.getConnections()`.
+`title()`. `McpConnectionNames.resolve(...)` encapsulates that lookup, falling back to `name()` and then to an
+identity-based placeholder, and both `FilteredToolCallbackProvider` and `McpClientStartupInitializer` call it. The
+resolved name is the key against `McpStreamableHttpClientProperties.getConnections()`, and
+`McpStartupToleranceIT` asserts the names and URLs the registry ends up holding against real Spring AI wiring rather
+than against a hand-built `Implementation`.
 
 ## Per-client init timeout
 
@@ -65,3 +89,5 @@ transcription).
   retry (deferred to a future change).
 - Operators can raise `app.mcp.startup.init-timeout` if a healthy server triggers a false-negative due to cold-start
   latency.
+- `McpClientStatus` carries `CONNECTED` and `FAILED` only. A `DISABLED` state was considered and dropped: when
+  `spring.ai.mcp.client.enabled=false` no client bean and no initialiser exist, so nothing could ever record it.

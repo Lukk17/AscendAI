@@ -21,9 +21,21 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -134,6 +146,88 @@ class FilteredToolCallbackProviderTest {
         assertThat(callbacks[0].getToolDefinition().name()).isEqualTo("transcribe");
         verify(failedClient, times(1)).initialize();
         verify(failedClient, times(2)).listTools();
+        verify(registry).markFailed("ascend-weather-mcp");
+        verify(registry, never()).markFailed("ascend-audio-scribe");
+    }
+
+    @Test
+    @DisplayName("getToolCallbacks demotes a client to FAILED when its reconnect itself fails")
+    void getToolCallbacks_ReconnectFails_MarksClientFailedInRegistry() {
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
+        when(connectedClient.listTools()).thenThrow(new McpTransportSessionNotFoundException("stale-session-id"));
+        doThrow(new IllegalStateException("Connection refused")).when(connectedClient).initialize();
+
+        FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
+                List.of(connectedClient), registry, startupProperties);
+
+        ToolCallback[] callbacks = singleProvider.getToolCallbacks();
+
+        assertThat(callbacks).isEmpty();
+        verify(connectedClient, times(1)).listTools();
+        verify(registry).markFailed("ascend-audio-scribe");
+    }
+
+    @Test
+    @DisplayName("getToolCallbacks leaves a recovered client CONNECTED rather than demoting it")
+    void getToolCallbacks_ReconnectRecoversClient_RegistryUntouched() {
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
+        when(connectedClient.listTools())
+                .thenThrow(new McpTransportSessionNotFoundException("stale-session-id"))
+                .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
+
+        FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
+                List.of(connectedClient), registry, startupProperties);
+
+        assertThat(singleProvider.getToolCallbacks()).hasSize(1);
+        verify(registry, never()).markFailed(anyString());
+    }
+
+    @Test
+    @DisplayName("two concurrent requests against one stale client reconnect it exactly once")
+    void getToolCallbacks_ConcurrentStaleDiscovery_InitializesClientOnlyOnce() throws Exception {
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
+
+        AtomicBoolean sessionAlive = new AtomicBoolean(false);
+        AtomicInteger initializeCalls = new AtomicInteger();
+        when(connectedClient.listTools()).thenAnswer(invocation -> {
+            if (!sessionAlive.get()) {
+                throw new McpTransportSessionNotFoundException("stale-session-id");
+            }
+
+            return new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null);
+        });
+        doAnswer(invocation -> {
+            initializeCalls.incrementAndGet();
+            TimeUnit.MILLISECONDS.sleep(200);
+            sessionAlive.set(true);
+
+            return null;
+        }).when(connectedClient).initialize();
+
+        FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
+                List.of(connectedClient), registry, startupProperties);
+
+        CountDownLatch startLine = new CountDownLatch(1);
+        Callable<ToolCallback[]> discovery = () -> {
+            startLine.await();
+
+            return singleProvider.getToolCallbacks();
+        };
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ToolCallback[]> first = pool.submit(discovery);
+            Future<ToolCallback[]> second = pool.submit(discovery);
+            startLine.countDown();
+
+            assertThat(first.get(10, TimeUnit.SECONDS)).hasSize(1);
+            assertThat(second.get(10, TimeUnit.SECONDS)).hasSize(1);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(initializeCalls).hasValue(1);
+        verify(registry, never()).markFailed(anyString());
     }
 
     @Test

@@ -59,7 +59,8 @@ the timeout SHALL be cancelled and the client recorded as `FAILED`.
 
 The `ToolCallbackProvider` consumed by `ChatExecutor` SHALL only advertise callbacks whose owning `McpSyncClient`
 is in `CONNECTED` state in the `McpClientStatusRegistry`. Tool callbacks from uninitialised or failed clients MUST
-NOT appear in `getToolCallbacks()`.
+NOT appear in `getToolCallbacks()`. The filtered provider SHALL be the only `ToolCallbackProvider` bean in the
+application context, so no injection point can reach an unfiltered view of the MCP tool set.
 
 #### Scenario: Mixed client states
 
@@ -75,12 +76,49 @@ NOT appear in `getToolCallbacks()`.
 - **THEN** an empty array is returned
 - **AND** the LLM is invoked without any MCP tools
 
+#### Scenario: No unfiltered provider is reachable from the context
+
+- **WHEN** the Spring context has refreshed with the MCP client enabled
+- **THEN** the only `ToolCallbackProvider` bean is the filtered wrapper
+- **AND** no `SyncMcpToolCallbackProvider` or `AsyncMcpToolCallbackProvider` bean is registered
+- **AND** an injection point that collects `List<ToolCallbackProvider>` therefore sees only the filtered view
+
+### Requirement: A session that goes stale after startup is reconnected once, then demoted
+
+A client recorded `CONNECTED` at startup whose MCP session the server has since forgotten SHALL be reconnected once
+per request before its tools are excluded. The reconnect SHALL be serialised per client and bounded by the same
+`app.mcp.startup.init-timeout` used at boot. A client whose reconnect fails, or whose discovery still fails after
+the reconnect, SHALL be recorded `FAILED` in the `McpClientStatusRegistry`.
+
+#### Scenario: Stale session recovers on the retry
+
+- **GIVEN** a `CONNECTED` client whose first `listTools()` call fails with a stale-session error
+- **WHEN** `getToolCallbacks()` runs
+- **THEN** the client is reconnected once and its tools are returned from the retry
+- **AND** the client stays `CONNECTED` in the registry
+
+#### Scenario: Stale session does not recover
+
+- **GIVEN** a `CONNECTED` client whose reconnect fails, or whose retry after the reconnect fails
+- **WHEN** `getToolCallbacks()` runs
+- **THEN** that client's tools are excluded from the returned array
+- **AND** the client is recorded `FAILED`, so later requests no longer attempt discovery against it
+- **AND** the tools of every other `CONNECTED` client are still returned
+
+#### Scenario: Two concurrent requests hit the same stale client
+
+- **GIVEN** a `CONNECTED` client whose session has gone stale
+- **WHEN** two requests call `getToolCallbacks()` at the same time
+- **THEN** `initialize()` is called on that client exactly once
+- **AND** both requests receive the client's tools
+
 ### Requirement: Readiness banner renders per-server MCP status
 
 The readiness-log banner emitted by `StartupLogConfig` on
 `AvailabilityChangeEvent<ReadinessState.ACCEPTING_TRAFFIC>` SHALL contain an `MCP servers:` section with one line
-per configured `streamable-http` connection. Each line MUST follow the format
-`<connection-name>: <url> [Connected | FAILED]` with the 4-space / 6-space indentation defined in
+per configured `streamable-http` connection, followed by one `Aggregate: N/M connected` counter line. Each
+per-connection line MUST follow the format `<connection-name>: <url> [Connected | FAILED]`, with the connection
+name padded to a common width so the URL column aligns, and with the 4-space / 6-space indentation defined in
 [coding-standards](../../../../../.agents/skills/coding-standards/SKILL.md). The exception detail of failed clients
 MUST NOT appear in the banner.
 
@@ -88,9 +126,11 @@ MUST NOT appear in the banner.
 
 - **GIVEN** three configured connections, two `CONNECTED` and one `FAILED`
 - **WHEN** the readiness banner is emitted
-- **THEN** the banner contains exactly three lines under `MCP servers:`, one per connection
+- **THEN** the banner contains exactly three per-connection lines under `MCP servers:`, one per connection, followed
+  by a single `Aggregate: N/M connected` counter line
 - **AND** the two reachable connections show `[Connected]`
 - **AND** the unreachable connection shows `[FAILED]`
+- **AND** the URL column is aligned across the per-connection lines
 - **AND** the connection-refused stack trace is logged at `DEBUG` level only, not in the banner
 
 #### Scenario: Banner contains no MCP-tools summary line
@@ -101,9 +141,12 @@ MUST NOT appear in the banner.
 
 ### Requirement: Configuration uses Spring AI's built-in deferral flag
 
-The application SHALL set `spring.ai.mcp.client.initialized=false` in
+The application SHALL set `spring.ai.mcp.client.initialized=false` and
+`spring.ai.mcp.client.toolcallback.enabled=false` in
 [application.yaml](../../../../../apps/ascend-agent/src/main/resources/application.yaml). The project MUST NOT replace,
-override, or fork Spring AI's `McpClientAutoConfiguration` or `SyncMcpToolCallbackProvider` beans.
+override, or fork Spring AI's `McpClientAutoConfiguration` or the `SyncMcpToolCallbackProvider` class. Switching off
+`McpToolCallbackAutoConfiguration` through its own documented property is the supported way to keep the unfiltered
+provider bean out of the context.
 
 #### Scenario: Spring AI version upgrade within the 1.1.x line
 
@@ -118,3 +161,18 @@ override, or fork Spring AI's `McpClientAutoConfiguration` or `SyncMcpToolCallba
 - **THEN** `McpClientAutoConfiguration` constructs every configured `McpSyncClient`
 - **AND** the transport, sampling, roots, and request-timeout on each client match the project's YAML config
 - **AND** no `McpSyncClient.initialize()` call is made by the auto-config factory
+- **AND** no auto-configured `SyncMcpToolCallbackProvider` bean is created
+
+### Requirement: The startup loop cannot fail the application start
+
+The `ApplicationReadyEvent` listener that drives per-client initialisation SHALL NOT propagate any exception. Every
+per-client step, including connection-name resolution and URL resolution, SHALL sit inside the per-client
+try/catch.
+
+#### Scenario: A client cannot even report its own identity
+
+- **GIVEN** a configured MCP client whose `getClientInfo()` call throws
+- **WHEN** the startup loop runs
+- **THEN** the application start completes
+- **AND** that client is recorded `FAILED` under a distinct placeholder name with an `unknown` URL
+- **AND** the remaining clients are still initialised

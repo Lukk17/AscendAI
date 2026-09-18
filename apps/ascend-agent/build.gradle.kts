@@ -127,6 +127,7 @@ tasks.register<Test>("integrationTest") {
     shouldRunAfter(tasks.test)
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
+    maxHeapSize = "2g"
     // Optional override for environments where Testcontainers' auto-detection picks the wrong pipe.
     // When unset (default), Testcontainers detects from the active Docker context.
     //   ./gradlew integrationTest -Pdocker.host=npipe:////./pipe/docker_engine

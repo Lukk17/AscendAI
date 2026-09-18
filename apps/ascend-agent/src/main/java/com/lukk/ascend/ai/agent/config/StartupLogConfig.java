@@ -339,7 +339,7 @@ public class StartupLogConfig {
         }
 
         int nameWidth = serverEntries.stream()
-                .mapToInt(e -> e.name().length())
+                .mapToInt(e -> e.name().length() + 1)
                 .max()
                 .orElse(8);
 
@@ -362,7 +362,6 @@ public class StartupLogConfig {
         return switch (status) {
             case CONNECTED -> "[Connected]";
             case FAILED -> "[FAILED]";
-            case DISABLED -> "[Disabled]";
         };
     }
 }

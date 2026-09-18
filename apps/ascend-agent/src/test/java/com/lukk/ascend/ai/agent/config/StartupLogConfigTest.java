@@ -1,5 +1,8 @@
 package com.lukk.ascend.ai.agent.config;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.lukk.ascend.ai.agent.config.mcp.McpClientEntry;
@@ -11,6 +14,7 @@ import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import io.qdrant.client.QdrantClient;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
@@ -35,11 +40,13 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -73,6 +80,9 @@ class StartupLogConfigTest {
     private ChatHistoryCompactionProperties compactionProperties;
 
     private StartupLogConfig config;
+
+    private Logger startupLogger;
+    private ListAppender<ILoggingEvent> appender;
 
     @BeforeEach
     void setUp() {
@@ -116,6 +126,16 @@ class StartupLogConfigTest {
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("app.s3.bucket"), org.mockito.ArgumentMatchers.anyString())).thenReturn("knowledge-base");
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("app.s3.endpoint"), org.mockito.ArgumentMatchers.anyString())).thenReturn("http://localhost:9070");
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("spring.datasource.url"), org.mockito.ArgumentMatchers.anyString())).thenReturn("jdbc:postgresql://localhost/ascend_ai");
+
+        startupLogger = (Logger) LoggerFactory.getLogger(StartupLogConfig.class);
+        appender = new ListAppender<>();
+        appender.start();
+        startupLogger.addAppender(appender);
+    }
+
+    @AfterEach
+    void detachAppender() {
+        startupLogger.detachAppender(appender);
     }
 
     @Test
@@ -213,30 +233,73 @@ class StartupLogConfigTest {
     }
 
     @Test
-    @DisplayName("onReadinessChange renders MCP servers section with registry entries")
-    void onReadinessChange_McpRegistryHasEntries_RendersMcpServersSection() throws Exception {
-        // given — registry already has one CONNECTED and one FAILED entry (configured per-test via mcpRegistry mock in setUp)
+    @DisplayName("onReadinessChange renders one aligned MCP line per registry entry with its status marker")
+    void onReadinessChange_McpRegistryHasEntries_RendersOneAlignedLinePerEntry() throws Exception {
+        when(mcpRegistry.entries()).thenReturn(List.of(
+                new McpClientEntry("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.CONNECTED),
+                new McpClientEntry("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.FAILED)
+        ));
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
 
-        // when — must not throw
         config.onReadinessChange(readinessEvent());
+
+        List<String> mcpLines = mcpSectionLines(capturedBanner());
+        assertThat(mcpLines).containsExactly(
+                "      ascend-audio-scribe:  http://localhost:7017 [FAILED]",
+                "      ascend-weather-mcp:   http://localhost:9998 [Connected]",
+                "      Aggregate: 1/2 connected");
+    }
+
+    @Test
+    @DisplayName("onReadinessChange aligns the URL column across MCP entries of differing name length")
+    void onReadinessChange_McpNamesOfDifferentLength_AlignsUrlColumn() throws Exception {
+        when(mcpRegistry.entries()).thenReturn(List.of(
+                new McpClientEntry("a", "http://localhost:1", McpClientStatus.CONNECTED),
+                new McpClientEntry("much-longer-name", "http://localhost:2", McpClientStatus.CONNECTED)
+        ));
+        stubDatabaseSuccess();
+        stubRedisSuccess();
+        stubQdrantSuccess();
+        stubS3Success();
+
+        config.onReadinessChange(readinessEvent());
+
+        List<String> serverLines = mcpSectionLines(capturedBanner()).stream()
+                .filter(line -> line.contains("http://"))
+                .toList();
+        assertThat(serverLines).hasSize(2);
+        assertThat(serverLines.get(0).indexOf("http://"))
+                .isEqualTo(serverLines.get(1).indexOf("http://"));
     }
 
     @Test
     @DisplayName("onReadinessChange renders empty MCP section when registry has no entries")
     void onReadinessChange_McpRegistryEmpty_RendersNoneRegistered() throws Exception {
-        // given
         when(mcpRegistry.entries()).thenReturn(List.of());
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
 
-        // when
         config.onReadinessChange(readinessEvent());
+
+        assertThat(mcpSectionLines(capturedBanner())).containsExactly("      (none registered)");
+    }
+
+    @Test
+    @DisplayName("onReadinessChange no longer emits the superseded single-line MCP tools summary")
+    void onReadinessChange_AnyRegistryState_OmitsLegacyMcpToolsLine() throws Exception {
+        stubDatabaseSuccess();
+        stubRedisSuccess();
+        stubQdrantSuccess();
+        stubS3Success();
+
+        config.onReadinessChange(readinessEvent());
+
+        assertThat(capturedBanner()).doesNotContain("MCP tools");
     }
 
     @Test
@@ -406,6 +469,33 @@ class StartupLogConfigTest {
         config.onReadinessChange(readinessEvent());
     }
 
+
+    private String capturedBanner() {
+        return appender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .filter(message -> message.contains("MAIN PROMPT ENDPOINT"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Startup banner was not emitted"));
+    }
+
+    private static List<String> mcpSectionLines(String banner) {
+        List<String> lines = new ArrayList<>();
+        boolean inSection = false;
+        for (String line : banner.split("\\R")) {
+            if (line.equals("    MCP servers:")) {
+                inSection = true;
+                continue;
+            }
+            if (inSection) {
+                if (line.isBlank()) {
+                    break;
+                }
+                lines.add(line);
+            }
+        }
+
+        return lines;
+    }
 
     private AvailabilityChangeEvent<ReadinessState> readinessEvent() {
         AvailabilityChangeEvent<ReadinessState> event = mock();

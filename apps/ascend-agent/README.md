@@ -396,8 +396,13 @@ app:
 ```
 
 The readiness banner lists each configured MCP server with a `[Connected]` or `[FAILED]` status marker under
-`MCP servers:`. FAILED clients' tools are not advertised to the LLM; the agent still serves requests using the
-remaining providers and MCP servers.
+`MCP servers:`, followed by an `Aggregate: N/M connected` counter. FAILED clients' tools are not advertised to the
+LLM; the agent still serves requests using the remaining providers and MCP servers.
+
+`spring.ai.mcp.client.toolcallback.enabled` is set to `false` so Spring AI's own unfiltered tool-callback provider
+never enters the context. `FilteredToolCallbackProvider` is then the only `ToolCallbackProvider` bean, and a FAILED
+server's tools have no route to the model. A client whose session goes stale mid-run is reconnected once per
+request, serialised per client, and demoted to `FAILED` when that reconnect or the retry after it also fails.
 
 ---
 

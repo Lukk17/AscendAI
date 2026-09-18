@@ -18,6 +18,7 @@ import org.springframework.boot.availability.ReadinessState;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,7 +71,7 @@ class StartupBannerIT extends TestcontainersBase {
                 .map(ILoggingEvent::getFormattedMessage)
                 .reduce("", (a, b) -> a + "\n" + b);
 
-        // Banner must be emitted with the four backing-service labels and the MCP tools line.
+        // Banner must be emitted with the four backing-service labels and the MCP servers section.
         // We assert structure, not connectivity — BackingServicesIT covers actual reachability,
         // and this IT must not flake when a singleton container's port races the JVM's resolver.
         assertThat(banner).contains("Application '");
@@ -80,10 +81,15 @@ class StartupBannerIT extends TestcontainersBase {
         assertThat(banner).contains("S3 (Floci):");
         assertThat(banner).contains("AscendMemory:");
         assertThat(banner).contains("Chat history:");
-        assertThat(banner).contains("MCP servers:");
-        assertThat(banner).contains("[Connected]");
-        assertThat(banner).contains("[FAILED]");
-        assertThat(banner).contains("Aggregate:");
+
+        // The MCP section is the authoritative view of integration state, so assert the real
+        // line format rather than the bare presence of a status word the database and cache
+        // lines already satisfy.
+        assertThat(mcpSectionLines(banner)).containsExactly(
+                "      ascend-audio-scribe:  http://localhost:7017 [Connected]",
+                "      ascend-weather-mcp:   http://localhost:9998 [FAILED]",
+                "      Aggregate: 1/2 connected");
+        assertThat(banner).doesNotContain("MCP tools");
 
         // Each backing-service line carries one of the status markers — this guards against
         // an accidental refactor that drops the [Connected]/[FAILED]/[Warning]/[Disabled] tag.
@@ -92,6 +98,25 @@ class StartupBannerIT extends TestcontainersBase {
         // Prompt endpoint line + the actual mapped path on PromptController.
         assertThat(banner).contains("MAIN PROMPT ENDPOINT");
         assertThat(banner).contains("/api/v1/ai/prompt");
+    }
+
+    private static List<String> mcpSectionLines(String banner) {
+        List<String> lines = new ArrayList<>();
+        boolean inSection = false;
+        for (String line : banner.split("\\R")) {
+            if (line.equals("    MCP servers:")) {
+                inSection = true;
+                continue;
+            }
+            if (inSection) {
+                if (line.isBlank()) {
+                    break;
+                }
+                lines.add(line);
+            }
+        }
+
+        return lines;
     }
 
     @Test
