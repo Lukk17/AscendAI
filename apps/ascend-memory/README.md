@@ -407,11 +407,11 @@ reinstalls.
 Bash:
 
 ```bash
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 ```bash
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 ```bash
@@ -419,17 +419,17 @@ rm uninstall.txt
 ```
 
 ```bash
-pip install -e .[dev]
+python -m pip install -e .[dev]
 ```
 
 PowerShell:
 
 ```powershell
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 ```powershell
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 ```powershell
@@ -437,7 +437,7 @@ Remove-Item uninstall.txt
 ```
 
 ```powershell
-pip install -e .[dev]
+python -m pip install -e .[dev]
 ```
 
 ---
@@ -445,7 +445,7 @@ pip install -e .[dev]
 ### Dependencies
 
 Dependency management lives in [pyproject.toml](pyproject.toml). Add a new dependency there, then reinstall with
-`pip install -e .[dev]`.
+`python -m pip install -e .[dev]`.
 
 ---
 

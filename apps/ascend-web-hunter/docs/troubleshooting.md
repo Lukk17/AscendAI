@@ -8,19 +8,19 @@ Common failure modes and the commands that diagnose them. For architectural rati
 ### Reinstalling Python dependencies
 
 Run each command from inside an activated venv. The sequence: list installed packages, uninstall them,
-remove the list, reinstall. `pip` commands are identical in both shells; only the file-deletion step
+remove the list, reinstall. The `python -m pip` commands are identical in both shells; only the file-deletion step
 differs between bash (`rm`) and PowerShell (`Remove-Item`).
 
 Step 1: snapshot installed packages.
 
 ```bash
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 Step 2: uninstall them all.
 
 ```bash
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 Step 3: remove the snapshot file.
@@ -40,7 +40,7 @@ Remove-Item uninstall.txt
 Step 4: reinstall.
 
 ```bash
-pip install -e .[dev]
+python -m pip install -e .[dev]
 ```
 
 ---

@@ -19,19 +19,19 @@ Every command below runs through this module's own virtual environment at `.venv
 `.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
 
 ```bash
-.venv/Scripts/pip.exe install -e .[dev]
+.venv/Scripts/python.exe -m pip install -e .[dev]
 ```
 
 ```bash
-.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7022 --reload
+.venv/Scripts/python.exe -m uvicorn src.main:app --host 0.0.0.0 --port 7022 --reload
 ```
 
 ```bash
-.venv/Scripts/pytest.exe
+.venv/Scripts/python.exe -m pytest
 ```
 
 ```bash
-.venv/Scripts/pytest.exe --cov=src --cov-report=term-missing
+.venv/Scripts/python.exe -m pytest --cov=src --cov-report=term-missing
 ```
 
 ```bash
@@ -39,7 +39,7 @@ Every command below runs through this module's own virtual environment at `.venv
 ```
 
 ```bash
-.venv/Scripts/mypy.exe src
+.venv/Scripts/python.exe -m mypy src
 ```
 
 ```bash

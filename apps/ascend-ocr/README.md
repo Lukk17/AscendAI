@@ -62,13 +62,13 @@ Install the project plus dev extras into the venv. First install is 5 to 10 minu
 roughly 3 GB of wheels:
 
 ```powershell
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 ```
 
 Run the dev server with auto-reload:
 
 ```powershell
-uvicorn src.main:app --host 0.0.0.0 --port 7022 --reload
+python -m uvicorn src.main:app --host 0.0.0.0 --port 7022 --reload
 ```
 
 Hit the readiness probe to wait until the default-language engine is warm:
@@ -84,7 +84,8 @@ curl.exe -fsS -F "file=@e2e/fixtures/argent-saga-chronicles-page1.png" -F "lang=
 ```
 
 **Linux / macOS users**: create the venv with `python3.11 -m venv .venv`, activate with `source .venv/bin/activate`,
-then the same `pip install`, `uvicorn`, and `curl` commands above (drop the `.exe` suffix on `curl`).
+then the same `python -m pip install`, `python -m uvicorn`, and `curl` commands above (drop the `.exe` suffix on
+`curl`).
 
 **No-activate alternative** that IntelliJ's Run button uses under the hood. Call the venv interpreter directly,
 nothing touches your shell:
@@ -187,7 +188,7 @@ All four commands run cleanly today and are gated in CI at
 Run the full pytest suite. The configured gate is 100 percent branch coverage:
 
 ```bash
-pytest
+python -m pytest
 ```
 
 Lint and import-sort:

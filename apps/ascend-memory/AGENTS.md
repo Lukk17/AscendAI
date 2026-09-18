@@ -19,13 +19,13 @@ Every command below runs through this module's own virtual environment at `.venv
 
 ```bash
 # Install dependencies
-.venv/Scripts/pip.exe install -e .[dev]
+.venv/Scripts/python.exe -m pip install -e .[dev]
 
 # Run the server (port 7020)
-.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7020 --reload
+.venv/Scripts/python.exe -m uvicorn src.main:app --host 0.0.0.0 --port 7020 --reload
 
 # Run tests with the configured 100% branch-coverage gate
-.venv/Scripts/pytest.exe --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+.venv/Scripts/python.exe -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 
 # Docker
 docker build -t ascend-memory:latest .

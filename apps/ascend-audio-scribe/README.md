@@ -576,11 +576,11 @@ Terminal in your activated virtual environment.
 Bash:
 
 ```bash
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 ```bash
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 ```bash
@@ -588,21 +588,21 @@ rm uninstall.txt
 ```
 
 ```bash
-pip install --no-cache-dir -r pytorch-requirements.txt
+python -m pip install --no-cache-dir -r pytorch-requirements.txt
 ```
 
 ```bash
-pip install --no-cache-dir .
+python -m pip install --no-cache-dir .
 ```
 
 PowerShell:
 
 ```powershell
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 ```powershell
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 ```powershell
@@ -610,11 +610,11 @@ Remove-Item uninstall.txt
 ```
 
 ```powershell
-pip install --no-cache-dir -r pytorch-requirements.txt
+python -m pip install --no-cache-dir -r pytorch-requirements.txt
 ```
 
 ```powershell
-pip install --no-cache-dir .
+python -m pip install --no-cache-dir .
 ```
 
 ---

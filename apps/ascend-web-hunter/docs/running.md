@@ -136,11 +136,20 @@ Add to your agent's MCP config:
 Tools advertised:
 
 - `web_search(query, limit)`: search the web through SearXNG
-- `web_read(url, include_links?, link_filter?, heavy_mode?)`: extract content from a URL
+- `web_read(url, include_links?, link_filter?, heavy_mode?, profile?, output_format?, tier?)`: extract content from a URL
 
 When the response carries `status: "human_intervention_required"`, the agent should display the `vnc_url` to
 the user and re-call `web_read` once they confirm the challenge is solved. The cached Redis session will let
 the second call succeed without escalating again.
+
+When it carries `status: "session_expired"`, the stored login for that domain and profile has lapsed and no tier
+ran. The agent should call `session_establish` for the same url and profile, have the user complete the login,
+then re-call `web_read`.
+
+`output_format` is `text` (the flat `content` field, the default) or `structured` (adds `title`, `author`, `date`
+and `sitename`), and `structured` is refused together with `include_links`. `tier` names where the chain starts,
+one of `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive` or
+`6-novnc`, and escalation continues through the tiers after it.
 
 ---
 

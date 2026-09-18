@@ -122,6 +122,52 @@ PowerShell:
 Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","heavy_mode":true}'
 ```
 
+Structured output. Adds `title`, `author`, `date` and `sitename` next to `content`. Defaults to `text`, and is
+rejected with HTTP 400 when combined with `include_links`, because the annotated-links response carries the flat
+shape plus a link map.
+
+Bash:
+
+```bash
+curl -X POST http://localhost:7021/api/v2/web/read -H "Content-Type: application/json" -d '{"url":"https://example.com","output_format":"structured"}'
+```
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","output_format":"structured"}'
+```
+
+Starting tier. Names where the escalation chain starts: `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr`,
+`4-playwright_stealth`, `5-crawlee_adaptive` or `6-novnc`, the same strings a read returns in `mode`. Escalation
+continues through the tiers after it. An unknown value is rejected with HTTP 422.
+
+Bash:
+
+```bash
+curl -X POST http://localhost:7021/api/v2/web/read -H "Content-Type: application/json" -d '{"url":"https://example.com","tier":"3-flaresolverr"}'
+```
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","tier":"3-flaresolverr"}'
+```
+
+An expired session. When a stored login for the target domain and profile no longer validates, the read stops
+before any tier runs and answers HTTP 200 with this body. Call `POST /api/v2/web/session/establish` for the same
+url and profile, complete the login, then read again.
+
+```json
+{
+  "url": "https://example.com/feed",
+  "content": "",
+  "status": "session_expired",
+  "profile": "work",
+  "message": "Stored session for example.com (profile=work) is no longer valid. Re-establish it with the session establish operation, then read again."
+}
+```
+
 ---
 
 ### Session clear (REST)

@@ -14,20 +14,20 @@ Every command below runs through this module's own virtual environment at `.venv
 
 ```bash
 # Install dependencies (pytorch first, then the project)
-.venv/Scripts/pip.exe install -r pytorch-requirements.txt
-.venv/Scripts/pip.exe install -e .[dev]
+.venv/Scripts/python.exe -m pip install -r pytorch-requirements.txt
+.venv/Scripts/python.exe -m pip install -e .[dev]
 
 # Run the server (port 7017)
-.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7017 --reload
+.venv/Scripts/python.exe -m uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
 
 # Run all tests
-.venv/Scripts/pytest.exe
+.venv/Scripts/python.exe -m pytest
 
 # Run a single test file
-.venv/Scripts/pytest.exe tests/transcription/test_openai_api_speach_to_text.py
+.venv/Scripts/python.exe -m pytest tests/transcription/test_openai_api_speach_to_text.py
 
 # Run a single test
-.venv/Scripts/pytest.exe tests/transcription/test_openai_api_speach_to_text.py::test_name -v
+.venv/Scripts/python.exe -m pytest tests/transcription/test_openai_api_speach_to_text.py::test_name -v
 
 # Docker
 docker build -t ascend-audio-scribe:latest .

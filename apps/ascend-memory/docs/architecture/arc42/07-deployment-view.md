@@ -15,13 +15,13 @@ Host machine
 Install dependencies:
 
 ```bash
-pip install -e .[dev]
+python -m pip install -e .[dev]
 ```
 
 Run the server:
 
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 7020 --reload
+python -m uvicorn src.main:app --host 0.0.0.0 --port 7020 --reload
 ```
 
 The `.env` file (not committed) overrides any `Settings` default. At minimum, `QDRANT_HOST` must point to the running
