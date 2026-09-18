@@ -106,13 +106,16 @@ are caught.
   no auth markers), then **after** a scripted login + seed, a fresh read returns logged-in content. saucedemo is a
   real login with a real session (not a mock). The reuse on the second call is the regression-prone behavior this
   part locks down.
-- **Part 3 — CAPTCHA human-solve + capture (reCAPTCHA v2, human, runs first):** read **blocked** returns HTTP 428 +
-  the intervention `vnc_url`; the human solves the reCAPTCHA in NoVNC; we assert the solved session is **captured into
-  the session store** (`session:google.com:default` with a `_GRECAPTCHA` cookie). Target is the Google reCAPTCHA v2
-  demo — the widget always needs a human click, so a headful browser can't auto-pass it and FlareSolverr can't solve
-  it (Cloudflare/DataDome targets are now auto-passed, so they no longer reliably need a human). `_GRECAPTCHA` is set
-  only on interaction, so its capture proves a human acted. Cross-request *reuse* is not asserted — a reCAPTCHA token
-  is single-use; capture is the deterministic signal that the human-intervention path works.
+- **Part 3 — CAPTCHA human-solve + capture. Shipped as its own spec 11, not as a part of spec 7.** Keeping a human
+  step inside spec 7 would have forced an otherwise fully automated spec to wait on a person, so it was carved out.
+  The target also changed, from the Google reCAPTCHA v2 demo to the democaptcha hCaptcha demo form
+  (`https://democaptcha.com/demo-form-eng/hcaptcha.html`), whose `hcaptcha.com/1/api.js` script is a block signature
+  for every automated tier. Call 1 with no session answers HTTP 428 with the intervention `vnc_url`, the human ticks
+  the widget through NoVNC, and the assertion is that the solve was **captured into the session store**:
+  `session:democaptcha.com:default` carrying the `hmt_id` cookie hCaptcha sets on the checkbox click, which proves a
+  human acted. Cross-request reuse is not asserted there, because that form renders its widget on every load and so
+  can never show reuse (register A60). Reuse is spec 12's job, on a site whose wall disappears once the clearance is
+  stored. With Part 3 gone, spec 7 is fully automated.
 
 ### Setup cost class
 
@@ -131,18 +134,19 @@ environment, never commit creds.
 
 - **Mutates:** Redis — ascend-web-hunter session store, keys for the matrix domains and the `e2e` profile of the
   login site.
-- **Conflicts with:** test 6 and any test sharing a target domain's session key. Each before/after pair (Part 2:
-  anon → seed → authed; Part 3: blocked → human solve → after) is strictly ordered; Part 3 runs first on the main
-  session while the matrix + Part 2 fan out across parallel e2e-runner agents.
+- **Conflicts with:** test 6 and any test sharing a target domain's session key, and, as shipped, tests 8, 10 and 12,
+  because this test's reset flushes every `session:*` key. Part 2's before/after pair (anon, seed, authed) is strictly
+  ordered on one runner while the matrix rows fan out across parallel e2e-runner agents. The human step that was
+  Part 3 is spec 11 and runs last of all, alone, on the main session.
 - **Serial:** false (vs non-overlapping tests).
 
 ### API client invocation
 
-Bruno requests under `docs/api/request/AscendAI/web-hunter/testing/`: the `realworld/` matrix (one per Part-1 row),
-`captcha-clearance-blocked.yml` (Part 3 Call 1), and `auth-read-secure-anon.yml` / `auth-read-secure.yml` (Part 2).
-Plus the Playwright harness `e2e/harness/seed_authenticated_session.py` (Part 2 scripted saucedemo login) and a Redis
-`GET session:google.com:default` capture check (Part 3, after the human solve). Part 3 needs no harness — the human
-solves via the scraper's own NoVNC flow.
+Bruno requests under `docs/api/request/AscendAI/web-hunter/testing/`: the `realworld/` matrix (one per Part-1 row) and
+`auth-read-secure-anon.yml` / `auth-read-secure.yml` (Part 2), plus the Playwright harness
+`e2e/harness/seed_authenticated_session.py` for Part 2's scripted saucedemo login. The human CAPTCHA step shipped as
+spec 11 with its own `captcha-clearance-blocked.yml` request and a Redis capture check against
+`session:democaptcha.com:default`. It needs no harness, since the human solves through the scraper's own NoVNC flow.
 
 ### Number assignment
 
@@ -151,5 +155,16 @@ N: 7
 ### Open design point
 
 The Step-B seed writes the captured `storage_state` into the service's Redis session store at
-`session:{domain}:{profile}` (white-box coupling to the store's key format). A future `POST /session/import`
-endpoint would decouple the harness from store internals; flagged for a follow-up.
+`session:{domain}:{profile}`, which is white-box coupling to the store's key format. A future
+`POST /api/v2/web/session/import` endpoint would decouple the harness from store internals. Still open, tracked as
+task 6.1.
+
+---
+
+## What the suite grew into
+
+This proposal covers specs 6 and 7. The suite that shipped around them holds twelve specs: 8 (`session/clear`),
+9 (`session/status`) and 10 (`session/establish`) close the gap between the session endpoints the router already
+exposed and the e2e coverage they had, 11 is the human hCaptcha spec carved out of spec 7, and 12 proves a stored
+Cloudflare clearance is reused on a second read. `design.md` records what shipped differently from this proposal,
+and `apps/ascend-web-hunter/e2e/README.md` states the contract the whole suite now holds to.

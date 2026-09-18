@@ -1,18 +1,23 @@
 ## ADDED Requirements
 
-### Requirement: Opt-in structured article output
+### Requirement: Structured article extraction behind an output-format switch
 
-The read operation SHALL support an `output_format` of `structured` that returns extracted article metadata — at least title, author, publication date, and site name — alongside the main text, using the extractor's metadata capability. When `output_format` is absent or `text`, the response shape SHALL be identical to today (the flat content field), so existing callers are unaffected.
+The orchestrator SHALL support an `output_format` of `structured` that returns extracted article metadata, at least title, author, publication date, and site name, alongside the main text, using the extractor's metadata capability. When `output_format` is absent or `text`, the response shape SHALL be the flat content field, unchanged from before. The REST and MCP read operations do not expose this field, so every response served over the API is the flat shape and no caller is affected.
 
-#### Scenario: Structured output requested
+#### Scenario: Structured output requested from the orchestrator
 
-- **WHEN** a read is requested with `output_format=structured` for an article page
-- **THEN** the response includes the main text plus available title, author, date, and site-name fields
+- **WHEN** a read runs with `output_format=structured` for an article page
+- **THEN** the result includes the main text plus available title, author, date, and site-name fields
 
 #### Scenario: Default output unchanged
 
-- **WHEN** a read is requested without `output_format`
-- **THEN** the response shape is identical to the pre-change flat content response
+- **WHEN** a read runs without `output_format`
+- **THEN** the response shape is the flat content response
+
+#### Scenario: API callers always receive the flat shape
+
+- **WHEN** a read is requested over REST or MCP
+- **THEN** the response is the flat content shape, because neither surface accepts `output_format`
 
 ### Requirement: Readability fallback for thin extractions
 

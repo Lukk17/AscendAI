@@ -1,4 +1,10 @@
-## ADDED Requirements
+# web-search-antibot-evasion Specification
+
+## Purpose
+
+Defines how ascend-web-hunter presents itself to a target site's anti-bot defences: one internally consistent browser fingerprint shared by every browser tier, an optional and off-by-default proxy egress seam wired into all four fetch tiers, and the deliberate absence of any service-side request throttling, which is left to the deployment stack.
+
+## Requirements
 
 ### Requirement: Coherent browser fingerprint across tiers
 
@@ -9,6 +15,11 @@ Every browser-based tier (Playwright, Crawlee, NoVNC) SHALL be configured from a
 - **WHEN** any browser tier creates a context
 - **THEN** its locale, timezone, and geolocation belong to the same coherent fingerprint
 - **AND** the user agent's implied platform matches the injected navigator fingerprint
+
+#### Scenario: Replaying a stored session
+
+- **WHEN** a browser tier replays a stored session that recorded its own user agent
+- **THEN** that recorded user agent is used instead of the fingerprint's default, so the replayed session stays coherent with the identity that earned it
 
 ### Requirement: Optional proxy egress, disabled by default
 
