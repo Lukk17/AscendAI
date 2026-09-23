@@ -2,13 +2,11 @@ name: E2E (free specs)
 
 # Never on pull_request: every job here boots a live docker-compose stack,
 # which a PR from an untrusted fork should not be able to trigger. Runs on
-# merges to master, on a nightly schedule, and on demand.
+# merges to master and on demand.
 on:
   push:
     branches:
       - master
-  schedule:
-    - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions:
