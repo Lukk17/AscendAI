@@ -17,10 +17,26 @@ useful.
       Decision 9 records which branch of its own rule applies. Open Question 2 is closed. The answer is not the
       reassuring one, because one page's cost is itself most of the container limit, which is what tasks 1.4 and
       1.5 now address.
-- [ ] 1.2 Measure p95 per-page inference time on the deployment's 4.0 CPU allocation, and the round-trip cost of a
+- [x] 1.2 Measure p95 per-page inference time on the deployment's 4.0 CPU allocation, and the round-trip cost of a
       trivial job through the process pool. Verify by recording both figures and setting `OCR_PAGE_TIMEOUT_SECONDS`
       and `OCR_DISPATCH_MARGIN_SECONDS` from them, replacing the provisional 120 s and 5 s in design.md with the
       measured values in the same table. This resolves the first half of Open Question 1.
+      Measured against the running container, whose allocation was verified from `docker inspect` as 4.0 CPUs and
+      12 GiB rather than taken from `compose.yaml`, with the deployed 1536 / 2,500,000 pair untouched.
+      **`OCR_PAGE_TIMEOUT_SECONDS=180`** and **`OCR_DISPATCH_MARGIN_SECONDS=2`**, both recorded in design.md's number
+      table with the sample, the method and the spread in its new "The measured per-page cost and the pool round
+      trip" section. Twenty-four single-page inferences over eight distinct pages, three rounds each: min 51.3 s,
+      median 79.5 s, max 93.8 s, with a per-page repeat spread of 1.3 to 3.3 percent, so the variation is between
+      documents rather than between runs. The sample is stated there as too thin and too uniform for a real 95th
+      percentile (eight pages, six of them one geometry from one document family), so the allowance is derived
+      from the measured maximum and the measured structure (about 55 s of detection plus about 1.1 s per detected
+      line) rather than from the nearest-rank p95 of 93.8 s. Pool round trip: 0.19 s median and 0.24 s maximum for
+      a trivial job over twelve repeats, under 0.5 s with the 45 MB worst-case upload. Two consequences are handed
+      to task 1.3 rather than decided here: the derived page limit falls to `floor(300 / 180) = 1`, and the
+      deployment's own `OCR_PAGE_TIMEOUT_SECONDS=150` override in `compose.yaml` has to move with the new default.
+      Also recorded there: the container's monotonic clock runs about 5.8 percent slow against the host, which is
+      the whole of the per-request overhead a client observes outside the worker, and one unreproduced 261 s first
+      inference on a host that was at 91 percent memory use.
 - [ ] 1.3 Decide the deployed absolute ceiling with the owner, from the p95 in 1.2 and the largest document the
       service must accept. Verify the chosen pair is recorded in design.md's number table, that the derived page
       limit is stated alongside it, and that `OCR_REQUEST_TIMEOUT` in `compose.yaml` matches. State to the

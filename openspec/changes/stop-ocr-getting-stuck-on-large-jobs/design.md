@@ -134,24 +134,99 @@ the largest page's transient and the memory is genuinely in use.
 
 ## The numbers, and where each comes from
 
-Every value below is derived. The time values still rest on a timing measurement that has not been taken. The two
-memory values are now derived from the fitted model above rather than bracketed, and what remains open about them is
-a budget and an accuracy trade, both of which belong to the owner rather than to this design.
+Every value below is derived. The two time values are now measured against the deployed container rather than
+guessed, and "The measured per-page cost and the pool round trip" below records the sample and the method. The two
+memory values are derived from the fitted model above rather than bracketed, and what remains open about them is a
+budget and an accuracy trade, both of which belong to the owner rather than to this design.
 
 | Value | Default | Where it comes from | Open? |
 |---|---|---|---|
 | Worker count | 1 | Today's `_WORKER_POOL_SIZE`, unchanged. It is a memory constraint: peak is one job's cost multiplied by this value, and one job's cost is already most of the container limit. See Decision 5. | No |
-| Per-page allowance | 120 s | The one live observation: a twenty page document had consumed more than 2100 s of worker time without finishing, so the average page on that document cost at least 105 s. 120 s is the first round value above the observed floor. | Yes, task 1.2 |
+| Per-page allowance | 180 s | Measured, task 1.2. Twenty-four single-page inferences on the running 4.0 CPU container cost 51.3 s to 93.8 s, the maximum being a 1.939 MP US Letter page carrying 35 lines. The marginal cost of text on that page size is about 1.1 s per detected line over a detection floor of roughly 55 s, so 180 s is the allowance a page of about 115 lines needs, and it is 1.9 times the measured maximum, which is the headroom the Risks section below asks for rather than sizing to a p95. | No, measured |
 | Absolute request ceiling | 300 s, unchanged for now | Today's deployed `OCR_REQUEST_TIMEOUT` in `compose.yaml`. Kept until measured, because changing it is a product decision about how long a caller holds a connection. | Yes, task 1.3 |
-| Dispatch margin | 5 s | The worker must give up before the parent does. Covers pickling the arguments, the spawn-context handoff, and the result trip back. | Yes, task 1.2 |
+| Dispatch margin | 2 s | Measured, task 1.2. The worker must give up before the parent does, and what that costs is the round trip through the pool: 0.19 s median and 0.25 s maximum for a trivial job over twelve repeats, and under 0.5 s with the largest upload the service accepts, a 45 MB file. 2 s is four times the measured worst case and still two orders of magnitude below the per-page allowance it is subtracted from. | No, measured |
 | Detector long-side bound | 1536 (`text_det_limit_type="max"`) | Decision 11 and task 1.5, resolved. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near lossless: 1280 lost dotted separators on a form, 960 lost genuine footnotes from a legal opinion. Recorded with the full candidate table in [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). | No — owner decided |
-| Maximum pages | derived, not configured | `floor(ceiling / per-page allowance)`. At the provisional values that is 2. It is a deadline artifact and not a memory constraint, which the restatement below shows. | Follows its two inputs |
+| Maximum pages | derived, not configured | `floor(ceiling / per-page allowance)`. At the measured allowance and today's undecided 300 s ceiling that is 1, down from 2 at the provisional allowance. It is a deadline artifact and not a memory constraint, which the restatement below shows, and it is the strongest argument task 1.3 has for raising the ceiling. | Follows its two inputs |
 | Reclamation grace | derived, not configured | `per-page allowance + dispatch margin`. The latest a healthy worker can legitimately return is one page's inference after its own budget expired, plus the trip back. | Follows its two inputs |
 | Pixel ceiling for one inference | 2,500,000, unchanged | Deployed together with the 1536 detector bound above, per this section's own concluding guidance: the defensible ceiling pending task 1.6 is the one that already covers the standard page sizes (A4 2.00 MP, Letter 1.94 MP, Legal 2.47 MP) with a bound deployed alongside it, which is where the change's original provisional value already sat. Not the 1,720,000 unbounded-case value computed further down, which assumes no detector bound and would needlessly refuse A4. Task 8.9 measured a real twenty-page A4 document against this pair and recorded the peak against the model's prediction. | Task 1.6 still open, for ceilings materially above the standard page sizes |
 | Consecutive pool rebuild attempts | 3 | Decision 12. Enough to survive a transient kill, few enough that a genuine crash loop stops and stays visibly not-ready instead of respawning forever. | No |
 
 Two numbers deliberately are not configuration. The maximum page count and the reclamation grace are computed from
 the two time settings, so they cannot drift out of agreement with them. An operator tunes them by tuning the times.
+
+### The measured per-page cost and the pool round trip
+
+Task 1.2's measurement, taken against the deployed `ascend-ocr` container on 2026-09-19. The allocation was verified
+from the container rather than from the compose file it was meant to come from: `NanoCpus` 4,000,000,000 and
+`Memory` 12,884,901,888, which is 4.0 CPUs and 12 GiB, matching `compose.yaml`. The deployed detector bound and
+pixel ceiling were left exactly as they stand, 1536 and 2,500,000, and one inference was observed saturating the
+whole allocation at 400 percent CPU and 9.76 GiB.
+
+The sample, stated first because a percentile is worth no more than what it was computed from. Eight distinct
+single pages, every one of them already in the repository: the five pages of
+`apps/ascend-agent/e2e/fixtures/argent-saga-chronicle.pdf` split into single-page documents, the one page of
+`banana-price-poland.pdf`, and the two screenshots in `apps/ascend-ocr/e2e/fixtures/`. The six PDF pages are US
+Letter, 612x792 pt, which the library's fixed 144 dpi renders at 1224x1584 px, 1.939 megapixels. The two
+screenshots are 0.725 megapixels. Text density runs from 2 detected lines to 35. Each page was submitted three
+times, giving twenty-four observations, all of which succeeded, plus a genuine two-page document submitted twice as
+a cross-check.
+
+That sample does not support a 95th percentile and this section does not claim one. Eight pages, six of them one
+geometry from one document family, is a sample of fixtures rather than of the service's real traffic, so the
+nearest-rank p95 over twenty-four observations is simply the second largest value and would move with the choice of
+fixtures rather than with the service. What it does support is a range and a structure, and those are reported
+instead.
+
+| Figure | Value |
+|---|---|
+| Per-page inference, all 24 observations | min 51.3 s, median 79.5 s, mean 74.4 s, max 93.8 s, standard deviation 16.6 s |
+| Per-page inference, the eighteen 1.939 MP US Letter pages | min 56.2 s, median 86.9 s, max 93.8 s |
+| Per-page inference, the six 0.725 MP screenshots | min 51.3 s, median 53.7 s, max 55.8 s |
+| Repeat spread on one page across the three rounds | coefficient of variation 1.3 to 3.3 percent |
+| Nearest-rank p95 over the 24, reported for completeness only | 93.8 s |
+
+Almost all of the 16.6 s standard deviation is between documents rather than between runs. Repeating one page gives
+the same answer to within a few percent, so the cost of a page is a property of the page.
+
+Its structure is two terms. A 1.939 MP page with 2 detected lines cost about 57 s and the same page size with 35
+lines cost about 93 s, which puts detection at roughly 55 s of fixed cost under the 1536 bound and recognition at
+roughly 1.1 s per detected line. The screenshots cost less for the same line count because they are 0.725
+megapixels and the 1536 bound never fires on them, which is the same relationship the memory model already
+describes. That structure is what justifies an allowance well above the measured maximum: the densest page in this
+repository carries 35 lines, and a form or a legal page carrying 115 would reach 180 s on this hardware.
+
+The two-page cross-check confirms the per-page model is additive: 181.7 s and 176.6 s of page inference for two
+pages, against 90.3 s as the single-page average of the same two pages measured separately.
+
+The pool round trip was measured by decomposition rather than by inference. A request refused at the boundary by
+the pixel ceiling never reaches the gate or the pool, and cost 5 to 11 ms for a 16 KB upload and 0.82 to 0.93 s for
+a 45 MB one, the difference being the upload itself. The smallest job that actually runs, a 320x80 px image,
+cost 0.179 to 0.247 s outside the worker across twelve repeats, of which 6 ms is that boundary, leaving a round
+trip of 0.19 s median and 0.24 s maximum. Repeating it with a 45 MB upload, which is the largest
+`MAX_FILE_SIZE_MB` admits and therefore the worst case for pickling the arguments, left the round trip under 0.5 s.
+Those two figures are upper bounds rather than the cost itself, because they still contain the clock artifact the
+next paragraph describes: remove it and what is left of a trivial job's dispatch is a few tens of milliseconds. The
+margin is set from the upper bounds anyway, since they are what a stopwatch on the outside would see.
+
+One caveat on how to read every number above, found while decomposing that round trip. The container's monotonic
+clock runs about 5.8 percent slow against the host: 120.17 s of host time measured 113.26 s and 113.19 s inside the
+container over two independent probes, while the container's NTP-corrected wall clock tracked the host to within
+1.2 percent, which is the signature of a hypervisor that syncs the wall clock and lets the monotonic clock
+free-run. Every figure in this section is in the container's own clock, which is the right one, because the service
+measures its deadlines with `time.monotonic()` inside that same container and the settings are compared against it.
+A caller's stopwatch will read about 6 percent longer than any of them, and that 6 percent is the whole of the
+apparent per-request overhead a client observes outside the worker.
+
+Two things could not be measured and are recorded rather than smoothed over. The first inference after the
+container had sat idle cost 261 s against a steady state of 86 to 91 s for the same page, once, and was never
+reproduced. It is not engine construction, because the Polish engine was built fresh mid-run and its first page
+cost 54.7 s against 51.3 s and 53.9 s later. The most likely cause is the host, which was at 91 percent memory use
+with 2.7 GiB free while one inference needs 9.76 GiB, so the virtual machine had to grow before the first large
+allocation and not afterwards. Reproducing it would mean restarting the container or the pool, which the
+measurement was not permitted to do, and the same memory pressure ruled out re-running the experiment natively on
+the host. It is a further reason for headroom in the per-page allowance rather than a reason to price it at 261 s.
+The second is that no page above 1.939 megapixels exists in this repository, so nothing between there and the
+2,500,000 pixel ceiling was measured at all.
 
 ### The pixel ceiling, recomputed
 
@@ -206,16 +281,19 @@ defensible either until 1.6 reports.
 
 ### The page count limit, restated
 
-The deadline arithmetic is unchanged. The limit is `floor(absolute ceiling / per-page allowance)`, which is 2 pages
-at the provisional 300 s and 120 s. What the measurement changes is why.
+The deadline arithmetic is unchanged. The limit is `floor(absolute ceiling / per-page allowance)`, which is 1 page
+at the 300 s ceiling task 1.3 has yet to revisit and the 180 s allowance task 1.2 measured. It was 2 at the
+provisional 120 s, and 2 at the 150 s the deployment currently sets, so the measurement has made the existing
+restriction tighter rather than looser. What the measurement changes is why.
 
 Memory does not cap page count anywhere near there. A page retains 11.5 MiB, so under a 12,288 MiB resident ceiling
 an unbounded A4 job runs out of memory at about ninety pages counted from a fresh worker, and an A4 job whose
 detector is bounded to 960 costs 5518 MiB on a worker with a full cache and does not run out until roughly 590
 pages.
 
-So the two page limit is entirely an artifact of the deployed 300 s ceiling. The consequence for the owner is
-direct: a service that must read twenty page documents needs an absolute ceiling of twenty per-page allowances, and
+So the page limit is entirely an artifact of the deployed 300 s ceiling. The consequence for the owner is
+direct: a service that must read twenty page documents needs an absolute ceiling of twenty per-page allowances,
+which at the measured 180 s is 3600 s, and
 the memory that decision costs is 230 MiB rather than a multiple of anything. What it costs instead is how long a
 caller holds a connection, which is the trade task 1.3 puts to the owner.
 
@@ -411,9 +489,10 @@ Beyond it, accepting the job means holding the only worker for the entire ceilin
 failed, which is the exact behaviour this change exists to remove. So it is refused at the boundary, with the same
 `FILE_TOO_LARGE` code and a detail naming the page count and the limit.
 
-At the provisional numbers the limit is `floor(300 / 120) = 2` pages, and that is worth stating plainly rather than
-shipping quietly. It means the service as currently configured cannot read a three page document, which was already
-true and simply invisible: it would have accepted the job, held the worker, and failed. The change makes it say so
+With the measured allowance and the ceiling task 1.3 has yet to set, the limit is `floor(300 / 180) = 1` page, and
+that is worth stating plainly rather than shipping quietly. It means the service as currently configured cannot read
+a two page document, which was already true of a three page one and simply invisible: it would have accepted the
+job, held the worker, and failed. The change makes it say so
 in milliseconds instead of five minutes, and it makes the underlying trade legible, which is that the deployed
 ceiling and the per-page cost together decide how large a document this service accepts.
 
@@ -634,16 +713,20 @@ every restructuring that avoids it either pays for the next page's inference jus
 Judged an acceptable trade of the interface `predict_iter()` offers, not a defect with a clean fix, and consistent
 with this change's own explicit requirement that an expired budget "SHALL NOT return a partial result" — the
 philosophy already treats "over budget" as a hard line regardless of how much of the true reason was "no more work
-left to do." Operators choosing the per-page allowance (task 1.2) should read this as a reason to keep real headroom
-above the measured per-page cost rather than sizing it exactly to the p95.
+left to do." It is why task 1.2 set the per-page allowance at 1.9 times the measured maximum rather than at the
+measured p95, and an operator retuning it should keep that headroom for the same reason. It was seen again during
+that measurement: a single-page document whose one page cost 261 s against a 150 s allowance failed with
+`OCR_FAILED` after the page had in fact been read.
 
 Worker replacement costs a warm-up, five to fifteen seconds, during which the service is honestly not ready.
 Mitigation: it only happens after a job has already failed and refused to stop, the empty pool queue means nothing
 else is lost, and readiness says so rather than accepting work it cannot serve.
 
-The page count limit at the provisional numbers is two pages, which is a visible restriction on what the service
-accepts. Mitigation: it is provisional, it is derived rather than chosen, task 1.3 sets the deployed pair, and the
-alternative is accepting jobs that cannot finish. This is disclosure of an existing limit, not a new one.
+The page count limit falls to one page once the measured 180 s allowance meets the 300 s ceiling that has not yet
+been revisited, which is a visible restriction on what the service accepts and a tighter one than the two pages the
+provisional numbers implied. Mitigation: it is derived rather than chosen, the ceiling is the input that moves it
+and task 1.3 sets it with the owner now that the per-page cost is known, and the alternative is accepting jobs that
+cannot finish. This is disclosure of an existing limit, sharpened by measurement, not a new one.
 
 The pixel ceiling and the detector bound are one decision split across two settings, and a deploy that sets only
 one of them is wrong in a different direction each way. Worse, the defaults are not neutral: an image deployed
@@ -689,10 +772,11 @@ Configuration is the one ordered part. The new settings all have defaults, so th
 change, but the pixel ceiling and the detector bound are shipped as a pair by default: `OCR_DETECTOR_MAX_SIDE=1536`
 with `OCR_MAX_INFERENCE_PIXELS=2,500,000`, the owner's measured choice recorded in
 [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md), so A4 and the other
-standard page sizes are accepted out of the box rather than refused pending a follow-up deploy. `OCR_REQUEST_TIMEOUT`
-and the per-page allowance still await task 1.3's measurement; until then they keep their provisional values and the
-derived page limit stays at 2, which is a disclosure of an existing limit rather than a regression this change
-introduces.
+standard page sizes are accepted out of the box rather than refused pending a follow-up deploy. The per-page
+allowance and the dispatch margin are now measured, 180 s and 2 s, and the deployment currently sets
+`OCR_PAGE_TIMEOUT_SECONDS=150` in `compose.yaml`, so that override has to move with them or be dropped.
+`OCR_REQUEST_TIMEOUT` still awaits task 1.3's decision, and until it is taken the derived page limit is one page,
+which is a disclosure of an existing limit rather than a regression this change introduces.
 
 Deploying the image with its shipped defaults is not the unbounded-and-refusing state this plan originally warned
 about, because the detector bound and pixel ceiling pair now ships together. Everything else in the change is
@@ -704,10 +788,12 @@ request parameter was added.
 
 ## Open Questions
 
-1. What is the p95 per-page inference time on the deployment's 4.0 CPU allocation, and what should the deployed
-   ceiling therefore be? Task 1.2 measures it and task 1.3 turns it into the deployed pair with the owner. It
-   changes three defaults and no behaviour, so it is deferrable in the sense that the mechanism is correct whatever
-   the numbers are, but the pair must be decided before the change is called done.
+1. Half closed. Task 1.2 measured the per-page cost on the deployment's verified 4.0 CPU and 12 GiB allocation:
+   51.3 s to 93.8 s over twenty-four single-page inferences, with the sample too thin to carry a true p95, and a
+   pool round trip of 0.19 s. The per-page allowance is 180 s and the dispatch margin is 2 s, both recorded in the
+   number table with their derivation in "The measured per-page cost and the pool round trip". What the deployed
+   absolute ceiling should therefore be is still task 1.3's, and it is now the more pressing half, because at
+   today's 300 s the derived page limit is one page.
 2. Closed. Peak memory is flat across page count, at 11.5 MiB of retained result per page. The model, its fit and
    its two validations are in "The measured memory model", and Decision 9 records which branch of its own rule
    applies and why the answer turned out not to be the reassuring one.
