@@ -74,6 +74,12 @@ purposes.
   test 3 conflict. It now names both.
 - The version in pyproject.toml, AGENTS.md and the constraints document lagged this changelog at
   0.0.3. All three say 0.0.5.
+- The development compose file still exported service.version=0.0.3 in OTEL_RESOURCE_ATTRIBUTES.
+  It says 0.0.5 now.
+- The REDIS_URL default was redis://localhost:6379/0. On a Windows host localhost resolves to IPv6
+  first, the asyncio Redis client timed out, and the cookie store fell back to memory without a
+  word. The default and every documented example say redis://127.0.0.1:6379/0 now. Both compose
+  files set REDIS_URL themselves, so containers are unaffected.
 - End-to-end spec 7 Part 3 targeted Google's reCAPTCHA v2 demo, whose script stays in the DOM after
   the solve so the NoVNC monitor could never declare that address cleared, and asserted a
   _GRECAPTCHA cookie that appears on a bare load. Part 3, its template and the Bruno request target

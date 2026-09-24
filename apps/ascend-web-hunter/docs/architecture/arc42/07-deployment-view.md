@@ -57,7 +57,7 @@ health check needs to model. See [ADR-008](../decisions/ADR-008-blocklist-vendor
 | `SEARXNG_BASE_URL` | `http://localhost:9020` | SearXNG endpoint. Docker Compose overrides to `http://searxng:8080`. |
 | `SEARXNG_USER_AGENT` | `ascend-web-hunter/1.0` | User-Agent sent to SearXNG. |
 | `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr endpoint. |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for session cookie store. |
+| `REDIS_URL` | `redis://127.0.0.1:6379/0` | Redis connection for session cookie store. |
 | `BLOCKLIST_URL` | `https://secure.fanboy.co.nz/fanboy-annoyance.txt` | Source `POST /api/v1/blocklist/refresh` downloads from. Never fetched automatically. |
 | `BLOCKLIST_PATH` | `src/assets/fanboy-annoyance.txt` | Path to the vendored blocklist file; also where a refresh writes. |
 | `BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS` | `60.0` | Minimum seconds between accepted refresh attempts. |

@@ -96,4 +96,4 @@ start of every request and inject the stored cookies and User-Agent into the out
 - `src/reader/strategies/beautifulsoup_strategy.py:29-37` — reads and injects cached session data.
 - `src/reader/strategies/trafilatura_strategy.py:27-36` — reads and injects cached session data.
 - `src/reader/strategies/flaresolverr_strategy.py:53-56` — saves `cf_clearance` after a successful solve.
-- `src/config/config.py` — `REDIS_URL` (default `redis://localhost:6379/0`).
+- `src/config/config.py` — `REDIS_URL` (default `redis://127.0.0.1:6379/0`).

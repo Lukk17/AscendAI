@@ -48,7 +48,7 @@ PowerShell:
 Install dependencies (identical in both shells):
 
 ```bash
-pip install -e .[dev]
+pip install -e ".[dev]"
 ```
 
 Install Playwright browsers (identical in both shells):

@@ -18,6 +18,17 @@ def test_settings_defaults():
     assert settings.SEARXNG_BASE_URL == "http://localhost:9020"
 
 
+def test_redis_url_default_uses_ipv4_loopback_not_localhost(monkeypatch):
+    # given
+    monkeypatch.delenv("REDIS_URL", raising=False)
+
+    # when
+    settings = Settings(_env_file=None)
+
+    # then
+    assert settings.REDIS_URL == "redis://127.0.0.1:6379/0"
+
+
 def test_settings_env_override():
     # given
     # Mocking environment variables

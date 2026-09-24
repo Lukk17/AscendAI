@@ -17,17 +17,57 @@ Every command below runs through this module's own virtual environment at `.venv
 `python -m venv .venv`, see docs/running.md) — never the system Python or pip. Windows interpreter:
 `.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
 
+Install dependencies, Windows:
+
+```powershell
+.venv/Scripts/python.exe -m pip install -e ".[dev]"
+```
+
+Linux/macOS:
+
 ```bash
-# Install dependencies
-.venv/Scripts/python.exe -m pip install -e .[dev]
+.venv/bin/python -m pip install -e ".[dev]"
+```
 
-# Run the server (port 7021)
+Install the Playwright Chromium build, Windows:
+
+```powershell
+.venv/Scripts/python.exe -m playwright install chromium
+```
+
+Linux/macOS (`--with-deps` also installs the system libraries Chromium needs, and may ask for sudo):
+
+```bash
+.venv/bin/python -m playwright install --with-deps chromium
+```
+
+Run the server (port 7021), Windows:
+
+```powershell
 .venv/Scripts/python.exe -m uvicorn src.main:app --host 0.0.0.0 --port 7021 --reload
+```
 
-# Run tests with the configured 100% branch-coverage gate
+Linux/macOS:
+
+```bash
+.venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 7021 --reload
+```
+
+Run tests with the configured 100% branch-coverage gate, Windows:
+
+```powershell
 .venv/Scripts/python.exe -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+```
 
-# Docker
+Linux/macOS:
+
+```bash
+.venv/bin/python -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+```
+
+Docker, identical on every platform:
+
+```bash
 docker build -t ascend-web-hunter:latest .
 ```
 

@@ -149,7 +149,7 @@ class Settings(BaseSettings):
         description="Public Internet-facing VNC URL (can be Ngrok api string)",
     )
     REDIS_URL: str = Field(
-        default="redis://localhost:6379/0",
+        default="redis://127.0.0.1:6379/0",
         description="Redis connection URL for cookie storage",
     )
 
