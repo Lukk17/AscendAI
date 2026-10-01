@@ -5,16 +5,17 @@ spring-dependency-management = "1.1.7"
 spring-integration-aws = "3.0.10"
 springdoc = "2.8.17"
 aws-sdk = "2.42.34"
-# qdrant-client intentionally NOT overridden — Spring AI BOM manages it at 1.13.0.
+# qdrant-client intentionally NOT overridden - Spring AI BOM manages it at 1.13.0.
 # Overriding to 1.17.0 breaks QdrantVectorStore (gRPC proto classes removed in 1.14+).
 commonmark = "0.28.0"
 pdfbox = "3.0.7"
-# Tika 3.3.0 — closes CVE-2025-66516 (CVSS 10) and CVE-2025-54988 vs the previous 2.9.4 EOL pin.
+# Tika 3.3.0 - closes CVE-2025-66516 (CVSS 10) and CVE-2025-54988 vs the previous 2.9.4 EOL pin.
 # Spring AI BOM 1.1.5 uses Tika 3.x transitively but does not publish tika-core as a managed entry,
 # so we pin it directly here.
 tika = "3.3.0"
 jacoco = "0.8.14"
 testcontainers = "2.0.5"
+pact = "4.6.21"
 
 [libraries]
 # Spring Boot starters (versions managed by Spring Boot BOM)
@@ -46,7 +47,7 @@ aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 # AWS SDK (version managed by AWS BOM)
 aws-sdk-s3 = { module = "software.amazon.awssdk:s3" }
 
-# Springdoc OpenAPI (no BOM published — version managed here)
+# Springdoc OpenAPI (no BOM published - version managed here)
 springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 
 # Database (versions managed by Spring Boot BOM)
@@ -55,7 +56,7 @@ liquibase-core = { module = "org.liquibase:liquibase-core" }
 h2 = { module = "com.h2database:h2" }
 
 # Standalone libraries (manual versioning)
-# qdrant-client: version managed by Spring AI BOM (1.13.0) — do not override
+# qdrant-client: version managed by Spring AI BOM (1.13.0) - do not override
 qdrant-client = { module = "io.qdrant:client" }
 commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
@@ -64,7 +65,7 @@ tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 # Spring Security (Boot BOM managed)
 spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
 
-# Actuator — exposes /actuator/health for liveness probes and the e2e prereq check.
+# Actuator - exposes /actuator/health for liveness probes and the e2e prereq check.
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 
 # Observability: Prometheus metrics registry + OTel tracing bridge/exporter
@@ -75,7 +76,7 @@ opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporte
 # Lombok (version managed by Spring Boot BOM)
 lombok = { module = "org.projectlombok:lombok" }
 
-# Spring Boot configuration-properties metadata processor — generates
+# Spring Boot configuration-properties metadata processor - generates
 # META-INF/spring-configuration-metadata.json so IntelliJ resolves @ConfigurationProperties
 # keys in application.yaml (e.g., app.s3.public-endpoint, app.memory.semantic.*).
 spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
@@ -83,12 +84,15 @@ spring-boot-configuration-processor = { module = "org.springframework.boot:sprin
 # Test
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 
-# Testcontainers — integration tests against real Postgres / Redis / Qdrant / Floci
+# Testcontainers - integration tests against real Postgres / Redis / Qdrant / Floci
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
 testcontainers-qdrant = { module = "org.testcontainers:qdrant" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+
+# Pact consumer contract tests against ascend-ocr
+pact-consumer-junit5 = { module = "au.com.dius.pact.consumer:junit5", version.ref = "pact" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

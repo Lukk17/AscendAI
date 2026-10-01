@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.when;
 class DocumentRouterTest {
 
     private static final int TEXT_THRESHOLD = 50;
+    private static final String CANARY = "ARGENT-SAGA-CANARY-7731";
 
     @Mock
     private IngestionService ingestionService;
@@ -100,6 +102,23 @@ class DocumentRouterTest {
         List<Document> result = documentRouter.routeAndProcess(bytes, filename, "image/" + extension);
 
         assertThat(result).containsExactly(mockDoc);
+        verify(ascendOcrClient).process(bytes, filename, null);
+    }
+
+    @Test
+    @DisplayName("routeAndProcess keeps a canary intact through the OCR Markdown headings and the chunking below it")
+    void routeAndProcess_WhenOcrMarkdownIsChunked_ThenCanarySurvives() {
+        byte[] bytes = "scan_bytes".getBytes();
+        String filename = "scan.png";
+        String markdown = ocrMarkdownWithCanary();
+        when(ascendOcrClient.process(bytes, filename, null))
+                .thenReturn(List.of(new Document(markdown, Map.of("source", filename, "type", "ascendocr"))));
+
+        List<Document> routed = documentRouter.routeAndProcess(bytes, filename, "image/png");
+        List<Document> chunks = productionChunker().splitDocuments(routed);
+
+        assertThat(chunks).hasSizeGreaterThan(1);
+        assertThat(chunks).anySatisfy(chunk -> assertThat(chunk.getText()).contains(CANARY));
         verify(ascendOcrClient).process(bytes, filename, null);
     }
 
@@ -230,7 +249,7 @@ class DocumentRouterTest {
     @Test
     @DisplayName("routeAndProcess routes to Docling when text length is exactly at the threshold boundary")
     void routeAndProcess_WhenTextLengthExactlyAtThreshold_ThenRouteToDocling() throws IOException {
-        // given — boundary: text length == threshold routes to Docling (not OCR)
+        // given - boundary: text length == threshold routes to Docling (not OCR)
         int threshold = 30;
         setThreshold(threshold);
         String borderText = "A".repeat(threshold);
@@ -250,7 +269,7 @@ class DocumentRouterTest {
     @Test
     @DisplayName("routeAndProcess routes to ascend-ocr when text length is below the threshold")
     void routeAndProcess_WhenTextLengthBelowThreshold_ThenRouteToAscendOcr() throws IOException {
-        // given — below threshold: short text on page → treated as scanned → OCR
+        // given - below threshold: short text on page → treated as scanned → OCR
         int threshold = 80;
         setThreshold(threshold);
         byte[] pdfBytes = createTextPdf("Hi");
@@ -330,6 +349,36 @@ class DocumentRouterTest {
             document.save(baos);
             return baos.toByteArray();
         }
+    }
+
+    private String ocrMarkdownWithCanary() {
+        String filler = "Kroniki Srebrnej Sagi opisuja dawny blask miasta. ".repeat(45);
+
+        return """
+                ## Page 1
+
+                %s
+
+                ## Page 2
+
+                %s
+
+                ## Page 3
+
+                %s %s
+                """.formatted(filler, filler, filler, CANARY);
+    }
+
+    // Mirrors app.ingestion.token-splitter in application.yaml.
+    private DocumentService productionChunker() {
+        DocumentService documentService = new DocumentService();
+        ReflectionTestUtils.setField(documentService, "tokenSplitterChunkSize", 500);
+        ReflectionTestUtils.setField(documentService, "minChunkSizeChars", 350);
+        ReflectionTestUtils.setField(documentService, "minChunkLengthToEmbed", 5);
+        ReflectionTestUtils.setField(documentService, "maxNumChunks", 10000);
+        ReflectionTestUtils.setField(documentService, "keepSeparator", true);
+
+        return documentService;
     }
 
     private byte[] createBlankPdf() throws IOException {

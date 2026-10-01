@@ -45,6 +45,7 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
     private final List<McpSyncClient> allClients;
     private final McpClientStatusRegistry registry;
     private final McpStartupProperties startupProperties;
+    private final McpToolCallbackCache toolCallbackCache;
     private final Map<String, ReconnectGate> reconnectGates = new ConcurrentHashMap<>();
 
     /** OpenAI and Anthropic require tool function names to match this pattern. */
@@ -52,15 +53,20 @@ public class FilteredToolCallbackProvider implements ToolCallbackProvider {
 
     public FilteredToolCallbackProvider(List<McpSyncClient> allClients,
                                         McpClientStatusRegistry registry,
-                                        McpStartupProperties startupProperties) {
+                                        McpStartupProperties startupProperties,
+                                        McpToolCallbackCache toolCallbackCache) {
         this.allClients = allClients;
         this.registry = registry;
         this.startupProperties = startupProperties;
+        this.toolCallbackCache = toolCallbackCache;
     }
 
     @Override
     public ToolCallback[] getToolCallbacks() {
-        Set<String> connected = registry.connectedNames();
+        return toolCallbackCache.getOrList(this::listToolCallbacks);
+    }
+
+    private ToolCallback[] listToolCallbacks(Set<String> connected) {
         List<McpSyncClient> connectedClients = allClients.stream()
                 .filter(client -> connected.contains(McpConnectionNames.resolve(client)))
                 .toList();

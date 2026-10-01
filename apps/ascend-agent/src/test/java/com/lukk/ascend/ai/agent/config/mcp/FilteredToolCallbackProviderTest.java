@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.config.mcp;
 
 import com.lukk.ascend.ai.agent.config.properties.McpStartupProperties;
+import com.lukk.ascend.ai.agent.config.properties.McpToolCacheProperties;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpTransportSessionNotFoundException;
@@ -18,6 +19,7 @@ import org.springframework.ai.tool.definition.DefaultToolDefinition;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +57,8 @@ class FilteredToolCallbackProviderTest {
 
     private McpStartupProperties startupProperties;
 
+    private McpToolCallbackCache toolCallbackCache;
+
     private FilteredToolCallbackProvider provider;
 
     @BeforeEach
@@ -65,7 +69,8 @@ class FilteredToolCallbackProviderTest {
         when(failedClient.getClientInfo()).thenReturn(failedInfo);
 
         startupProperties = new McpStartupProperties();
-        provider = new FilteredToolCallbackProvider(List.of(connectedClient, failedClient), registry, startupProperties);
+        toolCallbackCache = new McpToolCallbackCache(registry, new McpToolCacheProperties(), Clock.systemUTC());
+        provider = new FilteredToolCallbackProvider(List.of(connectedClient, failedClient), registry, startupProperties, toolCallbackCache);
     }
 
     @Test
@@ -91,7 +96,7 @@ class FilteredToolCallbackProviderTest {
     @Test
     @DisplayName("getToolCallbacks with no clients returns empty array")
     void getToolCallbacks_NoClients_ReturnsEmptyArray() {
-        FilteredToolCallbackProvider emptyProvider = new FilteredToolCallbackProvider(List.of(), registry, startupProperties);
+        FilteredToolCallbackProvider emptyProvider = new FilteredToolCallbackProvider(List.of(), registry, startupProperties, toolCallbackCache);
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
         ToolCallback[] callbacks = emptyProvider.getToolCallbacks();
@@ -105,7 +110,7 @@ class FilteredToolCallbackProviderTest {
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(failedClient), registry, startupProperties);
+                List.of(failedClient), registry, startupProperties, toolCallbackCache);
 
         ToolCallback[] callbacks = singleProvider.getToolCallbacks();
 
@@ -121,7 +126,7 @@ class FilteredToolCallbackProviderTest {
                 .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(connectedClient), registry, startupProperties);
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
 
         ToolCallback[] callbacks = singleProvider.getToolCallbacks();
 
@@ -158,7 +163,7 @@ class FilteredToolCallbackProviderTest {
         doThrow(new IllegalStateException("Connection refused")).when(connectedClient).initialize();
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(connectedClient), registry, startupProperties);
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
 
         ToolCallback[] callbacks = singleProvider.getToolCallbacks();
 
@@ -176,7 +181,7 @@ class FilteredToolCallbackProviderTest {
                 .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(connectedClient), registry, startupProperties);
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
 
         assertThat(singleProvider.getToolCallbacks()).hasSize(1);
         verify(registry, never()).markFailed(anyString());
@@ -205,7 +210,7 @@ class FilteredToolCallbackProviderTest {
         }).when(connectedClient).initialize();
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(connectedClient), registry, startupProperties);
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
 
         CountDownLatch startLine = new CountDownLatch(1);
         Callable<ToolCallback[]> discovery = () -> {
