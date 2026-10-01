@@ -16,6 +16,7 @@ class _Segment:
 
 
 def test_load_model_caches_and_returns_same_instance(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     fake_torch = MagicMock()
     fake_torch.cuda.is_available.return_value = False
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
@@ -25,11 +26,16 @@ def test_load_model_caches_and_returns_same_instance(monkeypatch: pytest.MonkeyP
     monkeypatch.setitem(sys.modules, "faster_whisper", fake_whisper)
 
     first = mod._load_model("path-a")
+
+    # when
     second = mod._load_model("path-a")
+
+    # then
     assert first is second
 
 
 def test_load_model_reloads_on_path_change(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     fake_torch = MagicMock()
     fake_torch.cuda.is_available.return_value = True
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
@@ -38,18 +44,27 @@ def test_load_model_reloads_on_path_change(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setitem(sys.modules, "faster_whisper", fake_whisper)
 
     first = mod._load_model("path-a")
+
+    # when
     second = mod._load_model("path-b")
+
+    # then
     assert first is not second
 
 
 def test_transcribe_chunk_sync_returns_offset_segments(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     fake_model = MagicMock()
     fake_model.transcribe.return_value = (
         [_Segment("hello", 0.0, 1.0), _Segment("world", 1.0, 2.0)],
         MagicMock(),
     )
     monkeypatch.setattr(mod, "_load_model", lambda _path: fake_model)
+
+    # when
     out = mod._transcribe_chunk_sync("model", "chunk.wav", "en", time_offset_s=10.0)
+
+    # then
     assert out == [
         {"text": "hello", "start": 10.0, "end": 11.0},
         {"text": "world", "start": 11.0, "end": 12.0},
@@ -75,6 +90,7 @@ class _FakeChunks:
 
 @pytest.mark.asyncio
 async def test_local_speech_transcription_stream_yields_segments(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks(["chunk0.wav", "chunk1.wav"]))
     monkeypatch.setattr(
         asyncio,
@@ -82,6 +98,9 @@ async def test_local_speech_transcription_stream_yields_segments(monkeypatch: py
         AsyncMock(return_value=[{"text": "hi", "start": 0.0, "end": 1.0}]),
     )
 
+    # when
     results = [seg async for seg in mod.local_speech_transcription_stream("m", "a.wav", "en")]
+
+    # then
     assert len(results) == 2
     assert results[0]["text"] == "hi"

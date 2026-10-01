@@ -26,28 +26,42 @@ def hf_token(monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 def test_get_client_caches(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     sentinels = [MagicMock(name="a"), MagicMock(name="b")]
     monkeypatch.setattr(mod, "InferenceClient", MagicMock(side_effect=sentinels))
     first = mod._get_client("hf-inference", "tok")
+
+    # when
     second = mod._get_client("hf-inference", "tok")
+
+    # then
     assert first is second
 
 
 def test_transcribe_single_chunk_returns_text() -> None:
+    # given
     client = MagicMock()
     client.automatic_speech_recognition.return_value = {"text": "hello"}
+
+    # when / then
     assert mod._transcribe_single_chunk(client, "x.wav", "model") == "hello"
 
 
 def test_transcribe_single_chunk_http_error() -> None:
+    # given
     client = MagicMock()
     client.automatic_speech_recognition.side_effect = _make_hf_http_error("boom")
+
+    # when / then
     with pytest.raises(UpstreamProviderError, match="Hugging Face upstream call failed"):
         mod._transcribe_single_chunk(client, "x.wav", "model")
 
 
 def test_hf_transcript_missing_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(settings, "HF_TOKEN", None)
+
+    # when / then
     with pytest.raises(ValueError, match="HF_TOKEN is not configured"):
         mod.hf_transcript("x.wav", "model", "hf-inference")
 
@@ -87,6 +101,7 @@ class _FakeChunksRaises:
 
 
 def test_hf_transcript_text_path(hf_token: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # given
     del hf_token
     client = MagicMock()
     client.automatic_speech_recognition.return_value = {"text": "hi"}
@@ -96,7 +111,11 @@ def test_hf_transcript_text_path(hf_token: str, monkeypatch: pytest.MonkeyPatch,
     chunk.write_bytes(b"x")
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(chunk)]))
     progress: list[dict[str, Any]] = []
+
+    # when
     result = mod.hf_transcript("a.wav", "m", "hf-inference", progress_callback=progress.append)
+
+    # then
     assert result == "hi"
     assert progress
 
@@ -104,6 +123,7 @@ def test_hf_transcript_text_path(hf_token: str, monkeypatch: pytest.MonkeyPatch,
 def test_hf_transcript_timestamps_path(
     hf_token: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    # given
     del hf_token
     client = MagicMock()
     client.automatic_speech_recognition.return_value = {"text": "frag"}
@@ -111,14 +131,21 @@ def test_hf_transcript_timestamps_path(
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(chunk), str(chunk)]))
+
+    # when
     result = mod.hf_transcript("a.wav", "m", "hf-inference", with_timestamps=True)
+
+    # then
     assert isinstance(result, list)
     assert len(result) == 2
 
 
 def test_hf_transcript_oserror_passthrough(hf_token: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     del hf_token
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunksRaises(OSError("ffmpeg crashed")))
+
+    # when / then
     with pytest.raises(OSError, match="ffmpeg crashed"):
         mod.hf_transcript("a.wav", "m", "hf-inference")
 
@@ -130,6 +157,7 @@ def test_hf_transcript_upstream_error_passthrough(
     `UpstreamProviderError`, not get rewrapped into the generic
     `RuntimeError("unexpected error")` path."""
 
+    # given
     del hf_token
     client = MagicMock()
     client.automatic_speech_recognition.side_effect = _make_hf_http_error("boom")
@@ -137,12 +165,17 @@ def test_hf_transcript_upstream_error_passthrough(
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(chunk)]))
+
+    # when / then
     with pytest.raises(UpstreamProviderError, match="Hugging Face upstream call failed"):
         mod.hf_transcript("a.wav", "m", "hf-inference")
 
 
 def test_hf_transcript_unexpected_error(hf_token: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     del hf_token
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunksRaises(RuntimeError("weird")))
+
+    # when / then
     with pytest.raises(RuntimeError, match="unexpected error"):
         mod.hf_transcript("a.wav", "m", "hf-inference")

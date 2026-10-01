@@ -13,15 +13,20 @@ from src.config.config import settings
 
 
 def test_extract_audio_suffix_found() -> None:
+    # when
     suffix = download_service._extract_audio_suffix_from_query("file=foo.mp3&sig=abc")
+
+    # then
     assert suffix == ".mp3"
 
 
 def test_extract_audio_suffix_none() -> None:
+    # when / then
     assert download_service._extract_audio_suffix_from_query("sig=abc") == ""
 
 
 def test_is_safe_ip_public() -> None:
+    # when / then
     assert download_service._is_safe_ip("8.8.8.8") is True
 
 
@@ -29,29 +34,37 @@ def test_is_safe_ip_public() -> None:
     "addr", ["10.0.0.1", "192.168.1.1", "127.0.0.1", "169.254.169.254", "::1", "fe80::1"]
 )
 def test_is_safe_ip_blocks_private(addr: str) -> None:
+    # when / then
     assert download_service._is_safe_ip(addr) is False
 
 
 def test_is_safe_ip_invalid() -> None:
+    # when / then
     assert download_service._is_safe_ip("not-an-ip") is False
 
 
 def test_validate_http_target_requires_hostname() -> None:
+    # when / then
     with pytest.raises(ValueError, match="no hostname"):
         download_service._validate_http_target(None)
 
 
 def test_validate_http_target_allows_listed_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(settings, "MCP_ALLOWED_HOSTS", ["internal-store"])
+
+    # when / then
     download_service._validate_http_target("internal-store")
 
 
 def test_validate_http_target_resolves_to_safe_ip() -> None:
+    # when / then
     with patch.object(download_service, "_resolve_to_ips", return_value=["8.8.8.8"]):
         download_service._validate_http_target("example.com")
 
 
 def test_validate_http_target_rejects_unresolvable() -> None:
+    # when / then
     with (
         patch.object(download_service, "_resolve_to_ips", return_value=[]),
         pytest.raises(ValueError, match="Could not resolve"),
@@ -60,6 +73,7 @@ def test_validate_http_target_rejects_unresolvable() -> None:
 
 
 def test_validate_http_target_rejects_private_ip() -> None:
+    # when / then
     with (
         patch.object(download_service, "_resolve_to_ips", return_value=["169.254.169.254"]),
         pytest.raises(ValueError, match="SSRF"),
@@ -69,54 +83,77 @@ def test_validate_http_target_rejects_private_ip() -> None:
 
 def test_resolve_to_ips_returns_empty_on_failure() -> None:
 
+    # given
     with patch.object(socket, "getaddrinfo", side_effect=socket.gaierror()):
+        # when / then
         assert download_service._resolve_to_ips("never.invalid") == []
 
 
 def test_resolve_to_ips_returns_list_on_success() -> None:
+    # given
     fake_infos = [(0, 0, 0, "", ("203.0.113.5", 0))]
     with patch.object(socket, "getaddrinfo", return_value=fake_infos):
+        # when / then
         assert download_service._resolve_to_ips("example.com") == ["203.0.113.5"]
 
 
 def test_resolve_file_uri_requires_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", None)
+
+    # when / then
     with pytest.raises(ValueError, match="disabled"):
         download_service._resolve_file_uri("/etc/passwd")
 
 
 def test_resolve_file_uri_rejects_escape(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
+
+    # when / then
     with pytest.raises(ValueError, match="escapes"):
         download_service._resolve_file_uri("/../etc/passwd")
 
 
 def test_resolve_file_uri_rejects_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
+
+    # when / then
     with pytest.raises(ValueError, match="not found"):
         download_service._resolve_file_uri("/missing.wav")
 
 
 def test_resolve_file_uri_returns_jailed_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
     (tmp_path / "ok.wav").write_text("data", encoding="utf-8")
+
+    # when
     resolved = download_service._resolve_file_uri("/ok.wav")
+
+    # then
     assert resolved == (tmp_path / "ok.wav").resolve()
 
 
 @pytest.mark.asyncio
 async def test_download_to_temp_rejects_unsupported_scheme() -> None:
+    # when / then
     with pytest.raises(ValueError, match="Unsupported URI scheme"):
         await download_service.download_to_temp_async("ftp://example.com/x.wav")
 
 
 @pytest.mark.asyncio
 async def test_download_to_temp_file_scheme_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     source = tmp_path / "src.wav"
     source.write_bytes(b"abcd" * 256)
     monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
 
+    # when
     result = await download_service.download_to_temp_async("file:///src.wav")
+
+    # then
     written = Path(result).read_bytes()
     Path(result).unlink()
     assert written == source.read_bytes()
@@ -126,10 +163,13 @@ async def test_download_to_temp_file_scheme_success(tmp_path: Path, monkeypatch:
 async def test_download_to_temp_file_scheme_enforces_cap(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # given
     source = tmp_path / "big.wav"
     source.write_bytes(b"x" * 4096)
     monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
     monkeypatch.setattr(settings, "MAX_DOWNLOAD_BYTES", 100)
+
+    # when / then
     with pytest.raises(FileSizeExceededError):
         await download_service.download_to_temp_async("file:///big.wav")
 
@@ -196,6 +236,7 @@ class _FakeSession:
 
 @pytest.mark.asyncio
 async def test_download_http_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
         download_service,
         "_validate_http_target",
@@ -205,7 +246,10 @@ async def test_download_http_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(aiohttp, "ClientSession", lambda *_a, **_kw: _FakeSession(response))
     monkeypatch.setattr(aiohttp, "ClientTimeout", lambda **_kw: None)
 
+    # when
     path = await download_service.download_to_temp_async("http://example.com/a.wav")
+
+    # then
     written = Path(path).read_bytes()
     Path(path).unlink()
     assert written == b"abcdef"
@@ -213,42 +257,56 @@ async def test_download_http_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_download_http_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(download_service, "_validate_http_target", MagicMock(return_value=None))
     response = _FakeResponse(status=500)
     monkeypatch.setattr(aiohttp, "ClientSession", lambda *_a, **_kw: _FakeSession(response))
     monkeypatch.setattr(aiohttp, "ClientTimeout", lambda **_kw: None)
+
+    # when / then
     with pytest.raises(ValueError, match="HTTP 500"):
         await download_service.download_to_temp_async("http://example.com/a.wav")
 
 
 @pytest.mark.asyncio
 async def test_download_http_content_length_too_big(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(download_service, "_validate_http_target", MagicMock(return_value=None))
     monkeypatch.setattr(settings, "MAX_DOWNLOAD_BYTES", 100)
     response = _FakeResponse(status=200, content_length=200, chunks=[])
     monkeypatch.setattr(aiohttp, "ClientSession", lambda *_a, **_kw: _FakeSession(response))
     monkeypatch.setattr(aiohttp, "ClientTimeout", lambda **_kw: None)
+
+    # when / then
     with pytest.raises(FileSizeExceededError):
         await download_service.download_to_temp_async("http://example.com/a.wav")
 
 
 @pytest.mark.asyncio
 async def test_download_http_streamed_body_too_big(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(download_service, "_validate_http_target", MagicMock(return_value=None))
     monkeypatch.setattr(settings, "MAX_DOWNLOAD_BYTES", 5)
     response = _FakeResponse(status=200, content_length=None, chunks=[b"hello", b"world"])
     monkeypatch.setattr(aiohttp, "ClientSession", lambda *_a, **_kw: _FakeSession(response))
     monkeypatch.setattr(aiohttp, "ClientTimeout", lambda **_kw: None)
+
+    # when / then
     with pytest.raises(FileSizeExceededError):
         await download_service.download_to_temp_async("http://example.com/a.wav")
 
 
 @pytest.mark.asyncio
 async def test_download_http_with_query_suffix(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(download_service, "_validate_http_target", MagicMock(return_value=None))
     response = _FakeResponse(status=200, chunks=[b"q"])
     monkeypatch.setattr(aiohttp, "ClientSession", lambda *_a, **_kw: _FakeSession(response))
     monkeypatch.setattr(aiohttp, "ClientTimeout", lambda **_kw: None)
+
+    # when
     path = await download_service.download_to_temp_async("https://x.test/path?file=foo.mp3&sig=z")
+
+    # then
     assert path.endswith(".mp3")
     Path(path).unlink()

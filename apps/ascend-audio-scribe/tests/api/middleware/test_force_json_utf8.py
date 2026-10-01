@@ -18,10 +18,15 @@ from src.api.middleware.force_json_utf8 import ForceJSONUTF8Middleware
 
 @pytest.mark.asyncio
 async def test_middleware_passes_through_non_http() -> None:
+    # given
     inner = AsyncMock()
     mw = ForceJSONUTF8Middleware(inner)
     scope = {"type": "lifespan"}
+
+    # when
     await mw(scope, AsyncMock(), AsyncMock())
+
+    # then
     inner.assert_awaited_once()
 
 
@@ -38,15 +43,21 @@ def _make_app(start_message: dict[str, Any]) -> AsyncMock:
 
 @pytest.mark.asyncio
 async def test_default_content_type_is_json_utf8() -> None:
+    # given
     send = AsyncMock()
     app = _make_app({"type": "http.response.start", "status": 200, "headers": []})
+
+    # when
     await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
     captured = send.await_args_list[0].args[0]
     assert (b"content-type", b"application/json; charset=utf-8") in captured["headers"]
 
 
 @pytest.mark.asyncio
 async def test_existing_json_gets_normalised() -> None:
+    # given
     send = AsyncMock()
     app = _make_app(
         {
@@ -55,13 +66,18 @@ async def test_existing_json_gets_normalised() -> None:
             "headers": [(b"content-type", b"application/json")],
         }
     )
+
+    # when
     await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
     captured = send.await_args_list[0].args[0]
     assert captured["headers"][0][1] == b"application/json; charset=utf-8"
 
 
 @pytest.mark.asyncio
 async def test_sse_without_charset_gets_charset_appended() -> None:
+    # given
     send = AsyncMock()
     app = _make_app(
         {
@@ -70,13 +86,18 @@ async def test_sse_without_charset_gets_charset_appended() -> None:
             "headers": [(b"content-type", b"text/event-stream")],
         }
     )
+
+    # when
     await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
     captured = send.await_args_list[0].args[0]
     assert b"charset=utf-8" in captured["headers"][0][1]
 
 
 @pytest.mark.asyncio
 async def test_sse_with_params_preserves_them() -> None:
+    # given
     send = AsyncMock()
     app = _make_app(
         {
@@ -85,7 +106,11 @@ async def test_sse_with_params_preserves_them() -> None:
             "headers": [(b"content-type", b"text/event-stream; profile=foo")],
         }
     )
+
+    # when
     await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
     captured = send.await_args_list[0].args[0]
     value = captured["headers"][0][1]
     assert b"profile=foo" in value
@@ -94,6 +119,7 @@ async def test_sse_with_params_preserves_them() -> None:
 
 @pytest.mark.asyncio
 async def test_existing_sse_with_charset_left_alone() -> None:
+    # given
     send = AsyncMock()
     app = _make_app(
         {
@@ -102,13 +128,18 @@ async def test_existing_sse_with_charset_left_alone() -> None:
             "headers": [(b"content-type", b"text/event-stream; charset=utf-8")],
         }
     )
+
+    # when
     await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
     captured = send.await_args_list[0].args[0]
     assert b"charset=utf-8" in captured["headers"][0][1]
 
 
 @pytest.mark.asyncio
 async def test_other_content_types_pass_through() -> None:
+    # given
     send = AsyncMock()
     app = _make_app(
         {
@@ -117,13 +148,18 @@ async def test_other_content_types_pass_through() -> None:
             "headers": [(b"content-type", b"text/markdown")],
         }
     )
+
+    # when
     await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
     captured = send.await_args_list[0].args[0]
     assert captured["headers"][0][1] == b"text/markdown"
 
 
 @pytest.mark.asyncio
 async def test_empty_content_type_left_alone() -> None:
+    # given
     send = AsyncMock()
     app = _make_app(
         {
@@ -132,6 +168,10 @@ async def test_empty_content_type_left_alone() -> None:
             "headers": [(b"content-type", b"")],
         }
     )
+
+    # when
     await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
     captured = send.await_args_list[0].args[0]
     assert captured["headers"][0] == (b"content-type", b"")

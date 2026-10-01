@@ -18,16 +18,19 @@ from src.transcription import audio_chunker
 
 
 def test_chunked_audio_yields_chunks(tmp_path: Path) -> None:
+    # given
     work = tmp_path / "work_xx"
     work.mkdir()
     (work / "chunk_00000.wav").write_bytes(b"a")
     (work / "chunk_00001.wav").write_bytes(b"b")
 
+    # when
     with (
         patch.object(tempfile, "mkdtemp", return_value=str(work)),
         patch("subprocess.run", return_value=MagicMock(returncode=0)),
         audio_chunker.chunked_audio("input.wav", 5) as chunks,
     ):
+        # then
         assert len(chunks) == 2
         assert chunks[0].endswith("chunk_00000.wav")
 
@@ -42,8 +45,11 @@ def _enter_and_collect(work: Path) -> list[str]:
 
 
 def test_chunked_audio_no_chunks_raises(tmp_path: Path) -> None:
+    # given
     work = tmp_path / "work_empty"
     work.mkdir()
+
+    # when / then
     with (
         patch.object(tempfile, "mkdtemp", return_value=str(work)),
         patch("subprocess.run", return_value=MagicMock(returncode=0)),
@@ -53,9 +59,12 @@ def test_chunked_audio_no_chunks_raises(tmp_path: Path) -> None:
 
 
 def test_chunked_audio_timeout(tmp_path: Path) -> None:
+    # given
     work = tmp_path / "work_t"
     work.mkdir()
     err = subprocess.TimeoutExpired(cmd="ffmpeg", timeout=1)
+
+    # when / then
     with (
         patch.object(tempfile, "mkdtemp", return_value=str(work)),
         patch("subprocess.run", side_effect=err),
@@ -65,9 +74,12 @@ def test_chunked_audio_timeout(tmp_path: Path) -> None:
 
 
 def test_chunked_audio_called_process_error(tmp_path: Path) -> None:
+    # given
     work = tmp_path / "work_e"
     work.mkdir()
     err = subprocess.CalledProcessError(1, "ffmpeg", stderr=b"bad input")
+
+    # when / then
     with (
         patch.object(tempfile, "mkdtemp", return_value=str(work)),
         patch("subprocess.run", side_effect=err),
@@ -77,6 +89,7 @@ def test_chunked_audio_called_process_error(tmp_path: Path) -> None:
 
 
 def test_chunked_audio_cleanup_swallows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     work = tmp_path / "work_clean"
     work.mkdir()
     (work / "chunk_00000.wav").write_bytes(b"a")
@@ -85,10 +98,12 @@ def test_chunked_audio_cleanup_swallows(tmp_path: Path, monkeypatch: pytest.Monk
     def boom(_path: str) -> None:
         raise OSError("cannot delete")
 
+    # when
     with (
         patch("subprocess.run", return_value=MagicMock(returncode=0)),
         patch.object(os, "remove", side_effect=boom),
         patch.object(os, "rmdir", side_effect=OSError("nope")),
         audio_chunker.chunked_audio("input.wav", 5) as chunks,
     ):
+        # then
         assert chunks

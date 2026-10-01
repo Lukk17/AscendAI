@@ -162,7 +162,10 @@ async def asgi_client() -> AsyncIterator[AsyncClient]:
 
 
 async def test_streamable_http_initialize_returns_utf8_and_session_id(asgi_client: AsyncClient) -> None:
+    # when
     session_id = await _initialize_session(asgi_client)
+
+    # then
     assert isinstance(session_id, str)
     assert len(session_id) > 0
 
@@ -170,6 +173,7 @@ async def test_streamable_http_initialize_returns_utf8_and_session_id(asgi_clien
 async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     monkeypatch.setattr(mcp_server_module, "local_speech_transcription", _fake_local_transcription)
 
     # Mock download_to_temp_async to return the temp_audio_file path directly
@@ -196,11 +200,14 @@ async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch
         },
     }
 
+    # when
     resp = await asgi_client.post(
         "/mcp",
         json=req,
         headers=session_headers(session_id),
     )
+
+    # then
     assert resp.status_code == 200, resp.text
     # Streamable HTTP may return JSON or event-stream; accept either
     _assert_content_type_one_of(resp, "application/json", "text/event-stream")
@@ -218,6 +225,7 @@ async def test_streamable_http_tools_list_then_transcribe_local_with_monkeypatch
 
 
 async def test_streamable_http_health_tool(asgi_client: AsyncClient) -> None:
+    # given
     session_id = await _initialize_session(asgi_client)
     await _tools_list(asgi_client, session_id)
 
@@ -227,7 +235,11 @@ async def test_streamable_http_health_tool(asgi_client: AsyncClient) -> None:
         "method": "tools/call",
         "params": {"name": "health", "arguments": {}},
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     assert resp.status_code == 200, resp.text
     _assert_content_type_one_of(resp, "application/json", "text/event-stream")
     payload = _parse_mcp_response(resp)
@@ -240,6 +252,7 @@ async def test_streamable_http_health_tool(asgi_client: AsyncClient) -> None:
 async def test_streamable_http_transcribe_openai_with_monkeypatch(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _fake_openai_transcription(*, audio_file_path: str, model: str, language: str) -> str:
         return "OPENAI OK"
 
@@ -268,7 +281,10 @@ async def test_streamable_http_transcribe_openai_with_monkeypatch(
         },
     }
 
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     assert resp.status_code == 200, resp.text
     _assert_content_type_one_of(resp, "application/json", "text/event-stream")
     payload = _parse_mcp_response(resp)
@@ -287,6 +303,7 @@ async def test_streamable_http_transcribe_openai_with_monkeypatch(
 async def test_streamable_http_transcribe_hf_with_monkeypatch(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _fake_hf_transcription(*, audio_file_path: str, model: str, provider: str) -> str:
         return "HF OK"
 
@@ -315,7 +332,10 @@ async def test_streamable_http_transcribe_hf_with_monkeypatch(
         },
     }
 
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     assert resp.status_code == 200, resp.text
     _assert_content_type_one_of(resp, "application/json", "text/event-stream")
     payload = _parse_mcp_response(resp)
@@ -334,6 +354,7 @@ async def test_streamable_http_transcribe_hf_with_monkeypatch(
 async def test_streamable_http_transcribe_local_with_timestamps_true(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     async def _fake_segments(*, audio_file_path: str, model_path: str, language: str) -> AsyncIterator[dict]:
         yield {"text": "one", "start": 0.0, "end": 0.5}
         yield {"text": "two", "start": 0.5, "end": 1.0}
@@ -363,7 +384,10 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(
         },
     }
 
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     assert resp.status_code == 200, resp.text
     _assert_content_type_one_of(resp, "application/json", "text/event-stream")
     payload = _parse_mcp_response(resp)
@@ -385,6 +409,7 @@ async def test_streamable_http_transcribe_local_with_timestamps_true(
 async def test_streamable_http_transcribe_local_file_not_found(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, asgi_client: AsyncClient
 ) -> None:
+    # given
     # A drive-lettered "X:/nope.wav" is absolute on Windows but relative on
     # POSIX (no drive concept there), so it doesn't fail for the same reason
     # on both hosts. tmp_path is always a real, absolute, host-native path
@@ -412,7 +437,11 @@ async def test_streamable_http_transcribe_local_file_not_found(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     assert resp.status_code == 200, resp.text
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
@@ -424,6 +453,7 @@ async def test_streamable_http_transcribe_local_file_not_found(
 async def test_streamable_http_transcribe_local_generator_value_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     async def _err_gen(*, audio_file_path: str, model_path: str, language: str) -> AsyncIterator[dict]:
         # Must be an async generator function (contain a yield) so async-for is valid
         raise ValueError("bad local input")
@@ -454,7 +484,11 @@ async def test_streamable_http_transcribe_local_generator_value_error(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "bad local input" in text
@@ -463,6 +497,7 @@ async def test_streamable_http_transcribe_local_generator_value_error(
 async def test_streamable_http_transcribe_local_generator_generic_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     async def _err_gen2(*, audio_file_path: str, model_path: str, language: str) -> AsyncIterator[dict]:
         # Must be an async generator function (contain a yield) so async-for is valid
         raise RuntimeError("boom")
@@ -493,7 +528,11 @@ async def test_streamable_http_transcribe_local_generator_generic_error(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "internal_error" in text
@@ -503,6 +542,7 @@ async def test_streamable_http_transcribe_local_generator_generic_error(
 async def test_streamable_http_transcribe_openai_missing_api_key(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     # Unset key
     monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
 
@@ -525,7 +565,11 @@ async def test_streamable_http_transcribe_openai_missing_api_key(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "OPENAI_API_KEY is not configured" in text
@@ -534,6 +578,7 @@ async def test_streamable_http_transcribe_openai_missing_api_key(
 async def test_streamable_http_transcribe_openai_file_not_found(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, asgi_client: AsyncClient
 ) -> None:
+    # given
     monkeypatch.setattr(settings, "OPENAI_API_KEY", "test")
 
     session_id = await _initialize_session(asgi_client)
@@ -550,7 +595,11 @@ async def test_streamable_http_transcribe_openai_file_not_found(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     # file:// without MCP_FILE_URI_ROOT → ValueError → validation_error envelope.
@@ -561,6 +610,7 @@ async def test_streamable_http_transcribe_openai_file_not_found(
 async def test_streamable_http_transcribe_openai_raises_value_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _raise_value_error(*, audio_file_path: str, model: str, language: str) -> NoReturn:
         raise ValueError("openai bad")
 
@@ -588,7 +638,11 @@ async def test_streamable_http_transcribe_openai_raises_value_error(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "openai bad" in text
@@ -597,6 +651,7 @@ async def test_streamable_http_transcribe_openai_raises_value_error(
 async def test_streamable_http_transcribe_openai_raises_io_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _raise_io_error(*, audio_file_path: str, model: str, language: str) -> NoReturn:
         raise OSError("disk full")
 
@@ -624,7 +679,11 @@ async def test_streamable_http_transcribe_openai_raises_io_error(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     # ADR-002: IOError → redacted envelope; "disk full" must not leak.
@@ -635,6 +694,7 @@ async def test_streamable_http_transcribe_openai_raises_io_error(
 async def test_streamable_http_transcribe_openai_raises_generic_exception(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _raise_generic(*, audio_file_path: str, model: str, language: str) -> NoReturn:
         raise RuntimeError("explode")
 
@@ -662,7 +722,11 @@ async def test_streamable_http_transcribe_openai_raises_generic_exception(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "explode" not in text
@@ -672,6 +736,7 @@ async def test_streamable_http_transcribe_openai_raises_generic_exception(
 async def test_streamable_http_transcribe_hf_missing_token(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     monkeypatch.setattr(settings, "HF_TOKEN", "")
 
     session_id = await _initialize_session(asgi_client)
@@ -688,7 +753,11 @@ async def test_streamable_http_transcribe_hf_missing_token(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "HF_TOKEN is not configured" in text
@@ -697,6 +766,7 @@ async def test_streamable_http_transcribe_hf_missing_token(
 async def test_streamable_http_transcribe_hf_file_not_found(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, asgi_client: AsyncClient
 ) -> None:
+    # given
     monkeypatch.setattr(settings, "HF_TOKEN", "test")
 
     # A drive-lettered "X:/nope.wav" is absolute on Windows but relative on
@@ -725,7 +795,11 @@ async def test_streamable_http_transcribe_hf_file_not_found(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "internal_error" in text
@@ -735,6 +809,7 @@ async def test_streamable_http_transcribe_hf_file_not_found(
 async def test_streamable_http_transcribe_hf_raises_value_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _raise_value_error_hf(*, audio_file_path: str, model: str, provider: str) -> NoReturn:
         raise ValueError("hf bad")
 
@@ -762,7 +837,11 @@ async def test_streamable_http_transcribe_hf_raises_value_error(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "hf bad" in text
@@ -771,6 +850,7 @@ async def test_streamable_http_transcribe_hf_raises_value_error(
 async def test_streamable_http_transcribe_hf_raises_io_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _raise_io_error_hf(*, audio_file_path: str, model: str, provider: str) -> NoReturn:
         raise OSError("network down")
 
@@ -798,7 +878,11 @@ async def test_streamable_http_transcribe_hf_raises_io_error(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "network down" not in text
@@ -808,6 +892,7 @@ async def test_streamable_http_transcribe_hf_raises_io_error(
 async def test_streamable_http_transcribe_hf_raises_generic_exception(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     def _raise_generic_hf(*, audio_file_path: str, model: str, provider: str) -> NoReturn:
         raise RuntimeError("kaboom")
 
@@ -835,7 +920,11 @@ async def test_streamable_http_transcribe_hf_raises_generic_exception(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "kaboom" not in text
@@ -843,7 +932,7 @@ async def test_streamable_http_transcribe_hf_raises_generic_exception(
 
 
 async def test_transcribe_local_validation_error_missing_uri(asgi_client: AsyncClient) -> None:
-    # // given
+    # given
     session_id = await _initialize_session(asgi_client)
 
     req = {
@@ -860,10 +949,10 @@ async def test_transcribe_local_validation_error_missing_uri(asgi_client: AsyncC
         },
     }
 
-    # // when
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
 
-    # // then
+    # then
     payload = _parse_mcp_response(resp)
     # FastMCP/Pydantic will likely raise an internal validation error returned in the result or as an JSON-RPC error
     # We check if the result indicates failure or error
@@ -880,7 +969,7 @@ async def test_transcribe_local_validation_error_missing_uri(asgi_client: AsyncC
 async def test_transcribe_local_download_failure(
     monkeypatch: pytest.MonkeyPatch, asgi_client: AsyncClient
 ) -> None:
-    # // given
+    # given
     async def _fail_download(uri: str) -> str:
         raise ValueError("Download Failed")
 
@@ -899,10 +988,10 @@ async def test_transcribe_local_download_failure(
         },
     }
 
-    # // when
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
 
-    # // then
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "Error" in text or "Failed" in text
@@ -912,7 +1001,7 @@ async def test_transcribe_local_download_failure(
 async def test_transcribe_openai_missing_api_key_check(
     monkeypatch: pytest.MonkeyPatch, asgi_client: AsyncClient
 ) -> None:
-    # // given
+    # given
     # Patch the actual settings object in src.config.config
     monkeypatch.setattr("src.config.config.settings.OPENAI_API_KEY", None)
 
@@ -928,10 +1017,10 @@ async def test_transcribe_openai_missing_api_key_check(
         },
     }
 
-    # // when
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
 
-    # // then
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "OPENAI_API_KEY is not configured" in text
@@ -940,7 +1029,7 @@ async def test_transcribe_openai_missing_api_key_check(
 async def test_transcribe_hf_missing_token_check(
     monkeypatch: pytest.MonkeyPatch, asgi_client: AsyncClient
 ) -> None:
-    # // given
+    # given
     # Patch the actual settings object in src.config.config
     monkeypatch.setattr("src.config.config.settings.HF_TOKEN", None)
 
@@ -956,10 +1045,10 @@ async def test_transcribe_hf_missing_token_check(
         },
     }
 
-    # // when
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
 
-    # // then
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "HF_TOKEN is not configured" in text
@@ -984,7 +1073,10 @@ async def _call_tool_with_empty_uri(
 
 
 async def test_transcribe_local_empty_uri_returns_validation_error(asgi_client: AsyncClient) -> None:
+    # when
     text = await _call_tool_with_empty_uri(asgi_client, "transcribe_local")
+
+    # then
     assert "validation_error" in text
     assert "URI not provided" in text
 
@@ -992,8 +1084,13 @@ async def test_transcribe_local_empty_uri_returns_validation_error(asgi_client: 
 async def test_transcribe_openai_empty_uri_returns_validation_error(
     monkeypatch: pytest.MonkeyPatch, asgi_client: AsyncClient
 ) -> None:
+    # given
     monkeypatch.setattr(settings, "OPENAI_API_KEY", "test")
+
+    # when
     text = await _call_tool_with_empty_uri(asgi_client, "transcribe_openai")
+
+    # then
     assert "validation_error" in text
     assert "URI not provided" in text
 
@@ -1001,14 +1098,22 @@ async def test_transcribe_openai_empty_uri_returns_validation_error(
 async def test_transcribe_hf_empty_uri_returns_validation_error(
     monkeypatch: pytest.MonkeyPatch, asgi_client: AsyncClient
 ) -> None:
+    # given
     monkeypatch.setattr(settings, "HF_TOKEN", "test")
+
+    # when
     text = await _call_tool_with_empty_uri(asgi_client, "transcribe_hf")
+
+    # then
     assert "validation_error" in text
     assert "URI not provided" in text
 
 
 async def test_transcribe_audacity_empty_uri_returns_validation_error(asgi_client: AsyncClient) -> None:
+    # when
     text = await _call_tool_with_empty_uri(asgi_client, "transcribe_audacity")
+
+    # then
     assert "validation_error" in text
     assert "URI not provided" in text
 
@@ -1016,6 +1121,7 @@ async def test_transcribe_audacity_empty_uri_returns_validation_error(asgi_clien
 async def test_transcribe_audacity_no_tracks_returns_validation_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
 
@@ -1035,7 +1141,11 @@ async def test_transcribe_audacity_no_tracks_returns_validation_error(
             "arguments": {"audio_uri": f"file://{temp_audio_file}"},
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "validation_error" in text
@@ -1045,6 +1155,7 @@ async def test_transcribe_audacity_no_tracks_returns_validation_error(
 async def test_transcribe_audacity_success(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
 
@@ -1074,7 +1185,11 @@ async def test_transcribe_audacity_success(
             },
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     inner = json.loads(text)
@@ -1090,6 +1205,7 @@ async def test_transcribe_audacity_success(
 async def test_transcribe_audacity_propagates_runtime_error_as_internal_error(
     monkeypatch: pytest.MonkeyPatch, temp_audio_file: str, asgi_client: AsyncClient
 ) -> None:
+    # given
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
 
@@ -1109,7 +1225,11 @@ async def test_transcribe_audacity_propagates_runtime_error_as_internal_error(
             "arguments": {"audio_uri": f"file://{temp_audio_file}"},
         },
     }
+
+    # when
     resp = await asgi_client.post("/mcp", json=req, headers=session_headers(session_id))
+
+    # then
     payload = _parse_mcp_response(resp)
     text = _first_text_block(payload)
     assert "zip corrupt" not in text
