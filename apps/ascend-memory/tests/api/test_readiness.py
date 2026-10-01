@@ -46,51 +46,66 @@ class _FakeAsyncClient:
 
 @pytest.mark.asyncio
 async def test_probe_qdrant_returns_ok_on_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
         httpx,
         "AsyncClient",
         lambda **_kw: _FakeAsyncClient(response=_FakeResponse(200)),
     )
+
+    # when / then
     assert await readiness_module._probe_qdrant() == {"status": "ok"}
 
 
 @pytest.mark.asyncio
 async def test_probe_qdrant_returns_error_on_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
         httpx,
         "AsyncClient",
         lambda **_kw: _FakeAsyncClient(response=_FakeResponse(500)),
     )
+
+    # when / then
     assert await readiness_module._probe_qdrant() == {"status": "error"}
 
 
 @pytest.mark.asyncio
 async def test_probe_qdrant_returns_error_on_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
         httpx,
         "AsyncClient",
         lambda **_kw: _FakeAsyncClient(raise_exc=RuntimeError("timeout")),
     )
+
+    # when / then
     assert await readiness_module._probe_qdrant() == {"status": "error"}
 
 
 @pytest.mark.asyncio
 async def test_probe_embedding_api_returns_ok_when_under_500(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
         httpx,
         "AsyncClient",
         lambda **_kw: _FakeAsyncClient(response=_FakeResponse(200)),
     )
+
+    # when / then
     assert await readiness_module._probe_embedding_api() == {"status": "ok"}
 
 
 @pytest.mark.asyncio
 async def test_probe_embedding_api_returns_error_on_5xx(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
         httpx,
         "AsyncClient",
         lambda **_kw: _FakeAsyncClient(response=_FakeResponse(503)),
     )
+
+    # when / then
     assert await readiness_module._probe_embedding_api() == {"status": "error"}
 
 
@@ -98,7 +113,10 @@ async def test_probe_embedding_api_returns_error_on_5xx(monkeypatch: pytest.Monk
 async def test_probe_embedding_api_returns_error_when_unknown_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # given
     monkeypatch.setattr(settings, "MEM0_DEFAULT_PROVIDER", "fake")
+
+    # when / then
     assert await readiness_module._probe_embedding_api() == {"status": "error"}
 
 
@@ -106,7 +124,10 @@ async def test_probe_embedding_api_returns_error_when_unknown_provider(
 async def test_probe_embedding_api_returns_error_when_base_url_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # given
     monkeypatch.setattr(settings, "LMSTUDIO_BASE_URL", "")
+
+    # when / then
     assert await readiness_module._probe_embedding_api() == {"status": "error"}
 
 
@@ -114,26 +135,34 @@ async def test_probe_embedding_api_returns_error_when_base_url_empty(
 async def test_probe_embedding_api_returns_error_on_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # given
     monkeypatch.setattr(
         httpx,
         "AsyncClient",
         lambda **_kw: _FakeAsyncClient(raise_exc=RuntimeError("boom")),
     )
+
+    # when / then
     assert await readiness_module._probe_embedding_api() == {"status": "error"}
 
 
 def test_probe_mem0_client_returns_ok_when_construction_succeeds() -> None:
+    # given
     with patch.object(readiness_module, "get_memory_client", return_value=MagicMock()):
+        # when / then
         assert readiness_module._probe_mem0_client() == {"status": "ok"}
 
 
 def test_probe_mem0_client_returns_error_when_construction_fails() -> None:
+    # given
     with patch.object(readiness_module, "get_memory_client", side_effect=RuntimeError("no key")):
+        # when / then
         assert readiness_module._probe_mem0_client() == {"status": "error"}
 
 
 @pytest.mark.asyncio
 async def test_ready_endpoint_returns_200_when_all_checks_ok(override_dependencies: Any) -> None:
+    # given
     del override_dependencies  # injected to ensure no real upstream calls; not asserted here
     with (
         patch.object(
@@ -154,13 +183,17 @@ async def test_ready_endpoint_returns_200_when_all_checks_ok(override_dependenci
         patch("src.main.warmup_client", new_callable=AsyncMock),
     ):
         with TestClient(app) as test_client:
+            # when
             response = test_client.get("/ready")
+
+            # then
             assert response.status_code == 200
             assert response.json()["status"] == "ready"
 
 
 @pytest.mark.asyncio
 async def test_ready_endpoint_returns_503_on_degraded_dependency(override_dependencies: Any) -> None:
+    # given
     del override_dependencies
     with (
         patch.object(
@@ -181,6 +214,9 @@ async def test_ready_endpoint_returns_503_on_degraded_dependency(override_depend
         patch("src.main.warmup_client", new_callable=AsyncMock),
     ):
         with TestClient(app) as test_client:
+            # when
             response = test_client.get("/ready")
+
+            # then
             assert response.status_code == 503
             assert response.json()["status"] == "degraded"

@@ -26,18 +26,22 @@ def reset_singleton() -> Iterator[None]:
 
 
 def test_resolve_provider_falls_back_to_default_when_none() -> None:
+    # when / then
     assert resolve_provider(None) == "lmstudio"
 
 
 def test_resolve_provider_falls_back_to_default_when_blank() -> None:
+    # when / then
     assert resolve_provider("   ") == "lmstudio"
 
 
 def test_resolve_provider_normalises_case() -> None:
+    # when / then
     assert resolve_provider("LMSTUDIO") == "lmstudio"
 
 
 def test_resolve_provider_rejects_unknown_provider() -> None:
+    # when / then
     with pytest.raises(ValueError, match="Unknown provider"):
         resolve_provider("not-a-provider")
 
@@ -45,9 +49,14 @@ def test_resolve_provider_rejects_unknown_provider() -> None:
 def test_get_memory_client_returns_cached_instance_on_second_call(
     mock_memory_service: Any,
 ) -> None:
+    # given
     del mock_memory_service  # patches mem0.Memory.from_config via conftest
+
+    # when
     first = get_memory_client("lmstudio")
     second = get_memory_client("lmstudio")
+
+    # then
     assert first is second
 
 
@@ -58,6 +67,7 @@ def test_get_memory_client_re_checks_cache_after_acquiring_lock(
     between the outer get() and the lock acquisition. The thread inside the
     lock must return the cached value instead of constructing a duplicate."""
 
+    # given
     del mock_memory_service
     # cast: MagicMock(spec=AscendMemoryClient) satisfies the dict's value type
     # at runtime; the cast tells static analysers we accept the substitution.
@@ -80,7 +90,10 @@ def test_get_memory_client_re_checks_cache_after_acquiring_lock(
 
     monkeypatch.setattr(client_module, "_client_lock", _SneakyLock())
 
+    # when
     result = client_module.get_memory_client("lmstudio")
+
+    # then
     assert result is sentinel
 
 
@@ -88,29 +101,41 @@ def test_get_memory_client_returns_different_instances_per_provider(
     monkeypatch: pytest.MonkeyPatch,
     mock_memory_service: Any,
 ) -> None:
+    # given
     del mock_memory_service
     from src.config import config as cfg
 
     monkeypatch.setattr(cfg.settings, "OPENAI_API_KEY", "sk-test-openai", raising=False)
 
+    # when
     a = get_memory_client("lmstudio")
     b = get_memory_client("openai")
+
+    # then
     assert a is not b
 
 
 def test_get_default_memory_client_returns_default_provider_instance(
     mock_memory_service: Any,
 ) -> None:
+    # given
     del mock_memory_service
+
+    # when
     client = get_default_memory_client()
+
+    # then
     assert isinstance(client, AscendMemoryClient)
     assert client.provider == "lmstudio"
 
 
 def test_init_raises_when_api_key_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     from src.config import config as cfg
 
     monkeypatch.setattr(cfg.settings, "LMSTUDIO_API_KEY", "", raising=False)
+
+    # when / then
     with pytest.raises(ValueError, match="LMSTUDIO_API_KEY"):
         AscendMemoryClient("lmstudio")
 
@@ -118,6 +143,7 @@ def test_init_raises_when_api_key_missing(monkeypatch: pytest.MonkeyPatch) -> No
 def test_init_routes_lmstudio_through_lmstudio_llm_backend(
     monkeypatch: pytest.MonkeyPatch, mock_memory_service: Any
 ) -> None:
+    # given
     captured: dict[str, Any] = {}
 
     def fake_from_config(config: dict[str, Any]) -> Any:
@@ -126,7 +152,10 @@ def test_init_routes_lmstudio_through_lmstudio_llm_backend(
 
     monkeypatch.setattr(mem0.Memory, "from_config", fake_from_config)
 
+    # when
     AscendMemoryClient("lmstudio")
+
+    # then
     assert captured["config"]["llm"]["provider"] == "lmstudio"
     assert "lmstudio_base_url" in captured["config"]["llm"]["config"]
 
@@ -134,6 +163,7 @@ def test_init_routes_lmstudio_through_lmstudio_llm_backend(
 def test_init_routes_openai_through_openai_llm_backend(
     monkeypatch: pytest.MonkeyPatch, mock_memory_service: Any
 ) -> None:
+    # given
     captured: dict[str, Any] = {}
 
     def fake_from_config(config: dict[str, Any]) -> Any:
@@ -145,17 +175,23 @@ def test_init_routes_openai_through_openai_llm_backend(
 
     monkeypatch.setattr(cfg.settings, "OPENAI_API_KEY", "sk-test", raising=False)
 
+    # when
     AscendMemoryClient("openai")
+
+    # then
     assert captured["config"]["llm"]["provider"] == "openai"
     assert "openai_base_url" in captured["config"]["llm"]["config"]
 
 
 def test_add_with_text_wraps_into_user_message(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.add.return_value = {"results": [{"id": "m1"}]}
     client = get_memory_client("lmstudio")
 
+    # when
     result = client.add(user_id="u1", text="hello")
 
+    # then
     assert result == [{"id": "m1"}]
     call_kwargs = mock_memory_service.add.call_args.kwargs
     assert call_kwargs["messages"] == [{"role": "user", "content": "hello"}]
@@ -163,36 +199,48 @@ def test_add_with_text_wraps_into_user_message(mock_memory_service: Any) -> None
 
 
 def test_add_with_messages_passes_through(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.add.return_value = {"results": [{"id": "m2"}]}
     client = get_memory_client("lmstudio")
     messages = [{"role": "user", "content": "x"}, {"role": "assistant", "content": "y"}]
 
+    # when
     result = client.add(user_id="u1", messages=messages)
 
+    # then
     assert result == [{"id": "m2"}]
     assert mock_memory_service.add.call_args.kwargs["messages"] == messages
 
 
 def test_add_without_messages_or_text_raises(mock_memory_service: Any) -> None:
+    # given
     del mock_memory_service
     client = get_memory_client("lmstudio")
+
+    # when / then
     with pytest.raises(ValueError, match=r"messages.*or.*text"):
         client.add(user_id="u1")
 
 
 def test_add_re_raises_on_upstream_failure(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.add.side_effect = RuntimeError("boom")
     client = get_memory_client("lmstudio")
+
+    # when / then
     with pytest.raises(RuntimeError, match="boom"):
         client.add(user_id="u1", text="x")
 
 
 def test_search_uses_mem0_2x_signature(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.search.return_value = {"results": [{"id": "m1", "score": 0.9}]}
     client = get_memory_client("lmstudio")
 
+    # when
     result = client.search(query="q", user_id="u1", limit=7)
 
+    # then
     assert result == [{"id": "m1", "score": 0.9}]
     mock_memory_service.search.assert_called_once_with(
         query="q",
@@ -202,40 +250,62 @@ def test_search_uses_mem0_2x_signature(mock_memory_service: Any) -> None:
 
 
 def test_search_returns_empty_list_when_mem0_returns_falsy(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.search.return_value = None
     client = get_memory_client("lmstudio")
+
+    # when / then
     assert client.search(query="q", user_id="u1") == []
 
 
 def test_search_re_raises_on_upstream_failure(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.search.side_effect = RuntimeError("qdrant down")
     client = get_memory_client("lmstudio")
+
+    # when / then
     with pytest.raises(RuntimeError, match="qdrant down"):
         client.search(query="q", user_id="u1")
 
 
 def test_delete_calls_through(mock_memory_service: Any) -> None:
+    # given
     client = get_memory_client("lmstudio")
+
+    # when
     client.delete(memory_id="m1")
+
+    # then
     mock_memory_service.delete.assert_called_once_with(memory_id="m1")
 
 
 def test_delete_re_raises_on_upstream_failure(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.delete.side_effect = RuntimeError("nope")
     client = get_memory_client("lmstudio")
+
+    # when / then
     with pytest.raises(RuntimeError):
         client.delete(memory_id="m1")
 
 
 def test_wipe_user_calls_delete_all_once(mock_memory_service: Any) -> None:
+    # given
     client = get_memory_client("lmstudio")
+
+    # when
     client.wipe_user(user_id="u1")
+
+    # then
     mock_memory_service.delete_all.assert_called_once_with(user_id="u1")
 
 
 def test_wipe_user_re_raises_on_upstream_failure(mock_memory_service: Any) -> None:
+    # given
     mock_memory_service.delete_all.side_effect = RuntimeError("qdrant 500")
     client = get_memory_client("lmstudio")
+
+    # when / then
     with pytest.raises(RuntimeError):
         client.wipe_user(user_id="u1")
 
@@ -243,11 +313,14 @@ def test_wipe_user_re_raises_on_upstream_failure(mock_memory_service: Any) -> No
 def test_wipe_user_all_collections_wipes_each_distinct_collection_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # given
     fake_client = MagicMock()
     monkeypatch.setattr(client_module, "get_memory_client", lambda provider: fake_client)
 
+    # when
     wipe_user_all_collections(user_id="u1")
 
+    # then
     distinct_collections = {cfg["collection_name"] for cfg in PROVIDER_CONFIGS.values()}
     assert fake_client.wipe_user.call_count == len(distinct_collections)
     for call in fake_client.wipe_user.call_args_list:
@@ -257,19 +330,25 @@ def test_wipe_user_all_collections_wipes_each_distinct_collection_once(
 def test_wipe_user_all_collections_continues_when_a_collection_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # given
     fake_client = MagicMock()
     fake_client.wipe_user.side_effect = RuntimeError("qdrant down")
     monkeypatch.setattr(client_module, "get_memory_client", lambda provider: fake_client)
 
+    # when
     wipe_user_all_collections(user_id="u1")
 
+    # then
     assert fake_client.wipe_user.called
 
 
 def test_hash_user_id_is_stable_and_short() -> None:
+    # when
     a = _hash_user_id("alice@example.com")
     b = _hash_user_id("alice@example.com")
     c = _hash_user_id("bob@example.com")
+
+    # then
     assert a == b
     assert a != c
     assert len(a) == 12

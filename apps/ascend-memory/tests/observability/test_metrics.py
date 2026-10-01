@@ -4,6 +4,7 @@ from src.observability import metrics
 
 
 def test_counters_registered_with_provider_and_outcome_labels() -> None:
+    # given
     for counter in (
         metrics.MEMORY_INSERT_TOTAL,
         metrics.MEMORY_SEARCH_TOTAL,
@@ -12,7 +13,10 @@ def test_counters_registered_with_provider_and_outcome_labels() -> None:
     ):
         counter.labels(provider="lmstudio", outcome="success").inc()
 
+    # when
     payload = generate_latest().decode()
+
+    # then
     for name in (
         "memory_insert_total",
         "memory_search_total",
@@ -23,6 +27,7 @@ def test_counters_registered_with_provider_and_outcome_labels() -> None:
 
 
 def test_histograms_registered_with_provider_label() -> None:
+    # given
     for histogram in (
         metrics.MEMORY_INSERT_DURATION_SECONDS,
         metrics.MEMORY_SEARCH_DURATION_SECONDS,
@@ -31,7 +36,10 @@ def test_histograms_registered_with_provider_label() -> None:
     ):
         histogram.labels(provider="lmstudio").observe(0.1)
 
+    # when
     payload = generate_latest().decode()
+
+    # then
     for name in (
         "memory_insert_duration_seconds",
         "memory_search_duration_seconds",

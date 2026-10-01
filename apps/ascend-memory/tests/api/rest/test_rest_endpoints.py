@@ -8,14 +8,17 @@ from src.observability.metrics import MEMORY_SEARCH_TOTAL
 
 @pytest.mark.asyncio
 async def test_insert_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
+    # given
     mock_service = override_dependencies
     mock_service.add.return_value = [{"id": "m1"}]
 
+    # when
     response = await client.post(
         "/api/v1/memory/insert",
         json={"user_id": "u1", "text": "test memory"},
     )
 
+    # then
     assert response.status_code == 200
     assert response.json() == [{"id": "m1"}]
     mock_service.add.assert_called_once()
@@ -23,14 +26,17 @@ async def test_insert_memory_success(client: AsyncClient, override_dependencies:
 
 @pytest.mark.asyncio
 async def test_insert_memory_with_provider(client: AsyncClient, override_dependencies: MagicMock) -> None:
+    # given
     mock_service = override_dependencies
     mock_service.add.return_value = []
 
+    # when
     response = await client.post(
         "/api/v1/memory/insert",
         json={"user_id": "u1", "text": "x", "provider": "openai"},
     )
 
+    # then
     assert response.status_code == 200
     mock_service.add.assert_called_once()
 
@@ -39,8 +45,10 @@ async def test_insert_memory_with_provider(client: AsyncClient, override_depende
 async def test_insert_memory_rejects_missing_user_id(
     client: AsyncClient, override_dependencies: MagicMock
 ) -> None:
+    # when
     response = await client.post("/api/v1/memory/insert", json={"text": "x"})
 
+    # then
     assert response.status_code == 422
     body = response.json()
     assert any("user_id" in str(e.get("loc", [])) for e in body.get("detail", []))
@@ -50,11 +58,13 @@ async def test_insert_memory_rejects_missing_user_id(
 async def test_insert_memory_rejects_missing_text_and_messages(
     client: AsyncClient, override_dependencies: MagicMock
 ) -> None:
+    # when
     response = await client.post(
         "/api/v1/memory/insert",
         json={"user_id": "u1"},
     )
 
+    # then
     assert response.status_code == 400
     body = response.json()
     assert body["status"] == 400
@@ -63,14 +73,17 @@ async def test_insert_memory_rejects_missing_text_and_messages(
 
 @pytest.mark.asyncio
 async def test_search_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
+    # given
     mock_service = override_dependencies
     mock_service.search.return_value = [{"id": "m1", "memory": "fact one", "score": 0.8}]
 
+    # when
     response = await client.get(
         "/api/v1/memory/search",
         params={"user_id": "u1", "query": "test"},
     )
 
+    # then
     assert response.status_code == 200
     assert response.json()[0]["id"] == "m1"
     mock_service.search.assert_called_once()
@@ -80,14 +93,17 @@ async def test_search_memory_success(client: AsyncClient, override_dependencies:
 async def test_search_memory_response_includes_user_id(
     client: AsyncClient, override_dependencies: MagicMock
 ) -> None:
+    # given
     mock_service = override_dependencies
     mock_service.search.return_value = [{"id": "m1", "memory": "fact one", "score": 0.9, "user_id": "u1"}]
 
+    # when
     response = await client.get(
         "/api/v1/memory/search",
         params={"user_id": "u1", "query": "test"},
     )
 
+    # then
     assert response.status_code == 200
     item = response.json()[0]
     assert item["user_id"] == "u1"
@@ -97,13 +113,16 @@ async def test_search_memory_response_includes_user_id(
 async def test_search_memory_rejects_too_long_query(
     client: AsyncClient, override_dependencies: MagicMock
 ) -> None:
+    # given
     long_q = "x" * 5000
 
+    # when
     response = await client.get(
         "/api/v1/memory/search",
         params={"user_id": "u1", "query": long_q},
     )
 
+    # then
     assert response.status_code == 422  # pydantic validation
 
 
@@ -111,11 +130,13 @@ async def test_search_memory_rejects_too_long_query(
 async def test_search_memory_rejects_user_id_with_unsafe_chars(
     client: AsyncClient, override_dependencies: MagicMock
 ) -> None:
+    # when
     response = await client.get(
         "/api/v1/memory/search",
         params={"user_id": "../etc/passwd", "query": "q"},
     )
 
+    # then
     assert response.status_code == 422
 
 
@@ -129,16 +150,19 @@ async def test_search_memory_upstream_failure_maps_to_500_and_records_error_outc
     "error" so the failure is visible in Grafana instead of being lumped
     in with successful searches."""
 
+    # given
     mock_service = override_dependencies
     mock_service.search.side_effect = RuntimeError("qdrant connection refused")
 
     before = MEMORY_SEARCH_TOTAL.labels(provider="lmstudio", outcome="error")._value.get()
 
+    # when
     response = await client.get(
         "/api/v1/memory/search",
         params={"user_id": "u1", "query": "test"},
     )
 
+    # then
     assert response.status_code == 500
     body = response.json()
     assert body["status"] == 500
@@ -150,10 +174,13 @@ async def test_search_memory_upstream_failure_maps_to_500_and_records_error_outc
 
 @pytest.mark.asyncio
 async def test_delete_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
+    # given
     mock_service = override_dependencies
 
+    # when
     response = await client.delete("/api/v1/memory", params={"memory_id": "m1"})
 
+    # then
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     mock_service.delete.assert_called_once_with(memory_id="m1")
@@ -161,9 +188,12 @@ async def test_delete_memory_success(client: AsyncClient, override_dependencies:
 
 @pytest.mark.asyncio
 async def test_wipe_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
+    # given
     with patch("src.api.rest.rest_endpoints.wipe_user_all_collections") as mock_wipe_all:
+        # when
         response = await client.post("/api/v1/memory/wipe", params={"user_id": "u1"})
 
+    # then
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     mock_wipe_all.assert_called_once_with(user_id="u1")
@@ -178,14 +208,17 @@ async def test_wipe_memory_with_explicit_provider_wipes_only_that_provider(
     ones) must only wipe that provider's collection, not every provider
     collection the user has data in."""
 
+    # given
     mock_service = override_dependencies
 
     with patch("src.api.rest.rest_endpoints.wipe_user_all_collections") as mock_wipe_all:
+        # when
         response = await client.post(
             "/api/v1/memory/wipe",
             params={"user_id": "u1", "provider": "openai"},
         )
 
+    # then
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     mock_service.wipe_user.assert_called_once_with(user_id="u1")
@@ -194,14 +227,17 @@ async def test_wipe_memory_with_explicit_provider_wipes_only_that_provider(
 
 @pytest.mark.asyncio
 async def test_value_error_maps_to_rfc7807_400(client: AsyncClient, override_dependencies: MagicMock) -> None:
+    # given
     mock_service = override_dependencies
     mock_service.add.side_effect = ValueError("nope")
 
+    # when
     response = await client.post(
         "/api/v1/memory/insert",
         json={"user_id": "u1", "text": "x"},
     )
 
+    # then
     assert response.status_code == 400
     body = response.json()
     assert body["type"].endswith("/validation")
@@ -213,15 +249,18 @@ async def test_value_error_maps_to_rfc7807_400(client: AsyncClient, override_dep
 async def test_unexpected_exception_maps_to_rfc7807_500(
     client: AsyncClient, override_dependencies: MagicMock
 ) -> None:
+    # given
     mock_service = override_dependencies
     sentinel_leak = "UPSTREAM_LEAK_MARKER_99"
     mock_service.add.side_effect = RuntimeError(f"upstream BLEW UP with {sentinel_leak}")
 
+    # when
     response = await client.post(
         "/api/v1/memory/insert",
         json={"user_id": "u1", "text": "x"},
     )
 
+    # then
     assert response.status_code == 500
     body = response.json()
     assert body["status"] == 500
@@ -232,8 +271,10 @@ async def test_unexpected_exception_maps_to_rfc7807_500(
 
 @pytest.mark.asyncio
 async def test_request_id_header_echoed_back(client: AsyncClient, override_dependencies: MagicMock) -> None:
+    # when
     response = await client.get("/health", headers={"X-Request-ID": "trace-123"})
 
+    # then
     assert response.headers["X-Request-ID"] == "trace-123"
 
 
@@ -241,11 +282,13 @@ async def test_request_id_header_echoed_back(client: AsyncClient, override_depen
 async def test_request_id_malformed_replaced_with_uuid(
     client: AsyncClient, override_dependencies: MagicMock
 ) -> None:
+    # when
     response = await client.get(
         "/health",
         headers={"X-Request-ID": "bad\r\nheader-injection"},
     )
 
+    # then
     rid = response.headers["X-Request-ID"]
     assert "\r" not in rid
     assert "\n" not in rid
