@@ -1,4 +1,4 @@
-# Tasks — Add Usage Metering and Quotas
+# Tasks - Add Usage Metering and Quotas
 
 Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation` (tenant model) being merged first.
 
@@ -6,7 +6,7 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 
 - [ ] 1.1 Create Liquibase changelog `apps/ascend-agent/src/main/resources/db/changelog/02-usage-metering.xml` with three tables: `usage_ledger` (tenant_id, user_id, conversation_id nullable, provider, model, prompt_tokens, completion_tokens, cached_tokens, request_type, occurred_at UTC; covering index `(tenant_id, occurred_at)` plus `(user_id, occurred_at)`), `tenant_quota_config` (tenant_id unique, monthly_token_budget, per_user_daily_token_budget nullable overrides), `tenant_provider_key` (tenant_id + provider unique, wrapped_dek, ciphertext, gcm_nonce, kek_id, key_last4, created_at, updated_at)
 - [ ] 1.2 Reference the new changelog from `db.changelog-master.yaml`; run `./gradlew integrationTest` to confirm Liquibase applies cleanly on Testcontainers Postgres
-- [ ] 1.3 Add the Redis-backed Bucket4j dependency (Lettuce integration compatible with Spring Boot 3.5.4) to `apps/ascend-agent/build.gradle.kts` and `gradle/libs.versions.toml`; pin the version (design Open Question 2)
+- [ ] 1.3 Add the Redis-backed Bucket4j dependency (Lettuce integration compatible with Spring Boot 3.5.14) to `apps/ascend-agent/build.gradle.kts` and `gradle/libs.versions.toml`; pin the version (design Open Question 2)
 - [ ] 1.4 Add `app.usage.*` configuration block to `application.yaml` (metering/quotas/rate-limit/byok `enabled` flags, default tenant monthly budget, default user daily budget, warning threshold 0.8, per-endpoint bucket capacities and refill rates) and a `UsageProperties` `@ConfigurationProperties` class; mirror env vars (`USAGE_KEK` etc.) in `compose.yaml`
 
 ## 2. Usage ledger
@@ -15,7 +15,7 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 - [ ] 2.2 Create `service/usage/UsageLedgerRecorder` with JPA entity + Spring Data repository; insert runs on a dedicated bounded async executor; failures log ERROR and increment `usage.ledger.write_failed` without propagating
 - [ ] 2.3 Wire `UsageLedgerRecorder` into every `recordOutcome` implementation alongside `GenAiTokenUsageRecorder`, reading prompt/completion/cached tokens from the response metadata (Anthropic `cacheReadInputTokens`, OpenAI/Gemini `PromptTokensDetails.cachedTokens`)
 - [ ] 2.4 Extend `ChatHistoryCompactionService` to build a `UsageContext` with `request_type = compaction` and record its provider calls
-- [ ] 2.5 Extend the embedding call path to record one ledger row per embedding batch with `request_type = embedding` (confirm batch granularity against the ingestion pipeline — design Open Question 1)
+- [ ] 2.5 Extend the embedding call path to record one ledger row per embedding batch with `request_type = embedding` (confirm batch granularity against the ingestion pipeline - design Open Question 1)
 - [ ] 2.6 Add `tenant` and `request_type` tags to `GenAiTokenUsageRecorder`
 - [ ] 2.7 Test: integration test asserting one chat turn writes exactly one `usage_ledger` row with `request_type = 'chat'`, correct tenant/user attribution, and token counts matching the stubbed provider usage metadata
 - [ ] 2.8 Test: ledger insert failure (repository throws) still returns the chat response and increments `usage.ledger.write_failed`
@@ -24,7 +24,7 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 ## 3. Usage query API
 
 - [ ] 3.1 Create `controller/UsageController` with `GET /api/v1/usage` (`from`, `to`, `groupBy=day|month`, `format=json|csv`, optional `userId` for ADMIN) and `service/usage/UsageQueryService` backed by a JPA aggregate query on `usage_ledger`
-- [ ] 3.2 Enforce scoping: `USER` sees only own rows (any `userId` param rejected with 403 or ignored — pick one and test it), `ADMIN` sees tenant-wide with optional user filter
+- [ ] 3.2 Enforce scoping: `USER` sees only own rows (any `userId` param rejected with 403 or ignored - pick one and test it), `ADMIN` sees tenant-wide with optional user filter
 - [ ] 3.3 Implement CSV rendering (`text/csv`, header row + one row per group) sharing the JSON aggregation
 - [ ] 3.4 Test: MockMvc tests for day/month grouping, USER self-scoping, ADMIN tenant scope + `userId` filter, CSV content type and shape
 - [ ] 3.5 Add Bruno requests for `GET /api/v1/usage` (JSON and CSV) under `docs/api/request/AscendAI/`
@@ -56,7 +56,7 @@ Depends on `add-auth-and-identity` (principal + roles) and `add-tenant-isolation
 ## 6. BYOK provider keys
 
 - [ ] 6.1 Create `service/usage/KeyEncryptionService` (AES-256-GCM envelope: random per-row DEK, DEK wrapped by `USAGE_KEK` from env, `kek_id` recorded) with a pluggable interface for a future KMS implementation
-- [ ] 6.2 Create `tenant_provider_key` JPA entity + repository and `service/usage/TenantProviderKeyService` (upsert, list, delete; compute `last4`; plaintext key never logged — verify no `toString` leakage)
+- [ ] 6.2 Create `tenant_provider_key` JPA entity + repository and `service/usage/TenantProviderKeyService` (upsert, list, delete; compute `last4`; plaintext key never logged - verify no `toString` leakage)
 - [ ] 6.3 Create `controller/ProviderKeyController` with `ADMIN`-only endpoints under `/api/v1/tenants/{tenantId}/provider-keys` (PUT upsert, GET list returning provider/last4/timestamps only, DELETE)
 - [ ] 6.4 Extend `ChatModelResolver` with a tenant-aware `resolve(provider, tenantId)`: Caffeine cache keyed `(provider, tenantId)` building tenant-keyed clients lazily; fallback to the existing global clients when no tenant key exists; eviction hooked into upsert/delete
 - [ ] 6.5 Route chat, memory-extraction, compaction, and embedding client resolution through the tenant-aware overload; provider `401` on a tenant key surfaces an error naming the provider and `last4`, with no silent retry on the global key

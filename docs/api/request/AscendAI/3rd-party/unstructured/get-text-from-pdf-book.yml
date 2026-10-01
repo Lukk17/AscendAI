@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: http://localhost:9080/general/v0/general
+  url: "{{protocol}}://{{baseUrl}}:9080/general/v0/general"
   headers:
     - name: accept
       value: application/json

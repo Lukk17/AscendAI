@@ -2,7 +2,7 @@
 
 AscendAI runs six application services in two language stacks (Java 21 / Spring Boot, Python 3.11+ / FastAPI), four data-layer prerequisites (Postgres, Redis, Qdrant, the S3-compatible object store), and four support services (SearXNG, FlareSolverr, Docling, Unstructured). Today, none of them export metrics, ship logs anywhere central, or emit traces. Operational state lives entirely in `docker logs` output streamed to stdout.
 
-This change wires three pillars of observability — metrics, logs, traces — in a single coordinated rollout, plus six dashboards including ones that validate the recent prompt-caching change is actually saving money.
+This change wires three pillars of observability - metrics, logs, traces - in a single coordinated rollout, plus six dashboards including ones that validate the recent prompt-caching change is actually saving money.
 
 ## Goals / Non-Goals
 
@@ -14,7 +14,7 @@ This change wires three pillars of observability — metrics, logs, traces — i
 - Grafana provisioned with three datasources (Prometheus, Loki, Tempo) and six checked-in dashboards (Platform Overview, AI Pipeline, Infrastructure, Token Cost, RAG Quality, Cache Hit Rate).
 - Common tags on every metric: `service`, `instance`, `version`. Same convention extended to log labels and span attributes.
 - Domain custom metrics that map 1:1 onto bugs we have already paid for once.
-- **Always-on stack** — no opt-out profile (user direction). Observable by default keeps the happy path one command long.
+- **Always-on stack** - no opt-out profile (user direction). Observable by default keeps the happy path one command long.
 - Documentation: `docs/OBSERVABILITY.md` describes what is collected and how to add a metric, log field, or span.
 
 **Non-Goals:**
@@ -27,19 +27,19 @@ This change wires three pillars of observability — metrics, logs, traces — i
 
 ## Decisions
 
-### D1 — Stack: Prometheus + Grafana + Vector + Loki + OTel collector + Tempo
+### D1 - Stack: Prometheus + Grafana + Vector + Loki + OTel collector + Tempo
 
 Three pillars, each via the modern open-standard tool:
 
-- **Metrics** — Prometheus pull-based scrape; Grafana for visualisation. Spring Boot Actuator's Prometheus integration is two lines of `build.gradle.kts` plus three lines of YAML. `prometheus-fastapi-instrumentator` is one Python dependency line plus one wiring call.
-- **Logs** — Vector reads Docker container stdout via the `docker_logs` source, ships to Loki via the `loki` sink. Vector chosen over Promtail because Vector is vendor-neutral; a future migration to Datadog / CloudWatch / Splunk is a `vector.toml` change with services unchanged.
-- **Traces** — OTel collector receives OTLP from every service, batches, and exports to Tempo. Spring AI 1.1 already emits OTel spans natively for LLM/tool/embedding calls — wiring it is `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`. Python services add `opentelemetry-distro` for one-line auto-instrumentation.
+- **Metrics** - Prometheus pull-based scrape; Grafana for visualisation. Spring Boot Actuator's Prometheus integration is two lines of `build.gradle.kts` plus three lines of YAML. `prometheus-fastapi-instrumentator` is one Python dependency line plus one wiring call.
+- **Logs** - Vector reads Docker container stdout via the `docker_logs` source, ships to Loki via the `loki` sink. Vector chosen over Promtail because Vector is vendor-neutral; a future migration to Datadog / CloudWatch / Splunk is a `vector.toml` change with services unchanged.
+- **Traces** - OTel collector receives OTLP from every service, batches, and exports to Tempo. Spring AI 1.1 already emits OTel spans natively for LLM/tool/embedding calls - wiring it is `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`. Python services add `opentelemetry-distro` for one-line auto-instrumentation.
 
 OTel collector also future-proofs the migration story: same collector pipeline can fan out to Datadog OTLP, Honeycomb, Jaeger, etc., when the operator decides to upgrade.
 
-**Alternative considered**: skip logs and traces, ship metrics only (the original plan). Rejected — the user asked for both. The marginal cost of three extra containers is small relative to the operational visibility gained, and the L3 cache-hit-rate dashboard motivated the metrics extension that powers L1/L2/L3 anyway.
+**Alternative considered**: skip logs and traces, ship metrics only (the original plan). Rejected - the user asked for both. The marginal cost of three extra containers is small relative to the operational visibility gained, and the L3 cache-hit-rate dashboard motivated the metrics extension that powers L1/L2/L3 anyway.
 
-### D2 — Custom metric inventory (named per OpenMetrics conventions)
+### D2 - Custom metric inventory (named per OpenMetrics conventions)
 
 Every metric is in lowercase, dot-separated for the Spring side (Micrometer auto-converts to underscore for Prometheus), suffixed `_total` for counters by Prometheus convention.
 
@@ -56,7 +56,7 @@ Every metric is in lowercase, dot-separated for the Spring side (Micrometer auto
 | `rag.top_score` | histogram | `provider` | Top-K score distribution for L2 dashboard. |
 | `mcp.tool.duration` | timer | `tool`, `outcome` | Per-tool latency / error rate. |
 | `ingestion.upload.bytes` | counter | `source_type`, `outcome` | Catch flood scenarios + idempotency regressions. |
-| `chat.history.size` | gauge | `user_id` (low-cardinality only — see D5) | Detect runaway sessions. |
+| `chat.history.size` | gauge | `user_id` (low-cardinality only - see D5) | Detect runaway sessions. |
 | `prompt_cache.tokens.read` | counter | `provider` | Cache-hit token count for L3 dashboard. Emitted by `AnthropicPromptCacheStrategy.recordOutcome` and `OpenAiPromptCacheStrategy.recordOutcome`. |
 | `prompt_cache.tokens.creation` | counter | `provider` | Cache-write token count (Anthropic only) for L3 dashboard. |
 | `prompt_cache.tokens.total` | counter | `provider` | Total prompt tokens (cached + uncached) for L3 ratio computation. |
@@ -64,19 +64,19 @@ Every metric is in lowercase, dot-separated for the Spring side (Micrometer auto
 
 **ascend-weather-mcp**: only `mcp.tool.duration` and the framework defaults.
 
-**Python services** — same set as the original draft (transcription, search, memory ops, OCR pages).
+**Python services** - same set as the original draft (transcription, search, memory ops, OCR pages).
 
-### D3 — Common tags + log labels + span attributes
+### D3 - Common tags + log labels + span attributes
 
 Every metric across every service carries:
 
-- `service` — service name from `application.yaml` / FastAPI app metadata.
-- `instance` — hostname (auto-populated by Prometheus from the scrape target).
-- `version` — application version, resolved at build time.
+- `service` - service name from `application.yaml` / FastAPI app metadata.
+- `instance` - hostname (auto-populated by Prometheus from the scrape target).
+- `version` - application version, resolved at build time.
 
 The same `service` and `version` flow into Vector's log labels (`labels.service` from container metadata) and OTel resource attributes (`service.name`, `service.version`). This means Grafana's "view related logs / traces" buttons on a metric panel work out of the box: same service tag everywhere.
 
-### D4 — Endpoint shape and security
+### D4 - Endpoint shape and security
 
 | Service | Path | Bound to |
 |---|---|---|
@@ -91,7 +91,7 @@ The same `service` and `version` flow into Vector's log labels (`labels.service`
 
 Actuator endpoints are exposed only via `prometheus`, `health`, `info`. `env`, `heapdump`, `threaddump`, `loggers`, `caches` stay disabled to avoid leaking config.
 
-### D5 — Cardinality discipline
+### D5 - Cardinality discipline
 
 High-cardinality tags are forbidden. Two rules:
 
@@ -100,23 +100,23 @@ High-cardinality tags are forbidden. Two rules:
 
 If a counter would naturally need an unbounded tag, drop the tag and emit a separate WARN log line with the rich context (now searchable in Loki).
 
-### D6 — Provisioning Grafana, not configuring it
+### D6 - Provisioning Grafana, not configuring it
 
 Grafana is fully provisioned at startup via files mounted into `/etc/grafana/provisioning/`:
 
-- `datasources/datasources.yaml` — Prometheus, Loki, Tempo (Prometheus marked default).
-- `dashboards/dashboards.yaml` — loads `/var/lib/grafana/dashboards/*.json`.
-- `dashboards/*.json` — six checked-in dashboards (Platform Overview, AI Pipeline, Infrastructure, Token Cost, RAG Quality, Cache Hit Rate).
+- `datasources/datasources.yaml` - Prometheus, Loki, Tempo (Prometheus marked default).
+- `dashboards/dashboards.yaml` - loads `/var/lib/grafana/dashboards/*.json`.
+- `dashboards/*.json` - six checked-in dashboards (Platform Overview, AI Pipeline, Infrastructure, Token Cost, RAG Quality, Cache Hit Rate).
 
 A fresh `docker-compose up` produces a fully working Grafana with all six dashboards already loaded across all three datasources. No clicking through the UI to wire datasources.
 
 The dashboards are saved as JSON via Grafana's "Share → Export" with `For external use` toggled on so they are portable. We treat them as code: any change goes through git.
 
-### D7 — Always-on, no opt-out
+### D7 - Always-on, no opt-out
 
 The earlier draft included a `--profile no-observability` opt-out. User dropped it: observability runs by default in `compose.yaml` with no profile attribute on any of the eight new containers. Operators who don't want it can comment out the services in `compose.yaml` (manual edit), which is acceptable given the always-on default makes the happy path simpler.
 
-### D8 — Logs via Vector + Loki (Vector chosen for vendor-neutrality)
+### D8 - Logs via Vector + Loki (Vector chosen for vendor-neutrality)
 
 Vector container reads Docker container logs via the `docker_logs` source:
 
@@ -148,7 +148,7 @@ The `vector.toml` includes commented placeholder sinks for Datadog, CloudWatch, 
 
 To migrate, the operator uncomments the alternative sink, removes (or keeps) the Loki sink, sets the env var, and `docker compose restart vector`. **Services are unaffected.** This is the property that motivates Vector over Promtail.
 
-### D9 — Traces via OTel collector + Tempo (Spring AI emits OTel natively)
+### D9 - Traces via OTel collector + Tempo (Spring AI emits OTel natively)
 
 OTel collector pipeline:
 
@@ -187,7 +187,7 @@ service:
 
 Result: a single chat turn produces a trace with spans for: ascend-ai-agent receives the request → RAG embedding call → Qdrant vector search → LLM provider call → MCP tool fan-out → response. Visible end-to-end in Grafana's Tempo panel.
 
-### D10 — Six dashboards with cross-pillar drilldown
+### D10 - Six dashboards with cross-pillar drilldown
 
 | # | Dashboard | Powered by | What it answers |
 |---|---|---|---|
@@ -198,19 +198,19 @@ Result: a single chat turn produces a trace with spans for: ascend-ai-agent rece
 | 5 | RAG Quality (L2) | metrics + logs | Top-K score distribution; miss-rate trends; ingestion throughput |
 | 6 | Cache Hit Rate (L3) | metrics | Is the prompt-caching change actually saving money? |
 
-**L1 — Token Cost**: Multiplies `gen_ai.client.token.usage{provider="...",type="input"}` by per-provider $/1k input rates and `type="output"` by $/1k output rates. Rates are committed in `infra/observability/grafana/dashboards/pricing.yaml` so updates go through git review. Daily-bucketed `sum by (provider)` panel; line chart per provider over time; total $ panel.
+**L1 - Token Cost**: Multiplies `gen_ai.client.token.usage{provider="...",type="input"}` by per-provider $/1k input rates and `type="output"` by $/1k output rates. Rates are committed in `infra/observability/grafana/dashboards/pricing.yaml` so updates go through git review. Daily-bucketed `sum by (provider)` panel; line chart per provider over time; total $ panel.
 
-**L2 — RAG Quality**: Heatmap of `rag.top_score` histogram over time (shows score distribution drift). Time-series of `rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)` (miss-rate). Bar chart of ingestion-events-per-hour by `source_type` from `ingestion.upload.bytes_total`. Logs panel below pulls Loki entries matching `service="ascend-ai-agent"` AND `level="WARN"` for retrieval-related warnings.
+**L2 - RAG Quality**: Heatmap of `rag.top_score` histogram over time (shows score distribution drift). Time-series of `rag.retrieval.hits{above_threshold="false"} / sum(rag.retrieval.hits)` (miss-rate). Bar chart of ingestion-events-per-hour by `source_type` from `ingestion.upload.bytes_total`. Logs panel below pulls Loki entries matching `service="ascend-ai-agent"` AND `level="WARN"` for retrieval-related warnings.
 
-**L3 — Cache Hit Rate**: `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider — the headline cache-hit-rate ratio. Side panel: absolute saved tokens per hour (`rate(prompt_cache.tokens.read[1h]) * 3600`). Validates that the prompt-caching change is firing in production. Flat-line at 0% for any provider would flag a regression.
+**L3 - Cache Hit Rate**: `rate(prompt_cache.tokens.read[5m]) / rate(prompt_cache.tokens.total[5m])` per provider - the headline cache-hit-rate ratio. Side panel: absolute saved tokens per hour (`rate(prompt_cache.tokens.read[1h]) * 3600`). Validates that the prompt-caching change is firing in production. Flat-line at 0% for any provider would flag a regression.
 
-### D11 — Why these new domain metrics on the cache strategies
+### D11 - Why these new domain metrics on the cache strategies
 
 The shipped `add-prompt-caching` change logs cache outcomes at INFO. That's enough to verify behaviour during dev but not enough to dashboard. This change adds three counters emitted from `recordOutcome(...)` in both strategies:
 
-- `prompt_cache.tokens.read{provider}` — incremented by `cacheReadInputTokens` (Anthropic) or `cachedTokens` (OpenAI/Gemini) on each call.
-- `prompt_cache.tokens.creation{provider}` — incremented by `cacheCreationInputTokens` on each Anthropic call (zero for OpenAI/Gemini, where cache writes are implicit).
-- `prompt_cache.tokens.total{provider}` — incremented by `promptTokens` on each call (the denominator for the hit-rate ratio).
+- `prompt_cache.tokens.read{provider}` - incremented by `cacheReadInputTokens` (Anthropic) or `cachedTokens` (OpenAI/Gemini) on each call.
+- `prompt_cache.tokens.creation{provider}` - incremented by `cacheCreationInputTokens` on each Anthropic call (zero for OpenAI/Gemini, where cache writes are implicit).
+- `prompt_cache.tokens.total{provider}` - incremented by `promptTokens` on each call (the denominator for the hit-rate ratio).
 
 `MeterRegistry` is already on the classpath after Actuator + Micrometer dependencies land. Wiring is one constructor arg and three `Counter.builder(...).register(meterRegistry).increment(...)` calls per strategy.
 
@@ -220,10 +220,10 @@ The shipped `add-prompt-caching` change logs cache outcomes at INFO. That's enou
 - **Disk growth.** Prometheus default retention 15 days at ~1 GB; Loki retention default 31 days; Tempo retention 14 days. Total local-dev disk: ~5 GB steady state. We set `--storage.tsdb.retention.time=72h` for Prometheus, `retention_period: 168h` for Loki, and `retention: 168h` for Tempo to bound it.
 - **Dashboard rot.** Custom dashboards drift from reality as code changes. Mitigation: every dashboard panel cites the underlying metric name, and `docs/OBSERVABILITY.md` lists the metrics inventory with the dashboards using them. When a metric is renamed, the cross-reference forces an update.
 - **Cardinality explosion via well-meaning new tags.** Mitigated by D5 and a code-review checklist item.
-- **Spring Boot version skew.** Spring Boot 3.5.4 is on Micrometer 1.13. The Prometheus simpleclient registry has moved to OpenMetrics-format-by-default; pin the registry version explicitly.
-- **Python instrumentation overhead.** `prometheus-fastapi-instrumentator` adds an ASGI middleware that times every request. Sub-microsecond. OTel auto-instrumentation adds ~5–20 µs per span; LLM calls dominate latency anyway.
+- **Spring Boot version skew.** Spring Boot 3.5.14 is on Micrometer 1.15. The Prometheus simpleclient registry has moved to OpenMetrics-format-by-default; pin the registry version explicitly.
+- **Python instrumentation overhead.** `prometheus-fastapi-instrumentator` adds an ASGI middleware that times every request. Sub-microsecond. OTel auto-instrumentation adds ~5-20 µs per span; LLM calls dominate latency anyway.
 - **Vector reads Docker socket.** Mounting `/var/run/docker.sock` into a container is a privilege escalation vector. Mitigation: Vector container runs as `read-only` against the socket (mount with `:ro`) and has no other privileges.
-- **OTel collector single point of failure.** If the collector container crashes, no traces ship until it restarts. Acceptable for v1 — local dev tolerates short blips. Production hardening (collector replicas, retry queues) is out of scope.
+- **OTel collector single point of failure.** If the collector container crashes, no traces ship until it restarts. Acceptable for v1 - local dev tolerates short blips. Production hardening (collector replicas, retry queues) is out of scope.
 
 ## Migration Plan
 

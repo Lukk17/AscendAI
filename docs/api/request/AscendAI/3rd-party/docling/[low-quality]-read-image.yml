@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: http://localhost:5001/v1/convert/file
+  url: "{{protocol}}://{{baseUrl}}:5001/v1/convert/file"
   headers:
     - name: accept
       value: application/json

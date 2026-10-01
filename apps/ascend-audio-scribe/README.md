@@ -45,6 +45,11 @@ When you change endpoint shapes here, update the SKILL.md so downstream agents s
 
 ### Prerequisites
 
+Platform support: [pytorch-requirements.txt](pytorch-requirements.txt) pins CUDA 12.6 builds of PyTorch, published
+only for Windows and Linux on x86_64, so they cannot be installed on macOS. The local (faster-whisper) backend needs
+Windows or Linux with an NVIDIA GPU. The OpenAI and Hugging Face backends need no PyTorch and work on any platform,
+macOS included. The CUDA, cuDNN and PyTorch items below apply only to the local backend.
+
 - **Python 3.11**
 - **Nvidia CUDA 12.6** ([download](https://developer.nvidia.com/cuda-12-6-0-download-archive))
 - **cuDNN 9.x** ([download](https://developer.nvidia.com/cudnn-downloads))
@@ -139,12 +144,14 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
+PyTorch, on Linux with an NVIDIA GPU only. Skip this step on macOS, where the local backend is unavailable:
+
 ```bash
 pip install -r pytorch-requirements.txt
 ```
 
 ```bash
-pip install -e .[dev]
+pip install -e ".[dev]"
 ```
 
 PowerShell:
@@ -171,6 +178,22 @@ The `-e` flag installs in editable mode so source edits show up without reinstal
 
 ```bash
 uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
+```
+
+**3. Run the tests.** The suite enforces 100 percent branch coverage through `pyproject.toml` and fails below it. It
+replaces `torch` with a stub, so it also runs on macOS without PyTorch. It calls the venv's interpreter by path, so it
+works whether or not the venv is activated.
+
+Bash:
+
+```bash
+.venv/bin/python -m pytest
+```
+
+PowerShell:
+
+```powershell
+.venv\Scripts\python.exe -m pytest
 ```
 
 #### With Docker (recommended)
@@ -475,14 +498,14 @@ standard Python app and the MCP server.
 
 Four diagnostic surfaces follow the platform's standard observability stack:
 
-- `GET /health` — liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound. Targeted by the Docker
+- `GET /health` - liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound. Targeted by the Docker
   `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should hit this.
-- `GET /ready` — readiness probe. Checks `ffmpeg` and `ffprobe` are on PATH and the system temp dir is writable.
+- `GET /ready` - readiness probe. Checks `ffmpeg` and `ffprobe` are on PATH and the system temp dir is writable.
   Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded", "checks": {...}}`.
-- `GET /metrics` — Prometheus payload. Counters labelled `provider={local,openai,huggingface}` and `outcome` for
+- `GET /metrics` - Prometheus payload. Counters labelled `provider={local,openai,huggingface}` and `outcome` for
   request totals + bytes processed, plus per-operation duration histograms. Audacity track count and ffmpeg
   invocation counters are also exposed.
-- `X-Request-ID` middleware — every request echoes (or generates) a correlation ID, injected into every log line via
+- `X-Request-ID` middleware - every request echoes (or generates) a correlation ID, injected into every log line via
   `[request_id]` so requests can be reassembled from log aggregation without bespoke tracing plumbing.
 
 ### Error contract
@@ -490,12 +513,12 @@ Four diagnostic surfaces follow the platform's standard observability stack:
 All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with `Content-Type:
 application/problem+json`.
 
-- `400` — validation failure (`ValueError` raised in the request lifecycle, e.g. unsafe URI, unsupported provider,
+- `400` - validation failure (`ValueError` raised in the request lifecycle, e.g. unsafe URI, unsupported provider,
   missing API key). Body includes `detail` with the service-authored failure reason.
-- `413` — upload, download, or Audacity zip exceeds the configured size cap (`MAX_UPLOAD_BYTES`,
+- `413` - upload, download, or Audacity zip exceeds the configured size cap (`MAX_UPLOAD_BYTES`,
   `MAX_DOWNLOAD_BYTES`, `MAX_ZIP_UNCOMPRESSED_BYTES`; all default 5 GiB).
-- `422` — pydantic schema validation failure (Form / Query parameter shape).
-- `500` — unhandled exception. Body intentionally omits `detail` so upstream stack traces or DSNs never reach the
+- `422` - pydantic schema validation failure (Form / Query parameter shape).
+- `500` - unhandled exception. Body intentionally omits `detail` so upstream stack traces or DSNs never reach the
   caller. Full diagnostics live in the service logs, correlated by `X-Request-ID`.
 
 The MCP surface returns structured envelopes instead of HTTP status codes (MCP tool results are JSON):
@@ -586,6 +609,8 @@ python -m pip uninstall -y -r uninstall.txt
 ```bash
 rm uninstall.txt
 ```
+
+PyTorch, on Linux with an NVIDIA GPU only. Skip this step on macOS:
 
 ```bash
 python -m pip install --no-cache-dir -r pytorch-requirements.txt
