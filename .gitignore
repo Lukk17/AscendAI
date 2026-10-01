@@ -64,7 +64,7 @@ out/
 # Claude Code per-user local settings
 .claude/settings.local.json
 
-# e2e manual test run records — ephemeral, one per sweep. Keep the README,
+# e2e manual test run records - ephemeral, one per sweep. Keep the README,
 # ignore the timestamped run files. Move a particular run into version control
 # manually if you want it as an audit artifact.
 apps/ascend-agent/e2e/testing/runs/*
@@ -81,10 +81,12 @@ apps/ascend-ocr/e2e/testing/runs/*
 !apps/ascend-ocr/e2e/testing/runs/README.md
 
 # Bruno CLI run-output dump. Bruno writes the report next to the collection
-# root when invoked with `--output` (the file is named after the format —
+# root when invoked with `--output` (the file is named after the format -
 # `json`, `junit.xml`, etc.). Transient test output, not source.
 docs/api/request/AscendAI/json
+docs/api/request/AscendAI/junit
 docs/api/request/AscendAI/junit.xml
+docs/api/request/AscendAI/html
 
 
 # =============================================================================
@@ -145,7 +147,7 @@ MANIFEST
 *.swp
 *~
 
-# Crawlee runtime state — request queues and key-value stores are ephemeral
+# Crawlee runtime state - request queues and key-value stores are ephemeral
 # artifacts produced at scrape time. They contain scraped URLs and responses
 # and must not be committed.
 apps/ascend-web-hunter/src/storage/

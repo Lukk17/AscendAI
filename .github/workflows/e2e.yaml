@@ -100,15 +100,15 @@ jobs:
         run: docker logs ascend-weather-mcp
 
   ascend-ocr:
-    name: e2e / ascend-ocr (12 of 12 free specs)
+    name: e2e / ascend-ocr (12 of 16 free specs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       # First build is 5-15 minutes: the PaddlePaddle wheels are heavy and
       # the model cache is prefetched in the builder stage (see ascend-ocr
-      # README). Acceptable here: this workflow is nightly/manual, not a
-      # pull-request gate with a fast-feedback SLA.
+      # README). Acceptable here: this workflow runs on pushes to master and
+      # on manual dispatch, not as a pull-request gate with a fast-feedback SLA.
       - name: Build and start ascend-ocr
         run: docker compose up -d --build --wait ascend-ocr
 

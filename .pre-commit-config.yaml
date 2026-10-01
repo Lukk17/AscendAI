@@ -8,14 +8,14 @@ repos:
       - id: ruff-format
         files: ^apps/ascend-ocr/
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.18.2
+  - repo: local
     hooks:
       - id: mypy
-        files: ^apps/ascend-ocr/src/
-        additional_dependencies:
-          - pydantic==2.13.4
-          - pydantic-settings==2.14.1
+        name: mypy
+        entry: bash -c 'cd apps/ascend-ocr || exit 1; py=.venv/bin/python; [ -x "$py" ] || py=.venv/Scripts/python.exe; exec "$py" -m mypy src tests'
+        language: system
+        files: ^apps/ascend-ocr/((src|tests)/|pyproject\.toml$)
+        pass_filenames: false
 
   - repo: https://github.com/awslabs/git-secrets
     rev: 1.3.0
