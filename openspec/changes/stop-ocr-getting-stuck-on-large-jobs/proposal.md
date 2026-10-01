@@ -1,5 +1,23 @@
 ## Why
 
+Reconciled on 2026-09-24. Two later changes, both implemented and neither archived yet, overtook part of this
+proposal, and where they disagree with it they are right. [read-long-documents](../read-long-documents/proposal.md)
+made every request an asynchronous job, so the absolute request ceiling, `OCR_REQUEST_TIMEOUT`, the page limit
+derived from it, and the rule that a waiting request holds its own deadline are gone. A document's budget is its page
+count multiplied by the per-page allowance, the page ceiling is configured and the reading ceiling derived from it,
+waiting is not charged to the budget, and an expired document's `OCR_FAILED` arrives inside a job record rather than
+as the status of a held request. [upgrade-ocr-to-ppocrv6](../upgrade-ocr-to-ppocrv6/proposal.md) moved every
+language but `ru` and `korean` to `PP-OCRv6_small`, on which one A4 page at 300 dots per inch was measured on
+2026-09-24 at about 440 MB flat, so the fitted memory model below, every figure priced from it, and the claim that the
+single worker is a memory constraint are void for those languages rather than conservative. The model stays exact for
+`ru` and `korean`. A third change, [fix-ocr-page-resolution](../fix-ocr-page-resolution/design.md), then overturned
+the pixel ceiling, the fixed 144 dpi rendering, the unset-able detector bound, the scratch file and the single
+per-page allowance, and it owns those figures now. Every measurement below is kept as the record of the service it
+described.
+[design.md](design.md) lists each overtaken statement at its top, the four spec files were rewritten to agree with
+the two later changes, and tasks 1.3, 1.4, 1.6 and 8.7 are recorded in [tasks.md](tasks.md) as superseded rather than
+done.
+
 The OCR service wedges on a large job and then lies about it. All three parts of that were measured against the
 running stack, not inferred.
 
@@ -121,7 +139,7 @@ A bound on what the detector sees, which is the fix the measurement points at:
   small text, which is what the owner cares about, so the three candidates and their costs are stated and choosing
   between them is a task that requires measuring against his own documents. Said plainly: a lower bound reads less
   small text, in the sense that small lines stop being detected at all rather than being detected and misread.
-  **Resolved**: the owner measured 960, 1280 and 1536 against five real documents and chose 1536 as near lossless —
+  **Resolved**: the owner measured 960, 1280 and 1536 against five real documents and chose 1536 as near lossless -
   see [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md) for the full table.
 - The bound and the pixel ceiling are one decision in two settings. **Resolved**: they ship together as
   `OCR_DETECTOR_MAX_SIDE=1536` and `OCR_MAX_INFERENCE_PIXELS=2,500,000`, so an image deployed with its shipped
@@ -176,7 +194,7 @@ No contract here is BREAKING. Every response field is additive and no error code
 caller sees does change in one way worth naming rather than burying: with the shipped defaults, input above the
 pixel ceiling is refused. With the resolved detector bound and pixel ceiling pair (1536 / 2,500,000) that ceiling
 covers A4 and the other standard page sizes, so this is not the loss of function it would have been had the pair
-shipped unresolved — see the two paragraphs above. What remains true regardless of the pair chosen: a caller
+shipped unresolved - see the two paragraphs above. What remains true regardless of the pair chosen: a caller
 submitting a genuinely oversized page gets a fast, named refusal in exchange for never again holding a connection
 open against a service that has killed itself reading it.
 
@@ -184,15 +202,22 @@ open against a service that has killed itself reading it.
 
 ### New Capabilities
 
-- `ocr-request-deadlines`: How long a request may run, how that budget is divided across the pages of a document,
-  how the worker stops itself, what happens when it does not, how requests queue behind the single worker, and the
-  worker cap the memory argument depends on.
+- `ocr-request-deadlines`: How a document's budget is derived from its pages, how the worker stops itself, what
+  happens when it does not, how a broken pool is rebuilt, and the single worker cap. Reconciled on 2026-09-24: the
+  overall request ceiling and the waiting-request deadline are removed, superseded by `read-long-documents`.
 - `ocr-service-readiness`: What `/health` and `/ready` each promise, and specifically when the service reports that
   it cannot take work.
 - `ocr-input-limits`: The pixel ceiling on one inference for both input types, the decode-time decompression bomb
-  guard, the page count refusal, and the error code all three use.
+  guard, the page count refusal, and the error code all three use. Reconciled on 2026-09-24: the page count refusal
+  is removed from this capability, because `read-long-documents`'s `ocr-job-admission` states it once, with the page
+  ceiling configured and the reading ceiling derived from it. The pixel ceiling on one inference is removed as well,
+  superseded by `fix-ocr-page-resolution`'s `ocr-page-resolution`, which shrinks an oversized page and owns the
+  source pixel ceiling. What stays here is the header-time decompression-bomb guard and the reuse of the existing
+  error code.
 - `ocr-memory-bounds`: What one inference is allowed to cost. The configurable bound on the detector's input, the
-  accuracy trade it makes, and the memory model the worker cap and the pixel ceiling are both derived from.
+  accuracy trade it makes, and the memory ceiling the service states at startup. The spec states no fitted figure, so
+  the model's being void on the new pair leaves its requirements standing. The detector bound requirement is narrowed
+  on 2026-09-24 to per-request quality modes that cannot be unset, which `ocr-page-resolution` owns.
 
 ### Modified Capabilities
 

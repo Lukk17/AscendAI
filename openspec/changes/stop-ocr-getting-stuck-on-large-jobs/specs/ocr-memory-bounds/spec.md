@@ -7,36 +7,30 @@ configuration rather than a property of whatever the caller happened to upload.
 
 ### Requirement: The input to one inference is bounded by configuration, not by the caller
 
-The service SHALL bound the input given to text detection to a configured longest-side limit, independently of the
-size of the page or image submitted. The bound SHALL be configurable, and it MAY be unset to restore the library's
-own unbounded behaviour. Lowering the bound reduces memory and reduces the smallest text that can be detected, so
-the deployed value SHALL be chosen by measuring both against real documents rather than taken as an unexamined
-default. The owner measured 960, 1280 and 1536 against his own documents and chose 1536 as near lossless; the
-shipped default is therefore 1536, not the library's unbounded behaviour, and the three candidates with what each
-costs in memory and in detected lines are recorded in
-[ADR-006](../../../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md).
+The service SHALL bound the input given to text detection to a longest-side limit set by the operator, independently
+of the size of the page or image submitted. A caller MAY choose among operator-configured quality modes, each of
+which names its own bound, and SHALL NOT supply the bound as a number. The bound SHALL NOT be unset. Lowering a bound
+reduces memory and reduces the smallest text that can be detected, so the deployed values SHALL be chosen by
+measuring both against real documents rather than taken as unexamined defaults. The modes, the bound each ships with
+and the largest downscale a bound may impose are owned by the `ocr-page-resolution` capability.
 
 #### Scenario: Input larger than the bound
 
-- **WHEN** a bound is configured and a page whose longest side exceeds it is submitted
+- **WHEN** a page whose longest side exceeds its mode's bound is submitted
 - **THEN** detection receives the page scaled down to the bound
-- **AND** the peak memory of the call is lower than the same page produces with no bound configured
+- **AND** the peak memory of the call is lower than the same page would produce with no bound
 
 #### Scenario: Input smaller than the bound
 
-- **WHEN** a bound is configured and a page whose longest side is below it is submitted
+- **WHEN** a page whose longest side is below its mode's bound is submitted
 - **THEN** the page is not scaled up to reach the bound
 
-#### Scenario: No bound configured
+#### Scenario: Recognition reads the rendered page, within a measured ratio
 
-- **WHEN** no bound is configured
-- **THEN** detection receives the page at the resolution it would receive today
-
-#### Scenario: Text is read at full resolution whatever the bound
-
-- **WHEN** a bound is configured and text is detected on the scaled-down page
-- **THEN** the text is recognised from the page at its full resolution, so the bound costs detected lines rather
-  than recognition quality
+- **WHEN** text is detected on the scaled-down page
+- **THEN** the text is recognised from crops of the page at its rendered resolution
+- **AND** that holds as a quality claim only while the downscale stays within the ratio `ocr-page-resolution`
+  permits, because past it every line can be found and every line misread
 
 ### Requirement: Peak memory is set by the largest page, not by the length of the document
 

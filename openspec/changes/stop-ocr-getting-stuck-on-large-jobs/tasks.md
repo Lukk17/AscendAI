@@ -8,6 +8,11 @@ until section 1 has reported. Two of its items, 1.4 and 1.5, are a single owner 
 and they gate the deploy rather than the implementation, because there is no pair of defaults that is both safe and
 useful.
 
+Reconciled on 2026-09-24. Tasks 1.3, 1.4, 1.6 and 8.7 are superseded by `read-long-documents` and by the measurement of
+the `PP-OCRv6_small` pair that `upgrade-ocr-to-ppocrv6` installed, not done. Each is struck through and left
+unticked, with the reason and the superseding change beside it, and design.md lists every statement of this change
+those two overtook.
+
 ## 1. Measure before freezing any number
 
 - [x] 1.1 Take the running memory investigation's result and answer one question: does peak resident memory stay
@@ -37,19 +42,35 @@ useful.
       Also recorded there: the container's monotonic clock runs about 5.8 percent slow against the host, which is
       the whole of the per-request overhead a client observes outside the worker, and one unreproduced 261 s first
       inference on a host that was at 91 percent memory use.
-- [ ] 1.3 Decide the deployed absolute ceiling with the owner, from the p95 in 1.2 and the largest document the
+- [ ] ~~1.3 Decide the deployed absolute ceiling with the owner, from the p95 in 1.2 and the largest document the
       service must accept. Verify the chosen pair is recorded in design.md's number table, that the derived page
       limit is stated alongside it, and that `OCR_REQUEST_TIMEOUT` in `compose.yaml` matches. State to the
       owner that memory does not constrain this trade: a page retains 11.5 MiB, so the page limit is a deadline
       artifact and the only thing a larger ceiling costs is how long a caller holds a connection. This resolves the
-      second half of Open Question 1.
-- [ ] 1.4 Set the deployed pixel ceiling from the fitted model rather than from the evidence bracket. The
+      second half of Open Question 1.~~
+      Superseded on 2026-09-24 by `read-long-documents`, not answered. There is no absolute request ceiling left to
+      decide, because every request is now an asynchronous job and no request holds a connection.
+      `OCR_REQUEST_TIMEOUT` is deleted there, the page ceiling is the configured `OCR_JOB_MAX_PAGES`, and a
+      document's reading ceiling is derived from it as `OCR_JOB_MAX_PAGES x OCR_PAGE_TIMEOUT_SECONDS`. See
+      `read-long-documents` design.md, "What the four pending capabilities now say" and its number table. The second
+      half of Open Question 1 closes with it.
+- [ ] ~~1.4 Set the deployed pixel ceiling from the fitted model rather than from the evidence bracket. The
       derivation, the formula and the table of ceilings per detector bound are already in design.md under "The
       pixel ceiling, recomputed". What is left is choosing the resident budget the ceiling assumes, which is an
       owner decision because the host measurement shows the container limit is not what the host can actually give.
       Verify the chosen budget and the resulting ceiling are recorded in design.md's number table, that the ceiling
       is stated together with the detector bound from 1.5 it depends on, and that the standard page sizes are
-      re-checked against it.
+      re-checked against it.~~
+      Superseded on 2026-09-24 by measurement, recorded in `read-long-documents`, not answered. The fitted model this
+      task would derive the ceiling from was measured on PaddleOCR 3.6.0 against `PP-OCRv5_server_det`, and
+      `upgrade-ocr-to-ppocrv6` moved every language but `ru` and `korean` to the `PP-OCRv6_small` pair. Measured on
+      that pair on 2026-09-24, one A4 page at 300 dots per inch costs about 440 MB, flat across text density (439,
+      439 and 441 MB for 6, 20 and 50 lines), against the fitted model's 9 to 45 GB (9,060 MB at 144 dots per inch,
+      44,847 MB at 300). The model is void on the new pair rather than conservative, so a ceiling derived from it
+      would mean nothing. The measurement and what it voids are in `read-long-documents` design.md, "The
+      measurements this change is derived from" and "What memory no longer constrains". The ceiling itself is gone:
+      `fix-ocr-page-resolution` deletes `OCR_MAX_INFERENCE_PIXELS`, reads an oversized page shrunk, and keeps only a
+      decompression-bomb refusal on `OCR_MAX_SOURCE_PIXELS`, which that change owns.
 - [x] 1.5 Choose the deployed detector long-side bound with the owner, by measuring 960, 1280 and 1536 against his
       own documents rather than against the one sample already measured. Verify by recording, for each candidate
       and for no bound, the peak memory and the detected line count and mean confidence on a set of his real pages,
@@ -61,11 +82,15 @@ useful.
       dotted separators on a form, 960 lost genuine footnotes from a legal opinion). `OCR_DETECTOR_MAX_SIDE` defaults
       to 1536, paired with `OCR_MAX_INFERENCE_PIXELS=2,500,000` (this section's own defensible-pending-1.6 value, not
       the 1,720,000 unbounded-case figure). Recorded in ADR-006 and in this file's own number table and Decision 11.
-- [ ] 1.6 Confirm the 318 MiB per megapixel residual at the top of the intended ceiling before deploying any ceiling
+- [ ] ~~1.6 Confirm the 318 MiB per megapixel residual at the top of the intended ceiling before deploying any ceiling
       much above the standard page sizes. It was fitted between 0.016 and 0.901 megapixels and the larger ceilings
       extrapolate it roughly twenty times beyond that. Verify by measuring peak memory with the chosen detector
       bound applied at two points near the intended ceiling and checking the model's prediction against them,
-      recording the result in design.md. This resolves Open Question 4.
+      recording the result in design.md. This resolves Open Question 4.~~
+      Superseded on 2026-09-24 by the same measurement, not answered. The 318 MiB per megapixel residual is a term of
+      the fitted model, which is void on the `PP-OCRv6_small` pair, so confirming it would confirm a constant of a
+      detector this service no longer runs for any language but `ru` and `korean`. `read-long-documents` design.md,
+      Open Questions, deletes the same question as void rather than answering it. Open Question 4 closes with it.
 
 ## 2. Configuration and the single worker cap
 
@@ -93,7 +118,7 @@ useful.
 - [x] 2.4 Replace `_WORKER_POOL_SIZE` with `settings.OCR_WORKER_COUNT` in `start_worker_pool`, and use the same
       value for the admission gate built in task 4.1. Verify with a test asserting the pool's `max_workers` and the
       gate's permit count are both equal to the setting, so the two cannot drift.
-      Done. `tests/service/test_ocr_service.py::TestWorkerPoolLifecycle::test_start_worker_pool_resets_gate_and_queue_depth`.
+      Done. `tests/service/test_ocr_service.py::TestWorkerPoolLifecycle::test_start_worker_pool_resets_gate`.
 - [x] 2.5 Record the memory ceiling the configuration implies in the existing startup banner
       (`src/config/startup_banner.py`), as one call's predicted peak multiplied by `OCR_WORKER_COUNT`, naming the
       detector bound and the pixel ceiling it was computed from. Verify with a test asserting the line appears, that
@@ -127,7 +152,7 @@ useful.
       per surface asserting the status, the error code, and the absence of any text or page in the body.
       Done. The worker raises `OcrDeadlineExceededError`, which crosses the process boundary intact and is now
       caught distinctly in `_run_and_reclaim` (logged, metered, and never confused with a worker that needed
-      replacing) rather than falling into the generic exception branch that discarded its detail — a defect found
+      replacing) rather than falling into the generic exception branch that discarded its detail - a defect found
       and fixed while closing out task 7.3. Tests: `test_worker_own_deadline_stop_fails_cleanly_without_rebuild`,
       `test_ocr_service_failure_returns_422_with_generic_message` (REST), `test_ocr_failed_error_code_in_message`
       (MCP).
@@ -178,7 +203,7 @@ useful.
       pool is rebuilt, that the next request is served, and that the killed request is never resubmitted.
       Done. `test_broken_pool_triggers_rebuild_and_fails_request`. Live verification (task 8.8) found a real defect
       in the first cut of this: `loop.run_in_executor(pool, ...)` raises `BrokenProcessPool` synchronously, inside
-      its own body, when the pool is already broken *before* this call (a worker killed between requests) — not
+      its own body, when the pool is already broken *before* this call (a worker killed between requests) - not
       through the awaited future the way a worker dying *during* this call does. The original code only wrapped
       `await future` in `except BrokenProcessPool`, so the already-broken case escaped as an unhandled 500 exactly
       like the original incident, never triggering a rebuild. Moved `future = loop.run_in_executor(...)` inside the
@@ -198,11 +223,11 @@ useful.
       Done. `sweep_scratch_dir` runs from `_warm_worker_engine` (every fresh/rebuilt worker) and from
       `create_app`'s lifespan. Tests in `TestSweepScratchDir`. Live verification (task 8.8) found a second, related
       defect: `process_file`'s own `finally: os.remove(temp_file_path)` (immediate cleanup of the successful or
-      failed request's own file) can itself raise — reproduced live on Windows, where a still-open file handle
+      failed request's own file) can itself raise - reproduced live on Windows, where a still-open file handle
       turned a clean `OcrDeadlineExceededError` into a `PermissionError` that then *replaced* the original exception
       (Python re-raises whichever exception a `finally` block itself raises), surfacing to the caller as an opaque
       generic failure with the real cause invisible even in the server's own logs. Wrapped the removal in
-      `try/except OSError`, logging a warning instead of propagating — `sweep_scratch_dir`'s age-based reclamation
+      `try/except OSError`, logging a warning instead of propagating - `sweep_scratch_dir`'s age-based reclamation
       already covers a file left behind this way, so nothing is lost by not removing it immediately. Added
       `test_cleanup_failure_does_not_mask_the_original_exception`. A generic `except Exception as exc:` branch
       further up in `_run_and_reclaim` was also swallowing whatever exception type actually reached it with no log
@@ -226,7 +251,7 @@ useful.
 - [x] 5.3 Assert `/health` is unaffected by every state in 5.1. Verify with a test polling liveness while a job is
       stuck, while a replacement is running, and while the pool is broken, asserting 200 and an unchanged body each
       time.
-      Done at the unit level — `/health` never imports or calls any of the accepting-work signals (see
+      Done at the unit level - `/health` never imports or calls any of the accepting-work signals (see
       `health_check` in `src/main.py`), which the module's own test coverage confirms. A live poll during an actual
       stuck/rebuilding worker is part of the end-to-end proof (task 8.8/session report), not a unit test.
 - [x] 5.4 Amend ADR-004 with the readiness condition this change adds, keeping its existing decisions intact.
@@ -296,7 +321,7 @@ useful.
       and the consecutive failure count. This closed a real defect found while wiring it up: the worker's own
       cooperative-stop exception (`OcrDeadlineExceededError`) was falling into the generic
       `except Exception as exc: raise OcrProcessingError("OCR processing failed") from exc` branch, discarding its
-      detail and going unmetered and unlogged — see task 3.5. No per-page log call exists (only the per-page
+      detail and going unmetered and unlogged - see task 3.5. No per-page log call exists (only the per-page
       metric/span above), so nothing logs at INFO once per page.
 
 ## 8. Gates and documentation
@@ -340,7 +365,7 @@ useful.
       (new "Memory model and the single worker" section, extended env var table), `11-risks-and-technical-debt.md`
       (the decompression-bomb, unmeasured-memory-cost and whole-document-timeout risks marked Closed, with what
       closed them; the single-worker risk rewritten around `OCR_WORKER_COUNT` as a memory constraint).
-- [ ] 8.7 Update `compose.yaml` with the deployed values from tasks 1.3, 1.4 and 1.5, deploying the detector
+- [ ] ~~8.7 Update `compose.yaml` with the deployed values from tasks 1.3, 1.4 and 1.5, deploying the detector
       bound and the pixel ceiling together because neither is safe alone, and any other new setting whose default
       the deployment overrides.
       Not done this session: out of scope by explicit instruction ("do not touch any compose file, memory limits are
@@ -348,13 +373,18 @@ useful.
       and `OCR_MAX_INFERENCE_PIXELS` now default to the resolved pair (1536 / 2,500,000) in `config.py` itself, so
       the running container picks them up without any compose edit once the image is rebuilt. `OCR_REQUEST_TIMEOUT`
       stays explicitly `300` in compose (task 1.3 remains unresolved) and `OCR_PAGE_TIMEOUT_SECONDS` is not set
-      there, so the code default of `120` applies, giving a page limit of 2 — an existing, disclosed limit, not a
-      regression.
+      there, so the code default of `120` applies, giving a page limit of 2 - an existing, disclosed limit, not a
+      regression.~~
+      Superseded on 2026-09-24 by `read-long-documents`, not answered. Its three inputs are gone or settled
+      elsewhere: 1.3 and 1.4 are superseded above, and 1.5's pair ships as the code defaults in `config.py`. The
+      compose values are now owned by `read-long-documents`: its task 2.6 removes `OCR_REQUEST_TIMEOUT` and the
+      `OCR_PAGE_TIMEOUT_SECONDS` override and adds the result store settings, and its task 2.7 decides the container
+      memory limit after the end-to-end gate.
 - [x] 8.8 End-to-end check against a running stack: submit a document that fits the budget, one that exceeds the
       page limit, an image above the pixel ceiling, a job engineered to overrun its budget, and a run in which the
       worker process is killed outright.
       Done against the module's own `.venv` interpreter (uvicorn started directly on 127.0.0.1:7122), not the
-      container — the running container (`ascend-ocr`, built 2026-09-04) still carries the pre-fix code
+      container - the running container (`ascend-ocr`, built 2026-09-04) still carries the pre-fix code
       (`_WORKER_POOL_SIZE`, no `OCR_WORKER_COUNT`), confirmed by reading its `ocr_service.py`, and it cannot be
       rebuilt this session. All five cases run against the real 20-page A4 PDF the incident left behind
       (`/tmp/tmp6ci_ewb6.pdf` in the container, copied out and also split into 1/2/3-page slices for the cases that
@@ -369,19 +399,19 @@ useful.
       `accepting_work:false` for about 6 seconds during the rebuild, the in-flight request failing cleanly
       (`OCR_FAILED`, no partial content) in 5.2s, and a subsequent real request against the same (rebuilt) worker
       succeeding in 80.3s with genuine OCR output ("Quarterly Settlement Report - Page 1 of 20", 44 lines, 0.988
-      mean confidence on the visible line) — no container restart at any point. The scratch directory was confirmed
+      mean confidence on the visible line) - no container restart at any point. The scratch directory was confirmed
       empty after a full startup sweep. Two real defects surfaced only by this live run and are fixed and tested;
       see tasks 4.7 and 4.9's own notes for what they were and how they were found.
 - [x] 8.9 Measure the deployed configuration end to end against the model: run the twenty page A4 document that was
       killed, with the chosen detector bound and ceiling in place, and record peak resident memory.
       Done against the module's own `.venv` interpreter, using the actual leaked file copied out of the container
-      (`/tmp/tmp6ci_ewb6.pdf`) since the container itself cannot be rebuilt with this change — measured on a single
+      (`/tmp/tmp6ci_ewb6.pdf`) since the container itself cannot be rebuilt with this change - measured on a single
       extracted A4 page (20-page timing was impractical at ~90s/page; per-page cost is what the model predicts on
       anyway, and pages are cheap per Decision 9). Peak resident memory, read from Windows' own
       `Process.PeakWorkingSet64` (the Windows analogue of Linux's kernel-tracked `VmHWM`, not a sampled value) on a
       freshly-warmed single-language worker: **8.80 GiB** (9,447,440,384 bytes) for one A4 page at the deployed
       1536/2,500,000 pair, against the design's own prediction of roughly 9.2-9.8 GiB for that configuration and
-      comfortably under the container's 12 GiB limit (27% headroom) — consistent with the model within the accuracy
+      comfortably under the container's 12 GiB limit (27% headroom) - consistent with the model within the accuracy
       Windows-vs-Linux working-set/RSS measurement differences would predict, and confirming the qualitative claim
       that mattered: down from the unbounded 11.0 GiB baseline, and nowhere near the container limit the way the
       unbounded configuration was. A second, 2-page run measured 8.72 GiB (8,717,168,640 bytes), consistent with

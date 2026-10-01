@@ -1,3 +1,75 @@
+## Reconciled with the two later changes (2026-09-24)
+
+This design was written for a service that answered every request synchronously, on PaddleOCR 3.6.0 with
+`PP-OCRv5_server_det`. Two later changes, both implemented and neither archived yet, overtook parts of it.
+[upgrade-ocr-to-ppocrv6](../upgrade-ocr-to-ppocrv6/design.md) moved every language but `ru` and `korean` to the
+`PP-OCRv6_small` pair, and [read-long-documents](../read-long-documents/design.md) made every request an
+asynchronous job whose result is written to object storage. Where this document and those two disagree, they are
+right and this document is the record of how the service got there. Its mechanisms stand: the cooperative per-page
+deadline, the admission gate, worker replacement, the pool rebuild, the scratch sweep, the readiness split, the pixel
+ceiling with its bomb guard, and the detector bound. What was overtaken, statement by statement:
+
+- The absolute request ceiling (Decision 1, the number table's "Absolute request ceiling" row, task 1.3). Gone. No
+  request holds a connection, `OCR_REQUEST_TIMEOUT` is deleted, and a document's budget is
+  `pages x OCR_PAGE_TIMEOUT_SECONDS` with no second term. The page ceiling is what bounds it.
+- Requests holding their own deadline while they wait (Decision 4's first two consequences, and Decision 12's
+  paragraph on a request that arrives during a rebuild). Superseded outright. Time spent waiting is not charged to a
+  document's budget, which is counted from the moment reading starts, and nothing is failed for having waited. The
+  purpose it served, never inferring for a caller already told the request failed, holds by construction, because no
+  caller is told that for waiting. The gate itself, and the empty pool queue Decision 3 rests on, both stand.
+- The derived page limit, `floor(ceiling / per-page allowance)` (Decision 8, "The page count limit, restated" and the
+  "Maximum pages" row). Inverted. The page ceiling is the configured `OCR_JOB_MAX_PAGES`, default 100, and the reading
+  ceiling is derived from it. Refusing work that provably cannot finish still stands, and `read-long-documents`'s
+  `ocr-job-admission` is now its only statement, so this change's `ocr-input-limits` no longer carries it.
+- An expired request's failure arriving as the status of the request. The code is unchanged, `OCR_FAILED`, but it
+  now arrives inside a job record that is itself read successfully.
+- The scratch sweep horizon of `OCR_REQUEST_TIMEOUT + OCR_DISPATCH_MARGIN_SECONDS` (Decision 13). Retargeted at the
+  longest legitimate document, the reading ceiling plus the dispatch margin.
+- The 180 s per-page allowance and every duration derived from it (the number table, "The measured per-page cost and
+  the pool round trip"). Those measurements stay true of the old pair and are kept as its record. On
+  `PP-OCRv6_small` a page costs 4.1 s to 10.0 s. The allowance itself, per engine, is now owned by
+  `fix-ocr-page-resolution` (its design.md Decision 8), which replaced the single 45 s `read-long-documents` first
+  settled.
+- The fitted memory model, `peak_MiB = 635 + 5302 x megapixels + 11.5 x pages`, and everything derived from it: "The
+  measured memory model", "The pixel ceiling, recomputed", the predicted peaks in Decision 11's table, the memory
+  arithmetic in Decisions 5, 9 and 10, and the Risks entries that rest on them. It was fitted on PaddleOCR 3.6.0 and
+  stays exact for `ru` and `korean`, which still load `PP-OCRv5_server_det`. For every other language it is void
+  rather than conservative: measured on 2026-09-24, one A4 page at 300 dots per inch costs about 440 MB, flat across
+  text density, where the model predicted 9,060 MB at 144 dots per inch and 44,847 MB at 300. The 11.5 MiB a page
+  retained-result term is the one part carried forward, as an upper bound, until `read-long-documents` task 1.2
+  measures it on the new pair.
+- The single worker as a memory constraint (Decision 5 and the "Worker count" row). One call now costs about 440 MB
+  of a 12 GB container, so memory no longer forces it. It stays at one because every promise the queue makes is
+  written against one worker, which `read-long-documents` Decision 7 and Open Question 4 record. Stating the service's
+  peak as the worker count multiplied by one call's peak still stands.
+- Deriving the pixel ceiling from the fitted model against a resident budget (task 1.4, task 1.6 and Open Question
+  4). Void with the model. `fix-ocr-page-resolution` has since deleted `OCR_MAX_INFERENCE_PIXELS` altogether.
+- The compose values (task 8.7). Owned by `read-long-documents` tasks 2.6 and 2.7.
+- Asynchronous job submission as a non-goal and as Open Question 5. It is what `read-long-documents` built.
+
+A third change, [fix-ocr-page-resolution](../fix-ocr-page-resolution/design.md), written later on the same date and not yet archived,
+overturns more of this design, and it owns the figures below rather than this document:
+
+- The pixel ceiling on one inference (Decision 7, the `ocr-input-limits` requirement "One inference receives no more
+  than a configured number of pixels"). Superseded. A page or image larger than its quality mode supports is shrunk
+  and read, a document page is never refused on pixels, and the only pixel refusal left is a decompression-bomb guard
+  on `OCR_MAX_SOURCE_PIXELS`. The requirement is removed from `ocr-input-limits`, and the header-time guard and the
+  reuse of the existing error code are kept there, now tied to that source pixel ceiling.
+- The fixed 144 dpi rendering (Decision 10, ADR-005). Overturned. The service renders every page itself at the
+  resolution its quality mode names.
+- The detector bound (Decision 11, the `ocr-memory-bounds` requirement "The input to one inference is bounded by
+  configuration, not by the caller"). Narrowed. It is chosen per request from operator-set quality modes, it can no
+  longer be unset, and "Text is read at full resolution whatever the bound" is false as a quality claim, because at a
+  6.85x downscale every line was found and none read correctly. The requirement is rewritten to say so.
+- The per-page allowance and everything derived from it. One allowance per engine, not one for every page.
+- The scratch file (Decision 13). Removed, because the worker no longer writes a submission to disk, so "Reclaiming a
+  worker reclaims the files it was using" is removed from `ocr-request-deadlines`, since it could no longer fail.
+
+Tasks 1.3, 1.4, 1.6 and 8.7 are recorded as superseded in [tasks.md](tasks.md), with the reason beside each, not as
+done. The four spec files were rewritten to agree with the later changes rather than annotated, so whichever
+change archives first leaves one statement of each invariant in `openspec/specs/`. The sections below are otherwise
+kept as written, and each place that states one of the overtaken figures or rules is marked with a pointer here.
+
 ## Context
 
 See [proposal.md](proposal.md) for the motivation and the measurements. The constraints below were each verified
@@ -83,7 +155,7 @@ Non-Goals:
 
 ## The measured memory model
 
-Everything in this section was measured against the running container after this change was first written. It
+Overtaken on 2026-09-24 for every language but `ru` and `korean`, see the section at the top of this document. Everything in this section was measured against the running container after this change was first written. It
 answers the question the change originally carried as an open task, and two of its consequences change what has to
 be built.
 
@@ -141,14 +213,14 @@ budget and an accuracy trade, both of which belong to the owner rather than to t
 
 | Value | Default | Where it comes from | Open? |
 |---|---|---|---|
-| Worker count | 1 | Today's `_WORKER_POOL_SIZE`, unchanged. It is a memory constraint: peak is one job's cost multiplied by this value, and one job's cost is already most of the container limit. See Decision 5. | No |
-| Per-page allowance | 180 s | Measured, task 1.2. Twenty-four single-page inferences on the running 4.0 CPU container cost 51.3 s to 93.8 s, the maximum being a 1.939 MP US Letter page carrying 35 lines. The marginal cost of text on that page size is about 1.1 s per detected line over a detection floor of roughly 55 s, so 180 s is the allowance a page of about 115 lines needs, and it is 1.9 times the measured maximum, which is the headroom the Risks section below asks for rather than sizing to a p95. | No, measured |
-| Absolute request ceiling | 300 s, unchanged for now | Today's deployed `OCR_REQUEST_TIMEOUT` in `compose.yaml`. Kept until measured, because changing it is a product decision about how long a caller holds a connection. | Yes, task 1.3 |
+| Worker count | 1 | Today's `_WORKER_POOL_SIZE`, unchanged. It is a memory constraint: peak is one job's cost multiplied by this value, and one job's cost is already most of the container limit. See Decision 5. | No. The memory reason is overtaken, see the section at the top of this document |
+| Per-page allowance | 180 s | Measured, task 1.2. Twenty-four single-page inferences on the running 4.0 CPU container cost 51.3 s to 93.8 s, the maximum being a 1.939 MP US Letter page carrying 35 lines. The marginal cost of text on that page size is about 1.1 s per detected line over a detection floor of roughly 55 s, so 180 s is the allowance a page of about 115 lines needs, and it is 1.9 times the measured maximum, which is the headroom the Risks section below asks for rather than sizing to a p95. | Measured on the old pair. Overtaken by 45 s on the new pair, see the section at the top of this document |
+| Absolute request ceiling | 300 s, unchanged for now | Today's deployed `OCR_REQUEST_TIMEOUT` in `compose.yaml`. Kept until measured, because changing it is a product decision about how long a caller holds a connection. | Overtaken, the ceiling no longer exists and task 1.3 is superseded, see the section at the top of this document |
 | Dispatch margin | 2 s | Measured, task 1.2. The worker must give up before the parent does, and what that costs is the round trip through the pool: 0.19 s median and 0.25 s maximum for a trivial job over twelve repeats, and under 0.5 s with the largest upload the service accepts, a 45 MB file. 2 s is four times the measured worst case and still two orders of magnitude below the per-page allowance it is subtracted from. | No, measured |
-| Detector long-side bound | 1536 (`text_det_limit_type="max"`) | Decision 11 and task 1.5, resolved. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near lossless: 1280 lost dotted separators on a form, 960 lost genuine footnotes from a legal opinion. Recorded with the full candidate table in [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). | No — owner decided |
-| Maximum pages | derived, not configured | `floor(ceiling / per-page allowance)`. At the measured allowance and today's undecided 300 s ceiling that is 1, down from 2 at the provisional allowance. It is a deadline artifact and not a memory constraint, which the restatement below shows, and it is the strongest argument task 1.3 has for raising the ceiling. | Follows its two inputs |
+| Detector long-side bound | 1536 (`text_det_limit_type="max"`) | Decision 11 and task 1.5, resolved. The owner measured 960, 1280 and 1536 against five of his own real documents and chose 1536 as near lossless: 1280 lost dotted separators on a form, 960 lost genuine footnotes from a legal opinion. Recorded with the full candidate table in [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). | No - owner decided |
+| Maximum pages | derived, not configured | `floor(ceiling / per-page allowance)`. At the measured allowance and today's undecided 300 s ceiling that is 1, down from 2 at the provisional allowance. It is a deadline artifact and not a memory constraint, which the restatement below shows, and it is the strongest argument task 1.3 has for raising the ceiling. | Overtaken, the page ceiling is configured and the reading ceiling derived from it, see the section at the top of this document |
 | Reclamation grace | derived, not configured | `per-page allowance + dispatch margin`. The latest a healthy worker can legitimately return is one page's inference after its own budget expired, plus the trip back. | Follows its two inputs |
-| Pixel ceiling for one inference | 2,500,000, unchanged | Deployed together with the 1536 detector bound above, per this section's own concluding guidance: the defensible ceiling pending task 1.6 is the one that already covers the standard page sizes (A4 2.00 MP, Letter 1.94 MP, Legal 2.47 MP) with a bound deployed alongside it, which is where the change's original provisional value already sat. Not the 1,720,000 unbounded-case value computed further down, which assumes no detector bound and would needlessly refuse A4. Task 8.9 measured a real twenty-page A4 document against this pair and recorded the peak against the model's prediction. | Task 1.6 still open, for ceilings materially above the standard page sizes |
+| Pixel ceiling for one inference | 2,500,000, unchanged | Deployed together with the 1536 detector bound above, per this section's own concluding guidance: the defensible ceiling pending task 1.6 is the one that already covers the standard page sizes (A4 2.00 MP, Letter 1.94 MP, Legal 2.47 MP) with a bound deployed alongside it, which is where the change's original provisional value already sat. Not the 1,720,000 unbounded-case value computed further down, which assumes no detector bound and would needlessly refuse A4. Task 8.9 measured a real twenty-page A4 document against this pair and recorded the peak against the model's prediction. | Deleted by `fix-ocr-page-resolution`, and task 1.6 is superseded, see the section at the top of this document |
 | Consecutive pool rebuild attempts | 3 | Decision 12. Enough to survive a transient kill, few enough that a genuine crash loop stops and stays visibly not-ready instead of respawning forever. | No |
 
 Two numbers deliberately are not configuration. The maximum page count and the reclamation grace are computed from
@@ -230,7 +302,7 @@ The second is that no page above 1.939 megapixels exists in this repository, so 
 
 ### The pixel ceiling, recomputed
 
-The ceiling is now derived rather than bracketed, and it depends on the deployed detector bound, because the bound
+Overtaken on 2026-09-24 with the fitted model it rests on, see the section at the top of this document. The ceiling is now derived rather than bracketed, and it depends on the deployed detector bound, because the bound
 decides how much of the 5302 MiB per megapixel a large input still buys.
 
 Write the budget down first. Under a chosen resident ceiling of R MiB, one call may use R minus what the worker
@@ -281,7 +353,7 @@ defensible either until 1.6 reports.
 
 ### The page count limit, restated
 
-The deadline arithmetic is unchanged. The limit is `floor(absolute ceiling / per-page allowance)`, which is 1 page
+Overtaken on 2026-09-24, the page ceiling is now configured and the reading ceiling derived from it, see the section at the top of this document. The deadline arithmetic is unchanged. The limit is `floor(absolute ceiling / per-page allowance)`, which is 1 page
 at the 300 s ceiling task 1.3 has yet to revisit and the 180 s allowance task 1.2 measured. It was 2 at the
 provisional 120 s, and 2 at the 150 s the deployment currently sets, so the measurement has made the existing
 restriction tighter rather than looser. What the measurement changes is why.
@@ -305,7 +377,7 @@ The present budget is one number covering an entire document, which fails a heal
 twenty pages long. A per-page deadline is the obvious replacement and, on its own, it is worse: it lets a thousand
 page document run for a thousand allowances, which is days.
 
-So both, and the effective budget for a request is `min(pages x per_page_allowance, absolute_ceiling)`. The per-page
+So both, and the effective budget for a request is `min(pages x per_page_allowance, absolute_ceiling)`. The ceiling term is overtaken, see the section at the top of this document. The per-page
 allowance is what makes a long healthy document legal. The ceiling is what makes an absurd one illegal. Neither
 alone does both jobs.
 
@@ -374,7 +446,7 @@ was spent queuing, so it starts a job whose caller may already have given up. Th
 abandoned job poisons everything behind it.
 
 Instead, requests wait on an admission gate in the API process, with as many permits as there are workers. Three
-things follow, and each of them is a defect fixed:
+things follow, and each of them is a defect fixed. The first two are superseded, see the section at the top of this document:
 
 - A request that runs out of budget while waiting fails at the gate and is never dispatched. No inference is ever
   started for a caller who has already been told the request failed.
@@ -484,7 +556,7 @@ Alternative considered: put the check in the worker. Rejected. It would occupy t
 
 ### Decision 8: a document that provably cannot finish is refused before it starts
 
-`floor(ceiling / per-page allowance)` is the largest page count that can finish inside the service's own budget.
+Overtaken on 2026-09-24, the page ceiling is now configured and the reading ceiling derived from it, see the section at the top of this document. `floor(ceiling / per-page allowance)` is the largest page count that can finish inside the service's own budget.
 Beyond it, accepting the job means holding the only worker for the entire ceiling and then telling the caller it
 failed, which is the exact behaviour this change exists to remove. So it is refused at the boundary, with the same
 `FILE_TOO_LARGE` code and a detail naming the page count and the limit.
@@ -614,7 +686,7 @@ Task 1.5 has since reported. The owner measured 960, 1280 and 1536 against five 
 1536: near lossless, where 1280 lost dotted separators on a form and 960 lost genuine footnotes from a legal
 opinion. The full candidate table, what each costs in memory, and where the accuracy loss lands is recorded in
 [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md). The shipped defaults are
-therefore `OCR_DETECTOR_MAX_SIDE=1536` paired with `OCR_MAX_INFERENCE_PIXELS=2,500,000` — this section's own
+therefore `OCR_DETECTOR_MAX_SIDE=1536` paired with `OCR_MAX_INFERENCE_PIXELS=2,500,000` - this section's own
 concluding guidance for the defensible pixel ceiling pending task 1.6, not the 1,720,000 unbounded-case figure
 computed earlier in this section. An image deployed on its own therefore accepts A4 rather than refusing it, and
 Decision 12 makes a kill survivable rather than terminal, which is not the same as making it acceptable.
@@ -640,7 +712,7 @@ broken. Readiness reports not-ready for the duration in both cases, which is the
 The request that was in flight when the worker died is not retried. It fails with the existing OCR failure code. A
 retry would feed the worker the input that just killed it, which is the definition of a loop.
 
-A request that arrives during a rebuild needs nothing new. It waits on the admission gate of Decision 4, holding its
+Superseded on 2026-09-24, a waiting document is no longer charged for waiting, see the section at the top of this document. A request that arrives during a rebuild needs nothing new. It waits on the admission gate of Decision 4, holding its
 own budget, exactly as it would behind a long job. If the rebuild finishes while it still has budget, it is
 dispatched with what is left. If not, it fails at the gate and is never dispatched. That is Decision 4's existing
 behaviour applied to a different reason for waiting, which is the payoff of having made the queue explicit.
@@ -672,7 +744,7 @@ process survives.
 
 The service writes to a scratch directory of its own, and the pool initializer, which runs in every fresh worker
 including every rebuilt one, deletes files in that directory older than the absolute request ceiling plus the
-dispatch margin. Startup does the same sweep for anything a previous container process left behind. Nothing in that
+dispatch margin. The horizon is overtaken and is now the reading ceiling plus the dispatch margin, see the section at the top of this document. Startup does the same sweep for anything a previous container process left behind. Nothing in that
 directory legitimately outlives one request, so age is a sound test and no bookkeeping is needed.
 
 Alternative considered: have the parent delete the file after a reclamation. Rejected. The parent does not know the
@@ -711,7 +783,7 @@ than its own per-page allowance failed with `OCR_FAILED` despite having nothing 
 every restructuring that avoids it either pays for the next page's inference just to learn there wasn't one
 (defeating the point of checking before starting unwanted work) or reintroduces the same problem one step later.
 Judged an acceptable trade of the interface `predict_iter()` offers, not a defect with a clean fix, and consistent
-with this change's own explicit requirement that an expired budget "SHALL NOT return a partial result" — the
+with this change's own explicit requirement that an expired budget "SHALL NOT return a partial result" - the
 philosophy already treats "over budget" as a hard line regardless of how much of the true reason was "no more work
 left to do." It is why task 1.2 set the per-page allowance at 1.9 times the measured maximum rather than at the
 measured p95, and an operator retuning it should keep that headroom for the same reason. It was seen again during
@@ -788,7 +860,7 @@ request parameter was added.
 
 ## Open Questions
 
-1. Half closed. Task 1.2 measured the per-page cost on the deployment's verified 4.0 CPU and 12 GiB allocation:
+1. Closed on 2026-09-24, its second half superseded with task 1.3, see the section at the top of this document. Task 1.2 measured the per-page cost on the deployment's verified 4.0 CPU and 12 GiB allocation:
    51.3 s to 93.8 s over twenty-four single-page inferences, with the sample too thin to carry a true p95, and a
    pool round trip of 0.19 s. The per-page allowance is 180 s and the dispatch margin is 2 s, both recorded in the
    number table with their derivation in "The measured per-page cost and the pool round trip". What the deployed
@@ -802,8 +874,8 @@ request parameter was added.
    [ADR-006](../../../apps/ascend-ocr/docs/architecture/decisions/ADR-006-detector-input-bound.md) with the full candidate
    table. Task 1.6, confirming the residual memory model at ceilings materially above the standard page sizes, stays
    open, but it bounds only how far the ceiling could later rise, not the pair actually deployed.
-4. Does the 318 MiB per megapixel residual hold at the top of the intended ceiling? Task 1.6 measures it. It bounds
+4. Closed on 2026-09-24 as void, with task 1.6 superseded, see the section at the top of this document. Does the 318 MiB per megapixel residual hold at the top of the intended ceiling? Task 1.6 measures it. It bounds
    how far the ceiling can be raised and nothing else.
-5. If the measured per-page cost makes documents of a realistic size take longer than a caller can hold a
+5. Answered on 2026-09-24 by `read-long-documents`, which built asynchronous job submission. If the measured per-page cost makes documents of a realistic size take longer than a caller can hold a
    connection, the answer is asynchronous job submission, which is a separate change. This one produces the
    evidence that would justify it, and deliberately does not pre-empt it.
