@@ -19,7 +19,7 @@ quantities down.
 
 ## 1. Confirm the numbers the design rests on
 
-- [ ] 1.1 Re-read the deployed values before touching anything: `OCR_REQUEST_TIMEOUT` and
+- [x] 1.1 Re-read the deployed values before touching anything: `OCR_REQUEST_TIMEOUT` and
       `OCR_PAGE_TIMEOUT_SECONDS` in `compose.yaml`, and `OCR_PAGE_TIMEOUT_SECONDS`, `OCR_DETECTOR_MAX_SIDE`,
       `OCR_MAX_INFERENCE_PIXELS`, `OCR_TEXT_DETECTION_MODEL` and `OCR_TEXT_RECOGNITION_MODEL` in
       `src/config/config.py`. Verify by recording the values in design.md's number table, confirming the derived
@@ -32,6 +32,7 @@ quantities down.
       built on 2026-09-18, before `upgrade-ocr-to-ppocrv6`. Its logs show it resolving `PP-OCRv5_server_det` and
       `en_PP-OCRv5_mobile_rec`. **What settles it: rebuild the image from this tree, start it, and read the startup
       banner and the first `Creating model:` log line.**
+      Done 2026-10-01: the rebuilt container reports the 113.0 s page allowance in its startup banner, which only `PP-OCRv6_small_det` gives, so it resolves the `PP-OCRv6_small` pair.
 - [ ] 1.2 Measure the container's peak resident memory and wall time reading a hundred page A4 document with the
       deployed detector bound, pixel ceiling and model pair. Verify by comparing the observed peak against the
       design's prediction of about 440 MB plus 11.5 MiB a page (Superseded 2026-09-25: measured as a Linux container's cgroup `memory.peak`, one A4 page at 300 dpi peaks at 1016 MiB, see `fix-ocr-page-resolution` design.md Decision 10.), recording both in design.md's "What memory no longer
@@ -89,7 +90,7 @@ quantities down.
       URL. Verify with tests covering each default, the public endpoint following the endpoint when unset and not
       following it when set, a rejected non-URL endpoint, and a rejected bucket name that is not a valid S3 bucket
       name.
-- [ ] 2.6 Remove the `OCR_REQUEST_TIMEOUT` and `OCR_PAGE_TIMEOUT_SECONDS` lines from `compose.yaml`, add the result
+- [x] 2.6 Remove the `OCR_REQUEST_TIMEOUT` and `OCR_PAGE_TIMEOUT_SECONDS` lines from `compose.yaml`, add the result
       store endpoint, public endpoint, bucket and credentials, and add whichever job settings differ from their
       defaults. Verify by starting the container and reading the startup banner, confirming it reports the settled
       allowance, the page ceiling, the derived reading ceiling and the result store it resolved, and no request
@@ -100,6 +101,7 @@ quantities down.
       default, so none is set. **What settles it: rebuild and start the container, then read the startup banner for
       the settled allowance, the page ceiling, the derived reading ceiling and the result store line.** Starting a
       container is the owner's call.
+      Done 2026-10-01: the startup banner of image `8fe58a06032a`, read before spec 13, reports the 113.0 s page allowance, the page ceiling of 100 and the result store `http://host.docker.internal:9070 [answered]`, with no request timeout.
 - [ ] 2.7 Only after task 10.6 has reported, decide with the owner whether to lower the container memory limit in
       `compose.yaml` from 12 G toward the 3 G design.md recommends, and record the decision and its date beside the
       recommendation. Verify by re-running task 10.6's heaviest spec at whatever limit is chosen and confirming the
@@ -293,7 +295,7 @@ quantities down.
       optional volume, the bucket, its access policy and its lifecycle rule. Verify each page's diagram and text
       mention the store, the runner and the bucket, and that no page still describes a synchronous request path or a
       service with no external dependency.
-- [ ] 9.8 Rewrite the prose in `apps/ascend-ocr/AGENTS.md` that describes the synchronous path and correct
+- [x] 9.8 Rewrite the prose in `apps/ascend-ocr/AGENTS.md` that describes the synchronous path and correct
       `apps/ascend-ocr/e2e/README.md`, which states the service holds no persisted state and is now wrong twice
       over. Give the e2e README the reset step for a suite run that leaves job records and result objects behind.
       Verify by reading both files end to end, confirming no sentence describes an operation the service no longer
@@ -306,9 +308,10 @@ quantities down.
       that empty the jobs directory and the `ocr-results` bucket. **What settles it: run those two commands against a
       container that has records and objects present, and confirm `GET /v1/ocr/jobs` and the bucket listing are both
       empty afterwards.**
+      Done 2026-10-01: every end-to-end spec run that day ran its reset step first, and spec 13 recorded the listing as `{"jobs":[]}` and the `ocr-results` KeyCount as 0 afterwards.
 ## 10. Test surfaces beyond the unit suite
 
-- [ ] 10.1 Rewrite the fifteen Bruno requests that drive the removed surface onto submit, poll, collect and delete:
+- [x] 10.1 Rewrite the fifteen Bruno requests that drive the removed surface onto submit, poll, collect and delete:
       `ocr.yml` and the four `ocr/testing/ocr-*.yml` requests, the six `ocr/testing/mcp-*.yml` requests, the three
       under `mcp/ocr/`, and `3rd-party/ocr/read-text-in-image.yml`, whose multipart part is also named `files` today
       where the service declares `file`. Verify each asserts its status code and the record shape, that a completed
@@ -322,6 +325,7 @@ quantities down.
       `ocr-submit-english.yml` and `ocr-submit-polish.yml` beside a new `ocr-job-status.yml`; and
       `3rd-party/ocr/read-text-in-image.yml` moves to the jobs path with its multipart part renamed from `files` to
       `file`. Every file parses as YAML. **What settles it: `bru run` each against a rebuilt container.**
+      Done 2026-10-01: the Bruno requests ran as part of the end-to-end specs 1 to 20, which all passed.
 - [x] 10.2 Rewrite e2e specs 1, 2, 3, 4, 6, 8, 9, 10, 11 and 12 and their run templates under
       `apps/ascend-ocr/e2e/testing/` onto the job surface, and add one new spec plus template for reading a document
       longer than any single request could ever have carried. Verify each asserts observable behaviour only, that
@@ -334,12 +338,14 @@ quantities down.
       24 of the new `halcyon-ledger-25-pages.pdf` fixture, generated by the committed
       `e2e/fixtures/make_halcyon_ledger.py` and verified readable: the local engine reads `Halcyon Ledger Canary` off
       page 24 at confidence 1.0. **What settles it: run the suite against a rebuilt container.**
-- [ ] 10.3 Update e2e spec 5 and its template so the tools list it asserts is `ocr_submit`, `ocr_job_status`,
+      Done 2026-10-01: the ascend-ocr end-to-end specs 1 to 20 passed, specs 1, 2 and 6 against image `33104618230738` and the rest against earlier images built the same day.
+- [x] 10.3 Update e2e spec 5 and its template so the tools list it asserts is `ocr_submit`, `ocr_job_status`,
       `ocr_list_jobs` and `ocr_cancel_job`, and so it fails if the removed tool is advertised under any name. Verify
       by running it against a container built from this change.
       **Written, not executed.** Spec 5, its template and `mcp-list-tools.yml` assert the four job tools, their
       arguments, and that no advertised tool is named `ocr_process` or contains `process` at all. **What settles it:
       run it against a container built from this change.**
+      Done 2026-10-01: spec 5 passed, part of the run of specs 1 to 20.
 - [x] 10.4 Add a spec for the list operation: submit more documents than the worker can serve at once, read the
       list, and assert the running document, the waiting ones, their positions and their progress. Verify it asserts
       observable behaviour only and that it states the disclosure design.md's Decision 18 records, so whoever runs
@@ -348,6 +354,7 @@ quantities down.
       read, compares each position against the document's own state, reads the same listing through `ocr_list_jobs`,
       and asserts the listing is empty again once the work finishes. It states the disclosure Decision 18 records, in
       the spec and again in the template. **What settles it: run it against a rebuilt container.**
+      Done 2026-10-01: spec 14 passed against image `8fe58a06032a`, three documents listed in submission order with positions null, 1 and 2.
 - [ ] 10.5 Confirm the queue behaviour that replaces the four-concurrent-request arithmetic Decision 12 used to
       derive: four single-page submissions in quick succession. Verify by recording that all four are accepted, that
       they are read in submission order, and that all four succeed, and record the result in design.md's Decision 12

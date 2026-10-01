@@ -96,8 +96,9 @@ fail before the code that makes them pass.
       elsewhere", in whichever of `stop-ocr-getting-stuck-on-large-jobs` and `read-long-documents` archives first, and
       rerun `openspec validate --all --strict`.
       Done 2026-09-24 in both older changes: the pixel requirement removed from `ocr-input-limits`, the detector bound requirement narrowed in `ocr-memory-bounds`, "Oversized page submitted" replaced in `ocr-job-admission`, and the vacuous scratch-file requirements removed or rewritten.
-- [ ] 5.5 Run the ascend-ocr end-to-end specs after a rebuild, in the run scenario the owner chooses from
+- [x] 5.5 Run the ascend-ocr end-to-end specs after a rebuild, in the run scenario the owner chooses from
       `docs/E2E_RUN_SCENARIOS.md`. Not run here: the owner approves every end-to-end run.
+      Done 2026-10-01: the ascend-ocr end-to-end specs 1 to 20 passed, specs 1, 2 and 6 against image `33104618230738` and the rest against earlier images built the same day. 929 unit tests pass at 100 percent coverage.
 - [x] 5.6 Reconcile `read-long-documents` with Decision 8, per the list at the end of design.md's "Requirements this
       change overturns elsewhere". Not edited here, because that change's files belong to other work in flight.
       Done 2026-09-24 in `read-long-documents`: every listed place now names this change as owner of the per-engine allowance and the figures derived from it.
@@ -130,16 +131,17 @@ fail before the code that makes them pass.
       `docs/CONFIGURATION.md`, `docs/README.md`, `docs/architecture/README.md`, arc42 chapters 06, 09 and 12, and the
       Bruno submit request `docs/api/request/AscendAI/ocr/ocr.yml` (a disabled `straighten` form field, no assertion
       changed).
-- [ ] 6.6 Re-measure every timing and memory figure that describes the old preprocessing:
+- [x] 6.6 Re-measure every timing and memory figure that describes the old preprocessing:
       `MEASURED_WORST_PAGE_SECONDS`, the startup banner's per-call peaks, the per-page time and memory tables in
       ADR-010, AGENTS.md and README.md, and the page allowances derived from them, for a plain request and for a
       straightened one. Owner-gated: the owner is measuring and sends the figures.
       Done 2026-09-25: the owner's container measurement (Linux, 4 CPUs, cgroup `memory.peak`, 3 runs each, image `7b2cb25e7360`) is applied. `MEASURED_WORST_PAGE_SECONDS` holds 28.4 s for `PP-OCRv6_small_det` and 96.0 s for `PP-OCRv5_server_det`, the banner prices plain and straightened calls, the idle engine and the API process from it, and ADR-006, ADR-010, ADR-011, AGENTS.md, README.md, docs/CONFIGURATION.md, the deployment view, `docs/architecture/memory-budget.md` and `docs/DEFECT_REGISTER.md` carry the figures. See section 7.
 - [x] 6.7 Gate: `python -m ruff check .`, `python -m ruff format --check .`, `python -m mypy src` and `python -m pytest`
       with the 100 percent line and branch gate, all clean. `openspec validate --all --strict` clean.
-- [ ] 6.8 Run the end-to-end specs that submit a straightened photo and a turned page after a rebuild, in the run
+- [x] 6.8 Run the end-to-end specs that submit a straightened photo and a turned page after a rebuild, in the run
       scenario the owner chooses from `docs/E2E_RUN_SCENARIOS.md`. Not run here: the owner approves every end-to-end
       run.
+      Done 2026-10-01: spec 17 (rotated photo), spec 18 (straightened crumpled photo) and spec 19 (crumpled photo, default) passed, part of the run of specs 1 to 20 on images built that day.
 
 ## 7. Container measurement, `ru` and `korean` off, and the language refused at submission (Decision 10, owner decisions of 2026-09-25)
 
@@ -173,9 +175,11 @@ fail before the code that makes them pass.
       `eslav_PP-OCRv5_mobile_rec`, with and without `straighten`, for memory, time and exact lines, and restore each
       language through `LANGUAGE_MODEL_OVERRIDES` and `SUPPORTED_LANGUAGES` only if its accuracy holds. Owner-gated:
       needs an inference run the owner starts.
-- [ ] 7.9 Rebuild the image and run the ascend-ocr end-to-end specs, spec 1's unsupported-language step included, in
+      Not done, owner decision of 2026-10-01: `ru` and `korean` stay switched off for now. Left open on purpose.
+- [x] 7.9 Rebuild the image and run the ascend-ocr end-to-end specs, spec 1's unsupported-language step included, in
       the run scenario the owner chooses from `docs/E2E_RUN_SCENARIOS.md`. Not run here: the owner approves every
       rebuild and every end-to-end run.
+      Done 2026-10-01: spec 1 with its unsupported-language step and spec 20 passed against image `33104618230738` and an earlier image of the same day, part of the run of specs 1 to 20.
 - [x] 7.10 Four defects found during 7.1 to 7.7, fixed. `ascendocr_ocr_requests_total` labels a request with its
       language only when it is supported, and with the fixed value `unsupported` otherwise, so a caller cannot mint
       label values (`request_language_label` in `src/observability/metrics.py`, tests on both surfaces). The startup
@@ -188,6 +192,7 @@ fail before the code that makes them pass.
       lost without straightening, and end-to-end spec 18 passes at 15 of 21. Candidates are a stronger recognition
       model, a better unwarping model, or image cleanup before recognition. Each is measured against that baseline, and
       spec 18's threshold is raised only when the new figure holds. Owner-gated: needs an inference run the owner starts.
+      Not done, owner decision of 2026-10-01: 15 of 21 exact phrases is accepted for now, an improvement may come later. Left open on purpose.
 
 ## 8. Recognition batch, warm-up read, and the dense page allowance (Decision 11, owner-approved 2026-09-25)
 
@@ -271,9 +276,10 @@ fail before the code that makes them pass.
       `test_start_worker_pool_resets_gate`.
 - [x] 9.13 Gate: `python -m ruff check .`, `python -m ruff format --check .`, `python -m mypy src` and `python -m pytest`
       with the 100 percent line and branch gate, all clean, then `openspec validate --all --strict`.
-- [ ] 9.14 Rebuild the image, measure the page times again with the thread cap in force, and run the ascend-ocr
+- [x] 9.14 Rebuild the image, measure the page times again with the thread cap in force, and run the ascend-ocr
       end-to-end specs in the run scenario the owner chooses from `docs/E2E_RUN_SCENARIOS.md`. The rebuild and the
       measurement are done (9.15 to 9.18). The end-to-end run is still open.
+      Done 2026-10-01: the ascend-ocr end-to-end specs 1 to 20 passed, specs 1, 2 and 6 against image `33104618230738` and the rest against earlier images built the same day. 929 unit tests pass at 100 percent coverage.
 - [x] 9.15 The page times measured again with the thread cap in force, on image `9c100951f59b`, in throwaway 4-CPU
       containers with the same probe as 8.3: the six cases of 8.3 plus the flat phone photo read with `straighten`,
       three runs each, host CPU sampled every 2 s and averaging 54 to 92 percent across the runs. Worst minimum 25.1 s,
