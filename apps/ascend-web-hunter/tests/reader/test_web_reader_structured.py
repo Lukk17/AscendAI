@@ -19,6 +19,7 @@ _GOOD_HTML = (
 @pytest.mark.asyncio
 async def test_read_structured_returns_metadata_fields() -> None:
     """output_format='structured' must return title/author/date/sitename alongside content."""
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -28,6 +29,7 @@ async def test_read_structured_returns_metadata_fields() -> None:
     ):
         result = await WebReader().read("https://example.com/article", output_format="structured")
 
+    # then
     assert result["status"] == "success"
     assert "content" in result
     assert "title" in result
@@ -39,6 +41,7 @@ async def test_read_structured_returns_metadata_fields() -> None:
 @pytest.mark.asyncio
 async def test_read_default_output_unchanged() -> None:
     """Default (no output_format) response must keep the original flat shape."""
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -48,6 +51,7 @@ async def test_read_default_output_unchanged() -> None:
     ):
         result = await WebReader().read("https://example.com/article")
 
+    # then
     assert result["status"] == "success"
     assert "content" in result
     assert "mode" in result
@@ -58,6 +62,7 @@ async def test_read_default_output_unchanged() -> None:
 @pytest.mark.asyncio
 async def test_read_structured_empty_html_from_strategy_records_empty_outcome() -> None:
     """When strategy.get_html() returns '' for output_format=structured, outcome=empty is recorded."""
+    # given
     from unittest.mock import MagicMock
 
     from src.reader.web_reader import WebReader
@@ -66,15 +71,19 @@ async def test_read_structured_empty_html_from_strategy_records_empty_outcome() 
     fake_strategy = MagicMock()
     fake_strategy.get_html = AsyncMock(return_value="")
 
+    # when
     result = await reader._execute_strategy(
         "1-beautifulsoup", fake_strategy, "https://empty.example.com/", output_format="structured"
     )
+
+    # then
     assert result is None
 
 
 @pytest.mark.asyncio
 async def test_read_structured_validation_fail_records_validation_failed_outcome() -> None:
     """When structured content fails validation, _execute_strategy returns None."""
+    # given
     from unittest.mock import MagicMock
 
     from src.reader.web_reader import WebReader
@@ -83,16 +92,20 @@ async def test_read_structured_validation_fail_records_validation_failed_outcome
     fake_strategy = MagicMock()
     fake_strategy.get_html = AsyncMock(return_value=_GOOD_HTML)
 
+    # when
     with patch("src.validator.content_validator.ContentValidator.validate", return_value=False):
         result = await reader._execute_strategy(
             "1-beautifulsoup", fake_strategy, "https://valfail.example.com/", output_format="structured"
         )
+
+    # then
     assert result is None
 
 
 @pytest.mark.asyncio
 async def test_read_text_output_unchanged() -> None:
     """output_format='text' must produce same flat shape as the default."""
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -102,6 +115,7 @@ async def test_read_text_output_unchanged() -> None:
     ):
         result = await WebReader().read("https://example.com/article", output_format="text")
 
+    # then
     assert result["status"] == "success"
     assert "content" in result
     assert "title" not in result

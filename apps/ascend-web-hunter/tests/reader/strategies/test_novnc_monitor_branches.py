@@ -35,17 +35,23 @@ def _factory(page_url: str, *, goto_ok: bool = True):
 async def test_monitor_exits_via_timeout_loop_condition():
     """With NOVNC_TIMEOUT_SECONDS=0 the while loop body executes zero times - the
     timeout-exit branch (51->75) is the only path to the finally."""
+    # given
     factory, browser, _ = _factory("http://test.com?login=1")
+
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 0),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
+
+    # then
     browser.close.assert_awaited()
 
 
 @pytest.mark.asyncio
 async def test_monitor_records_timeout_outcome_metric_for_login():
+    # given
     factory, browser, _ = _factory("http://novncmetrictimeout.com?login=1")
     before = _sample_value(
         "strategy_attempts_total",
@@ -58,12 +64,16 @@ async def test_monitor_records_timeout_outcome_metric_for_login():
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 0),
     ):
         await _monitor_for_cookies("http://novncmetrictimeout.com?login=1", "login")
+
+    # when
     after = _sample_value(
         "strategy_attempts_total",
         strategy="6-novnc-monitor",
         outcome="timeout",
         domain="novncmetrictimeout.com",
     )
+
+    # then
     assert after == before + 1.0
 
 
@@ -71,6 +81,7 @@ async def test_monitor_records_timeout_outcome_metric_for_login():
 async def test_monitor_records_rejected_outcome_when_timeout_still_blocked():
     """A captcha monitor that times out while the page is still a known block
     page must record 'rejected', not the more ambiguous 'timeout'."""
+    # given
     page = MagicMock()
     page.url = "http://novncmetricrejected.com"
     page.goto = AsyncMock()
@@ -100,12 +111,16 @@ async def test_monitor_records_rejected_outcome_when_timeout_still_blocked():
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_COOKIE_SYNC_POLL_SECONDS", 0.01),
     ):
         await _monitor_for_cookies("http://novncmetricrejected.com", "captcha")
+
+    # when
     after = _sample_value(
         "strategy_attempts_total",
         strategy="6-novnc-monitor",
         outcome="rejected",
         domain="novncmetricrejected.com",
     )
+
+    # then
     assert after == before + 1.0
     browser.close.assert_awaited()
 
@@ -114,6 +129,7 @@ async def test_monitor_records_rejected_outcome_when_timeout_still_blocked():
 async def test_monitor_continues_loop_when_url_did_not_change():
     """Page URL still matches the original URL -> branch 62->71 (continue) runs once,
     then the timeout window closes the loop."""
+    # given
     factory, browser, _ = _factory("http://test.com?login=1")
     sleeps = []
 
@@ -121,6 +137,7 @@ async def test_monitor_continues_loop_when_url_did_not_change():
         sleeps.append(seconds)
         raise RuntimeError("abort loop after one iteration")
 
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
@@ -131,4 +148,6 @@ async def test_monitor_continues_loop_when_url_did_not_change():
         patch("src.reader.strategies.novnc_strategy.asyncio.sleep", side_effect=fake_sleep),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
+
+    # then
     assert sleeps == [5.0]

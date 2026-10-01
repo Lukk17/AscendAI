@@ -15,8 +15,10 @@ async def test_read_with_links_propagates_428_when_novnc_raises():
     to NoVNC.  If NoVNC raises HumanInterventionRequiredException the 428 must
     propagate out of read_with_links, not be swallowed.
     """
+    # given
     exc = HumanInterventionRequiredException("http://vnc:7900", "login")
 
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -46,6 +48,7 @@ async def test_read_with_links_propagates_428_when_novnc_raises():
         with pytest.raises(HumanInterventionRequiredException) as exc_info:
             await WebReader().read_with_links("http://test.com")
 
+    # then
     assert exc_info.value.vnc_url == "http://vnc:7900"
 
 
@@ -55,8 +58,10 @@ async def test_read_with_links_direct_428_propagates():
     When a strategy directly raises HumanInterventionRequiredException
     on the get_html path, it must escape the _execute_html_strategy wrapper.
     """
+    # given
     exc = HumanInterventionRequiredException("http://vnc:7900", "captcha")
 
+    # when / then
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
         new=AsyncMock(side_effect=exc),
@@ -72,8 +77,10 @@ async def test_read_propagates_novnc_busy_instead_of_swallowing_it():
     already holds the shared browser/display must surface that conflict to
     the caller, not report a generic 'all_tiers_failed'.
     """
+    # given
     exc = NoVNCFlowBusyException("http://other-site.example", "default")
 
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -103,13 +110,16 @@ async def test_read_propagates_novnc_busy_instead_of_swallowing_it():
         with pytest.raises(NoVNCFlowBusyException) as exc_info:
             await WebReader().read("http://test.com")
 
+    # then
     assert exc_info.value.holder_url == "http://other-site.example"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_propagates_novnc_busy_instead_of_swallowing_it():
+    # given
     exc = NoVNCFlowBusyException("http://other-site.example", "default")
 
+    # when / then
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
         new=AsyncMock(side_effect=exc),

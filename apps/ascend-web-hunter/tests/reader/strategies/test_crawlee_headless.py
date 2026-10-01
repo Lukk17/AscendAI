@@ -40,6 +40,7 @@ _CRAWLER_FACTORY_PATH = (
 @pytest.mark.asyncio
 async def test_crawlee_uses_playwright_headless_setting():
     """headless kwarg passed to AdaptivePlaywrightCrawler must equal settings.PLAYWRIGHT_HEADLESS."""
+    # given
     captured: dict[str, Any] = {}
 
     def fake_crawler_factory(**kwargs: Any) -> MagicMock:
@@ -51,6 +52,7 @@ async def test_crawlee_uses_playwright_headless_setting():
         crawler.run = AsyncMock()
         return crawler
 
+    # when
     with (
         patch(
             _CRAWLER_FACTORY_PATH,
@@ -69,6 +71,7 @@ async def test_crawlee_uses_playwright_headless_setting():
         strategy = CrawleeStrategy(_mock_url_validator())
         await strategy.get_html("https://example.com")
 
+    # then
     pw_kwargs = captured.get("playwright_crawler_specific_kwargs", {})
     assert pw_kwargs.get("headless") is True
 
@@ -76,6 +79,7 @@ async def test_crawlee_uses_playwright_headless_setting():
 @pytest.mark.asyncio
 async def test_crawlee_headless_false_when_setting_false():
     """headless=False must be passed when PLAYWRIGHT_HEADLESS=False."""
+    # given
     captured: dict[str, Any] = {}
 
     def fake_crawler_factory(**kwargs: Any) -> MagicMock:
@@ -87,6 +91,7 @@ async def test_crawlee_headless_false_when_setting_false():
         crawler.run = AsyncMock()
         return crawler
 
+    # when
     with (
         patch(
             _CRAWLER_FACTORY_PATH,
@@ -105,6 +110,7 @@ async def test_crawlee_headless_false_when_setting_false():
         strategy = CrawleeStrategy(_mock_url_validator())
         await strategy.get_html("https://example.com")
 
+    # then
     pw_kwargs = captured.get("playwright_crawler_specific_kwargs", {})
     assert pw_kwargs.get("headless") is False
 
@@ -114,6 +120,7 @@ async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(monkeypa
     """A crawler.run() that never returns (e.g. Crawlee's autoscaler permanently reports the
     system as memory-overloaded, so no request is ever dequeued) must not hang this tier
     forever: get_html() must raise TimeoutError within the configured budget instead."""
+    # given
     monkeypatch.setattr("src.reader.strategies.crawlee_strategy.settings.EXTRACT_TIMEOUT", 0.05)
 
     async def hanging_run(urls: list[str]) -> None:
@@ -127,6 +134,7 @@ async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(monkeypa
         crawler.run = AsyncMock(side_effect=hanging_run)
         return crawler
 
+    # when / then
     with (
         patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory),
         patch(
@@ -146,6 +154,7 @@ async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatc
     normally after being cancelled (see asyncio.wait_for docs: a task that suppresses
     the cancellation and returns a value has that value returned, not TimeoutError).
     get_html() must still detect the overrun via elapsed time and raise TimeoutError."""
+    # given
     monkeypatch.setattr("src.reader.strategies.crawlee_strategy.settings.EXTRACT_TIMEOUT", 0.05)
 
     async def hangs_then_swallows_cancellation(urls: list[str]) -> None:
@@ -162,6 +171,7 @@ async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatc
         crawler.run = AsyncMock(side_effect=hangs_then_swallows_cancellation)
         return crawler
 
+    # when / then
     with (
         patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory),
         patch(
@@ -184,6 +194,7 @@ async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
     locator lazily builds and caches its Configuration singleton the first time any
     crawler is constructed in the process and never re-reads the environment afterwards,
     so setting the variable any later would silently have no effect."""
+    # given
     monkeypatch.setattr("src.reader.strategies.crawlee_strategy.settings.CRAWLEE_MEMORY_MBYTES", 2048)
     monkeypatch.delenv("CRAWLEE_MEMORY_MBYTES", raising=False)
 
@@ -198,6 +209,7 @@ async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
         crawler.run = AsyncMock()
         return crawler
 
+    # when / then
     try:
         with (
             patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory),
@@ -222,6 +234,7 @@ async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
     reads before the crawler is constructed, for the same reason as CRAWLEE_MEMORY_MBYTES
     above: Crawlee's service locator caches its Configuration singleton on first crawler
     construction and never re-reads the environment afterwards."""
+    # given
     storage_dir = tmp_path / "storage"
     monkeypatch.setattr(
         "src.reader.strategies.crawlee_strategy.settings.CRAWLEE_STORAGE_DIR", str(storage_dir)
@@ -239,6 +252,7 @@ async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
         crawler.run = AsyncMock()
         return crawler
 
+    # when / then
     try:
         with (
             patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory),

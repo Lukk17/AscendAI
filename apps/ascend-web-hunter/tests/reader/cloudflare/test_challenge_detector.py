@@ -6,6 +6,7 @@ from src.reader.cloudflare.challenge_detector import ChallengeDetector
 
 
 def test_is_blocked_no_content():
+    # when / then
     assert ChallengeDetector.is_blocked(403, "") is True
     assert ChallengeDetector.is_blocked(429, "") is True
     assert ChallengeDetector.is_blocked(503, "") is True
@@ -13,23 +14,35 @@ def test_is_blocked_no_content():
 
 
 def test_is_blocked_large_content():
+    # given
     large_html = "a" * 50001
+
+    # when / then
     assert ChallengeDetector.is_blocked(403, large_html) is False
 
 
 def test_is_blocked_keywords():
+    # given
     html_with_keyword = "<html><body>Just a moment...</body></html>"
+
+    # when / then
     assert ChallengeDetector.is_blocked(200, html_with_keyword) is True
     assert ChallengeDetector.is_blocked(403, html_with_keyword) is True
 
 
 def test_is_blocked_ray_id():
+    # given
     html_with_ray_id = "<html><body>Ray ID: 890123abc</body></html>"
+
+    # when / then
     assert ChallengeDetector.is_blocked(200, html_with_ray_id) is True
 
 
 def test_is_blocked_cf_tokens():
+    # given
     html_turnstile = "<html><body><script src='cf-turnstile'></script></body></html>"
+
+    # when / then
     assert ChallengeDetector.is_blocked(200, html_turnstile) is True
 
     html_clearance = "<html><body>Missing cf_clearance cookie</body></html>"
@@ -37,11 +50,15 @@ def test_is_blocked_cf_tokens():
 
 
 def test_not_blocked():
+    # given
     valid_html = "<html><body>Real website content without blocks</body></html>"
+
+    # when / then
     assert ChallengeDetector.is_blocked(200, valid_html) is False
 
 
 def test_is_login_required():
+    # when / then
     assert (
         ChallengeDetector.is_login_required(
             "<html><head><title>Sign In | Indeed Accounts</title></head><body></body></html>",
@@ -77,6 +94,7 @@ def test_is_login_required():
 
 def test_is_login_required_ignores_login_substring_within_words():
     """Word-boundary match: 'sign in' must not fire on 'design industry'."""
+    # when / then
     assert (
         ChallengeDetector.is_login_required(
             "<html><head><title>Web Design Industry News</title></head><body></body></html>",
@@ -92,16 +110,20 @@ def test_is_login_required_ignores_login_substring_within_words():
 
 
 def test_is_login_required_svg_bypass():
+    # given
     dirty_html = (
         "<html><body>"
         "<svg><title id='logo'>Indeed Logo</title></svg>"
         "<title dir='ltr'>Sign In | Indeed Accounts</title>"
         "</body></html>"
     )
+
+    # when / then
     assert ChallengeDetector.is_login_required(dirty_html) is True
 
 
 def test_is_blocked_returns_true_for_waf_script_signature():
+    # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
         {
@@ -111,10 +133,13 @@ def test_is_blocked_returns_true_for_waf_script_signature():
         },
     ):
         html = "<html>custom-waf-marker</html>"
+
+        # when / then
         assert ChallengeDetector.is_blocked(200, html) is True
 
 
 def test_is_blocked_returns_true_for_waf_strict_phrase():
+    # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
         {
@@ -124,64 +149,87 @@ def test_is_blocked_returns_true_for_waf_strict_phrase():
         },
     ):
         html = "<html><body>please verify you are human</body></html>"
+
+        # when / then
         assert ChallengeDetector.is_blocked(200, html) is True
 
 
 def test_is_blocked_returns_false_on_huge_content():
+    # given
     huge = "a" * 50001
+
+    # when / then
     assert ChallengeDetector.is_blocked(200, huge) is False
 
 
 def test_is_login_required_returns_false_on_huge_content():
+    # given
     huge = "a" * 50001
+
+    # when / then
     assert ChallengeDetector.is_login_required(huge) is False
 
 
 def test_is_login_redirect_url_empty_string_returns_false():
+    # when / then
     assert ChallengeDetector.is_login_redirect_url("") is False
 
 
 # noinspection PyTypeChecker
 def test_is_login_redirect_url_none_returns_false():
+    # when / then
     assert ChallengeDetector.is_login_redirect_url(None) is False  # type: ignore[arg-type]
 
 
 def test_has_real_content_true_for_genuine_article():
+    # given
     html = (
         "<html><body><article><p>"
         "This is a genuine paragraph of article content with more than ten words in it. "
         "It continues with a second sentence so the extractor has plenty of real prose."
         "</p></article></body></html>"
     )
+
+    # when / then
     assert ChallengeDetector.has_real_content(html) is True
 
 
 def test_has_real_content_false_for_empty_string():
+    # when / then
     assert ChallengeDetector.has_real_content("") is False
 
 
 def test_has_real_content_false_for_thin_interstitial():
     """A small page whose only text is a short interstitial paragraph (real content
     once boilerplate is stripped is near zero) must fail the positive-evidence check."""
+    # given
     html = "<html><body><p>Please enable JS and disable any ad blocker</p></body></html>"
+
+    # when / then
     assert ChallengeDetector.has_real_content(html) is False
 
 
 def test_has_real_content_true_for_large_page_regardless_of_shape():
     """Pages at or above CHALLENGE_WALL_MAX_BYTES pass automatically: a genuine
     interstitial is small, so size alone rules it out."""
+    # given
     huge = "a" * 50_000
+
+    # when / then
     assert ChallengeDetector.has_real_content(huge) is True
 
 
 def test_is_content_accepted_false_when_blocked_even_with_real_content():
     """A known block signature rejects the page even if it also contains
     enough words to otherwise pass the structural check."""
+    # given
     html = (
         "<html><body>Just a moment... "
         + "This looks like plenty of real prose to satisfy a naive word count. " * 2
         + "</body></html>"
     )
+
+    # when / then
     assert ChallengeDetector.is_content_accepted(200, html) is False
 
 
@@ -189,21 +237,27 @@ def test_is_content_accepted_false_for_unrecognized_thin_interstitial():
     """The Allegro regression: a DataDome block page carrying no literal
     'datadome' string and no cf_clearance/turnstile marker must still be
     rejected via the positive-evidence structural check."""
+    # given
     html = (
         "<html lang='en'><head><title>allegro.pl</title></head>"
         "<body style='margin:0'><p id='cmsg'>Please enable JS and disable any ad blocker</p>"
         "<script data-cfasync='false'>var dd={'host':'geo.captcha-delivery.com'}</script></body></html>"
     )
+
+    # when / then
     assert ChallengeDetector.is_content_accepted(200, html) is False
 
 
 def test_is_content_accepted_false_for_amazon_style_interstitial():
     """Regression guard for a phrase-dictionary hit: an interstitial that renders
     the literal dictionary phrase must still be rejected."""
+    # given
     html = (
         "<html><body><p>Sorry, we just need to make sure you're not a robot.</p>"
         "<a href='/errors/validateCaptcha'>Continue shopping</a></body></html>"
     )
+
+    # when / then
     assert ChallengeDetector.is_content_accepted(200, html) is False
 
 
@@ -225,6 +279,7 @@ def test_is_content_accepted_false_for_real_amazon_captcha_page_any_locale(local
     fixture is a trimmed faithful copy of the real page fetched from
     amazon.{locale} on 2026-09-04, not a fixture engineered to match the
     dictionary."""
+    # given
     html = (
         f"<html lang='{locale}'><head><title>Amazon.{locale}</title></head><body>"
         f"<div class='a-box a-alert a-alert-info'><h4>{heading}</h4></div>"
@@ -236,6 +291,8 @@ def test_is_content_accepted_false_for_real_amazon_captcha_page_any_locale(local
         "<div>&#169; 1996-2025 Amazon.com, Inc. or its affiliates</div>"
         "</body></html>"
     )
+
+    # when / then
     assert ChallengeDetector.has_real_content(html) is True, (
         "fixture must reproduce the original bug: footer boilerplate alone clears the word count"
     )
@@ -244,6 +301,7 @@ def test_is_content_accepted_false_for_real_amazon_captcha_page_any_locale(local
 
 
 def test_is_blocked_returns_true_for_waf_structural_marker():
+    # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
         {
@@ -254,17 +312,23 @@ def test_is_blocked_returns_true_for_waf_structural_marker():
         },
     ):
         html = "<html><body><form action='/errors_page/validateCaptcha'></form></body></html>"
+
+        # when / then
         assert ChallengeDetector.is_blocked(200, html) is True
 
 
 def test_is_content_accepted_true_for_real_datadome_rendered_page():
     """A DataDome-protected page that has actually cleared and serves full content
     must not be rejected merely for referencing DataDome infrastructure."""
+    # given
     html = "<html><body>" + "real job listings " * 50 + "</body></html>"
+
+    # when / then
     assert ChallengeDetector.is_content_accepted(200, html) is True
 
 
 def test_is_login_redirect_url_matches_known_patterns():
+    # when / then
     assert (
         ChallengeDetector.is_login_redirect_url(
             "https://secure.indeed.com/auth?continue=http://indeed.com/jobs"

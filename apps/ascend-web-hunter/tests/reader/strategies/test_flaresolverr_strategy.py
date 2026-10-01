@@ -21,14 +21,20 @@ def _make_session(json_payload: dict) -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_flaresolverr_skipped_when_url_unset():
+    # given
     strategy = FlareSolverrStrategy()
+
+    # when
     with patch("src.reader.strategies.flaresolverr_strategy.settings.FLARESOLVERR_URL", ""):
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -39,6 +45,8 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -51,6 +59,8 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
         ),
     ):
         result = await FlareSolverrStrategy().extract("http://test.com")
+
+    # then
     assert result == "Cleared"
     mock_save.assert_awaited_once()
 
@@ -59,6 +69,7 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
 async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empty():
     """After removing the cf_clearance gate, cookies are saved unconditionally
     when the set is non-empty - even if no cf_clearance is present."""
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -69,6 +80,8 @@ async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empt
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -78,6 +91,8 @@ async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empt
         patch("src.reader.strategies.flaresolverr_strategy.trafilatura.extract", return_value="x"),
     ):
         await FlareSolverrStrategy().extract("http://test.com")
+
+    # then
     mock_save.assert_awaited_once()
 
 
@@ -85,6 +100,7 @@ async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empt
 async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer():
     """A96/A61: the record saved after a solve must name FlareSolverr as the
     producer, so a later read can replay it through the tier that earned it."""
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -95,6 +111,8 @@ async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -105,12 +123,14 @@ async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer():
     ):
         await FlareSolverrStrategy().extract("http://test.com")
 
+    # then
     mock_save.assert_awaited_once()
     assert mock_save.call_args.args[-1] == PRODUCED_BY_FLARESOLVERR
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_login_wall_raises_challenge():
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -121,6 +141,8 @@ async def test_flaresolverr_login_wall_raises_challenge():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -130,11 +152,14 @@ async def test_flaresolverr_login_wall_raises_challenge():
     ):
         with pytest.raises(ChallengeDetectedException) as exc:
             await FlareSolverrStrategy().get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "login"
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation():
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -145,6 +170,8 @@ async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation()
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -158,29 +185,40 @@ async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation()
     ):
         with pytest.raises(ChallengeDetectedException) as exc:
             await FlareSolverrStrategy().get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "captcha"
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_status_not_ok_returns_empty():
+    # given
     session = _make_session({"status": "error", "message": "fail"})
+
+    # when
     with patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session):
         result = await FlareSolverrStrategy().get_html("http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_transport_error_returns_empty():
+    # when
     with patch(
         "src.reader.strategies.flaresolverr_strategy.requests.AsyncSession",
         side_effect=RuntimeError("net"),
     ):
         result = await FlareSolverrStrategy().get_html("http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_extract_returns_empty_when_trafilatura_none():
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -191,19 +229,26 @@ async def test_flaresolverr_extract_returns_empty_when_trafilatura_none():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch("src.reader.strategies.flaresolverr_strategy.trafilatura.extract", return_value=None),
     ):
         result = await FlareSolverrStrategy().extract("http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_extract_empty_when_html_blank():
+    # when
     with patch(
         "src.reader.strategies.flaresolverr_strategy.settings.FLARESOLVERR_URL",
         "",
     ):
         result = await FlareSolverrStrategy().extract("http://test.com")
+
+    # then
     assert result == ""

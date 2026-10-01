@@ -12,26 +12,32 @@ from src.validator.content_validator import ContentValidator
 
 def test_quality_metrics_exception_returns_false():
     """When textstat raises, the validator must fail closed (return False)."""
+    # given
     # Build content that passes length/keyword checks but trips textstat.
     content = " ".join([f"word{i}" for i in range(20)])
 
+    # when
     with patch(
         "src.validator.content_validator._lexicon_count",
         side_effect=RuntimeError("textstat boom"),
     ):
         result = ContentValidator().validate(content)
 
+    # then
     assert result is False
 
 
 def test_quality_metrics_flesch_exception_returns_false():
     """Flesch score raising must also fail closed."""
+    # given
     content = " ".join([f"word{i}" for i in range(20)])
 
+    # when
     with (
         patch("src.validator.content_validator._lexicon_count", return_value=20),
         patch("src.validator.content_validator._flesch_reading_ease", side_effect=ValueError("nan")),
     ):
         result = ContentValidator().validate(content)
 
+    # then
     assert result is False

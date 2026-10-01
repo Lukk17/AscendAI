@@ -30,19 +30,23 @@ def large_waf_page() -> str:
 
 
 def test_is_login_required_detects_marker_in_large_page(large_cf_page: str):
+    # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
         {"waf_script_signatures": [], "waf_strict_phrases": [], "login_title_patterns": ["sign in"]},
     ):
+        # when / then
         assert ChallengeDetector.is_login_required(large_cf_page) is True
 
 
 def test_is_blocked_detects_ray_id_in_large_page(large_waf_page: str):
+    # when / then
     assert ChallengeDetector.is_blocked(200, large_waf_page) is True
 
 
 def test_is_login_required_clean_large_page_returns_false():
     """A genuinely clean large page must not be misidentified as a login wall."""
+    # given
     big_clean = (
         "<html><head><title>LinkedIn Feed</title></head><body>" + "content " * 10_000 + "</body></html>"
     )
@@ -50,6 +54,7 @@ def test_is_login_required_clean_large_page_returns_false():
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
         {"waf_script_signatures": [], "waf_strict_phrases": [], "login_title_patterns": ["sign in"]},
     ):
+        # when / then
         assert ChallengeDetector.is_login_required(big_clean) is False
 
 
@@ -58,55 +63,73 @@ def test_challenge_detection_max_bytes_setting_respected():
     When CHALLENGE_DETECTION_MAX_BYTES is small, a marker placed after the prefix
     must NOT be detected (detector correctly limits its scan).
     """
+    # given
     marker = "cf_clearance"
     # Place marker after the scan window
     prefix = "a" * 100
     html = prefix + marker
 
+    # when
     with patch("src.reader.cloudflare.challenge_detector.settings.CHALLENGE_DETECTION_MAX_BYTES", 100):
         result = ChallengeDetector.is_blocked(200, html)
 
+    # then
     assert result is False
 
 
 def test_challenge_detection_fires_when_marker_within_max_bytes():
     """When a strong marker falls inside the prefix window, detection must fire
     regardless of total page size."""
+    # given
     html = "prefix Ray ID: 89abcdef0123 suffix " + "a" * 60_000
 
+    # when
     with patch("src.reader.cloudflare.challenge_detector.settings.CHALLENGE_DETECTION_MAX_BYTES", 50_000):
         result = ChallengeDetector.is_blocked(200, html)
 
+    # then
     assert result is True
 
 
 def test_large_page_embedding_turnstile_widget_is_not_blocked():
     """A real page that merely embeds a Turnstile widget (e.g. nowsecure.nl) must not
     be flagged as a challenge wall just because it contains cf-turnstile."""
+    # when
     html = "<html><body><div class='cf-turnstile'></div>" + "real content " * 6_000 + "</body></html>"
+
+    # then
     assert len(html) > 50_000
     assert ChallengeDetector.is_blocked(200, html) is False
 
 
 def test_small_interstitial_with_turnstile_is_blocked():
     """A small interstitial page dominated by the Turnstile widget is still a block."""
+    # given
     html = "<html><body><div class='cf-turnstile'></div></body></html>"
+
+    # when / then
     assert ChallengeDetector.is_blocked(200, html) is True
 
 
 def test_large_page_loading_datadome_tag_is_not_blocked():
     """A real DataDome-protected page loads the datadome tag while serving full content;
     it must not be flagged as a challenge wall on the basis of that tag alone."""
+    # when
     html = (
         "<html><head><script src='https://js.datadome.co/tags.js'></script></head><body>"
         + ("real job listings " * 6_000)
         + "</body></html>"
     )
+
+    # then
     assert len(html) > 50_000
     assert ChallengeDetector.is_blocked(200, html) is False
 
 
 def test_small_datadome_interstitial_is_blocked():
     """A small DataDome challenge interstitial is still a block."""
+    # given
     html = "<html><body><script src='https://js.datadome.co/tags.js'></script>captcha</body></html>"
+
+    # when / then
     assert ChallengeDetector.is_blocked(403, html) is True

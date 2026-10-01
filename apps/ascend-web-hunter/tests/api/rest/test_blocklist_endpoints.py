@@ -27,7 +27,10 @@ def restore_url_validator_rules():
 
 @pytest.mark.asyncio
 async def test_status_returns_current_rule_count_and_age(client: AsyncClient):
+    # when
     resp = await client.get("/api/v1/blocklist/status")
+
+    # then
     assert resp.status_code == 200
     body = resp.json()
     assert body["rule_count"] == real_blocklist_loader.state.rule_count
@@ -36,21 +39,29 @@ async def test_status_returns_current_rule_count_and_age(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_status_returns_503_when_not_loaded(client: AsyncClient):
+    # when
     with patch.object(real_blocklist_loader, "_state", None):
         resp = await client.get("/api/v1/blocklist/status")
+
+    # then
     assert resp.status_code == 503
 
 
 @pytest.mark.asyncio
 async def test_refresh_success_returns_new_rule_count(client: AsyncClient, restore_url_validator_rules):
+    # given
     new_state = BlocklistState(rule_count=42, loaded_at=datetime.now(UTC))
     new_rules = AdblockRules(["||fresh.example^"])
+
+    # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",
         new_callable=AsyncMock,
         return_value=(new_rules, new_state),
     ):
         resp = await client.post("/api/v1/blocklist/refresh")
+
+    # then
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "refreshed"
@@ -59,8 +70,11 @@ async def test_refresh_success_returns_new_rule_count(client: AsyncClient, resto
 
 @pytest.mark.asyncio
 async def test_refresh_swaps_the_shared_url_validator_rules(client: AsyncClient, restore_url_validator_rules):
+    # given
     new_state = BlocklistState(rule_count=1, loaded_at=datetime.now(UTC))
     new_rules = AdblockRules(["||fresh.example^"])
+
+    # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",
         new_callable=AsyncMock,
@@ -68,39 +82,49 @@ async def test_refresh_swaps_the_shared_url_validator_rules(client: AsyncClient,
     ):
         resp = await client.post("/api/v1/blocklist/refresh")
 
+    # then
     assert resp.status_code == 200
     assert url_validator.rules is new_rules
 
 
 @pytest.mark.asyncio
 async def test_refresh_network_failure_returns_503(client: AsyncClient):
+    # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",
         new_callable=AsyncMock,
         side_effect=httpx.ConnectError("network down"),
     ):
         resp = await client.post("/api/v1/blocklist/refresh")
+
+    # then
     assert resp.status_code == 503
 
 
 @pytest.mark.asyncio
 async def test_refresh_validation_failure_returns_502(client: AsyncClient):
+    # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",
         new_callable=AsyncMock,
         side_effect=BlocklistValidationError("empty ruleset"),
     ):
         resp = await client.post("/api/v1/blocklist/refresh")
+
+    # then
     assert resp.status_code == 502
 
 
 @pytest.mark.asyncio
 async def test_refresh_throttled_returns_429_with_retry_after(client: AsyncClient):
+    # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",
         new_callable=AsyncMock,
         side_effect=BlocklistRefreshThrottledError(30.0),
     ):
         resp = await client.post("/api/v1/blocklist/refresh")
+
+    # then
     assert resp.status_code == 429
     assert "Retry-After" in resp.headers

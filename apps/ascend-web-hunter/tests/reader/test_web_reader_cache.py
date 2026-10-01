@@ -10,6 +10,7 @@ from src.reader.web_reader import WebReader, _cache_key
 @pytest.mark.asyncio
 async def test_cache_hit_skips_strategy_chain() -> None:
     """A repeated request within TTL must return cached result without running strategies."""
+    # given
     reader = WebReader()
     call_count = 0
 
@@ -24,10 +25,12 @@ async def test_cache_hit_skips_strategy_chain() -> None:
         call_count += 1
         return {"content": "some content", "status": "success", "mode": name}
 
+    # when
     with patch.object(reader, "_execute_strategy", side_effect=_fake_execute):
         result1 = await reader.read("https://example.com/article")
         result2 = await reader.read("https://example.com/article")
 
+    # then
     assert result1["status"] == "success"
     assert result2["status"] == "success"
     assert call_count == 1, "strategy chain ran more than once - cache did not work"
@@ -36,22 +39,33 @@ async def test_cache_hit_skips_strategy_chain() -> None:
 @pytest.mark.asyncio
 async def test_cache_miss_on_different_output_format() -> None:
     """Different output_format must produce different cache keys."""
+    # given
     key_text = _cache_key("https://example.com/", False, False, None, "text")
+
+    # when
     key_structured = _cache_key("https://example.com/", False, False, None, "structured")
+
+    # then
     assert key_text != key_structured
 
 
 @pytest.mark.asyncio
 async def test_cache_miss_on_different_heavy_mode() -> None:
     """Different heavy_mode must produce different cache keys."""
+    # given
     key_light = _cache_key("https://example.com/", False, False, None, None)
+
+    # when
     key_heavy = _cache_key("https://example.com/", True, False, None, None)
+
+    # then
     assert key_light != key_heavy
 
 
 @pytest.mark.asyncio
 async def test_cache_entry_expires_after_ttl() -> None:
     """After the TTL has elapsed the cache must be a miss and re-run the chain."""
+    # given
     from src.reader.web_reader import _cache_key
 
     reader = WebReader()
@@ -73,6 +87,7 @@ async def test_cache_entry_expires_after_ttl() -> None:
     # Seed the cache with a stale entry (stored_at far in the past)
     reader._memory_cache[key] = ({"content": "stale", "status": "success", "mode": "1"}, 0.0)
 
+    # when
     with (
         patch.object(reader, "_execute_strategy", side_effect=_fake_execute),
         patch("src.reader.web_reader.settings.READ_CACHE_TTL_SECONDS", 1),
@@ -80,12 +95,14 @@ async def test_cache_entry_expires_after_ttl() -> None:
         # First call: cache is stale (stored_at=0.0, TTL=1, now >> 1), should re-run chain
         await reader.read(url)
 
+    # then
     assert call_count == 1, "stale cache should have been expired - chain must re-run"
 
 
 @pytest.mark.asyncio
 async def test_cache_hit_increments_metric() -> None:
     """READ_CACHE_HITS_TOTAL must increment on a cache hit."""
+    # given
     from prometheus_client import REGISTRY
 
     reader = WebReader()
@@ -108,13 +125,17 @@ async def test_cache_hit_increments_metric() -> None:
         await reader.read("https://cachemetric2.example.com/test")
         await reader.read("https://cachemetric2.example.com/test")
 
+    # when
     after = REGISTRY.get_sample_value("read_cache_hits_total") or 0.0
+
+    # then
     assert after == before + 1.0
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_cache_hit_skips_strategy_chain() -> None:
     """A cached read_with_links result must not re-run the strategy chain."""
+    # given
     reader = WebReader()
     url = "https://links-cache.example.com/"
 
@@ -129,14 +150,17 @@ async def test_read_with_links_cache_hit_skips_strategy_chain() -> None:
         execute_called = True
         return {"content": "fresh", "status": "success", "mode": name}
 
+    # when
     with patch.object(reader, "_execute_strategy", side_effect=_fake_execute):
         result = await reader.read_with_links(url)
 
+    # then
     assert result == cached_result
     assert not execute_called, "cache hit must not invoke the strategy chain"
 
 
 def test_clear_cache_for_domain_removes_matching_entries_only() -> None:
+    # given
     reader = WebReader()
     reader._memory_cache["https://allegro.pl/oferta/x|heavy=False|links=False|profile=|fmt=text"] = (
         {"content": "stale allegro", "status": "success", "mode": "1"},
@@ -151,8 +175,10 @@ def test_clear_cache_for_domain_removes_matching_entries_only() -> None:
         0.0,
     )
 
+    # when
     removed = reader.clear_cache_for_domain("allegro.pl")
 
+    # then
     assert removed == 2
     assert len(reader._memory_cache) == 1
     remaining_key = next(iter(reader._memory_cache))
@@ -160,14 +186,17 @@ def test_clear_cache_for_domain_removes_matching_entries_only() -> None:
 
 
 def test_clear_cache_for_domain_returns_zero_when_nothing_matches() -> None:
+    # given
     reader = WebReader()
     reader._memory_cache["https://example.com/z|heavy=False|links=False|profile=|fmt=text"] = (
         {"content": "unrelated", "status": "success", "mode": "1"},
         0.0,
     )
 
+    # when
     removed = reader.clear_cache_for_domain("never-cached.example.org")
 
+    # then
     assert removed == 0
     assert len(reader._memory_cache) == 1
 
@@ -175,6 +204,7 @@ def test_clear_cache_for_domain_returns_zero_when_nothing_matches() -> None:
 @pytest.mark.asyncio
 async def test_cache_is_isolated_per_reader_instance() -> None:
     """Each WebReader instance has its own in-process cache - they do not share state."""
+    # given
     reader1 = WebReader()
     reader2 = WebReader()
 
@@ -208,9 +238,11 @@ async def test_cache_is_isolated_per_reader_instance() -> None:
         # second call on reader1 should hit cache
         await reader1.read("https://shared.example.com/")
 
+    # when
     with patch.object(reader2, "_execute_strategy", side_effect=_fake2):
         # reader2 has no cache entry - must call chain
         await reader2.read("https://shared.example.com/")
 
+    # then
     assert count1 == 1
     assert count2 == 1

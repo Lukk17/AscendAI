@@ -16,26 +16,35 @@ def _addr(ip: str) -> tuple:
 
 
 def test_safe_public_address():
+    # given
     with patch("src.validator.url_validator.socket.getaddrinfo", return_value=[_addr("93.184.216.34")]):
+        # when / then
         assert is_safe_external_url("https://example.com") is True
 
 
 def test_rejects_loopback():
+    # given
     with patch("src.validator.url_validator.socket.getaddrinfo", return_value=[_addr("127.0.0.1")]):
+        # when / then
         assert is_safe_external_url("http://localhost") is False
 
 
 def test_rejects_private_rfc1918():
+    # given
     with patch("src.validator.url_validator.socket.getaddrinfo", return_value=[_addr("192.168.1.1")]):
+        # when / then
         assert is_safe_external_url("http://router") is False
 
 
 def test_rejects_link_local_aws_imds():
+    # given
     with patch("src.validator.url_validator.socket.getaddrinfo", return_value=[_addr("169.254.169.254")]):
+        # when / then
         assert is_safe_external_url("http://imds") is False
 
 
 def test_rejects_non_http_scheme():
+    # when / then
     assert is_safe_external_url("ftp://example.com") is False
 
 
@@ -50,6 +59,7 @@ async def test_curl_cffi_fetcher_blocks_redirect_to_private_ip():
     When a redirect Location header points to a private IP, the fetcher must
     return '' without following the redirect.
     """
+    # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
 
     redirect_response = MagicMock()
@@ -63,6 +73,7 @@ async def test_curl_cffi_fetcher_blocks_redirect_to_private_ip():
     mock_session.__aexit__ = AsyncMock(return_value=False)
     mock_session.get = AsyncMock(return_value=redirect_response)
 
+    # when
     with (
         patch("src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession", return_value=mock_session),
         patch(
@@ -84,4 +95,5 @@ async def test_curl_cffi_fetcher_blocks_redirect_to_private_ip():
     ):
         result = await fetch_with_curl_cffi("https://example.com", lambda: "UA", "test")
 
+    # then
     assert result == ""

@@ -156,11 +156,14 @@ async def _fetch(session: _PinAwareSession, resolver: Any, url: str = _URL) -> s
 
 @pytest.mark.asyncio
 async def test_a_name_rebound_after_validation_is_never_connected_to():
+    # given
     resolver = _RebindingResolver()
     session = _PinAwareSession(resolver, [_ok_response()])
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == _HTML
     assert session.curl_options[CurlOpt.RESOLVE] == [f"rebind.example:443:{_PUBLIC}"]
     assert session.connected_to == [_PUBLIC]
@@ -171,33 +174,42 @@ async def test_a_name_rebound_after_validation_is_never_connected_to():
 @pytest.mark.asyncio
 async def test_without_a_pin_the_rebound_address_is_the_one_that_connects():
     """The harness itself must be able to demonstrate the attack, or the test above proves nothing."""
+    # given
     resolver = _RebindingResolver()
     session = _PinAwareSession(resolver, [_ok_response()])
     resolver("rebind.example", 443)
 
+    # when
     await session.get(_URL)
 
+    # then
     assert session.connected_to == [_METADATA]
 
 
 @pytest.mark.asyncio
 async def test_a_host_that_resolves_to_an_internal_address_is_never_requested():
+    # given
     resolver = _FixedResolver(_METADATA)
     session = _PinAwareSession(resolver, [_ok_response()])
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == ""
     assert session.connected_to == []
 
 
 @pytest.mark.asyncio
 async def test_every_redirect_hop_connects_to_its_own_validated_address():
+    # given
     resolver = _FixedResolver(_PUBLIC)
     session = _PinAwareSession(resolver, [_redirect_response(_HOP_URL), _ok_response()])
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == _HTML
     assert session.connected_to == [_PUBLIC, _PUBLIC]
     assert resolver.calls == 2, "one resolution per hop, and none of them at connect time"
@@ -205,21 +217,27 @@ async def test_every_redirect_hop_connects_to_its_own_validated_address():
 
 @pytest.mark.asyncio
 async def test_the_pin_is_replaced_per_hop_rather_than_accumulated():
+    # given
     resolver = _FixedResolver(_PUBLIC)
     session = _PinAwareSession(resolver, [_redirect_response(_HOP_URL), _ok_response()])
 
+    # when
     await _fetch(session, resolver)
 
+    # then
     assert session.curl_options[CurlOpt.RESOLVE] == [f"hop.example:443:{_PUBLIC}"]
 
 
 @pytest.mark.asyncio
 async def test_a_root_relative_location_is_resolved_against_the_hop_that_returned_it():
+    # given
     resolver = _FixedResolver(_PUBLIC)
     session = _PinAwareSession(resolver, [_redirect_response("/article"), _ok_response()])
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == _HTML
     assert session.requested == [_URL, "https://rebind.example/article"]
     assert session.connected_to == [_PUBLIC, _PUBLIC]
@@ -227,6 +245,7 @@ async def test_a_root_relative_location_is_resolved_against_the_hop_that_returne
 
 @pytest.mark.asyncio
 async def test_a_path_relative_location_is_resolved_against_the_previous_hop_not_the_first_url():
+    # given
     resolver = _FixedResolver(_PUBLIC)
     responses = [
         _redirect_response("/docs/intro"),
@@ -235,8 +254,10 @@ async def test_a_path_relative_location_is_resolved_against_the_previous_hop_not
     ]
     session = _PinAwareSession(resolver, responses)
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == _HTML
     assert session.requested == [
         _URL,
@@ -247,11 +268,14 @@ async def test_a_path_relative_location_is_resolved_against_the_previous_hop_not
 
 @pytest.mark.asyncio
 async def test_a_protocol_relative_location_takes_the_scheme_of_the_hop_that_returned_it():
+    # given
     resolver = _HostResolver({"rebind.example": _PUBLIC, "hop.example": _PUBLIC})
     session = _PinAwareSession(resolver, [_redirect_response("//hop.example/page"), _ok_response()])
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == _HTML
     assert session.requested == [_URL, _HOP_URL]
     assert session.curl_options[CurlOpt.RESOLVE] == [f"hop.example:443:{_PUBLIC}"]
@@ -259,11 +283,14 @@ async def test_a_protocol_relative_location_takes_the_scheme_of_the_hop_that_ret
 
 @pytest.mark.asyncio
 async def test_a_protocol_relative_location_to_an_internal_host_is_refused():
+    # given
     resolver = _HostResolver({"rebind.example": _PUBLIC, "evil.example": _METADATA})
     session = _PinAwareSession(resolver, [_redirect_response("//evil.example/page"), _ok_response()])
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == ""
     assert session.requested == [_URL]
     assert session.connected_to == [_PUBLIC]
@@ -271,11 +298,14 @@ async def test_a_protocol_relative_location_to_an_internal_host_is_refused():
 
 @pytest.mark.asyncio
 async def test_a_relative_location_whose_host_has_rebound_is_still_refused():
+    # given
     resolver = _RebindingResolver()
     session = _PinAwareSession(resolver, [_redirect_response("/article"), _ok_response()])
 
+    # when
     html = await _fetch(session, resolver)
 
+    # then
     assert html == ""
     assert session.requested == [_URL]
     assert _METADATA not in session.connected_to

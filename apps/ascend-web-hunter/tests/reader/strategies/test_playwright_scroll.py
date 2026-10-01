@@ -36,9 +36,12 @@ def _make_browser_and_page() -> tuple[MagicMock, MagicMock, MagicMock]:
 @pytest.mark.asyncio
 async def test_scroll_called_configured_number_of_times() -> None:
     """PlaywrightStrategy must call window.scrollBy exactly SCROLL_ITERATIONS times."""
+    # given
     scroll_iters = 3
     scroll_step = 1200
     browser, _, page = _make_browser_and_page()
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
@@ -69,6 +72,7 @@ async def test_scroll_called_configured_number_of_times() -> None:
         strategy = PlaywrightStrategy(lambda: "UA", _make_url_validator())
         await strategy.get_html("https://example.com/page")
 
+    # then
     scroll_calls = [c for c in page.evaluate.await_args_list if "scrollBy" in str(c)]
     assert len(scroll_calls) == scroll_iters
 
@@ -76,8 +80,11 @@ async def test_scroll_called_configured_number_of_times() -> None:
 @pytest.mark.asyncio
 async def test_scroll_uses_configured_step_px() -> None:
     """Each scroll call must use SCROLL_STEP_PX pixels."""
+    # given
     scroll_step = 2500
     browser, _, page = _make_browser_and_page()
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
@@ -108,6 +115,7 @@ async def test_scroll_uses_configured_step_px() -> None:
         strategy = PlaywrightStrategy(lambda: "UA", _make_url_validator())
         await strategy.get_html("https://example.com/page")
 
+    # then
     scroll_calls = [c for c in page.evaluate.await_args_list if "scrollBy" in str(c)]
     assert len(scroll_calls) == 1
     assert str(scroll_step) in str(scroll_calls[0])

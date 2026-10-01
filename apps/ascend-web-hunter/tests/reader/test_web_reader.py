@@ -32,6 +32,7 @@ def _default_no_stored_session():
 
 @pytest.mark.asyncio
 async def test_read_succeeds_on_first_strategy():
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -40,23 +41,29 @@ async def test_read_succeeds_on_first_strategy():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["status"] == "success"
     assert result["mode"] == "1-beautifulsoup"
 
 
 @pytest.mark.asyncio
 async def test_read_all_strategies_fail_returns_failure_response():
+    # when
     with patch(
         "src.reader.web_reader.WebReader._execute_strategy",
         new=AsyncMock(return_value=None),
     ):
         result = await WebReader().read("http://fail.com")
+
+    # then
     assert result["status"] == "error"
     assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
 async def test_read_preempts_to_novnc_on_login_redirect_url():
+    # when
     with (
         patch(
             "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
@@ -65,11 +72,14 @@ async def test_read_preempts_to_novnc_on_login_redirect_url():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com?login=1")
+
+    # then
     assert result["mode"] == "6-novnc"
 
 
 @pytest.mark.asyncio
 async def test_read_heavy_mode_skips_lightweight():
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
@@ -78,6 +88,8 @@ async def test_read_heavy_mode_skips_lightweight():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com", heavy_mode=True)
+
+    # then
     assert result["mode"] == "4-playwright_stealth"
 
 
@@ -86,6 +98,7 @@ async def test_read_routes_browser_first_when_stored_session_exists():
     """A stored session (e.g. a captured cf_clearance) forces the browser tier first
     even without heavy_mode, so a curl tier can't trip the challenge and bypass the
     Playwright tier that replays the clearance with its matching user-agent."""
+    # when
     with (
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
@@ -102,6 +115,8 @@ async def test_read_routes_browser_first_when_stored_session_exists():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["mode"] == "4-playwright_stealth"
 
 
@@ -109,6 +124,7 @@ async def test_read_routes_browser_first_when_stored_session_exists():
 async def test_read_routes_flaresolverr_first_when_producer_is_flaresolverr():
     """A61: a clearance FlareSolverr earned must be replayed by FlareSolverr
     first, not skipped straight to the browser tiers."""
+    # when
     with (
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
@@ -129,6 +145,8 @@ async def test_read_routes_flaresolverr_first_when_producer_is_flaresolverr():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["mode"] == PRODUCED_BY_FLARESOLVERR
 
 
@@ -143,8 +161,11 @@ async def test_read_routes_browser_first_and_skips_flaresolverr_for_non_flaresol
     stored session with no recorded producer at all (a pre-fix record, or a
     caller that omitted the field), must not be replayed through
     FlareSolverr - the browser tiers stay first, exactly like today."""
+    # given
     flaresolverr_mock = AsyncMock(return_value="flaresolverr must not run for this producer")
     beautifulsoup_mock = AsyncMock(return_value="cheap tiers must not run when a session is stored")
+
+    # when
     with (
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
@@ -169,6 +190,8 @@ async def test_read_routes_browser_first_and_skips_flaresolverr_for_non_flaresol
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["mode"] == "4-playwright_stealth"
     flaresolverr_mock.assert_not_awaited()
     beautifulsoup_mock.assert_not_awaited()
@@ -179,7 +202,10 @@ async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first():
     """heavy_mode is an explicit caller preference and takes priority over
     producer-based routing, even when a FlareSolverr-produced clearance is
     stored: no FlareSolverr replay, straight to the browser tiers."""
+    # given
     producer_mock = AsyncMock(return_value=PRODUCED_BY_FLARESOLVERR)
+
+    # when
     with (
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
@@ -196,16 +222,21 @@ async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await WebReader().read("http://test.com", heavy_mode=True)
+
+    # then
     assert result["mode"] == "4-playwright_stealth"
     producer_mock.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flaresolverr():
+    # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job</a></body></html>"
     )
+
+    # when
     with (
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
@@ -225,6 +256,8 @@ async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flares
         ),
     ):
         result = await WebReader().read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "success"
     assert result["mode"] == PRODUCED_BY_FLARESOLVERR
 
@@ -237,6 +270,7 @@ async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as
     buys no auth benefit and costs exactly what tiering exists to avoid.
     Exercises the real CookieManager, not the module's default mock, so the
     fix is proven where it lives (the read side), not merely asserted."""
+    # given
     from src.reader.cloudflare.cookie_manager import CookieManager
 
     CookieManager._instance = None
@@ -247,6 +281,7 @@ async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as
         "https://empty-jar.example.com", {"cookies": [], "origins": []}, "UA"
     )
 
+    # when
     with patch(
         "src.reader.web_reader.cookie_manager.get_storage_state",
         new=fresh_cookie_manager.get_storage_state,
@@ -255,12 +290,16 @@ async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as
             "https://empty-jar.example.com", heavy_mode=False, profile=None
         )
 
+    # then
     assert prefer is False
 
 
 @pytest.mark.asyncio
 async def test_read_propagates_human_intervention():
+    # given
     exc = HumanInterventionRequiredException("http://vnc", "captcha")
+
+    # when / then
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
         new=AsyncMock(side_effect=exc),
@@ -274,6 +313,7 @@ async def test_read_falls_through_to_novnc_when_challenge_unsolved():
     """A curl-tier challenge no longer short-circuits to NoVNC; it falls through the
     ladder so the auto-solving tiers get a chance. When none resolve it, NoVNC (the
     last tier) handles it."""
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -305,6 +345,8 @@ async def test_read_falls_through_to_novnc_when_challenge_unsolved():
         ),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["mode"] == "6-novnc"
 
 
@@ -312,6 +354,7 @@ async def test_read_falls_through_to_novnc_when_challenge_unsolved():
 async def test_read_returns_failure_when_all_tiers_including_novnc_fail():
     """Every tier falls through on its challenge (NoVNC included); read ends in a
     failure response rather than looping."""
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -339,48 +382,63 @@ async def test_read_returns_failure_when_all_tiers_including_novnc_fail():
         ),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["status"] == "error"
     assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_success():
+    # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job One</a></body></html>"
     )
+
+    # when
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
         new=AsyncMock(return_value=raw_html),
     ):
         result = await WebReader().read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "success"
     assert result["links"][1] == "https://example.com/job1"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_filter_keeps_matching_only():
+    # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit. "
         "<a href='https://example.com/job-offer/senior'>Senior</a>"
         "<a href='https://example.com/about'>About</a>"
         "</body></html>"
     )
+
+    # when
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
         new=AsyncMock(return_value=raw_html),
     ):
         result = await WebReader().read_with_links("http://test.com", link_filter="/job-offer/")
+
+    # then
     assert len(result["links"]) == 1
     assert result["links"][1] == "https://example.com/job-offer/senior"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_falls_through_when_first_returns_empty():
+    # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job</a></body></html>"
     )
+
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -392,26 +450,36 @@ async def test_read_with_links_falls_through_when_first_returns_empty():
         ),
     ):
         result = await WebReader().read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_preempts_to_novnc_on_login_redirect_url():
+    # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job</a></body></html>"
     )
+
+    # when
     with patch(
         "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
         new=AsyncMock(return_value=raw_html),
     ):
         result = await WebReader().read_with_links("http://test.com?login=1")
+
+    # then
     assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_propagates_human_intervention():
+    # given
     exc = HumanInterventionRequiredException("http://vnc", "captcha")
+
+    # when / then
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
         new=AsyncMock(side_effect=exc),
@@ -422,21 +490,27 @@ async def test_read_with_links_propagates_human_intervention():
 
 @pytest.mark.asyncio
 async def test_read_with_links_all_strategies_fail():
+    # when
     with patch(
         "src.reader.web_reader.WebReader._execute_html_strategy",
         new=AsyncMock(return_value=""),
     ):
         result = await WebReader().read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "error"
     assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_falls_through_to_novnc_on_challenge():
+    # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job</a></body></html>"
     )
+
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -464,50 +538,75 @@ async def test_read_with_links_falls_through_to_novnc_on_challenge():
         ),
     ):
         result = await WebReader().read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
 async def test_execute_strategy_returns_none_on_exception():
+    # given
     reader = WebReader()
     fail_strategy = MagicMock()
     fail_strategy.get_html = AsyncMock(side_effect=RuntimeError("boom"))
+
+    # when
     result = await reader._execute_strategy("dummy", fail_strategy, "http://test.com")
+
+    # then
     assert result is None
 
 
 @pytest.mark.asyncio
 async def test_execute_strategy_returns_none_on_validation_fail():
+    # given
     reader = WebReader()
     strategy = MagicMock()
     strategy.get_html = AsyncMock(return_value=_ARTICLE_HTML)
+
+    # when
     with patch("src.validator.content_validator.ContentValidator.validate", return_value=False):
         result = await reader._execute_strategy("dummy", strategy, "http://test.com")
+
+    # then
     assert result is None
 
 
 @pytest.mark.asyncio
 async def test_execute_html_strategy_returns_empty_on_exception():
+    # given
     reader = WebReader()
     strategy = MagicMock()
     strategy.get_html = AsyncMock(side_effect=RuntimeError("boom"))
+
+    # when
     result = await reader._execute_html_strategy("dummy", strategy, "http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_execute_html_strategy_returns_empty_string_when_html_blank():
+    # given
     reader = WebReader()
     strategy = MagicMock()
     strategy.get_html = AsyncMock(return_value="")
+
+    # when
     result = await reader._execute_html_strategy("dummy", strategy, "http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_read_bails_when_budget_exceeded():
     """READ_TOTAL_BUDGET shortcut path: NoVNC rescue also fails, so reason stays budget_exhausted."""
+    # given
     reader = WebReader()
+
+    # when
     with (
         patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
         patch(
@@ -516,6 +615,8 @@ async def test_read_bails_when_budget_exceeded():
         ),
     ):
         result = await reader.read("http://test.com")
+
+    # then
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"
 
@@ -524,7 +625,10 @@ async def test_read_bails_when_budget_exceeded():
 async def test_read_bails_but_novnc_rescue_succeeds():
     """READ_TOTAL_BUDGET shortcut path: NoVNC is exempt from the budget check
     and, when it returns usable content, its result is the successful read."""
+    # given
     reader = WebReader()
+
+    # when
     with (
         patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
         patch(
@@ -534,13 +638,18 @@ async def test_read_bails_but_novnc_rescue_succeeds():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
     ):
         result = await reader.read("http://test.com")
+
+    # then
     assert result["status"] == "success"
     assert result["mode"] == "6-novnc"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_bails_when_budget_exceeded():
+    # given
     reader = WebReader()
+
+    # when
     with (
         patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
         patch(
@@ -549,6 +658,8 @@ async def test_read_with_links_bails_when_budget_exceeded():
         ),
     ):
         result = await reader.read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"
 
@@ -557,11 +668,14 @@ async def test_read_with_links_bails_when_budget_exceeded():
 async def test_read_with_links_bails_but_novnc_rescue_succeeds():
     """NoVNC is exempt from the budget check on the links path too: when it
     returns usable content, its result is the successful read."""
+    # given
     reader = WebReader()
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job One</a></body></html>"
     )
+
+    # when
     with (
         patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
         patch(
@@ -570,6 +684,8 @@ async def test_read_with_links_bails_but_novnc_rescue_succeeds():
         ),
     ):
         result = await reader.read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "success"
     assert result["mode"] == "6-novnc"
 
@@ -579,11 +695,14 @@ async def test_read_with_links_bails_and_novnc_rescue_fails_validation():
     """NoVNC's rescue HTML can clear the interstitial gate yet still fail the
     annotated-content validator; that must end in a failure response, not a
     false success."""
+    # given
     reader = WebReader()
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job One</a></body></html>"
     )
+
+    # when
     with (
         patch("src.reader.web_reader.settings.READ_TOTAL_BUDGET", 0.0),
         patch(
@@ -593,23 +712,29 @@ async def test_read_with_links_bails_and_novnc_rescue_fails_validation():
         patch("src.validator.content_validator.ContentValidator.validate", return_value=False),
     ):
         result = await reader.read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "error"
     assert result["reason"] == "budget_exhausted"
 
 
 @pytest.mark.asyncio
 async def test_failure_response_reports_all_tiers_failed_when_strategies_run_but_all_fail():
+    # when
     with patch(
         "src.reader.web_reader.WebReader._execute_strategy",
         new=AsyncMock(return_value=None),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["reason"] == "all_tiers_failed"
 
 
 @pytest.mark.asyncio
 async def test_read_falls_through_when_validation_fails_then_succeeds():
     """Validation-fail on tier 1 should not stop the chain."""
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -625,16 +750,21 @@ async def test_read_falls_through_when_validation_fails_then_succeeds():
         ),
     ):
         result = await WebReader().read("http://test.com")
+
+    # then
     assert result["mode"] == "2-trafilatura"
 
 
 @pytest.mark.asyncio
 async def test_read_with_links_validation_fail_then_next_tier_succeeds():
+    # given
     short_html = "<html><body>short</body></html>"
     long_html = (
         "<html><body>This is long enough filler content to pass the validator. "
         "<a href='https://example.com/x'>Link</a></body></html>"
     )
+
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -646,6 +776,8 @@ async def test_read_with_links_validation_fail_then_next_tier_succeeds():
         ),
     ):
         result = await WebReader().read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "success"
     assert result["mode"] == "2-trafilatura"
 
@@ -655,10 +787,13 @@ async def test_read_with_links_falls_through_when_annotated_content_fails_valida
     """Raw HTML that clears the interstitial gate (real, article-shaped content)
     can still fail ContentValidator on the annotated text; that must fall
     through to the next tier rather than stopping the chain."""
+    # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
         "<a href='https://example.com/job1'>Job One</a></body></html>"
     )
+
+    # when
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
@@ -674,50 +809,75 @@ async def test_read_with_links_falls_through_when_annotated_content_fails_valida
         ),
     ):
         result = await WebReader().read_with_links("http://test.com")
+
+    # then
     assert result["status"] == "success"
     assert result["mode"] == "2-trafilatura"
 
 
 @pytest.mark.asyncio
 async def test_load_user_agents_falls_back_when_path_missing():
+    # given
     reader = WebReader()
+
+    # when
     with patch("src.reader.web_reader.Path.exists", return_value=False):
         agents = reader._load_user_agents()
+
+    # then
     assert isinstance(agents, list)
     assert len(agents) >= 1
 
 
 @pytest.mark.asyncio
 async def test_read_json_file_returns_fallback_on_bad_json(tmp_path):
+    # given
     reader = WebReader()
     bad = tmp_path / "broken.json"
     bad.write_text("not json", encoding="utf-8")
+
+    # when
     agents = reader._read_json_file(bad)
+
+    # then
     assert isinstance(agents, list)
 
 
 def test_get_random_user_agent_returns_string():
+    # when
     reader = WebReader()
+
+    # then
     assert isinstance(reader._get_random_user_agent(), str)
 
 
 @pytest.mark.asyncio
 async def test_execute_html_strategy_falls_through_on_challenge():
     """A challenge on the get_html path yields '' so the ladder advances to the next tier."""
+    # given
     reader = WebReader()
     strategy = MagicMock()
     strategy.get_html = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login"))
+
+    # when
     result = await reader._execute_html_strategy("1-beautifulsoup", strategy, "http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_execute_strategy_falls_through_on_challenge():
     """A challenge on the get_html path yields None so the ladder advances to the next tier."""
+    # given
     reader = WebReader()
     strategy = MagicMock()
     strategy.get_html = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha"))
+
+    # when
     result = await reader._execute_strategy("1-beautifulsoup", strategy, "http://test.com")
+
+    # then
     assert result is None
 
 
@@ -726,12 +886,17 @@ async def test_execute_strategy_rejects_interstitial_before_validating():
     """A tier that returns a small page with no article-shaped content (an
     interstitial that clears ContentValidator's shallow checks) must be
     rejected before ever reaching content validation, not reported as success."""
+    # given
     reader = WebReader()
     strategy = MagicMock()
     interstitial_html = "<html><body><p>Continue shopping</p></body></html>"
     strategy.get_html = AsyncMock(return_value=interstitial_html)
+
+    # when
     with patch("src.validator.content_validator.ContentValidator.validate", return_value=True):
         result = await reader._execute_strategy("1-beautifulsoup", strategy, "http://test.com")
+
+    # then
     assert result is None
 
 
@@ -739,11 +904,16 @@ async def test_execute_strategy_rejects_interstitial_before_validating():
 async def test_execute_html_strategy_rejects_interstitial_before_returning():
     """The links path must reject a tier's raw HTML when the article extractor
     finds nothing, even though annotate_links would otherwise accept it."""
+    # given
     reader = WebReader()
     strategy = MagicMock()
     interstitial_html = "<html><body><p>Continue shopping</p></body></html>"
     strategy.get_html = AsyncMock(return_value=interstitial_html)
+
+    # when
     result = await reader._execute_html_strategy("1-beautifulsoup", strategy, "http://test.com")
+
+    # then
     assert result == ""
 
 
@@ -758,6 +928,7 @@ async def test_read_rejects_amazon_style_interstitial_and_escalates():
     marker (the fixed internal form action Amazon uses for this page) catches
     it. A fixture built from a dictionary phrase would pass for the wrong
     reason and miss a regression in the structural check."""
+    # given
     interstitial_html = (
         "<html lang='pl'><head><title>Amazon.pl</title></head><body>"
         "<div class='a-box a-alert a-alert-info'>"
@@ -771,6 +942,8 @@ async def test_read_rejects_amazon_style_interstitial_and_escalates():
         "<div>© 1996-2025 Amazon.com, Inc. lub podmioty stowarzyszone</div>"
         "</body></html>"
     )
+
+    # when / then
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",

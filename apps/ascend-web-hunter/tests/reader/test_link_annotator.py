@@ -4,14 +4,18 @@ BASE_URL = "https://example.com"
 
 
 def test_annotate_links_returns_numbered_map():
+    # given
     html = """
     <html><body>
         <p>Visit <a href="https://example.com/page1">Page One</a> for details.</p>
         <p>Also see <a href="https://example.com/page2">Page Two</a>.</p>
     </body></html>
     """
+
+    # when
     content, links = annotate_links(html, BASE_URL)
 
+    # then
     assert len(links) == 2
     assert links[1] == "https://example.com/page1"
     assert links[2] == "https://example.com/page2"
@@ -20,6 +24,7 @@ def test_annotate_links_returns_numbered_map():
 
 
 def test_annotate_links_strips_noise_tags():
+    # given
     html = """
     <html><body>
         <nav><a href="https://example.com/nav">Nav</a></nav>
@@ -27,13 +32,17 @@ def test_annotate_links_strips_noise_tags():
         <p><a href="https://example.com/content">Content</a></p>
     </body></html>
     """
+
+    # when
     content, links = annotate_links(html, BASE_URL)
 
+    # then
     assert len(links) == 1
     assert links[1] == "https://example.com/content"
 
 
 def test_annotate_links_filter_by_substring():
+    # given
     html = """
     <html><body>
         <a href="https://example.com/job-offer/senior-dev">Senior Dev</a>
@@ -41,25 +50,33 @@ def test_annotate_links_filter_by_substring():
         <a href="https://example.com/job-offer/mid-dev">Mid Dev</a>
     </body></html>
     """
+
+    # when
     content, links = annotate_links(html, BASE_URL, link_filter="/job-offer/")
 
+    # then
     assert len(links) == 2
     assert links[1] == "https://example.com/job-offer/senior-dev"
     assert links[2] == "https://example.com/job-offer/mid-dev"
 
 
 def test_annotate_links_resolves_relative_urls():
+    # given
     html = """
     <html><body>
         <a href="/relative/path">Relative</a>
     </body></html>
     """
+
+    # when
     content, links = annotate_links(html, "https://example.com")
 
+    # then
     assert links[1] == "https://example.com/relative/path"
 
 
 def test_annotate_links_skips_invalid_hrefs():
+    # given
     html = """
     <html><body>
         <a href="#">Hash</a>
@@ -69,22 +86,31 @@ def test_annotate_links_skips_invalid_hrefs():
         <a href="https://example.com/valid">Valid</a>
     </body></html>
     """
+
+    # when
     content, links = annotate_links(html, BASE_URL)
 
+    # then
     assert len(links) == 1
     assert links[1] == "https://example.com/valid"
 
 
 def test_annotate_links_empty_html_returns_empty():
+    # when
     content, links = annotate_links("", BASE_URL)
 
+    # then
     assert content == ""
     assert links == {}
 
 
 def test_annotate_links_no_anchors_returns_empty_map():
+    # given
     html = "<html><body><p>No links here.</p></body></html>"
+
+    # when
     content, links = annotate_links(html, BASE_URL)
 
+    # then
     assert links == {}
     assert "No links here" in content

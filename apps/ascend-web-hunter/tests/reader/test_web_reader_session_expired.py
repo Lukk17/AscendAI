@@ -77,19 +77,24 @@ def _html_reader() -> tuple[WebReader, dict[str, int], Any]:
 
 @pytest.mark.asyncio
 async def test_a_target_with_no_stored_login_reads_as_before():
+    # given
     reader, counter, execute = _succeeding_reader()
 
+    # when
     result = await _read(reader, [*_gate(has_auth=False, valid=False), execute])
 
+    # then
     assert result["status"] == "success"
     assert counter["calls"] == 1
 
 
 @pytest.mark.asyncio
 async def test_a_target_with_no_stored_login_is_never_validated():
+    # given
     reader, _, execute = _succeeding_reader()
     validate = AsyncMock(return_value=False)
 
+    # when
     with (
         patch(
             "src.reader.web_reader.cookie_manager.has_auth_cookies",
@@ -100,35 +105,45 @@ async def test_a_target_with_no_stored_login_is_never_validated():
     ):
         await reader.read(_URL)
 
+    # then
     validate.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_a_live_session_runs_the_chain():
+    # given
     reader, counter, execute = _succeeding_reader()
 
+    # when
     result = await _read(reader, [*_gate(has_auth=True, valid=True), execute])
 
+    # then
     assert result["status"] == "success"
     assert counter["calls"] == 1
 
 
 @pytest.mark.asyncio
 async def test_an_expired_session_stops_the_read_before_any_tier_runs():
+    # given
     reader, counter, execute = _succeeding_reader()
 
+    # when
     result = await _read(reader, [*_gate(has_auth=True, valid=False), execute], profile="work")
 
+    # then
     assert result["status"] == SESSION_EXPIRED_STATUS
     assert counter["calls"] == 0
 
 
 @pytest.mark.asyncio
 async def test_the_expired_outcome_carries_its_whole_contract():
+    # given
     reader, _, execute = _succeeding_reader()
 
+    # when
     result = await _read(reader, [*_gate(has_auth=True, valid=False), execute], profile="work")
 
+    # then
     for field in _SESSION_EXPIRED_FIELDS:
         assert field in result
     assert result["content"] == ""
@@ -140,49 +155,64 @@ async def test_the_expired_outcome_carries_its_whole_contract():
 
 @pytest.mark.asyncio
 async def test_the_expired_outcome_names_the_default_profile_when_none_was_given():
+    # given
     reader, _, execute = _succeeding_reader()
 
+    # when
     result = await _read(reader, [*_gate(has_auth=True, valid=False), execute])
 
+    # then
     assert result["profile"] == "default"
 
 
 @pytest.mark.asyncio
 async def test_the_expired_outcome_is_not_the_generic_failure():
+    # given
     reader, _, execute = _succeeding_reader()
 
+    # when
     result = await _read(reader, [*_gate(has_auth=True, valid=False), execute])
 
+    # then
     assert result["status"] != "error"
     assert "reason" not in result
 
 
 @pytest.mark.asyncio
 async def test_the_links_path_reports_the_expired_session_too():
+    # given
     reader, counter, execute = _html_reader()
 
+    # when
     result = await _read_with_links(reader, [*_gate(has_auth=True, valid=False), execute], profile="work")
 
+    # then
     assert result["status"] == SESSION_EXPIRED_STATUS
     assert counter["calls"] == 0
 
 
 @pytest.mark.asyncio
 async def test_the_links_path_with_a_live_session_runs_the_chain():
+    # given
     reader, counter, execute = _html_reader()
 
+    # when
     result = await _read_with_links(reader, [*_gate(has_auth=True, valid=True), execute])
 
+    # then
     assert result["status"] == "success"
     assert counter["calls"] == 1
 
 
 @pytest.mark.asyncio
 async def test_a_cached_result_does_not_mask_an_expired_session():
+    # given
     reader, _, execute = _succeeding_reader()
     key = _cache_key(_URL, False, False, None, None)
     reader._cache_put(key, {"content": "stale but authenticated", "status": "success", "mode": "1"})
 
+    # when
     result = await _read(reader, [*_gate(has_auth=True, valid=False), execute])
 
+    # then
     assert result["status"] == SESSION_EXPIRED_STATUS

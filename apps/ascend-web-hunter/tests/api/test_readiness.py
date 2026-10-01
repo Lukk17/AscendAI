@@ -16,6 +16,7 @@ def _open_breaker_state() -> BreakerState:
 
 @pytest.mark.asyncio
 async def test_ready_all_ok_returns_200(client: AsyncClient):
+    # when
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
@@ -26,6 +27,8 @@ async def test_ready_all_ok_returns_200(client: AsyncClient):
         mock_sb.state = BreakerState.CLOSED
         mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
+
+    # then
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ready"
@@ -34,6 +37,7 @@ async def test_ready_all_ok_returns_200(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_ready_degrades_when_any_check_fails(client: AsyncClient):
+    # when
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
@@ -44,6 +48,8 @@ async def test_ready_degrades_when_any_check_fails(client: AsyncClient):
         mock_sb.state = BreakerState.CLOSED
         mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
+
+    # then
     assert resp.status_code == 503
     assert resp.json()["status"] == "degraded"
 
@@ -51,6 +57,7 @@ async def test_ready_degrades_when_any_check_fails(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_ready_response_does_not_leak_exception_detail(client: AsyncClient):
     """Security: /ready must not echo upstream exception strings."""
+    # when
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "error"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
@@ -61,6 +68,8 @@ async def test_ready_response_does_not_leak_exception_detail(client: AsyncClient
         mock_sb.state = BreakerState.CLOSED
         mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
+
+    # then
     body = resp.text
     assert "redis://" not in body
     assert "password" not in body.lower()
@@ -69,6 +78,7 @@ async def test_ready_response_does_not_leak_exception_detail(client: AsyncClient
 @pytest.mark.asyncio
 async def test_ready_degrades_when_flaresolverr_breaker_open(client: AsyncClient):
     """An open circuit breaker on FlareSolverr makes /ready return 503."""
+    # when
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
@@ -79,6 +89,8 @@ async def test_ready_degrades_when_flaresolverr_breaker_open(client: AsyncClient
         mock_sb.state = BreakerState.CLOSED
         mock_fb.state = BreakerState.OPEN
         resp = await client.get("/ready")
+
+    # then
     assert resp.status_code == 503
     body = resp.json()
     assert body["checks"]["flaresolverr_breaker"]["breaker"] == "open"
@@ -87,6 +99,7 @@ async def test_ready_degrades_when_flaresolverr_breaker_open(client: AsyncClient
 @pytest.mark.asyncio
 async def test_ready_degrades_when_searxng_breaker_open(client: AsyncClient):
     """An open SearXNG circuit breaker makes /ready return 503."""
+    # when
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
@@ -97,6 +110,8 @@ async def test_ready_degrades_when_searxng_breaker_open(client: AsyncClient):
         mock_sb.state = BreakerState.OPEN
         mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
+
+    # then
     assert resp.status_code == 503
     body = resp.json()
     assert body["checks"]["searxng_breaker"]["breaker"] == "open"
@@ -105,6 +120,7 @@ async def test_ready_degrades_when_searxng_breaker_open(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_ready_degrades_when_breaker_is_half_open(client: AsyncClient):
     """A HALF_OPEN circuit breaker also makes /ready return 503 with breaker=half_open."""
+    # when
     with (
         patch("src.api.readiness._probe_redis", new=AsyncMock(return_value={"status": "ok"})),
         patch("src.api.readiness._probe_searxng", new=AsyncMock(return_value={"status": "ok"})),
@@ -115,6 +131,8 @@ async def test_ready_degrades_when_breaker_is_half_open(client: AsyncClient):
         mock_sb.state = BreakerState.HALF_OPEN
         mock_fb.state = BreakerState.CLOSED
         resp = await client.get("/ready")
+
+    # then
     assert resp.status_code == 503
     body = resp.json()
     assert body["checks"]["searxng_breaker"]["breaker"] == "half_open"
@@ -122,39 +140,54 @@ async def test_ready_degrades_when_breaker_is_half_open(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_probe_redis_skipped_when_url_empty():
+    # given
     from src.api.readiness import _probe_redis
 
+    # when
     with patch("src.api.readiness.settings.REDIS_URL", ""):
         result = await _probe_redis()
+
+    # then
     assert result["status"] == "skipped"
 
 
 @pytest.mark.asyncio
 async def test_probe_redis_ok_path():
+    # given
     from src.api.readiness import _probe_redis
 
     mock_client = AsyncMock()
     mock_client.ping = AsyncMock(return_value=True)
     mock_client.aclose = AsyncMock()
+
+    # when
     with patch("src.api.readiness.redis.from_url", return_value=mock_client):
         result = await _probe_redis()
+
+    # then
     assert result["status"] == "ok"
 
 
 @pytest.mark.asyncio
 async def test_probe_redis_error_path_returns_redacted_status():
+    # given
     from src.api.readiness import _probe_redis
 
     mock_client = AsyncMock()
     mock_client.ping = AsyncMock(side_effect=RuntimeError("redis://user:pw@host/0 down"))
     mock_client.aclose = AsyncMock(side_effect=RuntimeError("close failed"))
+
+    # when
     with patch("src.api.readiness.redis.from_url", return_value=mock_client):
         result = await _probe_redis()
+
+    # then
     assert result == {"status": "error"}
 
 
 @pytest.mark.asyncio
 async def test_probe_searxng_ok():
+    # given
     from src.api.readiness import _probe_searxng
 
     response = MagicMock()
@@ -162,13 +195,18 @@ async def test_probe_searxng_ok():
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.get = AsyncMock(return_value=response)
+
+    # when
     with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
         result = await _probe_searxng()
+
+    # then
     assert result["status"] == "ok"
 
 
 @pytest.mark.asyncio
 async def test_probe_searxng_non_200_is_error():
+    # given
     from src.api.readiness import _probe_searxng
 
     response = MagicMock()
@@ -176,25 +214,35 @@ async def test_probe_searxng_non_200_is_error():
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.get = AsyncMock(return_value=response)
+
+    # when
     with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
         result = await _probe_searxng()
+
+    # then
     assert result == {"status": "error"}
 
 
 @pytest.mark.asyncio
 async def test_probe_searxng_exception_redacted():
+    # given
     from src.api.readiness import _probe_searxng
 
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.get = AsyncMock(side_effect=RuntimeError("dns nope"))
+
+    # when
     with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
         result = await _probe_searxng()
+
+    # then
     assert result == {"status": "error"}
 
 
 @pytest.mark.asyncio
 async def test_probe_flaresolverr_posts_sessions_list():
+    # given
     from src.api.readiness import _probe_flaresolverr
 
     response = MagicMock()
@@ -202,14 +250,19 @@ async def test_probe_flaresolverr_posts_sessions_list():
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.post = AsyncMock(return_value=response)
+
+    # when
     with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
         result = await _probe_flaresolverr()
+
+    # then
     assert result["status"] == "ok"
     mock_client.post.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_probe_flaresolverr_non_200_is_error():
+    # given
     from src.api.readiness import _probe_flaresolverr
 
     response = MagicMock()
@@ -217,18 +270,27 @@ async def test_probe_flaresolverr_non_200_is_error():
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.post = AsyncMock(return_value=response)
+
+    # when
     with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
         result = await _probe_flaresolverr()
+
+    # then
     assert result == {"status": "error"}
 
 
 @pytest.mark.asyncio
 async def test_probe_flaresolverr_exception_redacted():
+    # given
     from src.api.readiness import _probe_flaresolverr
 
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.post = AsyncMock(side_effect=RuntimeError("net"))
+
+    # when
     with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
         result = await _probe_flaresolverr()
+
+    # then
     assert result == {"status": "error"}

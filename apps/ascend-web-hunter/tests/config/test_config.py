@@ -8,8 +8,7 @@ from src.config.config import Settings
 
 
 def test_settings_defaults():
-    # given
-    # When initializing settings without env vars
+    # when
     settings = Settings()
 
     # then
@@ -41,8 +40,7 @@ def test_settings_env_override():
 
 
 def test_blocklist_path_defaults_to_vendored_asset():
-    # given
-    # When initializing settings without env vars
+    # when
     settings = Settings()
 
     # then

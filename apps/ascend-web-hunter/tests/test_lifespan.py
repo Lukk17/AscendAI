@@ -8,23 +8,30 @@ from fastapi import FastAPI
 @pytest.mark.asyncio
 async def test_lifespan_raises_when_blocklist_not_loaded():
     """The lifespan must fail hard if the blocklist singleton was somehow never loaded."""
+    # given
     from src import main as main_module
     from src.config.blocklist_loader import blocklist_loader
 
     original_state = blocklist_loader.state
+
+    # when
     with patch.object(blocklist_loader, "_state", None):
         # Build a fresh app so we exercise the new lifespan.
         app = main_module.create_app()
         with pytest.raises(RuntimeError):
             async with LifespanManager(app):
                 pass
+
+    # then
     assert blocklist_loader.state == original_state
 
 
 @pytest.mark.asyncio
 async def test_lifespan_logs_warning_when_rest_search_client_close_fails():
+    # given
     from src import main as main_module
 
+    # when / then
     with (
         patch.object(
             main_module.rest_search_client,
@@ -44,8 +51,10 @@ async def test_lifespan_logs_warning_when_rest_search_client_close_fails():
 
 @pytest.mark.asyncio
 async def test_lifespan_logs_warning_when_mcp_search_client_close_fails():
+    # given
     from src import main as main_module
 
+    # when / then
     with (
         patch.object(
             main_module.rest_search_client,

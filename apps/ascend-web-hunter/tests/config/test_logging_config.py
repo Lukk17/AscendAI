@@ -11,15 +11,22 @@ from src.config.logging_config import (
 
 
 def test_setup_logging_attaches_filter():
+    # given
     with patch("src.config.logging_config.logging.basicConfig") as mock_basic_config:
+        # when
         setup_logging()
+
+        # then
         mock_basic_config.assert_called_once()
         kwargs = mock_basic_config.call_args.kwargs
         assert kwargs["level"] == logging.INFO
 
 
 def test_get_uvicorn_log_config_returns_expected_keys():
+    # when
     config = get_uvicorn_log_config()
+
+    # then
     assert config["version"] == 1
     assert "filters" in config
     assert "correlation" in config["filters"]
@@ -27,36 +34,52 @@ def test_get_uvicorn_log_config_returns_expected_keys():
 
 
 def test_correlation_filter_injects_request_id_default():
+    # given
     f = CorrelationFilter()
     record = logging.LogRecord("x", logging.INFO, "x", 1, "msg", None, None)
+
+    # when / then
     assert f.filter(record) is True
     assert record.request_id == "-"
 
 
 def test_centered_level_formatter_centers_short_level():
+    # given
     f = CenteredLevelFormatter(
         "%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y",
         log_colors={"INFO": "green"},
     )
     record = logging.LogRecord("x", logging.INFO, "x", 1, "hello", None, None)
+
+    # when
     output = f.format(record)
+
+    # then
     assert "hello" in output
 
 
 def test_centered_level_formatter_no_match_returns_unchanged():
     """When the format string does not contain ' - LEVEL - ', the regex misses and
     the formatted output is returned as-is."""
+    # given
     f = CenteredLevelFormatter(
         "%(message)s",  # No level marker
         datefmt="%Y",
         log_colors={"INFO": "green"},
     )
     record = logging.LogRecord("x", logging.INFO, "x", 1, "no level marker", None, None)
+
+    # when
     output = f.format(record)
+
+    # then
     assert "no level marker" in output
 
 
 def test_get_logger_returns_module_logger():
+    # when
     logger = get_logger("test.module")
+
+    # then
     assert logger.name == "test.module"

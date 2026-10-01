@@ -21,21 +21,30 @@ def _make_loader(tmp_path: Path, content: str | None = "||example.com^\n! commen
 
 
 def test_load_rules_reads_the_vendored_file(tmp_path):
+    # given
     loader = _make_loader(tmp_path, "||example.com^\n! comment\n\n||other.com^\n")
     rules = loader.load_rules()
+
+    # when / then
     assert rules.should_block("http://example.com")
     assert loader.state is not None
     assert loader.state.rule_count == 2
 
 
 def test_load_rules_raises_file_not_found_when_missing(tmp_path):
+    # given
     loader = _make_loader(tmp_path, content=None)
+
+    # when / then
     with pytest.raises(FileNotFoundError):
         loader.load_rules()
 
 
 def test_load_rules_raises_runtime_error_on_corrupt_file(tmp_path):
+    # given
     loader = _make_loader(tmp_path)
+
+    # when / then
     with patch("pathlib.Path.open", side_effect=PermissionError("read denied")):
         with pytest.raises(RuntimeError):
             loader.load_rules()
@@ -50,11 +59,13 @@ def _mock_response(content: bytes) -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_refresh_success_swaps_file_and_state(tmp_path):
+    # given
     loader = _make_loader(tmp_path)
     new_content = b"||fresh.example^\n! comment\n||another.example^\n"
     with patch("httpx.AsyncClient.get", return_value=_mock_response(new_content)):
         rules, state = await loader.refresh()
 
+    # when / then
     assert rules.should_block("http://fresh.example")
     assert state.rule_count == 2
     assert loader.state == state
@@ -63,31 +74,42 @@ async def test_refresh_success_swaps_file_and_state(tmp_path):
 
 @pytest.mark.asyncio
 async def test_refresh_raises_httpx_error_and_leaves_file_untouched(tmp_path):
+    # given
     loader = _make_loader(tmp_path)
     original_content = loader.blocklist_path.read_bytes()
+
+    # when
     with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("network down")):
         with pytest.raises(httpx.HTTPError):
             await loader.refresh()
 
+    # then
     assert loader.blocklist_path.read_bytes() == original_content
     assert loader.state is None
 
 
 @pytest.mark.asyncio
 async def test_refresh_raises_validation_error_on_empty_ruleset_and_leaves_file_untouched(tmp_path):
+    # given
     loader = _make_loader(tmp_path)
     original_content = loader.blocklist_path.read_bytes()
+
+    # when
     with patch("httpx.AsyncClient.get", return_value=_mock_response(b"! only a comment\n")):
         with pytest.raises(BlocklistValidationError):
             await loader.refresh()
 
+    # then
     assert loader.blocklist_path.read_bytes() == original_content
     assert loader.state is None
 
 
 @pytest.mark.asyncio
 async def test_refresh_raises_throttled_error_within_cooldown(tmp_path):
+    # given
     loader = _make_loader(tmp_path)
+
+    # when / then
     with patch("httpx.AsyncClient.get", return_value=_mock_response(b"||example.com^\n")):
         await loader.refresh()
         with pytest.raises(BlocklistRefreshThrottledError):
@@ -96,20 +118,25 @@ async def test_refresh_raises_throttled_error_within_cooldown(tmp_path):
 
 @pytest.mark.asyncio
 async def test_refresh_allows_retry_after_cooldown_elapses(tmp_path, monkeypatch):
+    # given
     loader = _make_loader(tmp_path)
     fake_clock = [1000.0]
     monkeypatch.setattr("src.config.blocklist_loader.time.monotonic", lambda: fake_clock[0])
+
+    # when
     with patch("httpx.AsyncClient.get", return_value=_mock_response(b"||example.com^\n")):
         await loader.refresh()
 
         fake_clock[0] += settings.BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS + 1
         _, state = await loader.refresh()
 
+    # then
     assert state.rule_count == 1
 
 
 @pytest.mark.asyncio
 async def test_refresh_serialises_concurrent_calls(tmp_path):
+    # given
     loader = _make_loader(tmp_path)
     call_order: list[str] = []
 
@@ -119,9 +146,11 @@ async def test_refresh_serialises_concurrent_calls(tmp_path):
         call_order.append("end")
         return _mock_response(b"||example.com^\n")
 
+    # when
     with patch("httpx.AsyncClient.get", side_effect=_slow_get):
         results = await asyncio.gather(loader.refresh(), loader.refresh(), return_exceptions=True)
 
+    # then
     successes = [r for r in results if not isinstance(r, Exception)]
     throttled = [r for r in results if isinstance(r, BlocklistRefreshThrottledError)]
     assert len(successes) == 1

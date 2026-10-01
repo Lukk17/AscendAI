@@ -30,15 +30,18 @@ def _make_session(json_payload: dict) -> MagicMock:
 @pytest.mark.asyncio
 async def test_open_breaker_skips_flaresolverr() -> None:
     """When the FlareSolverr breaker is open, the strategy returns '' without making an HTTP call."""
+    # given
     session = _make_session(
         {"status": "ok", "solution": {"response": "html", "cookies": [], "userAgent": ""}}
     )
     for _ in range(100):
         flaresolverr_breaker.record_failure()
 
+    # when
     with patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session):
         result = await FlareSolverrStrategy().get_html("https://example.com")
 
+    # then
     assert result == ""
     session.post.assert_not_awaited()
 
@@ -46,6 +49,7 @@ async def test_open_breaker_skips_flaresolverr() -> None:
 @pytest.mark.asyncio
 async def test_successful_response_closes_breaker() -> None:
     """A successful FlareSolverr call must call record_success (closes the breaker)."""
+    # given
     payload = {
         "status": "ok",
         "solution": {
@@ -56,6 +60,7 @@ async def test_successful_response_closes_breaker() -> None:
     }
     session = _make_session(payload)
 
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -66,6 +71,7 @@ async def test_successful_response_closes_breaker() -> None:
     ):
         result = await FlareSolverrStrategy().get_html("https://example.com")
 
+    # then
     assert flaresolverr_breaker.state.name == "CLOSED"
     assert result != ""
 
@@ -73,10 +79,13 @@ async def test_successful_response_closes_breaker() -> None:
 @pytest.mark.asyncio
 async def test_failed_response_records_failure() -> None:
     """A non-ok FlareSolverr status must call record_failure on the breaker."""
+    # given
     session = _make_session({"status": "error", "message": "timeout"})
     initial_failures = flaresolverr_breaker._consecutive_failures
 
+    # when
     with patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session):
         await FlareSolverrStrategy().get_html("https://example.com")
 
+    # then
     assert flaresolverr_breaker._consecutive_failures == initial_failures + 1

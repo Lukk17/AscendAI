@@ -21,7 +21,10 @@ def _reset_novnc_flow_lock():
 async def test_novnc_get_html_forwards_profile_to_monitor_task():
     """The profile passed to the constructor must reach the background monitor
     task, not be silently dropped."""
+    # when
     strategy = NoVNCStrategy("work")
+
+    # then
     assert strategy.profile == "work"
     with (
         patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://vnc"),
@@ -35,32 +38,45 @@ async def test_novnc_get_html_forwards_profile_to_monitor_task():
 
 @pytest.mark.asyncio
 async def test_novnc_get_html_raises_login_intervention_on_login_redirect_url():
+    # given
     strategy = NoVNCStrategy()
+
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://vnc"),
         patch("src.reader.strategies.novnc_strategy.asyncio.create_task"),
     ):
         with pytest.raises(HumanInterventionRequiredException) as exc:
             await strategy.get_html("http://test.com?login=1")
+
+    # then
     assert exc.value.intervention_type == "login"
     assert exc.value.vnc_url == "http://vnc/vnc.html?autoconnect=true"
 
 
 @pytest.mark.asyncio
 async def test_novnc_get_html_raises_captcha_intervention_when_no_login_url():
+    # given
     strategy = NoVNCStrategy()
+
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://vnc"),
         patch("src.reader.strategies.novnc_strategy.asyncio.create_task"),
     ):
         with pytest.raises(HumanInterventionRequiredException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "captcha"
 
 
 @pytest.mark.asyncio
 async def test_novnc_extract_calls_get_html_and_returns_empty():
+    # given
     strategy = NoVNCStrategy()
+
+    # when / then
     with (
         patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://vnc"),
         patch("src.reader.strategies.novnc_strategy.asyncio.create_task"),
@@ -74,14 +90,19 @@ async def test_novnc_get_html_raises_busy_when_another_flow_holds_the_lock():
     """A second flow -- whether a manual establish() or an automatic
     escalation -- must be rejected immediately rather than colliding with
     the flow already holding the shared browser/display."""
+    # given
     _novnc_flow_lock.try_acquire("http://already-running.example", "default")
     strategy = NoVNCStrategy()
+
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://vnc"),
         patch("src.reader.strategies.novnc_strategy.asyncio.create_task") as mock_create_task,
     ):
         with pytest.raises(NoVNCFlowBusyException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.holder_url == "http://already-running.example"
     assert exc.value.holder_profile == "default"
     mock_create_task.assert_not_called()
@@ -90,7 +111,10 @@ async def test_novnc_get_html_raises_busy_when_another_flow_holds_the_lock():
 @pytest.mark.asyncio
 async def test_novnc_get_html_releases_lock_when_vnc_url_resolution_fails():
     """If the flow never reaches task creation, the lock must not leak."""
+    # given
     strategy = NoVNCStrategy()
+
+    # when
     with (
         patch.object(
             NoVNCStrategy, "_resolve_public_vnc_url", new=AsyncMock(side_effect=RuntimeError("boom"))
@@ -99,6 +123,8 @@ async def test_novnc_get_html_releases_lock_when_vnc_url_resolution_fails():
     ):
         with pytest.raises(RuntimeError, match="boom"):
             await strategy.get_html("http://test.com")
+
+    # then
     mock_create_task.assert_not_called()
 
     # The lock must be free again: a second flow can now acquire it.
@@ -107,13 +133,19 @@ async def test_novnc_get_html_releases_lock_when_vnc_url_resolution_fails():
 
 @pytest.mark.asyncio
 async def test_novnc_resolve_public_vnc_url_direct():
+    # given
     strategy = NoVNCStrategy()
+
+    # when
     result = await strategy._resolve_public_vnc_url()
+
+    # then
     assert result.endswith("/vnc.html?autoconnect=true")
 
 
 @pytest.mark.asyncio
 async def test_novnc_fetch_ngrok_url_picks_first_tunnel():
+    # given
     strategy = NoVNCStrategy()
     response = MagicMock()
     response.raise_for_status = MagicMock()
@@ -121,6 +153,8 @@ async def test_novnc_fetch_ngrok_url_picks_first_tunnel():
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.get = AsyncMock(return_value=response)
+
+    # when
     with (
         patch(
             "src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL",
@@ -129,15 +163,20 @@ async def test_novnc_fetch_ngrok_url_picks_first_tunnel():
         patch("src.reader.strategies.novnc_strategy.httpx.AsyncClient", return_value=mock_client),
     ):
         url = await strategy._resolve_public_vnc_url()
+
+    # then
     assert url == "https://abc.ngrok.app/vnc.html?autoconnect=true"
 
 
 @pytest.mark.asyncio
 async def test_novnc_fetch_ngrok_url_falls_back_on_error():
+    # given
     strategy = NoVNCStrategy()
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
     mock_client.get = AsyncMock(side_effect=RuntimeError("nope"))
+
+    # when
     with (
         patch(
             "src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL",
@@ -150,10 +189,17 @@ async def test_novnc_fetch_ngrok_url_falls_back_on_error():
         patch("src.reader.strategies.novnc_strategy.httpx.AsyncClient", return_value=mock_client),
     ):
         url = await strategy._resolve_public_vnc_url()
+
+    # then
     assert url == "http://fallback/vnc.html?autoconnect=true"
 
 
 def test_novnc_extract_url_from_ngrok_empty_tunnels_uses_fallback():
+    # given
     strategy = NoVNCStrategy()
+
+    # when
     result = strategy._extract_url_from_ngrok_response({"tunnels": []}, "http://fallback")
+
+    # then
     assert result == "http://fallback/vnc.html?autoconnect=true"
