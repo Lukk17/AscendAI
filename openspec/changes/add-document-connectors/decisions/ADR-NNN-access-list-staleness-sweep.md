@@ -1,8 +1,8 @@
-# ADR-014: Access Lists Past a Maximum Age Are Emptied
+# ADR-NNN: Access Lists Past a Maximum Age Are Emptied
 
 ## Status
 
-Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. Superseded for the current scope by ADR-016, which keeps this record's instinct and drops its enforcement. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
+Deferred, 2026-09-05. Not implemented by the OpenSpec change `add-document-connectors`, and not accepted by it. Superseded for the current scope by the `sync-freshness-check-replaces-the-sweep` record, which keeps this record's instinct and drops its enforcement. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive with this status intact, taking the next free number at that time.
 
 ## Deferral, 2026-09-05
 
@@ -10,11 +10,11 @@ The sweep empties an access list to contain a stale authorization decision. Unde
 
 So the enforcement half is deferred, and the permissions-only trigger mode goes with it, because a permissions-only run would have nothing to confirm and nothing to write.
 
-The instinct is not deferred, and it is the part of this record worth arguing with rather than reading past. A control that keeps returning a plausible answer after it stopped being an answer is the worst failure shape available, and it has to be made visible by something that does not depend on the thing that failed. What can still fail silently in this version is the sync itself, so ADR-016 re-aims exactly that reasoning at the connector rather than at the access list, and makes the signal non-destructive because there is no enforcement left to trade availability for.
+The instinct is not deferred, and it is the part of this record worth arguing with rather than reading past. A control that keeps returning a plausible answer after it stopped being an answer is the worst failure shape available, and it has to be made visible by something that does not depend on the thing that failed. What can still fail silently in this version is the sync itself, so the `sync-freshness-check-replaces-the-sweep` record re-aims exactly that reasoning at the connector rather than at the access list, and makes the signal non-destructive because there is no enforcement left to trade availability for.
 
-Nothing below was found to be wrong. Two of its findings hold under ADR-016 and are inherited there rather than restated: that the control must not depend on the failed path, and that the maximum age sitting below the refresh interval is a misconfiguration which is silent right up until it fires on everything at once, and therefore has to be rejected at write time.
+Nothing below was found to be wrong. Two of its findings hold under the `sync-freshness-check-replaces-the-sweep` record and are inherited there rather than restated: that the control must not depend on the failed path, and that the maximum age sitting below the refresh interval is a misconfiguration which is silent right up until it fires on everything at once, and therefore has to be rejected at write time.
 
-What has to happen for this record to become active: per-document access lists that a source can change, which means ADR-010 becoming active. At that point the sweep returns alongside ADR-016's check rather than instead of it, because they detect two different outages.
+What has to happen for this record to become active: per-document access lists that a source can change, which means the `effective-permissions-not-change-feed` record becoming active. At that point the sweep returns alongside the `sync-freshness-check-replaces-the-sweep` record's check rather than instead of it, because they detect two different outages.
 
 ## Context
 
@@ -28,7 +28,7 @@ Something has to make that state visible, and it has to do so without depending 
 
 ## Decision
 
-A scheduled sweep finds items whose access list has not been confirmed within a configured maximum age and empties the `acl` on those items' chunks, through the payload-only path from ADR-013, recording each as an outcome under a run with trigger type `PERMISSION_SWEEP`.
+A scheduled sweep finds items whose access list has not been confirmed within a configured maximum age and empties the `acl` on those items' chunks, through the payload-only path from the `payload-only-update-carve-out` record, recording each as an outcome under a run with trigger type `PERMISSION_SWEEP`.
 
 Under the deny-by-default rule in ADR-M006, an emptied list makes the document invisible immediately.
 
@@ -65,6 +65,6 @@ It also gives the outage a defined end state rather than an indefinite drift. Wi
 
 - ADR-M004 for the `acl_synced_at` field and the staleness this backstops
 - ADR-M006 (`docs/architecture/decisions/ADR-M006-deny-by-default-on-missing-acl.md`) for why an empty list means invisible
-- ADR-013, whose payload-only path the sweep uses
-- ADR-010, for the confirmation interval the maximum age must exceed
+- the `payload-only-update-carve-out` record, whose payload-only path the sweep uses
+- the `effective-permissions-not-change-feed` record, for the confirmation interval the maximum age must exceed
 - Design decision D14

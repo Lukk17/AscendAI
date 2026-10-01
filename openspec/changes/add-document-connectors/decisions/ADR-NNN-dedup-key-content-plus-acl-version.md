@@ -1,4 +1,4 @@
-# ADR-012: The Deduplication Key Pairs Content Version With Access-List Version
+# ADR-NNN: The Deduplication Key Pairs Content Version With Access-List Version
 
 ## Status
 
@@ -12,7 +12,7 @@ Nothing below was found to be wrong. Two of its findings survive the deferral an
 
 The paragraph in the Context section about the current spec writing the content-only bug into a requirement no longer applies as written. The scenario it named asserted that an unchanged file re-landed is a no-op, which under a captured list would have prescribed the bug and which under a company-wide list is simply correct. It becomes a defect again the day capture returns, which is why the paragraph stays.
 
-What has to happen for this record to become active: an access list whose value can differ between two runs of one connector, which means ADR-010 becoming active.
+What has to happen for this record to become active: an access list whose value can differ between two runs of one connector, which means the `effective-permissions-not-change-feed` record becoming active.
 
 ## Context
 
@@ -38,7 +38,7 @@ The hash is taken over a canonical form: principals sorted lexicographically and
 
 Sorting is what makes the version mean "the effective permitted set changed" rather than "the source's response differed". Sources do not promise a stable order, so an unsorted hash would change on a response reordering, every reordering would present as a permission change, and every such change would trigger a payload write on a document nothing happened to. The counter that is supposed to say "permissions moved" would then say it constantly and stop being a signal.
 
-Sorting also makes two items sharing a permitted set share a version, which is what turns the container-level comparison in ADR-011 into a single equality instead of a set difference over two lists.
+Sorting also makes two items sharing a permitted set share a version, which is what turns the container-level comparison in the `container-first-permission-capture` record into a single equality instead of a set difference over two lists.
 
 ### Trade-offs
 
@@ -57,6 +57,6 @@ Sorting also makes two items sharing a permitted set share a version, which is w
 ## Related
 
 - `docs/architecture/permission-aware-retrieval.md`, "Failure mode one: the permission-only change"
-- ADR-013, for what happens on the runs this key stops skipping
-- ADR-011, which relies on a shared version being a single equality
+- the `payload-only-update-carve-out` record, for what happens on the runs this key stops skipping
+- the `container-first-permission-capture` record, which relies on a shared version being a single equality
 - Design decision D10

@@ -1,4 +1,4 @@
-# ADR-010: Access-List Capture Reads Effective Permissions, Not the Change Feed
+# ADR-NNN: Access-List Capture Reads Effective Permissions, Not the Change Feed
 
 ## Status
 
@@ -42,10 +42,10 @@ Both failures share a shape. Nothing errors, no counter moves, no log line appea
 
 ### Trade-offs
 
-- Capture costs requests the content sync would not have made, against the same per-tenant throttling budget. ADR-011 exists to make that cost survivable, and the two decisions only work together.
+- Capture costs requests the content sync would not have made, against the same per-tenant throttling budget. The `container-first-permission-capture` record exists to make that cost survivable, and the two decisions only work together.
 - The revocation latency a customer is told is now the permission confirmation interval, not the content sync interval. Those are different numbers and the confirmation one is the honest answer.
 - The sync cursor grows a second dimension, and a run can now succeed on content and fail on permissions. That is a real increase in the number of states an operator has to understand, and it is the price of the two being genuinely independent.
-- `acl_synced_at` now means what ADR-M004 says it means, when the list was last confirmed rather than when it last changed, which is what makes the staleness sweep in ADR-014 measurable at all.
+- `acl_synced_at` now means what ADR-M004 says it means, when the list was last confirmed rather than when it last changed, which is what makes the staleness sweep in the `access-list-staleness-sweep` record measurable at all.
 
 ### Alternatives considered
 
@@ -58,4 +58,4 @@ Both failures share a shape. Nothing errors, no counter moves, no log line appea
 - ADR-M004 (`docs/architecture/decisions/ADR-M004-acl-mirroring-onto-chunks.md`) for why the list is mirrored at all
 - `docs/architecture/permission-aware-retrieval.md`, "Failure mode one: the permission-only change"
 - Design decision D8, and D12 for the cursor state this requires
-- ADR-011, which makes the request cost of this decision affordable
+- the `container-first-permission-capture` record, which makes the request cost of this decision affordable

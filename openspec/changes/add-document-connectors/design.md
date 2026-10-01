@@ -124,7 +124,7 @@ SharePoint is the first connector. Google Drive, Confluence, and network shares 
 
 The reasoning that put SharePoint first is that the customers this is being built for are on Microsoft, and it is unaffected by the scope cut.
 
-The counter-argument this decision used to weigh against, that Google Drive is cheaper to make permission-correct because its change feed returns permissions inline while Graph needs a separate request per item, is dormant rather than resolved. Under this scope neither connector reads permissions, so the two are equally cheap and the ordering question has one input rather than two. The argument returns intact the day capture returns, and it is recorded in ADR-015 and in Deferred D9 rather than in this decision, so that a future reader re-opening the ordering finds the analysis rather than rediscovering it.
+The counter-argument this decision used to weigh against, that Google Drive is cheaper to make permission-correct because its change feed returns permissions inline while Graph needs a separate request per item, is dormant rather than resolved. Under this scope neither connector reads permissions, so the two are equally cheap and the ordering question has one input rather than two. The argument returns intact the day capture returns, and it is recorded in the `sharepoint-first-despite-google-being-cheaper` record and in Deferred D9 rather than in this decision, so that a future reader re-opening the ordering finds the analysis rather than rediscovering it.
 
 ### D18: A connector-synced document is visible company-wide, and the connector composes no list itself
 
@@ -159,9 +159,9 @@ The freshness check, then:
 
 The configuration invariant survives with a new pair of values. A connector's maximum sync age has to be greater than the interval its cron schedule fires on, or a healthy connector marks itself stale on its first check. The framework rejects that configuration at write time rather than discovering it at check time, because that particular misconfiguration is silent until every connector reads stale at once.
 
-What this is not: it is not the alert ADR-014 rejects. An alert was rejected there because a notification is not an enforcement while the system is actively serving stale authorization decisions. Nothing here is serving an authorization decision, so a signal is the proportionate control and enforcement is not available to be traded away. The destructive form returns with capture, and ADR-014 says so on its own status line.
+What this is not: it is not the alert the `access-list-staleness-sweep` record rejects. An alert was rejected there because a notification is not an enforcement while the system is actively serving stale authorization decisions. Nothing here is serving an authorization decision, so a signal is the proportionate control and enforcement is not available to be traded away. The destructive form returns with capture, and the `access-list-staleness-sweep` record says so on its own status line.
 
-ADR-016 records this decision, including why it does not contradict ADR-014's rejection of alerting and what it inherits from it. ADR-014 is deferred rather than withdrawn, and the two detect different outages once both exist.
+The `sync-freshness-check-replaces-the-sweep` record records this decision, including why it does not contradict the `access-list-staleness-sweep` record's rejection of alerting and what it inherits from it. The `access-list-staleness-sweep` record is deferred rather than withdrawn, and the two detect different outages once both exist.
 
 ## Named limitation: connector-synced documents are company-visible in this version
 
@@ -284,7 +284,7 @@ Spring AI's `VectorStore` abstraction cannot express this. It offers `add` and `
 
 The update carries the same tenant predicate every other Qdrant operation carries, so it can never reach across tenants, and it names the four access-list keys explicitly rather than replacing the payload, so it cannot drop `source`, `type`, `title`, or `tenant_id` by omission.
 
-Under the current scope only two of these four branches are reachable, because the access-list version of a connector-landed document never changes, and the two that remain are the ones the existing content-only dedup already implements. The carve-out to the no-direct-vector-store-writes rule is therefore not taken in this version, and D1 states the rule without an exception. The carve-out returns with the branch, and ADR-013 records it as deferred rather than as withdrawn, so a future reader finds a reviewed exception rather than an invitation to invent one.
+Under the current scope only two of these four branches are reachable, because the access-list version of a connector-landed document never changes, and the two that remain are the ones the existing content-only dedup already implements. The carve-out to the no-direct-vector-store-writes rule is therefore not taken in this version, and D1 states the rule without an exception. The carve-out returns with the branch, and the `payload-only-update-carve-out` record records it as deferred rather than as withdrawn, so a future reader finds a reviewed exception rather than an invitation to invent one.
 
 ### Deferred D12: The `PERMISSIONS_UPDATED` outcome, and permission confirmation state on the cursor
 
@@ -365,7 +365,7 @@ Whether an item granted directly to individual people, with no group entry at al
 - [Secret leakage via logs or API echoes]: write-only credential fields, reference-only persistence, explicit test asserting no credential material appears in logs at any level during a sync (including failure paths).
 - [The connector endpoints are reachable by any authenticated caller, because `add-auth-and-identity`'s filter-chain matrix leaves every path it does not name at merely authenticated and the administrative prefix rule it used to carry was removed with the identity-link endpoints]: this change adds its own filter-chain rule for `/api/v1/connectors/**` requiring `ADMIN`, in `SecurityConfig` where the sibling keeps the single visible source of truth, with a test asserting 401 unauthenticated and 403 for `USER` on every endpoint including the sync trigger. A connector row holds a customer's Graph credentials reference and its scope, so an authenticated non-administrator reaching that surface is a credential-adjacent exposure and not only a tidiness question.
 - [Sibling-change coupling, this change cannot ship before its four dependencies]: declared up front, and the framework compiles against interfaces those changes define, and `tasks.md` states which tasks are blocked and by what.
-- [A future reader takes the absence of capture code for a decision that per-document permissions do not matter]: the Named limitation section, the Deferred section, and the deferral notes on ADR-010 through ADR-014 all say the opposite, in the change and in the records that outlive it.
+- [A future reader takes the absence of capture code for a decision that per-document permissions do not matter]: the Named limitation section, the Deferred section, and the deferral notes on the `effective-permissions-not-change-feed` record through the `access-list-staleness-sweep` record all say the opposite, in the change and in the records that outlive it.
 
 ## Migration Plan
 
@@ -381,10 +381,10 @@ Whether an item granted directly to individual people, with no group entry at al
 1. Settled 2026-10-01: sync-run history is capped at the last 50 runs per connector, pruned on run insert.
 2. Settled 2026-10-01: the orchestrator depends on an injectable `TenantPrefixResolver` interface. add-tenant-isolation provides the implementation. Until then a test double supplies it.
 3. Settled 2026-10-01: the default maximum sync age is 3 times the interval of the default cron schedule, computed at startup from that schedule, and stated in `docs/CONNECTORS.md`.
-4. Whether the Google Drive change feed's inline permissions hold under the partial-response field selection a connector would actually use. The Drive change resource carries the File resource and the File resource carries a permissions array, which is the basis for ADR-015, but that was not confirmed against the `changes.list` reference itself. It needs verifying before a Google Drive connector is planned, and it is dormant rather than urgent under the current scope, since neither connector reads permissions here.
+4. Whether the Google Drive change feed's inline permissions hold under the partial-response field selection a connector would actually use. The Drive change resource carries the File resource and the File resource carries a permissions array, which is the basis for the `sharepoint-first-despite-google-being-cheaper` record, but that was not confirmed against the `changes.list` reference itself. It needs verifying before a Google Drive connector is planned, and it is dormant rather than urgent under the current scope, since neither connector reads permissions here.
 
 Three further open questions belong to capture and are parked in the Deferred section rather than left here, since none of them can arise in this version.
 
 ## Decision Records
 
-Decisions this change makes that go beyond the monorepo records ADR-M004 through ADR-M009 are written up under `decisions/`. See `decisions/README.md` for the index, for which records are deferred under the current scope, and for where those files land when the change is archived.
+Decisions this change makes that go beyond the monorepo records ADR-M004 through ADR-M009 are written up under `decisions/`. These drafts carry no number yet (`ADR-NNN-<slug>.md`) and each takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` at implementation time. See `decisions/README.md` for the index, for which records are deferred under the current scope, and for where those files land when the change is archived.

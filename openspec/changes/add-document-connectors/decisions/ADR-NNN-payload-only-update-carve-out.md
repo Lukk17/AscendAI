@@ -1,4 +1,4 @@
-# ADR-013: A Permission-Only Change Takes a Payload-Only Write, Carved Out of the No-Direct-Writes Rule
+# ADR-NNN: A Permission-Only Change Takes a Payload-Only Write, Carved Out of the No-Direct-Writes Rule
 
 ## Status
 
@@ -12,13 +12,13 @@ This is a deferral and not a withdrawal, and the distinction matters more here t
 
 Nothing below was found to be wrong. The observable that proves no re-embed happened, unchanged point identifiers, is the one an implementation cannot fake, and it is asserted in this version too, on the re-enumeration path where an unchanged file must keep its points.
 
-What has to happen for this record to become active: a permission-only change has to be possible, which means ADR-010 and ADR-012 becoming active.
+What has to happen for this record to become active: a permission-only change has to be possible, which means the `effective-permissions-not-change-feed` record and the `dedup-key-content-plus-acl-version` record becoming active.
 
 ## Context
 
 The connector framework states a firm rule: a connector lands bytes and triggers the existing pipeline, and it never writes to the vector store directly. The rule earns its place. One write path means one set of parser bugs, one dedup semantics, one metrics surface, and no way for a connector to produce chunks the ingestion pipeline never saw.
 
-ADR-012 makes permission-only changes visible to that pipeline. What the pipeline then does with one is the problem.
+The `dedup-key-content-plus-acl-version` record makes permission-only changes visible to that pipeline. What the pipeline then does with one is the problem.
 
 The pipeline's only tool for changing a chunk is to re-index the document: re-parse, re-chunk, re-embed, replace. For a 200-chunk document whose sharing changed and whose text did not, that is 200 embedding calls to rewrite one keyword array. It costs money for a change that produced no new meaning, and it costs time: a revocation that should land in seconds instead takes as long as re-embedding the document, and for that whole window the revoked group can still retrieve it. The slowest possible response to a revocation is the one the architecture would force.
 
@@ -59,6 +59,6 @@ Naming the keys explicitly rather than replacing the payload also closes a speci
 ## Related
 
 - ADR-M005 (`docs/architecture/decisions/ADR-M005-pre-filter-in-vector-search.md`) for why the list has to be in the payload
-- ADR-012, which makes these runs happen at all
-- ADR-011, for the container revocation that fans out into many of these updates
+- the `dedup-key-content-plus-acl-version` record, which makes these runs happen at all
+- the `container-first-permission-capture` record, for the container revocation that fans out into many of these updates
 - Design decisions D11 and D1

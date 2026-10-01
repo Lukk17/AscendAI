@@ -1,4 +1,4 @@
-# ADR-015: SharePoint Stays First, Although Google Drive Is Cheaper To Make Permission-Correct
+# ADR-NNN: SharePoint Stays First, Although Google Drive Is Cheaper To Make Permission-Correct
 
 ## Status
 
@@ -12,7 +12,7 @@ What changed is the counter-argument's status. Access-list capture is deferred u
 
 The comparison is not withdrawn, and it is the whole point of keeping this record. It becomes live again the day capture returns, and it will argue then exactly what it argues now. A future reader re-opening the ordering should find this analysis rather than rediscover it, and should not read the deferral as evidence that the difference between the two sources was overstated.
 
-One consequence of the amendment is worth naming, because it is the opposite of the trade-off recorded below. The complexity this record apologises for, ADR-011 and the separate permission budget existing to serve a constraint the second connector will not have, is not being paid in this version at all. It is deferred with the capture work. So the first connector is no longer the expensive one, and the argument that the harder capture path should shape the abstraction is an argument about a future version rather than about the code this change ships.
+One consequence of the amendment is worth naming, because it is the opposite of the trade-off recorded below. The complexity this record apologises for, the `container-first-permission-capture` record and the separate permission budget existing to serve a constraint the second connector will not have, is not being paid in this version at all. It is deferred with the capture work. So the first connector is no longer the expensive one, and the argument that the harder capture path should shape the abstraction is an argument about a future version rather than about the code this change ships.
 
 ## Context
 
@@ -22,7 +22,7 @@ Google Drive's change feed returns each changed file as a File resource, and tha
 
 Microsoft Graph's drive delta returns item metadata without permissions. The permission collection is a separate request per item.
 
-That difference is not a detail. It is the entire reason ADR-011 exists: the container-first inheritance scheme, the per-item confirmation schedule, the separate permission throttling budget, and the inheritance table are all machinery for making per-item permission requests affordable. A Google Drive connector would need very little of it, because the expensive thing it avoids is not expensive there.
+That difference is not a detail. It is the entire reason the `container-first-permission-capture` record exists: the container-first inheritance scheme, the per-item confirmation schedule, the separate permission throttling budget, and the inheritance table are all machinery for making per-item permission requests affordable. A Google Drive connector would need very little of it, because the expensive thing it avoids is not expensive there.
 
 So on permission correctness alone, the ordering that was settled on other grounds is the wrong way round, and that deserves to be written down rather than left as something a future reader rediscovers and quietly reverses.
 
@@ -41,7 +41,7 @@ The harder capture path is also the one that should shape the abstraction. An `A
 ### Trade-offs
 
 - The first connector is the one where getting permissions right is the most work, so it is the one most likely to ship late. Accepted knowingly rather than discovered later.
-- A meaningful share of this change's complexity, specifically ADR-011 and the permission throttling budget, exists to serve a constraint the second connector will not have. That machinery is not wasted, but it is not amortised either, and a reader comparing the two implementations will find the Google one much smaller and should not read that as the SharePoint one being over-built.
+- A meaningful share of this change's complexity, specifically the `container-first-permission-capture` record and the permission throttling budget, exists to serve a constraint the second connector will not have. That machinery is not wasted, but it is not amortised either, and a reader comparing the two implementations will find the Google one much smaller and should not read that as the SharePoint one being over-built.
 - Deferring Google Drive defers the cheapest possible validation of the capture abstraction against a second source, so the abstraction's generality stays unproven until then.
 
 ### Alternatives considered
@@ -52,6 +52,6 @@ The harder capture path is also the one that should shape the abstraction. An `A
 
 ## Related
 
-- ADR-011, which exists because of the difference this record describes
+- the `container-first-permission-capture` record, which exists because of the difference this record describes
 - Design decision D17
 - `add-document-connectors` design, Open Question 6, which flags that the Google Drive inline-permissions claim underpinning this record was not verified against the `changes.list` reference and must be before a Google connector is planned
