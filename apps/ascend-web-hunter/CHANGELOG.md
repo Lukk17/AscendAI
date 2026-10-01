@@ -9,6 +9,16 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
+## [0.0.6] - 2026-10-01
+
+### Fixed
+- Dashes in comments, docstrings, test assertion messages, documentation, the architecture decisions, the
+  agent skill file, the end-to-end specs, templates and harness, the pyproject.toml lint comments and the
+  standalone deployment's .env.example are plain hyphens or commas now. No service code, configuration
+  value or log message changed.
+- The end-to-end README points at this module's own entry under the service suites of
+  docs/E2E_RUN_SCENARIOS.md.
+
 ## [0.0.5]
 
 ### Changed

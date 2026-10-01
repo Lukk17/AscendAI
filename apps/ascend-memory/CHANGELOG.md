@@ -8,6 +8,30 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.1.3] - 2026-10-01
+
+### Changed
+- OpenTelemetry goes from 1.42.1 to 1.44.0 (opentelemetry-api, opentelemetry-sdk,
+  opentelemetry-exporter-otlp) and opentelemetry-instrumentation-fastapi from 0.63b1 to 0.65b0.
+- httpx2 2.13.1 joins the development extras, because Starlette's test client, which the readiness tests
+  use, now asks for httpx2 instead of httpx.
+- The source is reformatted with ruff format at the configured 110 character line length. No behaviour
+  changes.
+- The test suite carries type annotations on its fixtures and tests, and patches mem0 and httpx directly
+  instead of through the names the service modules import.
+
+### Fixed
+- The end-to-end prerequisites said the embedding backend could be LM Studio or OpenAI. Every insert and
+  search request in the suite pins provider=openai, so the list now requires OpenAI and OPENAI_API_KEY on
+  the container and says LM Studio is not needed.
+- AGENTS.md gained the Linux and macOS commands beside the Windows ones, and the README gained a step that
+  runs the tests with the 100 percent branch coverage gate.
+- The install commands quote ".[dev]", because zsh reads an unquoted [dev] as a glob.
+- Dashes in comments, docstrings, documentation, the Dockerfile, the agent skill file and the end-to-end
+  specs are plain hyphens or commas now.
+- The end-to-end README points at this module's own entry under the service suites of
+  docs/E2E_RUN_SCENARIOS.md.
+
 ## [0.1.2]
 
 ### Fixed

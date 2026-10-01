@@ -8,6 +8,19 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `build.gradle.kts` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.0.4] - 2026-10-01
+
+### Fixed
+- The descriptions of weather_forecast, weather_air_quality and weather_geocode, which every MCP client
+  shows to its model, used en dashes in their ranges (1-16 days, 1-10 candidates) and an em dash in the
+  air quality text. They use plain hyphens now. Only the punctuation changed.
+- AGENTS.md named Spring Boot 3.5.4. The build uses 3.5.14, and the text says so now.
+- Dashes in comments, test comments, documentation and the end-to-end specs and templates are plain
+  hyphens or commas now. End-to-end spec 7 writes the US longitude band as between -95.0 and -75.0, where
+  the dash read as a minus sign.
+- The end-to-end README points at this module's own entry under the service suites of
+  docs/E2E_RUN_SCENARIOS.md.
+
 ## [0.0.3]
 
 ### Fixed
