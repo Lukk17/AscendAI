@@ -1,38 +1,40 @@
-# Tasks - update-docs-and-architecture
+# Tasks - Update Docs and Architecture
 
-## 1. Monorepo architecture and ADRs
+Build order: last, after `add-customer-stack-installer`. Load the skills in the proposal's Relevant Skills section first. Follow the documentation standard in the owner's global rules: plain words, no em or en dashes, one command per code block.
 
-- [ ] 1.1 Update `docs/architecture/` arc42 sections for the end-state topology (gateway-only public surface, Keycloak, tenant boundary across every data plane, connector/crawl paths, metering/audit cross-cuts)
-- [ ] 1.2 Refresh the C4 diagrams (context + container) as Mermaid to show the gateway, Keycloak, and the tenant boundary
-- [ ] 1.3 Add/refresh ADRs for the load-bearing decisions: gateway-only surface, presign resolution to the agent content endpoint, tenant model, tenant administration, per-tenant policy, scraper tier-ladder restructure
-- [ ] 1.4 Verify each diagram against the shipped compose topology and endpoint set
+## 0. Scope
 
-## 2. ascend-ai-agent internal architecture
+- [ ] 0.1 Run `openspec list` and list `openspec/changes/archive/`, and update the "Changes it consolidates" list in `openspec/changes/update-docs-and-architecture/proposal.md` to what exists. Acceptance: every change named there exists either as an active folder or in the archive, and each active one is marked shipped or pending.
 
-- [ ] 2.1 Update `apps/ascend-agent/docs/architecture/` component diagrams and internal arc42 for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management, connector)
-- [ ] 2.2 Update the module-level ADR index
+## 1. Monorepo architecture and decision records
 
-## 3. Cross-cutting request-path diagrams
+- [ ] 1.1 Update the five files in `docs/architecture/arc42/` for the end state: gateway as the only public surface, Keycloak on its own host address, tenant boundary on RAG, storage, chat history and memory, connector and crawl paths, OCR job API with its result store, observability services, metering and audit. Acceptance: each file names only services that appear in `docker compose config --services` or in the data-store prerequisites.
+- [ ] 1.2 Update `docs/architecture/diagrams/system-overview.md` (container view, design D2) and `docs/architecture/diagrams/prompt-flow.md` (authenticated streamed chat turn), and add `docs/architecture/diagrams/document-ingestion-flow.md`. All three in Mermaid. Acceptance: each diagram renders in the Mermaid live editor without error, and every service box matches a compose service name or a named external prerequisite.
+- [ ] 1.3 Add monorepo decision records from `ADR-M011` onward in `docs/architecture/decisions/` for: gateway-only public surface, private object store with downloads through the agent content endpoint, tenant model, tenant administration, per-tenant policy, web search tier ladder, and every other load-bearing decision a consolidated change recorded only in its own design. Use `/architecture-decision-records`. Acceptance: `docs/architecture/decisions/README.md` lists every file in the folder.
+- [ ] 1.4 Update `docs/architecture/README.md` to link every arc42 file, diagram and decision record. Acceptance: a link check over the file finds no broken link.
 
-- [ ] 3.1 Add/refresh a Mermaid diagram for an authenticated streamed chat turn with RAG source attachments served via the content endpoint
-- [ ] 3.2 Add/refresh a Mermaid diagram for a document flowing through ingestion/connector into tenant RAG
+## 2. Agent internal architecture
 
-## 4. READMEs and documentation map
+- [ ] 2.1 Update the twelve files in `apps/ascend-agent/docs/architecture/arc42/` and the four diagrams in `apps/ascend-agent/docs/architecture/diagrams/` for the new packages (auth, tenant, admin, policy, usage, audit, erasure, export, streaming, document management, connectors, citations). Acceptance: every package named in `component-diagram.md` exists under `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/`.
+- [ ] 2.2 Update `apps/ascend-agent/docs/architecture/decisions/README.md` (or the index in `09-architecture-decisions.md`) to list every agent decision record. Acceptance: every `ADR-*.md` file in that folder is listed.
 
-- [ ] 4.1 Bring the root `README.md` into line with the documentation standard: quick-start including auth, honest alternatives comparison, configuration/ports reflecting the gateway and loopback bindings, counts in badges
-- [ ] 4.2 Update each module `README.md` for its end-state surface
-- [ ] 4.3 Complete the documentation map linking every shipped doc (`SECURITY.md`, `COMPLIANCE.md`, `CONNECTORS.md`, `USAGE_AND_QUOTAS.md`, `DEPLOYMENT.md`, `MCP_SETUP.md`, `deploy/README.md`); verify every link resolves
+## 3. READMEs and documentation map
 
-## 5. AGENTS.md reconciliation
+- [ ] 3.1 Bring the root `README.md` in line with the documentation standard: title and badges, quick start that includes signing in, architecture diagram, request-path diagram, features, honest comparison, configuration and ports (gateway on 80 and 443, loopback-bound service ports, Keycloak host port), documentation map, license. Acceptance: no service, endpoint or capability count appears in prose (`grep -nE '[0-9]+ (services|endpoints|capabilities)' README.md` finds nothing).
+- [ ] 3.2 Update each module README (`apps/*/README.md`, `apps/ascend-web-hunter/deploy-standalone/README.md`, and the Flutter app README) for its end-state surface. Acceptance: every port and endpoint in each README matches that module's `AGENTS.md`.
+- [ ] 3.3 Complete the documentation map in the root README: every `.md` file in `docs/` and `docs/architecture/`, every module README and `AGENTS.md`, `deploy/README.md`, and the topic documents the consolidated changes added. Acceptance: every link resolves, checked with a link checker run over `README.md`, and every `docs/*.md` file appears in the map.
 
-- [ ] 5.1 Reconcile root and per-module `AGENTS.md` with the shipped endpoints, roles, ports, compose services, and capability matrix
+## 4. `AGENTS.md` reconciliation
 
-## 6. API surface docs
+- [ ] 4.1 Reconcile the root `AGENTS.md` and each `apps/*/AGENTS.md` with the shipped endpoints, roles, ports, compose services and capability matrix. Acceptance: the compose service tables list exactly the services of `docker compose config --services`, and the port table matches `docker compose config` port bindings.
 
-- [ ] 6.1 Ensure the OpenAPI specification covers the full end-state endpoint set (auth token flow, conversations, documents + content download, ingestion runs, usage, audit, erasure/export, admin tenant/user/policy, connectors, crawl)
-- [ ] 6.2 Ensure the Bruno collection under `docs/api/request/AscendAI/` exercises every shipped endpoint
-- [ ] 6.3 Verify: README quick-start works against a freshly installed stack; the Bruno collection runs green end-to-end
+## 5. API surface
 
-## 7. Pending-aware pass
+- [ ] 5.1 Add an `openApi { }` block to `apps/ascend-agent/build.gradle.kts` for the already applied springdoc Gradle plugin (design D5), writing `openapi.json` to the repository's `docs/api/` folder, and generate it. Acceptance: `./gradlew generateOpenApiDocs` in `apps/ascend-agent` writes `docs/api/openapi.json`, and the file is valid OpenAPI 3 (it parses as JSON and its `openapi` field starts with `3.`).
+- [ ] 5.2 Confirm `docs/api/openapi.json` contains every shipped endpoint group: token-protected prompt and stream, conversations, documents and content download, ingestion runs, usage, audit, erasure and export, admin tenants, users and policy, connectors, crawl. Acceptance: a `jq '.paths | keys'` listing contains a path for each group, or the group is marked pending per task 6.1.
+- [ ] 5.3 Make the Bruno collection under `docs/api/request/AscendAI/` contain a request for every path in `docs/api/openapi.json`. Acceptance: a comparison of the path list with the `.yml` request files finds no path without a request.
+- [ ] 5.4 Verify the README quick start against a freshly installed stack and run the Bruno collection. Ask the owner which run scenario from `docs/E2E_RUN_SCENARIOS.md` to use before running any e2e spec. Acceptance: the quick start works step by step and the chosen run is green.
 
-- [ ] 7.1 For any dependency not yet shipped, document what exists and mark the rest pending - never describe unshipped behavior as shipped
+## 6. Pending-aware pass
+
+- [ ] 6.1 For every consolidated change not yet shipped, mark the documented feature "Pending: <change name>" and describe only what exists. Acceptance: `grep -rn 'Pending:' docs README.md apps/*/README.md` lists exactly the pending changes from task 0.1.
