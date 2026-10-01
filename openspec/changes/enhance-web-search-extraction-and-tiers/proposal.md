@@ -1,46 +1,73 @@
 ## Why
 
-`enhance-web-search-scraping` (already implemented) gave ascend-web-hunter coherent browser fingerprints, session replay across tiers, trafilatura structured output with a readability-lxml fallback, an optional proxy seam, read caching, per-domain metrics, and circuit breakers. That closed the "can it log in and render" gap. It did not make extraction best-in-class, and it left the tier ladder on FlareSolverr - a barely-maintained Cloudflare-bypass proxy whose detection rate keeps climbing and which is the weakest rung.
+ascend-web-hunter returns one main-content blob from trafilatura, with a readability-lxml recall pass when trafilatura
+returns thin content (ADR-009), and an optional `structured` format with title, author, date and site name (ADR-007).
+It ignores the structured data most commercial pages already carry (JSON-LD, OpenGraph, microdata), it cannot return
+fields a caller asks for by schema, and it ignores linked PDFs, images and audio even though the platform already runs
+docling-serve, ascend-ocr and ascend-audio-scribe.
 
-To compete with Firecrawl and Zyte on the two things buyers actually evaluate - extraction quality and unblocking reliability - two gaps remain. Extraction still returns one main-content blob: no embedded structured data (JSON-LD / OpenGraph / microdata), no scored choice between extractors, no schema-guided structured output, and no reuse of the platform's own document-understanding stack for linked PDFs and images. And the browser ladder is a single vanilla-Playwright tier behind FlareSolverr, with no memory of what worked per domain.
-
-This change is scoped strictly to that delta. It does not redo anything `enhance-web-search-scraping` already ships.
+The folder name is historical. On 2026-10-01 the owner split the original change in two: the tier work moved to
+`enhance-web-search-tier-ladder`, and this folder now holds only structured extraction.
 
 ## What Changes
 
-- **Tier ladder restructure (retire FlareSolverr):** the ladder becomes curl_cffi → Patchright (patched Chromium, a drop-in replacement for the current Playwright tier) → Camoufox (hardened Firefox, tried automatically when Patchright is detected or fails) → NoVNC human. FlareSolverr is removed; the patched browsers subsume its Cloudflare-challenge job and render the page in one step. Both Patchright and Camoufox are free and self-hosted; no external paid dependency.
-- **Per-domain tier memory with decay:** record the cheapest tier that last succeeded per registrable domain in Redis and start there next time, decaying back toward curl_cffi over time so a one-off block does not pin a domain to an expensive tier forever.
-- **Local CAPTCHA solver rung:** a free, self-hosted open-source solver for the common CAPTCHA types is tried before escalating to the existing NoVNC human tier. No paid CAPTCHA-solving API is used (sovereignty: nothing leaves the deployment to a solving farm).
-- **Embedded structured data first:** parse JSON-LD, OpenGraph, and microdata before any heuristic or model runs, and return it alongside the text - free, deterministic structure present on most commercial pages.
-- **Scored ensemble extraction:** run trafilatura and the readability extractor over the same DOM, score both (text vs link density, boilerplate ratio) and keep the winner, instead of trafilatura-primary-with-fallback.
-- **Schema-guided extraction endpoint:** a read mode where the caller supplies a JSON schema and gets back validated JSON, produced by an LLM call to a configurable OpenAI-compatible endpoint (which can be a local model, ascend-ai-agent's provider proxy, or a cloud provider) so the extraction can run fully on-premises.
-- **Self-healing domain recipes:** on the first schema extraction for a domain, persist the LLM-emitted CSS/XPath selectors as a recipe; subsequent extractions replay the cheap selectors and skip the model, regenerating the recipe on drift (empty or type-mismatched fields).
-- **Route non-HTML into the platform stack:** linked PDFs go to Docling, image-heavy pages/linked images to ascend-ocr, linked audio to ascend-audio-scribe - reusing services the platform already runs, which no standalone scraper ships with.
-- **Multi-format output:** add full-page screenshot and extracted-tables-as-rows to the existing output formats, selectable per request.
+- Embedded structured data: JSON-LD, OpenGraph and microdata are parsed and returned in a `metadata` object on the
+  `structured` format.
+- Scored ensemble: trafilatura and readability-lxml both run on every extraction and the higher scoring result wins.
+  This replaces the ADR-009 recall pass, which runs readability only when trafilatura is thin. ADR-009 is superseded.
+- Schema-guided extraction: `output_format` `schema` with an `extraction_schema` (JSON Schema) returns JSON validated
+  against it, produced by a configurable OpenAI-compatible endpoint, which can be a local model.
+- Self-healing recipes: the model also returns CSS selectors per field. They are stored per domain and schema hash
+  and replayed without the model. When a replay fails validation the recipe is rebuilt.
+- Non-HTML routing: a linked or directly read PDF goes to docling-serve (the `docling-serve` service in
+  `compose.yaml`, port 5001), an image goes to the ascend-ocr job API (`POST /v1/ocr/jobs` on port 7022, then
+  `GET /v1/ocr/jobs/{job_id}`), and audio goes to ascend-audio-scribe (`POST /api/v1/transcribe/local` on port
+  7017 with `stream=false`).
+- Two more output formats: `tables` (HTML tables as rows) and `screenshot` (full-page PNG, base64).
+- Security for page content sent to a model: content is passed as data never as instructions, capped in size, and
+  the answer is accepted only when it validates against the caller's schema.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `web-search-tier-ladder`: the restructured curl_cffi → Patchright → Camoufox → NoVNC ladder with FlareSolverr retired, per-domain tier memory with decay, and a local open-source CAPTCHA rung before human escalation.
-- `web-search-structured-extraction`: embedded structured-data parsing (JSON-LD / OpenGraph / microdata), scored ensemble main-content extraction, schema-guided LLM extraction returning validated JSON via a configurable endpoint, self-healing per-domain selector recipes, routing of linked PDFs/images/audio into Docling/apps/ascend-ocr/ascend-audio-scribe, and screenshot + table output formats.
+- `web-search-structured-extraction`: embedded structured data, schema-guided extraction, recipes, non-HTML routing,
+  the `tables` and `screenshot` formats, and the model-input safety rules.
 
 ### Modified Capabilities
 
-(none as spec deltas - `enhance-web-search-scraping`'s capabilities are not archived to `openspec/specs/`, so they cannot be modified here. This change is additive and names distinct new capabilities; where it supersedes a rung - FlareSolverr - the tasks call out the removal and the migration of session/cookie replay onto the patched-browser tiers.)
+- `web-search-extraction-quality`: "Readability fallback for thin extractions" is REMOVED (replaced by the ensemble),
+  and "Structured article extraction, selectable by the caller" is MODIFIED: `OutputFormat` grows from
+  `Literal["text", "structured"]` to `Literal["text", "structured", "schema", "tables", "screenshot"]`, and
+  `include_links` is accepted only with `text`.
+- `web-search-caching-observability`: "Read-result caching" is MODIFIED: the cache key adds the SHA-256 of the
+  canonical `extraction_schema`, and `screenshot` results are never cached.
+
+## Dependencies and Build Order
+
+Build order fixed by the owner on 2026-10-01: `open-several-novnc-windows-at-once`, then
+`detect-challenge-walls-in-any-language`, then `enhance-web-search-tier-ladder`, then this change, then
+`enhance-web-search-crawl-at-scale`. This change depends on `enhance-web-search-tier-ladder` only for the `screenshot`
+format, which needs a browser tier and is taken from whichever browser tier served the read. Everything else works on
+the HTML any tier returns. `enhance-web-search-crawl-at-scale` depends on this change for per-page extraction.
 
 ## Impact
 
-- **Depends on**: `enhance-web-search-scraping` (fingerprints, session replay, proxy seam, caching, per-domain metrics it builds on) - ideally archived first. The schema-extraction endpoint optionally integrates with ascend-ai-agent's provider router for tenant-policy-aware, local-capable extraction, but works standalone against any OpenAI-compatible endpoint.
-- **ascend-web-hunter (code)**: `pyproject.toml` adds `patchright` and `camoufox` (and a local CAPTCHA-solver library); `src/reader/strategies/` gains `patchright_strategy.py` and `camoufox_strategy.py`, removes `flaresolverr_strategy.py`; `src/reader/web_reader.py` orchestrator ladder and per-domain tier memory (Redis); `src/reader/` gains structured-data parsing, ensemble scoring, schema extraction + recipe store, and non-HTML routing clients (Docling/apps/ascend-ocr/ascend-audio-scribe); `src/api/rest` + `src/api/mcp` gain the schema-extraction mode and new output formats; `src/config/config.py` new settings.
-- **Config**: extraction LLM endpoint + model, recipe store TTL, tier-memory decay, CAPTCHA-solver toggle, non-HTML routing service URLs.
-- **Docs**: `apps/ascend-web-hunter/AGENTS.md` tier ladder and extraction modes; ADRs for the tier restructure and the self-healing recipe model.
-- **Tests**: ladder escalation Patchright→Camoufox; tier-memory start point and decay; JSON-LD/OG/microdata extraction; ensemble scoring picks the better extractor on a messy page; schema extraction returns schema-valid JSON; recipe replay then regenerate-on-drift; linked-PDF routed to Docling; screenshot and table outputs.
+- `apps/ascend-web-hunter/src/reader/extraction.py`: ensemble scoring, embedded data, tables.
+- `apps/ascend-web-hunter/src/reader/schema_extraction.py` and `src/reader/recipe_store.py`: new.
+- `apps/ascend-web-hunter/src/reader/document_router.py`: new, the three platform clients.
+- `apps/ascend-web-hunter/src/reader/web_reader.py`: `OutputFormat`, `_cache_key`, format dispatch.
+- `apps/ascend-web-hunter/src/api/rest/rest_endpoints.py` and `src/api/mcp/mcp_server.py`: the new fields and the
+  `include_links` rule.
+- `apps/ascend-web-hunter/src/config/config.py`: the settings in `design.md`.
+- `apps/ascend-web-hunter/pyproject.toml`: `extruct` (embedded data) and `jsonschema`, exact pins.
+- Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, ADR-016 (ensemble, superseding ADR-009), ADR-017 (schema
+  extraction, recipes and model-input safety), CHANGELOG with a bump to 0.0.9.
 
 ## Relevant Skills
 
 - `/python-patterns`
-- `/python-testing`
+- `/tdd-workflow`
 - `/api-design`
-- `/docker-patterns`
 - `/security-review`
+- `/architecture-decision-records`

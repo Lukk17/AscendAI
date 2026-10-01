@@ -34,11 +34,11 @@ change done.
 
 ## 3. The flow registry
 
-- [ ] 3.1 Promote `CookieManager._get_domain` to a module-level `registrable_domain(url)` in `cookie_manager.py`,
-      with the static method delegating to it, and replace the two `# noqa: SLF001` call sites for it in
-      `session_manager.py` and `rest_endpoints.py` with the public function. Verify the existing cookie manager
-      tests pass unchanged and add a test asserting the function and the method return the same value for a host
-      with a subdomain, a bare host, a host with a port and a malformed input.
+- [ ] 3.1 Key the registry on the existing public static method `CookieManager.registrable_domain(url)` in
+      `src/reader/cloudflare/cookie_manager.py`. Do not add a second implementation and do not add any
+      `# noqa: SLF001`. Verify with a test in `tests/reader/novnc/test_flow_registry.py` asserting that the flow key
+      for a host with a subdomain, a bare host, a host with a port and a malformed input equals
+      `CookieManager.registrable_domain(url)` plus the profile, and by grepping `src/` for `SLF001` with no new match.
 - [ ] 3.2 Create `src/reader/novnc/flow_registry.py` with `NoVNCFlow` and `NoVNCFlowRegistry` per `design.md`
       Decision 1, plus the module-level `novnc_flow_registry` instance. Verify with
       `tests/reader/novnc/test_flow_registry.py`: reserve takes the lowest free slot, reserve past the cap raises
@@ -161,18 +161,27 @@ change done.
       `docs/configuration.md`, with `NOVNC_MAX_CONCURRENT_FLOWS` documented as a memory constraint and not only a
       display one. Verify each of the ten names appears in all three files and that no stale reference to the
       single-flow behaviour remains, by grepping for "only one" and "one at a time" across the module's docs.
-- [ ] 10.2 Write `docs/architecture/decisions/ADR-009-concurrent-human-intervention-windows.md` in the existing
+- [ ] 10.2 Write `docs/architecture/decisions/ADR-013-concurrent-human-intervention-windows.md` in the existing
       ADR format: the concurrency model, the per-flow browser and ephemeral CDP port, the cascade layout, the join
       rule, and the widened unauthenticated VNC surface with the recommendation to set `VNC_PASSWORD`. Include the
       rejected alternatives from `design.md` Decisions 4 and 5 with their reasons. Verify the file follows the
-      structure of ADR-003 and ADR-008 and is added to the decisions `README.md` index.
+      structure of ADR-003 and ADR-008 and is added to the decisions `README.md` index. The ADR also states that the
+      new listing endpoint is read-only and unauthenticated, exactly like `vnc_url` in the 428 body, that it returns
+      no cookies, storage state or page content, and that it discloses only `vnc_url` values the 428 body already
+      returns. ADR-009 to ADR-012 already exist, so this record is ADR-013.
 - [ ] 10.3 Amend ADR-003 rather than superseding it: mark the single-flow paragraph and the
-      `--remote-debugging-port=9222` security bullet as superseded by ADR-009, with the date, and leave the rest of
+      `--remote-debugging-port=9222` security bullet as superseded by ADR-013, with the date, and leave the rest of
       the record intact. Verify ADR-003's status line and its other content are unchanged, and that the risk it
       recorded ("No cap on concurrent tasks exists today") now points at the setting that answers it.
 - [ ] 10.4 Add one evidence line to F22 in `docs/DEFECT_REGISTER.md` recording that the collision it names cannot
       recur under the per-flow model, naming this change and the regression test in task 9.1. Verify F22's status
       is not changed and no other row is touched.
+- [ ] 10.5 Bump `version` in `apps/ascend-web-hunter/pyproject.toml` from `0.0.6` to `0.0.7` and the version line in
+      `apps/ascend-web-hunter/AGENTS.md`, and add one `## [0.0.7]` entry at the top of
+      `apps/ascend-web-hunter/CHANGELOG.md` describing the concurrent intervention windows. This is the only version
+      bump for this change and for `detect-challenge-walls-in-any-language`, whose task 10.5 adds its lines to the
+      same entry and does not bump again. Verify `pyproject.toml` reads `0.0.7` and the CHANGELOG holds exactly one
+      `## [0.0.7]` heading.
 
 ## 11. End-to-end spec 7
 

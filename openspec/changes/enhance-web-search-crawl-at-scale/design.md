@@ -1,55 +1,90 @@
-# Design - enhance-web-search-crawl-at-scale
-
 ## Context
 
-ascend-web-hunter is a per-URL reader. The platform has a document-ingestion pipeline (MinIO → DocumentRouter → Qdrant) and, via `add-document-connectors`, a connector framework whose contract is "land bytes in MinIO under the tenant prefix, then trigger the existing ingestion." `enhance-web-search-extraction-and-tiers` provides best-in-class per-page extraction and a proxy seam already exists from `enhance-web-search-scraping`. What is missing is the layer that turns "read one URL" into "crawl a site and keep it fresh in RAG."
-
-## Goals / Non-Goals
-
-**Goals:**
-
-- An async crawl job API that mirrors the platform's async-run pattern and writes results to MinIO.
-- A polite, horizontally-scalable frontier honouring robots.txt, crawl-delay, and per-domain concurrency.
-- Incremental recrawl that makes re-crawling cheap.
-- An optional bring-your-own-proxy hook for scale, never a proxy we run.
-- A `web` connector that lands crawl output into tenant RAG through the existing framework.
-
-**Non-Goals:**
-
-- Building, running, or reselling proxies.
-- Per-URL result caching and change-monitoring (dropped by product decision).
-- Competing on proxy-network scale; the honest ceiling is hundreds of thousands of pages per job.
-- Any parallel parse path - the connector lands bytes and reuses the ingestion pipeline like every other connector.
+ascend-web-hunter reads one URL per request through its tier ladder, with an SSRF guard re-validated on every redirect
+hop and connect-time address pinning (ADR-012). ascend-ocr already ships a job API with polling and results in Floci
+(its ADR-008 and ADR-009). The crawl job API follows the same shape so callers learn one idiom.
 
 ## Decisions
 
-### D1 - Async crawl jobs, results to MinIO, mirroring the ingestion-run pattern
+### D1: Polling job API, no webhook
 
-A crawl request (seed URLs, include/exclude patterns, max depth, page budget, optional extraction schema) returns a job id immediately; status is polled; a terminal webhook is optional. Results are written to MinIO as markdown or NDJSON. This matches the async-run shape `add-document-management-api` uses, so operators and the eventual Flutter client see one consistent job idiom.
+Endpoints under `/api/v1/crawl`:
 
-### D2 - Redis frontier, horizontal workers, politeness first
+| Method | Path | Answer |
+| :-- | :-- | :-- |
+| POST | `/api/v1/crawl/jobs` | 202 with `job_id`, `state` `waiting`, `poll_after_seconds` |
+| GET | `/api/v1/crawl/jobs/{job_id}` | 200 with state, counts and result keys, 404 `JOB_NOT_FOUND` |
+| GET | `/api/v1/crawl/jobs` | 200 with the jobs still retained |
+| DELETE | `/api/v1/crawl/jobs/{job_id}` | 200 with state `cancelled`, 404 when unknown |
 
-The URL frontier lives in Redis: a per-domain queue with crawl-delay and a per-domain concurrency cap, seeded from sitemaps when present, honouring robots.txt (toggleable per job for internal sites the customer owns). Scale is adding ascend-web-hunter worker containers that consume the same frontier - no central coordinator beyond Redis. Politeness is a first-class default, not an afterthought, because an impolite crawler gets the deployment's IP banned.
+MCP tools: `crawl_submit`, `crawl_job_status`, `crawl_list_jobs`, `crawl_cancel_job`, same arguments and results.
+States: `waiting`, `running`, `succeeded`, `failed`, `cancelled`. A webhook was rejected for v1: it needs its own SSRF
+guard on an address the caller chooses, signing and retries, and polling covers every current caller.
 
-### D3 - Incremental recrawl via content hash + conditional requests
+### D2: Request schema
 
-Each fetched URL stores a content hash and the server's ETag / Last-Modified. A recrawl issues conditional requests; a 304 or an unchanged hash short-circuits before extraction and embedding. This makes "keep the knowledge base fresh" cheap enough to run often.
+```json
+{
+  "seeds": ["https://docs.example.com/"],
+  "include_patterns": ["/guide/*"],
+  "exclude_patterns": ["*/archive/*"],
+  "max_depth": 2,
+  "page_budget": 100,
+  "same_domain_only": true,
+  "respect_robots": true,
+  "output_format": "text",
+  "extraction_schema": null,
+  "profile": null
+}
+```
 
-### D4 - Bring-your-own-proxy hook, off by default
+- `seeds`: 1 to `CRAWL_MAX_SEEDS` (default 20) absolute `http` or `https` URLs.
+- `include_patterns` and `exclude_patterns`: up to 50 each, glob patterns matched with `fnmatch` against the URL path.
+  Globs, not regular expressions, so a caller cannot submit a pattern with catastrophic backtracking.
+- `max_depth`: 0 to `CRAWL_MAX_DEPTH` (default 5), default 2.
+- `page_budget`: 1 to `CRAWL_MAX_PAGES` (default 10000), default 100.
+- `same_domain_only`: default true, links outside the seeds' registrable domains are dropped.
+- `respect_robots`: default true. False is allowed only for a seed domain listed in `CRAWL_ROBOTS_OPT_OUT_DOMAINS`
+  (default empty), meaning a site the operator owns.
+- `output_format`, `extraction_schema`, `profile`: the same meaning and rules as on a single read.
 
-The proxy seam from `enhance-web-search-scraping` is extended with a config hook for customer-supplied proxy credentials, engaged only when a job's scale requires it. ascend-web-hunter never runs or resells proxies - this keeps the on-prem story clean and the abuse liability with the proxy vendor the customer chose. With no proxy configured, crawling works exactly as today, capped at lower volume.
+### D3: Results in Floci
 
-### D5 - The `web` connector plugs into the existing connector framework
+S3 client settings: `CRAWL_RESULT_S3_ENDPOINT` (default `http://localhost:9070`, Floci), `CRAWL_RESULT_S3_BUCKET`
+(default `web-hunter-crawls`), `CRAWL_RESULT_S3_PREFIX` (default `crawl-results/`), `CRAWL_RESULT_S3_ACCESS_KEY` and
+`CRAWL_RESULT_S3_SECRET_KEY`. Keys are `<prefix><job_id>/pages.ndjson` (one line per page: URL, status, content hash,
+fetched time, result key) and `<prefix><job_id>/pages/<sha256 of URL>.md` (or `.json` for `schema`). Job records and
+results expire after `CRAWL_JOB_RETENTION_SECONDS` (default 604800).
 
-The scrape-to-RAG capability is a `web` connector type in `add-document-connectors`, not a new pipeline. Its config is seed URLs / patterns / schedule; on each scheduled run it triggers an ascend-web-hunter crawl, lands the output in the tenant's MinIO prefix, and triggers the existing ingestion - the framework's land-bytes-then-ingest contract. Source-page deletion propagates through the framework's deletion path (owned by `add-document-management-api`). No parallel parse path, tenant isolation inherited from the framework.
+### D4: SSRF rules for crawl URLs
 
-## Risks / Trade-offs
+- Every seed is checked at submission with the same guard single reads use. A seed with a scheme other than `http` or
+  `https`, with userinfo, or resolving to a private, loopback, link-local or reserved address is refused with HTTP 400
+  `UNSAFE_URI` and the job is not created.
+- Every discovered link, every redirect hop, every robots.txt fetch and every sitemap fetch goes through the same
+  guard and connect-time pinning (ADR-012). A link that fails is dropped and counted as `skipped_unsafe`.
+- Links are taken only from `href` attributes and sitemap `loc` entries, never from scripts.
 
-- [Crawl scale claims overpromise] → the frontier targets the hundreds-of-thousands class; docs state this honestly rather than implying proxy-network scale.
-- [A crawl hammers a site and gets banned] → politeness (robots, crawl-delay, per-domain concurrency) is default-on; BYO-proxy spreads load only when the customer opts in.
-- [Connector crawl overlaps a manual crawl of the same site] → jobs are keyed by connector + scope; a run in progress blocks a duplicate, same as other connectors.
-- [Freshness vs cost] → incremental recrawl with conditional requests keeps repeat crawls cheap; schedule is per connector.
+### D5: Frontier and politeness
 
-## Open Questions
+Redis keys per job: a per-domain queue, a seen set of normalised URLs, and a per-domain in-flight counter. Defaults:
+`CRAWL_DOMAIN_CONCURRENCY` 2, `CRAWL_DEFAULT_DELAY_SECONDS` 1, robots.txt `Crawl-delay` used when larger. robots.txt
+is parsed with `protego`. Sitemaps from robots.txt seed the frontier. Each worker claims a URL atomically, so two
+workers never fetch the same URL. Politeness applies only inside crawl jobs. Single reads stay unthrottled.
 
-- None blocking. Exact frontier/robots library choices are validated in implementation; the job and connector contracts do not depend on them.
+### D6: Incremental recrawl
+
+Per normalised URL the store keeps the content hash, `ETag` and `Last-Modified` from the last job with the same seeds
+and patterns. A recrawl sends `If-None-Match` and `If-Modified-Since`. A 304 or an equal hash writes no new page file
+and marks the page `unchanged` in `pages.ndjson`.
+
+### D7: Customer proxy, crawl only
+
+`CRAWL_PROXY_URL` (default empty) routes crawl fetches through a proxy the customer supplies. Single reads keep using
+the existing `PROXY_*` seam. The project never runs or resells a proxy.
+
+## Risks
+
+- Scale claims: the honest ceiling is the hundreds-of-thousands-of-pages class per job across several workers, and
+  the docs say so.
+- A crawl getting the deployment's address blocked: politeness is on by default and the per-domain cap is low.

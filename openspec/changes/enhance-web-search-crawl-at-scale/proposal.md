@@ -1,42 +1,66 @@
 ## Why
 
-ascend-web-hunter reads one URL at a time. There is no way to crawl a whole site - a customer's documentation portal, an intranet, a knowledge base - into the RAG store, which is the single most valuable thing a scraper can do for this platform: point it at a site and get a continuously fresh, private knowledge base. No competitor offers scrape-to-RAG inside a sovereign, on-premises stack, and the machinery is a short step from the per-page reader plus the connector framework the platform already has.
-
-Crawling at volume also surfaces the one problem single-page reads never hit: IP bans. A site sees hundreds of requests from one address and blocks it. The answer is not to build or resell proxies (a legal and cost liability), but to add an optional hook where a customer plugs in their own proxy provider - used only when large crawls need it.
+ascend-web-hunter reads one URL at a time. There is no way to crawl a whole site, such as a documentation portal or
+an intranet, in one request. Crawling at volume also brings the one problem single reads never hit: one address
+sending hundreds of requests gets blocked. The answer is politeness by default and an optional hook for a proxy the
+customer supplies, never a proxy this project runs.
 
 ## What Changes
 
-- **Job-based crawl API** (REST + MCP), mirroring the async ingestion-run pattern: a crawl request with seed URLs, include/exclude URL patterns, max depth, page budget, and an optional extraction schema returns a job id. Status is queryable, terminal state fires an optional webhook, and results are written to MinIO as markdown or NDJSON. Per-page extraction reuses the `enhance-web-search-extraction-and-tiers` pipeline.
-- **URL frontier with per-domain politeness**: a Redis-backed frontier honouring robots.txt (toggleable per job), crawl-delay, per-domain concurrency caps, and sitemap seeding. Scale is horizontal - additional worker containers consume the same frontier. The honest target is the hundreds-of-thousands-of-pages class per job, not proxy-network scale, and the docs say so.
-- **Incremental recrawl**: content hashes plus ETag / Last-Modified conditional requests, so an unchanged page costs a single conditional round-trip and is neither re-extracted nor re-embedded.
-- **Optional bring-your-own-proxy hook**: a config slot for customer-supplied proxy credentials (e.g. Oxylabs, Webshare), building on the proxy seam `enhance-web-search-scraping` already ships. ascend-web-hunter never runs or resells proxies; the hook is off by default and only engaged when a job's scale requires it.
-- **Web connector into RAG**: a `web` connector type in the `add-document-connectors` framework whose job is a scheduled crawl that lands its output in MinIO under the tenant prefix and triggers the existing ingestion pipeline - the same land-bytes-then-ingest contract every other connector follows, no parallel parse path. This is what turns a crawl into a continuously fresh tenant knowledge base.
+- A crawl job API, polling only. `POST /api/v1/crawl/jobs` answers HTTP 202 with a `job_id`. `GET
+  /api/v1/crawl/jobs/{job_id}` returns the state, counts and result keys. `GET /api/v1/crawl/jobs` lists jobs.
+  `DELETE /api/v1/crawl/jobs/{job_id}` cancels. MCP tools `crawl_submit`, `crawl_job_status`, `crawl_list_jobs` and
+  `crawl_cancel_job` mirror them. There is no webhook in v1.
+- Results go to Floci, the S3-compatible store on host port 9070, under the configurable prefix
+  `CRAWL_RESULT_S3_PREFIX`.
+- A Redis frontier with per-domain politeness: robots.txt, crawl-delay, a per-domain concurrency cap and sitemap
+  seeding. More worker containers share the same frontier.
+- Incremental recrawl: content hash plus `ETag` and `Last-Modified` conditional requests.
+- SSRF rules for seeds and every discovered link.
+- The existing proxy seam gains a customer-supplied proxy hook for crawl jobs, off by default.
+- The RAG connector that lands crawl output into tenant knowledge bases is not in this change. It moved to
+  `add-web-crawl-rag-connector`, which depends on `add-document-connectors`.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `web-search-crawl-jobs`: async crawl job API (seed/patterns/depth/budget/schema, job id, status, webhook, MinIO results), the Redis URL frontier with robots/crawl-delay/per-domain concurrency/sitemap politeness, horizontal worker scaling, incremental recrawl via content hash + conditional requests, and the optional off-by-default bring-your-own-proxy hook.
-- `web-search-rag-connector`: a `web` connector in the `add-document-connectors` framework that runs a scheduled crawl, lands output in MinIO under the tenant prefix, and triggers the existing ingestion pipeline (land-bytes-then-ingest, deletion propagation reused), turning a site into a continuously fresh tenant knowledge base.
+- `web-search-crawl-jobs`: the job API, the request schema, result storage, the frontier, politeness, incremental
+  recrawl and the SSRF rules for crawl URLs.
 
 ### Modified Capabilities
 
-(none as spec deltas - the connector framework (`add-document-connectors`) and the extraction pipeline (`enhance-web-search-extraction-and-tiers`) are defined in sibling changes, not archived to `openspec/specs/`. The `web` connector is expressed as an ADDED capability here that plugs into the framework's landing contract; the framework hook points are named in the tasks.)
+- `web-search-antibot-evasion`: "Optional proxy egress, disabled by default" gains a separate crawl proxy that is
+  used only by crawl jobs, and "No service-side request rate limiting" is narrowed so crawl politeness is allowed
+  while single reads stay unthrottled.
+
+## Dependencies and Build Order
+
+Last in the owner's order of 2026-10-01: `open-several-novnc-windows-at-once`, `detect-challenge-walls-in-any-language`,
+`enhance-web-search-tier-ladder`, `enhance-web-search-extraction-and-tiers` (structured extraction), then this change.
+It depends on the tier ladder (every page is read through the normal ladder) and on structured extraction (the
+`output_format` and `extraction_schema` a job may ask for). `add-web-crawl-rag-connector` depends on this change.
 
 ## Impact
 
-- **Depends on**: `enhance-web-search-extraction-and-tiers` (per-page extraction/tiers used by the crawler), `enhance-web-search-scraping` (proxy seam, session/fingerprint machinery), and `add-document-connectors` (the connector framework the `web` connector plugs into, plus its deletion-propagation path). The `web` connector also inherits `add-tenant-isolation` (tenant-prefix landing) transitively through the connector framework.
-- **ascend-web-hunter (code)**: `src/crawl/` package (job model, frontier over Redis, worker loop, robots/sitemap handling, incremental-recrawl hash+conditional logic), `src/api/rest` + `src/api/mcp` crawl endpoints/tools, results writer to MinIO (markdown/NDJSON), webhook dispatch; `pyproject.toml` any frontier/robots deps; config for concurrency caps, politeness, proxy hook, result store.
-- **ascend-ai-agent (code)**: a `web` connector type under the `service/connector/` framework from `add-document-connectors` - connector config (seed/patterns/schedule), a client that triggers an ascend-web-hunter crawl and awaits/streams results into the tenant MinIO prefix, then the standard ingestion trigger; deletion propagation reuses the framework path.
-- **Compose**: optional additional ascend-web-hunter worker replicas consuming the frontier; documented, not default.
-- **Docs**: `apps/ascend-web-hunter/AGENTS.md` crawl API + politeness + BYO-proxy; `docs/CONNECTORS.md` (from `add-document-connectors`) gains the web connector; honest scale statement.
-- **Tests**: crawl job over a fixture site respects include/exclude, depth, and budget; frontier honours robots.txt and per-domain concurrency; incremental recrawl skips unchanged pages via conditional requests; BYO-proxy engaged only when configured; web connector lands crawl output under the tenant prefix and the existing pipeline indexes it; source-page deletion propagates.
+- `apps/ascend-web-hunter/src/crawl/`: new package (`models.py`, `frontier.py`, `worker.py`, `robots.py`,
+  `result_store.py`, `job_service.py`).
+- `apps/ascend-web-hunter/src/api/rest/crawl_endpoints.py`: new router under `/api/v1/crawl`, mounted in `src/main.py`.
+- `apps/ascend-web-hunter/src/api/mcp/mcp_server.py`: four tools.
+- `apps/ascend-web-hunter/src/proxy/proxy_provider.py`: the crawl proxy.
+- `apps/ascend-web-hunter/src/config/config.py`: the settings in `design.md`.
+- `apps/ascend-web-hunter/pyproject.toml`: an S3 client (`boto3` or `aioboto3`, exact pin) and `protego` for
+  robots.txt.
+- `compose.ascend-web-hunter.yaml` and `apps/ascend-web-hunter/deploy-standalone/compose.yaml`: the crawl S3 variables,
+  with matching lines in both `.env.example` files and the standalone README table.
+- Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, ADR-018 for the crawl model, and a CHANGELOG bump.
 
 ## Relevant Skills
 
 - `/python-patterns`
-- `/python-testing`
+- `/tdd-workflow`
 - `/api-design`
+- `/backend-patterns`
 - `/docker-patterns`
 - `/security-review`
-- `/springboot-patterns`
+- `/architecture-decision-records`

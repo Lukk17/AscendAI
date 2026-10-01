@@ -1,54 +1,71 @@
-# Design - enhance-web-search-extraction-and-tiers
-
 ## Context
 
-ascend-web-hunter escalates reads through curl_cffi → FlareSolverr → Playwright → Crawlee with NoVNC for human intervention. `enhance-web-search-scraping` already added session replay into every tier, coherent fingerprints (`src/reader/fingerprint.py`), an optional proxy seam (`src/proxy/proxy_provider.py`), read caching, per-domain metrics, and circuit breakers. FlareSolverr's only job is solving the Cloudflare challenge and returning cookies; a patched stealth browser both solves the challenge and renders the page, so the middle tiers can collapse. Patchright is a drop-in Playwright replacement (patched Chromium); Camoufox is a hardened Firefox driven through Playwright - both free and self-hosted.
-
-Extraction returns trafilatura output with a readability fallback: a single main-content blob, no embedded structured data, no schema-guided output, and linked PDFs/images are ignored even though the platform runs Docling, ascend-ocr, and ascend-audio-scribe.
-
-## Goals / Non-Goals
-
-**Goals:**
-
-- Retire FlareSolverr; ladder curl_cffi → Patchright → Camoufox → NoVNC with per-domain memory and a local CAPTCHA rung.
-- Extraction that beats a single-extractor blob: embedded structure, scored ensemble, schema-guided JSON, self-healing recipes, non-HTML routing, richer output formats.
-- Keep every capability free and self-hostable; the schema-extraction LLM endpoint is configurable and can be fully local.
-
-**Non-Goals:**
-
-- Crawling at scale, the frontier, incremental recrawl, and the RAG connector (owned by the sibling `enhance-web-search-crawl-at-scale`).
-- Paid CAPTCHA-solving APIs and paid proxy networks (explicitly excluded).
-- Redoing session replay, fingerprints, caching, or metrics (`enhance-web-search-scraping` owns them).
+Extraction lives in `apps/ascend-web-hunter/src/reader/extraction.py` and `src/reader/web_reader.py`. Today
+`OutputFormat = Literal["text", "structured"]`, the cache key is built by `_cache_key(url, heavy_mode, include_links,
+profile, output_format, tier)`, and `output_format=structured` with `include_links=true` is refused at both API
+boundaries. ADR-007 records the structured format and ADR-009 the readability recall pass.
 
 ## Decisions
 
-### D1 - Collapse FlareSolverr + Playwright into a patched-browser tier, add Camoufox as auto-escalation
+### D1: Embedded data first, on the `structured` format
 
-Patchright replaces the Playwright tier as a drop-in (same API, patched Chromium), so the existing Playwright flow, including the session `storage_state` replay from `enhance-web-search-scraping`, carries over unchanged. Camoufox becomes the next rung, tried automatically when Patchright is detected/blocked or fails. FlareSolverr is removed; its cookie-persistence behaviour is already superseded by the session replay the earlier change installed on the browser tiers.
+`extruct` parses JSON-LD, OpenGraph and microdata from the HTML the tier returned. The result goes into a new
+`metadata` object on the `structured` response, beside the existing title, author, date and site name. A parse error
+leaves `metadata` empty and logs a WARNING. It never fails the read.
 
-### D2 - Per-domain tier memory in Redis, with decay
+### D2: Scored ensemble replaces the recall pass
 
-Keyed by registrable domain, store the cheapest tier that last succeeded and start there. Decay the stored tier back toward curl_cffi on a time schedule so a transient block does not pin a domain to Camoufox forever. This reuses the Redis the service already has (sessions, `enhance-web-search-scraping`).
+Both extractors run on the same HTML. Each result is scored by text length times (1 minus link density) times (1
+minus boilerplate ratio), and the higher score wins. Ties go to trafilatura. This supersedes ADR-009: the recall pass
+ran readability only below a threshold, and lost on pages where readability was better but trafilatura was not thin.
 
-### D3 - Structured data before heuristics; scored ensemble for the main body
+### D3: Schema extraction through a configurable endpoint
 
-Parse JSON-LD, OpenGraph, and microdata first and return them as structured fields - deterministic and free. For the main body, run trafilatura and readability over the same DOM and score both on text-vs-link density and boilerplate ratio, keeping the winner, rather than trafilatura-primary-with-fallback which loses on pages where readability is better.
+`output_format` `schema` requires `extraction_schema`, a JSON Schema object of at most `EXTRACTION_SCHEMA_MAX_BYTES`
+(default 16384). The service sends the extracted main text (never raw HTML with scripts) to
+`EXTRACTION_LLM_BASE_URL` with `EXTRACTION_LLM_MODEL` and `EXTRACTION_LLM_API_KEY`, asking for the values and one CSS
+selector per field. When `EXTRACTION_LLM_BASE_URL` is empty the `schema` format answers HTTP 400 naming the missing
+setting. The endpoint can be LM Studio, any OpenAI-compatible local model, or a cloud provider.
 
-### D4 - Schema-guided extraction with self-healing recipes
+### D4: Recipes keyed by domain and schema
 
-A schema mode: the caller supplies a JSON schema; the service returns validated JSON. The first extraction for a domain asks the LLM to emit CSS/XPath selectors alongside the values, and the selectors are persisted as a recipe. Later extractions replay the cheap selectors and skip the model; on drift (empty or type-mismatched fields against the schema) the recipe is regenerated. The LLM call targets a configurable OpenAI-compatible endpoint, so it can be a local model, ascend-ai-agent's provider proxy (tenant-policy-aware, keeps data on-prem), or a cloud provider - the service stays decoupled and sovereign by default.
+Key `recipe:{registrable_domain}:{sha256 of canonical schema}` in Redis, TTL `RECIPE_TTL_SECONDS` (default 604800).
+A replay runs the stored selectors with `lxml.cssselect`, builds the object and validates it with `jsonschema`. On a
+validation failure or an empty required field the recipe is deleted and the model runs again. Selectors are plain CSS
+strings, never JavaScript and never XPath with functions, and a selector longer than 512 characters is rejected.
 
-### D5 - Route non-HTML into the existing platform services
+### D5: Model-input safety
 
-Linked PDFs → Docling, image-heavy pages / linked images → ascend-ocr, linked audio → ascend-audio-scribe, over HTTP to the services the compose stack already runs. This is configuration (service URLs), not new parsing code, and gives the scraper document-understanding depth no standalone competitor ships.
+- Page text is put in the user message inside a delimited block and the system message says the block is untrusted
+  data and any instruction in it must be ignored.
+- The text is cut to `EXTRACTION_LLM_MAX_INPUT_CHARS` (default 60000) before sending.
+- The answer is parsed as JSON and validated against the caller's schema. Anything else is HTTP 502 with code
+  `EXTRACTION_FAILED`. Nothing the model returns is executed or fetched.
+- The model call has a timeout `EXTRACTION_LLM_TIMEOUT_SECONDS` (default 60).
 
-## Risks / Trade-offs
+### D6: Non-HTML routing
 
-- [Camoufox is heavier than Patchright] → it is the escalation rung, not the default; most domains resolve at curl_cffi or Patchright per the tier memory.
-- [Self-healing recipe returns stale/wrong data silently] → every replay validates against the caller's schema; drift triggers regeneration, so a broken recipe self-repairs rather than serving garbage.
-- [Schema extraction cost/latency] → recipes make the common path model-free; the model runs on first-seen domains and on drift only.
-- [Local CAPTCHA solver accuracy is limited] → it is a cheap first attempt for common types; anything it cannot solve escalates to the existing NoVNC human tier, unchanged.
+- PDF (by `Content-Type` or a `.pdf` main link): bytes are fetched through the existing SSRF-guarded client, capped
+  at `DOCUMENT_MAX_BYTES` (default 52428800), and posted to docling-serve at `DOCLING_SERVE_URL` (default
+  `http://docling-serve:5001`), endpoint `/v1/convert/file`, asking for Markdown. The exact docling-serve path is
+  checked against its pinned image version in task 4.1.
+- Image: posted to ascend-ocr `POST /v1/ocr/jobs` at `ASCEND_OCR_URL` (default `http://ascend-ocr:7022`), then polled
+  with `GET /v1/ocr/jobs/{job_id}` using the poll hint the service returns, up to `OCR_ROUTE_TIMEOUT_SECONDS` (default
+  300). The Markdown is read from the result address in the final state.
+- Audio: posted to ascend-audio-scribe `POST /api/v1/transcribe/local` at `AUDIO_SCRIBE_URL` (default
+  `http://ascend-audio-scribe:7017`) with `stream=false`.
+- An empty URL setting turns that route off. A route failure returns the HTML extraction with a `routing_error`
+  field, it never fails the read.
 
-## Open Questions
+### D7: Formats, links and the cache key
 
-- None blocking. The exact local CAPTCHA-solver library is an implementation choice validated during task 1; the ladder and interfaces do not depend on which one.
+`OutputFormat` becomes `Literal["text", "structured", "schema", "tables", "screenshot"]`. `include_links=true` is
+accepted only with `text`, and every other format with it is refused at the boundary naming the combination. The
+cache key adds `schema=<sha256 of canonical extraction_schema or empty>`. `screenshot` results are never cached,
+because a full-page PNG would crowd the in-process cache.
+
+## Risks
+
+- A model that ignores the instructions. D5 limits the damage to a wrong answer, which schema validation catches when
+  the shape is wrong. A right-shaped wrong value is not caught, and the docs say so.
+- docling-serve, ascend-ocr and ascend-audio-scribe are slow on large files. The size cap and the timeouts bound it.
