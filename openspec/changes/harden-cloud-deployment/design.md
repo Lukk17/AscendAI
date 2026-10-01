@@ -73,6 +73,8 @@ Rejected: `--no-sandbox` (removes the layer that matters for untrusted content),
 
 ### D6 - SearXNG limiter stays off
 
+Owner decision, confirmed 2026-10-01: the limiter stays off, and no change in `openspec/changes/` turns it on.
+
 `infra/searxng/settings.yml:37-41` turns the limiter off on purpose: every caller reaches SearXNG from the ascend-web-hunter container, so all requests share one Docker network address and the per-address limiter blocks them together. The earlier plan of this change was to turn the limiter on and forward the client's `X-Forwarded-For`. That does not answer the reason: ascend-web-hunter is called by the agent over MCP, not by end users, so the forwarded address would still be the same for every request. The change therefore keeps `limiter: false` and keeps the `SEARXNG_X_REAL_IP` and `SEARXNG_X_FORWARDED_FOR` values ascend-web-hunter sends (`compose.ascend-web-hunter.yaml:190-191`). Protection comes from the network: SearXNG is reachable only on the compose network and on host loopback, and ascend-web-hunter rate-limits upstream. `infra/searxng/settings.yml` and its byte-identical copy `apps/ascend-web-hunter/deploy-standalone/searxng/settings.yml` are not changed.
 
 ### D7 - SSRF allowlists and object store privacy

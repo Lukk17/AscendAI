@@ -50,7 +50,7 @@ Policy is a `tenant_policy` row per tenant (provider allow-list, per-provider mo
 ## Open Questions
 
 - None blocking. Whether per-provider model allow-lists are required at launch or providers-only suffices is settled as: providers-only is mandatory, per-provider model lists optional (empty means all models of an allowed provider).
-- Owner decision not taken: the admin URL prefix value. This change keeps `/api/v1/admin/policy` as written, matching `add-tenant-administration`.
+- Closed (owner, 2026-10-01): every administration endpoint lives under the one prefix `/api/v1/admin/`. This change owns `/api/v1/admin/policy`.
 
 ## Dependencies
 

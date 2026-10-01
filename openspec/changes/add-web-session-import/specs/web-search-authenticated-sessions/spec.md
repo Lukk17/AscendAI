@@ -2,7 +2,7 @@
 
 ### Requirement: Import a captured browser storage state through the REST API
 
-ascend-web-hunter SHALL expose `POST /api/v2/web/session/import` accepting `url`, an optional `profile`, a Playwright `storage_state` (`cookies` and `origins`) and an optional `user_agent`. Before storing anything it SHALL refuse a URL that fails the safe external URL check with `400 UNSAFE_URL`, a profile outside `^[A-Za-z0-9_-]{1,64}$` with `400 INVALID_PROFILE`, a body larger than `SESSION_IMPORT_MAX_BYTES` or with more cookies than `SESSION_IMPORT_MAX_COOKIES` with `413 STORAGE_STATE_TOO_LARGE`, and a storage state with no cookie for the URL's registrable domain with `400 NO_COOKIES_FOR_DOMAIN`. On success it SHALL drop cookies of other domains, store the rest under the URL's registrable domain and the effective profile with provenance `import` in the same record shape a NoVNC capture produces, clear the read cache for that domain, and answer `200` with the domain, the profile and the counts of stored and dropped cookies.
+ascend-web-hunter SHALL expose `POST /api/v2/web/session/import` accepting `url`, an optional `profile`, a Playwright `storage_state` (`cookies` and `origins`) and an optional `user_agent`. Before storing anything it SHALL refuse a URL that fails the safe external URL check with `400 UNSAFE_URL`, a profile outside `^[A-Za-z0-9_-]{1,64}$` with `400 INVALID_PROFILE` and a storage state with no cookie for the URL's registrable domain with `400 NO_COOKIES_FOR_DOMAIN`. On success it SHALL drop cookies of other domains, store the rest under the URL's registrable domain and the effective profile with provenance `import` in the same record shape a NoVNC capture produces, clear the read cache for that domain, and answer `200` with the domain, the profile and the counts of stored and dropped cookies. The endpoint SHALL NOT refuse a storage state for its size or for its number of cookies.
 
 #### Scenario: Imported session is replayed on the next read
 
@@ -16,11 +16,11 @@ ascend-web-hunter SHALL expose `POST /api/v2/web/session/import` accepting `url`
 - **THEN** the answer is `400` with code `UNSAFE_URL`
 - **AND** nothing is written to the session store
 
-#### Scenario: Oversized storage state is refused
+#### Scenario: Large storage state is accepted
 
-- **WHEN** the request body is larger than `SESSION_IMPORT_MAX_BYTES`
-- **THEN** the answer is `413` with code `STORAGE_STATE_TOO_LARGE`
-- **AND** nothing is written to the session store
+- **WHEN** a caller imports a storage state holding 1000 cookies for the URL's registrable domain
+- **THEN** the answer is `200`
+- **AND** all 1000 cookies are stored
 
 #### Scenario: Cookies for another site only
 

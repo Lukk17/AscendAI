@@ -52,7 +52,7 @@ The `tenants` table (from `add-tenant-isolation`) gains a `status` column (`ACTI
 
 ### D5 - Delete is erase-then-deprovision, ordered and audited
 
-Deleting a tenant is destructive and ordered: (1) suspend, (2) run the per-tenant erasure job of `add-audit-and-gdpr-compliance` to zero residue by calling its `ErasureOrchestrator` directly (the HTTP endpoint there is for the tenant's own `ADMIN`), (3) remove the Keycloak users whose `tenant` attribute equals the tenant id (whether erasure deletes or disables a Keycloak account is an owner decision not taken yet, and this step follows that decision), (4) remove the `tenants` row. Each step is audited as `ADMIN_OPERATION`. `add-audit-and-gdpr-compliance` is built before this change, so erasure is always present.
+Deleting a tenant is destructive and ordered: (1) suspend, (2) run the per-tenant erasure job of `add-audit-and-gdpr-compliance` to zero residue by calling its `ErasureOrchestrator` directly (the HTTP endpoint there is for the tenant's own `ADMIN`), (3) disable the Keycloak users whose `tenant` attribute equals the tenant id and clear their personal attributes, never deleting them (owner decision, 2026-10-01, the same rule erasure follows), (4) remove the `tenants` row. Each step is audited as `ADMIN_OPERATION`. `add-audit-and-gdpr-compliance` is built before this change, so erasure is always present.
 
 ### D6 - `PLATFORM_ADMIN` reads the audit log across tenants
 
@@ -68,5 +68,5 @@ Deleting a tenant is destructive and ordered: (1) suspend, (2) run the per-tenan
 ## Open Questions
 
 - None blocking. Invited users default to `USER` only (least privilege, promotion to `ADMIN` is an explicit second call).
-- Owner decision not taken: the admin URL prefix value. This change keeps `/api/v1/admin/tenants` and `/api/v1/admin/users` as written.
-- Owner decision not taken: delete or disable the Keycloak account on erasure and on user removal. D5 step 3 and the remove operation follow whatever `add-audit-and-gdpr-compliance` settles.
+- Closed (owner, 2026-10-01): every administration endpoint lives under the one prefix `/api/v1/admin/`. This change owns `/api/v1/admin/tenants` and `/api/v1/admin/users`.
+- Closed (owner, 2026-10-01): a Keycloak account is disabled and never deleted, on erasure, on user removal and in D5 step 3. Removing a user disables the account and clears its personal attributes.

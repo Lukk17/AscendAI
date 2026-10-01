@@ -19,11 +19,11 @@ Infrastructure available: Postgres (Liquibase-managed, `db/changelog/db.changelo
 
 **Goals:**
 
-- One durable, queryable usage row per LLM-touching request, attributable to tenant + user, precise enough to invoice from.
+- One durable, queryable usage row per LLM-touching request and per metered service operation (OCR job, ingested file, transcription, web search, page read, memory operation), attributable to tenant + user, precise enough to invoice from.
 - Hard token budgets (tenant/month, user/day) enforced before money is spent, with a soft-warning event ahead of cut-off.
 - Request-rate limits that hold across ascend-ai-agent replicas.
 - Per-tenant provider keys that never leave the server in plaintext once written, with clean fallback to the deployment's global keys.
-- All enforcement lives in ascend-ai-agent (the gateway); downstream Python services stay untouched.
+- All enforcement and all ledger writes live in ascend-ai-agent (the gateway). Downstream Python services keep no ledger. Two of them report one extra number in a tool result (D12).
 
 **Non-Goals:**
 
@@ -85,7 +85,7 @@ Table `tenant_provider_key`: tenant id, provider name, wrapped data-encryption-k
 
 - Per stored key, generate a random 256-bit DEK; encrypt the provider key with AES-256-GCM under the DEK; wrap the DEK with the master key-encryption-key (KEK).
 - KEK comes from env `USAGE_KEK` (base64, 32 bytes) via a `KeyEncryptionService` abstraction with a `kekId` column - swapping env-KEK for AWS KMS/Vault later means a new `KeyEncryptionService` implementation plus re-wrap migration, no schema change.
-- API is write-only: `PUT` upserts (request body carries the plaintext key over TLS, never logged), `GET` returns provider, `last4`, timestamps only, `DELETE` removes. All `ADMIN`-scoped under `/api/v1/tenants/{tenantId}/provider-keys`.
+- API is write-only: `PUT` upserts (request body carries the plaintext key over TLS, never logged), `GET` returns provider, `last4`, timestamps only, `DELETE` removes. All `ADMIN`-scoped under `/api/v1/admin/tenants/{tenantId}/provider-keys`, inside the one administration prefix `/api/v1/admin/` that every admin endpoint uses (owner decision, 2026-10-01). A tenant `ADMIN` whose tenant differs from `{tenantId}` gets 403.
 
 Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL text - worse), storing keys only in env per tenant (does not scale past a handful of tenants, no API), Vault-only storage (new mandatory infrastructure dependency; kept as upgrade path instead).
 
@@ -99,12 +99,38 @@ Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL te
 
 ### D11 - Observability integration
 
-- `GenAiTokenUsageRecorder` gains `tenant` and `request_type` tags on `gen_ai.client.token.usage` (bounded cardinality: tenants are operator-created, request types are a closed set of four).
+- `GenAiTokenUsageRecorder` gains `tenant` and `request_type` tags on `gen_ai.client.token.usage` (bounded cardinality: tenants are operator-created, request types are the closed set listed in D12).
 - New counters: `usage.ledger.write_failed`, `usage.quota.rejected{scope}`, `usage.quota.warning{scope}`, `rate_limit.rejected{scope,endpoint}`, `rate_limit.redis_unavailable`.
 - One new provisioned dashboard `infra/observability/grafana/dashboards/usage-quotas.json`: tokens by tenant over time, top users, quota-consumption gauges, 429 rates.
 
+### D12 - Metering every service: the agent records what it calls
+
+Owner decision, 2026-10-01: metering covers everything a tenant can make the platform do, not only model calls. Every call below is made by ascend-ai-agent with the tenant and user already resolved, so the agent writes the ledger row through the same `UsageLedgerRecorder` and `UsageContext` (D1, D2). No service gets a ledger, a database or a tenant concept of its own.
+
+| Request type | Source of the numbers | Columns filled |
+|---|---|---|
+| `ocr` | `AscendOcrClient`, from the terminal job record it already polls (`pages_done`, `finished_at - started_at`) | `pages`, `processing_ms`, `provider = ascend-ocr` |
+| `ingestion` | the ingestion pipeline, once per ingested file, after chunking | `files = 1`, `bytes`, `chunks` (embedding tokens stay in the `embedding` rows of the same run) |
+| `transcription` | the MCP tool-callback wrapper around the ascend-audio-scribe tools, from `audio_seconds` in the tool result | `audio_seconds`, `provider` = `local`, `openai` or `hf` from the tool name |
+| `web-search` | the same wrapper around the ascend-web-hunter search tool, one row per call | `provider = ascend-web-hunter` |
+| `web-read` | the same wrapper around the page-read tool, one row per call | `tier`, the tier that produced the content |
+| `memory-search`, `memory-insert`, `memory-delete` | `SemanticMemoryClient`, one row per REST call to AscendMemory | `provider` = the embedding provider sent |
+
+The ledger table gains nullable columns `pages`, `processing_ms`, `files`, `bytes`, `chunks`, `audio_seconds` (numeric, three decimals) and `tier`. Token columns default to 0 for non-model rows. A row per operation means request counts are plain row counts and every quantity sums with `SUM`, so the usage API and the quota rebuild stay one aggregate query. Alternative rejected: a JSON column of free measures, which cannot be summed or constrained without parsing.
+
+Two services report one number they do not report today. ascend-audio-scribe adds `audio_seconds` (the decoded length of the input) to the success result of `transcribe_local`, `transcribe_openai` and `transcribe_hf`. ascend-web-hunter makes the page-read result name the tier that produced the content, where it does not already. Both are additive fields in the result body, so older callers ignore them.
+
+A failed operation writes no row: an OCR job that ends failed, an ingestion that stores nothing, a tool call that returns an error. The rows record work delivered, which is what an invoice can defend. The erasure job deletion of AscendMemory data (`wipeUserMemory`) is not metered, because it is the platform's legal duty and not a tenant's use.
+
+Calls that bypass the agent are not metered, because they carry no tenant: the services' own REST and MCP endpoints called directly (ascend-ocr on 7022, ascend-audio-scribe on 7017, ascend-web-hunter on 7021, AscendMemory on 7020), for example by an operator script or an MCP client on the development stack. These ports are platform-internal. A deployment that exposes one of them to tenants must route that traffic through the agent first, and `docs/USAGE_AND_QUOTAS.md` says so.
+
+### D13 - Budgets for the non-model costs
+
+Two non-model costs grow with the size of the input and can be large in one call: OCR pages (CPU time in ascend-ocr) and transcription seconds (paid per minute on the OpenAI backend). Each gets an optional per-tenant monthly budget (`app.usage.quotas.ocr-pages-per-month`, `app.usage.quotas.transcription-seconds-per-month`, unset means unlimited, per-tenant overrides in `tenant_quota_config`), with Redis counters `quota:tenant:{id}:{yyyy-MM}:ocr-pages` and `quota:tenant:{id}:{yyyy-MM}:transcription-seconds` on the same rebuild rule as D4. The OCR gate runs before `AscendOcrClient` submits a job, and the transcription gate runs in the tool-callback wrapper before the tool is called, returning a tool result that names the retry time instead of a 429, the same way the web-search bucket does (D6). Web search, page reads, ingestion and memory operations get no budget: they are bounded by the rate limits of D6 and recorded for the invoice. Embedding tokens already count against the token budget.
+
 ## Risks / Trade-offs
 
+- [A service reports a wrong number (D12)] → each reported field has a test in its own module, and the agent rejects a negative or missing `audio_seconds` by writing the row with the field empty and logging a WARN, so a bad report never fails the user request.
 - [Single-request quota overshoot (D4)] → accepted and documented; budgets should be set with one-request headroom. Soft warning at 80% gives operators lead time.
 - [Redis outage weakens rate limiting (fail-open, D6)] → quota gate still bounds absolute spend via Postgres rebuild; `rate_limit.redis_unavailable` metric alerts operators.
 - [Ledger insert per chat turn adds write load] → single-row insert on an async executor, indexed narrow table; at this platform's request volume partitioning is premature. Revisit with a monthly-partition Liquibase changelog if row count warrants it.
@@ -115,7 +141,7 @@ Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL te
 
 ## Migration Plan
 
-1. Liquibase changelog is purely additive (three new tables) - deploys ahead of code safely.
+1. Liquibase changelog is purely additive (three new tables, the ledger already carrying the D12 columns) - deploys ahead of code safely.
 2. Feature flags: `app.usage.metering.enabled` (ledger writes), `app.usage.quotas.enabled`, `app.usage.rate-limit.enabled`, `app.usage.byok.enabled` - all default `true` in docker posture, `false` only useful for debugging. Disabling quotas/rate-limits reverts to today's unlimited behavior; disabling metering stops new rows but keeps the API serving historical data.
 3. Rollback: flip flags off; tables remain (no destructive rollback needed). BYOK rollback additionally clears the tenant client cache so all traffic reverts to global keys.
 4. Ships after `add-auth-and-identity` and `add-tenant-isolation` are merged, and has no standalone value before them. `add-audit-and-gdpr-compliance` (erasure and export of `usage_ledger` rows) and `add-tenant-policy` (provider and model policy on the tenant-aware `ChatModelResolver`) build on it.
@@ -123,4 +149,5 @@ Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL te
 ## Closed Questions
 
 1. Embedding-call granularity: one ledger row per embedding provider call, which is one batch of the Spring AI `BatchingStrategy` that `VectorStore.add(...)` uses. Reason: each provider call returns its own usage metadata and is what the provider bills, so a row per call needs no estimation, while a row per document would have to split a batch's tokens across documents by guesswork.
-2. Bucket4j artifact and version: `com.bucket4j:bucket4j_jdk17-lettuce` 8.20.0, the release Maven Central lists as latest on 2026-10-01. Reason: the `jdk17` line is the one built for Java 17 and later (this module runs Java 21), and the Lettuce module reuses the Lettuce client Spring Boot 3.5.14 already brings with `spring-boot-starter-data-redis`, so no second Redis driver enters the build.
+2. Bucket4j artifact and version: `com.bucket4j:bucket4j_jdk17-lettuce` 8.20.0, the release Maven Central lists as latest on 2026-10-01, accepted by the owner on 2026-10-01. Recheck Maven Central at implementation time and take a newer patch release if one exists. Reason: the `jdk17` line is the one built for Java 17 and later (this module runs Java 21), and the Lettuce module reuses the Lettuce client Spring Boot 3.5.14 already brings with `spring-boot-starter-data-redis`, so no second Redis driver enters the build.
+3. Scope of metering (owner, 2026-10-01): everything, not only model calls. D12 lists the request types, where each number comes from, and which calls bypass the agent.

@@ -41,11 +41,9 @@ All checks run before anything is written. Errors use the service's existing `HT
 | Body does not match the model, including a bad `url` | 422 | FastAPI validation error, unchanged |
 | `url` fails `is_safe_external_url` | 400 | `UNSAFE_URL` |
 | `profile` does not match `^[A-Za-z0-9_-]{1,64}$` | 400 | `INVALID_PROFILE` |
-| Raw request body larger than `SESSION_IMPORT_MAX_BYTES` (default 262144) | 413 | `STORAGE_STATE_TOO_LARGE` |
-| More cookies than `SESSION_IMPORT_MAX_COOKIES` (default 300) | 413 | `STORAGE_STATE_TOO_LARGE` |
 | No cookie whose `domain`, with a leading dot removed, equals the URL's registrable domain or ends with `.` plus it | 400 | `NO_COOKIES_FOR_DOMAIN` |
 
-The size check reads `Content-Length` and the length of the body actually received, whichever is larger, so a missing or false header cannot bypass it. The profile pattern is stricter than the free-form label the main spec allows, because an imported profile becomes part of a Redis key and is written by any caller. The other session routes keep their current behaviour.
+There is no limit on the body size or on the number of cookies (owner decision, 2026-10-01: no made-up limits). The checks are the ones that protect something real: the safe URL, the profile pattern and the domain match. The profile pattern is stricter than the free-form label the main spec allows, because an imported profile becomes part of a Redis key and is written by any caller. The other session routes keep their current behaviour.
 
 ### D3: Storing
 

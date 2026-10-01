@@ -51,12 +51,12 @@ A tenant's status SHALL be `ACTIVE` or `SUSPENDED`. When the resolved tenant for
 
 ### Requirement: Tenant deletion is erase-then-deprovision
 
-Deleting a tenant SHALL proceed in order: suspend the tenant, run the per-tenant erasure job owned by `add-audit-and-gdpr-compliance` to zero residue, remove the Keycloak users whose `tenant` attribute equals the tenant id, then remove the `tenants` row. If the erasure job ends `PARTIAL` or `FAILED`, the delete SHALL stop before removing users or the row and report the job id. Each step SHALL emit an `ADMIN_OPERATION` audit event.
+Deleting a tenant SHALL proceed in order: suspend the tenant, run the per-tenant erasure job owned by `add-audit-and-gdpr-compliance` to zero residue, disable the Keycloak users whose `tenant` attribute equals the tenant id and clear their personal attributes without deleting them, then remove the `tenants` row. If the erasure job ends `PARTIAL` or `FAILED`, the delete SHALL stop before removing users or the row and report the job id. Each step SHALL emit an `ADMIN_OPERATION` audit event.
 
 #### Scenario: Delete erases before deprovisioning
 
 - **WHEN** a `PLATFORM_ADMIN` deletes tenant `acme` while erasure is available
-- **THEN** the tenant is suspended, its data is erased across all stores, its Keycloak users are removed, and the `tenants` row is deleted
+- **THEN** the tenant is suspended, its data is erased across all stores, its Keycloak users are disabled and not deleted, and the `tenants` row is deleted
 - **AND** audit rows record the suspend, erasure, and deprovision steps
 
 #### Scenario: Delete stops on incomplete erasure

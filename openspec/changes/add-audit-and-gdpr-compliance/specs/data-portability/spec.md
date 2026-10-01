@@ -43,7 +43,7 @@ ascend-ai-agent SHALL expose a status/download endpoint returning the job's stat
 
 ### Requirement: Per-tenant export for offboarding
 
-A tenant ADMIN SHALL be able to start an export job covering their own entire tenant via `POST /api/v1/tenants/{tenantId}/data/export`, and an ADMIN whose tenant differs from `{tenantId}` SHALL receive HTTP 403, using the same job machinery, store coverage, status/download endpoint, and audit semantics as per-user export, with tenant attribution supplied by `add-tenant-isolation`.
+A tenant ADMIN SHALL be able to start an export job covering their own entire tenant via `POST /api/v1/admin/tenants/{tenantId}/data/export`, and an ADMIN whose tenant differs from `{tenantId}` SHALL receive HTTP 403, using the same job machinery, store coverage, status/download endpoint, and audit semantics as per-user export, with tenant attribution supplied by `add-tenant-isolation`.
 
 #### Scenario: Tenant export then erase
 

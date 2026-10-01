@@ -26,6 +26,27 @@ ascend-ai-agent SHALL enforce a per-tenant monthly token budget and a per-user d
 - **WHEN** the platform default tenant budget is X tokens and a tenant has a configured override of 2X
 - **THEN** that tenant is only rejected after consuming 2X tokens in the window
 
+### Requirement: OCR page and transcription second budgets are enforced before the call
+
+ascend-ai-agent SHALL support an optional per-tenant monthly budget of OCR pages and an optional per-tenant monthly budget of transcription audio seconds, with platform defaults in `app.usage.quotas.*` (unset means unlimited) and per-tenant overrides in the quota configuration table. Both use rebuildable Redis counters with the ledger as the source of truth. A tenant at its OCR page budget SHALL be refused with HTTP `429` before any job is submitted to ascend-ocr. A tenant at its transcription budget SHALL get a tool result naming the retry time instead of the transcription, before ascend-audio-scribe is called, and the enclosing chat request SHALL still complete.
+
+#### Scenario: Exhausted OCR page budget refuses the upload before submission
+
+- **WHEN** tenant `acme` has used its whole monthly OCR page budget and one of its users uploads a scanned PDF
+- **THEN** the response is `429` with `code = "QUOTA_EXCEEDED"` and `scope = "tenant"`
+- **AND** no job is submitted to ascend-ocr
+
+#### Scenario: Exhausted transcription budget skips the tool call
+
+- **WHEN** tenant `acme` has used its whole monthly transcription budget and a chat turn calls a transcription tool
+- **THEN** ascend-audio-scribe receives no call and the tool result names the retry time
+- **AND** the chat request completes with `200`
+
+#### Scenario: No budget set means unlimited
+
+- **WHEN** no OCR page budget is configured for a tenant or as a platform default
+- **THEN** that tenant's uploads are never refused for OCR pages
+
 ### Requirement: Quota rejection carries a structured error and Retry-After
 
 A quota-rejected request SHALL return `429` with a `Retry-After` header equal to the seconds remaining until the exhausted window rolls over, and a JSON body containing `code = QUOTA_EXCEEDED`, `scope` (`tenant` or `user`), `limit`, `used`, `windowEnd`, and `retryAfterSeconds`.

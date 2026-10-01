@@ -237,7 +237,7 @@ Strict additive change, executed in this order:
 5. Add OTel collector + Tempo containers + OTel config; enable Spring AI's auto-instrumentation pointing at the collector.
 6. Wire Python services for metrics (`prometheus-fastapi-instrumentator`).
 7. Wire Python services for traces (`opentelemetry-distro`).
-8. Add data-layer exporters (`postgres_exporter`, `redis_exporter`, Qdrant `/metrics`).
+8. Add data-layer exporters (`postgres_exporter`, `redis_exporter`, Qdrant `/metrics`). The owner kept the Redis and Postgres exporters in scope on 2026-10-01. Their exact image versions are looked up and pinned (version tag and digest) at implementation time.
 9. Author and provision the six dashboards.
 10. Write `docs/OBSERVABILITY.md`.
 11. Smoke-test: every dashboard renders something non-empty after running representative traffic.

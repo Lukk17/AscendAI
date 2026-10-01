@@ -9,13 +9,13 @@
 
 ## 2. Keycloak Admin client
 
-- [ ] 2.1 Create `service/identity/KeycloakAdminClient.java`: client-credentials token acquisition + refresh, create user with the `tenant` attribute, search users by attribute `tenant`, enable/disable/delete user, assign/remove realm role, trigger `execute-actions-email` (UPDATE_PASSWORD, VERIFY_EMAIL). No group operations. Acceptance: task 2.2 passes
+- [ ] 2.1 Create `service/identity/KeycloakAdminClient.java`: client-credentials token acquisition + refresh, create user with the `tenant` attribute, search users by attribute `tenant`, enable/disable user, clear a user's personal attributes (no delete operation), assign/remove realm role, trigger `execute-actions-email` (UPDATE_PASSWORD, VERIFY_EMAIL). No group operations. Acceptance: task 2.2 passes
 - [ ] 2.2 Unit tests (WireMock Keycloak Admin API): each operation issues the correct request; token refresh on 401; secret never logged
 
 ## 3. Tenant lifecycle service and API
 
 - [ ] 3.1 Create `service/admin/TenantAdminService.java`: create (`tenants` row only, 409 on an existing id), list, get, suspend, resume; validate the slug format from `add-tenant-isolation`. Acceptance: a unit test shows create makes no Keycloak call
-- [ ] 3.2 Implement delete as ordered erase-then-deprovision (design D5): suspend → per-tenant erasure through `ErasureOrchestrator` from `add-audit-and-gdpr-compliance` → remove the Keycloak users whose `tenant` attribute matches → delete `tenants` row. Stop and report the job id when erasure ends `PARTIAL` or `FAILED`. Acceptance: an integration test with a forced `PARTIAL` job leaves the users and the row in place
+- [ ] 3.2 Implement delete as ordered erase-then-deprovision (design D5): suspend → per-tenant erasure through `ErasureOrchestrator` from `add-audit-and-gdpr-compliance` → disable the Keycloak users whose `tenant` attribute matches and clear their personal attributes, never deleting them → delete `tenants` row. Stop and report the job id when erasure ends `PARTIAL` or `FAILED`. Acceptance: an integration test with a forced `PARTIAL` job leaves the users and the row in place
 - [ ] 3.3 Create `controller/admin/TenantAdminController.java` under `/api/v1/admin/tenants`: create (201 + Location), list (paginated), get (404 unknown), suspend/resume (200), delete (202 job or 204); restrict all to `PLATFORM_ADMIN`. Acceptance: task 3.5 passes
 - [ ] 3.4 Emit `ADMIN_OPERATION` audit events through `AuditRecorder` (`add-audit-and-gdpr-compliance`) for tenant create / suspend / resume / delete. Acceptance: an integration test finds one `audit_log` row per operation with the operation name in `details`
 - [ ] 3.5 MockMvc tests: PLATFORM_ADMIN required (USER/ADMIN → 403); create leaves Keycloak untouched, delete follows the erase-then-deprovision order
@@ -29,10 +29,10 @@
 
 ## 5. User management service and API
 
-- [ ] 5.1 Create `service/admin/UserManagementService.java`: invite (create Keycloak user with `tenant` attribute = caller's tenant, no group, default role `USER`, trigger set-password email, idempotent by email), list users whose `tenant` attribute is the caller's tenant, assign/revoke `ADMIN`/`USER`, enable/disable, remove (optionally chaining per-user erasure from `add-audit-and-gdpr-compliance`). Acceptance: task 5.4 passes
+- [ ] 5.1 Create `service/admin/UserManagementService.java`: invite (create Keycloak user with `tenant` attribute = caller's tenant, no group, default role `USER`, trigger set-password email, idempotent by email), list users whose `tenant` attribute is the caller's tenant, assign/revoke `ADMIN`/`USER`, enable/disable, remove (disables the Keycloak account and clears its personal attributes, never deletes it, optionally chaining per-user erasure from `add-audit-and-gdpr-compliance`). Acceptance: task 5.4 passes
 - [ ] 5.2 Create `controller/admin/UserAdminController.java` under `/api/v1/admin/users`: restrict to tenant `ADMIN`; derive the tenant from the caller's token, never from the path/body; 403 on any attempt to act on another tenant. Acceptance: task 5.4 passes
 - [ ] 5.3 Emit `ADMIN_OPERATION` audit events for invite / role-change / enable-disable / remove. Acceptance: one `audit_log` row per operation in the integration test
-- [ ] 5.4 MockMvc + integration tests (Keycloak Testcontainer): invite creates a Keycloak user with `tenant` attribute and `USER`, sends the email, and the invitee's token carries the `tenant` claim and a group claim with no tenant entry; a tenant ADMIN cannot list or mutate another tenant's users (403); role promotion/demotion reflected in Keycloak; remove disables/erases per option
+- [ ] 5.4 MockMvc + integration tests (Keycloak Testcontainer): invite creates a Keycloak user with `tenant` attribute and `USER`, sends the email, and the invitee's token carries the `tenant` claim and a group claim with no tenant entry; a tenant ADMIN cannot list or mutate another tenant's users (403); role promotion/demotion reflected in Keycloak; remove leaves the Keycloak account in place and disabled, starts erasure only when requested, and no request in the test issues `DELETE` on a Keycloak user
 
 ## 6. Documentation and API collection
 
