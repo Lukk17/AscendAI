@@ -7,27 +7,20 @@ from PIL import Image
 
 from src.api.exception_handlers import FileSizeExceededError, UnsupportedFileTypeError
 from src.config.config import settings
-
-# Matches PADDLE_PDX_PDF_RENDER_SCALE's own default in paddlex/utils/flags.py: the
-# library rasterizes every PDF page at this fixed zoom on PDF points, which is 144 dpi.
-# Not configurable here by design (see ADR for the fixed rendering resolution) — this
-# constant only lets the service predict what the library will do, it does not control it.
-PDF_RENDER_SCALE: float = 2.0
-
-Image.MAX_IMAGE_PIXELS = settings.OCR_MAX_INFERENCE_PIXELS
+from src.service.page_renderer import image_page_count
 
 
 @dataclass(frozen=True)
 class InputShape:
     page_count: int
-    max_page_pixels: int
 
 
 def inspect_input(data: bytes, mime: str) -> InputShape:
-    """Determine the page count and the pixels one inference will receive, from the header only.
+    """Count the pages a submission holds, from the header only.
 
     Raises:
         UnsupportedFileTypeError: when the header cannot be parsed.
+        FileSizeExceededError: when an image frame declares more pixels than the source pixel ceiling.
     """
     if mime == "application/pdf":
         return _inspect_pdf(data)
@@ -36,24 +29,32 @@ def inspect_input(data: bytes, mime: str) -> InputShape:
 
 
 def _inspect_image(data: bytes) -> InputShape:
-    # Pillow's own decompression-bomb guard (Image.MAX_IMAGE_PIXELS, set from
-    # OCR_MAX_INFERENCE_PIXELS at import time above) only warns below twice that
-    # value and raises above it, so both branches are handled explicitly here: the
-    # warning is suppressed because enforce_pixel_ceiling below is the real guard for
-    # that range, and the raise is remapped to the service's own oversized-input code.
+    # Pillow's own guard (Image.MAX_IMAGE_PIXELS, set from OCR_MAX_SOURCE_PIXELS) only
+    # warns between one and two times its value and raises above that, so the warning is
+    # silenced because enforce_source_pixel_ceiling below refuses that range itself, and
+    # the raise is mapped to the same refusal.
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", Image.DecompressionBombWarning)
             with Image.open(io.BytesIO(data)) as image:
-                width, height = image.size
+                frame_sizes = [_frame_size(image, index) for index in range(image_page_count(image))]
     except Image.DecompressionBombError as exc:
         raise FileSizeExceededError(
-            f"Image exceeds the pixel ceiling of {settings.OCR_MAX_INFERENCE_PIXELS}: {exc}"
+            f"Image exceeds the source pixel ceiling of {settings.OCR_MAX_SOURCE_PIXELS}: {exc}"
         ) from exc
     except Exception as exc:
         raise UnsupportedFileTypeError(f"Cannot read image header: {exc}") from exc
 
-    return InputShape(page_count=1, max_page_pixels=width * height)
+    for width, height in frame_sizes:
+        enforce_source_pixel_ceiling(width * height)
+
+    return InputShape(page_count=len(frame_sizes))
+
+
+def _frame_size(image: Image.Image, index: int) -> tuple[int, int]:
+    image.seek(index)
+
+    return image.size
 
 
 def _inspect_pdf(data: bytes) -> InputShape:
@@ -64,30 +65,29 @@ def _inspect_pdf(data: bytes) -> InputShape:
 
     try:
         page_count = len(pdf)
-        if page_count == 0:
-            raise UnsupportedFileTypeError("PDF declares no pages")
-
-        max_pixels = 0
-        for index in range(page_count):
-            width_pt, height_pt = pdf[index].get_size()
-            pixels = int(width_pt * PDF_RENDER_SCALE * height_pt * PDF_RENDER_SCALE)
-            max_pixels = max(max_pixels, pixels)
     finally:
         pdf.close()
 
-    return InputShape(page_count=page_count, max_page_pixels=max_pixels)
+    if page_count == 0:
+        raise UnsupportedFileTypeError("PDF declares no pages")
+
+    return InputShape(page_count=page_count)
 
 
-def enforce_pixel_ceiling(shape: InputShape) -> None:
-    if shape.max_page_pixels > settings.OCR_MAX_INFERENCE_PIXELS:
+def enforce_source_pixel_ceiling(pixels: int) -> None:
+    """Refuse an image frame at decompression-bomb scale.
+
+    Raises:
+        FileSizeExceededError: when the frame declares more pixels than OCR_MAX_SOURCE_PIXELS.
+    """
+    if pixels > settings.OCR_MAX_SOURCE_PIXELS:
         raise FileSizeExceededError(
-            f"One inference would receive {shape.max_page_pixels} pixels, "
-            f"exceeding the ceiling of {settings.OCR_MAX_INFERENCE_PIXELS}"
+            f"Image frame has {pixels} pixels, exceeding the source pixel ceiling of {settings.OCR_MAX_SOURCE_PIXELS}"
         )
 
 
 def enforce_page_limit(shape: InputShape) -> None:
-    if shape.page_count > settings.OCR_MAX_PAGES:
+    if shape.page_count > settings.OCR_JOB_MAX_PAGES:
         raise FileSizeExceededError(
-            f"Document has {shape.page_count} pages, exceeding the limit of {settings.OCR_MAX_PAGES}"
+            f"Document has {shape.page_count} pages, exceeding the limit of {settings.OCR_JOB_MAX_PAGES}"
         )

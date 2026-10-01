@@ -1,20 +1,19 @@
 import asyncio
 import multiprocessing
-import os
-import re
-import tempfile
 import time
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
-from typing import Any, cast
+from typing import Any, Final, cast
 
+import numpy as np
 from paddleocr import PaddleOCR
+from PIL import Image, ImageDraw, ImageFont
 
 from src.api.exception_handlers import FileSizeExceededError, OcrProcessingError, UnsupportedFileTypeError
-from src.config.config import settings
-from src.config.cpu_limits import apply_cpu_thread_limit
+from src.config.config import DEFAULT_QUALITY, ModelPair, QualityMode, QualityProfile, settings
+from src.config.cpu_limits import apply_cpu_thread_limit, detect_cpu_limit
 from src.config.logging_config import get_logger, setup_logging
 from src.model.ocr_models import OcrJsonResponse, OcrPageResult, OcrTextLine
 from src.observability.metrics import (
@@ -22,15 +21,22 @@ from src.observability.metrics import (
     ENGINE_WARMUP_DURATION_SECONDS,
     OCR_DEADLINE_STOPS_TOTAL,
     OCR_PAGE_DURATION_SECONDS,
-    OCR_QUEUE_DEPTH,
-    OCR_QUEUE_WAIT_SECONDS,
     POOL_REBUILDS_TOTAL,
     WORKER_REPLACEMENTS_TOTAL,
 )
 from src.observability.tracing import configure_worker_tracing, extract_trace_context, get_tracer
+from src.service.job_store import write_progress
+from src.service.page_renderer import PageImage, render_pages
 
 logger = get_logger(__name__)
 tracer = get_tracer()
+
+TEXTLINE_ORIENTATION_BATCH_SIZE: Final[int] = 1
+TEXT_RECOGNITION_BATCH_SIZE: Final[int] = 1
+WARM_UP_TEXT: Final[str] = "Warm up the reader"
+WARM_UP_PAGE_SIZE: Final[tuple[int, int]] = (320, 64)
+WARM_UP_TEXT_ORIGIN: Final[tuple[int, int]] = (16, 16)
+WARM_UP_FONT_SIZE: Final[int] = 24
 # Runs once per process (main process and each spawned worker re-import this module
 # fresh). setup_logging() must run first, because a spawned worker is a fresh
 # interpreter that never executes create_app()'s own setup_logging() call. Without this,
@@ -44,8 +50,6 @@ tracer = get_tracer()
 setup_logging()
 apply_cpu_thread_limit()
 
-_SAFE_EXT_PATTERN = re.compile(r"^\.[A-Za-z0-9]{1,8}$")
-
 
 class OcrDeadlineExceededError(Exception):
     """Raised inside the worker when a request's budget expires before or during inference."""
@@ -53,25 +57,23 @@ class OcrDeadlineExceededError(Exception):
 
 class OcrService:
     def __init__(self) -> None:
-        self._engines: OrderedDict[str, PaddleOCR] = OrderedDict()
+        self._engines: OrderedDict[ModelPair, PaddleOCR] = OrderedDict()
 
     def process_file(
         self,
         file_bytes: bytes,
         filename: str,
         language: str,
+        quality: QualityMode,
         trace_carrier: dict[str, str] | None = None,
         budget_seconds: float | None = None,
+        job_id: str | None = None,
+        straighten: bool = False,
     ) -> OcrJsonResponse:
         start_time: float = time.monotonic()
         engine: PaddleOCR = self._get_engine(language)
+        profile = settings.quality_profile(quality)
         deadline: float | None = time.monotonic() + budget_seconds if budget_seconds is not None else None
-
-        file_ext = _safe_suffix(filename)
-        os.makedirs(settings.OCR_SCRATCH_DIR, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=settings.OCR_SCRATCH_DIR, suffix=file_ext, delete=False) as temp_file:
-            temp_file.write(file_bytes)
-            temp_file_path: str = temp_file.name
 
         # trace_carrier, when present, was produced by inject_trace_context() in the
         # process that submitted this call. Extracting it here reattaches this span to
@@ -79,25 +81,14 @@ class OcrService:
         # itself runs inside a separate OCR worker process (see start_worker_pool).
         parent_context = extract_trace_context(trace_carrier) if trace_carrier else None
 
-        try:
-            with tracer.start_as_current_span(
-                "ascend-ocr.engine.predict",
-                context=parent_context,
-                attributes={"language": language},
-            ):
-                pages: list[OcrPageResult] = self._predict_pages(engine, temp_file_path, deadline)
-        finally:
-            # A removal failure here must never replace whatever exception this method
-            # is already propagating (Python re-raises whichever exception a `finally`
-            # itself raises, discarding the original) — found live, on Windows, where a
-            # library that still held the file open turned a clean deadline-exceeded
-            # error into a confusing PermissionError. sweep_scratch_dir reclaims
-            # anything left behind by age, so leaving the file behind here is safe.
-            try:
-                if os.path.exists(temp_file_path):
-                    os.remove(temp_file_path)
-            except OSError:
-                logger.warning("Failed to remove scratch file after processing: %s", temp_file_path)
+        with tracer.start_as_current_span(
+            "ascend-ocr.engine.predict",
+            context=parent_context,
+            attributes={"language": language, "quality": quality, "straighten": straighten},
+        ):
+            pages: list[OcrPageResult] = self._predict_pages(
+                engine, render_pages(file_bytes, profile), profile, deadline, job_id, straighten
+            )
 
         elapsed: float = round(time.monotonic() - start_time, 3)
 
@@ -108,13 +99,18 @@ class OcrService:
             processing_time_seconds=elapsed,
         )
 
-    def _predict_pages(self, engine: PaddleOCR, path: str, deadline: float | None) -> list[OcrPageResult]:
-        # predict_iter() is what predict() itself is built on (predict() is just
-        # list(predict_iter(...))): switching to the generator form gives one checkpoint
-        # per page, which is the only seam the library offers a cooperative deadline.
-        # The check runs before pulling the next item, i.e. before that page's own
-        # inference starts, not after — next(iterator) is what actually does the work.
-        iterator = iter(engine.predict_iter(path))
+    def _predict_pages(
+        self,
+        engine: PaddleOCR,
+        page_images: Iterator[PageImage],
+        profile: QualityProfile,
+        deadline: float | None,
+        job_id: str | None = None,
+        straighten: bool = False,
+    ) -> list[OcrPageResult]:
+        # One checkpoint per page, and it runs before the next page is pulled, i.e.
+        # before that page is rendered and before its inference starts: next(page_images)
+        # is what renders it.
         pages: list[OcrPageResult] = []
         page_number = 0
 
@@ -125,7 +121,7 @@ class OcrService:
             page_start = time.monotonic()
             remaining_budget = deadline - page_start if deadline is not None else None
             try:
-                page_data = next(iterator)
+                page_image = next(page_images)
             except StopIteration:
                 break
 
@@ -137,9 +133,16 @@ class OcrService:
                     "remaining_budget_seconds": round(remaining_budget, 3) if remaining_budget is not None else -1.0,
                 },
             ):
+                page_data = _predict_page(engine, page_image, profile, straighten)
                 OCR_PAGE_DURATION_SECONDS.observe(time.monotonic() - page_start)
                 if isinstance(page_data, dict):
                     pages.append(OcrPageResult(page_number=page_number, lines=self._extract_text_lines(page_data)))
+
+            # The same seam the deadline uses, so progress is written exactly where the
+            # worker is already free to be interrupted, and a poll arriving mid-document
+            # reads a page count rather than nothing.
+            if job_id is not None:
+                write_progress(job_id, page_number)
 
         return pages
 
@@ -151,7 +154,8 @@ class OcrService:
             "ascend-ocr.engine.warmup",
             attributes={"language": language},
         ):
-            self._get_engine(language)
+            engine = self._get_engine(language)
+            _predict_page(engine, _warm_up_page(), settings.quality_profile(DEFAULT_QUALITY), straighten=False)
 
         ENGINE_WARMUP_DURATION_SECONDS.labels(language=language).observe(time.monotonic() - start)
 
@@ -159,32 +163,24 @@ class OcrService:
         if language not in settings.SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {language!r}")
 
-        cached = self._engines.get(language)
+        models = _resolve_model_pair(language)
+        cached = self._engines.get(models)
         if cached is not None:
-            self._engines.move_to_end(language)
+            self._engines.move_to_end(models)
 
             return cached
 
-        engine_kwargs: dict[str, object] = {"lang": language, "enable_mkldnn": False}
-        if settings.OCR_DETECTOR_MAX_SIDE is not None:
-            # Detection is otherwise configured with a minimum-side limit, which only
-            # ever scales an image up, so every real page reaches the detector at its
-            # full rendered resolution. "max" bounds the longest side instead, which is
-            # the fix the measured memory cost points at (design.md Decision 11).
-            engine_kwargs["text_det_limit_type"] = "max"
-            engine_kwargs["text_det_limit_side_len"] = settings.OCR_DETECTOR_MAX_SIDE
-
-        engine = PaddleOCR(**engine_kwargs)
-        self._engines[language] = engine
+        engine = build_engine(models)
+        self._engines[models] = engine
         self._evict_if_over_capacity()
 
         return engine
 
     def _evict_if_over_capacity(self) -> None:
         while len(self._engines) > settings.ENGINE_CACHE_MAX_SIZE:
-            evicted_lang, _ = self._engines.popitem(last=False)
-            ENGINE_CACHE_EVICTIONS_TOTAL.labels(language=evicted_lang).inc()
-            logger.info("Evicted engine for language %s (cache full)", evicted_lang)
+            evicted_models, _ = self._engines.popitem(last=False)
+            ENGINE_CACHE_EVICTIONS_TOTAL.labels(engine=str(evicted_models)).inc()
+            logger.info("Evicted engine %s (cache full)", evicted_models)
 
     def _extract_text_lines(self, page_data: dict[str, object]) -> list[OcrTextLine]:
         rec_texts = cast(Iterable[Any], page_data.get("rec_texts", []))
@@ -201,12 +197,63 @@ class OcrService:
         ]
 
 
-def _safe_suffix(filename: str) -> str:
-    candidate = os.path.splitext(filename)[1]
-    if _SAFE_EXT_PATTERN.match(candidate):
-        return candidate
+def _resolve_model_pair(language: str) -> ModelPair:
+    return settings.model_pair(language)
 
-    return ""
+
+def build_engine(models: ModelPair) -> PaddleOCR:
+    """Build one engine with every model it can be asked to run loaded, and no library default left to chance.
+
+    Unwarping is loaded here but runs only on a call that asks for it (see ADR-011).
+    """
+    # Named rather than resolved from `lang`: PaddleOCR silently picks a model per
+    # language, and passing both names and a language makes it warn and ignore the
+    # language anyway (see PaddleOCR.__init__ in paddleocr/_pipelines/ocr.py).
+    # ADR-007 records which models and why.
+    return PaddleOCR(
+        text_detection_model_name=models.detection,
+        text_recognition_model_name=models.recognition,
+        use_doc_orientation_classify=True,
+        use_doc_unwarping=True,
+        use_textline_orientation=True,
+        textline_orientation_batch_size=TEXTLINE_ORIENTATION_BATCH_SIZE,
+        text_recognition_batch_size=TEXT_RECOGNITION_BATCH_SIZE,
+        enable_mkldnn=False,
+        cpu_threads=detect_cpu_limit(),
+    )
+
+
+def preload_models() -> None:
+    """Fetch every model any accepted language can load, so no request ever downloads one."""
+    for models in sorted(settings.reachable_model_pairs(), key=str):
+        build_engine(models)
+
+
+def _predict_page(engine: PaddleOCR, page_image: PageImage, profile: QualityProfile, straighten: bool) -> object:
+    """Read one rendered page, bounding what detection sees by the request's quality mode.
+
+    The pipeline's own detection limit only ever scales an image up, so without "max" every
+    page would reach the detector at its full rendered size (see ADR-006). Every preprocessing
+    flag is passed on each call, so the engine's construction never decides what a page gets.
+    """
+    results = engine.predict_iter(
+        page_image,
+        text_det_limit_type="max",
+        text_det_limit_side_len=profile.detector_max_side,
+        use_doc_orientation_classify=True,
+        use_doc_unwarping=straighten,
+        use_textline_orientation=True,
+    )
+
+    return next(iter(results), None)
+
+
+def _warm_up_page() -> PageImage:
+    image = Image.new("RGB", WARM_UP_PAGE_SIZE, "white")
+    font = ImageFont.load_default(WARM_UP_FONT_SIZE)
+    ImageDraw.Draw(image).text(WARM_UP_TEXT_ORIGIN, WARM_UP_TEXT, fill="black", font=font)
+
+    return np.ascontiguousarray(np.asarray(image, dtype=np.uint8)[:, :, ::-1])
 
 
 def _convert_polygon(polygon: Any) -> list[list[float]]:
@@ -230,7 +277,6 @@ ocr_service = OcrService()
 _process_pool: ProcessPoolExecutor | None = None
 _pool_generation: int = 0
 _admission_semaphore: asyncio.Semaphore = asyncio.Semaphore(settings.OCR_WORKER_COUNT)
-_queue_depth: int = 0
 # Keyed by a private token rather than a single shared scalar: OCR_WORKER_COUNT jobs
 # can be in flight at once, each running _run_and_reclaim concurrently, and a single
 # shared deadline would have one call's own finally overwrite or erase another's,
@@ -239,6 +285,7 @@ _queue_depth: int = 0
 _active_deadlines: dict[object, float] = {}
 _rebuild_lock: asyncio.Lock = asyncio.Lock()
 _consecutive_rebuild_failures: int = 0
+_pending_replacements: set[asyncio.Task[None]] = set()
 
 
 def start_worker_pool() -> bool:
@@ -254,7 +301,7 @@ def start_worker_pool() -> bool:
         True if the pool's initializer warmed up successfully, False if it left the
         pool broken (caller decides how to count that towards the rebuild cap).
     """
-    global _process_pool, _pool_generation, _admission_semaphore, _queue_depth  # noqa: PLW0603
+    global _process_pool, _pool_generation, _admission_semaphore  # noqa: PLW0603
     _process_pool = ProcessPoolExecutor(
         max_workers=settings.OCR_WORKER_COUNT,
         mp_context=multiprocessing.get_context("spawn"),
@@ -265,7 +312,6 @@ def start_worker_pool() -> bool:
     # Tied to the same setting and rebuilt alongside the pool so the two can never
     # disagree about how many jobs may run at once (see settings.OCR_WORKER_COUNT).
     _admission_semaphore = asyncio.Semaphore(settings.OCR_WORKER_COUNT)
-    _queue_depth = 0
 
     # ProcessPoolExecutor spawns a worker per submit() call only when no worker is
     # already idle (see _adjust_process_count in the concurrent.futures.process
@@ -276,7 +322,7 @@ def start_worker_pool() -> bool:
     # warming the default-language engine. Without this, workers beyond the first are
     # only spawned lazily by real concurrent traffic, and each then pays its own
     # warm-up cost (seconds, per ENGINE_WARMUP_DURATION_SECONDS) inside that caller's
-    # own request instead of at startup — the exact "discover it under load" failure
+    # own request instead of at startup - the exact "discover it under load" failure
     # mode the worker-count memory budget exists to avoid.
     warmup_futures = [_process_pool.submit(_noop_task) for _ in range(settings.OCR_WORKER_COUNT)]
     try:
@@ -287,7 +333,7 @@ def start_worker_pool() -> bool:
         # broken and every future submission will raise this same exception. Log and
         # return instead of letting it propagate: this runs from the FastAPI lifespan,
         # and a startup exception there kills the whole container before /health or
-        # /ready can ever answer. Leaving it unwarm here is enough — is_engine_warm()
+        # /ready can ever answer. Leaving it unwarm here is enough - is_engine_warm()
         # never observed a successful warm-up, so /ready honestly reports not-ready,
         # and a real OCR request against the broken pool surfaces as a handled,
         # rebuild-triggering failure rather than a crash.
@@ -298,11 +344,35 @@ def start_worker_pool() -> bool:
     return True
 
 
-def stop_worker_pool() -> None:
+def stop_worker_pool(terminate: bool = False) -> None:
+    """Shut the pool down, optionally killing its workers first.
+
+    `shutdown(wait=True)` on its own waits for the work item in flight, and one work
+    item is a whole document, so a cancel that only shut the pool down would go on
+    reading the document it was asked to stop. Killing the processes first is what makes
+    the inference stop, and it is why cancellation passes `terminate`.
+    """
     global _process_pool  # noqa: PLW0603  module-level pool reassigned once at shutdown
-    if _process_pool is not None:
-        _process_pool.shutdown(wait=True)
-        _process_pool = None
+    if _process_pool is None:
+        return
+
+    if terminate:
+        _terminate_pool_processes(_process_pool)
+
+    _process_pool.shutdown(wait=True)
+    _process_pool = None
+
+
+def _terminate_pool_processes(pool: ProcessPoolExecutor) -> None:
+    """Kill every worker process the pool owns.
+
+    Reaches for the pool's own process table because concurrent.futures offers no
+    public way to stop a work item that is already running, and the alternative, a
+    cooperative signal the worker polls, is a second stopping mechanism beside the
+    deadline the worker already checks (see ADR-008).
+    """
+    for process in list(pool._processes.values()):
+        process.kill()
 
 
 def get_process_pool() -> ProcessPoolExecutor:
@@ -316,12 +386,8 @@ def get_pool_generation() -> int:
     return _pool_generation
 
 
-def get_queue_depth() -> int:
-    return _queue_depth
-
-
 def is_rebuild_in_progress() -> bool:
-    return _rebuild_lock.locked()
+    return _rebuild_lock.locked() or bool(_pending_replacements)
 
 
 def is_job_overrunning() -> bool:
@@ -348,7 +414,47 @@ def _reset_rebuild_failures() -> None:
     _consecutive_rebuild_failures = 0
 
 
-async def _rebuild_pool(observed_generation: int, reason: str) -> None:
+def request_worker_replacement_for_cancel() -> None:
+    """Start replacing the worker reading a cancelled document, and return without waiting for it.
+
+    The replacement kills the worker and warms a new one, which takes as long as a warm-up,
+    so a caller that awaited it would hold its own answer for that long. The task counts as
+    a rebuild in progress from this call on, so readiness drops before it first runs.
+    """
+    task = asyncio.create_task(replace_worker_for_cancel())
+    _pending_replacements.add(task)
+    task.add_done_callback(_forget_replacement)
+
+
+def _forget_replacement(task: asyncio.Task[None]) -> None:
+    _pending_replacements.discard(task)
+    if task.cancelled():
+        return
+
+    failure = task.exception()
+    if failure is not None:
+        logger.error("Replacing the OCR worker after a cancel failed", exc_info=failure)
+
+
+async def wait_for_worker_replacements() -> None:
+    """Wait until every replacement a cancel started has finished, without cancelling one if the waiter is cancelled."""
+    if not _pending_replacements:
+        return
+
+    await asyncio.wait(set(_pending_replacements))
+
+
+async def replace_worker_for_cancel() -> None:
+    """Stop the document being read now by replacing the worker reading it.
+
+    The third trigger of the replacement path, beside a worker that would not stop and a
+    broken pool. It kills rather than drains, because the work item in flight is a whole
+    document and draining it is exactly what a cancel is asking not to happen.
+    """
+    await _rebuild_pool(_pool_generation, reason="cancel", terminate=True)
+
+
+async def _rebuild_pool(observed_generation: int, reason: str, terminate: bool = False) -> None:
     """Replace the worker pool. A no-op if another caller already rebuilt it first."""
     global _consecutive_rebuild_failures  # noqa: PLW0603
     async with _rebuild_lock:
@@ -372,10 +478,10 @@ async def _rebuild_pool(observed_generation: int, reason: str) -> None:
         # blocks until every currently in-flight work item across every worker finishes, not
         # only the one that triggered this rebuild (ProcessPoolExecutor has no per-worker
         # teardown). Calling it directly here would freeze this coroutine's own event loop
-        # thread for that whole span — bounded by roughly one page's own inference time when
+        # thread for that whole span - bounded by roughly one page's own inference time when
         # OCR_WORKER_COUNT is 1, since there is never a second job to wait on, but bounded by
         # nothing shorter than another worker's own full budget once a second worker exists.
-        await loop.run_in_executor(None, stop_worker_pool)
+        await loop.run_in_executor(None, stop_worker_pool, terminate)
         warmed = await loop.run_in_executor(None, start_worker_pool)
 
         if warmed:
@@ -385,36 +491,36 @@ async def _rebuild_pool(observed_generation: int, reason: str) -> None:
             POOL_REBUILDS_TOTAL.labels(reason=reason, outcome="failed").inc()
 
 
-async def _await_admission(effective_budget: float, arrival: float, surface: str) -> None:
+async def _await_admission(effective_budget: float, arrival: float, surface: str) -> asyncio.Semaphore:
     """Wait for a free worker permit, counting the wait against the request's own budget.
+
+    Returns:
+        The gate the permit came from, which the caller releases even if a rebuild replaced it.
 
     Raises:
         OcrProcessingError: if the budget expires before a permit is granted.
     """
-    global _queue_depth  # noqa: PLW0603
-    _queue_depth += 1
-    OCR_QUEUE_DEPTH.set(_queue_depth)
+    gate = _admission_semaphore
+    remaining = effective_budget - (time.monotonic() - arrival)
     try:
-        remaining = effective_budget - (time.monotonic() - arrival)
-        try:
-            await asyncio.wait_for(_admission_semaphore.acquire(), timeout=max(remaining, 0.0))
-        except TimeoutError:
-            OCR_DEADLINE_STOPS_TOTAL.labels(surface=surface).inc()
-            raise OcrProcessingError("Request budget exhausted while waiting for a worker") from None
-        finally:
-            OCR_QUEUE_WAIT_SECONDS.observe(time.monotonic() - arrival)
-    finally:
-        _queue_depth -= 1
-        OCR_QUEUE_DEPTH.set(_queue_depth)
+        await asyncio.wait_for(gate.acquire(), timeout=max(remaining, 0.0))
+    except TimeoutError:
+        OCR_DEADLINE_STOPS_TOTAL.labels(surface=surface).inc()
+        raise OcrProcessingError("Request budget exhausted while waiting for a worker") from None
+
+    return gate
 
 
 async def _run_and_reclaim(
     file_bytes: bytes,
     filename: str,
     language: str,
+    quality: QualityMode,
     trace_carrier: dict[str, str] | None,
     remaining: float,
     surface: str,
+    job_id: str | None,
+    straighten: bool,
 ) -> OcrJsonResponse:
     """Dispatch to the worker pool, replacing it if the worker fails to stop in time.
 
@@ -433,7 +539,7 @@ async def _run_and_reclaim(
     deadline_token = object()
     _active_deadlines[deadline_token] = dispatch_start + remaining
     try:
-        wait_budget = remaining + settings.OCR_RECLAMATION_GRACE_SECONDS
+        wait_budget = remaining + settings.reclamation_grace_seconds(settings.model_pair(language))
 
         try:
             # get_process_pool() is inside this try, not before it, so a request that
@@ -445,11 +551,20 @@ async def _run_and_reclaim(
             # executor.submit() (called synchronously inside run_in_executor, before
             # it returns a future) raises BrokenProcessPool immediately when the pool
             # was already broken at submission time, rather than surfacing it through
-            # the awaited future — a worker killed between requests is caught here,
+            # the awaited future - a worker killed between requests is caught here,
             # not below. A worker that dies while this specific call is in flight still
             # surfaces the same exception through the await instead.
             future = loop.run_in_executor(
-                pool, run_ocr_in_worker, file_bytes, filename, language, trace_carrier, worker_budget
+                pool,
+                run_ocr_in_worker,
+                file_bytes,
+                filename,
+                language,
+                quality,
+                trace_carrier,
+                worker_budget,
+                job_id,
+                straighten,
             )
             result = await asyncio.wait_for(future, timeout=wait_budget)
         except OcrDeadlineExceededError as exc:
@@ -495,19 +610,23 @@ async def dispatch_ocr_request(
     file_bytes: bytes,
     filename: str,
     language: str,
+    quality: QualityMode,
     effective_budget: float,
     surface: str,
     trace_carrier: dict[str, str] | None = None,
+    job_id: str | None = None,
+    straighten: bool = False,
 ) -> OcrJsonResponse:
     """Admit, dispatch and, if necessary, reclaim a single OCR request.
 
-    Shared by the REST and MCP surfaces so both queue on the same gate and enforce the
-    same deadline. `effective_budget` is the whole duration this request may run for,
-    counted from the moment it arrives (including any time spent waiting here).
+    Called only by the job runner, which is the single consumer of the queue, so the
+    gate below has exactly one client and one document is read at a time.
+    `effective_budget` is the whole duration this document may be read for, counted from
+    the moment the runner picked it up rather than from when it was submitted.
 
     Raises:
-        OcrProcessingError: on any failure — expired budget, a worker that would not
-            stop, a broken pool, or a genuine OCR engine failure — mapped uniformly so
+        OcrProcessingError: on any failure - expired budget, a worker that would not
+            stop, a broken pool, or a genuine OCR engine failure - mapped uniformly so
             both surfaces surface the existing OCR failure code with no partial result.
     """
     arrival = time.monotonic()
@@ -515,7 +634,7 @@ async def dispatch_ocr_request(
     if not is_pool_usable():
         raise OcrProcessingError("OCR worker pool is unavailable")
 
-    await _await_admission(effective_budget, arrival, surface)
+    gate = await _await_admission(effective_budget, arrival, surface)
 
     try:
         remaining = effective_budget - (time.monotonic() - arrival)
@@ -523,58 +642,33 @@ async def dispatch_ocr_request(
             OCR_DEADLINE_STOPS_TOTAL.labels(surface=surface).inc()
             raise OcrProcessingError("Request budget exhausted before dispatch")
 
-        return await _run_and_reclaim(file_bytes, filename, language, trace_carrier, remaining, surface)
+        return await _run_and_reclaim(
+            file_bytes, filename, language, quality, trace_carrier, remaining, surface, job_id, straighten
+        )
     finally:
-        _admission_semaphore.release()
+        gate.release()
 
 
 def run_ocr_in_worker(
     file_bytes: bytes,
     filename: str,
     language: str,
+    quality: QualityMode,
     trace_carrier: dict[str, str] | None = None,
     budget_seconds: float | None = None,
+    job_id: str | None = None,
+    straighten: bool = False,
 ) -> OcrJsonResponse:
     """Entry point executed inside the worker process. Must stay top-level and picklable."""
-    return ocr_service.process_file(file_bytes, filename, language, trace_carrier, budget_seconds)
+    return ocr_service.process_file(
+        file_bytes, filename, language, quality, trace_carrier, budget_seconds, job_id, straighten
+    )
 
 
 def _warm_worker_engine(language: str) -> None:
     """Pool initializer: runs once per worker process, before it accepts any task."""
     configure_worker_tracing()
-    sweep_scratch_dir()
     ocr_service.warm_up_engine(language)
-
-
-def sweep_scratch_dir() -> None:
-    """Remove scratch files no request could still legitimately own.
-
-    A killed worker never runs its own cleanup, so it leaks the temporary copy of
-    whatever it was reading. Every fresh worker (including every rebuilt one) and the
-    API process at startup call this, so age is a sound test on its own: nothing in
-    this directory legitimately outlives one request's own ceiling.
-    """
-    scratch_dir = settings.OCR_SCRATCH_DIR
-    os.makedirs(scratch_dir, exist_ok=True)
-    max_age_seconds = settings.OCR_REQUEST_TIMEOUT + settings.OCR_DISPATCH_MARGIN_SECONDS
-    now = time.time()
-
-    for entry in os.scandir(scratch_dir):
-        if not entry.is_file():
-            continue
-
-        try:
-            age = now - entry.stat().st_mtime
-        except OSError:
-            continue
-
-        if age <= max_age_seconds:
-            continue
-
-        try:
-            os.remove(entry.path)
-        except OSError:
-            logger.warning("Failed to sweep stale scratch file: %s", entry.path)
 
 
 def _noop_task() -> None:

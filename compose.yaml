@@ -66,9 +66,16 @@ services:
       - LOG_FORMAT=json
       - DEFAULT_LANGUAGE=en
       - MAX_FILE_SIZE_MB=50
-      - OCR_REQUEST_TIMEOUT=300
-      - OCR_PAGE_TIMEOUT_SECONDS=150
       - ENGINE_CACHE_MAX_SIZE=2
+      # Result store: the same Floci instance the agent uses, reached from inside the
+      # container by its host-published address, with presigned URLs signed against the
+      # address a caller on the host can fetch. Its own bucket, never the agent's
+      # knowledge-base, whose contents the agent's manual ingestion indexes as sources.
+      - OCR_RESULT_S3_ENDPOINT=http://host.docker.internal:9070
+      - OCR_RESULT_S3_PUBLIC_ENDPOINT=http://localhost:9070
+      - OCR_RESULT_S3_BUCKET=ocr-results
+      - OCR_RESULT_S3_ACCESS_KEY=${OCR_RESULT_S3_ACCESS_KEY:-admin}
+      - OCR_RESULT_S3_SECRET_KEY=${OCR_RESULT_S3_SECRET_KEY:-password}
       # SSRF guard: the host-published object store (Floci) is reached via
       # the host-bound localhost address (host.docker.internal:9070) per ADR-001.
       - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
@@ -81,7 +88,7 @@ services:
       - OTEL_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-ocr
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.3.0
     networks:
       default:
         aliases:
@@ -96,7 +103,7 @@ services:
       resources:
         limits:
           cpus: "4.0"
-          memory: 12G
+          memory: 4G
         reservations:
           cpus: "0.5"
           memory: 2G
@@ -122,7 +129,7 @@ services:
     environment:
       # Activate container-mode overrides (src/main/resources/application-docker.yaml).
       - SPRING_PROFILES_ACTIVE=docker
-      # Provider API keys — runtime-only, sourced from .env on the host.
+      # Provider API keys - runtime-only, sourced from .env on the host.
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ASCEND_ANTHROPIC_API_KEY=${ASCEND_ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
@@ -140,7 +147,7 @@ services:
       - APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED=${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:-true}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-agent
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=1.0.0
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.2
     networks:
       default:
         aliases:
@@ -178,7 +185,7 @@ services:
       # Qdrant must be running externally (port 6333)
       - QDRANT_HOST=host.docker.internal
       - QDRANT_PORT=6333
-      # Per-provider routing — each provider hits its own endpoint with its own key.
+      # Per-provider routing - each provider hits its own endpoint with its own key.
       - LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
       - LMSTUDIO_API_KEY=sk_local
       - OPENAI_BASE_URL=https://api.openai.com/v1
@@ -192,7 +199,7 @@ services:
       - LOG_LEVEL=INFO
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-memory
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.3
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -234,7 +241,7 @@ services:
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-weather-mcp
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=1.0.0
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.4
     # Memory sized from measured usage: peak observed at 374 MiB over 24h
     # (docker stats, 2026-09-04). The Dockerfile already pins heap to 70% of
     # this limit via JAVA_TOOL_OPTIONS, so this value and that heap setting
@@ -270,7 +277,7 @@ services:
       - MCP_FILE_URI_ROOT=/audio
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-audio-scribe
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.0
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.9.3
     volumes:
       - D:/Development/AI/hf-cache:/hf-cache
       - C:\Users\Lukk\Desktop:/audio

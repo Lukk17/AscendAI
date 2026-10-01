@@ -20,7 +20,7 @@ class TestSniffMime:
             (b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 10, "image/webp"),
         ],
     )
-    def test_known_signatures(self, data: bytes, expected: str):
+    def test_known_signatures(self, data: bytes, expected: str) -> None:
         # Then
         assert sniff_mime(data) == expected
 

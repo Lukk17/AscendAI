@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -7,6 +8,7 @@ from typing import Literal
 import uvicorn
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
+from starlette.types import ASGIApp
 
 from src.api.exception_handlers import register_exception_handlers
 from src.api.mcp.mcp_server import mcp
@@ -14,51 +16,61 @@ from src.api.middleware.correlation_id import CorrelationIdMiddleware
 from src.api.middleware.rate_limit import configure_rate_limiting
 from src.api.middleware.security_headers import SecurityHeadersMiddleware
 from src.api.rest.rest_endpoints import rest_router
-from src.config.config import settings
-from src.config.logging_config import get_uvicorn_log_config, setup_logging
+from src.config.config import MCP_ENDPOINT_PATH, settings
+from src.config.logging_config import setup_logging
 from src.config.startup_banner import log_startup_banner
 from src.model.ocr_models import HealthResponse, ReadinessResponse
 from src.observability.metrics import is_engine_warm
 from src.observability.tracing import configure_tracing
+from src.service.job_service import job_runner, job_store
 from src.service.ocr_service import (
-    get_queue_depth,
     is_accepting_work,
     start_worker_pool,
     stop_worker_pool,
-    sweep_scratch_dir,
+    wait_for_worker_replacements,
 )
+from src.service.result_store import result_store
 
 logger = logging.getLogger("uvicorn")
 
 SERVICE_VERSION: str = get_package_version("ascend-ocr")
 
 
+class _CorrelatedFastAPI(FastAPI):
+    def build_middleware_stack(self) -> ASGIApp:
+        return CorrelationIdMiddleware(super().build_middleware_stack(), mcp_endpoint_path=MCP_ENDPOINT_PATH)
+
+
 def create_app() -> FastAPI:
     setup_logging()
-    mcp_asgi_app = mcp.http_app()
+    mcp_asgi_app = mcp.http_app(path=MCP_ENDPOINT_PATH)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.info("Starting ascend-ocr service")
-        # Reclaims anything a previous container process left behind: a killed worker
-        # never runs its own cleanup (see sweep_scratch_dir).
-        sweep_scratch_dir()
         # The engine warms inside the OCR worker process, the one that actually serves
         # inference (see start_worker_pool). Warming a second engine here, in the main
         # process, would just hold ~316 MiB it never uses for the life of the container.
         start_worker_pool()
+        # Both run before the runner takes its first document: the bucket so the banner
+        # can report whether results have anywhere to go, and recovery so nothing left
+        # waiting or running by the previous process is ever dispatched or polled.
+        await asyncio.to_thread(result_store.ensure_bucket)
+        job_store.recover_after_restart()
 
         async with AsyncExitStack() as stack:
             stack.callback(stop_worker_pool)
+            stack.push_async_callback(wait_for_worker_replacements)
+            stack.push_async_callback(job_runner.stop)
             await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(_app))
+            await job_runner.start()
             log_startup_banner()
 
             yield
 
-    fastapi_app = FastAPI(title="ascend-ocr", lifespan=lifespan)
+    fastapi_app = _CorrelatedFastAPI(title="ascend-ocr", version=SERVICE_VERSION, lifespan=lifespan)
 
     fastapi_app.add_middleware(SecurityHeadersMiddleware)
-    fastapi_app.add_middleware(CorrelationIdMiddleware)
 
     configure_rate_limiting(fastapi_app)
     register_exception_handlers(fastapi_app)
@@ -89,7 +101,10 @@ def create_app() -> FastAPI:
             version=SERVICE_VERSION,
             engine_warm=engine_warm,
             accepting_work=accepting_work,
-            queue_depth=get_queue_depth(),
+            # Additive, and deliberately not part of the status: a queue with work in it
+            # is a busy service, and busy stays ready (ADR-004).
+            jobs_queued=job_runner.documents_waiting(),
+            jobs_running=job_runner.documents_running(),
         )
 
     fastapi_app.mount("/", mcp_asgi_app)
@@ -100,7 +115,6 @@ def create_app() -> FastAPI:
 app = create_app()
 
 if __name__ == "__main__":
-    import asyncio
     import sys
 
     if sys.platform == "win32":
@@ -110,5 +124,5 @@ if __name__ == "__main__":
         "src.main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
-        log_config=get_uvicorn_log_config(),
+        ws="none",
     )
