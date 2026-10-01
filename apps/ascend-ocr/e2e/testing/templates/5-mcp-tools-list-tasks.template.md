@@ -1,4 +1,4 @@
-# MCP tools/list contract: run tasks template
+# MCP tools list: run tasks template
 
 Spec: [../5-mcp-tools-list-test.md](../5-mcp-tools-list-test.md)
 
@@ -17,16 +17,22 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-tools-list-tasks.md` before sta
 
 ### Run
 
-- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header, capture the session id (32 character hexadecimal session id without hyphens)
-- [ ] Send `mcp-list-tools.yml` via `bru run` with `--env-var "mcp_session_id=<captured session id>"` and wait for HTTP 200
+- [ ] `initialize` handshake returns an `mcp-session-id` header
+- [ ] Send `ocr/testing/mcp-initialized.yml` with that session id, HTTP 202 with an empty body
+- [ ] Send `ocr/testing/mcp-list-tools.yml` with that session id
 
 ### Expected
 
-- [ ] `initialize` returns HTTP 200 with a non-empty `Mcp-Session-Id` header
-- [ ] `mcp-list-tools.yml` returns HTTP 200
-- [ ] `result.tools` array contains an entry with `name="ocr_process"`
-- [ ] That entry's `inputSchema.properties` includes a key `file_uri` and a key `lang`
-- [ ] That entry's `inputSchema.required` array contains `"file_uri"`
+- [ ] HTTP 200
+- [ ] Exactly four tools advertised, no other name
+- [ ] `ocr_submit` advertised, with `file_uri` and `lang`
+- [ ] `ocr_submit` advertises `quality` as a string, `enum` exactly `normal` and `high`, `default` `high`
+- [ ] `ocr_submit` advertises `straighten` as a boolean, `default` `false`
+- [ ] `ocr_job_status` advertised, with `job_id`
+- [ ] `ocr_list_jobs` advertised
+- [ ] `ocr_cancel_job` advertised, with `job_id`
+- [ ] `ocr_process` is not advertised under any name
+- [ ] No advertised tool name contains `process`
 
 ### Verdict
 
@@ -36,9 +42,9 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-tools-list-tasks.md` before sta
 
 
 
-Input tokens: 0
+Input tokens:
 
-Output tokens: 0
+Output tokens:
 
 Start (UTC):
 

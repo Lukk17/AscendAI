@@ -5,14 +5,14 @@ info:
 
 http:
   method: POST
-  url: http://localhost:7022/v1/ocr
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs"
   headers:
     - name: accept
       value: application/json
   body:
     type: multipart-form
     data:
-      - name: files
+      - name: file
         type: file
         value:
           - /C:/Users/Lukk/Desktop/test-image.pdf
@@ -24,20 +24,21 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("Status code is 200", function () {
-            expect(res.getStatus()).to.equal(200);
+        test("The document is accepted for reading", function () {
+            expect(res.getStatus()).to.equal(202);
         });
-        test("OCR endpoint returns extracted text from image", function () {
+        test("The answer carries an identifier and where to read the state", function () {
             const body = res.getBody();
-            expect(body).to.be.a("string");
-            const data = typeof body === "string" ? JSON.parse(body) : body;
-            expect(data).to.have.property("pages");
-            expect(data.pages).to.be.an("array");
-            if (data.pages.length > 0) {
-                expect(data.pages[0]).to.have.property("lines");
-                expect(data.pages[0].lines).to.be.an("array");
-            }
+            expect(body.job_id).to.be.a("string").with.lengthOf(22);
+            expect(body.status_url).to.equal("/v1/ocr/jobs/" + body.job_id);
+            expect(body.poll_after_seconds).to.be.a("number").greaterThan(0);
         });
+        test("The answer carries no page content", function () {
+            expect(res.getBody()).to.not.have.property("pages");
+        });
+    - type: post-response
+      code: |-
+        bru.setVar("ocrJobId", res.getBody().job_id);
 
 settings:
   encodeUrl: true

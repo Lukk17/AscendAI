@@ -1,0 +1,67 @@
+info:
+  name: mcp-unsupported-language
+  type: http
+  seq: 35
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 35,
+        "method": "tools/call",
+        "params": {
+          "name": "ocr_submit",
+          "arguments": {
+            "file_uri": "http://host.docker.internal:9070/e2e-fixtures/argent-saga-chronicles-page1.png",
+            "lang": "korean"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("A language the service does not read is refused with UNSUPPORTED_LANGUAGE", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const text = JSON.stringify(envelope);
+            expect(text).to.include("UNSUPPORTED_LANGUAGE");
+            expect(text).to.include("Supported languages:");
+        });
+        test("The refusal comes before the URI is fetched and never echoes the language", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const text = JSON.stringify(envelope);
+            expect(text).to.not.include("DOWNLOAD_FAILED");
+            expect(text).to.not.include("korean");
+        });
+        test("No identifier is issued, so nothing was queued", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(JSON.stringify(envelope)).to.not.include("job_id");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

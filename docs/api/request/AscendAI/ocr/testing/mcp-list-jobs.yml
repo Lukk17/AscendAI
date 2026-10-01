@@ -1,7 +1,7 @@
 info:
-  name: ocr-process-english
+  name: mcp-list-jobs
   type: http
-  seq: 3
+  seq: 8
 
 http:
   method: POST
@@ -11,10 +11,8 @@ http:
       value: application/json
     - name: Accept
       value: application/json, text/event-stream
-    - name: MCP-Session-Id
+    - name: Mcp-Session-Id
       value: "{{mcp_session_id}}"
-    - name: MCP-Protocol-Version
-      value: "{{mcp_protocol_version}}"
   body:
     type: json
     data: |-
@@ -23,11 +21,8 @@ http:
         "id": 3,
         "method": "tools/call",
         "params": {
-          "name": "ocr_process",
-          "arguments": {
-            "file_uri": "/path/to/image.png",
-            "lang": "en"
-          }
+          "name": "ocr_list_jobs",
+          "arguments": {}
         }
       }
   auth: inherit
@@ -39,20 +34,16 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("ocr_process with English language returns valid OCR response", function () {
+        test("ocr_list_jobs returns the same listing the REST surface returns", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
             const payload = JSON.parse(envelope.result.content[0].text);
-            expect(payload).to.have.property("status");
-            expect(payload.status).to.equal("ok");
-            expect(payload).to.have.property("language");
-            expect(payload.language).to.equal("en");
-            expect(payload).to.have.property("pages");
-            expect(payload.pages).to.be.an("array");
-            expect(payload.pages.length).to.be.at.least(1);
-            expect(payload.pages[0]).to.have.property("lines");
-            expect(payload.pages[0].lines).to.be.an("array");
+            expect(payload.jobs).to.be.an("array");
+            payload.jobs.forEach(function (entry, index) {
+                expect(["waiting", "running"]).to.include(entry.state);
+                expect(entry.queue_position).to.equal(entry.state === "running" ? null : index);
+            });
         });
 
 settings:

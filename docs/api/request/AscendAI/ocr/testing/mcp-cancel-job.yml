@@ -1,0 +1,52 @@
+info:
+  name: mcp-cancel-job
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "tools/call",
+        "params": {
+          "name": "ocr_cancel_job",
+          "arguments": {
+            "job_id": "{{ocrJobId}}"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("ocr_cancel_job accepts the identifier it was given", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(payload.job_id).to.equal(bru.getVar("ocrJobId") || bru.getEnvVar("ocrJobId"));
+            expect(payload.cancelled).to.be.true;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

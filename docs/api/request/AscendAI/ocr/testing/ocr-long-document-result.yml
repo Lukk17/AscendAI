@@ -1,0 +1,40 @@
+info:
+  name: ocr-long-document-result
+  type: http
+  seq: 16
+
+http:
+  method: GET
+  url: "{{ocrResultUrl}}"
+  headers:
+    - name: accept
+      value: text/markdown
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("The time-limited link fetches the stored object", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Every one of the twenty five pages is in the Markdown, in order", function () {
+            const markdown = String(res.getBody());
+            const headings = markdown.split("\n").filter(function (line) { return line.indexOf("## Page ") === 0; });
+            expect(headings.length).to.equal(25);
+            headings.forEach(function (heading, index) {
+                expect(heading).to.equal("## Page " + (index + 1));
+            });
+        });
+        test("The canary on page 24 was read, so the whole document was", function () {
+            expect(String(res.getBody())).to.include("Halcyon Ledger Canary");
+        });
+        test("The object carries no front matter", function () {
+            expect(String(res.getBody()).indexOf("---")).to.not.equal(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,42 @@
+info:
+  name: ocr-polish-result
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{ocrResultUrl}}"
+  headers:
+    - name: accept
+      value: text/markdown
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("The time-limited link fetches the stored object", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The object is the document's text, one heading per page", function () {
+            expect(String(res.getBody()).split("\n")[0]).to.equal("## Page 1");
+        });
+        test("The object carries no front matter", function () {
+            const markdown = String(res.getBody());
+            expect(markdown.indexOf("---")).to.not.equal(0);
+            expect(markdown).to.not.include("schema_version");
+        });
+        test("The text carries the Polish canary substring", function () {
+            const markdown = String(res.getBody()).toLowerCase();
+            const canaries = ["saga świetlna", "aenaria", "eklipsą"];
+            expect(canaries.some(function (c) { return markdown.includes(c); })).to.be.true;
+        });
+        test("The text carries a Polish-specific accented character", function () {
+            expect(/[śżąęćółńźŚŻĄĘĆÓŁŃŹ]/.test(String(res.getBody()))).to.be.true;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,48 @@
+info:
+  name: ocr-queue-full
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - "{{ocrFixtures}}/argent-saga-chronicles-page1.png"
+      - name: lang
+        type: text
+        value: en
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("A submission past the queue bound is refused with 503", function () {
+            expect(res.getStatus()).to.equal(503);
+        });
+        test("The refusal carries the queue-full code", function () {
+            expect(res.getBody().code).to.equal("QUEUE_FULL");
+        });
+        test("The refusal says to try again in exactly 30 whole seconds under the checked defaults", function () {
+            const retryAfter = res.getHeader("retry-after");
+            expect(retryAfter).to.match(/^[0-9]+$/);
+            expect(Number(retryAfter)).to.equal(30);
+        });
+        test("No identifier is issued, so nothing was queued", function () {
+            expect(res.getBody()).to.not.have.property("job_id");
+            expect(res.getHeader("location")).to.be.undefined;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

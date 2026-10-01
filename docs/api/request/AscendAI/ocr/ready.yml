@@ -27,6 +27,18 @@ runtime:
         test("version is a non-empty string", function () {
             expect(res.getBody().version).to.be.a("string").and.not.empty;
         });
+        test("accepting_work true", function () {
+            expect(res.getBody().accepting_work).to.equal(true);
+        });
+        test("an idle service reports nothing queued", function () {
+            expect(res.getBody().jobs_queued).to.equal(0);
+        });
+        test("an idle service reports nothing running", function () {
+            expect(res.getBody().jobs_running).to.equal(0);
+        });
+        test("queue_depth is no longer reported", function () {
+            expect(res.getBody()).to.not.have.property("queue_depth");
+        });
 
 settings:
   encodeUrl: true

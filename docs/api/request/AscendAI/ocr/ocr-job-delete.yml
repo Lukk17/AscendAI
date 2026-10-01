@@ -1,0 +1,28 @@
+info:
+  name: ocr-job-delete
+  type: http
+  seq: 5
+
+http:
+  method: DELETE
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs/{{ocrJobId}}"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Deleting answers 204 with no body", function () {
+            expect(res.getStatus()).to.equal(204);
+            const body = res.getBody();
+            expect(body === undefined || body === null || body === "").to.equal(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,4 +1,4 @@
-# MCP SSRF guard rejection: run tasks template
+# MCP SSRF rejection: run tasks template
 
 Spec: [../8-mcp-ssrf-rejection-test.md](../8-mcp-ssrf-rejection-test.md)
 
@@ -10,7 +10,6 @@ Copy this file to `../runs/<UTC-timestamp>_8-mcp-ssrf-rejection-tasks.md` before
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
-- [ ] `docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS` does NOT contain `169.254.169.254`
 
 ### Reset state
 
@@ -18,13 +17,15 @@ Copy this file to `../runs/<UTC-timestamp>_8-mcp-ssrf-rejection-tasks.md` before
 
 ### Run
 
-- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header, capture the session id (32 character hexadecimal session id without hyphens)
-- [ ] Send `mcp-ssrf-link-local.yml` via `bru run` with `--env-var "mcp_session_id=<captured session id>"` and wait for HTTP 200
+- [ ] `initialize` handshake returns an `mcp-session-id` header
+- [ ] `notifications/initialized` sent with `ocr/testing/mcp-initialized.yml` and that session id, HTTP 202 with an empty body
+- [ ] Send `ocr/testing/mcp-ssrf-link-local.yml` with that session id
 
 ### Expected
 
-- [ ] Step 1 returns HTTP 200 and the `Mcp-Session-Id` header value is non-empty
-- [ ] Step 2 returns HTTP 200 carrying a JSON-RPC error envelope (`error` field present OR `result.isError` truthy)
+- [ ] HTTP 200 at the transport, with a JSON-RPC error frame or an `isError` result
+- [ ] The answer carries `UNSAFE_URI`
+- [ ] No `job_id` is issued
 
 ### Verdict
 
@@ -34,9 +35,9 @@ Copy this file to `../runs/<UTC-timestamp>_8-mcp-ssrf-rejection-tasks.md` before
 
 
 
-Input tokens: 0
+Input tokens:
 
-Output tokens: 0
+Output tokens:
 
 Start (UTC):
 

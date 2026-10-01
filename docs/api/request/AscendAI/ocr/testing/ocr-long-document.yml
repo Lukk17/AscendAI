@@ -1,0 +1,50 @@
+info:
+  name: ocr-long-document
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - "{{ocrFixtures}}/halcyon-ledger-25-pages.pdf"
+      - name: lang
+        type: text
+        value: en
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("A document far past the old two page ceiling is accepted", function () {
+            expect(res.getStatus()).to.equal(202);
+            expect(res.getBody().page_count).to.equal(25);
+        });
+        test("The answer carries an identifier and where to read the state", function () {
+            const body = res.getBody();
+            expect(body.job_id).to.be.a("string").with.lengthOf(22);
+            expect(body.state).to.equal("waiting");
+            expect(body.status_url).to.equal("/v1/ocr/jobs/" + body.job_id);
+            expect(res.getHeader("location")).to.equal("/v1/ocr/jobs/" + body.job_id);
+        });
+        test("The answer carries no page content", function () {
+            expect(res.getBody()).to.not.have.property("pages");
+        });
+    - type: post-response
+      code: |-
+        bru.setVar("ocrJobId", res.getBody().job_id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

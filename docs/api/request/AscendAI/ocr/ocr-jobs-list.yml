@@ -1,0 +1,47 @@
+info:
+  name: ocr-jobs-list
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200, even with nothing in flight", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The listing is an array", function () {
+            expect(res.getBody().jobs).to.be.an("array");
+        });
+        test("Only work in flight is listed", function () {
+            res.getBody().jobs.forEach(function (entry) {
+                expect(["waiting", "running"]).to.include(entry.state);
+            });
+        });
+        test("A waiting entry's position is its place in submission order, a running entry has none", function () {
+            res.getBody().jobs.forEach(function (entry, index) {
+                expect(entry.queue_position).to.equal(entry.state === "running" ? null : index);
+            });
+        });
+        test("Every entry reports progress and how long it has been in flight", function () {
+            res.getBody().jobs.forEach(function (entry) {
+                expect(entry.job_id).to.be.a("string").with.lengthOf(22);
+                expect(entry.pages_done).to.be.a("number").at.least(0);
+                expect(entry.pages_done).to.be.at.most(entry.page_count);
+                expect(entry.elapsed_seconds).to.be.a("number").at.least(0);
+            });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

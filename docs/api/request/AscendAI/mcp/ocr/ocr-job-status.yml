@@ -1,0 +1,57 @@
+info:
+  name: ocr-job-status
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: MCP-Session-Id
+      value: "{{mcp_session_id}}"
+    - name: MCP-Protocol-Version
+      value: "{{mcp_protocol_version}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": {
+          "name": "ocr_job_status",
+          "arguments": {
+            "job_id": "{{ocrJobId}}"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("ocr_job_status carries the state, the hint and, once finished, the result address", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const payload = JSON.parse(envelope.result.content[0].text);
+            expect(["waiting", "running", "succeeded", "failed", "cancelled"]).to.include(payload.state);
+            if (payload.state === "succeeded") {
+                expect(payload.result.bucket).to.be.a("string").that.is.not.empty;
+                expect(payload.result.key).to.equal(payload.job_id + ".md");
+            }
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

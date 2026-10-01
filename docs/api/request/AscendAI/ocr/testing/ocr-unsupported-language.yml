@@ -1,0 +1,50 @@
+info:
+  name: ocr-unsupported-language
+  type: http
+  seq: 26
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - "{{ocrFixtures}}/argent-saga-chronicles-page1.png"
+      - name: lang
+        type: text
+        value: korean
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("A language the service does not read is refused with 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+        test("The refusal carries the unsupported-language code", function () {
+            expect(res.getBody().code).to.equal("UNSUPPORTED_LANGUAGE");
+        });
+        test("The detail names the languages the service does read", function () {
+            expect(res.getBody().detail).to.include("Supported languages:");
+        });
+        test("The detail never echoes the caller's language", function () {
+            expect(res.getBody().detail).to.not.include("korean");
+        });
+        test("No identifier is issued, so nothing was queued", function () {
+            expect(res.getBody()).to.not.have.property("job_id");
+            expect(res.getBody()).to.not.have.property("state");
+            expect(res.getHeader("location")).to.be.undefined;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

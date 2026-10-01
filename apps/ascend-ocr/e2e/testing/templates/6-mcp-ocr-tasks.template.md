@@ -1,4 +1,4 @@
-# MCP ocr_process happy path: run tasks template
+# MCP reading through the job surface: run tasks template
 
 Spec: [../6-mcp-ocr-test.md](../6-mcp-ocr-test.md)
 
@@ -10,38 +10,39 @@ Copy this file to `../runs/<UTC-timestamp>_6-mcp-ocr-tasks.md` before starting a
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
-- [ ] `apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png` exists on the host
-- [ ] Object store `curl -fsS http://localhost:9070/_floci/health` returns HTTP 200 with `"s3":"running"`
-- [ ] `docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS` returns a list containing `host.docker.internal`
+- [ ] Object store answers on `http://localhost:9070/_floci/health`
+- [ ] `MCP_ALLOWED_HOSTS` contains `host.docker.internal`
 
 ### Reset state
 
-- [ ] `curl -sS -o /dev/null -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"` prints `200`
-- [ ] `curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"` returned HTTP 204 (object cleared)
-- [ ] `curl -sS -o /dev/null -w "%{http_code}\n" -X PUT -H "Content-Type: image/png" --data-binary "@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png" "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"` prints `200`
-- [ ] `curl -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=argent-saga"` carries `<Key>argent-saga-chronicles-page1.png</Key>` with `<Size>212563</Size>`
+- [ ] `e2e-fixtures` bucket created (idempotent)
+- [ ] Previous fixture object deleted
+- [ ] Fixture uploaded, HTTP 200
+- [ ] Job records dropped from the container's jobs directory
+- [ ] `ocr-results` bucket emptied
 
 ### Run
 
-- [ ] Step 1: `curl -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header, capture the session id (32 character hexadecimal session id without hyphens)
-- [ ] Send `mcp-ocr.yml` via `bru run` with `--env-var "mcp_session_id=<captured session id>"` and wait for HTTP 200
+- [ ] `initialize` handshake returns an `mcp-session-id` header
+- [ ] `notifications/initialized` sent with `ocr/testing/mcp-initialized.yml` and that session id, HTTP 202 with an empty body
+- [ ] Step 1: `ocr_submit` answers with a job record
+- [ ] Step 2: first `ocr_job_status` read taken right away after step 1, before waiting for a hint
+- [ ] Step 2: `ocr_job_status` polled until terminal
+- [ ] Step 3: result URL fetched
+- [ ] Step 4: `ocr_cancel_job` forgets the finished job
+- [ ] Step 5: `ocr/testing/mcp-job-not-found.yml` reads the forgotten identifier
 
 ### Expected
 
-- [ ] HTTP 200
-- [ ] `result.content` carries a serialised `OcrJsonResponse`
-- [ ] `language="en"`
-- [ ] `filename="argent-saga-chronicles-page1.png"`
-- [ ] `pages` is non-empty
-- [ ] Concatenated `pages[*].lines[*].text` (case-insensitive) contains `Argent Saga`, `Aenaria`, or `Halen Veyr`
-- [ ] `processing_time_seconds` is a finite non-negative number
-
-### Post-run cleanup
-
-Run regardless of the Run-step verdict; the delete is idempotent.
-
-- [ ] `curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"` returned HTTP 204
-- [ ] The `e2e-fixtures` bucket itself was left in place
+- [ ] Step 1: 22 character `job_id`, `state="waiting"`, `page_count=1`
+- [ ] Step 1: no page content in the tool payload
+- [ ] Step 2: the first read is `waiting`, `running` or `succeeded` (write which)
+- [ ] Step 2: if the first read is `waiting` or `running`, it carries `poll_after_seconds` between 1 and 30. If it is already `succeeded`, write "not observed" beside this box instead of ticking or failing it
+- [ ] Step 2: non-terminal reads carry `poll_after_seconds`, the terminal read does not
+- [ ] Step 2: terminal state is `succeeded` with `result.key = <job_id>.md`
+- [ ] Step 3: HTTP 200, first line `## Page 1`, canary substring present
+- [ ] Step 4: the same `job_id` and `cancelled: true`
+- [ ] Step 5: the answer carries `JOB_NOT_FOUND` and no record
 
 ### Verdict
 
@@ -51,9 +52,9 @@ Run regardless of the Run-step verdict; the delete is idempotent.
 
 
 
-Input tokens: 0
+Input tokens:
 
-Output tokens: 0
+Output tokens:
 
 Start (UTC):
 

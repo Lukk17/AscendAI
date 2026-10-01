@@ -1,0 +1,52 @@
+info:
+  name: ocr-job-cancelled
+  type: http
+  seq: 17
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs/{{ocrJobId}}"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200, a cancelled record is still readable", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The record is the one that was cancelled", function () {
+            expect(res.getBody().job_id).to.equal(bru.getEnvVar("ocrJobId") || bru.getVar("ocrJobId"));
+        });
+        test("The work reads cancelled, not failed and not succeeded", function () {
+            expect(res.getBody().state).to.equal("cancelled");
+        });
+        test("A cancel is not a failure, so it carries no error code", function () {
+            const body = res.getBody();
+            expect(body.error_code).to.be.null;
+        });
+        test("A terminal record carries no hint to ask again", function () {
+            const body = res.getBody();
+            expect(body).to.not.have.property("poll_after_seconds");
+        });
+        test("Cancelled work has no result address", function () {
+            const body = res.getBody();
+            expect(body.result).to.be.null;
+        });
+        test("Progress never passes the document's own page count", function () {
+            const body = res.getBody();
+            expect(body.pages_done).to.be.a("number").at.least(0);
+            expect(body.pages_done).to.be.at.most(body.page_count);
+        });
+        test("The record says when the work stopped", function () {
+            expect(res.getBody().finished_at).to.be.a("number").greaterThan(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

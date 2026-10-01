@@ -1,0 +1,71 @@
+info:
+  name: mcp-file-uri-jail-escape
+  type: http
+  seq: 25
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7023/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 25,
+        "method": "tools/call",
+        "params": {
+          "name": "ocr_submit",
+          "arguments": {
+            "file_uri": "file:///tmp/ocr-jail/../../etc/passwd",
+            "lang": "en"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("A path that resolves outside the root is refused with UNSAFE_URI", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(JSON.stringify(envelope)).to.include("UNSAFE_URI");
+        });
+        test("The refusal comes from the jail, not from file:// being switched off", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const text = JSON.stringify(envelope);
+            expect(text).to.include("escapes MCP_FILE_URI_ROOT");
+            expect(text).to.not.include("MCP_FILE_URI_ROOT is unset");
+        });
+        test("Nothing outside the root was read", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(JSON.stringify(envelope)).to.not.include("root:x:0:0");
+        });
+        test("No identifier is issued, so nothing was queued", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(JSON.stringify(envelope)).to.not.include("job_id");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

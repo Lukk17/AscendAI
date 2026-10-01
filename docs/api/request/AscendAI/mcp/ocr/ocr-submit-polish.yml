@@ -1,5 +1,5 @@
 info:
-  name: ocr-process-polish
+  name: ocr-submit-polish
   type: http
   seq: 4
 
@@ -23,9 +23,9 @@ http:
         "id": 4,
         "method": "tools/call",
         "params": {
-          "name": "ocr_process",
+          "name": "ocr_submit",
           "arguments": {
-            "file_uri": "/path/to/image.png",
+            "file_uri": "http://host.docker.internal:9070/e2e-fixtures/argent-saga-chronicles-page1-polish.png",
             "lang": "pl"
           }
         }
@@ -39,20 +39,16 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("ocr_process with Polish language returns valid OCR response", function () {
+        test("ocr_submit answers with an identifier, not with the document's text", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
             const payload = JSON.parse(envelope.result.content[0].text);
-            expect(payload).to.have.property("status");
-            expect(payload.status).to.equal("ok");
-            expect(payload).to.have.property("language");
-            expect(payload.language).to.equal("pl");
-            expect(payload).to.have.property("pages");
-            expect(payload.pages).to.be.an("array");
-            expect(payload.pages.length).to.be.at.least(1);
-            expect(payload.pages[0]).to.have.property("lines");
-            expect(payload.pages[0].lines).to.be.an("array");
+            expect(payload.job_id).to.be.a("string").with.lengthOf(22);
+            expect(payload.state).to.equal("waiting");
+            expect(payload.status_url).to.equal("/v1/ocr/jobs/" + payload.job_id);
+            expect(payload).to.not.have.property("pages");
+            bru.setVar("ocrJobId", payload.job_id);
         });
 
 settings:

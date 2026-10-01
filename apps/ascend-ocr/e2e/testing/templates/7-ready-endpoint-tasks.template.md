@@ -24,6 +24,9 @@ Copy this file to `../runs/<UTC-timestamp>_7-ready-endpoint-tasks.md` before sta
 - [ ] HTTP 200
 - [ ] Body `status` equals `"ready"`
 - [ ] Body `engine_warm` equals `true`
+- [ ] Body `accepting_work` is `true`
+- [ ] Body `jobs_queued` is `0` and `jobs_running` is `0` on an idle service
+- [ ] Body has no `queue_depth` key
 - [ ] Body `version` is a non-empty string
 
 ### Verdict
@@ -34,9 +37,9 @@ Copy this file to `../runs/<UTC-timestamp>_7-ready-endpoint-tasks.md` before sta
 
 
 
-Input tokens: 0
+Input tokens:
 
-Output tokens: 0
+Output tokens:
 
 Start (UTC):
 

@@ -1,7 +1,7 @@
 info:
   name: mcp-list-tools
   type: http
-  seq: 5
+  seq: 14
 
 http:
   method: POST
@@ -18,7 +18,7 @@ http:
     data: |-
       {
         "jsonrpc": "2.0",
-        "id": 1,
+        "id": 9,
         "method": "tools/list",
         "params": {}
       }
@@ -31,15 +31,63 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("tools/list advertises ocr_process with the documented schema", function () {
+        test("Exactly the four job tools are advertised, and nothing else", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
-            const tool = envelope.result.tools.find(function (t) { return t.name === "ocr_process"; });
+            const names = envelope.result.tools.map(function (t) { return t.name; }).sort();
+            expect(names).to.deep.equal(["ocr_cancel_job", "ocr_job_status", "ocr_list_jobs", "ocr_submit"]);
+        });
+        test("ocr_submit advertises quality as normal or high, defaulting to high", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "ocr_submit"; });
+            expect(tool).to.be.ok;
+            const quality = tool.inputSchema.properties.quality;
+            expect(quality).to.be.an("object");
+            expect(quality.type).to.equal("string");
+            expect(quality.enum).to.have.members(["normal", "high"]);
+            expect(quality.enum).to.have.lengthOf(2);
+            expect(quality.default).to.equal("high");
+        });
+        test("ocr_submit advertises straighten as a boolean, defaulting to false", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "ocr_submit"; });
+            expect(tool).to.be.ok;
+            const straighten = tool.inputSchema.properties.straighten;
+            expect(straighten).to.be.an("object");
+            expect(straighten.type).to.equal("boolean");
+            expect(straighten.default).to.equal(false);
+        });
+        test("ocr_submit takes a URI and an optional language", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "ocr_submit"; });
             expect(tool).to.be.ok;
             expect(tool.inputSchema.properties).to.have.property("file_uri");
             expect(tool.inputSchema.properties).to.have.property("lang");
-            expect(tool.inputSchema.required).to.include("file_uri");
+        });
+        test("The status and cancel tools take an identifier", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            ["ocr_job_status", "ocr_cancel_job"].forEach(function (name) {
+                const tool = envelope.result.tools.find(function (t) { return t.name === name; });
+                expect(tool).to.be.ok;
+                expect(tool.inputSchema.properties).to.have.property("job_id");
+            });
+        });
+        test("The removed synchronous tool is not advertised under any name", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const names = envelope.result.tools.map(function (t) { return t.name; });
+            expect(names).to.not.include("ocr_process");
+            expect(names.filter(function (n) { return n.indexOf("process") >= 0; })).to.be.empty;
         });
 
 settings:
