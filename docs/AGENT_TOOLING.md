@@ -122,8 +122,9 @@ What you just pulled:
 - [.agents/skills/](../.agents/skills/), the canonical skills, plus [.agents/agents/](../.agents/agents/), the shared
   OpenCode-format subagents, [.agents/hooks/](../.agents/hooks/), the four hook scripts, and
   [.agents/plugin/hooks.js](../.agents/plugin/hooks.js), the OpenCode and Kilo adapter for the gate.
-- [.claude/](../.claude/): the `CLAUDE.md` bridge, the `skills` symlink, the generated `agents/` tree, and
-  `settings.json` carrying the Claude Code hooks.
+- [.claude/](../.claude/): the `CLAUDE.md` bridge, the `skills` symlink, the generated `agents/` tree,
+  `settings.json` carrying the Claude Code hooks, and the `workflows/` folder holding the
+  [skill audit](#auditing-the-skills).
 - `.opencode/agents` and `.kilo/agents`: symlinks into [.agents/agents/](../.agents/agents/). One tree, two agents.
 - [.codex/](../.codex/): the generated TOML custom agents and `config.toml`, which holds both the Codex MCP servers
   and the Codex gate hooks inline.
@@ -157,8 +158,8 @@ If any of them came through as a small text file instead of a link, go back to S
 
 [docs/AGENTS-UPDATE.md](AGENTS-UPDATE.md) ships from upstream, holds the per-shell update commands, and refreshes
 itself on every run. Open it and run the block for your shell. It refreshes the shipped documents, all four hook
-scripts and the plugin, the Copilot hook file, and only the skills and subagents already present in your tree.
-Nothing new appears behind your back.
+scripts and the plugin, the Copilot hook file, and only the skills, subagents and saved Claude Code workflows already
+present in your tree. Nothing new appears behind your back.
 
 It deliberately leaves your `AGENTS.md`, your five MCP config files, `.claude/settings.json`, and `.claude/CLAUDE.md`
 alone. Those are yours. When you do want an upstream change in one of the configuration files, each shell section of
@@ -196,11 +197,11 @@ Each agent wires that same script through its own hook surface:
 
 | Agent | Where the hooks live | What it can stop |
 | --- | --- | --- |
-| Claude Code | [.claude/settings.json](../.claude/settings.json) | blocks the tool call, injects the gate at session start and every turn, lints markdown after an edit, blocks a reply on `Stop` and `SubagentStop`, and mirrors the task list |
-| Codex | inline `[[hooks.*]]` tables in [.codex/config.toml](../.codex/config.toml) | blocks the tool call, injects the gate every turn and on subagent start, runs the formatting check on `Stop`, and seeds the task list at session start |
-| OpenCode | plugin [.agents/plugin/hooks.js](../.agents/plugin/hooks.js), declared in [opencode.json](../opencode.json) | blocks the tool call |
-| Kilo Code | the same plugin, the same declaration | blocks the tool call |
-| GitHub Copilot | [.github/hooks/preflight.json](../.github/hooks/preflight.json) | fires on the tool call but always allows, caller identity is always unknown there; injects the gate once per session and on subagent start |
+| Claude Code | [.claude/settings.json](../.claude/settings.json) | blocks the tool call, injects the gate at session start and every turn, tells a subagent to do its task itself on subagent start, lints markdown after an edit, blocks a reply on `Stop` and `SubagentStop`, and mirrors the task list |
+| Codex | inline `[[hooks.*]]` tables in [.codex/config.toml](../.codex/config.toml) | blocks the tool call, injects the gate every turn, tells a subagent to do its task itself on subagent start, runs the formatting check on `Stop`, and seeds the task list at session start |
+| OpenCode | plugin [.agents/plugin/hooks.js](../.agents/plugin/hooks.js), declared in [opencode.json](../opencode.json) | blocks the tool call, injects the gate on every main-thread prompt through `chat.message` and the subagent text in a subagent's session |
+| Kilo Code | the same plugin, the same declaration | blocks the tool call, injects the gate on every main-thread prompt through `chat.message` and the subagent text in a subagent's session |
+| GitHub Copilot | [.github/hooks/preflight.json](../.github/hooks/preflight.json) | fires on the tool call but always allows, caller identity is always unknown there; injects the gate at session start and on every prompt through `userPromptTransformed`, and tells a subagent to do its task itself on subagent start |
 
 Only Claude Code has task events, so `tasks.md` is written from them there and merely injected at session start
 elsewhere. Nothing has a task-updated event, so the hook writes only `open` and `done` and the model sets
@@ -275,7 +276,9 @@ Copilot reads this setup natively across its surfaces, so it needs no bridge ins
   file actually in effect. The JetBrains plugin reads a global file only, and the cloud agent takes JSON pasted into
   a repository settings page. Both manual blocks are in [MCP_SETUP.md](MCP_SETUP.md).
 - Preflight: [.github/hooks/preflight.json](../.github/hooks/preflight.json), camelCase events, injecting the gate
-  on `sessionStart` and `subagentStart` and blocking on `preToolUse`. The pre-tool payload carries no agent
+  on `sessionStart`, telling a subagent to do its task itself on `subagentStart`, appending the gate to every prompt on
+  `userPromptTransformed`, and blocking on
+  `preToolUse`. The pre-tool payload carries no agent
   identifier, so caller identity there resolves to unknown and none of the gate's rules ever fires on that hook: this
   surface runs entirely unenforced rather than merely weaker. Copilot in JetBrains fires only six events, has no
   subagent event, and reads hook configuration only from `.github/hooks/`.
@@ -300,6 +303,33 @@ Skills are invoked from inside the agent shell with slash syntax:
 
 Depending on the agent, the autocomplete may show `/name` or `/name.md`. Use whichever form yours offers. The full
 catalogue is [.agents/skills/](../.agents/skills/), one directory per skill, each holding a `SKILL.md`.
+
+---
+
+### Auditing the skills
+
+[.claude/workflows/skill-audit.js](../.claude/workflows/skill-audit.js) is a saved Claude Code workflow. It reads every
+skill under [.agents/skills/](../.agents/skills/) and reports contradictions, broken references, weak descriptions,
+and overlaps between skills. A second agent tries to refute each finding before it is reported, so the result lists
+confirmed and rejected findings separately.
+
+It is read-only: no agent in it edits a file or runs a script. A full run is expensive in tokens, because it starts
+one lister, then one reader and one checker per batch of skills, at most five batches. To gauge the cost first, audit
+a few skills rather than all of them.
+
+It runs only in Claude Code. Claude Code runs a saved workflow as a command named after it, so type:
+
+```text
+/skill-audit
+```
+
+To audit a few skills only, name them in the same prompt, and Claude passes them to the script as its `args` list:
+
+```text
+Run /skill-audit on python-patterns and bash
+```
+
+Run `/workflows` to watch the progress of a run or to stop it.
 
 ---
 
