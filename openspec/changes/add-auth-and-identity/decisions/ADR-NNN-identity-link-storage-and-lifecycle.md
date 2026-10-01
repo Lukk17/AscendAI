@@ -1,4 +1,6 @@
-# ADR-012: Identity Links Live in PostgreSQL With a Three-State Lifecycle
+# ADR-NNN: Identity Links Live in PostgreSQL With a Three-State Lifecycle
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 

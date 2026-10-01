@@ -87,7 +87,7 @@ The migration SHALL create a keyword payload index on `tenant_id` and a keyword 
 
 ### Requirement: Tenant context and principal set resolved per request, fail-closed
 
-The agent SHALL resolve, for every request, both the current tenant (from the JWT `tenant` claim) and the caller's principal set (resolved by `add-auth-and-identity` from the token's group claim or the provider's transitive membership endpoint), each exposed to services through a single request-scoped accessor. Every tenant-scoped operation (Qdrant search, MinIO upload/scan/presign, chat history read/write, user-instruction read/write, AscendMemory call) SHALL require a resolved tenant id, and every access-scoped operation (Qdrant search and source presigning) SHALL additionally require a resolved principal set.
+The agent SHALL resolve, for every request, both the current tenant (from the JWT `tenant` claim) and the caller's principal set (resolved by `add-auth-and-identity` from the token's group claim or the provider's transitive membership endpoint), each exposed to services through a single request-scoped accessor. Every tenant-scoped operation (Qdrant search, the object store (Floci) upload/scan/presign, chat history read/write, user-instruction read/write, AscendMemory call) SHALL require a resolved tenant id, and every access-scoped operation (Qdrant search and source presigning) SHALL additionally require a resolved principal set.
 
 When either is unresolved, the operation SHALL fail with an error. It SHALL NOT fall back to an unfiltered query, a query filtered on one axis only, a shared key, or the `default` tenant. An empty resolved principal set is distinct from an unresolved one: an empty set is a valid answer that legitimately matches nothing, while an unresolved set is a failure that SHALL throw.
 
@@ -100,7 +100,7 @@ When either is unresolved, the operation SHALL fail with an error. It SHALL NOT 
 
 - **WHEN** a tenant-scoped service method is invoked while no tenant is resolved for the current request
 - **THEN** the operation throws an error surfaced as HTTP 401/403 at the web layer
-- **AND** no Qdrant, MinIO, Redis, Postgres, or AscendMemory access is performed for that operation
+- **AND** no Qdrant, the object store (Floci), Redis, Postgres, or AscendMemory access is performed for that operation
 
 #### Scenario: Missing principal set fails closed
 
@@ -127,13 +127,33 @@ When either is unresolved, the operation SHALL fail with an error. It SHALL NOT 
 - **THEN** the composed filter uses only the resolved principal set
 - **AND** no chunk granted solely by the claimed principal is retrieved
 
+### Requirement: Documents registry and OCR results are tenant-scoped
+
+The `documents` registry table that `add-document-management-api` introduced SHALL carry `tenant_id VARCHAR(64) NOT NULL` with a foreign key to `tenants(id)`, its `object_key` SHALL start with `tenant/{tenantId}/`, and every read, list, update and delete through the document management API SHALL filter on the caller's tenant. A document id that exists under another tenant SHALL be answered as not found. OCR results that ascend-ocr writes to its own `ocr-results` bucket SHALL be fetched by the agent only for jobs it submitted for the caller's tenant, and the agent SHALL record the tenant of every OCR job it submits so a result link is never handed to a caller of another tenant.
+
+#### Scenario: Another tenant's document is not found
+
+- **WHEN** a caller of tenant `globex` reads, deletes or re-indexes a document whose `documents` row carries `tenant_id = 'acme'`
+- **THEN** the response is 404
+- **AND** the row, its object and its Qdrant points are unchanged
+
+#### Scenario: Document list is per tenant
+
+- **WHEN** a caller of tenant `acme` lists documents
+- **THEN** every returned row carries `tenant_id = 'acme'`
+
+#### Scenario: An OCR result of another tenant is not handed out
+
+- **WHEN** an OCR job was submitted by the agent for tenant `acme` and a caller of tenant `globex` asks for its result
+- **THEN** the agent answers not found and issues no presigned link to the `ocr-results` object
+
 ### Requirement: Default-tenant migration for existing deployments
 
 The upgrade path SHALL map all pre-existing data to the reserved `default` tenant and SHALL give it an explicit access list in the same step. The Liquibase changelog SHALL backfill `tenant_id = 'default'` on all existing `chat_history` and `user_instructions` rows before tightening the columns to `NOT NULL`.
 
 A one-shot, idempotent migration task SHALL, for all existing points in both collections, stamp `tenant_id = 'default'`, stamp `acl = ["tenant:everyone:default"]` with `acl_source = 'tenant-default'`, a matching `acl_version`, and `acl_synced_at` set to the migration time. The explicit list is mandatory rather than optional: under deny-by-default a point stamped with a tenant and no access list is retrievable by nobody, so a tenant-only backfill would silently make every pre-existing document invisible. Stamping `tenant:everyone:default` reproduces the pre-change behaviour of a single-company deployment deliberately, as a grant visible in the payload, rather than by omission.
 
-The same task SHALL create the keyword payload indexes on `tenant_id` and `acl`, and SHALL move existing MinIO objects from `markdown/` and `documents/` to `tenant/default/markdown/` and `tenant/default/documents/`.
+The same task SHALL create the keyword payload indexes on `tenant_id` and `acl`, and SHALL move existing object-store objects from `markdown/` and `documents/` to `tenant/default/markdown/` and `tenant/default/documents/`.
 
 #### Scenario: Postgres rows backfilled at boot
 

@@ -1,4 +1,6 @@
-# ADR-012: Fail Closed on a Missing Tenant Context or Principal Set
+# ADR-NNN: Fail Closed on a Missing Tenant Context or Principal Set
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 
@@ -44,6 +46,6 @@ Log a warning and continue. A log line on a system that returns 200 is not a con
 ## Related
 
 - OpenSpec change `add-tenant-isolation`, design decision 2, and the `tenant-isolation` requirement "Tenant context and principal set resolved per request, fail-closed"
-- ADR-010, the discriminator model this rule protects
-- ADR-011, the single call site the rule is applied at
+- ADR-NNN-logical-tenant-isolation-via-discriminators, the discriminator model this rule protects
+- ADR-NNN-single-similarity-search-call-site, the single call site the rule is applied at
 - `docs/architecture/decisions/ADR-M006-deny-by-default-on-missing-acl.md`, the same instinct applied to a chunk rather than a request

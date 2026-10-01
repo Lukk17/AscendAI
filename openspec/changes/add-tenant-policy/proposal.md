@@ -9,7 +9,7 @@ This change adds a per-tenant policy surface that makes both enforceable: which 
 ## What Changes
 
 - **Per-tenant provider and model allow-list**: a policy per tenant naming the permitted providers (subset of `lmstudio`, `openai`, `gemini`, `anthropic`, `minimax`) and, optionally, permitted models per provider. A chat or embedding request selecting a provider or model outside the tenant's allow-list SHALL be rejected with a clear error before any provider call - enforced at `ChatModelResolver`, the same resolution point BYOK and metering already hook. A local-only policy (`lmstudio` alone) makes "data never leaves our infrastructure" enforceable.
-- **Per-tenant MCP tool allow-list**: a policy naming the MCP tools a tenant's model may call. Tool availability is filtered per tenant when the chat request assembles its tool callbacks, so a disallowed tool is never exposed to the model and cannot be invoked - closing the RAG-injection exfiltration channel for egress tools like web search.
+- **Per-tenant MCP tool allow-list**: a policy naming the MCP tools a tenant's model may call. Tool availability is filtered per tenant in `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/mcp/FilteredToolCallbackProvider.java` (`getToolCallbacks()`, after the shared `McpToolCallbackCache` read), the one provider `ChatExecutor` takes its tool callbacks from, so a disallowed tool is never exposed to the model and cannot be invoked - closing the RAG-injection exfiltration channel for egress tools like web search.
 - **Policy management API** under `/api/v1/admin/policy`, restricted to tenant `ADMIN`, scoped to the caller's tenant: get and update the tenant's provider/model and tool policy. A deployment-level default policy applies to tenants with no explicit policy; a tenant admin may only narrow within the deployment default, never widen beyond it.
 - **Default-deny option**: the deployment default policy is configurable; a security-forward deployment can default to local-only providers and no egress tools, with tenants opting in.
 
@@ -26,19 +26,19 @@ This change adds a per-tenant policy surface that makes both enforceable: which 
 
 ## Impact
 
-- **Depends on**: `add-tenant-isolation` (tenant context), `add-auth-and-identity` (ADMIN role), `add-usage-metering-and-quotas` (the tenant-aware `ChatModelResolver` this change gates, and the same policy-cache pattern). Coordinates with `add-audit-and-gdpr-compliance` (policy changes and policy-denied requests emit audit events).
-- **ascend-ai-agent (new code)**: `service/policy/TenantPolicyService.java` (+ Caffeine cache keyed by tenant, evicted on update, matching the BYOK client-cache pattern), `model/TenantPolicy` entity + repository, Liquibase changelog for a `tenant_policy` table (JSONB or normalized columns for provider/model/tool allow-lists), `controller/admin/PolicyController.java`; enforcement hooks in `ChatModelResolver` (provider/model gate) and in the chat tool-callback assembly (tool filter).
+- Depends on: `add-tenant-isolation` (tenant context), `add-auth-and-identity` (ADMIN role), `add-usage-metering-and-quotas` (the tenant-aware `ChatModelResolver.resolve(provider, tenantId)` this change gates, and the Caffeine dependency and cache pattern it introduces), `add-audit-and-gdpr-compliance` (`AuditRecorder`, used for policy changes and policy-denied requests as `ADMIN_OPERATION` events) and `add-tenant-administration` (the `/api/v1/admin` surface and the `PLATFORM_ADMIN` / tenant `ADMIN` split). All land first. Build order (owner, 2026-10-01): groups A, B, D, `harden-cloud-deployment`, `add-auth-and-identity`, `add-tenant-isolation`, `add-usage-metering-and-quotas`, `add-audit-and-gdpr-compliance`, `add-tenant-administration`, this change, then `add-document-connectors`, `add-customer-stack-installer`, `update-docs-and-architecture`.
+- **ascend-ai-agent (new code)**: `service/policy/TenantPolicyService.java` (+ Caffeine cache keyed by tenant, evicted on update, matching the BYOK client-cache pattern), `model/TenantPolicy` Spring Data JDBC aggregate + repository, Liquibase changelog `<NN>-tenant-policy.xml` (numbered at implementation time) for a `tenant_policy` table with JSONB columns for the provider, model and tool allow-lists, `controller/admin/PolicyController.java`; enforcement hooks in `service/provider/ChatModelResolver.java` (provider/model gate) and in `config/mcp/FilteredToolCallbackProvider.java` (tool filter applied after `McpToolCallbackCache`).
+- Dependencies: Caffeine (`com.github.ben-manes.caffeine:caffeine`, version from the Spring Boot dependency management) is declared once in `apps/ascend-agent/gradle/libs.versions.toml`. `add-usage-metering-and-quotas` adds the entry for its BYOK client cache, and this change reuses it, adding it only if it is missing.
 - **Config**: `app.policy.default.*` for the deployment default policy (allowed providers, allowed tools), env-overridable per `harden-cloud-deployment`.
 - **Docs**: a policy section in `docs/SECURITY.md`; `AGENTS.md` endpoint notes; Bruno requests for the policy API.
 - **Tests**: request with a disallowed provider rejected before any provider call; local-only policy blocks a request that selects `openai`; a disallowed MCP tool is absent from the model's tool set and a prompt trying to invoke it cannot; tenant admin cannot widen beyond the deployment default; policy change audited.
 
 ## Relevant Skills
 
-- `/springboot-security`
 - `/springboot-patterns`
 - `/java-coding-standards`
 - `/api-design`
-- `/jpa-patterns`
+- `/postgres-patterns`
 - `/database-migrations`
 - `/security-review`
-- `/springboot-tdd`
+- `/tdd-workflow`

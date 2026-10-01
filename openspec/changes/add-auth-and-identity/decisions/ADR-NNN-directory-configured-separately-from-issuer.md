@@ -1,4 +1,6 @@
-# ADR-010: Directory Lookups Are Configured Separately From the Token Issuer
+# ADR-NNN: Directory Lookups Are Configured Separately From the Token Issuer
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 
@@ -32,7 +34,7 @@ The token issuer and the directory are two independent configuration axes.
 - `app.identity.claims` maps that issuer's claim names onto the resolved identity's fields: which claim is the directory subject, which is the group claim, which is the email. Entra ID is `oid`, `groups`, `email`. Google is `sub`, no group claim, `email`. Keycloak is `sub`, `groups`, `email`.
 - `app.identity.directories` is a list of directory adapters. Each entry names a provider kind (`microsoft-graph` or `google-directory`), the brokered identity provider alias it serves, the principal namespace its groups mint into, and its own credentials. An empty list is valid and means the token's group claim is the only source of groups.
 
-ADR-013 later fixed the issuer axis to a single value, our own Keycloak realm, with each customer's provider brokered behind it. That confirms this record rather than disturbing it: the two axes are still independent, and the alias on each adapter entry is what binds a directory to the customer it serves. ADR-014 then decided which of the two axes is the primary source of membership, and the answer is the directory.
+ADR-NNN-keycloak-one-realm-one-issuer-customers-brokered later fixed the issuer axis to a single value, our own Keycloak realm, with each customer's provider brokered behind it. That confirms this record rather than disturbing it: the two axes are still independent, and the alias on each adapter entry is what binds a directory to the customer it serves. ADR-NNN-directory-is-the-primary-membership-path then decided which of the two axes is the primary source of membership, and the answer is the directory.
 
 Two adapters ship: Microsoft Graph and Google Directory, behind one interface with one method, transitive group membership for a directory subject. A third vendor is new code, and the documentation says so rather than implying a property change would cover it.
 
@@ -47,7 +49,7 @@ Two adapters ship: Microsoft Graph and Google Directory, behind one interface wi
 ### Trade-offs
 
 - More configuration surface than one property, and a misconfigured claim-name mapping is a new way to get an empty group set. Mitigated by the startup check that a deployment with directory adapters configured also has a directory-subject claim mapped, and by the principal-set-size metric the design document already requires.
-- Credentials for a directory are a second secret per deployment, with their own rotation story, and a directory client secret that expires produces the failure ADR-011 turns into a 503.
+- Credentials for a directory are a second secret per deployment, with their own rotation story, and a directory client secret that expires produces the failure ADR-NNN-principal-set-never-silently-narrowed turns into a 503.
 - Two adapters is not a plugin system, and it is not meant to be. A vendor beyond Microsoft and Google is a code change, deliberately, because a generic directory abstraction built before a second real customer needs it would be built against guesses.
 
 ### Alternatives considered
@@ -62,4 +64,4 @@ Two adapters ship: Microsoft Graph and Google Directory, behind one interface wi
 - `docs/architecture/decisions/ADR-M007-group-principals-membership-at-login.md`
 - `docs/architecture/decisions/ADR-M008-email-join-with-provider-identifiers.md`
 - OpenSpec change `add-auth-and-identity`, decisions D9, D13 and D15, capabilities `identity-provider` and `identity-brokering`
-- ADR-013, which fixes the issuer axis to one brokering realm, and ADR-014, which makes the directory the primary membership path
+- ADR-NNN-keycloak-one-realm-one-issuer-customers-brokered, which fixes the issuer axis to one brokering realm, and ADR-NNN-directory-is-the-primary-membership-path, which makes the directory the primary membership path

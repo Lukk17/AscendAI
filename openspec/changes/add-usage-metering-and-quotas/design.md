@@ -2,7 +2,7 @@
 
 ## Context
 
-Every LLM call in ascend-ai-agent already funnels through one observation point: `PromptCacheStrategy.recordOutcome(userId, chatResponse)` is called by `service/chat/ChatExecutor.java` (line 95) and `service/memory/SemanticMemoryExtractor.java` (line 100), and every strategy implementation delegates to `service/cache/GenAiTokenUsageRecorder.java`, which reads `ChatResponse.getMetadata().getUsage()` and increments the aggregate `gen_ai.client.token.usage` Micrometer counter. That counter has no user/tenant tags and Prometheus retention is 72h, so it cannot back billing. The compaction path (`memory/ChatHistoryCompactionService.java`) and the embedding path call providers without passing through `recordOutcome` at all.
+Every LLM call in ascend-ai-agent already funnels through one observation point: `PromptCacheStrategy.recordOutcome(userId, chatResponse)` is called by `service/chat/ChatExecutor.java` (`execute(...)`, line 97) and `service/memory/SemanticMemoryExtractor.java` (line 100), and each of the three strategy implementations (`AnthropicPromptCacheStrategy`, `OpenAiPromptCacheStrategy`, `NoopPromptCacheStrategy`) delegates to `service/cache/GenAiTokenUsageRecorder.java`, which reads `ChatResponse.getMetadata().getUsage()` and increments the aggregate `gen_ai.client.token.usage` Micrometer counter. That counter has no user/tenant tags and Prometheus retention is 72h, so it cannot back billing. The compaction path (`memory/ChatHistoryCompactionService.java`) and the embedding path call providers without passing through `recordOutcome` at all.
 
 Provider clients are built **once at startup**: `service/provider/ChatModelResolver.initializeProviders()` (`@PostConstruct`) constructs one `OpenAiChatModel` / `AnthropicChatModel` per enabled provider from `AiProviderProperties`, with the API key baked into the `OpenAiApi` / `AnthropicApi` instance. BYOK therefore cannot be a per-request option tweak; it needs per-tenant client instances.
 
@@ -66,7 +66,7 @@ Tenant budget window = calendar month UTC; user budget window = calendar day UTC
 
 ### D6 - Rate limiting: Bucket4j with Redis (Lettuce) backend
 
-`bucket4j-redis` (Lettuce integration, matching Spring Data Redis's default driver already on the classpath) provides distributed token buckets, so limits hold across replicas. Alternatives: Resilience4j RateLimiter (in-memory only - fails the multi-replica requirement), hand-rolled Redis Lua (reinventing a maintained wheel), Spring Cloud Gateway RequestRateLimiter (would introduce a whole gateway layer).
+`com.bucket4j:bucket4j_jdk17-lettuce` 8.20.0 (Lettuce integration, matching Spring Data Redis's default driver already on the classpath) provides distributed token buckets, so limits hold across replicas. Alternatives: Resilience4j RateLimiter (in-memory only - fails the multi-replica requirement), hand-rolled Redis Lua (reinventing a maintained wheel), Spring Cloud Gateway RequestRateLimiter (would introduce a whole gateway layer).
 
 Placement:
 
@@ -95,7 +95,7 @@ Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL te
 
 ### D10 - Usage API shape
 
-`GET /api/v1/usage?from=&to=&groupBy=day|month&format=json|csv`. `USER` role: own rows only. `ADMIN`: whole tenant, optional `userId` filter. Response rows: period, provider, model, requestType, promptTokens, completionTokens, cachedTokens, requestCount. CSV export is the same aggregation with `text/csv` content type - enough for invoicing without any payment logic. Backed by a Spring Data JPA aggregate query on the ledger table with a covering index `(tenant_id, occurred_at)`.
+`GET /api/v1/usage?from=&to=&groupBy=day|month&format=json|csv`. `USER` role: own rows only. `ADMIN`: whole tenant, optional `userId` filter. Response rows: period, provider, model, requestType, promptTokens, completionTokens, cachedTokens, requestCount. CSV export is the same aggregation with `text/csv` content type - enough for invoicing without any payment logic. Backed by a Spring Data JDBC `@Query` aggregate on the ledger table with a covering index `(tenant_id, occurred_at)`.
 
 ### D11 - Observability integration
 
@@ -118,9 +118,9 @@ Alternatives: Postgres `pgcrypto` (puts plaintext key and passphrase into SQL te
 1. Liquibase changelog is purely additive (three new tables) - deploys ahead of code safely.
 2. Feature flags: `app.usage.metering.enabled` (ledger writes), `app.usage.quotas.enabled`, `app.usage.rate-limit.enabled`, `app.usage.byok.enabled` - all default `true` in docker posture, `false` only useful for debugging. Disabling quotas/rate-limits reverts to today's unlimited behavior; disabling metering stops new rows but keeps the API serving historical data.
 3. Rollback: flip flags off; tables remain (no destructive rollback needed). BYOK rollback additionally clears the tenant client cache so all traffic reverts to global keys.
-4. Ships after `add-auth-and-identity` and `add-tenant-isolation` are merged; no standalone value before them.
+4. Ships after `add-auth-and-identity` and `add-tenant-isolation` are merged, and has no standalone value before them. `add-audit-and-gdpr-compliance` (erasure and export of `usage_ledger` rows) and `add-tenant-policy` (provider and model policy on the tenant-aware `ChatModelResolver`) build on it.
 
-## Open Questions
+## Closed Questions
 
-1. Embedding-call granularity: one ledger row per embedding batch (recommended - matches provider billing) vs per ingested document. Tasks assume per-batch; confirm during implementation against the ingestion pipeline's batching.
-2. Exact Bucket4j Redis integration artifact (`bucket4j-redis` Lettuce module version compatible with Spring Boot 3.5.14's Lettuce). Pin during implementation, not in spec.
+1. Embedding-call granularity: one ledger row per embedding provider call, which is one batch of the Spring AI `BatchingStrategy` that `VectorStore.add(...)` uses. Reason: each provider call returns its own usage metadata and is what the provider bills, so a row per call needs no estimation, while a row per document would have to split a batch's tokens across documents by guesswork.
+2. Bucket4j artifact and version: `com.bucket4j:bucket4j_jdk17-lettuce` 8.20.0, the release Maven Central lists as latest on 2026-10-01. Reason: the `jdk17` line is the one built for Java 17 and later (this module runs Java 21), and the Lettuce module reuses the Lettuce client Spring Boot 3.5.14 already brings with `spring-boot-starter-data-redis`, so no second Redis driver enters the build.

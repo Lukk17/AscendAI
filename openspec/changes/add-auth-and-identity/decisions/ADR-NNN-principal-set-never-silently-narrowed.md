@@ -1,4 +1,6 @@
-# ADR-011: A Principal Set Is Never Silently Narrowed
+# ADR-NNN: A Principal Set Is Never Silently Narrowed
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 

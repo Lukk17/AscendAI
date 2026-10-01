@@ -16,12 +16,12 @@ ascend-ai-agent SHALL expose `/api/v1/admin/users` supporting invite, list, role
 
 ### Requirement: Inviting a user provisions a Keycloak user and sends a set-password email
 
-An invite SHALL create a Keycloak user in the caller's tenant group with the default role `USER`, and SHALL trigger Keycloak's built-in set-password / verify-email action email so the invitee sets their own credentials. ascend-ai-agent SHALL never receive or store the invitee's password. The invited user's token, once they log in, SHALL carry the caller's tenant as its `tenant` claim.
+An invite SHALL create a Keycloak user whose `tenant` attribute is the caller's tenant (taken from the caller's resolved tenant context, never from the request), with the default role `USER` and no group, and SHALL trigger Keycloak's built-in set-password / verify-email action email, sent through the realm SMTP settings, so the invitee sets their own credentials. ascend-ai-agent SHALL never receive or store the invitee's password. The invited user's token, once they log in, SHALL carry the caller's tenant as its `tenant` claim.
 
 #### Scenario: Invite creates a least-privilege user and emails them
 
 - **WHEN** a tenant `ADMIN` of `acme` invites `newuser@acme.example`
-- **THEN** a Keycloak user is created in group `/tenants/acme` with role `USER` and no other role
+- **THEN** a Keycloak user is created with attribute `tenant` = `acme`, role `USER` and no other role, and no group
 - **AND** a set-password action email is triggered for that address
 
 #### Scenario: Invited user's token carries the tenant

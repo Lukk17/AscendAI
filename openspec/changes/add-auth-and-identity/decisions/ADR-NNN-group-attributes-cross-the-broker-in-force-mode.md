@@ -1,4 +1,6 @@
-# ADR-015: Group Attributes Cross the Broker in Force Mode and Are Declared in the User Profile
+# ADR-NNN: Group Attributes Cross the Broker in Force Mode and Are Declared in the User Profile
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 
@@ -10,13 +12,13 @@ No group identifiers cross the broker in this version. Brokering is optional con
 
 The change goes further than deferring this record and makes its absence a requirement: no brokered identity provider may carry a mapper that imports a group claim, a role claim, or any other attribute the resolved identity derives authorization from. That is a stronger statement than "not yet configured", and it is what makes the deferral safe rather than merely unfinished.
 
-Everything below is kept because all three findings are primary-source facts about Keycloak that cost real work to establish, and every one of them becomes live again the moment a group attribute is imported. Force mode versus import mode, where the wrong choice freezes a person's permissions at their first login forever and nothing about it looks wrong. The declarative user profile, enabled by default since Keycloak 24, silently dropping an undeclared imported attribute after a default flipped in a minor release. The array importer accepting textual elements only, which is also the fact ADR-014 turns on. And the removal test, which is the only thing that tells force mode from import mode from outside.
+Everything below is kept because all three findings are primary-source facts about Keycloak that cost real work to establish, and every one of them becomes live again the moment a group attribute is imported. Force mode versus import mode, where the wrong choice freezes a person's permissions at their first login forever and nothing about it looks wrong. The declarative user profile, enabled by default since Keycloak 24, silently dropping an undeclared imported attribute after a default flipped in a minor release. The array importer accepting textual elements only, which is also the fact ADR-NNN-directory-is-the-primary-membership-path turns on. And the removal test, which is the only thing that tells force mode from import mode from outside.
 
 What has to happen for this record to become active: a decision to import group identifiers across the broker at all, which is one of the answers to the open question about how a directory's groups relate to Keycloak's, and which the change deliberately does not take.
 
 ## Context
 
-ADR-013 puts a broker between the customer's identity provider and ascend-ai-agent. The agent reads a Keycloak token, not the customer's token, so anything the customer's provider asserted reaches the agent only if a mapper deliberately copied it across.
+ADR-NNN-keycloak-one-realm-one-issuer-customers-brokered puts a broker between the customer's identity provider and ascend-ai-agent. The agent reads a Keycloak token, not the customer's token, so anything the customer's provider asserted reaches the agent only if a mapper deliberately copied it across.
 
 For group identifiers the route is documented and single: an Attribute Importer on the brokered provider copies the array claim element by element into a multivalued user attribute, and a protocol mapper puts that attribute into the access token as an array. Attributes declared this way are administrator-context by default, so the signed-in person cannot write their own group list, which is the property that makes trusting the resulting claim defensible at all.
 
@@ -26,7 +28,7 @@ The synchronisation mode is the first. Under force the attribute is refreshed on
 
 The user profile declaration is the second. Since Keycloak 24 the declarative user profile is enabled by default, and an attribute that a mapper imports but the user profile does not declare is dropped silently. The importer runs, reports nothing, and the attribute does not exist. That default flipped in a minor release and turned working configurations into silently failing ones.
 
-The claim shape is the third. The array importer accepts only textual elements. An array of strings works. An array of objects is dropped with a warning. This is also the fact ADR-014 turns on, because it is why the Entra overage markers cannot cross the broker.
+The claim shape is the third. The array importer accepts only textual elements. An array of strings works. An array of objects is dropped with a warning. This is also the fact ADR-NNN-directory-is-the-primary-membership-path turns on, because it is why the Entra overage markers cannot cross the broker.
 
 ## Decision
 
@@ -56,9 +58,9 @@ The realm export carries a disabled brokered-provider template with this mapper 
 ### Trade-offs
 
 - Force mode means every login writes attributes, so a person's group set is rewritten on each sign-in rather than only when it changed. That is cheap and it is the correct trade, but it is not free and it makes login slightly more expensive than import mode would.
-- Force mode plus the absence of the claim is a removal, which is exactly why an over-cap Entra user ends up with nothing rather than with stale data. That is a correct behaviour producing an unwanted outcome, and ADR-014 is the answer to it rather than a weakening of this record.
+- Force mode plus the absence of the claim is a removal, which is exactly why an over-cap Entra user ends up with nothing rather than with stale data. That is a correct behaviour producing an unwanted outcome, and ADR-NNN-directory-is-the-primary-membership-path is the answer to it rather than a weakening of this record.
 - The claim path is only usable by customers whose provider emits a plain array of group identifiers. A customer whose claim shape does not fit has to change it or move to the directory path, and we cannot fix it on our side.
-- Keycloak's upgrade cadence is now an authorization concern rather than an operational one. The user profile default that flipped in a minor release is the precedent, and the response is to re-run the onboarding verification after an upgrade, which is a standing cost recorded in ADR-013.
+- Keycloak's upgrade cadence is now an authorization concern rather than an operational one. The user profile default that flipped in a minor release is the precedent, and the response is to re-run the onboarding verification after an upgrade, which is a standing cost recorded in ADR-NNN-keycloak-one-realm-one-issuer-customers-brokered.
 
 ### Alternatives considered
 
@@ -69,7 +71,7 @@ The realm export carries a disabled brokered-provider template with this mapper 
 
 ## Related
 
-- ADR-013, which decides brokering and makes this route the only one group identifiers have
-- ADR-014, which depends on the textual-elements constraint recorded here
+- ADR-NNN-keycloak-one-realm-one-issuer-customers-brokered, which decides brokering and makes this route the only one group identifiers have
+- ADR-NNN-directory-is-the-primary-membership-path, which depends on the textual-elements constraint recorded here
 - `docs/architecture/decisions/ADR-M007-group-principals-membership-at-login.md`
 - OpenSpec change `add-auth-and-identity`, decisions D2, D15, D16 and D18, capability `identity-brokering`

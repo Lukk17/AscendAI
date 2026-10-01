@@ -1,5 +1,7 @@
 Ordering rule for this change: identity exists before anything reads it, and the password sign-in path exists before anything optional. Sections 1 through 5 build the realm, password sign-in, the verified caller, the principal format, and the principal set. Section 6 adds optional corporate sign-on, and nothing before it depends on it. Everything after consumes that work or hardens the perimeter around it.
 
+Build order (owner, 2026-10-01): groups A, B and D, then `harden-cloud-deployment`, then this change, then `add-tenant-isolation`, `add-usage-metering-and-quotas`, `add-audit-and-gdpr-compliance`, `add-tenant-administration`, `add-tenant-policy`, then `add-document-connectors` and `add-customer-stack-installer`. Tasks 1.6a and 1.6b edit files that `harden-cloud-deployment` creates, which is already built when this change starts.
+
 Blocked siblings. `add-tenant-isolation` cannot compose an access-list predicate until a principal set exists on the request, and `add-document-connectors` cannot write access lists until the principal format is fixed. The tasks they wait on are section 3 (the resolved identity), section 4 (the principal format and its factory), and section 5.1 (the assembled set on the request). Those three are the contract freeze. Neither sibling starts before all of them are done and their verifications pass.
 
 Every task carries its own verification, and every verification is an observable check: a status code, a response body, a stored row, a call that was or was not made, a value on a resolved object. None of them is a log line.
@@ -16,8 +18,12 @@ Every task carries its own verification, and every verification is an observable
   - verify: `jq` shows the group membership mapper on the `ascend-flutter` client emitting a full-path-free array claim, and a token for an account in the seeded group carries that group name in the claim
 - [ ] 1.5 Author the development overlay separately: the seeded test user with both roles, an email address, and membership of realm group `dev-all`, plus the direct-access-grant client the Bruno collection and e2e suite use, imported only in the development compose posture
   - verify: importing the production export alone into a clean Keycloak yields no human user and no client accepting a password grant, and importing the overlay as well yields both
-- [ ] 1.6 Add the `keycloak` service to `compose.yaml`: `quay.io/keycloak/keycloak` with `start-dev --import-realm`, the export and the development overlay mounted into `/opt/keycloak/data/import/`, backed by the external PostgreSQL on a dedicated `keycloak` database, healthcheck exposed, non-conflicting host port
-  - verify: on a clean environment the container reaches healthy, and `GET /realms/ascend-ai/.well-known/openid-configuration` returns 200 carrying a `jwks_uri`, with no manual console step performed
+- [ ] 1.6 Add the `keycloak` service to `compose.yaml` as a separate service on its own host address and port, not routed under any gateway path: `quay.io/keycloak/keycloak` with `start-dev --import-realm` in the development posture, host port 8180 mapped to container port 8080, the export and the development overlay mounted into `/opt/keycloak/data/import/`, backed by the external PostgreSQL on a dedicated `keycloak` database, healthcheck exposed
+  - verify: on a clean environment the container reaches healthy, `GET http://localhost:8180/realms/ascend-ai/.well-known/openid-configuration` returns 200 carrying a `jwks_uri`, no manual console step was performed, and no other service in `compose.yaml` or `compose.ascend-web-hunter.yaml` publishes host port 8180
+- [ ] 1.6a Add the production start mode to the production compose file that `harden-cloud-deployment` ships: the `keycloak` service runs `start --import-realm` with `KC_HOSTNAME` set to the public Keycloak address, `KC_HTTP_ENABLED=true` and `KC_PROXY_HEADERS=xforwarded`, imports the production export only, and is reached on its own host name rather than a path under the agent's host
+  - verify: `docker compose -f <production compose file> config` shows the `start` command and `KC_HOSTNAME`, the issuer in `/.well-known/openid-configuration` equals `<KC_HOSTNAME>/realms/ascend-ai`, and no development overlay file is mounted
+- [ ] 1.6b Add rate limits on the Keycloak login and token endpoints in the reverse proxy configuration that `harden-cloud-deployment` ships, on the Keycloak host only: a per-client-address limit on `/realms/ascend-ai/login-actions/authenticate` and `/realms/ascend-ai/protocol/openid-connect/token`, with the limit values as proxy configuration
+  - verify: a burst of token requests from one address above the limit receives 429 for every request over it and the Keycloak admin events show no login attempt for them, and a single normal sign-in plus code exchange receives no 429
 - [ ] 1.7 Prove password sign-in end to end through Keycloak's own login page, with no brokered provider configured anywhere in the realm
   - verify: an authorization request against `ascend-flutter` reaches Keycloak's login page, submitting the seeded account's password returns an authorization code, and exchanging that code with the PKCE verifier returns an access token; no request issued by the client carries the password
 - [ ] 1.8 Prove the direct access grant stays off on the customer-facing client, which is the defect this change already fixed and must not reintroduce
@@ -29,14 +35,14 @@ Every task carries its own verification, and every verification is an observable
 
 ## 2. ascend-ai-agent resource server
 
-- [ ] 2.1 `apps/ascend-agent/build.gradle.kts`: replace `spring-boot-starter-oauth2-client` with `spring-boot-starter-oauth2-resource-server`; add `spring-security-test` to the test scope
+- [ ] 2.1 `apps/ascend-agent/gradle/libs.versions.toml` and `apps/ascend-agent/build.gradle.kts`: replace the `spring-boot-starter-oauth2-client` catalog entry (`libs.versions.toml` line 25, used at `build.gradle.kts` line 45) with `spring-boot-starter-oauth2-resource-server`, and add a `spring-security-test` catalog entry used in the test scope
   - verify: `./gradlew dependencies --configuration runtimeClasspath` lists `spring-boot-starter-oauth2-resource-server` and does not list `spring-boot-starter-oauth2-client`
 - [ ] 2.2 Rewrite `SecurityConfig.java` as a JWT resource-server chain carrying the D4 matrix: `/api/v1/ai/prompt` and `/api/v1/ingestion/upload` need `USER` or `ADMIN`; `/api/v1/ingestion/run` needs `ADMIN`; `/actuator/health`, `/actuator/prometheus`, and the Swagger and OpenAPI paths are permitAll; everything else is authenticated. CSRF stays disabled, sessions stateless. Delete the HTTP Basic branch, the `UserDetailsService`, and the `PasswordEncoder` bean
   - verify: MockMvc returns 401 tokenless on prompt, 403 for a `USER` token on `/api/v1/ingestion/run`, 200 for an `ADMIN` token on the same path, and 200 tokenless on `/actuator/health` and `/swagger-ui.html`
 - [ ] 2.3 Add the tolerant role-claim converter: `realm_access.roles` when present, else a top-level `roles` claim, mapped to `ROLE_USER` and `ROLE_ADMIN`, and consuming no group claim
   - verify: a token in each shape resolves the same authorities, and a token carrying a `groups` claim resolves no authority derived from it
-- [ ] 2.4 Delete `SecurityProperties.java` and the `app.security` block from `application.yaml`; add `spring.security.oauth2.resourceserver.jwt.issuer-uri`, environment-overridable, with the docker default pointing at the compose Keycloak
-  - verify: the application starts with `app.security.enabled=true` set on the command line and the property has no effect, because binding no longer exists
+- [ ] 2.4 Delete `SecurityProperties.java` with its `app.security` binding, the `app.security` block from `application.yaml` (lines 68-74, which read `SECURITY_ENABLED`, `SECURITY_USERNAME` and `SECURITY_PASSWORD`), and every reference to those three variables in `compose.yaml`, `.env.example` and the module docs; add `spring.security.oauth2.resourceserver.jwt.issuer-uri`, environment-overridable, with the docker default `http://keycloak:8080/realms/ascend-ai`
+  - verify: the application starts with `app.security.enabled=true` set on the command line and the property has no effect, because binding no longer exists, and `grep -rn "SECURITY_ENABLED\|SECURITY_USERNAME\|SECURITY_PASSWORD"` over the repository outside `openspec/` returns nothing
 - [ ] 2.5 Add the `dev` profile chain: permitAll plus the synthesized identity, with the default and `docker` profiles requiring JWTs
   - verify: under `dev` a tokenless prompt request returns a non-401 status; under no profile the same request returns 401
 - [ ] 2.6 Security slice tests with `SecurityMockMvcRequestPostProcessors.jwt()` covering the full matrix, including expired and wrongly-signed tokens
@@ -112,8 +118,8 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
   - verify: 401 tokenless on a transcribe route and on `/mcp`, 200 on `/health`
 - [ ] 7.4 ascend-web-hunter: the same REST dependency and FastMCP enforcement, `/health` open
   - verify: 401 tokenless on a search route and on `/mcp`, 200 on `/health`
-- [ ] 7.5 ascend-ocr: the same REST dependency on `/v1/ocr` and FastMCP enforcement, `/health` and `/ready` open
-  - verify: 401 tokenless on `/v1/ocr` and on `/mcp`, 200 on `/health` and `/ready`
+- [ ] 7.5 ascend-ocr: the same REST dependency on the job routes `POST /v1/ocr/jobs`, `GET /v1/ocr/jobs/{job_id}`, `GET /v1/ocr/jobs` and `DELETE /v1/ocr/jobs/{job_id}`, and FastMCP enforcement on `ocr_submit`, `ocr_job_status`, `ocr_list_jobs` and `ocr_cancel_job`, with `/health`, `/ready` and `/metrics` open
+  - verify: 401 tokenless on each of the four job routes and on `/mcp`, no job record is created by a tokenless submission, and 200 on `/health` and `/ready`
 - [ ] 7.6 pytest per service covering the token matrix
   - verify: each service's suite asserts 401 without a token, 401 with a wrong token, non-401 with the correct token, open health, and a rejected tokenless MCP `tools/call`
 - [ ] 7.7 pytest per service for the posture rule
@@ -150,10 +156,10 @@ Nothing in sections 1 through 5 depends on this section. A deployment that skips
 
 - [ ] 11.1 Add a token-acquisition request against the seeded realm user to the Bruno collection at `docs/api/request/AscendAI/`, using the development overlay's client rather than the application client, and thread the bearer token through the existing requests by environment variable
   - verify: `bru run` against the secured stack completes the collection with no 401, removing the token step reproduces 401 on the first protected request, and the same collection run against a realm imported without the development overlay fails at the token step rather than obtaining a token
-- [ ] 11.2 Update the five e2e specs and their tasks-templates in `apps/ascend-agent/e2e/` for the secured posture, adding the token step to setup and removing `X-User-Id` usage, while keeping the dev-profile path documented for ad-hoc manual runs
-  - verify: no spec or template under `apps/ascend-agent/e2e/` still references `X-User-Id`, and each of the five names its token-acquisition setup step
+- [ ] 11.2 Update the eleven e2e specs and their tasks-templates in `apps/ascend-agent/e2e/` for the secured posture, adding the token step to setup and removing `X-User-Id` usage, while keeping the dev-profile path documented for ad-hoc manual runs
+  - verify: no spec or template under `apps/ascend-agent/e2e/` still references `X-User-Id`, and each of the eleven names its token-acquisition setup step
 - [ ] 11.3 Run the e2e sweep against the secured stack
-  - verify: all five specs pass with verdicts recorded under `apps/ascend-agent/e2e/testing/runs/`
+  - verify: all eleven specs pass with verdicts recorded under `apps/ascend-agent/e2e/testing/runs/`
 
 ## 12. Documentation and architecture decision records
 

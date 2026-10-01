@@ -1,4 +1,6 @@
-# ADR-013: Keycloak Is the Identity Layer, With One Realm, One Issuer, and One Brokered Provider Per Customer
+# ADR-NNN: Keycloak Is the Identity Layer, With One Realm, One Issuer, and One Brokered Provider Per Customer
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 
@@ -53,7 +55,7 @@ The realm export stops being a test fixture and becomes the provisioning of a re
 - Keycloak is now a service the platform operates, and if it is down nobody signs in at any customer. It needs a database, certificates, backups with a restore that has actually been run, and an upgrade habit. There is no long-term support release upstream, minor releases land roughly quarterly and patches roughly monthly, breaking changes have shipped inside patch releases, and sixteen security advisories were published this year through August. This is the standing cost of the decision. It is recorded rather than mitigated, because the available mitigations reduce the risk of an upgrade and do not remove the work.
 - One realm means one configuration blast radius. A mistake in the realm's user profile, its default roles, or its session lifetimes reaches every customer at once. The export being checked in, reviewed, and rebuilt deterministically is the control, and it is a weaker control than separate realms would have been.
 - The tenant claim is now load-bearing in a way it was not when it emitted the constant `default`. A brokered provider with no hardcoded-attribute mapper produces people with the wrong tenant rather than people with no tenant, which is a worse failure than the one it replaces. The onboarding verification exists to catch it.
-- Brokering means ascend-ai-agent never sees the upstream provider's token. Anything not deliberately copied across by a mapper is unavailable to it, and ADR-015 is the whole discipline that follows from that.
+- Brokering means ascend-ai-agent never sees the upstream provider's token. Anything not deliberately copied across by a mapper is unavailable to it, and ADR-NNN-group-attributes-cross-the-broker-in-force-mode is the whole discipline that follows from that.
 
 ### Alternatives considered
 
@@ -66,7 +68,7 @@ The realm export stops being a test fixture and becomes the provisioning of a re
 
 - `docs/architecture/permission-aware-retrieval.md`, sections "Three deployment shapes, one mechanism" and "Resolving group membership"
 - OpenSpec change `add-auth-and-identity`, decisions D1, D2, D2a, D4, D9, D15 and D19, capabilities `identity-provider` and `identity-brokering`
-- ADR-014, which decides which membership path is primary once directory lookups exist, and which is deferred with them
-- ADR-015, which decides how group identifiers cross the broker, and which is deferred because none do in this version
-- ADR-010 and ADR-012, deferred for the same reason
+- ADR-NNN-directory-is-the-primary-membership-path, which decides which membership path is primary once directory lookups exist, and which is deferred with them
+- ADR-NNN-group-attributes-cross-the-broker-in-force-mode, which decides how group identifiers cross the broker, and which is deferred because none do in this version
+- ADR-NNN-directory-configured-separately-from-issuer and ADR-NNN-identity-link-storage-and-lifecycle, deferred for the same reason
 - OpenSpec changes `add-tenant-isolation`, `add-usage-metering-and-quotas`, and `add-audit-and-gdpr-compliance`, whose single-issuer assumption this record confirms rather than disturbs

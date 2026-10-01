@@ -1,4 +1,6 @@
-# ADR-011: One Call Site for Similarity Search, Held There by an Architecture Test
+# ADR-NNN: One Call Site for Similarity Search, Held There by an Architecture Test
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 
@@ -38,5 +40,5 @@ Grep the source tree from a plain unit test. Same assertion, written worse, with
 
 - OpenSpec change `add-tenant-isolation`, design decision 10, and the `rag-retrieval` requirement "Exactly one method issues the similarity search"
 - `RagRetrievalService.performSimilaritySearch`
-- ADR-012, the fail-closed rule that covers the case where the one call site runs without resolved context
+- ADR-NNN-fail-closed-on-missing-tenant-or-principals, the fail-closed rule that covers the case where the one call site runs without resolved context
 - `docs/architecture/decisions/ADR-M005-pre-filter-in-vector-search.md` and `ADR-M009-enforcement-in-the-agent.md`

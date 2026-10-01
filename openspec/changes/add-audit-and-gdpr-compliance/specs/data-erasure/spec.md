@@ -2,7 +2,7 @@
 
 ### Requirement: Per-user erasure endpoint starts an asynchronous job
 
-ascend-ai-agent SHALL expose `DELETE /api/v1/users/{userId}/data` which creates a persisted erasure job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` (self-service) or by an ADMIN for any user; any other caller receives HTTP 403. Job state SHALL be persisted in a Postgres `erasure_job` table (Liquibase changelog) so that requests survive restarts and remain reportable after completion.
+ascend-ai-agent SHALL expose `DELETE /api/v1/users/{userId}/data` which creates a persisted erasure job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` (self-service) or by a tenant ADMIN for any user of the ADMIN's own tenant. Any other caller, including an ADMIN of another tenant, receives HTTP 403. Job state SHALL be persisted in a Postgres `erasure_job` table (Liquibase changelog) so that requests survive restarts and remain reportable after completion.
 
 #### Scenario: Self-service erasure accepted
 
@@ -15,23 +15,30 @@ ascend-ai-agent SHALL expose `DELETE /api/v1/users/{userId}/data` which creates 
 - **WHEN** authenticated user `frosty` (no ADMIN role) calls `DELETE /api/v1/users/otheruser/data`
 - **THEN** the response is HTTP 403 and no erasure job is created
 
-### Requirement: Erasure spans all five data stores
+#### Scenario: ADMIN of another tenant refused
 
-An erasure job for user `{userId}` SHALL delete, recording a per-store outcome and deleted-item count: a) Postgres rows in `chat_history`, `user_instructions`, the user's `conversations` rows (owned by `add-chat-streaming-and-conversations`), and the per-user usage rows owned by the `add-usage-metering-and-quotas` capability; b) Redis chat-history keys for the user's conversations (`chat:` prefix); c) MinIO objects in the `knowledge-base` bucket attributed to the user; d) Qdrant points attributed to the user in both `ascendai-768` and `ascendai-1536` collections; e) AscendMemory memories via `SemanticMemoryClient.wipeUserMemory` for every configured embedding provider. User attribution of MinIO objects and Qdrant points follows the ownership metadata defined by `add-tenant-isolation`. Each step SHALL be idempotent (delete-if-exists) so a job can be safely re-run.
+- **WHEN** an ADMIN of tenant `globex` calls `DELETE /api/v1/users/frosty/data` for `frosty` of tenant `acme`
+- **THEN** the response is HTTP 403 and no erasure job is created
+
+### Requirement: Erasure spans every data store holding subject data
+
+An erasure job for user `{userId}` SHALL delete, recording a per-store outcome and deleted-item count: a) Postgres rows of the user's tenant in `chat_history`, `user_instructions`, the user's `conversations` rows, and the user's `usage_ledger` rows owned by the `add-usage-metering-and-quotas` capability; b) the Redis keys `chat:{tenantId}:{conversationId}` for each of the user's conversations and `user:{tenantId}:{userId}:instructions`; c) objects under `tenant/{tenantId}/` in the Floci `knowledge-base` bucket attributed to the user; d) the results of the user's OCR jobs in the ascend-ocr `ocr-results` bucket, found through the OCR jobs the agent recorded for the tenant; e) Qdrant points of the tenant attributed to the user in both `ascendai-768` and `ascendai-1536` collections; f) AscendMemory memories via `SemanticMemoryClient.wipeUserMemory` for every configured embedding provider, sent under the tenant-qualified id `{tenantId}:{userId}`; g) the user's Keycloak user record in realm `ascend-ai`, so that the account can no longer sign in and its personal attributes are removed (whether this deletes or disables the account is an owner decision not taken yet). User attribution of object-store objects and Qdrant points follows the ownership metadata defined by `add-tenant-isolation`. Data of any other tenant SHALL be untouched. Each step SHALL be idempotent (delete-if-exists) so a job can be safely re-run.
 
 #### Scenario: Zero residue after completed job
 
 - **WHEN** an erasure job for user `frosty` completes with status `COMPLETED`
-- **THEN** Postgres contains no `chat_history`, `user_instructions`, or usage rows for `frosty`
-- **AND** Redis contains no `chat:` keys for `frosty`'s conversations
-- **AND** the MinIO `knowledge-base` bucket contains no objects attributed to `frosty`
+- **THEN** Postgres contains no `chat_history`, `conversations`, `user_instructions`, or `usage_ledger` rows for `frosty` in tenant `acme`
+- **AND** Redis contains no `chat:acme:{conversationId}` key for `frosty`'s conversations and no `user:acme:frosty:instructions` key
+- **AND** the Floci `knowledge-base` bucket contains no objects under `tenant/acme/` attributed to `frosty`
+- **AND** the `ocr-results` bucket contains no result of an OCR job recorded for `frosty`
 - **AND** neither `ascendai-768` nor `ascendai-1536` contains points attributed to `frosty`
-- **AND** an AscendMemory search for `frosty` returns no memories for any configured embedding provider
+- **AND** an AscendMemory search for `acme:frosty` returns no memories for any configured embedding provider
+- **AND** `frosty` can no longer obtain a token from Keycloak
 
 #### Scenario: Store failure yields PARTIAL, job re-runnable
 
-- **WHEN** the MinIO step fails during a job while the other stores succeed
-- **THEN** the job ends with status `PARTIAL`, the MinIO step recorded as failed with a failure detail, the other steps recorded as succeeded
+- **WHEN** the Floci `knowledge-base` step fails during a job while the other stores succeed
+- **THEN** the job ends with status `PARTIAL`, the `knowledge-base` step recorded as failed with a failure detail, the other steps recorded as succeeded
 - **AND** re-running the job retries all steps without error on the already-erased stores
 
 ### Requirement: Erasure job status endpoint
@@ -41,7 +48,7 @@ ascend-ai-agent SHALL expose `GET /api/v1/users/{userId}/data/erasure/{jobId}` r
 #### Scenario: Status shows per-store counts
 
 - **WHEN** the requester polls the status endpoint after the job finishes
-- **THEN** the response is HTTP 200 listing each of the five stores with its outcome and deleted-item count, plus `requested_at` and `completed_at`
+- **THEN** the response is HTTP 200 listing each store step with its outcome and deleted-item count, plus `requested_at` and `completed_at`
 
 ### Requirement: Erasure completion is audited and audit rows are pseudonymized, not deleted
 
@@ -56,10 +63,10 @@ Each erasure job SHALL synchronously record `ERASURE_REQUESTED` on acceptance an
 
 ### Requirement: Per-tenant erasure job
 
-An ADMIN SHALL be able to start an erasure job covering an entire tenant via `DELETE /api/v1/tenants/{tenantId}/data`, using the same job machinery, store coverage, status endpoint, and audit semantics as per-user erasure, with tenant attribution supplied by `add-tenant-isolation`. The tenant job additionally covers tenant-shared data that is not attributed to a single user: the `documents`, `document_index_state`, and `ingestion_runs` registry rows (owned by `add-document-management-api`) and the connector configuration, sync-run, and delta-token rows (owned by `add-document-connectors`) for the tenant, alongside every user's per-user data. Where a sibling change is not yet implemented, its tables are absent and that store step is a no-op; where it is present, the step SHALL cover it.
+A tenant ADMIN SHALL be able to start an erasure job covering their own entire tenant via `DELETE /api/v1/tenants/{tenantId}/data`, and an ADMIN whose tenant differs from `{tenantId}` SHALL receive HTTP 403, using the same job machinery, store coverage, status endpoint, and audit semantics as per-user erasure, with tenant attribution supplied by `add-tenant-isolation`. The tenant job additionally covers tenant-shared data that is not attributed to a single user: the `documents`, `document_index_state`, and `ingestion_runs` registry rows (owned by `add-document-management-api`) and the connector configuration, sync-run, and delta-token rows (owned by `add-document-connectors`) for the tenant, alongside every user's per-user data. Where a sibling change is not yet implemented, its tables are absent and that store step is a no-op; where it is present, the step SHALL cover it.
 
 #### Scenario: Tenant offboarding
 
 - **WHEN** an ADMIN calls `DELETE /api/v1/tenants/acme/data` and the job completes
-- **THEN** no data attributed to tenant `acme` (any of its users or its shared resources) remains in any of the five stores
+- **THEN** no data attributed to tenant `acme` (any of its users or its shared resources) remains in any store step the job covers
 - **AND** the job status endpoint reports per-store outcomes, and `ERASURE_REQUESTED` / `ERASURE_COMPLETED` audit rows exist

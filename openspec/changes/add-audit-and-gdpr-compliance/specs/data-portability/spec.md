@@ -2,7 +2,7 @@
 
 ### Requirement: Per-user data export starts an asynchronous job
 
-ascend-ai-agent SHALL expose `POST /api/v1/users/{userId}/data/export` which creates a persisted export job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` or by an ADMIN for any user; any other caller receives HTTP 403. Job state SHALL be persisted so the request survives restarts and remains reportable after completion, mirroring the erasure job lifecycle.
+ascend-ai-agent SHALL expose `POST /api/v1/users/{userId}/data/export` which creates a persisted export job and returns HTTP 202 with the job id. The endpoint SHALL be callable by the authenticated user for their own `userId` or by a tenant ADMIN for any user of the ADMIN's own tenant. Any other caller, including an ADMIN of another tenant, receives HTTP 403. Job state SHALL be persisted so the request survives restarts and remains reportable after completion, mirroring the erasure job lifecycle.
 
 #### Scenario: Self-service export accepted
 
@@ -17,13 +17,14 @@ ascend-ai-agent SHALL expose `POST /api/v1/users/{userId}/data/export` which cre
 
 ### Requirement: Export assembles subject data into a downloadable archive
 
-An export job SHALL assemble, into a single archive with a machine-readable manifest, the subject's: chat history and `conversations`, `user_instructions`, ingested documents fetched from MinIO, and AscendMemory memories across configured embedding providers. The job SHALL reuse the same store-walker inventory the erasure capability uses, so the set of stores exported equals the set of stores erased. The archive SHALL be retrievable via a status/download endpoint and SHALL be retained for a bounded, configurable window before automatic cleanup.
+An export job SHALL assemble, into a single archive with a machine-readable manifest, the subject's: chat history and `conversations`, `user_instructions`, `usage_ledger` rows, ingested documents fetched from the Floci `knowledge-base` bucket, the results of the subject's OCR jobs from the `ocr-results` bucket, AscendMemory memories across configured embedding providers under the tenant-qualified id `{tenantId}:{userId}`, and the subject's Keycloak user record (profile fields, realm roles and groups). The job SHALL reuse the same store-walker inventory the erasure capability uses, so the set of stores exported equals the set of stores erased. The archive SHALL be retrievable via a status/download endpoint and SHALL be retained for a bounded, configurable window before automatic cleanup.
 
 #### Scenario: Export contains every subject store
 
 - **WHEN** an export job for `frosty` completes
 - **THEN** the archive manifest lists chat history / conversations, user instructions, ingested documents, and AscendMemory memories for `frosty`
-- **AND** the archive contains the ingested document bytes retrieved from MinIO
+- **AND** the archive contains the ingested document bytes retrieved from the Floci `knowledge-base` bucket
+- **AND** the manifest lists the Keycloak user record of `frosty`
 
 #### Scenario: Export and erasure cover the same stores
 
@@ -42,7 +43,7 @@ ascend-ai-agent SHALL expose a status/download endpoint returning the job's stat
 
 ### Requirement: Per-tenant export for offboarding
 
-An ADMIN SHALL be able to start an export job covering an entire tenant via `POST /api/v1/tenants/{tenantId}/data/export`, using the same job machinery, store coverage, status/download endpoint, and audit semantics as per-user export, with tenant attribution supplied by `add-tenant-isolation`.
+A tenant ADMIN SHALL be able to start an export job covering their own entire tenant via `POST /api/v1/tenants/{tenantId}/data/export`, and an ADMIN whose tenant differs from `{tenantId}` SHALL receive HTTP 403, using the same job machinery, store coverage, status/download endpoint, and audit semantics as per-user export, with tenant attribution supplied by `add-tenant-isolation`.
 
 #### Scenario: Tenant export then erase
 

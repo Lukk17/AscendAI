@@ -1,4 +1,6 @@
-# ADR-014: The Directory Lookup Is the Primary Membership Path, Not a Fallback
+# ADR-NNN: The Directory Lookup Is the Primary Membership Path, Not a Fallback
+
+Draft. The number is assigned at implementation time: it takes the next free number in `apps/ascend-agent/docs/architecture/decisions/` (ADR-010 already exists there), so every reference below names the record by its slug.
 
 ## Status
 
@@ -12,7 +14,7 @@ This is the record whose analysis is most worth keeping, and it is kept whole. M
 
 None of it applies while groups live only in Keycloak, because a Keycloak group claim has no vendor cap and no overage markers, and an absent claim genuinely means an administrator placed the person in no groups.
 
-What has to happen for this record to become active: directory lookups have to exist at all, which is ADR-010's deferral, and that in turn waits on the owner's decision about how a directory's groups relate to Keycloak's.
+What has to happen for this record to become active: directory lookups have to exist at all, which is ADR-NNN-directory-configured-separately-from-issuer's deferral, and that in turn waits on the owner's decision about how a directory's groups relate to Keycloak's.
 
 ## Context
 
@@ -22,7 +24,7 @@ Two facts, both checked against primary sources, make that ordering wrong in pra
 
 The first is a cap. Microsoft limits the groups claim to 200 group identifiers for the token protocols and 150 for SAML, counting nested groups. Above the cap it does not truncate the list. It emits no groups claim at all and substitutes a pointer to a Graph endpoint, which is the overage the `_claim_names` and `_claim_sources` markers describe. That is not a rare condition in a company of any size, and it lands on the people who belong to the most groups, which is to say the people whose access matters most.
 
-The second is brokering, decided in ADR-013. ascend-ai-agent no longer reads the provider's token. It reads a Keycloak token, and the only group data in that token is whatever an Attribute Importer copied across. That importer copies a JSON array of textual elements into a multivalued attribute. The overage markers are not an array of strings, so they do not cross the broker through it, and no supported importer shape carries a JSON object claim across in a form the completeness test could read. Under the force synchronisation mode ADR-015 mandates, the attribute is correctly removed when the upstream claim is absent.
+The second is brokering, decided in ADR-NNN-keycloak-one-realm-one-issuer-customers-brokered. ascend-ai-agent no longer reads the provider's token. It reads a Keycloak token, and the only group data in that token is whatever an Attribute Importer copied across. That importer copies a JSON array of textual elements into a multivalued attribute. The overage markers are not an array of strings, so they do not cross the broker through it, and no supported importer shape carries a JSON object claim across in a form the completeness test could read. Under the force synchronisation mode ADR-NNN-group-attributes-cross-the-broker-in-force-mode mandates, the attribute is correctly removed when the upstream claim is absent.
 
 Compose those two and the result is specific: an over-cap person arrives with an empty group claim carrying no marker of any kind, which is byte-for-byte what a person who genuinely belongs to no groups looks like. The completeness test from ADR-M007 is not merely unreliable on the brokered path. There is nothing in the token to test.
 
@@ -53,7 +55,7 @@ This refines ADR-M007 rather than contradicting its intent, which was that a cla
 
 ### Trade-offs
 
-- Every cache miss now pays a directory call, for every customer with an adapter configured rather than only for over-cap users. Directory availability becomes product availability on that path, which ADR-011 already accepted deliberately and turns into a 503 rather than a quiet narrowing. The design document's open question about synchronous resolution latency against a large directory stays open and gets more weight, not less.
+- Every cache miss now pays a directory call, for every customer with an adapter configured rather than only for over-cap users. Directory availability becomes product availability on that path, which ADR-NNN-principal-set-never-silently-narrowed already accepted deliberately and turns into a 503 rather than a quiet narrowing. The design document's open question about synchronous resolution latency against a large directory stays open and gets more weight, not less.
 - Directory credentials become a per-customer prerequisite rather than a fallback arrangement. A customer who will consent to sign-in but not to an application identity reading their directory now has no working small-tenant path unless they are genuinely small, and the stored-token escape hatch is the only other answer.
 - ADR-M007 and the retrieval design now say something this change does not do, until task 12.11 lands. That is a real inconsistency for the duration, and it is called out in the task rather than papered over.
 - The claim path still exists and still has to be maintained and tested, for the small tenant and for the direct-issuer escape hatch. Two paths is more than one, and deleting the claim path would have been simpler and would have removed a legitimate configuration.
@@ -63,12 +65,12 @@ This refines ADR-M007 rather than contradicting its intent, which was that a cla
 - Keep ADR-M007's order and rely on the completeness test. Pro: no change, and it is correct when the agent validates a provider token directly. Con: on the brokered path the test has no input, and the failure it is supposed to catch is exactly the one that hits the most heavily permissioned people. Rejected on the facts rather than on preference.
 - Import the overage markers across the broker with a second mapper, so the completeness test keeps working. Pro: preserves the existing order and the existing reasoning. Con: the markers are a JSON object rather than an array of textual elements, which is the shape the array importer accepts, so this is not available through the documented mechanism. Rejected as unimplementable rather than as undesirable.
 - Call the directory always, and delete the claim path. Pro: one path, one set of tests, no cap to reason about anywhere. Con: it forces directory credentials onto every customer including the small ones and the ones with no corporate directory at all, and it removes the only configuration that works when a customer refuses an application identity. Rejected.
-- Use the claim and reconcile against the directory in the background. Pro: keeps the fast path and eventually corrects it. Con: it means serving a knowingly wrong principal set for the reconciliation interval, which is precisely the silent narrowing ADR-011 refuses, and the wrongness is largest for the people it affects most. Rejected.
+- Use the claim and reconcile against the directory in the background. Pro: keeps the fast path and eventually corrects it. Con: it means serving a knowingly wrong principal set for the reconciliation interval, which is precisely the silent narrowing ADR-NNN-principal-set-never-silently-narrowed refuses, and the wrongness is largest for the people it affects most. Rejected.
 
 ## Related
 
 - `docs/architecture/permission-aware-retrieval.md`, sections "Resolving group membership" and "Staleness"
 - `docs/architecture/decisions/ADR-M007-group-principals-membership-at-login.md`, whose resolution order this record refines
-- ADR-011, which refuses to narrow a principal set quietly, and which this record leans on for the directory-failure behaviour
-- ADR-013, which decides brokering, and ADR-015, which decides how group identifiers cross the broker
+- ADR-NNN-principal-set-never-silently-narrowed, which refuses to narrow a principal set quietly, and which this record leans on for the directory-failure behaviour
+- ADR-NNN-keycloak-one-realm-one-issuer-customers-brokered, which decides brokering, and ADR-NNN-group-attributes-cross-the-broker-in-force-mode, which decides how group identifiers cross the broker
 - OpenSpec change `add-auth-and-identity`, decisions D9, D13 and D18, capabilities `principal-resolution` and `identity-provider`

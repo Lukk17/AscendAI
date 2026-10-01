@@ -6,7 +6,7 @@ AscendAI has no per-tenant or per-user accounting of what anything costs, and no
 
 ## What Changes
 
-- **Usage ledger (Postgres).** Every LLM-touching request persists a usage row - tenant, user, conversation, provider, model, prompt / completion / cached-token counts, timestamp, and request type (`chat`, `compaction`, `memory-extraction`, `embedding`) - via a new Liquibase changelog. Recording hooks into the existing token-usage interception point: `PromptCacheStrategy.recordOutcome(...)` invoked from `ChatExecutor` (line 95) and `SemanticMemoryExtractor` (line 100), extended to cover the compaction (`memory/ChatHistoryCompactionService.java`) and embedding paths which today bypass it.
+- **Usage ledger (Postgres).** Every LLM-touching request persists a usage row - tenant, user, conversation, provider, model, prompt / completion / cached-token counts, timestamp, and request type (`chat`, `compaction`, `memory-extraction`, `embedding`) - via a new Liquibase changelog. Recording hooks into the existing token-usage interception point: `PromptCacheStrategy.recordOutcome(...)` invoked from `ChatExecutor.execute(...)` (line 97 of `service/chat/ChatExecutor.java`) and `SemanticMemoryExtractor` (line 100), extended to cover the compaction (`memory/ChatHistoryCompactionService.java`) and embedding paths which today bypass it.
 - **Usage query API.** `GET /api/v1/usage` returns summaries grouped by day or month - tenant-wide for `ADMIN`, own usage for `USER` - with CSV and JSON export suitable for invoicing. Payment processing is an explicit **non-goal**.
 - **Quotas.** Per-tenant monthly token budget and per-user daily token budget, with configurable platform defaults and per-tenant overrides. Enforced **before** the provider call; an exhausted budget returns `429` with `Retry-After` and a structured error body. Crossing a soft-warning threshold (default 80%) emits a log event and a metric so operators can alert before hard cut-off.
 - **Rate limiting.** Per-user and per-tenant request-rate limits on the chat endpoint, ingestion upload, and web-search-tool-invoking paths. Redis-backed token buckets (Bucket4j vs. Redis Lua decided in design) so limits hold across ascend-ai-agent replicas. Over-limit requests get `429` + `Retry-After`.
@@ -28,21 +28,20 @@ AscendAI has no per-tenant or per-user accounting of what anything costs, and no
 
 ## Impact
 
-- **ascend-ai-agent code**: new `service/usage/` package (ledger recorder, quota gate, usage query service), new `repository/` entities + Spring Data repositories, new `controller/UsageController.java` and `controller/ProviderKeyController.java`, rate-limit filter/interceptor wiring, `ChatModelResolver` + `config/properties/AiProviderProperties.java` extended for tenant-key resolution, the four `service/cache/*PromptCacheStrategy` call sites feed the ledger.
-- **Dependencies**: `apps/ascend-agent/build.gradle.kts` gains a Redis-backed rate-limiter dependency (Bucket4j + Lettuce integration or equivalent - design decides).
-- **Database**: new Liquibase changelog in `src/main/resources/db/changelog/` (usage ledger table, quota config table, tenant provider-key table) referenced from `db.changelog-master.yaml`.
+- **ascend-ai-agent code**: new `service/usage/` package (ledger recorder, quota gate, usage query service), new `repository/` Spring Data JDBC aggregates and repositories, new `controller/UsageController.java` and `controller/ProviderKeyController.java`, rate-limit filter/interceptor wiring, `ChatModelResolver` + `config/properties/AiProviderProperties.java` extended for tenant-key resolution, the three `service/cache/` strategy classes (`AnthropicPromptCacheStrategy`, `OpenAiPromptCacheStrategy`, `NoopPromptCacheStrategy`) and `GenAiTokenUsageRecorder` feed the ledger.
+- **Dependencies**: `apps/ascend-agent/build.gradle.kts` gains `com.bucket4j:bucket4j_jdk17-lettuce` 8.20.0 (the current Bucket4j release, Lettuce matches the Spring Data Redis driver) and Caffeine for the tenant client cache, both declared in `apps/ascend-agent/gradle/libs.versions.toml`.
+- **Database**: new Liquibase changelog `<NN>-usage-metering.xml` in `src/main/resources/db/changelog/`, numbered at implementation time, (usage ledger table, quota config table, tenant provider-key table) referenced from `db.changelog-master.yaml`.
 - **Configuration**: `application.yaml` gains default quota/rate-limit values and the master encryption key env var; `compose.yaml` mirrors the env vars.
 - **Observability**: extra tags on `gen_ai.client.token.usage`, new quota/rate-limit counters, one new provisioned Grafana dashboard under `infra/observability/grafana/dashboards/`.
 - **API surface**: new `GET /api/v1/usage`, new `ADMIN` endpoints under `/api/v1/tenants/{tenantId}/provider-keys`; chat/ingestion/web-search paths can now return `429`.
-- **Depends on**: `add-auth-and-identity` (authenticated principal, `USER`/`ADMIN` roles) and `add-tenant-isolation` (tenant model and `tenant` claim). Neither is re-specified here. `add-chat-streaming-and-conversations` interaction: streamed responses must still record a ledger row at stream completion (design consideration).
+- Depends on: `add-auth-and-identity` (authenticated principal, `USER`/`ADMIN` roles) and `add-tenant-isolation` (tenant model and `tenant` claim). Neither is re-specified here. Build order (owner, 2026-10-01): groups A, B, D, then `harden-cloud-deployment`, `add-auth-and-identity`, `add-tenant-isolation`, this change, `add-audit-and-gdpr-compliance`, `add-tenant-administration`, `add-tenant-policy`. `add-tenant-policy` depends on the tenant-aware `ChatModelResolver.resolve(provider, tenantId)` this change adds. `add-chat-streaming-and-conversations` interaction: streamed responses must still record a ledger row at stream completion (design consideration).
 - **Docs**: `docs/` usage-and-billing page, module `AGENTS.md` touch-ups, Bruno collection additions for the new endpoints.
 
 ## Relevant Skills
 
 - `/springboot-patterns`
 - `/java-coding-standards`
-- `/jpa-patterns`
+- `/postgres-patterns`
 - `/database-migrations`
 - `/api-design`
-- `/springboot-security`
-- `/springboot-tdd`
+- `/tdd-workflow`

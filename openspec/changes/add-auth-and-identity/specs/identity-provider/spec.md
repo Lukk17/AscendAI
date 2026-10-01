@@ -53,9 +53,24 @@ Group names SHALL satisfy the principal character set, so that every group can b
 - **THEN** the token's group claim does not list `policy-readers`
 - **AND** the resolved principal set does not contain `local:group:policy-readers`
 
+### Requirement: Keycloak login and token endpoints are rate limited
+
+The login form endpoint (`/realms/ascend-ai/login-actions/authenticate`) and the token endpoint (`/realms/ascend-ai/protocol/openid-connect/token`) SHALL be rate limited per client address in front of Keycloak, so a password guessing run is slowed before Keycloak brute-force detection locks an account. A request over the limit SHALL receive HTTP 429 and SHALL NOT reach Keycloak. The limit values SHALL be configuration, not code.
+
+#### Scenario: A burst of token requests is refused
+
+- **WHEN** one client address sends more token requests in one window than the configured limit
+- **THEN** every request over the limit receives HTTP 429
+- **AND** Keycloak records no login attempt for those refused requests
+
+#### Scenario: Normal sign-in is not affected
+
+- **WHEN** a person signs in once through the login page and exchanges the code at the token endpoint
+- **THEN** neither request receives HTTP 429
+
 ### Requirement: Keycloak runs as a provisioned docker-compose service
 
-The compose stack SHALL include a `keycloak` service that imports the checked-in realm export (`keycloak/realm-ascend-ai.json`) at startup, backed by the external PostgreSQL prerequisite (dedicated `keycloak` database). After `docker compose up`, the realm SHALL be usable with zero manual console configuration, and the service SHALL expose a healthcheck the ascend-ai-agent's `depends_on` can gate on. The checked-in export SHALL be the source of truth for realm configuration, and a console edit that is not reflected back into the export SHALL be understood as lost at the next clean deploy.
+The compose stack SHALL include a `keycloak` service that imports the checked-in realm export (`keycloak/realm-ascend-ai.json`) at startup, backed by the external PostgreSQL prerequisite (dedicated `keycloak` database). Keycloak SHALL be a separate service on its own host address and port, host port 8180 mapped to container port 8080, and SHALL NOT be routed under a path of any gateway in front of ascend-ai-agent. The development posture SHALL run `start-dev --import-realm`, and the production posture SHALL run `start --import-realm` with `KC_HOSTNAME` set to the public Keycloak address. After `docker compose up`, the realm SHALL be usable with zero manual console configuration, and the service SHALL expose a healthcheck the ascend-ai-agent's `depends_on` can gate on. The checked-in export SHALL be the source of truth for realm configuration, and a console edit that is not reflected back into the export SHALL be understood as lost at the next clean deploy.
 
 #### Scenario: Fresh stack yields a working issuer
 
