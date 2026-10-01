@@ -2,3 +2,5 @@
 *.sh text eol=lf
 *.bat text eol=crlf
 *.jar binary
+contracts/pacts/*.json text eol=lf
+apps/ascend-agent/src/test/resources/ascend-ocr/*.md text eol=lf

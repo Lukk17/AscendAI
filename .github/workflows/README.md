@@ -1,6 +1,6 @@
 # GitHub Actions Workflows
 
-This directory contains the two GitHub Actions workflows for the AscendAI monorepo.
+This directory contains the three GitHub Actions workflows for the AscendAI monorepo.
 
 ---
 
@@ -10,6 +10,7 @@ This directory contains the two GitHub Actions workflows for the AscendAI monore
 |---|---|---|---|
 | CI | `ci.yaml` | `pull_request`, `push: master`, `workflow_dispatch` | Never |
 | Release | `release.yaml` | `workflow_dispatch` only | Yes (selected apps only) |
+| E2E (free specs) | `e2e.yaml` | `push: master`, `workflow_dispatch` | Never |
 
 No tag-push trigger, no cron, no auto-push. Nothing runs automatically except when a PR is opened or a commit lands on `master`.
 
@@ -22,11 +23,13 @@ Secrets are configured at **Settings → Secrets and variables → Actions** on 
 | Secret | Used by | Purpose |
 |---|---|---|
 | `DOCKERHUB_USERNAME` | `release.yaml` only | Docker Hub login username |
-| `DOCKERHUB_TOKEN` | `release.yaml` only | Docker Hub access token (not your password — create a token at hub.docker.com → Security) |
+| `DOCKERHUB_TOKEN` | `release.yaml` only | Docker Hub access token (not your password - create a token at hub.docker.com → Security) |
 
 GitHub Container Registry needs no configured secret. The `build-and-push` job authenticates with the automatically provided `GITHUB_TOKEN`, which is why that job declares `packages: write` in its own `permissions` block rather than at workflow level.
 
 `ci.yaml` consumes **no secrets**. Pull requests from forks therefore run CI safely with no privileged access.
+
+`e2e.yaml` consumes **no secrets** either. The one secret-like value it needs, `SEARXNG_SECRET`, is generated fresh for each run.
 
 ---
 
@@ -49,20 +52,52 @@ A new `verify-changelog` job runs on every `pull_request` and manual `workflow_d
 
 `build` and `integration-test` both declare `needs: [changes, verify-changelog]` with `!cancelled() && needs.verify-changelog.result != 'failure'` in their `if:`, so a changelog failure blocks the build/test jobs for the affected apps, and a *skipped* `verify-changelog` (for example on `push: master`, or when no app directory changed) does not block them.
 
-**Cost.** The gate fires on every change under `apps/<app>/**` for that app, including a documentation-only edit to that app's own `README.md` or a comment-only refactor, not only user-facing or deployable changes. A multi-app PR needs a changelog bump in every touched app. There is no check on changelog *quality* beyond "non-blank content beneath the entry" — a one-word bump satisfies it. This mirrors the tradeoff the Pharmacy monorepo's own `verify-version-bump` job accepts for the same reason: catching an unbumped release is worth the friction of an occasional forced bump on a trivial change.
+**Cost.** The gate fires on every change under `apps/<app>/**` for that app, including a documentation-only edit to that app's own `README.md` or a comment-only refactor, not only user-facing or deployable changes. A multi-app PR needs a changelog bump in every touched app. There is no check on changelog *quality* beyond "non-blank content beneath the entry" - a one-word bump satisfies it. This mirrors the tradeoff the Pharmacy monorepo's own `verify-version-bump` job accepts for the same reason: catching an unbumped release is worth the friction of an occasional forced bump on a trivial change.
 
 ### Per-service toolchain
 
 | Service | Language | Python version | Test command |
 |---|---|---|---|
-| `ascend-ai-agent` | Java | — | `./gradlew --no-daemon build test` |
-| `ascend-weather-mcp` | Java | — | `./gradlew --no-daemon build test` |
+| `ascend-ai-agent` | Java | - | `./gradlew --no-daemon build test` |
+| `ascend-weather-mcp` | Java | - | `./gradlew --no-daemon build test` |
 | `ascend-audio-scribe` | Python | 3.11 | `pytest` |
 | `ascend-web-hunter` | Python | 3.12 | `pytest` |
 | `ascend-memory` | Python | 3.11 | `pytest` |
-| `ascend-ocr` | Python | 3.11 | `pytest` |
+| `ascend-ocr` | Python | 3.11 | `pytest -m "not contract"` |
 
-Java services use Eclipse Temurin 21 via `actions/setup-java@v4` and Gradle dependency caching via `gradle/actions/setup-gradle@v3`. Python services use `actions/setup-python@v5` with `cache: pip` and install with `pip install -e .[dev]`.
+Java services use Eclipse Temurin 21 via `actions/setup-java@v4` and Gradle dependency caching via `gradle/actions/setup-gradle@v3`. Python services use `actions/setup-python@v5` with `cache: pip` and install with `pip install -e .[dev]`. The pip cache key comes from `cache-dependency-path`, set to the service's own `pyproject.toml` and any `*requirements*.txt` beside it, so a dependency change in one service does not touch another service's cache. `contract-provider` keys its cache on `apps/ascend-ocr/pyproject.toml` the same way.
+
+### Lint, type check and coverage gates
+
+The `build` job runs more than the test command for each service:
+
+- **Jacoco coverage gate (`ascend-ai-agent` only).** After the Gradle build and tests, the job runs `./gradlew --no-daemon jacocoTestCoverageVerification`. The build fails if instruction coverage is below 80 percent. `ascend-weather-mcp` has no coverage floor, so this step does not run for it.
+- **Ruff lint (every Python service).** `ruff check .` runs in the service directory after the install step.
+- **Mypy type check (every Python service).** `mypy src` runs after Ruff.
+- **pytest coverage gate (every Python service).** `ascend-audio-scribe` runs plain `pytest` and `ascend-ocr` runs `pytest -m "not contract"`, and both pick up the `--cov-fail-under=100` their `pyproject.toml` sets. The `build` job leaves the `ascend-ocr` contract test to the contract jobs below, which verify it only after the committed pact file is proved current. `ascend-web-hunter` and `ascend-memory` run `pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100` with the flags written out. Their `pyproject.toml` now sets the same flags, so the command repeats the gate rather than adds it. In every case a Python service fails if branch coverage is below 100 percent.
+
+### Integration test job
+
+The `integration-test` job runs only when `ascend-ai-agent` changed. Like `build`, it needs `changes` and `verify-changelog` and is blocked only by a failed changelog check. It sets up Temurin 21 and Gradle, then runs `./gradlew --no-daemon integrationTest` in `apps/ascend-agent`. Those tests use Testcontainers to start Postgres, Redis and Qdrant on the runner's own Docker daemon. It is a separate job so the slow container start does not delay the unit test results for the other services. Its JUnit XML is uploaded as the `integration-test-results-ascend-agent` artifact on every run, including failures.
+
+### Contract tests
+
+Two jobs check the Pact contract between `ascend-agent` (the consumer) and `ascend-ocr` (the provider). The contract file is committed at `contracts/pacts/ascend-agent-ascend-ocr.json`, and there is no Pact Broker. See [contracts/README.md](../../contracts/README.md) and [ADR-M010](../../docs/architecture/decisions/ADR-M010-consumer-driven-contract-in-repo.md).
+
+| Job | Needs | What it runs |
+|---|---|---|
+| `contract-consumer` | `changes`, `verify-changelog` | Sets up Temurin 21 and Gradle like `build`, runs `./gradlew --no-daemon test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"` in `apps/ascend-agent`, then fails if `git status --porcelain -- contracts/pacts` prints anything. Uploads `contracts/pacts` as the `pact-ascend-agent-ascend-ocr` artifact on every run. |
+| `contract-provider` | `changes`, `contract-consumer` | Sets up Python 3.11 with the pip cache, runs `pip install -e .[dev]` and then `pytest tests/contract --no-cov` in `apps/ascend-ocr`. |
+
+**Order.** `contract-provider` runs only after `contract-consumer` succeeded. A stale pact fails the consumer job, and the provider job is then skipped, so it never verifies a file the consumer no longer produces.
+
+**Triggers.** Both jobs run when `apps/ascend-agent/**`, `apps/ascend-ocr/**`, `contracts/**` or `.github/workflows/**` changed (the `contract` output of `changes`). A docs-only change runs neither. Like `build`, the consumer job is blocked only by a failed `verify-changelog`, never by a skipped one.
+
+**Fixing a drift failure.** The job log prints the diff and an error that the committed pact is out of date. Regenerate the file on your machine with the consumer test (the commands are in [contracts/README.md](../../contracts/README.md)), check that `git status --porcelain -- contracts/pacts` shows the change you expect, and commit the updated JSON on the same branch. Never edit the JSON by hand.
+
+**Fixing a provider failure.** ascend-ocr no longer answers the way the agent expects. Either fix ascend-ocr, or, when the change to the interface is intended, change the agent and its consumer test first, regenerate the pact, and commit both sides together.
+
+The contract jobs use no secrets.
 
 ### Test report artifacts
 
@@ -135,12 +170,12 @@ grep -oP -m1 '##\s*\[\K[0-9]+\.[0-9]+\.[0-9]+' <path>/CHANGELOG.md
 
 ### The bump guard
 
-The guard no longer looks at git history at all, which is what makes it immune to a module's path moving between releases (the previous git-tag-based guard was retired for exactly this reason — see the defect register). Instead, inside `build-and-push`, after logging in to both registries, each matrix leg checks whether `<image>:v<version>` already exists:
+The guard no longer looks at git history at all, which is what makes it immune to a module's path moving between releases (the previous git-tag-based guard was retired for exactly this reason - see the defect register). Instead, inside `build-and-push`, after logging in to both registries, each matrix leg checks whether `<image>:v<version>` already exists:
 
-- **Found on both registries** — this exact version was already fully published. The job fails with a message to add a new `CHANGELOG.md` entry before releasing.
-- **Found on neither** — the normal case. The job proceeds to build and push.
-- **Found on exactly one** — treated as an incomplete previous publish (for example Docker Hub succeeded and GHCR failed on a transient auth or network error), not a failure. The job logs a warning and proceeds, completing the missing registry. This does not open a loophole for re-shipping changed code under an old version number, because `ci.yaml`'s `verify-changelog` job already refused to merge any module change without a version bump — a same-version re-run only ever rebuilds the same merged commit.
-- **Ambiguous** (the registry lookup itself failed, for example an auth or network error rather than a clean "not found") — the job fails closed rather than guessing.
+- **Found on both registries** - this exact version was already fully published. The job fails with a message to add a new `CHANGELOG.md` entry before releasing.
+- **Found on neither** - the normal case. The job proceeds to build and push.
+- **Found on exactly one** - treated as an incomplete previous publish (for example Docker Hub succeeded and GHCR failed on a transient auth or network error), not a failure. The job logs a warning and proceeds, completing the missing registry. This does not open a loophole for re-shipping changed code under an old version number, because `ci.yaml`'s `verify-changelog` job already refused to merge any module change without a version bump - a same-version re-run only ever rebuilds the same merged commit.
+- **Ambiguous** (the registry lookup itself failed, for example an auth or network error rather than a clean "not found") - the job fails closed rather than guessing.
 
 To fix a bump-guard failure:
 
@@ -157,7 +192,7 @@ Each `stack_version` is cut once. If the tag `ascend-ai_<stack_version>` already
 
 ### Where the changelog lives
 
-Each app carries its own committed `apps/<app>/CHANGELOG.md`, written by developers in the PR that ships the change, not by the release workflow — the workflow only ever reads these files and never edits them or creates commits. The per-app detail (what changed, in prose) lives there.
+Each app carries its own committed `apps/<app>/CHANGELOG.md`, written by developers in the PR that ships the change, not by the release workflow - the workflow only ever reads these files and never edits them or creates commits. The per-app detail (what changed, in prose) lives there.
 
 The GitHub Release body is a second, coarser record: it lists the current version of all six apps, marking which were shipped in that run. GitHub's auto-generated PR notes (`generate_release_notes: true`) add a summary of every merged PR since the previous `ascend-ai_*` tag on top of that.
 
@@ -195,23 +230,48 @@ Each service has its own Buildx cache scope (`scope=<service>`). Six services ×
 
 ---
 
+## E2E workflow (`e2e.yaml`)
+
+### What it does
+
+On every push to `master` and every manual dispatch, the workflow boots each service under test with `docker compose` on a hosted runner and runs its free end-to-end specs through the Bruno CLI (`bru run`) from `docs/api/request/AscendAI`. Free means the spec needs no paid API call and no human at the keyboard. It never runs on `pull_request`, because every job starts a live stack and a PR from an untrusted fork should not be able to trigger that.
+
+### The four jobs
+
+The jobs are independent and run in parallel. Each job installs the Bruno CLI with `npm install -g @usebruno/cli`, runs its specs one after another in a single step, and prints the service's `docker logs` if a step fails. MCP specs open a fresh MCP session with an `initialize` call and pass its `Mcp-Session-Id` to Bruno as `mcp_session_id`.
+
+| Job | Service started | Wait before specs | Specs run | Left out |
+|---|---|---|---|---|
+| `ascend-weather-mcp` | `ascend-weather-mcp` | polls `/actuator/health` on port 9998, because the service has no compose healthcheck | 7 of 7 | nothing. The container is restarted before spec 7, which needs a cold geocoding cache |
+| `ascend-ocr` | `ascend-ocr` (`--wait`) | polls `/ready` on port 7022 until the default engine is warm | 12 of 16 | the other 4 specs |
+| `ascend-web-hunter` | `searxng`, `flaresolverr`, `ascend-web-hunter` (`--wait`) | the compose healthchecks | 11 of 12 | spec 11, which needs a human to solve a CAPTCHA through NoVNC |
+| `ascend-memory` | `ascend-memory` (`--wait`) | the compose healthcheck | 2 of 6 (specs 1 and 4) | specs 2, 3, 5 and 6, which make paid OpenAI embedding calls |
+
+The external prerequisites are job-level service containers, not compose services: `redis:7-alpine` on port 6379 for `ascend-web-hunter` and `qdrant/qdrant:v1.13.0` on port 6333 for `ascend-memory`. The `ascend-web-hunter` job writes a random `SEARXNG_SECRET` (`openssl rand -hex 32`) to the job environment before compose starts, because compose refuses to start SearXNG without one.
+
+Some `ascend-web-hunter` specs (tiered scraping, the real-world URL matrix, clearance reuse) read live third-party sites, so they can fail on upstream rate limits or bot blocking that has nothing to do with the service's own code.
+
+### Permissions and concurrency
+
+The workflow has `contents: read` only. It uses `cancel-in-progress: false` with one group per ref, so a new push to `master` waits for the running e2e run instead of cancelling it.
+
+---
+
 ## Trigger matrix
 
-| Event | `ci.yaml` | `release.yaml` |
-|---|:---:|:---:|
-| `pull_request` (any branch) | runs | does not run |
-| `push` to `master` | runs | does not run |
-| `push` to feature branch | does not run | does not run |
-| `workflow_dispatch` | runs | runs (only trigger) |
-| Tag push | does not run | does not run |
-| Schedule (cron) | does not run | does not run |
+| Event | `ci.yaml` | `release.yaml` | `e2e.yaml` |
+|---|:---:|:---:|:---:|
+| `pull_request` (any branch) | runs | does not run | does not run |
+| `push` to `master` | runs | does not run | runs |
+| `push` to feature branch | does not run | does not run | does not run |
+| `workflow_dispatch` | runs | runs (only trigger) | runs |
+| Tag push | does not run | does not run | does not run |
+| Schedule (cron) | does not run | does not run | does not run |
 
 ---
 
 ## Follow-up ideas (not in scope for this change)
 
 - CodeQL SAST scan on PRs.
-- Coverage gating (fail CI if coverage drops below threshold).
 - Dependabot for dependency version bumps.
-- Bruno e2e tests run against a live stack in CI.
 - Automatic draft release on merge to master.
