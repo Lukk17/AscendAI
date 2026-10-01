@@ -52,5 +52,7 @@
 
 ## 6. Still open
 
-- [ ] 6.1 Add a `POST /api/v2/web/session/import` endpoint so the Part 2 harness stops writing `session:{domain}:{profile}` directly and loses its white-box coupling to the store's key format. Flagged as an open design point in the proposal and still open.
-- [ ] 6.2 Correct this module's spec count in `docs/E2E_COST.md`, which still reads 10 ascend-web-hunter specs against the 12 now on disk, and update the 48 / 33 / 15 totals that number feeds.
+This change stays open on purpose. It is the living ascend-web-hunter e2e suite, and new specs are added here as tasks in section 4 until the owner decides to archive it.
+
+- [x] 6.1 Moved out of this change on 2026-10-01 by the owner's decision. The `POST /api/v2/web/session/import` endpoint, which removes the Part 2 harness's direct write of `session:{domain}:{profile}`, is now planned and tracked in `openspec/changes/add-web-session-import/`, whose task 3.5 points back here.
+- [x] 6.2 Correct this module's spec count in `docs/E2E_COST.md`. Checked 2026-10-01: the document already states 12 ascend-web-hunter specs and the verified 58 / 43 / 15 split (58 specs outside the storage group, 43 free, 15 paid).

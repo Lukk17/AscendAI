@@ -22,7 +22,7 @@
 
 ### Requirement: Path-filtered dynamic matrix per service
 
-`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when `.github/workflows/**` has changed. The `changes` job SHALL use `dorny/paths-filter@v3` with one filter per service (`ascend-agent` for `apps/ascend-agent/**`, `ascend-weather-mcp` for `apps/ascend-weather-mcp/**`, `ascend-audio-scribe` for `apps/ascend-audio-scribe/**`, `ascend-web-hunter` for `apps/ascend-web-hunter/**`, `ascend-memory` for `apps/ascend-memory/**`, `ascend-ocr` for `apps/ascend-ocr/**`), plus a `workflows` filter, and SHALL emit a JSON matrix holding only the selected services. The `build` job SHALL be skipped when that matrix is empty.
+`ci.yaml` SHALL run a build-and-test matrix entry for a service only when files under that service's directory have changed in the triggering push or pull request, OR when `.github/workflows/` has changed. The `changes` job SHALL use `dorny/paths-filter@v3` with one filter per service (`ascend-agent` for `apps/ascend-agent/`, `ascend-weather-mcp` for `apps/ascend-weather-mcp/`, `ascend-audio-scribe` for `apps/ascend-audio-scribe/`, `ascend-web-hunter` for `apps/ascend-web-hunter/`, `ascend-memory` for `apps/ascend-memory/`, `ascend-ocr` for `apps/ascend-ocr/**`), plus a `workflows` filter, and SHALL emit a JSON matrix holding only the selected services. The `build` job SHALL be skipped when that matrix is empty.
 
 #### Scenario: Docs-only PR runs zero matrix entries
 
@@ -65,13 +65,19 @@ For each Java service in the matrix, the workflow SHALL set up Eclipse Temurin J
 
 ### Requirement: Python services lint, type check and test with a 100 percent branch coverage floor
 
-For each Python service in the matrix, the workflow SHALL set up the per-service Python interpreter via `actions/setup-python@v5` with `cache: pip` and a `cache-dependency-path` of that service's own `pyproject.toml` and any `*requirements*.txt` beside it, install the service with `pip install -e .[dev]`, then run `ruff check .`, `mypy src`, and the tests, all from the service's subdirectory. `ascend-audio-scribe` and `ascend-ocr` SHALL run plain `pytest`, whose configured options enforce `--cov-fail-under=100` with branch coverage. `ascend-web-hunter` and `ascend-memory` SHALL run `pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100`. Per-service Python versions: `ascend-audio-scribe`, `ascend-memory` and `ascend-ocr` use `3.11`, and `ascend-web-hunter` uses `3.12`.
+For each Python service in the matrix, the workflow SHALL set up the per-service Python interpreter via `actions/setup-python@v5` with `cache: pip` and a `cache-dependency-path` of that service's own `pyproject.toml` and any `*requirements*.txt` beside it, install the service with `pip install -e .[dev]`, then run `ruff check .`, the Mypy check, and the tests, all from the service's subdirectory. The Mypy check SHALL be `mypy src` for `ascend-audio-scribe`, `ascend-web-hunter` and `ascend-memory`, and `mypy src tests` for `ascend-ocr`. `ascend-audio-scribe` SHALL run plain `pytest`, whose configured options enforce `--cov-fail-under=100` with branch coverage. `ascend-ocr` SHALL run `pytest -m "not contract"`, whose configured options enforce the same floor, and SHALL leave the contract test to the `contract-provider` job. `ascend-web-hunter` and `ascend-memory` SHALL run `pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100`. Per-service Python versions: `ascend-audio-scribe`, `ascend-memory` and `ascend-ocr` use `3.11`, and `ascend-web-hunter` uses `3.12`.
 
 #### Scenario: A Python entry runs every gate
 
 - **WHEN** the `ascend-memory` matrix entry executes
 - **THEN** `actions/setup-python@v5` installs Python 3.11 with a pip cache keyed on `apps/ascend-memory/pyproject.toml`
 - **AND** `pip install -e .[dev]`, `ruff check .`, `mypy src` and the coverage-gated `pytest` run in that order from `apps/ascend-memory/`
+
+#### Scenario: ascend-ocr type checks its tests and skips the contract test
+
+- **WHEN** the `ascend-ocr` matrix entry executes
+- **THEN** the Mypy step runs `mypy src tests`
+- **AND** the test step runs `pytest -m "not contract"` from `apps/ascend-ocr/`
 
 #### Scenario: ascend-web-hunter uses Python 3.12
 
@@ -131,7 +137,7 @@ For each Python service in the matrix, the workflow SHALL set up the per-service
 
 ### Requirement: Agent to OCR contract verification runs when either side changes
 
-`ci.yaml` SHALL verify the Pact contract between `ascend-agent` (consumer) and `ascend-ocr` (provider) in two ordered jobs whenever `apps/ascend-agent/**`, `apps/ascend-ocr/**`, `contracts/**` or `.github/workflows/**` changed. The `changes` job SHALL expose this as a `contract` output. The job `contract-consumer` SHALL run `./gradlew --no-daemon test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"` in `apps/ascend-agent`, SHALL fail when `git status --porcelain -- contracts/pacts` is not empty afterwards, and SHALL upload `contracts/pacts` as artifact `pact-ascend-agent-ascend-ocr` on every run. The job `contract-provider` SHALL run only after `contract-consumer` succeeded, and SHALL run `pytest tests/contract --no-cov` in `apps/ascend-ocr` after `pip install -e .[dev]` on Python 3.11. Neither job SHALL use a repository secret or a Pact Broker.
+`ci.yaml` SHALL verify the Pact contract between `ascend-agent` (consumer) and `ascend-ocr` (provider) in two ordered jobs whenever `apps/ascend-agent/`, `apps/ascend-ocr/`, `contracts/` or `.github/workflows/` changed. The `changes` job SHALL expose this as a `contract` output. The job `contract-consumer` SHALL run `./gradlew --no-daemon test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"` in `apps/ascend-agent`, SHALL fail when `git status --porcelain -- contracts/pacts` is not empty afterwards, and SHALL upload `contracts/pacts` as artifact `pact-ascend-agent-ascend-ocr` on every run. The job `contract-provider` SHALL run only after `contract-consumer` succeeded, and SHALL run `pytest tests/contract --no-cov` in `apps/ascend-ocr` after `pip install -e .[dev]` on Python 3.11. Neither job SHALL use a repository secret or a Pact Broker.
 
 #### Scenario: Agent-only change runs both contract jobs
 

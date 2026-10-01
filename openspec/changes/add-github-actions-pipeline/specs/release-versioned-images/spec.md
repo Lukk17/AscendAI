@@ -102,11 +102,11 @@ The workflow SHALL log in to Docker Hub using `docker/login-action@v3` with the 
 
 ### Requirement: Aggregated monorepo release record listing every app version
 
-When `create_github_release` is ticked and every selected app pushed successfully, the workflow SHALL create the Git tag `ascend-ai_<stack_version>` and a GitHub Release (via `softprops/action-gh-release@v2`) whose body lists the current changelog version of **all six** apps, marking which were released in this run, together with `generate_release_notes: true` PR notes. The release SHALL NOT be a draft or a prerelease. The `prepare` job SHALL reject a `stack_version` whose `ascend-ai_<stack_version>` tag already exists, before any build.
+When `create_github_release` is ticked and every selected app pushed successfully, the workflow SHALL create the Git tag `ascend-ai_<stack_version>` and a GitHub Release (via `softprops/action-gh-release@v2`) whose body lists the current changelog version of all six apps, marking which were released in this run, together with `generate_release_notes: true` PR notes. The release SHALL NOT be a draft or a prerelease. The `prepare` job SHALL reject a `stack_version` whose `ascend-ai_<stack_version>` tag already exists, before any build.
 
 #### Scenario: Release notes list all app versions
 
-- **WHEN** a release of `ascend-agent` (1.3.0) and `ascend-audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 1.0.0, ascend-web-hunter 1.2.0, ascend-memory 0.4.0, ascend-ocr 0.1.0
+- **WHEN** a release of `ascend-agent` (0.1.3) and `ascend-audio-scribe` (0.9.4) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 0.0.4, ascend-web-hunter 0.0.6, ascend-memory 0.1.3, ascend-ocr 0.3.0
 - **THEN** a GitHub Release tagged `ascend-ai_1.1.1` is created
 - **AND** its body lists all six apps with their current versions, marking `ascend-agent` and `ascend-audio-scribe` as released
 - **AND** the release is not a draft

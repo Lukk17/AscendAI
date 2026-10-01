@@ -7,8 +7,8 @@
 #### Scenario: Prometheus targets are healthy after stack startup
 
 - **WHEN** `docker compose up -d` completes and 30 seconds elapse
-- **AND** `GET http://localhost:9090/api/v1/targets` is invoked
-- **THEN** every target with `job` ∈ {`ascend-ai-agent`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `ascend-ocr`, `ascend-weather-mcp`, `qdrant`, `redis`, `postgres`} reports `health="up"`
+- **AND** `GET http://localhost:7077/api/v1/targets` is invoked
+- **THEN** every target with `job` ∈ {`ascend-agent`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `ascend-ocr`, `ascend-weather-mcp`, `qdrant`, `redis`, `postgres`} reports `health="up"`
 
 #### Scenario: Scrape interval is 15 seconds by default
 
@@ -32,29 +32,29 @@
 
 ### Requirement: Traces ship to Tempo via the OTel collector
 
-`compose.yaml` SHALL define an `otel-collector` service and a `tempo` service. The OTel collector SHALL accept OTLP receivers on gRPC `:4317` and HTTP `:4318`, batch and memory-limit-process spans, and export to Tempo via OTLP. ascend-ai-agent and ascend-weather-mcp SHALL be configured with `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` so Spring AI's auto-emitted spans land in Tempo. Python services SHALL be configured equivalently via `opentelemetry-distro`.
+`compose.yaml` SHALL define an `otel-collector` service and a `tempo` service. The OTel collector SHALL accept OTLP receivers on gRPC `:4317` and HTTP `:4318`, batch and memory-limit-process spans, and export to Tempo via OTLP. ascend-agent and ascend-weather-mcp SHALL be configured with `management.otlp.tracing.endpoint=http://otel-collector:4318/v1/traces` and `management.tracing.sampling.probability=1.0` so Spring AI's auto-emitted spans land in Tempo, because Spring Boot 3.5.14 does not read `OTEL_EXPORTER_OTLP_ENDPOINT`. Python services SHALL be configured equivalently via `opentelemetry-distro`.
 
 #### Scenario: A single chat turn produces a queryable trace
 
-- **WHEN** ascend-ai-agent serves one `POST /api/v1/ai/prompt` request
+- **WHEN** ascend-agent serves one `POST /api/v1/ai/prompt` request
 - **AND** Tempo is queried via Grafana's Tempo datasource within 10 seconds
-- **THEN** a trace with `service.name=ascend-ai-agent` exists for that request
+- **THEN** a trace with `service.name=ascend-agent` exists for that request
 - **AND** the trace contains at least one Spring AI auto-emitted LLM-call span
 
 ### Requirement: Grafana runs in docker-compose with provisioned datasources and six dashboards
 
-`compose.yaml` SHALL define a `grafana` service exposed on host port `3030` with anonymous Viewer access enabled by default. Grafana SHALL be provisioned at startup with three datasources (`Prometheus`, `Loki`, `Tempo`) and six checked-in dashboards (`Platform Overview`, `AI Pipeline`, `Infrastructure`, `Token Cost`, `RAG Quality`, `Cache Hit Rate`).
+`compose.yaml` SHALL define a `grafana` service exposed on host port `7078` (container port `3000`) with anonymous Viewer access enabled by default. Grafana SHALL be provisioned at startup with three datasources (`Prometheus`, `Loki`, `Tempo`) and six checked-in dashboards (`Platform Overview`, `AI Pipeline`, `Infrastructure`, `Token Cost`, `RAG Quality`, `Cache Hit Rate`).
 
 #### Scenario: Grafana is reachable after stack startup
 
 - **WHEN** `docker compose up -d` completes and 30 seconds elapse
-- **AND** `GET http://localhost:3030/api/health` is invoked
+- **AND** `GET http://localhost:7078/api/health` is invoked
 - **THEN** the response status is 200
 
 #### Scenario: All three datasources are provisioned
 
 - **WHEN** Grafana has finished startup
-- **AND** `GET http://localhost:3030/api/datasources` is invoked
+- **AND** `GET http://localhost:7078/api/datasources` is invoked
 - **THEN** the response includes datasources named `Prometheus`, `Loki`, `Tempo` of the corresponding types
 - **AND** `Prometheus` is marked as the default datasource
 

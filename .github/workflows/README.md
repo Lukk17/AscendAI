@@ -58,7 +58,7 @@ A new `verify-changelog` job runs on every `pull_request` and manual `workflow_d
 
 | Service | Language | Python version | Test command |
 |---|---|---|---|
-| `ascend-ai-agent` | Java | - | `./gradlew --no-daemon build test` |
+| `ascend-agent` | Java | - | `./gradlew --no-daemon build test` |
 | `ascend-weather-mcp` | Java | - | `./gradlew --no-daemon build test` |
 | `ascend-audio-scribe` | Python | 3.11 | `pytest` |
 | `ascend-web-hunter` | Python | 3.12 | `pytest` |
@@ -71,14 +71,14 @@ Java services use Eclipse Temurin 21 via `actions/setup-java@v4` and Gradle depe
 
 The `build` job runs more than the test command for each service:
 
-- **Jacoco coverage gate (`ascend-ai-agent` only).** After the Gradle build and tests, the job runs `./gradlew --no-daemon jacocoTestCoverageVerification`. The build fails if instruction coverage is below 80 percent. `ascend-weather-mcp` has no coverage floor, so this step does not run for it.
+- **Jacoco coverage gate (`ascend-agent` only).** After the Gradle build and tests, the job runs `./gradlew --no-daemon jacocoTestCoverageVerification`. The build fails if instruction coverage is below 80 percent. `ascend-weather-mcp` has no coverage floor, so this step does not run for it.
 - **Ruff lint (every Python service).** `ruff check .` runs in the service directory after the install step.
 - **Mypy type check (every Python service).** `mypy src` runs after Ruff.
 - **pytest coverage gate (every Python service).** `ascend-audio-scribe` runs plain `pytest` and `ascend-ocr` runs `pytest -m "not contract"`, and both pick up the `--cov-fail-under=100` their `pyproject.toml` sets. The `build` job leaves the `ascend-ocr` contract test to the contract jobs below, which verify it only after the committed pact file is proved current. `ascend-web-hunter` and `ascend-memory` run `pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100` with the flags written out. Their `pyproject.toml` now sets the same flags, so the command repeats the gate rather than adds it. In every case a Python service fails if branch coverage is below 100 percent.
 
 ### Integration test job
 
-The `integration-test` job runs only when `ascend-ai-agent` changed. Like `build`, it needs `changes` and `verify-changelog` and is blocked only by a failed changelog check. It sets up Temurin 21 and Gradle, then runs `./gradlew --no-daemon integrationTest` in `apps/ascend-agent`. Those tests use Testcontainers to start Postgres, Redis and Qdrant on the runner's own Docker daemon. It is a separate job so the slow container start does not delay the unit test results for the other services. Its JUnit XML is uploaded as the `integration-test-results-ascend-agent` artifact on every run, including failures.
+The `integration-test` job runs only when `ascend-agent` changed. Like `build`, it needs `changes` and `verify-changelog` and is blocked only by a failed changelog check. It sets up Temurin 21 and Gradle, then runs `./gradlew --no-daemon integrationTest` in `apps/ascend-agent`. Those tests use Testcontainers to start Postgres, Redis and Qdrant on the runner's own Docker daemon. It is a separate job so the slow container start does not delay the unit test results for the other services. Its JUnit XML is uploaded as the `integration-test-results-ascend-agent` artifact on every run, including failures.
 
 ### Contract tests
 
@@ -125,7 +125,7 @@ CI uses `cancel-in-progress: true`. A force-push or new commit to the same PR ca
 |---|---|---|---|
 | `create_github_release` | boolean | yes | Default `true`. Untick to publish images only: no Git tag, no GitHub Release, no stack version consumed. |
 | `stack_version` | string | no | Semver string for the monorepo release, e.g. `1.1.1`. The Git tag will be `ascend-ai_1.1.1`. Required when `create_github_release` is ticked, ignored otherwise. |
-| `release_ascend_ai_agent` | boolean | yes | Ship `ascend-ai-agent`. Default `false`. |
+| `release_ascend_agent` | boolean | yes | Ship `ascend-agent`. Default `false`. |
 | `release_ascend_weather_mcp` | boolean | yes | Ship `ascend-weather-mcp`. Default `false`. |
 | `release_ascend_audio_scribe` | boolean | yes | Ship `ascend-audio-scribe`. Default `false`. |
 | `release_ascend_web_hunter` | boolean | yes | Ship `ascend-web-hunter`. Default `false`. |
@@ -202,7 +202,7 @@ Each build is pushed to both registries under the same name, tagged `v<version>`
 
 | Service key | Docker Hub image | GHCR image |
 |---|---|---|
-| `ascend-ai-agent` | `lukk17/ascend-ai-ascend-agent` | `ghcr.io/lukk17/ascend-ai-ascend-agent` |
+| `ascend-agent` | `lukk17/ascend-ai-ascend-agent` | `ghcr.io/lukk17/ascend-ai-ascend-agent` |
 | `ascend-weather-mcp` | `lukk17/ascend-ai-ascend-weather-mcp` | `ghcr.io/lukk17/ascend-ai-ascend-weather-mcp` |
 | `ascend-audio-scribe` | `lukk17/ascend-ai-ascend-audio-scribe` | `ghcr.io/lukk17/ascend-ai-ascend-audio-scribe` |
 | `ascend-web-hunter` | `lukk17/ascend-ai-ascend-web-hunter` | `ghcr.io/lukk17/ascend-ai-ascend-web-hunter` |
