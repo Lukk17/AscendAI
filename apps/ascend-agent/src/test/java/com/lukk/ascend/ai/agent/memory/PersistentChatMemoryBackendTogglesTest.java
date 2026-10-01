@@ -5,10 +5,12 @@ import com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionPropertie
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
+import com.lukk.ascend.ai.agent.test.LogCapture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -25,6 +27,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +54,9 @@ class PersistentChatMemoryBackendTogglesTest {
     private ChatHistoryCompactionProperties compactionProperties;
 
     private PersistentChatMemory memory;
+
+    @RegisterExtension
+    final LogCapture logs = LogCapture.forClass(PersistentChatMemory.class);
 
     @BeforeEach
     void setUp() {
@@ -89,6 +96,9 @@ class PersistentChatMemoryBackendTogglesTest {
 
         // when
         memory.add(CONV_ID, List.of(new UserMessage("hello")));
+
+        // then
+        verifyNoInteractions(redisTemplate, repository, compactionService);
     }
 
 
@@ -188,6 +198,9 @@ class PersistentChatMemoryBackendTogglesTest {
 
         // when
         memory.add(CONV_ID, List.of(new UserMessage("message")));
+
+        // then
+        verify(listOperations).trim(REDIS_KEY, 0, 10);
     }
 
     @Test
@@ -224,6 +237,10 @@ class PersistentChatMemoryBackendTogglesTest {
 
         // when
         memory.logToggleState();
+
+        // then
+        assertThat(logs.messages()).containsExactly(
+                "[PersistentChatMemory] Chat history backends - Redis: [Enabled], Postgres: [Enabled]; Compaction: [Enabled]");
     }
 
     @Test
@@ -237,6 +254,10 @@ class PersistentChatMemoryBackendTogglesTest {
 
         // when
         memory.logToggleState();
+
+        // then
+        assertThat(logs.messages()).containsExactly(
+                "[PersistentChatMemory] Chat history backends - Redis: [Disabled], Postgres: [Enabled]; Compaction: [Disabled]");
     }
 
     @Test
@@ -250,6 +271,10 @@ class PersistentChatMemoryBackendTogglesTest {
 
         // when
         memory.logToggleState();
+
+        // then
+        assertThat(logs.messages()).containsExactly(
+                "[PersistentChatMemory] Chat history backends - Redis: [Enabled], Postgres: [Disabled]; Compaction: [Enabled]");
     }
 
 

@@ -191,8 +191,18 @@ class SemanticMemoryClientTest {
         when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
 
-        // when - no exception
+        // when
         semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
+
+        // then
+        verify(postMock).uri("http://memory/api/v1/memory/insert");
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
+        verify(bodySpecMock).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue())
+                .containsEntry("user_id", DEFAULT_USER_ID)
+                .containsEntry("text", FACT)
+                .containsEntry("provider", EMBEDDING_PROVIDER);
+        verify(responseSpecMock).toBodilessEntity();
     }
 
     @Test

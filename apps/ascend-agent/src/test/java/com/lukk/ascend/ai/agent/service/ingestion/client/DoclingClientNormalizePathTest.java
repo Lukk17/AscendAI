@@ -1,9 +1,11 @@
 package com.lukk.ascend.ai.agent.service.ingestion.client;
 
+import com.lukk.ascend.ai.agent.test.LogCapture;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.config.properties.DoclingProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
@@ -15,6 +17,9 @@ import static org.mockito.Mockito.mock;
  * legacy-auto-correct, missing-leading-slash, trailing-slash, and null configured value.
  */
 class DoclingClientNormalizePathTest {
+
+    @RegisterExtension
+    final LogCapture logs = LogCapture.forClass(DoclingClient.class);
 
     private final RestClient restClient = mock(RestClient.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -91,7 +96,10 @@ class DoclingClientNormalizePathTest {
         // given
         DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/v1/convert/file");
 
-        // when - package-private invoked via reflection to cover the @PostConstruct line
+        // when
         ReflectionTestUtils.invokeMethod(client, "logConfiguredEndpoint");
+
+        // then
+        assertThat(logs.messages()).containsExactly("[DoclingClient] Configured upload endpoint: http://docling/v1/convert/file");
     }
 }

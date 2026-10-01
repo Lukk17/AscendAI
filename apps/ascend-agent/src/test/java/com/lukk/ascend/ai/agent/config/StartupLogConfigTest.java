@@ -49,6 +49,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -147,8 +148,11 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // when - must not throw even if DB is unavailable
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Postgres:  postgresql://localhost/ascend_ai [FAILED]");
     }
 
     @Test
@@ -168,6 +172,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Redis:        redis://localhost:6379 [FAILED]");
     }
 
     @Test
@@ -180,8 +187,11 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // when - should not throw
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Redis:        redis://localhost:6379 [Warning (no connection factory)]");
     }
 
     @Test
@@ -200,6 +210,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Qdrant:       localhost:6334 [FAILED]");
     }
 
     @Test
@@ -214,6 +227,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Qdrant:       localhost:6334 [Warning (no client bean)]");
     }
 
     @Test
@@ -230,6 +246,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      S3 (Floci):   http://localhost:9070/knowledge-base [FAILED]");
     }
 
     @Test
@@ -325,6 +344,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      AscendMemory: http://localhost:7020 [Disabled]");
     }
 
     @Test
@@ -332,7 +354,7 @@ class StartupLogConfigTest {
     void onReadinessChange_AscendMemoryProbeFails_LogsFailedStatus() throws Exception {
         // given - enable semantic memory so the HTTP probe actually runs
         semanticMemoryProperties.setEnabled(true);
-        semanticMemoryProperties.setBaseUrl("http://localhost:7020");
+        semanticMemoryProperties.setBaseUrl("http://127.0.0.1:29999");
 
         stubDatabaseSuccess();
         stubRedisSuccess();
@@ -340,9 +362,10 @@ class StartupLogConfigTest {
         stubS3Success();
 
         // when
-        // The probe uses an actual RestClient pointing at a non-listening port - it will throw.
-        // We just verify it doesn't propagate.
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      AscendMemory: http://127.0.0.1:29999 [FAILED]");
     }
 
     @Test
@@ -352,8 +375,12 @@ class StartupLogConfigTest {
         AvailabilityChangeEvent<ReadinessState> event = mock();
         when(event.getState()).thenReturn(ReadinessState.REFUSING_TRAFFIC);
 
-        // when - no interactions expected
+        // when
         config.onReadinessChange(event);
+
+        // then
+        assertThat(appender.list).isEmpty();
+        verifyNoInteractions(dataSource, redisTemplate, s3Client, qdrantClientProvider, mcpRegistry);
     }
 
     @Test
@@ -369,7 +396,10 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
-        // Verifies the https branch in the protocol selection
+
+        // then
+        assertThat(capturedBanner()).contains("      Local:     https://localhost:")
+                .contains("      POST  https://localhost:");
     }
 
     @Test
@@ -385,6 +415,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("    Profile(s): prod, cloud");
     }
 
     @Test
@@ -400,6 +433,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner().lines()).containsSequence("    Chat providers (default = openai):", "      (none configured)");
     }
 
     @Test
@@ -415,6 +451,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner().lines()).containsSequence("    Embedding providers (default = openai):", "      (none configured)");
     }
 
     @Test
@@ -434,6 +473,10 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains(
+                "    Compaction:   [Enabled] (trigger: 20 turns / 50% context, keep: 8 turns, defaults: openai=gpt-4o-mini)");
     }
 
     @Test
@@ -457,6 +500,11 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner())
+                .contains("      - openai     type=openai model=gpt-4o")
+                .contains("      - openai     dims=1536 model=text-embedding-3-small collection=ascendai-1536");
     }
 
     @Test
@@ -473,6 +521,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("    Chat history: Redis [Disabled], Postgres [Disabled]");
     }
 
     @Test
@@ -494,8 +545,10 @@ class StartupLogConfigTest {
         stubS3Success();
 
         // when
-        // must not throw
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      AscendMemory: http://127.0.0.1:29999 [FAILED]");
     }
 
 

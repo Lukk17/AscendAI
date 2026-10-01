@@ -29,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -238,7 +239,11 @@ class ManualIngestionServiceS3PaginationTest {
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
         // when
-        manualIngestionService.run(Optional.empty(), "openai");
+        ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
+
+        // then
+        verify(metadataStore).putIfAbsent(eq("manual-ingestion:markdown/notes.md:unknown"), anyString());
+        assertThat(result.indexed).isEqualTo(1);
     }
 
     @Test

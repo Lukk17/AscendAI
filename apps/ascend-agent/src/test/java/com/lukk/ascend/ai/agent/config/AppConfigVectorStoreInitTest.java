@@ -1,24 +1,33 @@
 package com.lukk.ascend.ai.agent.config;
 
+import ch.qos.logback.classic.Level;
 import com.lukk.ascend.ai.agent.config.properties.VectorStoreProperties;
+import com.lukk.ascend.ai.agent.test.LogCapture;
 import io.qdrant.client.QdrantClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AppConfigVectorStoreInitTest {
+
+    @RegisterExtension
+    final LogCapture logs = LogCapture.forClass(AppConfig.class);
 
     @Test
     @DisplayName("initVectorStore skips collection creation when it already exists")
@@ -82,7 +91,10 @@ class AppConfigVectorStoreInitTest {
 
         // when
         CommandLineRunner runner = config.initVectorStore(qdrant, props);
-        runner.run();
+
+        // then
+        assertThatCode(runner::run).doesNotThrowAnyException();
+        assertThat(logs.messagesAt(Level.ERROR)).containsExactly("Failed to fetch existing collections");
     }
 
     @Test
@@ -99,7 +111,10 @@ class AppConfigVectorStoreInitTest {
 
         // when
         CommandLineRunner runner = config.initVectorStore(qdrant, props);
-        runner.run();
+
+        // then
+        assertThatCode(runner::run).doesNotThrowAnyException();
+        assertThat(logs.messagesAt(Level.ERROR)).containsExactly("Failed to fetch existing collections");
     }
 
     @Test
@@ -121,7 +136,11 @@ class AppConfigVectorStoreInitTest {
 
         // when
         CommandLineRunner runner = config.initVectorStore(qdrant, props);
-        runner.run();
+
+        // then
+        assertThatCode(runner::run).doesNotThrowAnyException();
+        verify(qdrant).createCollectionAsync(eq("new-collection"), any(io.qdrant.client.grpc.Collections.VectorParams.class));
+        assertThat(logs.messagesAt(Level.ERROR)).containsExactly("[AppConfig] Failed to create collection 'new-collection'");
     }
 
 

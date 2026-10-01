@@ -4,12 +4,14 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -42,8 +44,11 @@ class NoopPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome emits gen_ai.client.token.usage counter for null response gracefully")
     void recordOutcome_NullResponse_DoesNotThrow() {
-        // then - must not throw; null response is silently skipped
-        new NoopPromptCacheStrategy("x", new SimpleMeterRegistry()).recordOutcome("u", null);
+        // when
+        ThrowingCallable recordOutcome = () -> new NoopPromptCacheStrategy("x", new SimpleMeterRegistry()).recordOutcome("u", null);
+
+        // then
+        assertThatCode(recordOutcome).doesNotThrowAnyException();
     }
 
     @Test

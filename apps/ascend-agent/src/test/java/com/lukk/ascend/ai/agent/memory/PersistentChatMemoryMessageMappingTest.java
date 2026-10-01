@@ -4,10 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.exception.ServiceException;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
+import com.lukk.ascend.ai.agent.test.LogCapture;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
@@ -23,6 +26,7 @@ import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,6 +56,9 @@ class PersistentChatMemoryMessageMappingTest {
     private com.lukk.ascend.ai.agent.config.properties.ChatHistoryCompactionProperties compactionProperties;
     private com.lukk.ascend.ai.agent.memory.ChatHistoryCompactionService compactionService;
     private PersistentChatMemory memory;
+
+    @RegisterExtension
+    final LogCapture logs = LogCapture.forClass(PersistentChatMemory.class);
 
     @BeforeEach
     void setup() {
@@ -156,7 +163,12 @@ class PersistentChatMemoryMessageMappingTest {
         doThrow(new RuntimeException("db down")).when(repository).save(any());
 
         // when
-        memory.persistToDb(CONVO_ID, new UserMessage("text"));
+        ThrowingCallable persistToDb = () -> memory.persistToDb(CONVO_ID, new UserMessage("text"));
+
+        // then
+        assertThatCode(persistToDb).doesNotThrowAnyException();
+        verify(repository).save(any());
+        assertThat(logs.messages()).containsExactly("Async DB persist failed for user: " + CONVO_ID);
     }
 
     @ParameterizedTest(name = "get redis={0} postgres={1}")
@@ -259,8 +271,13 @@ class PersistentChatMemoryMessageMappingTest {
         doThrow(new RuntimeException("compaction blew up"))
                 .when(compactionService).maybeCompact(any(), any(), any());
 
-        // when - compaction failures never break the user's turn
-        memory.add(CONVO_ID, List.of(new UserMessage("hi")));
+        // when
+        ThrowingCallable add = () -> memory.add(CONVO_ID, List.of(new UserMessage("hi")));
+
+        // then
+        assertThatCode(add).doesNotThrowAnyException();
+        verify(listOperations).rightPush(eq(REDIS_KEY), any());
+        assertThat(logs.messages()).contains("Compaction dispatch threw for conversation '" + CONVO_ID + "': compaction blew up");
     }
 
     @Test

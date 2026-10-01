@@ -24,8 +24,10 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
+import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -212,8 +214,11 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("extractFactsFromJson returns empty list when input is blank (findLastBalancedJsonArray returns empty)")
     void extractFactsFromJson_BlankInput_ReturnsEmpty() {
+        // when
+        List<String> facts = extractor.extractFactsFromJson("   ");
+
         // then
-        extractor.extractFactsFromJson("   ");
+        assertThat(facts).isEmpty();
     }
 
 
