@@ -5,8 +5,8 @@ package com.lukk.ascend.ai.agent.service.ingestion;
  * by every ingestion producer (Markdown, Docling, ascend-ocr, Unstructured) and read back by
  * RAG retrieval and source-file presigning.
  *
- * <p>Per-protocol keys (e.g., ascend-ocr's {@code "lines"} / {@code "pages"} JSON keys,
- * Docling's {@code "md_content"}) belong on their client classes — they are not metadata
+ * <p>Per-protocol keys (e.g., ascend-ocr's {@code "job_id"} / {@code "result"} JSON keys,
+ * Docling's {@code "md_content"}) belong on their client classes. They are not metadata
  * shared across the pipeline.
  */
 public final class IngestionMetadataKeys {

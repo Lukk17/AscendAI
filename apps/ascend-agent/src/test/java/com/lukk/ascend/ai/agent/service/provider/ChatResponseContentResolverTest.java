@@ -64,7 +64,7 @@ class ChatResponseContentResolverTest {
     @Test
     @DisplayName("resolveContent returns empty string when the ChatResponse is null")
     void resolveContent_WhenNullResponse_ThenReturnsEmptyString() {
-        // given / when
+        // when
         String result = resolver.resolveContent(null);
 
         // then

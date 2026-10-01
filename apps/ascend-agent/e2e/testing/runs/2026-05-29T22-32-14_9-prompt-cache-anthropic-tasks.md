@@ -27,10 +27,10 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) — `cache_creation_input_tokens: 418`
-- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) — NOTE: warm-cache path; `cache_read_input_tokens: 2176` (prior run within 5 min) — spec explicitly allows this: "Either path proves the `cache_control` directive was accepted."
+- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) - `cache_creation_input_tokens: 418`
+- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) - NOTE: warm-cache path; `cache_read_input_tokens: 2176` (prior run within 5 min) - spec explicitly allows this: "Either path proves the `cache_control` directive was accepted."
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.cacheReadInputTokens > 0` — `cache_read_input_tokens: 2176`
+- [x] Step 2: `usage.cacheReadInputTokens > 0` - `cache_read_input_tokens: 2176`
 
 ### Verdict
 
@@ -57,5 +57,5 @@ Duration: 00:02:35
 ## Additional tasks I did
 
 - State reset was performed twice: once before the initial Bruno CLI run (which served as step 1 observation), and once more before the final clean pair of curl calls used to capture both step 1 and step 2 response bodies with usage metadata. Bruno CLI output does not print response bodies, so a curl-based re-run was needed for assertion verification.
-- Verified AscendAgent startup readiness banner: all external dependencies show [Connected] — Postgres, Redis, Qdrant, S3/MinIO, AscendMemory, and 8 MCP tools.
+- Verified AscendAgent startup readiness banner: all external dependencies show [Connected] - Postgres, Redis, Qdrant, S3/MinIO, AscendMemory, and 8 MCP tools.
 

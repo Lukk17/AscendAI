@@ -23,7 +23,7 @@ Every `<N>-<capability>-test.md` file is the **immutable spec** for one test and
    substrings.
 6. **Fixtures.** Paths to local canary audio files under `../fixtures/` that the test uploads.
 
-Each spec has a matching `<N>-<capability>-tasks.template.md` in the [templates/](templates/) subdirectory — the
+Each spec has a matching `<N>-<capability>-tasks.template.md` in the [templates/](templates/) subdirectory - the
 **checkbox template** for a run. The runner never edits the spec or the template directly. Before starting a run, it
 copies the template from `templates/` into [runs/](runs/) with a timestamped filename, ticks boxes as it progresses,
 fills in `Result summary` and `Verdict`, and logs anything done outside the spec under `Additional tasks I did`. See

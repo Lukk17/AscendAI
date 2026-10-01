@@ -20,6 +20,8 @@ import java.util.Map;
 @Slf4j
 public class McpClientStartupInitializer {
 
+    private static final String UNKNOWN_URL = "unknown";
+
     private final List<McpSyncClient> mcpSyncClients;
     private final McpClientStatusRegistry registry;
     private final McpStartupProperties startupProperties;
@@ -43,21 +45,8 @@ public class McpClientStartupInitializer {
 
         int connected = 0;
         for (McpSyncClient client : mcpSyncClients) {
-            String connectionName = resolveConnectionName(client);
-            String url = resolveUrl(connectionName, connections);
-            try {
-                Mono.fromRunnable(client::initialize)
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .timeout(timeout)
-                        .block();
-                registry.record(connectionName, url, McpClientStatus.CONNECTED, null);
+            if (initializeClient(client, connections, timeout)) {
                 connected++;
-                log.info("MCP client '{}' at {} connected", connectionName, url);
-            } catch (Exception e) {
-                Throwable cause = unwrap(e);
-                registry.record(connectionName, url, McpClientStatus.FAILED, cause);
-                log.warn("MCP client '{}' at {} failed to initialise within {}: {}",
-                        connectionName, url, timeout, cause.getMessage());
             }
         }
 
@@ -67,20 +56,46 @@ public class McpClientStartupInitializer {
         }
     }
 
-    private String resolveConnectionName(McpSyncClient client) {
-        return McpClientStatusRegistry.resolveConnectionName(client);
+    private boolean initializeClient(McpSyncClient client,
+                                     Map<String, McpStreamableHttpClientProperties.ConnectionParameters> connections,
+                                     Duration timeout) {
+        String connectionName = McpConnectionNames.fallbackName(client);
+        String url = UNKNOWN_URL;
+        try {
+            connectionName = McpConnectionNames.resolve(client);
+            url = resolveUrl(connectionName, connections);
+
+            Mono.fromRunnable(client::initialize)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .timeout(timeout)
+                    .block();
+
+            registry.record(connectionName, url, McpClientStatus.CONNECTED);
+            log.info("MCP client '{}' at {} connected", connectionName, url);
+
+            return true;
+        } catch (Exception e) {
+            Throwable cause = unwrap(e);
+            registry.record(connectionName, url, McpClientStatus.FAILED);
+            log.warn("MCP client '{}' at {} failed to initialise within {}: {}",
+                    connectionName, url, timeout, cause.getMessage());
+            log.debug("MCP {} init failed", connectionName, cause);
+
+            return false;
+        }
     }
 
-    private String resolveUrl(String connectionName, Map<String, McpStreamableHttpClientProperties.ConnectionParameters> connections) {
+    private String resolveUrl(String connectionName,
+                              Map<String, McpStreamableHttpClientProperties.ConnectionParameters> connections) {
         if (connections == null) {
-            return "unknown";
+            return UNKNOWN_URL;
         }
         McpStreamableHttpClientProperties.ConnectionParameters params = connections.get(connectionName);
         if (params == null) {
-            return "unknown";
+            return UNKNOWN_URL;
         }
 
-        return params.url() != null ? params.url() : "unknown";
+        return params.url() != null ? params.url() : UNKNOWN_URL;
     }
 
     private Throwable unwrap(Throwable t) {

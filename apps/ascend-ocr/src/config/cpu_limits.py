@@ -60,21 +60,17 @@ def _quota_to_cpus(quota_us: int, period_us: int) -> int:
 
 
 def apply_cpu_thread_limit() -> int:
-    """Cap PaddlePaddle's and OpenCV's own thread pools to the container's real CPU budget.
+    """Cap OpenCV's thread pool to the container's real CPU budget and return that budget.
 
-    Both default to the host's full logical core count rather than the cgroup quota:
-    paddlex reads PADDLE_PDX_CPU_NUM_THREADS for its inference graph's thread count,
-    defaulting to 10, and OpenCV's parallel_for_ backend defaults cv2.getNumThreads() to
-    os.cpu_count() and does not honour its own OPENCV_NUM_THREADS env var (verified
-    empirically, not documented). Left uncapped, a 4-CPU container ends up running
-    several times more worker threads than it has quota for, which contend with each
-    other for the same throttled slice instead of finishing sooner. setdefault leaves
-    room for an operator to override PADDLE_PDX_CPU_NUM_THREADS explicitly if needed.
+    OpenCV's parallel_for_ backend defaults cv2.getNumThreads() to os.cpu_count() and does
+    not honour its own OPENCV_NUM_THREADS env var (verified empirically, not documented).
+    Paddle is capped separately, per engine, by build_engine passing cpu_threads: PaddleOCR
+    always passes its own default of 10 to paddlex, so PADDLE_PDX_CPU_NUM_THREADS never
+    reaches the inference graph and is deliberately not set here.
     """
     cpu_limit = detect_cpu_limit()
-    os.environ.setdefault("PADDLE_PDX_CPU_NUM_THREADS", str(cpu_limit))
     cv2.setNumThreads(cpu_limit)
 
-    logger.info("Capped OCR thread pools to %d CPU(s)", cpu_limit)
+    logger.info("Capped OpenCV's thread pool to %d CPU(s)", cpu_limit)
 
     return cpu_limit

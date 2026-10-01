@@ -2,6 +2,8 @@ package com.lukk.ascend.ai.agent.service.provider;
 
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import org.junit.jupiter.api.DisplayName;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -43,7 +45,7 @@ class ChatModelResolverProviderRegistrationTest {
         ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
         resolver.initializeProviders();
 
-        // then — provider was disabled, so resolving it should throw
+        // then - provider was disabled, so resolving it should throw
         assertThatThrownBy(() -> resolver.resolve("openai"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -86,7 +88,7 @@ class ChatModelResolverProviderRegistrationTest {
         ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
         resolver.initializeProviders();
 
-        // when — blank provider falls back to defaultProvider="openai"
+        // when - blank provider falls back to defaultProvider="openai"
         var model = resolver.resolve("  ");
 
         // then
@@ -109,8 +111,11 @@ class ChatModelResolverProviderRegistrationTest {
         props.setProviders(Map.of("openai", config));
         ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
 
-        // then — HTTP/1.1 branch is exercised without throwing
+        // when
         resolver.initializeProviders();
+
+        // then
+        assertThat(resolver.resolve("openai")).isInstanceOf(OpenAiChatModel.class);
     }
 
     @Test
@@ -129,7 +134,10 @@ class ChatModelResolverProviderRegistrationTest {
         props.setProviders(Map.of("anthropic", config));
         ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
 
-        // then — default timeout branch exercised without throwing
+        // when
         resolver.initializeProviders();
+
+        // then
+        assertThat(resolver.resolve("anthropic")).isInstanceOf(AnthropicChatModel.class);
     }
 }

@@ -5,7 +5,7 @@
     { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
   ],
   "annotations": { "list": [] },
-  "description": "L3 Cache Hit Rate — validates that prompt-caching is firing. A flat line at 0% for any provider signals a regression.",
+  "description": "L3 Cache Hit Rate - validates that prompt-caching is firing. A flat line at 0% for any provider signals a regression.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -21,7 +21,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Prompt cache hit rate per provider — cached tokens read / total prompt tokens. Metric: prompt_cache_tokens_read_total and prompt_cache_tokens_total. A flat line at 0% for a given provider means caching is not activating (regression). Emitted from AnthropicPromptCacheStrategy.recordOutcome() and OpenAiPromptCacheStrategy.recordOutcome().",
+      "description": "Prompt cache hit rate per provider - cached tokens read / total prompt tokens. Metric: prompt_cache_tokens_read_total and prompt_cache_tokens_total. A flat line at 0% for a given provider means caching is not activating (regression). Emitted from AnthropicPromptCacheStrategy.recordOutcome() and OpenAiPromptCacheStrategy.recordOutcome().",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -120,7 +120,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Absolute cache-read tokens saved per provider per hour — the denominator for cost savings. Metric: prompt_cache_tokens_read_total. Multiply by per-provider input rate to get USD/hour saved.",
+      "description": "Absolute cache-read tokens saved per provider per hour - the denominator for cost savings. Metric: prompt_cache_tokens_read_total. Multiply by per-provider input rate to get USD/hour saved.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -174,7 +174,7 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "L3 — Cache Hit Rate",
+  "title": "L3 - Cache Hit Rate",
   "uid": "ascend-cache-hit-rate",
   "version": 1
 }

@@ -11,7 +11,7 @@ single-purpose, no database.
 ### Tech stack
 
 - Java 21
-- Spring Boot 3.5.4
+- Spring Boot 3.5.14
 - Spring AI 1.1.5 (`spring-ai-starter-mcp-server-webmvc`)
 - Gradle ([build.gradle.kts](build.gradle.kts))
 

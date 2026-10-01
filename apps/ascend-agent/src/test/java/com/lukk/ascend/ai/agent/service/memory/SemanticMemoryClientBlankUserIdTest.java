@@ -14,6 +14,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -51,22 +52,31 @@ class SemanticMemoryClientBlankUserIdTest {
     @Test
     @DisplayName("insertMemory does nothing when userId is blank")
     void insertMemory_BlankUserId_DoesNothing() {
-        // then
+        // when
         client.insertMemory("", "some fact", "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 
     @Test
     @DisplayName("wipeUserMemory does nothing when userId is blank")
     void wipeUserMemory_BlankUserId_DoesNothing() {
-        // then
+        // when
         client.wipeUserMemory("", "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 
     @Test
     @DisplayName("deleteMemory does nothing when userId is blank")
     void deleteMemory_BlankUserId_DoesNothing() {
-        // then
+        // when
         client.deleteMemory("", "mem-123", "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 
 
@@ -86,8 +96,11 @@ class SemanticMemoryClientBlankUserIdTest {
         // given
         properties.setEnabled(false);
 
-        // then
+        // when
         client.insertMemory(TestConstants.DEFAULT_USER_ID, "some fact", "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 
     @Test
@@ -96,8 +109,11 @@ class SemanticMemoryClientBlankUserIdTest {
         // given
         properties.setEnabled(false);
 
-        // then
+        // when
         client.wipeUserMemory(TestConstants.DEFAULT_USER_ID, "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 
     @Test
@@ -106,22 +122,31 @@ class SemanticMemoryClientBlankUserIdTest {
         // given
         properties.setEnabled(false);
 
-        // then
+        // when
         client.deleteMemory(TestConstants.DEFAULT_USER_ID, "mem-123", "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 
 
     @Test
     @DisplayName("deleteMemory does nothing when memoryId is blank")
     void deleteMemory_BlankMemoryId_DoesNothing() {
-        // then
+        // when
         client.deleteMemory(TestConstants.DEFAULT_USER_ID, "   ", "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 
     @Test
     @DisplayName("deleteMemory does nothing when memoryId is null")
     void deleteMemory_NullMemoryId_DoesNothing() {
-        // then
+        // when
         client.deleteMemory(TestConstants.DEFAULT_USER_ID, null, "lmstudio");
+
+        // then
+        verifyNoInteractions(restClientBuilder);
     }
 }

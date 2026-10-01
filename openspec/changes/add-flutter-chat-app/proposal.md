@@ -1,39 +1,60 @@
 ## Why
 
-AscendAI has no user-facing frontend. Every interaction with the platform goes through raw HTTP requests or API clients. A cross-platform chat application built with Flutter would give users a native, polished interface on Android, iOS, Windows, macOS, Linux, and web, all from a single codebase. The [`flutter_chat_ui` library](https://github.com/flyerhq/flutter_chat_ui) (version 2.11.1, Apache 2.0, 1600+ pub likes, published by flyer.chat) provides a production-grade, backend-agnostic chat widget with animated message lists, customizable theming, and support for text, image, file, and system messages, which maps directly onto the ascend-ai-agent prompt and conversation API.
+AscendAI has no user-facing frontend. Every interaction with the platform goes through raw HTTP requests or API clients. A cross-platform chat application built with Flutter gives users one interface on Android, iOS, Windows, macOS, Linux and web from a single codebase. The `flutter_chat_ui` library (Apache 2.0, published by flyer.chat) provides a backend-agnostic chat widget with an animated message list, theming, and text, image, file and system messages, which maps directly onto the ascend-ai-agent prompt and conversation API.
+
+The owner's requirement (2026-10-01): the app must be separate and must be able to connect even from a phone. So it is a standalone client that talks to the agent's API directly at a configurable address. It is not served by the agent and not placed behind nginx.
 
 ## What Changes
 
-- Add a new `AscendChat` Flutter module at the repository root, alongside the existing backend modules.
-- Integrate `flutter_chat_ui` (^2.11.1) and `flutter_chat_core` (^2.9.0) as the chat interface foundation.
-- Implement an API client layer that connects to the ascend-ai-agent REST endpoints (`POST /api/v1/ai/prompt`, `POST /api/v1/ai/prompt/stream` via server-sent events, and the `/api/v1/conversations` family).
-- Build a custom `ChatController` backed by the conversation API for persistent message history across sessions.
-- Support server-sent events streaming so assistant responses appear token-by-token in real time.
-- Provide a conversation list screen (create, rename, delete conversations) and a chat screen per conversation.
-- Support AI provider and model selection per prompt.
-- Support image and document attachment uploads via multipart form data.
-- Display RAG source document references returned by the assistant.
-- Apply a dark-mode-first custom theme consistent with the AscendAI brand.
-- Wire the module into `compose.yaml` for optional containerized deployment behind nginx.
-- Add a module-level `AGENTS.md` to the new module for agent instructions.
+- Add a standalone Flutter client at `apps/ascend-chat/` (pubspec name `ascend_chat`).
+- The agent base URL is set at build time with `--dart-define=ASCEND_API_URL=<url>` (default `http://localhost:9917` for local development). A phone on the same network uses the agent host's LAN address, for example `http://192.168.1.20:9917`, and a remote deployment uses its public address.
+- Use `flutter_chat_ui` and `flutter_chat_core` for the chat interface. Every dependency version is re-checked against pub.dev at implementation time and pinned to the current stable release then.
+- An API client for `POST /api/v1/ai/prompt/stream` (server-sent events), the `/api/v1/conversations` family, and multipart attachments. On native platforms streaming reads the chunked response with `package:http`. On web it uses fetch-based streaming of the POST response body through `package:web` (not `EventSource`, which cannot send a POST body, and not `dart:html`, which is deprecated).
+- A custom `ChatController` backed by the conversation API.
+- A conversation list screen (create, rename, delete) and a chat screen per conversation.
+- Per-prompt AI provider and model selection.
+- RAG sources open their presigned `downloadUrl`. Citations from add-passage-level-citations show as tappable labels.
+- A dark-mode-first theme.
+- State management uses the current Riverpod API (`Notifier`, `AsyncNotifier` and their providers). The legacy `StateNotifierProvider` is not used.
+- Backend work this needs, in the agent: a CORS configuration for the Flutter web build with configurable allowed origins, and documentation of how a phone reaches the agent (host address, port 9917 binding).
+- A module-level `apps/ascend-chat/AGENTS.md`.
 
 ## Capabilities
 
 ### New Capabilities
-- `flutter-chat/core-chat`: The primary chat screen powered by `flutter_chat_ui`, including the `Chat` widget integration, custom `ChatController` backed by ascend-ai-agent conversations API, real-time server-sent events streaming for assistant responses, message sending with text, and display of system messages.
-- `flutter-chat/conversation-management`: Conversation list screen with create, rename, delete operations, conversation switching, and auto-creation on first prompt.
-- `flutter-chat/attachments`: Image and document file attachment support via the multipart upload fields on the prompt endpoint, including file picker integration and upload progress indication.
-- `flutter-chat/provider-selection`: Per-prompt AI provider and model selection UI, allowing the user to pick from configured providers (LM Studio, OpenAI, Gemini, Anthropic, MiniMax) and override the model.
-- `flutter-chat/source-references`: Display of RAG source document references returned in prompt responses, with document name, type badge, and presigned download link.
-- `flutter-chat/theming`: Dark-mode-first custom `ChatTheme` and app-wide Material theme aligned with the AscendAI brand, with light-mode support via dynamic theming.
+- `flutter-chat/core-chat`: the chat screen powered by `flutter_chat_ui`, the custom `ChatController`, streaming responses, system messages, and the configurable direct connection to the agent.
+- `flutter-chat/conversation-management`: conversation list with create, rename, delete, switching, and auto-creation on first prompt.
+- `flutter-chat/attachments`: image and document attachments through the multipart fields on the prompt endpoint.
+- `flutter-chat/provider-selection`: per-prompt provider and model selection (LM Studio, OpenAI, Gemini, Anthropic, MiniMax).
+- `flutter-chat/source-references`: RAG source references with name, type badge and presigned download link, plus tappable citation labels.
+- `flutter-chat/theming`: dark-mode-first `ChatTheme` and app-wide Material theme with a light mode.
 
 ### Modified Capabilities
 (none)
 
 ## Impact
 
-- New top-level module `AscendChat/` with its own `pubspec.yaml`, `AGENTS.md`, `Dockerfile`, and source tree.
-- Depends on the ascend-ai-agent HTTP API (port 9917), specifically the existing `POST /api/v1/ai/prompt` and the specced streaming and conversation endpoints from the `add-chat-streaming-and-conversations` change.
-- Requires Flutter SDK 3.x and Dart 3.x on the build machine.
-- Adds a new service entry to `compose.yaml` for the containerized web build.
-- No changes to any existing backend module code.
+- New module `apps/ascend-chat/` with its own `pubspec.yaml`, `AGENTS.md`, `README.md` and source tree. No Dockerfile, no nginx and no compose service: the web build is static files any host can serve, and the app is not served by the agent.
+- Agent changes (small): a CORS configuration class in `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/` with allowed origins from a property, and documentation in `apps/ascend-agent/AGENTS.md` on reaching the agent from a phone. The agent's compose service is `ascend-agent`, port 9917.
+- Depends on `POST /api/v1/ai/prompt/stream` and `/api/v1/conversations` from add-chat-streaming-and-conversations, on `downloadUrl` in sources (add-document-management-api), and on the `citations` event (add-passage-level-citations).
+- Identity stays the `X-User-Id` header until group C adds authentication. The app sends a configurable user id (`--dart-define=ASCEND_USER_ID`).
+- Requires a current stable Flutter SDK and Dart 3 on the build machine.
+
+## Build order
+
+Last in group D: add-document-management-api, then add-chat-streaming-and-conversations, then add-passage-level-citations, then this change.
+
+## Relevant Skills
+
+- `/flutter-architecture`
+- `/flutter-http-and-json`
+- `/flutter-routing-and-navigation`
+- `/flutter-layout`
+- `/flutter-forms`
+- `/flutter-testing-apps`
+- `/flutter-accessibility`
+- `/flutter-environment-setup-windows`, `/flutter-environment-setup-linux`, `/flutter-environment-setup-macos`
+- `/design-system`
+- `/springboot-patterns` (CORS configuration in the agent)
+- `/security-review` (CORS origins)
+- `/tdd-workflow`

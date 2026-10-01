@@ -31,10 +31,10 @@ things explain it, both confirmed by reading the code the monitor actually runs:
    fixed in the codebase. This bullet was rewritten on 2026-09-08 to match the code as it stands, not the code this
    spec first ran against.
 2. **The captcha-branch "cleared" check does not require a challenge to have existed.**
-   `ChallengeDetector.is_content_accepted` — "the single shared decision point... before the NoVNC monitor declares
-   a challenge cleared" — returns true for any response that is not a recognised block page and has real content.
+   `ChallengeDetector.is_content_accepted` - "the single shared decision point... before the NoVNC monitor declares
+   a challenge cleared" - returns true for any response that is not a recognised block page and has real content.
    An ordinary, never-challenged page satisfies that on its very first poll (`NOVNC_COOKIE_SYNC_POLL_SECONDS`,
-   5 seconds by default), so `establish()` against a plain URL captures whatever cookies exist — often none — as
+   5 seconds by default), so `establish()` against a plain URL captures whatever cookies exist - often none - as
    though a challenge had just been solved.
 
 (1) has since been fixed, independently of this spec, and the bullet above is corrected to match. (2) is unchanged:
@@ -52,15 +52,15 @@ record its own call creates.
 Every other cheap ascend-web-hunter spec either touches no external process at all or only Redis. This one is
 different: `SessionManager.establish` launches a real headful Chromium browser through Playwright and hands it to
 NoVNC, then starts a background monitor task (`_monitor_for_cookies`) that polls the page for up to
-`NOVNC_TIMEOUT_SECONDS` (600 seconds / 10 minutes by default) before giving up and closing the browser on its own —
+`NOVNC_TIMEOUT_SECONDS` (600 seconds / 10 minutes by default) before giving up and closing the browser on its own -
 or, per the finding above, stops within one poll cycle once it decides the page is "cleared." Nothing in this test
 asks a human to act; the response assertions are satisfiable immediately, and even the Redis assertion below only
 needs a short, bounded wait, not the full 10-minute ceiling. But when the monitor does not resolve this quickly (a
 genuinely challenged or slow-loading target), the call still leaves a live, resource-consuming browser + VNC
 session running in the background for up to 10 minutes. Running this spec back to back without letting a previous
 run's monitor finish will stack multiple live headful browsers in the same container. Treat it as the highest
-per-run resource cost in this module's suite, higher than test 6 or 7's Playwright/FlareSolverr usage, even though —
-like every other ascend-web-hunter spec — it makes no call to any priced LLM or embedding provider and so still
+per-run resource cost in this module's suite, higher than test 6 or 7's Playwright/FlareSolverr usage, even though -
+like every other ascend-web-hunter spec - it makes no call to any priced LLM or embedding provider and so still
 belongs in the cost-free set in dollar terms.
 
 ## Prerequisites
@@ -89,6 +89,22 @@ docker exec redis redis-cli PING
 ```
 
 Expect `PONG`.
+
+Check the process-wide NoVNC flow lock is free. The service holds one shared headful browser, so any NoVNC flow
+started earlier in the same sweep, whether by another spec that escalates to the NoVNC tier or by a previous run of
+this test, makes this test's own call return HTTP 409 with `status="novnc_busy"` until that flow's window closes.
+The live browser is the observable form of a held lock, because the monitor closes that browser and releases the
+lock in the same teardown block.
+
+```bash
+docker exec ascend-web-hunter pgrep -fa "remote-debugging-port=9222"
+```
+
+Expect no output and a non-zero exit status, which means no NoVNC flow is in flight and the lock is free. A printed
+process line means one still is: wait 30 seconds, run the check again, and start the Run section only once it comes
+back empty. The wait is bounded, because a holding flow's lease expires 630 seconds after it acquired the lock
+(`NOVNC_TIMEOUT_SECONDS` is 600 in the container and `_NOVNC_LOCK_LEASE_GRACE_SECONDS` adds 30), and the next call
+reclaims it.
 
 ## Reset state
 
@@ -131,7 +147,7 @@ bru run "web-hunter/testing/session-establish.yml" --env ascend-local
   docker exec redis redis-cli EXISTS "session:example.net:e2e-establish"
   ```
 
-  Expect `1` — this is the documented current behaviour, not a defect this spec is trying to catch.
+  Expect `1` - this is the documented current behaviour, not a defect this spec is trying to catch.
 
 - Clean up the record this test created, so `example.net` is sessionless again for test 8 or a repeat of this test:
 

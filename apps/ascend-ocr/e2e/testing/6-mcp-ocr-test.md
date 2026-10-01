@@ -1,18 +1,14 @@
-# MCP ocr_process happy path: e2e test
+# MCP reading through the job surface: e2e test
 
 ## What this verifies
 
-- `tools/call` for `name="ocr_process"` with arguments `{"file_uri": "<object-store-url>", "lang": "en"}` returns
-  HTTP 200 and a JSON-RPC `result` whose content is the serialised `OcrJsonResponse`.
-- `file_uri` is fetched by ascend-ocr over HTTP. The runner uploads the fixture into the dedicated `e2e-fixtures`
-  bucket on the object store, and ascend-ocr reaches back out to the host-published endpoint at
-  `host.docker.internal:9070` to download it. The MCP tool does **not** assume any host-side mount; the fixture flows
-  over the same wire any real client would use.
-- `language` echoes back `"en"`.
-- The concatenated `pages[*].lines[*].text` (case-insensitive) contains the canary substring `Argent Saga`,
-  `Aenaria`, or `Halen Veyr`.
-- This is the MCP-transport mirror of test 2 — the assertion content is the same; the only difference is that
-  the fixture reaches the OCR engine via the MCP tool's URL argument rather than via a multipart upload.
+- `tools/call` for `ocr_submit` with a `file_uri` pointing at the object store answers with a job record, not with
+  the document's text.
+- The record carries a 22 character `job_id`, `state` `"waiting"`, and where the state can be read.
+- `ocr_job_status` on the same identifier reports the same states the REST surface reports, and once the work has
+  succeeded it names the bucket, the key and a time-limited URL.
+- Fetching that URL returns the same Markdown a REST caller would get, carrying the canary substring.
+- The fixture is fetched by the service over HTTP from the object store, with no container mount involved.
 
 ## Prerequisites
 
@@ -32,157 +28,160 @@ curl -fsS http://localhost:7022/health
 
 Expect HTTP 200 with `"status":"ok"` in the body.
 
-Check the English canary fixture exists on the host.
+Check the object store is reachable on the host. It serves the S3 API on port 9070 without authentication, so this
+spec needs no client, no credentials, and no container name.
 
-```bash
-ls apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png
-```
-
-Expect the file path printed.
-
-Check the object store is reachable on the host. It serves the S3 API on port 9070 without authentication, so
-this spec needs no client, no credentials, and no container name.
-
-Windows:
-```powershell
-curl.exe -fsS http://localhost:9070/_floci/health
-```
-
-Unix:
 ```bash
 curl -fsS http://localhost:9070/_floci/health
 ```
 
 Expect HTTP 200 with `"s3":"running"` in the JSON body.
 
-Check the ascend-ocr container has `MCP_ALLOWED_HOSTS` including `host.docker.internal`. The MCP tool's SSRF guard blocks RFC1918 destinations by default; the docker-internal `host.docker.internal` host-gateway resolves to a private IP and must be explicitly allowlisted. See [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md) for the policy.
+Check the ascend-ocr container has `MCP_ALLOWED_HOSTS` including `host.docker.internal`. The MCP tool's SSRF guard
+blocks RFC1918 destinations by default, and the docker-internal `host.docker.internal` host-gateway resolves to a
+private address. See [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md).
 
 ```bash
 docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS
 ```
 
-Expect `host.docker.internal,localhost,127.0.0.1` (or any superset containing `host.docker.internal`). If empty, set the env var in `compose.yaml` under the `ascend-ocr` service and recreate the container.
+Expect `host.docker.internal,localhost,127.0.0.1`, or any superset containing `host.docker.internal`.
 
 ## Reset state
 
-Every command below names the `e2e-fixtures` bucket literally. That bucket belongs to this repository. Never issue a
-command that sweeps buckets instead of naming one, because the same object store also backs other projects on this
-machine.
+Every command below names a bucket literally. Those buckets belong to this repository. Never issue a command that
+sweeps buckets instead of naming one, because the same object store also backs other projects on this machine.
 
-Create the dedicated `e2e-fixtures` bucket. The call is idempotent: an existing bucket answers HTTP 200 exactly like a
-freshly created one.
+Create the dedicated `e2e-fixtures` bucket. The call is idempotent.
 
-Windows:
-```powershell
-curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"
-```
-
-Unix:
 ```bash
 curl -sS -o /dev/null -w "%{http_code}\n" -X PUT "http://localhost:9070/e2e-fixtures"
 ```
 
 Expect `200`.
 
-Drop only this test's fixture so the re-upload is clean. A key that is already gone also returns HTTP 204, so the step
-is safe to re-run.
+Drop only this test's fixture so the re-upload is clean.
 
 ```bash
 curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
 ```
 
-Upload the fixture straight from the host. No client and no intermediate container copy: the S3 endpoint takes the
-bytes on a plain `PUT`.
+Upload the fixture straight from the host.
 
-Windows:
-```powershell
-curl.exe -sS -o NUL -w "%{http_code}\n" -X PUT -H "Content-Type: image/png" --data-binary "@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png" "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
-```
-
-Unix:
 ```bash
 curl -sS -o /dev/null -w "%{http_code}\n" -X PUT -H "Content-Type: image/png" --data-binary "@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png" "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
 ```
 
 Expect `200`.
 
-Verify the object lands in the bucket.
+Drop every job record the service holds, so the listing this run leaves behind is this run's own.
 
 ```bash
-curl -fsS "http://localhost:9070/e2e-fixtures?list-type=2&prefix=argent-saga"
+docker exec ascend-ocr sh -c 'rm -f /tmp/ascend-ocr-jobs/*'
 ```
 
-Expect a `ListBucketResult` carrying `<Key>argent-saga-chronicles-page1.png</Key>` with a `<Size>` of `212563`.
+Drop every stored result from the service's own bucket.
+
+```bash
+curl -fsS "http://localhost:9070/ocr-results?list-type=2" | grep -o "<Key>[^<]*</Key>" | sed -e "s/<Key>//" -e "s|</Key>||" | xargs -I {} curl -fsS -X DELETE "http://localhost:9070/ocr-results/{}"
+```
 
 ## Run
+
+Open an MCP session and keep the session id. FastMCP answers the `initialize` call with an
+`Mcp-Session-Id` response header, and every `tools/call` in this spec carries it back.
+
+```bash
+curl -isS -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"1\"}}}"
+```
+
+Expect HTTP 200 and an `mcp-session-id` response header. Use that value as the `mcp_session_id` env-var below.
 
 ```bash
 cd docs/api/request/AscendAI
 ```
 
-**Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the response headers.
-
-Windows:
-```powershell
-curl.exe -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
-```
-
-Unix:
-```bash
-curl -fsS -i -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
-```
-
-Look for `Mcp-Session-Id: <session id>` in the response. The value is a 32 character hexadecimal session id without hyphens,
-as FastMCP emits it. Use that session id as the value of the `mcp_session_id` env-var in the next step.
-
-**Step 2.** Send the `tools/call` with the captured session ID injected:
+Complete the handshake. The MCP protocol requires the client to send the `notifications/initialized` notification
+after `initialize` and before any other request on the session.
 
 ```bash
-bru run "ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
+bru run "ocr/testing/mcp-initialized.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>"
 ```
 
-## Post-run cleanup
+Expect HTTP 202 with an empty body.
 
-Drop the fixture this spec uploaded, so the bucket is left exactly as the spec found it. Run it regardless of whether
-the Run step passed or failed. The command names the `e2e-fixtures` bucket literally and one key, and a key that is
-already gone also returns HTTP 204, so the step is safe to re-run.
+Step 1. Submit through the tool. Read `job_id` from the answer.
 
 ```bash
-curl -fsS -X DELETE "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
+bru run "ocr/testing/mcp-ocr.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>"
 ```
 
-Leave the bucket itself in place. This spec creates it only if absent, and other specs seed their own fixtures into
-it, so deleting the bucket would break them.
+Step 2. Read the state through the tool right away, as soon as step 1 has answered, without waiting for a hint
+first. One page reads in about 15 to 24 seconds, so a first read taken later usually finds the work already finished,
+and the checks on work in flight never run. Then keep reading the state through the tool until it is terminal,
+waiting `poll_after_seconds` between reads. The first read and every later read use the same request.
+
+```bash
+bru run "ocr/testing/mcp-job-status.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>" --env-var "ocrJobId=<job_id from step 1>"
+```
+
+Step 3. Collect the result from the address the successful state carried.
+
+```bash
+bru run "ocr/ocr-job-result.yml" --env ascend-local --env-var "ocrResultUrl=<result.url from step 2>"
+```
+
+Step 4. Cancel the job through the tool, which forgets a finished one along with its stored result.
+
+```bash
+bru run "ocr/testing/mcp-cancel-job.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>" --env-var "ocrJobId=<job_id from step 1>"
+```
+
+Step 5. Read the forgotten identifier through the tool once more.
+
+```bash
+bru run "ocr/testing/mcp-job-not-found.yml" --env ascend-local --env-var "mcp_session_id=<paste session id>" --env-var "ocrJobId=<job_id from step 1>"
+```
 
 ## Expected
 
-- HTTP 200.
-- The JSON-RPC `result.content` array carries a serialised `OcrJsonResponse` whose deserialised shape matches the
-  REST endpoint's response model.
-- `language` equals `"en"`.
-- `filename` equals `"argent-saga-chronicles-page1.png"`.
-- `pages` is non-empty.
-- The concatenated text from `pages[*].lines[*].text` (case-insensitive) contains the substring `Argent Saga`,
-  `Aenaria`, or `Halen Veyr`.
-- `processing_time_seconds` is a finite non-negative number.
+Step 1:
+
+- HTTP 200 and a JSON-RPC result that is not an error frame.
+- The tool payload carries a 22 character `job_id`, `state` `"waiting"`, `page_count` 1 and
+  `status_url` equal to `/v1/ocr/jobs/<job_id>`.
+- The payload carries no `pages` key and no line text.
+
+Step 2:
+
+- Every read returns one of the five states.
+- The first read, taken right away, has `state` `waiting`, `running` or `succeeded`.
+- When the first read is `waiting` or `running`, it carries `poll_after_seconds` between 1 and 30.
+- When the first read is already `succeeded`, the check on work in flight (the hint on a non-terminal read) is
+  recorded as not observed, not as failed. The checks on the terminal read below still apply to it.
+- Non-terminal reads carry `poll_after_seconds`. The terminal read does not.
+- The terminal state is `succeeded`, with `result.key` equal to `<job_id>.md` and a bucket and URL beside it.
+
+Step 3:
+
+- HTTP 200, first line `## Page 1`, and the canary substring `Argent Saga`, `Aenaria` or `Halen Veyr`.
+
+Step 4:
+
+- The tool answers with the same `job_id` and `cancelled: true`.
+
+Step 5:
+
+- HTTP 200 at the transport, with a JSON-RPC error frame or an `isError` result carrying `JOB_NOT_FOUND`.
+- No record in the answer: no `poll_after_seconds` and no `succeeded` state.
 
 ## Fixtures
 
-- [`apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png`](../fixtures/argent-saga-chronicles-page1.png) — same
-  fixture as tests 2 and 4, served to ascend-ocr over HTTP from the object store at
-  `http://host.docker.internal:9070/e2e-fixtures/argent-saga-chronicles-page1.png`.
+- [`apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png`](../fixtures/argent-saga-chronicles-page1.png),
+  uploaded to the object store's `e2e-fixtures` bucket during Reset state. ascend-ocr fetches it over HTTP.
 
 ## Concurrency
 
-Engine-bound. This spec runs alone: no runner of any suite active while it is in flight, from this suite or from any other module's sweep, not even a reject-fast spec of this suite. Start it only when nothing else is running anywhere, and start nothing else until it has returned.
-
-The reason is the engine, not the fixture. `ocr_service.process_file` invokes PaddleOCR's blocking `engine.predict` inside the OCR worker process, and the engine is single-threaded (defect register A47), so inference runs at one core's speed and any other runner on the host competes for that core. Measured on 2026-09-10 with the English fixture: 59.2 seconds of round trip on a quiet host, 160.9 seconds on a loaded one, past the 150 second per-page budget compose sets. A loaded host turns a passing run into a timeout, so raising the budget is not the fix.
-
-The MCP path mirrors the REST path once the URL is resolved. Under contention the JSON-RPC envelope returns `result.isError=true` instead of the expected `result.content[0]` payload.
-
-- Mutates: object-store bucket `e2e-fixtures` (object key `argent-saga-chronicles-page1.png`). `Reset state` uploads that key and `Post-run cleanup` deletes it again, so the spec leaves no object behind. The bucket itself is created if absent and is never deleted, because other specs seed their own fixtures into it.
-- Conflicts with: any future test that also writes `e2e-fixtures/argent-saga-chronicles-page1.png`. None currently exist.
-
-Unsafe with everything: the other engine-bound specs (2, 3, 4, 6) and the reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12) alike.
-
-See [`apps/ascend-ocr/e2e/README.md`](../README.md) "Parallelism and execution order" and [`apps/ascend-ocr/e2e/testing/README.md`](README.md) "Execution order".
+Engine-bound. This spec runs alone, exactly as specs 2, 3, 4 and 13 do: no runner of any suite active while it is in
+flight. The submission itself is fast, because it only fetches the bytes and queues the work, but the reading behind
+it is a full inference on the single worker.

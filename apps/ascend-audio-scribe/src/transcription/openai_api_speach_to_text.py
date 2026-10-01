@@ -30,7 +30,7 @@ _client_instance: OpenAI | None = None
 
 
 def _get_client() -> OpenAI:
-    """Lazy OpenAI client singleton — avoids OPENAI_API_KEY enforcement at
+    """Lazy OpenAI client singleton - avoids OPENAI_API_KEY enforcement at
     import time so unrelated paths (HF, local) work without it.
 
     The narrowing dance: capture the module global into a local under the
@@ -38,7 +38,7 @@ def _get_client() -> OpenAI:
     analysers can narrow the local to `OpenAI` even though they refuse to
     narrow the module global between statements."""
 
-    global _client_instance  # noqa: PLW0603 — module cache
+    global _client_instance  # noqa: PLW0603 - module cache
 
     with _client_lock:
         instance = _client_instance
@@ -51,9 +51,7 @@ def _get_client() -> OpenAI:
         return instance
 
 
-def _build_create_kwargs(
-    audio_file: Any, model: str, language: str, with_timestamps: bool
-) -> dict[str, Any]:
+def _build_create_kwargs(audio_file: Any, model: str, language: str, with_timestamps: bool) -> dict[str, Any]:
     kwargs: dict[str, Any] = {"model": model, "file": audio_file}
     if language:
         kwargs["language"] = language
@@ -69,7 +67,7 @@ def _segments_from_response(response: Any) -> list[dict[str, Any]]:
     The OpenAI typeshed types `response.segments` as `list[Segment] | None
     | list[DiarizedSegment]`. We early-return on the None case (explicit
     `if not raw` so static analysers narrow), then iterate the resulting
-    iterable directly — no `list()` re-materialisation needed."""
+    iterable directly - no `list()` re-materialisation needed."""
 
     raw: Any = getattr(response, "segments", None)
     if not raw:
@@ -132,7 +130,7 @@ def _accumulate_chunk_result(
 ) -> None:
     """Sort the per-chunk OpenAI response into the right accumulator.
     `_transcribe_single_chunk` returns a `list[dict]` when timestamps were
-    requested and a `str` otherwise — dispatch purely on runtime type."""
+    requested and a `str` otherwise - dispatch purely on runtime type."""
 
     if isinstance(result, list):
         for segment in result:
@@ -179,11 +177,14 @@ def openai_transcript(
             chunk_num = idx + 1
             chunk_size = _check_chunk_size(chunk_path, chunk_num)
             chunk_size_mb = chunk_size / 1024 / 1024
-            _emit_progress(progress_callback, {
-                "type": "progress",
-                "message": f"Transcribing chunk {chunk_num}/{num_chunks}",
-                "data": {"chunk": chunk_num, "total": num_chunks, "size_mb": round(chunk_size_mb, 2)},
-            })
+            _emit_progress(
+                progress_callback,
+                {
+                    "type": "progress",
+                    "message": f"Transcribing chunk {chunk_num}/{num_chunks}",
+                    "data": {"chunk": chunk_num, "total": num_chunks, "size_mb": round(chunk_size_mb, 2)},
+                },
+            )
 
             chunk_start = time.monotonic()
             result = _transcribe_single_chunk(chunk_path, model, language, with_timestamps)
@@ -196,11 +197,14 @@ def openai_transcript(
                 full_text=full_text,
             )
             logger.info(f"Chunk {chunk_num}/{num_chunks} complete in {elapsed:.2f}s.")
-            _emit_progress(progress_callback, {
-                "type": "progress",
-                "message": f"Chunk {chunk_num}/{num_chunks} complete in {elapsed:.2f}s",
-                "data": {"chunk": chunk_num, "total": num_chunks, "elapsed_s": round(elapsed, 2)},
-            })
+            _emit_progress(
+                progress_callback,
+                {
+                    "type": "progress",
+                    "message": f"Chunk {chunk_num}/{num_chunks} complete in {elapsed:.2f}s",
+                    "data": {"chunk": chunk_num, "total": num_chunks, "elapsed_s": round(elapsed, 2)},
+                },
+            )
 
     if with_timestamps:
         return full_segments

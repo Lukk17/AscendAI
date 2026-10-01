@@ -12,59 +12,72 @@ class InputValidatorTest {
     @Test
     @DisplayName("validateCity returns null for a valid city name")
     void validateCity_validName_returnsNull() {
+        // then
         assertThat(InputValidator.validateCity("Warsaw")).isNull();
     }
 
     @Test
     @DisplayName("validateCity returns error when city is null")
     void validateCity_null_returnsBlankError() {
+        // then
         assertThat(InputValidator.validateCity(null)).containsIgnoringCase("blank");
     }
 
     @Test
     @DisplayName("validateCity returns error when city is blank")
     void validateCity_blank_returnsBlankError() {
+        // then
         assertThat(InputValidator.validateCity("   ")).containsIgnoringCase("blank");
     }
 
     @Test
     @DisplayName("validateCity returns error when city exceeds max length")
     void validateCity_tooLong_returnsLengthError() {
+        // when
         String longCity = "A".repeat(InputValidator.CITY_MAX_LENGTH + 1);
+        // then
         assertThat(InputValidator.validateCity(longCity)).containsIgnoringCase("characters");
     }
 
     @Test
     @DisplayName("validateCity returns error when city contains unsupported characters")
     void validateCity_controlCharacters_returnsUnsupportedCharactersError() {
+        // then
         assertThat(InputValidator.validateCity("Warsaw\r\n")).containsIgnoringCase("unsupported");
     }
 
     @Test
     @DisplayName("validatePlaceName uses the supplied label in the error message")
     void validatePlaceName_blankInput_errorMessageContainsLabel() {
+        // when
         String error = InputValidator.validatePlaceName("   ", "Query");
+        // then
         assertThat(error).startsWith("Query");
     }
 
     @Test
     @DisplayName("validatePlaceName with label City delegates same logic as validateCity")
     void validatePlaceName_cityLabel_sameResultAsValidateCity() {
+        // when
         String viaPlaceName = InputValidator.validatePlaceName("Warsaw", "City");
         String viaValidateCity = InputValidator.validateCity("Warsaw");
+        // then
         assertThat(viaPlaceName).isEqualTo(viaValidateCity);
     }
 
     @Test
     @DisplayName("validatePlaceName applies NFKC normalisation so compatibility characters are accepted")
     void validatePlaceName_nfkcCompatibilityChar_normalises() {
+        // when
         String fullwidthW = "Ｗarsaw";
+        // then
         assertThat(InputValidator.validatePlaceName(fullwidthW, "City")).isNull();
     }
 
     @Test
     @DisplayName("validateCountryCode returns null for a valid two-letter ISO country code")
     void validateCountryCode_validCode_returnsNull() {
+        // then
         assertThat(InputValidator.validateCountryCode("US")).isNull();
         assertThat(InputValidator.validateCountryCode("PL")).isNull();
         assertThat(InputValidator.validateCountryCode("DE")).isNull();
@@ -73,73 +86,86 @@ class InputValidatorTest {
     @Test
     @DisplayName("validateCountryCode returns null when country code is null")
     void validateCountryCode_null_returnsNull() {
+        // then
         assertThat(InputValidator.validateCountryCode(null)).isNull();
     }
 
     @Test
     @DisplayName("validateCountryCode returns null when country code is blank")
     void validateCountryCode_blank_returnsNull() {
+        // then
         assertThat(InputValidator.validateCountryCode("   ")).isNull();
     }
 
     @Test
     @DisplayName("validateCountryCode returns error when country code is not two letters")
     void validateCountryCode_threeLetters_returnsFormatError() {
+        // then
         assertThat(InputValidator.validateCountryCode("POL")).containsIgnoringCase("alpha-2");
     }
 
     @Test
     @DisplayName("validateCountryCode returns error when country code is ZZ (two letters but not a real ISO code)")
     void validateCountryCode_zzCode_returnsUnknownIsoError() {
+        // then
         assertThat(InputValidator.validateCountryCode("ZZ")).containsIgnoringCase("ISO-3166-1");
     }
 
     @Test
     @DisplayName("validateCountryCode returns error when country code is AA (two letters but not a real ISO code)")
     void validateCountryCode_aaCode_returnsUnknownIsoError() {
+        // then
         assertThat(InputValidator.validateCountryCode("AA")).containsIgnoringCase("ISO-3166-1");
     }
 
     @Test
     @DisplayName("validateCountryCode accepts lowercase input by uppercasing internally")
     void validateCountryCode_lowercase_returnsNull() {
+        // then
         assertThat(InputValidator.validateCountryCode("us")).isNull();
     }
 
     @Test
     @DisplayName("validateHistoricalDate returns null for a valid past date")
     void validateHistoricalDate_validPastDate_returnsNull() {
+        // then
         assertThat(InputValidator.validateHistoricalDate("2020-01-15")).isNull();
     }
 
     @Test
     @DisplayName("validateHistoricalDate returns error when date is null")
     void validateHistoricalDate_null_returnsBlankError() {
+        // then
         assertThat(InputValidator.validateHistoricalDate(null)).containsIgnoringCase("blank");
     }
 
     @Test
     @DisplayName("validateHistoricalDate returns error when date is blank")
     void validateHistoricalDate_blank_returnsBlankError() {
+        // then
         assertThat(InputValidator.validateHistoricalDate("   ")).containsIgnoringCase("blank");
     }
 
     @Test
     @DisplayName("validateHistoricalDate returns error when date format is wrong")
     void validateHistoricalDate_wrongFormat_returnsFormatError() {
+        // then
         assertThat(InputValidator.validateHistoricalDate("30-01-2020")).containsIgnoringCase("format");
     }
 
     @Test
     @DisplayName("validateHistoricalDate error does not echo the bad date value in the message")
     void validateHistoricalDate_wrongFormat_errorDoesNotEchoInput() {
+        // when
         String error = InputValidator.validateHistoricalDate("not-a-date");
+        // then
         assertThat(error).doesNotContain("not-a-date");
     }
 
     @Test
     @DisplayName("validateHistoricalDate returns error when date is today")
     void validateHistoricalDate_today_returnsPastError() {
+        // then
         assertThat(InputValidator.validateHistoricalDate(LocalDate.now().toString()))
                 .containsIgnoringCase("past");
     }
@@ -147,6 +173,7 @@ class InputValidatorTest {
     @Test
     @DisplayName("validateHistoricalDate returns error when date is in the future")
     void validateHistoricalDate_future_returnsPastError() {
+        // then
         assertThat(InputValidator.validateHistoricalDate(LocalDate.now().plusDays(1).toString()))
                 .containsIgnoringCase("past");
     }
@@ -154,7 +181,9 @@ class InputValidatorTest {
     @Test
     @DisplayName("validateHistoricalDate returns error when date is older than 80 years")
     void validateHistoricalDate_tooOld_returnsYearsError() {
+        // when
         String ancient = LocalDate.now().minusYears(InputValidator.MAX_HISTORICAL_YEARS + 1).toString();
+        // then
         assertThat(InputValidator.validateHistoricalDate(ancient))
                 .containsIgnoringCase("80 years");
     }
@@ -162,66 +191,77 @@ class InputValidatorTest {
     @Test
     @DisplayName("normaliseUnit returns the recognised unit unchanged")
     void normaliseUnit_celsius_returnsCelsius() {
+        // then
         assertThat(InputValidator.normaliseUnit("celsius")).isEqualTo("celsius");
     }
 
     @Test
     @DisplayName("normaliseUnit defaults to celsius for an unrecognised value")
     void normaliseUnit_unknown_defaultsToCelsius() {
+        // then
         assertThat(InputValidator.normaliseUnit("kelvin")).isEqualTo(InputValidator.DEFAULT_UNIT);
     }
 
     @Test
     @DisplayName("normaliseUnit defaults to celsius when null")
     void normaliseUnit_null_defaultsToCelsius() {
+        // then
         assertThat(InputValidator.normaliseUnit(null)).isEqualTo(InputValidator.DEFAULT_UNIT);
     }
 
     @Test
     @DisplayName("normaliseLanguage returns the recognised language unchanged")
     void normaliseLanguage_en_returnsEn() {
+        // then
         assertThat(InputValidator.normaliseLanguage("en")).isEqualTo("en");
     }
 
     @Test
     @DisplayName("normaliseLanguage defaults to en for an unrecognised language")
     void normaliseLanguage_unknown_defaultsToEn() {
+        // then
         assertThat(InputValidator.normaliseLanguage("zz")).isEqualTo(InputValidator.DEFAULT_LANGUAGE);
     }
 
     @Test
     @DisplayName("normaliseCountryCode returns null when input is blank")
     void normaliseCountryCode_blank_returnsNull() {
+        // then
         assertThat(InputValidator.normaliseCountryCode("   ")).isNull();
     }
 
     @Test
     @DisplayName("normaliseCountryCode returns null when input is null")
     void normaliseCountryCode_null_returnsNull() {
+        // then
         assertThat(InputValidator.normaliseCountryCode(null)).isNull();
     }
 
     @Test
     @DisplayName("normaliseCountryCode uppercases the input")
     void normaliseCountryCode_lowercase_returnsUppercase() {
+        // then
         assertThat(InputValidator.normaliseCountryCode("pl")).isEqualTo("PL");
     }
 
     @Test
     @DisplayName("normaliseCacheKey returns null when input is null")
     void normaliseCacheKey_null_returnsNull() {
+        // then
         assertThat(InputValidator.normaliseCacheKey(null)).isNull();
     }
 
     @Test
     @DisplayName("normaliseCacheKey lowercases and trims the input")
     void normaliseCacheKey_mixedCase_returnsLowercaseTrimmed() {
+        // then
         assertThat(InputValidator.normaliseCacheKey("  Warsaw  ")).isEqualTo("warsaw");
     }
 
     @Test
     @DisplayName("normaliseCacheKey applies NFKC normalisation so compatibility characters become ASCII")
     void normaliseCacheKey_fullwidthLetters_normalisesToAscii() {
+        // then
         assertThat(InputValidator.normaliseCacheKey("Ｗarsaw")).isEqualTo("warsaw");
     }
 }

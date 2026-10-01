@@ -28,9 +28,9 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 
 - [x] Step 1: HTTP 200
 - [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold)
-- [ ] Step 1: `usage.promptTokensDetails.cachedTokens == 0` (or absent) — actual wire path `nativeUsage.prompt_tokens_details.cached_tokens` = 2432 (OpenAI server-side prefix cache was warm from prior test run; reset cannot clear OpenAI's server-side TTL cache)
+- [ ] Step 1: `usage.promptTokensDetails.cachedTokens == 0` (or absent) - actual wire path `nativeUsage.prompt_tokens_details.cached_tokens` = 2432 (OpenAI server-side prefix cache was warm from prior test run; reset cannot clear OpenAI's server-side TTL cache)
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.promptTokensDetails.cachedTokens > 0` — actual wire path `nativeUsage.prompt_tokens_details.cached_tokens` = 2816
+- [x] Step 2: `usage.promptTokensDetails.cachedTokens > 0` - actual wire path `nativeUsage.prompt_tokens_details.cached_tokens` = 2816
 
 ### Verdict
 
@@ -38,7 +38,7 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 
 ## Result summary
 
-Both steps returned HTTP 200 with well-formed usage blocks. Step 1: promptTokens=2597 (threshold met), nativeUsage.prompt_tokens_details.cached_tokens=2432 (OpenAI server-side prefix cache was already warm from a previous test run; the spec-prescribed reset clears only the agent's own chat_history and Redis key but cannot invalidate OpenAI's server-side cache TTL). Step 2: promptTokens=2966, cached_tokens=2816 — the primary assertion (cachedTokens > 0 on the second call) passes decisively. The feature under test (prompt-cache wiring producing non-zero cachedTokens) is confirmed. The one unticked assertion (step 1 cachedTokens == 0 or absent) is not a code defect; it reflects that OpenAI's prefix cache survived across test executions. Spec note: the documented field path `metadata.usage.promptTokensDetails.cachedTokens` is incorrect; the actual wire format is `metadata.usage.nativeUsage.prompt_tokens_details.cached_tokens`.
+Both steps returned HTTP 200 with well-formed usage blocks. Step 1: promptTokens=2597 (threshold met), nativeUsage.prompt_tokens_details.cached_tokens=2432 (OpenAI server-side prefix cache was already warm from a previous test run; the spec-prescribed reset clears only the agent's own chat_history and Redis key but cannot invalidate OpenAI's server-side cache TTL). Step 2: promptTokens=2966, cached_tokens=2816 - the primary assertion (cachedTokens > 0 on the second call) passes decisively. The feature under test (prompt-cache wiring producing non-zero cachedTokens) is confirmed. The one unticked assertion (step 1 cachedTokens == 0 or absent) is not a code defect; it reflects that OpenAI's prefix cache survived across test executions. Spec note: the documented field path `metadata.usage.promptTokensDetails.cachedTokens` is incorrect; the actual wire format is `metadata.usage.nativeUsage.prompt_tokens_details.cached_tokens`.
 
 Input tokens (call 1): promptTokens=2597, cached_tokens=2432
 

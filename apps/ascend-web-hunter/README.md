@@ -130,7 +130,7 @@ and `.env`. The most-used variables:
 | `API_PORT`           | `7021`                             | Service port                                         |
 | `SEARXNG_BASE_URL`   | `http://localhost:9020`            | SearXNG meta-search instance                         |
 | `FLARESOLVERR_URL`   | `http://localhost:8191/v1`         | FlareSolverr Cloudflare-bypass instance              |
-| `REDIS_URL`          | `redis://localhost:6379/0`         | Redis for cookie persistence                         |
+| `REDIS_URL`          | `redis://127.0.0.1:6379/0`         | Redis for cookie persistence                         |
 | `READ_TOTAL_BUDGET`  | `90.0`                             | Wall-clock cap across the strategy chain (seconds)   |
 | `PLAYWRIGHT_HEADLESS`| `false`                            | Headless Chromium; flip to `true` in CI / no X       |
 | `PUBLIC_VNC_URL`     | `http://localhost:7900`            | NoVNC URL (or `http://ngrok:4040/api/tunnels`)       |

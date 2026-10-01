@@ -49,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Why mock {@link VectorStoreResolver} but not the object store/Postgres: the embedding HTTP call
  * happens inside Spring AI's {@code OpenAiEmbeddingModel}, which is constructed deep inside
  * {@code VectorStoreConfig#buildProviderVectorStore}. Stubbing the resolver keeps the
- * assertion surface simple — we still exercise the real S3 listing, the real Postgres-backed
+ * assertion surface simple - we still exercise the real S3 listing, the real Postgres-backed
  * metadata-store dedupe, and the real document-routing logic in {@code ManualIngestionService}.
  */
 @AutoConfigureMockMvc
@@ -97,6 +97,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
     @Test
     void upload_acceptsMarkdownPdfAndDocxInOneRequest_andStoresInObjectStore() throws Exception {
+        // given
         MockMultipartFile mdFile = new MockMultipartFile(
                 "file", "notes.md", "text/markdown",
                 "# Title\n\nSome **bold** body text for the e2e ingestion test.".getBytes());
@@ -110,6 +111,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 minimalDocxBytes());
 
+        // when
         MvcResult result = mockMvc.perform(multipart("/api/v1/ingestion/upload")
                         .file(mdFile)
                         .file(pdfFile)
@@ -118,13 +120,14 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 .andExpect(jsonPath("$.uploaded.length()").value(3))
                 .andReturn();
 
+        // then
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         List<String> keys = objectMapper.convertValue(body.get("uploaded"), new TypeReference<List<String>>() {
         });
 
         assertThat(keys).contains("markdown/notes.md", "documents/report.pdf");
         // DOCX-by-extension is rejected if Tika sniffs the synthesized bytes as plain zip,
-        // but a zip is itself in the allowlist — so the key may be either documents/doc.docx
+        // but a zip is itself in the allowlist - so the key may be either documents/doc.docx
         // or absent. We assert both possible accepted shapes.
         assertThat(keys).anyMatch(k -> k.equals("documents/doc.docx"));
 
@@ -138,7 +141,8 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
     @Test
     void upload_rejectsDisallowedPayload_with415_andLeavesObjectStoreUntouched() throws Exception {
-        // SVG bytes — Tika detects as image/svg+xml, which is NOT in the allowlist
+        // given
+        // SVG bytes - Tika detects as image/svg+xml, which is NOT in the allowlist
         // (only png/jpeg/webp/gif are). Reliable across Tika versions because the
         // <svg xmlns="http://www.w3.org/2000/svg"> root element is the canonical signature.
         byte[] svgBytes = ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -147,12 +151,14 @@ class IngestionEndToEndIT extends TestcontainersBase {
         MockMultipartFile bad = new MockMultipartFile(
                 "file", "evil.svg", "image/svg+xml", svgBytes);
 
+        // when
         mockMvc.perform(multipart("/api/v1/ingestion/upload").file(bad))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.status").value(415))
                 .andExpect(jsonPath("$.error").value("unsupported_media_type"))
                 .andExpect(jsonPath("$.message").exists());
 
+        // then
         // Nothing should have landed in the object store for this filename.
         ListObjectsV2Response list = s3Client.listObjectsV2(ListObjectsV2Request.builder()
                 .bucket(BUCKET).build());
@@ -161,14 +167,17 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
     @Test
     void upload_filenameWithTraversalIsSanitized() throws Exception {
+        // given
         MockMultipartFile traversal = new MockMultipartFile(
                 "file", "../../etc/passwd.md", "text/markdown",
                 "# Sanitized\n\nContent.".getBytes());
 
+        // when
         MvcResult result = mockMvc.perform(multipart("/api/v1/ingestion/upload").file(traversal))
                 .andExpect(status().isOk())
                 .andReturn();
 
+        // then
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         List<String> keys = objectMapper.convertValue(body.get("uploaded"), new TypeReference<List<String>>() {
         });
@@ -193,7 +202,8 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
     @Test
     void runIngestion_processesUploadedMarkdown_andPersistsMetadataAndCallsVectorStore() throws Exception {
-        // Upload a single Markdown file — the run pipeline should ingest it.
+        // given
+        // Upload a single Markdown file - the run pipeline should ingest it.
         MockMultipartFile mdFile = new MockMultipartFile(
                 "file", "run-target.md", "text/markdown",
                 ("# Heading\n\n" + "Body content. ".repeat(50)).getBytes());
@@ -201,6 +211,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
         mockMvc.perform(multipart("/api/v1/ingestion/upload").file(mdFile))
                 .andExpect(status().isOk());
 
+        // when
         mockMvc.perform(post("/api/v1/ingestion/run")
                         .param("embeddingProvider", "lmstudio")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -208,6 +219,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 .andExpect(jsonPath("$.indexed").isNumber())
                 .andExpect(jsonPath("$.failed").value(0));
 
+        // then
         // The metadata store must have been written through to Postgres for the uploaded key.
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM INT_METADATA_STORE WHERE METADATA_KEY LIKE 'manual-ingestion:markdown/run-target.md:%'",
@@ -220,6 +232,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
     @Test
     void runIngestion_isIdempotent_acrossRepeatedRuns() throws Exception {
+        // given
         MockMultipartFile mdFile = new MockMultipartFile(
                 "file", "idempotent.md", "text/markdown",
                 ("# Title\n\n" + "Repeatable body. ".repeat(50)).getBytes());
@@ -238,7 +251,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
                 "SELECT COUNT(*) FROM INT_METADATA_STORE WHERE METADATA_KEY LIKE 'manual-ingestion:%'",
                 Integer.class);
 
-        // Reset interactions on the mock, so the second-run assertion is unambiguous —
+        // Reset interactions on the mock, so the second-run assertion is unambiguous -
         // we want to prove the second run did NOT call add() at all (the metadata store
         // dedupes everything).
         reset(mockVectorStore);
@@ -246,12 +259,14 @@ class IngestionEndToEndIT extends TestcontainersBase {
         when(vectorStoreResolver.resolve(ArgumentMatchers.anyString())).thenReturn(mockVectorStore);
         when(vectorStoreResolver.resolve(ArgumentMatchers.isNull())).thenReturn(mockVectorStore);
 
+        // when
         mockMvc.perform(post("/api/v1/ingestion/run")
                         .param("embeddingProvider", "lmstudio")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.skipped").isNumber());
 
+        // then
         // No new metadata-store rows.
         Integer countAfterSecond = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM INT_METADATA_STORE WHERE METADATA_KEY LIKE 'manual-ingestion:%'",
@@ -290,7 +305,7 @@ class IngestionEndToEndIT extends TestcontainersBase {
 
     /**
      * Minimal zip-with-DOCX-marker bytes. A real DOCX is a zip containing
-     * {@code [Content_Types].xml} — Tika sniffs the marker and returns the OOXML wordprocessingml MIME.
+     * {@code [Content_Types].xml} - Tika sniffs the marker and returns the OOXML wordprocessingml MIME.
      * If detection falls back to {@code application/zip}, the upload still succeeds (zip is allowlisted),
      * which keeps Test 1 stable.
      */

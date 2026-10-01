@@ -1,6 +1,6 @@
 [project]
 name = "ascend-web-hunter"
-version = "0.0.5"
+version = "0.0.6"
 description = "AscendAI Web Search & Scraping Service"
 requires-python = ">=3.12"
 dependencies = [
@@ -102,15 +102,15 @@ ignore = [
     "S311",    # random for viewport jitter / UA rotation is not security-sensitive
     "PLR0911", # too-many-returns; happy on guard-clause heavy functions
     "PLC0415", # import-not-at-top is required for OTel/asyncio lazy imports guarded by env checks
-    "G004",    # f-strings in logger.x — readable and perf-equivalent at our log levels
-    "TRY003",  # raise with message — forcing per-message Exception subclasses is overkill
-    "TRY300",  # try/else split — often hurts readability for short happy paths
-    "TRY301",  # raise inside try — intentional pattern in strategy escalation
+    "G004",    # f-strings in logger.x - readable and perf-equivalent at our log levels
+    "TRY003",  # raise with message - forcing per-message Exception subclasses is overkill
+    "TRY300",  # try/else split - often hurts readability for short happy paths
+    "TRY301",  # raise inside try - intentional pattern in strategy escalation
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
-    "S101",     # assert IS pytest idiom — never replace with if/raise
+    "S101",     # assert IS pytest idiom - never replace with if/raise
     "SIM117",   # nested `with` mocks are clearer than one combined block
     "RUF059",   # factory tuple-unpacks intentionally leave some names unused
     "PLR1711",  # bare returns in test stubs are explicit
@@ -129,7 +129,7 @@ warn_return_any = true
 warn_unused_ignores = true
 ignore_missing_imports = false
 # Tame two strict-mode rules that fight third-party libraries (crawlee / redis /
-# playwright_stealth) without typed stubs. Internal code still has to be typed —
+# playwright_stealth) without typed stubs. Internal code still has to be typed -
 # the rest of the strict flags remain on.
 disable_error_code = ["no-untyped-call", "type-arg"]
 

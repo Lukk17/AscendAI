@@ -54,9 +54,7 @@ async def save_upload_to_temp_async(upload: UploadFile) -> str:
                     break
                 bytes_written += len(chunk)
                 if bytes_written > cap:
-                    raise FileSizeExceededError(
-                        f"Upload exceeds maximum size of {cap} bytes"
-                    )
+                    raise FileSizeExceededError(f"Upload exceeds maximum size of {cap} bytes")
                 await out_file.write(chunk)
     except FileSizeExceededError:
         cleanup_temp_file(temp_path)

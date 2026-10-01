@@ -1,9 +1,12 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
+import com.lukk.ascend.ai.agent.test.LogCapture;
 import com.lukk.ascend.ai.agent.test.TestConstants;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.anthropic.api.AnthropicCacheStrategy;
@@ -14,12 +17,16 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class AnthropicPromptCacheStrategyTest {
 
     private final AnthropicPromptCacheStrategy strategy = new AnthropicPromptCacheStrategy(new SimpleMeterRegistry());
+
+    @RegisterExtension
+    final LogCapture logs = LogCapture.forClass(AnthropicPromptCacheStrategy.class);
 
     @Test
     @DisplayName("buildOptions produces AnthropicChatOptions with SYSTEM_ONLY multi-block caching")
@@ -51,8 +58,12 @@ class AnthropicPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome does not throw when response is null")
     void recordOutcome_NullResponse_DoesNotThrow() {
+        // when
+        ThrowingCallable recordOutcome = () -> strategy.recordOutcome("u", null);
+
         // then
-        strategy.recordOutcome("u", null);
+        assertThatCode(recordOutcome).doesNotThrowAnyException();
+        assertThat(logs.messages()).isEmpty();
     }
 
     @Test
@@ -66,48 +77,68 @@ class AnthropicPromptCacheStrategyTest {
         when(md.getUsage()).thenReturn(usage);
         when(usage.getNativeUsage()).thenReturn(new Object());
 
+        // when
+        ThrowingCallable recordOutcome = () -> strategy.recordOutcome("u", response);
+
         // then
-        strategy.recordOutcome("u", response);
+        assertThatCode(recordOutcome).doesNotThrowAnyException();
+        assertThat(logs.messages()).isEmpty();
     }
 
     @Test
     @DisplayName("recordOutcome logs cache read tokens on a cache hit")
     void recordOutcome_AnthropicHit_LogsCacheReadTokens() {
-        // given — cache hit: cacheRead > 0, cacheCreate == 0
+        // given - cache hit: cacheRead > 0, cacheCreate == 0
         ChatResponse response = anthropicResponse(487, 0, 612);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
+
+        // then
+        assertThat(logs.messages()).singleElement().asString()
+                .endsWith("provider=anthropic user=" + TestConstants.DEFAULT_USER_ID + " hit=true cache_read_tokens=487 cache_creation_tokens=0 prompt_tokens=612");
     }
 
     @Test
     @DisplayName("recordOutcome logs zeroes on a cold-start cache miss")
     void recordOutcome_AnthropicMiss_LogsZeroes() {
-        // given — cold start: both cacheRead and cacheCreate are 0
+        // given - cold start: both cacheRead and cacheCreate are 0
         ChatResponse response = anthropicResponse(0, 0, 612);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
+
+        // then
+        assertThat(logs.messages()).singleElement().asString()
+                .endsWith("provider=anthropic user=" + TestConstants.DEFAULT_USER_ID + " hit=false cache_read_tokens=0 cache_creation_tokens=0 prompt_tokens=612");
     }
 
     @Test
     @DisplayName("recordOutcome logs cacheCreate tokens on first cache population (write only)")
     void recordOutcome_AnthropicWrite_LogsCacheCreateTokens() {
-        // given — cache write: cacheCreate > 0, cacheRead == 0 (first population of cache)
+        // given - cache write: cacheCreate > 0, cacheRead == 0 (first population of cache)
         ChatResponse response = anthropicResponse(0, 350, 612);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
+
+        // then
+        assertThat(logs.messages()).singleElement().asString()
+                .endsWith("provider=anthropic user=" + TestConstants.DEFAULT_USER_ID + " hit=false cache_read_tokens=0 cache_creation_tokens=350 prompt_tokens=612");
     }
 
     @Test
     @DisplayName("recordOutcome handles both cacheRead and cacheCreate being non-zero in a partial hit")
     void recordOutcome_AnthropicHitAndWrite_BothNonZero() {
-        // given — mixed: cache was partially warmed so both counters > 0
+        // given - mixed: cache was partially warmed so both counters > 0
         ChatResponse response = anthropicResponse(312, 100, 1024);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
+
+        // then
+        assertThat(logs.messages()).singleElement().asString()
+                .endsWith("provider=anthropic user=" + TestConstants.DEFAULT_USER_ID + " hit=true cache_read_tokens=312 cache_creation_tokens=100 prompt_tokens=1024");
     }
 
     @Test

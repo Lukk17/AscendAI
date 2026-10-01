@@ -50,14 +50,14 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processMarkdown extracts basename for title when filename has no path separator")
     void processMarkdown_FilenameWithoutPath_UsesBareFilenameAsTitle() throws java.io.IOException {
-        // given — markdown with no H1, filename is just "readme.md" (no slash)
+        // given - markdown with no H1, filename is just "readme.md" (no slash)
         String markdown = "Some content without a heading.";
         try (InputStream stream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8))) {
 
             // when
             List<Document> docs = ingestionService.processMarkdown(stream, "readme.md");
 
-            // then — title falls back to the full filename since there's no slash
+            // then - title falls back to the full filename since there's no slash
             assertThat(docs).hasSize(1);
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("readme.md");
         }
@@ -99,12 +99,15 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured returns empty list when JSON array is empty")
     void processUnstructured_EmptyArray_ReturnsEmpty() throws java.io.IOException {
+        // given
         stubUnstructured("[]");
 
+        // when
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
             List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
+            // then
             assertThat(docs).isEmpty();
         }
     }
@@ -112,13 +115,15 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured uses non-Title element text but falls back to filename for title")
     void processUnstructured_ElementsWithoutTitleType_UsesFallbackTitle() throws java.io.IOException {
-        // given — no element has type "Title", so title falls back to basename
+        // given - no element has type "Title", so title falls back to basename
         stubUnstructured("[{\"type\":\"NarrativeText\",\"text\":\"Some body text.\"}]");
 
+        // when
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
             List<Document> docs = ingestionService.processUnstructured(stream, "folder/report.pdf");
 
+            // then
             assertThat(docs).hasSize(1);
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("report.pdf");
             assertThat(docs.getFirst().getText()).contains("Some body text.");
@@ -128,13 +133,15 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured skips elements that lack a text field")
     void processUnstructured_ElementWithNoTextField_SkippedFromText() throws java.io.IOException {
-        // given — second element has no "text" field; only first contributes
+        // given - second element has no "text" field; only first contributes
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"My Title\"},{\"type\":\"Image\"}]");
 
+        // when
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
             List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
+            // then
             assertThat(docs).hasSize(1);
             // "Image" element contributed no text, only "My Title" row did
             assertThat(docs.getFirst().getText()).isEqualTo("My Title\n");
@@ -144,13 +151,15 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured ignores Title element with blank text when extracting title")
     void processUnstructured_TitleElementWithBlankText_FallsBackToFilename() throws java.io.IOException {
-        // given — Title element has blank text candidate
+        // given - Title element has blank text candidate
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"   \"},{\"type\":\"NarrativeText\",\"text\":\"body\"}]");
 
+        // when
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
             List<Document> docs = ingestionService.processUnstructured(stream, "blank_title.pdf");
 
+            // then
             assertThat(docs).hasSize(1);
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("blank_title.pdf");
         }
@@ -159,12 +168,15 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured captures first Title element as the document title")
     void processUnstructured_FirstTitleElement_UsedAsTitle() throws java.io.IOException {
+        // given
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"Real Title\"},{\"type\":\"Title\",\"text\":\"Second Title\"}]");
 
+        // when
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
             List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
+            // then
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("Real Title");
         }
     }
@@ -172,13 +184,16 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured skips Title extraction once title is already set")
     void processUnstructured_TitleAlreadySet_SkipsSubsequentTitleElements() throws java.io.IOException {
+        // given
         // First Title is captured; second Title node should be skipped (but its text still appended)
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"First Title\"},{\"type\":\"Title\",\"text\":\"Ignored Title\"}]");
 
+        // when
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
 
             List<Document> docs = ingestionService.processUnstructured(stream, "two_titles.pdf");
 
+            // then
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("First Title");
             assertThat(docs.getFirst().getText()).contains("First Title").contains("Ignored Title");
         }
@@ -187,12 +202,15 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured skips Title extraction when Title element has no text field")
     void processUnstructured_TitleWithNoTextField_FallsBackToFilename() throws java.io.IOException {
+        // given
         // Title element present BUT has no "text" field -> 4th condition of compound fails -> extractedTitle stays null
         stubUnstructured("[{\"type\":\"Title\"},{\"type\":\"NarrativeText\",\"text\":\"body\"}]");
 
+        // when
         try (java.io.InputStream stream = new java.io.ByteArrayInputStream("data".getBytes())) {
             List<Document> docs = ingestionService.processUnstructured(stream, "test.pdf");
 
+            // then
             assertThat(docs).hasSize(1);
             // Title had no text -> title falls back to basename "test.pdf"
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("test.pdf");
@@ -202,11 +220,14 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processMarkdown uses bare filename as title when filename has no path separator")
     void processMarkdown_FilenameNoSlash_UsesFullFilename() throws java.io.IOException {
+        // given
         String markdown = "Some content";
         try (InputStream stream = new ByteArrayInputStream(markdown.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
 
+            // when
             List<Document> docs = ingestionService.processMarkdown(stream, "nopath.md");
 
+            // then
             assertThat(docs).hasSize(1);
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("nopath.md");
         }
@@ -215,6 +236,7 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processMarkdown uses filename as title when extracted title is blank")
     void processMarkdown_BlankExtractedTitle_UsesFallbackFilename() throws Exception {
+        // given
         // Markdown with H1 that has blank text content (unlikely but possible via edge-case parser)
         // More practically: a heading that only contains whitespace
         // Actually TitleExtractionVisitor extracts literal text, so let's test via a heading with empty text
@@ -225,8 +247,10 @@ class IngestionServiceTitleExtractionTest {
         String markdown = "#   \n\nSome content.";
         try (java.io.InputStream stream = new java.io.ByteArrayInputStream(markdown.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
 
+            // when
             List<Document> docs = ingestionService.processMarkdown(stream, "test.md");
 
+            // then
             assertThat(docs).hasSize(1);
             // H1 with just spaces produces "" title -> isBlank() = true -> use filename
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("test.md");
@@ -236,6 +260,7 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processMarkdown throws IngestionException when inputStream throws IOException")
     void processMarkdown_IOExceptionFromStream_ThrowsIngestionException() {
+        // when
         // Create an InputStream that throws IOException on read
         java.io.InputStream brokenStream = new java.io.InputStream() {
             @Override
@@ -244,6 +269,7 @@ class IngestionServiceTitleExtractionTest {
             }
         };
 
+        // then
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> ingestionService.processMarkdown(brokenStream, "broken.md"))
                 .isInstanceOf(com.lukk.ascend.ai.agent.exception.IngestionException.class)

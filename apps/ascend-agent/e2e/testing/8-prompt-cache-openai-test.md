@@ -99,7 +99,7 @@ Nothing else survives the run. This spec sends no attachment, uploads no object 
 
 ## Expected
 
-- After step 1: HTTP 200. Response `metadata.usage.promptTokens >= 1024` (otherwise OpenAI's auto cache won't fire on the next call; the test prompt is sized to clear this threshold). `metadata.usage.nativeUsage.prompt_tokens_details.cached_tokens` is 0 or absent on a fresh-cache run; non-zero is acceptable when OpenAI's server-side cache TTL hasn't expired from a prior local run (the local Reset cannot clear the server-side TTL — this is environmental, not a regression).
+- After step 1: HTTP 200. Response `metadata.usage.promptTokens >= 1024` (otherwise OpenAI's auto cache won't fire on the next call; the test prompt is sized to clear this threshold). `metadata.usage.nativeUsage.prompt_tokens_details.cached_tokens` is 0 or absent on a fresh-cache run; non-zero is acceptable when OpenAI's server-side cache TTL hasn't expired from a prior local run (the local Reset cannot clear the server-side TTL - this is environmental, not a regression).
 - After step 2: HTTP 200. Response `metadata.usage.nativeUsage.prompt_tokens_details.cached_tokens > 0`. The cached portion should be most of the prompt prefix; expect the cached count to be in the high hundreds at minimum.
 - Two consecutive runs of the same exact prompt produce stable structural responses (both succeed, both have `usage` blocks).
 

@@ -27,6 +27,7 @@ jobs:
       ascend_web_hunter_changed: ${{ steps.filter.outputs.ascend-web-hunter }}
       ascend_memory_changed: ${{ steps.filter.outputs.ascend-memory }}
       ascend_ocr_changed: ${{ steps.filter.outputs.ascend-ocr }}
+      contract: ${{ steps.filter.outputs.ascend-agent == 'true' || steps.filter.outputs.ascend-ocr == 'true' || steps.filter.outputs.contract == 'true' || steps.filter.outputs.workflows == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +48,8 @@ jobs:
               - 'apps/ascend-memory/**'
             ascend-ocr:
               - 'apps/ascend-ocr/**'
+            contract:
+              - 'contracts/**'
             workflows:
               - '.github/workflows/**'
 
@@ -259,6 +262,9 @@ jobs:
         with:
           python-version: ${{ matrix.python_version }}
           cache: pip
+          cache-dependency-path: |
+            ${{ matrix.path }}/pyproject.toml
+            ${{ matrix.path }}/*requirements*.txt
 
       - name: Install service with dev extras
         if: matrix.language == 'python'
@@ -271,20 +277,31 @@ jobs:
         run: ruff check .
 
       - name: Mypy type check
-        if: matrix.language == 'python'
+        if: matrix.language == 'python' && matrix.service != 'ascend-ocr'
         working-directory: ${{ matrix.path }}
         run: mypy src
 
+      - name: Mypy type check (source and tests)
+        if: matrix.service == 'ascend-ocr'
+        working-directory: ${{ matrix.path }}
+        run: mypy src tests
+
       # ascend-audio-scribe and ascend-ocr already bake --cov-fail-under=100
-      # into their own pytest addopts, so plain `pytest` enforces it.
+      # into their own pytest addopts, so `pytest` enforces it. ascend-ocr
+      # deselects the contract marker, which the contract jobs verify.
       - name: Run pytest
-        if: matrix.language == 'python' && matrix.service != 'ascend-web-hunter' && matrix.service != 'ascend-memory'
+        if: matrix.language == 'python' && matrix.service != 'ascend-web-hunter' && matrix.service != 'ascend-memory' && matrix.service != 'ascend-ocr'
         working-directory: ${{ matrix.path }}
         run: pytest
 
-      # ascend-web-hunter and ascend-memory declare fail_under=100 in
-      # [tool.coverage.report] but do not bake it into pytest addopts, so the
-      # coverage flags must be passed explicitly to actually enforce it.
+      - name: Run pytest (without the contract test)
+        if: matrix.service == 'ascend-ocr'
+        working-directory: ${{ matrix.path }}
+        run: pytest -m "not contract"
+
+      # ascend-web-hunter and ascend-memory also bake --cov-fail-under=100
+      # into their own pytest addopts now, so the explicit coverage flags
+      # below repeat that gate rather than add it.
       - name: Run pytest with coverage gate
         if: matrix.service == 'ascend-web-hunter' || matrix.service == 'ascend-memory'
         working-directory: ${{ matrix.path }}
@@ -338,3 +355,75 @@ jobs:
           name: integration-test-results-ascend-agent
           path: apps/ascend-agent/build/test-results/**/*.xml
           if-no-files-found: ignore
+
+  contract-consumer:
+    name: Contract consumer (ascend-agent to ascend-ocr)
+    needs: [changes, verify-changelog]
+    if: >-
+      !cancelled()
+      && needs.verify-changelog.result != 'failure'
+      && needs.changes.outputs.contract == 'true'
+    runs-on: ubuntu-latest
+    env:
+      PACT_DO_NOT_TRACK: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java (Temurin 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Generate the pact from the consumer test
+        working-directory: apps/ascend-agent
+        run: ./gradlew --no-daemon test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"
+
+      - name: Fail when the committed pact is out of date
+        run: |
+          set -euo pipefail
+
+          if [ -n "$(git status --porcelain -- contracts/pacts)" ]; then
+            git status --porcelain -- contracts/pacts
+            git diff -- contracts/pacts
+            echo "::error::The committed pact in contracts/pacts is out of date. Regenerate it with the ascend-agent consumer test and commit the result."
+            exit 1
+          fi
+
+      - name: Upload the pact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pact-ascend-agent-ascend-ocr
+          path: contracts/pacts
+          if-no-files-found: ignore
+
+  contract-provider:
+    name: Contract provider (ascend-ocr verifies the pact)
+    needs: [changes, contract-consumer]
+    if: >-
+      !cancelled()
+      && needs.contract-consumer.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      PACT_DO_NOT_TRACK: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: apps/ascend-ocr/pyproject.toml
+
+      - name: Install service with dev extras
+        working-directory: apps/ascend-ocr
+        run: pip install -e .[dev]
+
+      - name: Verify the pact against the provider
+        working-directory: apps/ascend-ocr
+        run: pytest tests/contract --no-cov

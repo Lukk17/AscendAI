@@ -40,7 +40,7 @@ class WeatherMcpApplicationTests {
     @Test
     @DisplayName("ToolCallbackProvider publishes exactly the five expected weather tools")
     void toolCallbackProvider_PublishesWeatherTools() {
-        // given
+        // when
         ToolCallback[] tools = toolCallbackProvider.getToolCallbacks();
         List<String> publishedNames = Arrays.stream(tools)
                 .map(t -> t.getToolDefinition().name())

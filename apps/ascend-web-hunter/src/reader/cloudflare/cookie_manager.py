@@ -123,7 +123,8 @@ class CookieManager:
         logger.warning("%s: %s", message, error)
 
     @staticmethod
-    def _get_domain(url: str) -> str:
+    def registrable_domain(url: str) -> str:
+        """Return the registrable domain a session record for *url* is keyed by."""
         parsed = urlparse(url)
         host = parsed.netloc or urlparse(f"//{url}", scheme="http").netloc or url.split("/", 1)[0]
         host = host.lower().split(":", 1)[0]
@@ -200,7 +201,7 @@ class CookieManager:
         profile: str | None = None,
     ) -> dict[str, Any] | None:
         """Return a merged Playwright storage_state for the given URL + profile, or None."""
-        domain = self._get_domain(url)
+        domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         record = await self._load_record(domain, effective_profile)
         if record is None:
@@ -236,7 +237,7 @@ class CookieManager:
         saved before this field existed or by a caller that omitted it, and None
         only when no valid stored session exists at all.
         """
-        domain = self._get_domain(url)
+        domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         record = await self._load_record(domain, effective_profile)
         if record is None:
@@ -270,7 +271,7 @@ class CookieManager:
         profile: str | None = None,
     ) -> str | None:
         """Return stored user-agent for this domain/profile, or None."""
-        domain = self._get_domain(url)
+        domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         record = await self._load_record(domain, effective_profile)
         if record is None:
@@ -297,7 +298,7 @@ class CookieManager:
         `PRODUCED_BY_*` constants), so a later read can decide whether the stored
         clearance can be replayed by the tier that earned it.
         """
-        domain = self._get_domain(url)
+        domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         auth_state, waf_state = _split_storage_state(storage_state)
         now = time.time()
@@ -329,7 +330,7 @@ class CookieManager:
         profile: str | None = None,
     ) -> None:
         """Slide the auth TTL on a successful authenticated read."""
-        domain = self._get_domain(url)
+        domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         record = await self._load_record(domain, effective_profile)
         if record is None or "auth" not in record:
@@ -337,6 +338,67 @@ class CookieManager:
 
         record["auth"]["saved_at"] = time.time()
         await self._save_record(domain, effective_profile, record)
+
+    async def has_auth_cookies(
+        self,
+        url: str,
+        profile: str | None = None,
+    ) -> bool:
+        """Return whether a login was ever captured for this domain/profile.
+
+        Deliberately ignores the TTL: this answers "is there a session to
+        validate", which is the question the read path asks before it decides
+        whether an expired session is worth reporting. A record holding only
+        WAF clearance answers False, because nobody logged in to expire.
+        """
+        domain = self.registrable_domain(url)
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        record = await self._load_record(domain, effective_profile)
+        if record is None:
+            return False
+
+        auth_entry: dict[str, Any] = record.get("auth") or {}
+        cookies: list[dict[str, Any]] = auth_entry.get("storage_state", {}).get("cookies", [])
+
+        return bool(cookies)
+
+    async def has_session_record(
+        self,
+        url: str,
+        profile: str | None = None,
+    ) -> bool:
+        """Return whether anything at all is stored for this domain/profile.
+
+        Wider than `has_auth_cookies`: a record holding only WAF clearance, or an
+        auth entry whose jar is empty, still answers True. This is the question
+        that tells a session which expired apart from one that was never
+        established.
+        """
+        domain = self.registrable_domain(url)
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+
+        return await self._load_record(domain, effective_profile) is not None
+
+    async def get_auth_saved_at(
+        self,
+        url: str,
+        profile: str | None = None,
+    ) -> float | None:
+        """Return when the auth entry was last saved or validated, or None.
+
+        The timestamp moves on capture and on every slid TTL, so it reads as
+        "last validated" to a caller. None means no auth entry is stored, or the
+        stored one predates the field.
+        """
+        domain = self.registrable_domain(url)
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        record = await self._load_record(domain, effective_profile)
+        if record is None or "auth" not in record:
+            return None
+
+        saved_at = record["auth"].get("saved_at")
+
+        return saved_at if isinstance(saved_at, int | float) else None
 
     async def get_auth_ttl_remaining(
         self,
@@ -348,7 +410,7 @@ class CookieManager:
         `_auth_ttl_remaining_from_entry` for how cookie expiry and the
         configured ceiling combine.
         """
-        domain = self._get_domain(url)
+        domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         record = await self._load_record(domain, effective_profile)
         if record is None or "auth" not in record:
@@ -373,7 +435,7 @@ class CookieManager:
             {
                 "name": name,
                 "value": value,
-                "domain": self._get_domain(url),
+                "domain": self.registrable_domain(url),
                 "path": "/",
                 "expires": -1,
                 "httpOnly": False,
@@ -429,7 +491,7 @@ class CookieManager:
         and the in-memory fallback. Idempotent: returns whether a record
         existed, but deleting an absent record is not an error.
         """
-        domain = self._get_domain(url)
+        domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
         memory_key = self._memory_key(domain, effective_profile)
         existed = self._memory_store.pop(memory_key, None) is not None

@@ -1,0 +1,94 @@
+info:
+  name: ocr-job-status
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs/{{ocrJobId}}"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The record is the one that was asked for", function () {
+            expect(res.getBody().job_id).to.equal(bru.getEnvVar("ocrJobId") || bru.getVar("ocrJobId"));
+        });
+        test("State is exactly one of the five", function () {
+            expect(["waiting", "running", "succeeded", "failed", "cancelled"]).to.include(res.getBody().state);
+        });
+        test("A hint is present while work is in flight and absent once it is not", function () {
+            const body = res.getBody();
+            const terminal = ["succeeded", "failed", "cancelled"].indexOf(body.state) >= 0;
+            if (terminal) {
+                expect(body).to.not.have.property("poll_after_seconds");
+            } else {
+                expect(body.poll_after_seconds).to.be.a("number").within(1, 30);
+            }
+        });
+        test("A place in the queue is reported only while the work is waiting", function () {
+            const body = res.getBody();
+            if (body.state === "waiting") {
+                expect(body.queue_position).to.be.a("number").at.least(0);
+                expect(body.pages_ahead).to.be.a("number").at.least(0);
+            } else {
+                expect(body.queue_position).to.be.null;
+                expect(body.pages_ahead).to.be.null;
+            }
+        });
+        test("Progress is reported, never past the document's own page count", function () {
+            const body = res.getBody();
+            expect(body.pages_done).to.be.a("number").at.least(0);
+            expect(body.pages_done).to.be.at.most(body.page_count);
+        });
+        test("A result address appears only once the work succeeded", function () {
+            const body = res.getBody();
+            if (body.state === "succeeded") {
+                expect(body.result.bucket).to.be.a("string").that.is.not.empty;
+                expect(body.result.key).to.equal(body.job_id + ".md");
+                expect(body.result.url).to.be.a("string").that.includes("http");
+                expect(body.result.page_count).to.equal(body.page_count);
+                expect(body.result.processing_time_seconds).to.be.a("number").at.least(0);
+            } else {
+                expect(body.result).to.be.null;
+            }
+        });
+        test("A succeeded record echoes the language the spec names in ocrExpectedLanguage", function () {
+            const body = res.getBody();
+            const expectedLanguage = bru.getEnvVar("ocrExpectedLanguage");
+            if (body.state === "succeeded" && expectedLanguage) {
+                expect(body.result.language).to.equal(expectedLanguage);
+            }
+        });
+        test("A failed record carries a code, a reason and whether it is worth resubmitting", function () {
+            const body = res.getBody();
+            if (body.state === "failed") {
+                expect(body.error_code).to.be.a("string").that.is.not.empty;
+                expect(body.error_reason).to.be.a("string").that.is.not.empty;
+                expect(body.retryable).to.be.a("boolean");
+            }
+        });
+        test("No state carries page content", function () {
+            expect(res.getBody()).to.not.have.property("pages");
+            expect(JSON.stringify(res.getBody())).to.not.include("\"lines\"");
+        });
+    - type: post-response
+      code: |-
+        if (res.getBody().state === "succeeded") {
+            bru.setVar("ocrResultUrl", res.getBody().result.url);
+            bru.setVar("ocrResultBucket", res.getBody().result.bucket);
+            bru.setVar("ocrResultKey", res.getBody().result.key);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

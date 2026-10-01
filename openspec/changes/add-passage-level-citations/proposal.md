@@ -4,7 +4,7 @@ An answer grounded in the user's own documents cannot currently say where it cam
 
 The system prompt in `apps/ascend-agent/src/main/resources/application.yaml` then asks the model to do something the context makes impossible: attribute inline with the document's title or id, for example `[doc: notes-2026]`, and never fabricate ids. No id is ever supplied, so a well-behaved model omits citations entirely and a badly-behaved one invents them. This is a live defect, not a design choice.
 
-Page provenance is destroyed at ingestion even though every parser returns it. `IngestionService.parseUnstructuredResponse` iterates the Unstructured API's per-element array and appends each element's `text` into one `StringBuilder`, emitting a single `Document` per file with the per-element page number discarded. `AscendOcrClient.extractPagesText` walks a `pages` array whose entries carry an explicit `page_number` (`apps/ascend-ocr/src/model/ocr_models.py`, `OcrPageResult.page_number`) and flattens it into one `StringBuilder` the same way. `DocumentRouter.routePdfPerPage` does know the page number, but only encodes it into a synthetic filename (`filename + "_page" + n + ".pdf"`) that the parser clients then stamp as the chunk's `source`, which is both unusable as a locator and wrong as a source key. Separately, `ManualIngestionService.ingestObject`, the route that feeds the RAG corpus, does not call `DocumentRouter` at all: it branches on markdown versus unstructured and never reaches the per-page PDF path.
+Page provenance is destroyed at ingestion even though every parser returns it. `IngestionService.parseUnstructuredResponse` iterates the Unstructured API's per-element array and appends each element's `text` into one `StringBuilder`, emitting a single `Document` per file with the per-element page number discarded. `AscendOcrClient` is job based (`process`, `submitJob`, `awaitTerminalState`, `fetchResult`, `toDocuments`): it fetches the job's result Markdown from object storage and `toDocuments` returns one `Document` for the whole file. The ascend-ocr service writes each page under a `## Page N` heading (`apps/ascend-ocr/src/service/result_store.py`), so the page number is present in the text but never reaches chunk metadata. `DocumentRouter.routePdfPerPage` does know the page number, but only encodes it into a synthetic filename (`filename + "_page" + n + ".pdf"`) that the parser clients then stamp as the chunk's `source`, which is both unusable as a locator and wrong as a source key. Separately, `ManualIngestionService.ingestObject`, the route that feeds the RAG corpus, does not call `DocumentRouter` today. add-document-management-api fixes that routing, and this change builds on it.
 
 Source citation is the product's stated differentiator. Today the platform cannot do it at any granularity.
 
@@ -13,9 +13,9 @@ Source citation is the product's stated differentiator. Today the platform canno
 - Retrieved passages are labeled in the prompt. `buildContextBlock` emits one labeled block per injected chunk, carrying a short stable label, the document title, and a locator (page number where one exists), so the model has something real to cite and no reason to invent one.
 - A new `citations` array on the prompt response resolves every label back to a real document and location: label, registry document id, display name, page when known, and the chunk's ordinal position within its document. Label assignment is deterministic from the retrieval result.
 - The system prompt's Citations block is rewritten to name the label format the model is actually given, replacing the current instruction to cite an id that is never supplied.
-- Page provenance survives ingestion on every parser path. Unstructured elements are grouped by `metadata.page_number` into one document per page, ascend-ocr pages become one document per `page_number`, and `DocumentRouter` stamps the page number it already computes as structured metadata instead of burying it in a synthetic filename. The original object key stays the chunk's `source` on the per-page PDF path.
+- Page provenance survives ingestion on every parser path. Unstructured elements are grouped by `metadata.page_number` into one document per page, the ascend-ocr result Markdown is split inside `AscendOcrClient.toDocuments` on its `## Page N` headings into one document per page with `page = N` and the heading removed from the text, and `DocumentRouter` stamps the page number it already computes as structured metadata instead of burying it in a synthetic filename. The original object key stays the chunk's `source` on the per-page PDF path.
 - Chunk ordinal metadata (`chunk_index` and `chunk_count`, scoped per parent document) is stamped during splitting, so a chunk from a page-less source such as a Markdown file or a scraped web page still has a locator.
-- The corpus ingestion route gains the per-page treatment: `ManualIngestionService` routes scanned objects through `DocumentRouter` rather than its markdown-versus-unstructured branch. `add-document-management-api` already specifies that same routing fix in its `ingestion-correctness` delta, so this change consumes that requirement rather than restating it and adds only the provenance guarantee on top. Design.md records an open question about that change's internal contradiction on the scope of the fix.
+- The corpus ingestion route gains the per-page treatment because add-document-management-api routes every bucket-scan object through `DocumentRouter` (its tasks 3.2a and 3.2b). That change owns the routing. This change adds only the provenance guarantee on top and verifies it on the corpus path.
 - `SourceFile` gains `ingestedAt`, the instant the document's chunks were last written to the vector store, so a reader can judge whether an answer is stale. It is read from the document registry's last-indexed timestamp and sits on the source entry, not on the citation, because ingestion time is a property of the document and is identical for every passage inside it.
 - REINDEX REQUIRED: page and chunk-ordinal metadata are new payload fields on Qdrant points. Documents indexed before this change carry none of them and degrade to a document-level citation with no page and no ordinal until they are reindexed. Every task that depends on reindexing is marked in tasks.md.
 - No existing field on `AiResponse.sources[*]` is renamed, removed, retyped, or moved. The presigned `downloadUrl` and its `expiresAt` stay exactly as they are.
@@ -42,9 +42,14 @@ Source citation is the product's stated differentiator. Today the platform canno
 - Configuration: the `app.system-prompt` Citations block is rewritten in `apps/ascend-agent/src/main/resources/application.yaml`, and new `app.rag.citations.*` keys are bound through `config/properties/RagProperties.java`.
 - Stored data: Qdrant points gain `page`, `chunk_index` and `chunk_count` payload fields. Existing points are not migrated in place, so a reindex is required to populate them.
 - API: `AiResponse` gains an optional `citations` array and `SourceFile` gains `ingestedAt`. Both are additive.
-- Architecture documentation: two new records under `apps/ascend-agent/docs/architecture/decisions/`, numbered ADR-010 and ADR-011.
+- Architecture documentation: two new records under `apps/ascend-agent/docs/architecture/decisions/`, each taking the next free number at implementation time (ADR-010 is already taken by the MCP tool listing cache record).
 - Dependencies: none new.
-- Sibling coordination: `add-document-management-api` (registry document id, `contentPath`, bucket-scan routing), `add-tenant-isolation` (tenant filter on retrieval, tenant-scoped presign), and `add-chat-streaming-and-conversations` (the streaming `sources` event needs a sibling `citations` event, recorded as an open question in design.md).
+- Sibling coordination: `add-document-management-api` (registry document id, `contentPath`, bucket-scan routing), `add-tenant-isolation` (tenant filter on retrieval, tenant-scoped presign), and `add-chat-streaming-and-conversations` (this change owns the streaming `citations` event, sent before `sources` and before `done`).
+- Contract test: `AscendOcrClientPactTest` must keep passing unchanged. The page split happens after the result Markdown is fetched, so the HTTP interactions the pact records do not change.
+
+## Build order
+
+Third in group D: add-document-management-api, then add-chat-streaming-and-conversations, then this change, then add-flutter-chat-app.
 
 ## Relevant Skills
 
@@ -52,5 +57,6 @@ Source citation is the product's stated differentiator. Today the platform canno
 - `/java-coding-standards`
 - `/api-design`
 - `/architecture-decision-records`
-- `/springboot-tdd`
+- `/tdd-workflow`
+- `/postgres-patterns`
 - `/coding-standards`

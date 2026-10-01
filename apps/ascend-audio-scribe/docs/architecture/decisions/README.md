@@ -1,4 +1,4 @@
-# Architecture Decision Records — ascend-audio-scribe
+# Architecture Decision Records - ascend-audio-scribe
 
 | ID | Title | Status | Date |
 | :- | :---- | :----- | :--- |

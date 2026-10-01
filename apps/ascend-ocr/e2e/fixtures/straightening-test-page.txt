@@ -1,0 +1,21 @@
+Test page for straightening, ascend-ocr
+Invoice 2026-0917 issued on 25 September 2026
+Customer: Harbour Lane Bakery, 14 Mill Street
+Order reference HLB-4471, delivery window 08:00 to 10:30
+Item 1: rye sourdough loaves, 24 pieces, 3.40 EUR each
+Item 2: poppy seed rolls, 60 pieces, 0.85 EUR each
+Item 3: oat and honey biscuits, 12 boxes, 6.20 EUR each
+Subtotal 207.00 EUR, VAT 23 percent 47.61 EUR
+Total due 254.61 EUR within 14 days of this invoice
+IBAN PL61 1090 1014 0000 0712 1981 2874
+Payment title must quote the order reference above
+Zażółć gęślą jaźń, pchnąć w tę łódź jeża lub ośm skrzyń fig
+Grzegorz Brzęczyszczykiewicz, Chrząszczyżewoszyce, powiat Łękołody
+El pingüino Wenceslao hizo kilómetros bajo exhaustiva lluvia
+¿Dónde está la señora Muñoz? ¡Llegó ayer a Córdoba!
+The quick brown fox jumps over the lazy dog 0123456789
+Pack my box with five dozen liquor jugs, then ship by Friday
+Serial numbers: QX-5082-77, QX-5082-78, QX-5083-01
+Contact: orders@harbourlane.example, phone +48 512 334 906
+Notes: keep refrigerated below 6 degrees, do not stack
+Signed on behalf of the supplier by Marta Kowalczyk

@@ -318,7 +318,7 @@ class ForecastToolServiceTest {
     @Test
     @DisplayName("returns ok with null fields when sub-lists are shorter than the time list")
     void getForecast_subListsShorterThanTimeList_returnsOkWithNullFields() {
-        // given — 2 dates but only 1 temperature max entry (index 1 is out of range)
+        // given - 2 dates but only 1 temperature max entry (index 1 is out of range)
         ForecastUpstream.Daily partial = new ForecastUpstream.Daily(
                 List.of("2026-05-01", "2026-05-02"),
                 List.of(18.5),
@@ -333,7 +333,7 @@ class ForecastToolServiceTest {
         // when
         ForecastResult result = service.getForecast(CITY_WARSAW, null, null, null, null);
 
-        // then — should succeed; the second entry has nulls for the missing values
+        // then - should succeed; the second entry has nulls for the missing values
         assertThat(result.status()).isEqualTo(WeatherToolStatus.OK);
         assertThat(result.forecast()).hasSize(2);
         assertThat(result.forecast().get(0).maxTemp()).isEqualTo(18.5);
@@ -372,7 +372,7 @@ class ForecastToolServiceTest {
     @Test
     @DisplayName("returns ok with null fields when sub-lists are null")
     void getForecast_subListsNull_returnsOkWithNullFields() {
-        // given — time has 1 entry, all sub-lists are null (testing getOrNull/getIntOrNull null-list branch)
+        // given - time has 1 entry, all sub-lists are null (testing getOrNull/getIntOrNull null-list branch)
         ForecastUpstream.Daily nullSublists = new ForecastUpstream.Daily(
                 List.of("2026-05-01"), null, null, null, null
         );

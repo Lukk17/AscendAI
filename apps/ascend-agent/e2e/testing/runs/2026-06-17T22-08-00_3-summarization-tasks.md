@@ -15,7 +15,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 
@@ -30,7 +30,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ## Result summary
 
-The Bruno request returned HTTP 200 in approximately 22 seconds. The response `content` field contained a rich, structured summary of the Argent Saga document. All four Expected assertions passed: (1) HTTP 200 confirmed; (2) the summary is coherent and grounded in document content (7-rank order structure, specific dates and events); (3) at least 11 of the 12 specified proper nouns and facts were present verbatim, including `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.`; (4) the response is a detailed factual summary with no refusal language — the PDF was parsed page-by-page through the Docling pipeline and the extracted text clearly reached the MiniMax-M2.7 model (3444 prompt tokens consumed, confirming document context was injected).
+The Bruno request returned HTTP 200 in approximately 22 seconds. The response `content` field contained a rich, structured summary of the Argent Saga document. All four Expected assertions passed: (1) HTTP 200 confirmed; (2) the summary is coherent and grounded in document content (7-rank order structure, specific dates and events); (3) at least 11 of the 12 specified proper nouns and facts were present verbatim, including `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.`; (4) the response is a detailed factual summary with no refusal language - the PDF was parsed page-by-page through the Docling pipeline and the extracted text clearly reached the MiniMax-M2.7 model (3444 prompt tokens consumed, confirming document context was injected).
 
 Input tokens: 3444
 

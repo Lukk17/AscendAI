@@ -5,7 +5,7 @@
 ### Requirement: Redis chat-history honors the configured TTL
 
 `PersistentChatMemory` SHALL apply the configured `app.memory.chat-history.ttl` duration to every Redis key it writes,
-so that chat history does not accumulate unbounded in Redis. Redis keys SHALL be per conversation — `chat:<conversationId>`
+so that chat history does not accumulate unbounded in Redis. Redis keys SHALL be per conversation - `chat:<conversationId>`
 where `conversationId` is the conversation UUID from the `conversations` table (no longer the raw user id). The TTL
 SHALL be refreshed on each write so an active conversation does not expire mid-session. Legacy `chat:<userId>` keys
 written before the conversation model SHALL NOT be migrated or refreshed; they age out under their existing TTL while

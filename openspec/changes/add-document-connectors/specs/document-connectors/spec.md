@@ -61,7 +61,7 @@ The agent SHALL expose a connector management REST API under `/api/v1/connectors
 #### Scenario: Principal identifiers absent from run history
 
 - **WHEN** an ADMIN fetches the run history for a connector whose last run landed documents
-- **THEN** each outcome carries its action, source path, and MinIO key
+- **THEN** each outcome carries its action, source path, and object key
 - **AND** no principal identifier appears in the response body
 
 #### Scenario: Disable stops future syncs
@@ -74,7 +74,7 @@ The agent SHALL expose a connector management REST API under `/api/v1/connectors
 
 - **WHEN** an ADMIN deletes a connector that has previously synced documents
 - **THEN** its configuration, sync cursors, and run history are removed
-- **AND** the documents it ingested remain in MinIO and Qdrant, retrievable by the company that owns them
+- **AND** the documents it ingested remain in object storage and Qdrant, retrievable by the company that owns them
 
 ### Requirement: Scheduled incremental sync runs per enabled connector
 
@@ -109,7 +109,7 @@ The agent SHALL allow an ADMIN to trigger an immediate sync run for a connector 
 
 ### Requirement: Sync-run history with per-file outcomes
 
-The agent SHALL persist one record per sync run: trigger type (`SCHEDULED`, `MANUAL`, `FRESHNESS_CHECK`), status (`RUNNING`, `SUCCEEDED`, `PARTIAL`, `FAILED`), start/finish timestamps, and counters for added / updated / deleted / skipped / failed files, and one record per touched file with its source path, action, resulting MinIO key, and a failure reason where applicable. The per-file action set SHALL be `ADDED`, `UPDATED`, `DELETED`, `SKIPPED`, `FAILED`. History SHALL be readable via the API per connector.
+The agent SHALL persist one record per sync run: trigger type (`SCHEDULED`, `MANUAL`, `FRESHNESS_CHECK`), status (`RUNNING`, `SUCCEEDED`, `PARTIAL`, `FAILED`), start/finish timestamps, and counters for added / updated / deleted / skipped / failed files, and one record per touched file with its source path, action, resulting object key, and a failure reason where applicable. The per-file action set SHALL be `ADDED`, `UPDATED`, `DELETED`, `SKIPPED`, `FAILED`. History SHALL be readable via the API per connector.
 
 #### Scenario: Run outcome recorded
 
@@ -121,25 +121,25 @@ The agent SHALL persist one record per sync run: trigger type (`SCHEDULED`, `MAN
 
 - **WHEN** one file in a batch fails to download and the others succeed
 - **THEN** the run completes with status `PARTIAL`
-- **AND** the failed file's outcome record carries the failure reason while the successful files' records show their MinIO keys
+- **AND** the failed file's outcome record carries the failure reason while the successful files' records show their object keys
 
 ### Requirement: Connectors land bytes and reuse the existing ingestion pipeline
 
-A connector SHALL deliver documents by writing the source file's bytes to MinIO under the tenant prefix (markdown into the markdown folder, everything else into the documents folder, matching the upload controller's routing) and then triggering the existing bucket-scan ingestion for the affected prefix. Connectors SHALL NOT parse, chunk, or embed content themselves, and SHALL NOT write to the vector store by any route.
+A connector SHALL deliver documents by writing the source file's bytes to object storage under the tenant prefix (markdown into the markdown folder, everything else into the documents folder, matching the upload controller's routing) and then triggering the existing bucket-scan ingestion for the affected prefix. Connectors SHALL NOT parse, chunk, or embed content themselves, and SHALL NOT write to the vector store by any route.
 
-Before the MinIO write, connector-fetched files SHALL pass the same filename sanitization and sniffed-MIME allowlist checks (`app.ingestion.upload.allowed-mime-types`) that govern manual uploads; object keys SHALL include a sanitized source-relative path segment so distinct source files cannot collide on a shared leaf name.
+Before the object storage write, connector-fetched files SHALL pass the same filename sanitization and sniffed-MIME allowlist checks (`app.ingestion.upload.allowed-mime-types`) that govern manual uploads; object keys SHALL include a sanitized source-relative path segment so distinct source files cannot collide on a shared leaf name.
 
 #### Scenario: Synced file flows through the existing pipeline
 
 - **WHEN** a connector sync fetches a new PDF from the source
-- **THEN** the PDF bytes are written to MinIO under the tenant's documents prefix
+- **THEN** the PDF bytes are written to object storage under the tenant's documents prefix
 - **AND** the existing ingestion scan indexes it into Qdrant through the standard parse path
 - **AND** no chunk for that PDF was written to Qdrant by the connector itself
 
 #### Scenario: Disallowed type is skipped before storage
 
 - **WHEN** a connector sync encounters a source file whose sniffed MIME type is not in the allowlist
-- **THEN** no MinIO write and no Qdrant write occur for that file
+- **THEN** no object storage write and no Qdrant write occur for that file
 - **AND** the file's outcome record shows `SKIPPED` with the disallowed type as reason
 
 #### Scenario: The framework holds no vector-store handle
@@ -171,21 +171,21 @@ Per-document permissions captured from the source are out of scope for this vers
 - **THEN** neither builds a principal string, calls a principal factory, nor sets any of the four access-list metadata keys
 - **AND** the only producer of `tenant:everyone:{tenantId}` remains the helper owned by `add-tenant-isolation`
 
-### Requirement: Deduplication for connector-landed objects uses the existing content marker
+### Requirement: Deduplication for connector-landed objects uses the document registry ETag
 
-The ingestion deduplication marker for a connector-landed object SHALL be the existing content-keyed marker, `manual-ingestion:<key>:<etag>`, unchanged in format from the manual upload paths. A connector SHALL NOT introduce a second marker format. An object whose bytes are unchanged since the previous run SHALL be skipped without re-parsing, re-chunking, or re-embedding; an object whose bytes changed SHALL be re-indexed.
+Deduplication for a connector-landed object SHALL be the document registry ETag comparison from add-document-management-api: the bucket scan compares the stored object's ETag with `document_index_state.etag` for the target collection. A connector SHALL NOT introduce a marker or dedup store of its own. An object whose bytes are unchanged since the previous run SHALL be skipped without re-parsing, re-chunking, or re-embedding; an object whose bytes changed SHALL be re-indexed.
 
 #### Scenario: Unchanged file is a no-op
 
-- **WHEN** a sync re-lands a file whose bytes are identical to the object already in MinIO
-- **THEN** the deduplication marker matches and re-indexing is skipped
+- **WHEN** a sync re-lands a file whose bytes are identical to the object already in object storage
+- **THEN** the object's ETag equals the registry ETag and re-indexing is skipped
 - **AND** the Qdrant chunk count and point identifiers for that source are unchanged
 - **AND** the file's outcome record shows `SKIPPED`
 
 #### Scenario: Changed file is re-indexed
 
 - **WHEN** a file's bytes change at the source
-- **THEN** the deduplication marker differs and the file is re-parsed, re-chunked, and re-embedded
+- **THEN** the object's ETag differs from the registry ETag and the file is re-parsed, re-chunked, and re-embedded
 - **AND** the file's outcome record shows `UPDATED`
 
 #### Scenario: The marker format is unchanged
@@ -197,7 +197,7 @@ The ingestion deduplication marker for a connector-landed object SHALL be the ex
 
 The agent SHALL run a scheduled check that compares each enabled connector's last successful sync against its configured maximum sync age and marks a connector that has exceeded it as stale. The stale flag SHALL be returned by the connector read and list endpoints, and the time since each connector's last successful sync SHALL be exposed as a metric. A successful sync SHALL clear the flag. The check SHALL be claimed with the same database row lock as a scheduled sync so that concurrent agent instances do not act on one connector twice, and it SHALL record a run with trigger type `FRESHNESS_CHECK` only when a connector's stale state changes.
 
-The check SHALL NOT write to MinIO, SHALL NOT write to the vector store, and SHALL NOT call the source, so that it stays able to report an outage in the very machinery that failed. A `FRESHNESS_CHECK` run SHALL NOT move the connector's last successful sync timestamp, so a check can never clear the condition it exists to report.
+The check SHALL NOT write to object storage, SHALL NOT write to the vector store, and SHALL NOT call the source, so that it stays able to report an outage in the very machinery that failed. A `FRESHNESS_CHECK` run SHALL NOT move the connector's last successful sync timestamp, so a check can never clear the condition it exists to report.
 
 #### Scenario: Silently stopped connector becomes visible
 
@@ -209,7 +209,7 @@ The check SHALL NOT write to MinIO, SHALL NOT write to the vector store, and SHA
 #### Scenario: The check changes no document
 
 - **WHEN** the freshness check marks a connector stale
-- **THEN** every document that connector landed still exists in MinIO
+- **THEN** every document that connector landed still exists in object storage
 - **AND** every chunk of those documents still carries its text, its access list, and its other metadata keys
 - **AND** a caller of the owning company still retrieves those documents
 
@@ -227,19 +227,19 @@ The check SHALL NOT write to MinIO, SHALL NOT write to the vector store, and SHA
 
 ### Requirement: Deletion propagation
 
-When a sync detects that a previously synced file was removed at the source, the agent SHALL remove the corresponding MinIO object and its Qdrant chunks during that run, using the single-document deletion path owned by `add-document-management-api`. The deletion SHALL be recorded as a per-file outcome with action `DELETED`.
+When a sync detects that a previously synced file was removed at the source, the agent SHALL remove the corresponding stored object and its Qdrant chunks during that run, using the single-document deletion path owned by `add-document-management-api`. The deletion SHALL be recorded as a per-file outcome with action `DELETED`.
 
-#### Scenario: Source deletion removes MinIO object and chunks
+#### Scenario: Source deletion removes stored object and chunks
 
 - **WHEN** a file that was synced in an earlier run is deleted at the source and the next sync runs
-- **THEN** the MinIO object for that file no longer exists
+- **THEN** the stored object for that file no longer exists
 - **AND** Qdrant contains no chunks whose source metadata references it
 - **AND** the run's history shows a `DELETED` outcome for that file
 
 #### Scenario: Deletion of a never-synced file is ignored
 
 - **WHEN** the source reports a deletion for an item the connector never landed (e.g., filtered out by type)
-- **THEN** no MinIO or Qdrant operation is attempted
+- **THEN** no object storage or Qdrant operation is attempted
 - **AND** the run does not fail
 
 ### Requirement: Connector credentials are encrypted at rest and never logged

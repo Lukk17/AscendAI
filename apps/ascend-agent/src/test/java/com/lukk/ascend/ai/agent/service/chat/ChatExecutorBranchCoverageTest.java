@@ -114,7 +114,7 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute retries without cache options when isCacheConfigError returns true")
     void execute_WhenCacheConfigError_RetriesWithoutCache() {
-        // given — strategy that claims all exceptions are cache config errors
+        // given - strategy that claims all exceptions are cache config errors
         PromptCacheStrategy alwaysCacheError = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -145,7 +145,7 @@ class ChatExecutorBranchCoverageTest {
         // when
         AiResponse result = chatExecutor.execute(USER_ID, "sys", USER_TEXT, List.of(), null, PROVIDER, MODEL);
 
-        // then — second invocation succeeded
+        // then - second invocation succeeded
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 
@@ -153,70 +153,90 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("resolveImageMimeType defaults to image/png when content-type is null and filename has no extension")
     void resolveImageMimeType_NullContentTypeAndNoExtension_DefaultsToPng() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "noextension", null, new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/png");
     }
 
     @Test
     @DisplayName("resolveImageMimeType falls back to extension when content-type is application/octet-stream")
     void resolveImageMimeType_OctetStream_FallsBackToExtension() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "photo.jpg", "application/octet-stream", new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/jpeg");
     }
 
     @Test
     @DisplayName("resolveImageMimeType falls back to extension when content-type has no slash")
     void resolveImageMimeType_NoSlashInContentType_FallsBackToExtension() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "photo.png", "FILE", new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/png");
     }
 
     @Test
     @DisplayName("resolveImageMimeType returns image/webp for .webp extension when content-type is absent")
     void resolveImageMimeType_WebpExtension_ReturnsWebp() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "img.webp", null, new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/webp");
     }
 
     @Test
     @DisplayName("resolveImageMimeType returns image/gif for .gif extension when content-type is absent")
     void resolveImageMimeType_GifExtension_ReturnsGif() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "anim.gif", null, new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/gif");
     }
 
     @Test
     @DisplayName("resolveImageMimeType defaults to image/png for unknown extension when content-type is absent")
     void resolveImageMimeType_UnknownExtension_DefaultsToPng() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "image.bmp", null, new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/png");
     }
 
     @Test
     @DisplayName("resolveImageMimeType returns image/jpeg from content-type header when valid")
     void resolveImageMimeType_ValidContentType_UsesHeader() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "photo.png", "image/jpeg", new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/jpeg");
     }
 
     @Test
     @DisplayName("resolveImageMimeType falls back to extension when content-type is blank")
     void resolveImageMimeType_BlankContentType_FallsBackToExtension() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "photo.jpeg", "", new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/jpeg");
     }
 
     @Test
     @DisplayName("resolveImageMimeType defaults to image/png when filename has a trailing dot")
     void resolveImageMimeType_TrailingDotFilename_DefaultsToPng() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", "image.", null, new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/png");
     }
 
     @Test
     @DisplayName("resolveImageMimeType defaults to image/png when filename is null")
     void resolveImageMimeType_NullFilename_DefaultsToPng() {
+        // when
         MockMultipartFile f = new MockMultipartFile("file", null, null, new byte[1]);
+        // then
         assertThat(chatExecutor.resolveImageMimeType(f).toString()).isEqualTo("image/png");
     }
 
@@ -224,7 +244,7 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute rethrows RuntimeException when isCacheConfigError returns false")
     void execute_CacheErrorFalse_Rethrows() {
-        // given — strategy that says it's NOT a cache error (default NoopPromptCacheStrategy)
+        // given - strategy that says it's NOT a cache error (default NoopPromptCacheStrategy)
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new org.springframework.ai.tool.function.FunctionToolCallback[0]);
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class)))
@@ -247,9 +267,10 @@ class ChatExecutorBranchCoverageTest {
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
-        // when — null history passed
+        // when - null history passed
         AiResponse result = chatExecutor.execute(USER_ID, msgs, USER_TEXT, null, null, PROVIDER, MODEL);
 
+        // then
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 
@@ -276,7 +297,7 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute with null history and non-null options passes both correctly")
     void execute_NullHistoryWithNonNullOptions_Succeeds() {
-        // given — strategy returns non-null options AND history is null
+        // given - strategy returns non-null options AND history is null
         PromptCacheStrategy anthStrategy = anthropicStrategyWithCacheOptions();
         when(cacheStrategyResolver.resolve(any())).thenReturn(anthStrategy);
         when(chatModelResolver.resolve("anthropic")).thenReturn(chatModel);
@@ -286,7 +307,7 @@ class ChatExecutorBranchCoverageTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
-        // when — null history AND non-null options (covers: if (options != null) { promptBuilder.options(options); })
+        // when - null history AND non-null options (covers: if (options != null) { promptBuilder.options(options); })
         AiResponse result = chatExecutor.execute(USER_ID, "sys", USER_TEXT, null, null, "anthropic", "claude-sonnet-4-5");
 
         // then
@@ -296,15 +317,18 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute with decoratedOptions=null and blank model does NOT set model on builder")
     void execute_NullOptionsAndBlankModel_DoesNotSetModel() {
+        // given
         // NoopPromptCacheStrategy returns null options, blank model -> buildChatClient skips defaultOptions
         AssembledSystemMessages msgs = new AssembledSystemMessages("sys", "");
         ChatResponse resp = buildResponse();
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
+        // when
         // blank model -> decoratedOptions=null (noop) AND model is blank -> no defaultOptions on builder
         AiResponse result = chatExecutor.execute(USER_ID, msgs, USER_TEXT, null, null, PROVIDER, "");
 
+        // then
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 
@@ -312,17 +336,20 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute with non-empty history list adds messages to conversation context")
     void execute_NonEmptyHistoryList_AddsHistoryToMessages() {
+        // given
         AssembledSystemMessages msgs = new AssembledSystemMessages("sys", "");
         ChatResponse resp = buildResponse();
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
+        // when
         // Non-empty history -> history != null && !history.isEmpty() = true -> addAll(history) called
         org.springframework.ai.chat.messages.UserMessage userMsg =
                 new org.springframework.ai.chat.messages.UserMessage("previous user message");
         AiResponse result = chatExecutor.execute(USER_ID, msgs, USER_TEXT,
                 java.util.List.of(userMsg), null, PROVIDER, MODEL);
 
+        // then
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 
@@ -330,14 +357,17 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute with empty (not null) history list does not add history to messages")
     void execute_EmptyHistoryList_DoesNotAddHistory() {
+        // given
         AssembledSystemMessages msgs = new AssembledSystemMessages("sys", "");
         ChatResponse resp = buildResponse();
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
+        // when
         // empty list (non-null) -> history != null but history.isEmpty() == true -> not added
         AiResponse result = chatExecutor.execute(USER_ID, msgs, USER_TEXT, java.util.List.of(), null, PROVIDER, MODEL);
 
+        // then
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 
@@ -345,15 +375,18 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("handleImageContext uses text-only prompt when image file is empty (isEmpty=true)")
     void execute_EmptyImageFile_UsesTextOnlyPrompt() {
+        // given
         AssembledSystemMessages msgs = new AssembledSystemMessages("sys", "");
         ChatResponse resp = buildResponse();
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
+        // when
         // MockMultipartFile with empty byte array -> isEmpty() returns true
         MockMultipartFile emptyImage = new MockMultipartFile("file", "img.png", "image/png", new byte[0]);
         AiResponse result = chatExecutor.execute(USER_ID, msgs, USER_TEXT, java.util.List.of(), emptyImage, PROVIDER, MODEL);
 
+        // then
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 
@@ -361,6 +394,7 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute cache retry uses null fallback options when model is blank/null")
     void execute_CacheRetryWithBlankModel_UsesFallbackOptionsNull() {
+        // given
         PromptCacheStrategy alwaysCacheError = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -389,9 +423,11 @@ class ChatExecutorBranchCoverageTest {
                 .thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
+        // when
         // Pass null model so StringUtils.hasText(null) == false -> fallback options = null
         AiResponse result = chatExecutor.execute(USER_ID, "sys", USER_TEXT, java.util.List.of(), null, PROVIDER, null);
 
+        // then
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 

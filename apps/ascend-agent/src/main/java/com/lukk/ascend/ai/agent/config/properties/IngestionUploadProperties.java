@@ -11,7 +11,7 @@ import java.util.List;
  * Bound from {@code app.ingestion.upload.*} in application.yaml.
  *
  * <p>Uses {@code @ConfigurationProperties} rather than {@code @Value} with a colon-default
- * because Spring's {@code @Value} does not bind YAML lists — it silently returned an empty
+ * because Spring's {@code @Value} does not bind YAML lists - it silently returned an empty
  * list at runtime, disabling the MIME allowlist check.
  */
 @Getter

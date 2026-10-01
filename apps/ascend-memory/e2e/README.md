@@ -1,15 +1,15 @@
 # AscendMemory: end-to-end capability tests
 
 Manual / AI-runnable e2e suite for the AscendMemory module. Each test exercises **one memory operation** end-to-end
-against a live AscendMemory container on port 7020. Assertions are observable behaviour only — HTTP status codes,
+against a live AscendMemory container on port 7020. Assertions are observable behaviour only - HTTP status codes,
 response body shape and content, persisted state in the backing Qdrant collection (`ascend_memory`). Logs are
 diagnostic, not authoritative.
 
 AscendMemory holds user-scoped memories in Qdrant via mem0ai. Reset for these tests means wiping the specific
-`user_id`(s) the test touches via `POST /api/v1/memory/wipe?user_id=...` — never restarting the container or wiping
+`user_id`(s) the test touches via `POST /api/v1/memory/wipe?user_id=...` - never restarting the container or wiping
 all users.
 
-Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+Before running this suite, or any other e2e suite, pick a run scenario or a service suite from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md). To run only this suite, use its entry under [Service suites](../../../docs/E2E_RUN_SCENARIOS.md#ascend-memory-service-suite).
 
 ## What's here
 
@@ -20,7 +20,7 @@ apps/ascend-memory/e2e/
 │   └── README.md
 └── testing/                             # numbered specs + templates/ + runs/
     ├── README.md
-    ├── 1-invalid-input-test.md          # immutable spec (lowest cost — no Qdrant writes)
+    ├── 1-invalid-input-test.md          # immutable spec (lowest cost - no Qdrant writes)
     ├── 2-insert-and-search-test.md
     ├── 3-wipe-user-scope-test.md
     ├── 4-mcp-tools-list-test.md
@@ -47,7 +47,7 @@ and `6` write to Qdrant via mem0ai; each is responsible for wiping its own user-
 The Bruno collection isn't here. It lives at the **repo root** under
 `docs/api/request/AscendAI/memory/testing/` so it stays a portable API client artifact. Each spec references the
 matching Bruno request file under that path. The pre-existing ad-hoc dev requests under
-`docs/api/request/AscendAI/memory/` are left untouched — only the `testing/` subfolder is e2e-suite property.
+`docs/api/request/AscendAI/memory/` are left untouched - only the `testing/` subfolder is e2e-suite property.
 
 ## Flow
 
@@ -79,7 +79,7 @@ Every spec follows the same template:
    would remove.
 6. **Expected.** Observable behaviour only: HTTP status, response body fields, persisted state visible via a
    subsequent search call. No log substrings.
-7. **Fixtures.** Paths to local files the test reads (none for the current suite — all payloads are inline text).
+7. **Fixtures.** Paths to local files the test reads (none for the current suite - all payloads are inline text).
 
 The paired `templates/<N>-<feature>-tasks.template.md` is the runner's checklist for one execution: prerequisites,
 reset state, run steps, expected, verdict, plus **Result summary** (with **Input tokens**, **Output tokens**,
@@ -109,7 +109,7 @@ parallel or sequential; ordering inside that group does not matter because their
 1. AscendMemory container running on port 7020. The docker-compose `ascend-ai` project starts it: `docker compose up -d ascend-memory` (or include in the full stack).
 2. `curl -fsS http://localhost:7020/health` returns HTTP 200 with `{"status":"ok"}`. While the container is still warming up it returns HTTP 503 with `{"status":"starting"}`; wait for `"ok"` before starting the suite.
 3. Qdrant reachable on `:6333` (AscendMemory needs it for any insert/search).
-4. The embedding backend (LM Studio at `:1234` or OpenAI, depending on configured `OPENAI_BASE_URL`) is reachable.
+4. OpenAI is reachable and `OPENAI_API_KEY` is set on the container, because every insert and search request under `docs/api/request/AscendAI/memory/testing/` pins `provider=openai`. LM Studio is not needed.
 5. Bruno CLI installed: `bru --version` returns a version string. Install once with `npm install -g @usebruno/cli`.
 
 ## Running tests

@@ -1,7 +1,7 @@
 info:
   name: mcp-ssrf-link-local
   type: http
-  seq: 7
+  seq: 13
 
 http:
   method: POST
@@ -18,10 +18,10 @@ http:
     data: |-
       {
         "jsonrpc": "2.0",
-        "id": 1,
+        "id": 8,
         "method": "tools/call",
         "params": {
-          "name": "ocr_process",
+          "name": "ocr_submit",
           "arguments": {
             "file_uri": "http://169.254.169.254/latest/meta-data/",
             "lang": "en"
@@ -34,16 +34,21 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("Status code is 200 (JSON-RPC envelope)", function () {
+        test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("JSON-RPC error frame returned (UNSAFE_URI)", function () {
+        test("A link-local address is refused with UNSAFE_URI", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
-            const hasError = envelope.error || (envelope.result && envelope.result.isError);
-            expect(hasError).to.be.ok;
-            expect(envelope.result.content[0].text).to.include("UNSAFE_URI");
+            const text = JSON.stringify(envelope);
+            expect(text).to.include("UNSAFE_URI");
+        });
+        test("No identifier is issued, so nothing was queued", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(JSON.stringify(envelope)).to.not.include("job_id");
         });
 
 settings:

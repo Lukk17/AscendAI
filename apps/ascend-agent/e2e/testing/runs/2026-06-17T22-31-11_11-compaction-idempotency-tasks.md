@@ -40,11 +40,11 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ## Result summary
 
-After seeding the database to the post-compaction state (1 [Conversation summary] system row + 8 raw turns = 9 rows total), one prompt was sent as user `frostyCompactionIdempotencyTest`. The agent responded HTTP 200 with content "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)." — directly referencing the seeded facts (Rex the beagle, Praga shelter, Warsaw). After waiting 5 seconds for any async compaction, Postgres showed exactly 11 rows (9 pre-seeded + 1 new user + 1 new assistant) and exactly 1 [Conversation summary] row. Compaction did not re-fire despite the pre-existing summary, confirming the idempotency guard is working correctly.
+After seeding the database to the post-compaction state (1 [Conversation summary] system row + 8 raw turns = 9 rows total), one prompt was sent as user `frostyCompactionIdempotencyTest`. The agent responded HTTP 200 with content "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)." - directly referencing the seeded facts (Rex the beagle, Praga shelter, Warsaw). After waiting 5 seconds for any async compaction, Postgres showed exactly 11 rows (9 pre-seeded + 1 new user + 1 new assistant) and exactly 1 [Conversation summary] row. Compaction did not re-fire despite the pre-existing summary, confirming the idempotency guard is working correctly.
 
-Row count after step 3: 11 (expected 11) — PASS
+Row count after step 3: 11 (expected 11) - PASS
 
-Summary row count after step 3: 1 (expected 1) — PASS
+Summary row count after step 3: 1 (expected 1) - PASS
 
 Input tokens: ~531 (Anthropic API, per response metadata)
 

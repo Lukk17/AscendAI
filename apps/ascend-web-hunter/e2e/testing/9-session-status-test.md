@@ -5,13 +5,13 @@
 `POST /api/v2/web/session/status` reports the auth-session lifecycle state for a `url` + `profile` without changing
 anything. The endpoint's own contract (`SessionManager.status`) is a three-way state, and all three are gated:
 
-- **`none`** — no session record was ever stored for this `url` + `profile`. `auth_ttl_remaining_seconds` is `0` and
+- **`none`** - no session record was ever stored for this `url` + `profile`. `auth_ttl_remaining_seconds` is `0` and
   `last_validated` is `null`.
-- **`expired`** — a session record exists, but its `saved_at` timestamp is older than `SESSION_AUTH_TTL_SECONDS`
+- **`expired`** - a session record exists, but its `saved_at` timestamp is older than `SESSION_AUTH_TTL_SECONDS`
   (14 days by default). `auth_ttl_remaining_seconds` is `0` and `last_validated` is `null`, identical to `none` on
-  those two fields — the only observable difference is the `status` string itself, so this test seeds a real record
+  those two fields - the only observable difference is the `status` string itself, so this test seeds a real record
   to exercise that branch rather than assuming it from the `none` case.
-- **`active`** — a session record exists with a `saved_at` inside the TTL window. `auth_ttl_remaining_seconds` is
+- **`active`** - a session record exists with a `saved_at` inside the TTL window. `auth_ttl_remaining_seconds` is
   close to the 14-day ceiling and `last_validated` is a recent Unix timestamp.
 
 All three are asserted on the response body only, never on log output.
@@ -56,7 +56,7 @@ docker exec redis redis-cli EXISTS "session:example.com:default"
 docker exec redis redis-cli EXISTS "session:example.org:default"
 ```
 
-Expect `0` for both. If `example.org` returns `1`, a previous run of this spec did not clean up — delete it before
+Expect `0` for both. If `example.org` returns `1`, a previous run of this spec did not clean up - delete it before
 continuing.
 
 ```bash
@@ -78,6 +78,17 @@ docker exec redis sh -c "redis-cli -x SETEX 'session:example.org:default' 120960
 
 Expect `OK`.
 
+Remove the copied seed file now that the record is in Redis. Nothing after this point reads it, and leaving the
+copy in the container would carry one run's state into the next. The `sh -c` wrapper is the same guard the seed
+command above uses, and here it keeps the container path intact, because Git Bash on Windows rewrites a bare
+`/tmp/...` argument into a host path before Docker ever sees it.
+
+```bash
+docker exec redis sh -c "rm /tmp/session-status-expired-seed.json"
+```
+
+Expect no output.
+
 ## Run
 
 Move into the Bruno collection root first.
@@ -86,20 +97,20 @@ Move into the Bruno collection root first.
 cd docs/api/request/AscendAI
 ```
 
-Call 1 — `example.com`, which has never carried a session (the `none` branch).
+Call 1 - `example.com`, which has never carried a session (the `none` branch).
 
 ```bash
 bru run "web-hunter/testing/session-status-none.yml" --env ascend-local
 ```
 
-Call 2 — `example.org`, seeded with the stale fixture above (the `expired` branch).
+Call 2 - `example.org`, seeded with the stale fixture above (the `expired` branch).
 
 ```bash
 bru run "web-hunter/testing/session-status-expired.yml" --env ascend-local
 ```
 
 Re-seed `example.org` with a **fresh** `saved_at` (current Unix time) so the same key now falls inside the TTL
-window. This has no static fixture — the timestamp has to be "now" at run time — so build it inline instead of
+window. This has no static fixture - the timestamp has to be "now" at run time - so build it inline instead of
 committing a file that would immediately go stale.
 
 **PowerShell:**
@@ -136,7 +147,16 @@ docker exec redis sh -c "redis-cli -x SETEX 'session:example.org:default' 120960
 
 Expect `OK`.
 
-Call 3 — `example.org` again, now inside its TTL window (the `active` branch).
+Remove this copy too, now that the record is in Redis, for the same reason and behind the same `sh -c` guard as
+the expired seed in Reset state.
+
+```bash
+docker exec redis sh -c "rm /tmp/session-status-active-seed.json"
+```
+
+Expect no output.
+
+Call 3 - `example.org` again, now inside its TTL window (the `active` branch).
 
 ```bash
 bru run "web-hunter/testing/session-status-active.yml" --env ascend-local
@@ -152,7 +172,7 @@ bru run "web-hunter/testing/session-status-active.yml" --env ascend-local
   `1209000` (within a few minutes of the 1,209,600-second ceiling), `last_validated` is a number within the last
   5 minutes.
 - **No collateral damage:** every session key that existed before this test started is still present and unchanged
-  afterward, and `example.org`'s key — created only by this test — is removed at cleanup.
+  afterward, and `example.org`'s key - created only by this test - is removed at cleanup.
 
   ```bash
   docker exec redis redis-cli DEL "session:example.org:default"
@@ -172,7 +192,7 @@ bru run "web-hunter/testing/session-status-active.yml" --env ascend-local
 
 ## Fixtures
 
-[fixtures/session-status-expired-seed.json](../fixtures/session-status-expired-seed.json) — a synthetic minimal
+[fixtures/session-status-expired-seed.json](../fixtures/session-status-expired-seed.json) - a synthetic minimal
 `storage_state` record for `example.org` with a `saved_at` timestamp already outside the auth TTL, not a captured
 real login. `status()` only reads `saved_at` and the record's presence; it never inspects the cookies themselves,
 so the fixture's shape only needs to match what `save_storage_state` would have written.

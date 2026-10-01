@@ -175,7 +175,7 @@ the error path).
 
 ## Fixtures
 
-- `apps/ascend-audio-scribe/e2e/fixtures/meeting-clip.wav` — same fixture used by spec `2-transcribe-openai-test.md`. The MCP
+- `apps/ascend-audio-scribe/e2e/fixtures/meeting-clip.wav` - same fixture used by spec `2-transcribe-openai-test.md`. The MCP
   test references it via `http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav`, which ascend-audio-scribe's
   `download_service` resolves back out to the host-published object store.
 
@@ -185,4 +185,4 @@ the error path).
   `/tmp/transcript_*.md` cache entries. `Reset state` uploads the object key and `Post-run cleanup` deletes it again,
   so the spec leaves no object behind. The bucket itself is created if absent and is never deleted, because other
   specs seed their own fixtures into it.
-- **Conflicts with:** any future test that also writes `e2e-fixtures/meeting-clip.wav` — none currently exist.
+- **Conflicts with:** any future test that also writes `e2e-fixtures/meeting-clip.wav` - none currently exist.

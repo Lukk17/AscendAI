@@ -10,7 +10,7 @@ class AiResponseTest {
     @DisplayName("accessors return constructed values")
     @Test
     void accessors_ReturnConstructedValues() {
-        // given
+        // when
         AiResponse r = new AiResponse("answer", null);
 
         // then

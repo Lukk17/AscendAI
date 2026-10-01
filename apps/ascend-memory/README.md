@@ -98,7 +98,7 @@ PowerShell:
 **3. Install dependencies.** The `-e` flag installs in editable mode so source edits show up without reinstall.
 
 ```bash
-pip install -e .[dev]
+pip install -e ".[dev]"
 ```
 
 **4. Run the server.** With no env vars set, [src/config/config.py](src/config/config.py) already defaults to
@@ -139,6 +139,21 @@ $env:OPENAI_API_KEY="sk-..."
 
 ```powershell
 python src/main.py
+```
+
+**5. Run the tests.** The suite enforces 100 percent branch coverage and fails below it. It calls the venv's
+interpreter by path, so it works whether or not the venv is activated.
+
+Bash:
+
+```bash
+.venv/bin/python -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+```
+
+PowerShell:
+
+```powershell
+.venv\Scripts\python.exe -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 ```
 
 #### With Docker (recommended)
@@ -350,16 +365,16 @@ bru run "memory/testing/insert-reykjavik.yml" --env ascend-local
 
 The service exposes three diagnostic endpoints plus per-operation Prometheus metrics:
 
-- `GET /health` — liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound, regardless of upstream
+- `GET /health` - liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound, regardless of upstream
   state. Targeted by the Docker `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should
   hit this.
-- `GET /ready` — readiness probe. Probes Qdrant `/healthz`, the default embedding API `/models`, and constructs the
+- `GET /ready` - readiness probe. Probes Qdrant `/healthz`, the default embedding API `/models`, and constructs the
   mem0 client. Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded",
   "checks": {...}}`. Per-probe budget is 3 s; worst-case total latency is ~9 s. Kubernetes readiness probes and
   load-balancer health checks should hit this.
-- `GET /health/legacy` — combined liveness+readiness shape kept for callers still on the pre-split contract. Returns
+- `GET /health/legacy` - combined liveness+readiness shape kept for callers still on the pre-split contract. Returns
   503 during warmup, 200 after. Scheduled for removal once all callers migrate.
-- `GET /metrics` — Prometheus payload. Four counters (`memory_{insert,search,delete,wipe}_total`) labelled by
+- `GET /metrics` - Prometheus payload. Four counters (`memory_{insert,search,delete,wipe}_total`) labelled by
   `provider` and `outcome`, plus four histograms (`memory_*_duration_seconds`) labelled by `provider`.
 
 Every request echoes (or generates) an `X-Request-ID` header. The same value is injected into every log line for that
@@ -371,11 +386,11 @@ plumbing.
 All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with `Content-Type:
 application/problem+json`.
 
-- `400` — validation failure (`ValueError` raised in the request lifecycle). Body includes `detail` with the
+- `400` - validation failure (`ValueError` raised in the request lifecycle). Body includes `detail` with the
   human-readable failure reason (authored by the service, safe to surface).
-- `422` — pydantic input validation failure (query parameters, request body). Body shape is FastAPI's default
+- `422` - pydantic input validation failure (query parameters, request body). Body shape is FastAPI's default
   validation error envelope.
-- `500` — unhandled exception. Body intentionally omits `detail` to prevent leaking upstream stack traces or DSNs.
+- `500` - unhandled exception. Body intentionally omits `detail` to prevent leaking upstream stack traces or DSNs.
   Full diagnostics live in the service logs, correlated by `X-Request-ID`.
 
 The MCP surface returns a structured envelope instead of HTTP status codes (MCP tool results are JSON):
@@ -407,11 +422,11 @@ reinstalls.
 Bash:
 
 ```bash
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 ```bash
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 ```bash
@@ -419,17 +434,17 @@ rm uninstall.txt
 ```
 
 ```bash
-pip install -e .[dev]
+python -m pip install -e ".[dev]"
 ```
 
 PowerShell:
 
 ```powershell
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 ```powershell
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 ```powershell
@@ -437,7 +452,7 @@ Remove-Item uninstall.txt
 ```
 
 ```powershell
-pip install -e .[dev]
+python -m pip install -e .[dev]
 ```
 
 ---
@@ -445,7 +460,7 @@ pip install -e .[dev]
 ### Dependencies
 
 Dependency management lives in [pyproject.toml](pyproject.toml). Add a new dependency there, then reinstall with
-`pip install -e .[dev]`.
+`python -m pip install -e ".[dev]"`.
 
 ---
 
@@ -458,7 +473,7 @@ Dependency management lives in [pyproject.toml](pyproject.toml). Add a new depen
 | [src/config/config.py](src/config/config.py)                               | Settings, provider routing, defaults.                               |
 | [src/service/memory_client.py](src/service/memory_client.py)               | mem0 client wiring, per-provider routing.                           |
 | [src/api/rest/rest_endpoints.py](src/api/rest/rest_endpoints.py)           | REST endpoints under `/api/v1/memory/*`.                            |
-| [src/api/readiness.py](src/api/readiness.py)                               | `/ready` probe — Qdrant, embedding-API, mem0 client construction.   |
+| [src/api/readiness.py](src/api/readiness.py)                               | `/ready` probe - Qdrant, embedding-API, mem0 client construction.   |
 | [src/api/mcp/mcp_server.py](src/api/mcp/mcp_server.py)                     | FastMCP tool definitions.                                           |
 | [src/api/exception_handlers.py](src/api/exception_handlers.py)             | RFC 7807 problem-document handlers for `ValueError` and `Exception`.|
 | [src/observability/request_context.py](src/observability/request_context.py) | `X-Request-ID` middleware and request-id ContextVar.              |

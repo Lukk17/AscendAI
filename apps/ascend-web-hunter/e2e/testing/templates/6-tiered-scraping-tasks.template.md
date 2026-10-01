@@ -27,9 +27,9 @@ Add anything you did beyond the spec under **Additional tasks I did**.
 ### Run
 
 - [ ] `cd docs/api/request/AscendAI`.
-- [ ] Step 1 — `bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local` returned HTTP 200.
-- [ ] Step 2 — `bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local` returned HTTP 200.
-- [ ] Step 3 — `bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local -o "$env:TEMP\js-quotes-run.json" -f json` returned HTTP 200.
+- [ ] Step 1 - `bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local` returned HTTP 200.
+- [ ] Step 2 - `bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local` returned HTTP 200.
+- [ ] Step 3 - `bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local -o "$env:TEMP\js-quotes-run.json" -f json` returned HTTP 200.
 - [ ] Step 4. Printed the served `mode` from the captured JSON output.
 
 ### Expected

@@ -94,7 +94,7 @@ class IngestionServiceTest {
     @Test
     @DisplayName("processMarkdown strips S3 prefix from filename and uses only the basename as title")
     void processMarkdown_WhenNoH1PresentAndFilenameHasS3Prefix_ThenUsesBasenameAsTitle() throws IOException {
-        // given — ManualIngestionService passes the full S3 key (with the "markdown/" prefix);
+        // given - ManualIngestionService passes the full S3 key (with the "markdown/" prefix);
         // the title fallback should be just the basename, not the full key.
         String markdown = "## Subtitle\nSome content.";
         String s3Key = "markdown/uploaded-doc.md";
@@ -161,7 +161,7 @@ class IngestionServiceTest {
     @Test
     @DisplayName("processUnstructured extracts the first Title element from the Unstructured response as title metadata")
     void processUnstructured_WhenResponseContainsTitleElement_ThenExtractsItAsTitleMetadata() throws Exception {
-        // given — Unstructured returns the document's title as an element of type "Title".
+        // given - Unstructured returns the document's title as an element of type "Title".
         // The first such element wins; subsequent ones are folded into the body text only.
         String filename = "annual-report.pdf";
         String jsonResponse = "[{\"type\":\"Title\",\"text\":\"Acme 2026 Annual Report\"},{\"type\":\"NarrativeText\",\"text\":\"Body paragraph...\"}]";
@@ -213,7 +213,7 @@ class IngestionServiceTest {
     @Test
     @DisplayName("processUnstructured uses file basename as title fallback when no Title element and S3 prefix is present")
     void processUnstructured_WhenNoTitleElementAndFilenameHasS3Prefix_ThenUsesBasenameAsTitleFallback() throws Exception {
-        // given — Unstructured returns only NarrativeText elements (no Title);
+        // given - Unstructured returns only NarrativeText elements (no Title);
         // the title fallback should strip the "documents/" prefix from the S3 key.
         String s3Key = "documents/pierogi-recipe.docx";
         String jsonResponse = "[{\"type\":\"NarrativeText\",\"text\":\"Body paragraph\"}]";

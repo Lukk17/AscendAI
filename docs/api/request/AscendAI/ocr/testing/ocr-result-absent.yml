@@ -1,0 +1,26 @@
+info:
+  name: ocr-result-absent
+  type: http
+  seq: 18
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:9070/ocr-results/{{ocrJobId}}.md"
+  headers:
+    - name: accept
+      value: text/markdown
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("No result object exists for work that was stopped", function () {
+            expect(res.getStatus()).to.equal(404);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

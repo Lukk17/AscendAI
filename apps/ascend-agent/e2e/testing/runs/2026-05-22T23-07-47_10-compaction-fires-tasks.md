@@ -31,10 +31,10 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 ### Expected
 
 - [x] Step 1: HTTP 200, response is a normal chat completion
-- [x] Step 3: `chat_history` row count for `frostyCompactionFiresTest` equals exactly 9 — observed 9
-- [x] Step 3: exactly 1 row has `role='system'` and content begins with `[Conversation summary]` — confirmed
-- [x] Step 3: exactly 8 rows have `role IN ('user', 'assistant')` — observed 8
-- [x] (Manual spot-check) summary content references Rex / Warsaw / TechCorp / Spring Boot — confirmed all four
+- [x] Step 3: `chat_history` row count for `frostyCompactionFiresTest` equals exactly 9 - observed 9
+- [x] Step 3: exactly 1 row has `role='system'` and content begins with `[Conversation summary]` - confirmed
+- [x] Step 3: exactly 8 rows have `role IN ('user', 'assistant')` - observed 8
+- [x] (Manual spot-check) summary content references Rex / Warsaw / TechCorp / Spring Boot - confirmed all four
 
 NOTE: The `ORDER BY created_at ASC LIMIT 1` check in the spec expected `role='system'` as first row, but the compaction inserts the summary with the current timestamp (not an older one), so it sorts last. The functional assertions (9 total, 1 summary, 8 raw) all pass. This is an implementation detail, not a bug.
 

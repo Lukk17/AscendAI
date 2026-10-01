@@ -29,7 +29,7 @@ Copy this file to `runs/<UTC-timestamp>_2-image-description-tasks.md` before sta
 
 ## Result summary
 
-The Bruno run returned HTTP 502 on both attempts. The AscendAgent received the request and successfully routed it to the OpenAI provider (gpt-5.1) with the image attached (image bytes were sent: 5,895,902 bytes read by Bruno). However, OpenAI rejected the request with a 400 `invalid_request_error` because one of the MCP tool function names registered with the agent does not conform to OpenAI's required pattern `^[a-zA-Z0-9_-]+$` — specifically `tools[5].function.name` contains an illegal character. This is an application-level defect in MCP tool name sanitisation, not a missing API key. The OpenAI API key is working (the error is a validation rejection, not an authentication failure). The three Expected assertions requiring HTTP 200, a detailed description, and concrete visual features all fail; only the non-refusal assertion is untestable because the request never reached the model.
+The Bruno run returned HTTP 502 on both attempts. The AscendAgent received the request and successfully routed it to the OpenAI provider (gpt-5.1) with the image attached (image bytes were sent: 5,895,902 bytes read by Bruno). However, OpenAI rejected the request with a 400 `invalid_request_error` because one of the MCP tool function names registered with the agent does not conform to OpenAI's required pattern `^[a-zA-Z0-9_-]+$` - specifically `tools[5].function.name` contains an illegal character. This is an application-level defect in MCP tool name sanitisation, not a missing API key. The OpenAI API key is working (the error is a validation rejection, not an authentication failure). The three Expected assertions requiring HTTP 200, a detailed description, and concrete visual features all fail; only the non-refusal assertion is untestable because the request never reached the model.
 
 Input tokens:
 
@@ -46,5 +46,5 @@ Duration: 00:02:01
 ## Additional tasks I did
 
 - Inspected AscendAgent container logs (`docker logs ascend-agent`) to identify the root cause of the 502: OpenAI 400 `invalid_request_error` on `tools[5].function.name` not matching `^[a-zA-Z0-9_-]+$`.
-- Confirmed that the OpenAI API key is present and valid (the error is a request-validation rejection, not an authentication failure — OpenAI processes the request far enough to validate the tool schema).
+- Confirmed that the OpenAI API key is present and valid (the error is a request-validation rejection, not an authentication failure - OpenAI processes the request far enough to validate the tool schema).
 - Noted that prior successful runs left chat history for user `frostyImageDescriptionTest` containing an assistant description of the image, confirming the capability worked previously. The defect is a regression in MCP tool name registration.

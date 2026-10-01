@@ -23,6 +23,7 @@ def _build_html_with_articles(count: int = 1) -> str:
 
 @pytest.mark.asyncio
 async def test_search_returns_results_for_async_client():
+    # given
     html = _build_html_with_articles(1)
 
     mock_response = MagicMock()
@@ -31,9 +32,12 @@ async def test_search_returns_results_for_async_client():
     mock_response.raise_for_status = MagicMock()
 
     client = SearxngClient()
+
+    # when
     with patch.object(client.client, "get", new=AsyncMock(return_value=mock_response)):
         results = await client.search("query")
 
+    # then
     assert len(results) == 1
     assert results[0]["title"] == "Title 0"
     assert results[0]["url"] == "http://example.com/0"
@@ -44,6 +48,7 @@ async def test_search_returns_results_for_async_client():
 
 @pytest.mark.asyncio
 async def test_search_limits_results():
+    # given
     html = _build_html_with_articles(5)
 
     mock_response = MagicMock()
@@ -52,15 +57,19 @@ async def test_search_limits_results():
     mock_response.raise_for_status = MagicMock()
 
     client = SearxngClient()
+
+    # when
     with patch.object(client.client, "get", new=AsyncMock(return_value=mock_response)):
         results = await client.search("query", limit=2)
 
+    # then
     assert len(results) == 2
     await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_search_skips_article_without_title():
+    # given
     html = """
     <html><body>
         <article class="result">
@@ -77,9 +86,12 @@ async def test_search_skips_article_without_title():
     mock_response.raise_for_status = MagicMock()
 
     client = SearxngClient()
+
+    # when
     with patch.object(client.client, "get", new=AsyncMock(return_value=mock_response)):
         results = await client.search("query")
 
+    # then
     assert len(results) == 1
     assert results[0]["title"] == "Good"
     assert results[0]["content"] == ""
@@ -89,6 +101,7 @@ async def test_search_skips_article_without_title():
 
 @pytest.mark.asyncio
 async def test_search_with_categories_forwards_param():
+    # given
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.text = "<html></html>"
@@ -96,15 +109,19 @@ async def test_search_with_categories_forwards_param():
 
     client = SearxngClient()
     mock_get = AsyncMock(return_value=mock_response)
+
+    # when
     with patch.object(client.client, "get", new=mock_get):
         await client.search("q", categories="news")
 
+    # then
     assert mock_get.call_args.kwargs["params"]["categories"] == "news"
     await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_search_raises_on_http_status_error():
+    # given
     request = httpx.Request("GET", "http://searxng/search")
     response = httpx.Response(500, request=request)
     mock_get = AsyncMock(side_effect=httpx.HTTPStatusError("boom", request=request, response=response))
@@ -114,11 +131,13 @@ async def test_search_raises_on_http_status_error():
         with pytest.raises(httpx.HTTPStatusError):
             await client.search("q")
 
+    # when / then
     await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_search_raises_on_timeout():
+    # given
     mock_get = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
 
     client = SearxngClient()
@@ -126,11 +145,13 @@ async def test_search_raises_on_timeout():
         with pytest.raises(httpx.TimeoutException):
             await client.search("q")
 
+    # when / then
     await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_search_raises_on_transport_error():
+    # given
     mock_get = AsyncMock(side_effect=httpx.ConnectError("nope"))
 
     client = SearxngClient()
@@ -138,12 +159,14 @@ async def test_search_raises_on_transport_error():
         with pytest.raises(httpx.ConnectError):
             await client.search("q")
 
+    # when / then
     await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_search_fails_fast_when_breaker_open() -> None:
     """When the searxng circuit breaker is OPEN, search() raises without making an HTTP call."""
+    # given
     breaker = CircuitBreaker("test-searxng", failure_threshold=1, recovery_timeout=999.0)
     breaker.record_failure()  # opens the breaker
 
@@ -152,4 +175,5 @@ async def test_search_fails_fast_when_breaker_open() -> None:
         with pytest.raises(httpx.HTTPError):
             await client.search("q")
 
+    # when / then
     await client.aclose()

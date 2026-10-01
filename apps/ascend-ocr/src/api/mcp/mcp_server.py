@@ -1,41 +1,48 @@
 import asyncio
 import ipaddress
+import logging
 import os
 import socket
 import time
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
+from typing import Final
 from urllib.parse import ParseResult, unquote, urlparse
 from urllib.request import url2pathname
 
 import aiofiles
 import aiohttp
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from src.api.exception_handlers import (
     ERROR_CODE_DOWNLOAD_FAILED,
     ERROR_CODE_FILE_TOO_LARGE,
-    ERROR_CODE_OCR_FAILED,
+    ERROR_CODE_JOB_NOT_FOUND,
+    ERROR_CODE_QUEUE_FULL,
     ERROR_CODE_UNSAFE_URI,
     ERROR_CODE_UNSUPPORTED_FILE_TYPE,
+    ERROR_CODE_UNSUPPORTED_LANGUAGE,
     DownloadFailedError,
     FileSizeExceededError,
-    OcrProcessingError,
+    JobNotFoundError,
+    QueueFullError,
     UnsafeUriError,
     UnsupportedFileTypeError,
+    UnsupportedLanguageError,
+    log_refusal,
 )
-from src.api.limits import enforce_page_limit, enforce_pixel_ceiling, inspect_input
+from src.api.mcp.request_log_context import McpRequestLogContextMiddleware
 from src.api.middleware.audit_log import emit_mcp_audit
-from src.api.mime_sniffer import sniff_mime
-from src.config.config import settings
+from src.config.config import DEFAULT_QUALITY, QualityMode, settings
 from src.config.logging_config import get_logger
 from src.observability.metrics import (
     MCP_DOWNLOAD_DURATION_SECONDS,
-    OCR_DURATION_SECONDS,
     OCR_REQUESTS_TOTAL,
+    request_language_label,
 )
-from src.observability.tracing import get_tracer, inject_trace_context
-from src.service.ocr_service import dispatch_ocr_request
+from src.observability.tracing import get_tracer
+from src.service.job_service import ensure_language_supported, job_service
 
 logger = get_logger(__name__)
 tracer = get_tracer()
@@ -44,6 +51,16 @@ _BYTES_PER_MB: int = 1024 * 1024
 _DOWNLOAD_CHUNK_BYTES: int = 64 * 1024
 _HTTP_OK: int = 200
 _SURFACE: str = "mcp"
+_REFUSAL_CODES: Final[dict[type[Exception], str]] = {
+    UnsafeUriError: ERROR_CODE_UNSAFE_URI,
+    UnsupportedFileTypeError: ERROR_CODE_UNSUPPORTED_FILE_TYPE,
+    FileSizeExceededError: ERROR_CODE_FILE_TOO_LARGE,
+    DownloadFailedError: ERROR_CODE_DOWNLOAD_FAILED,
+    QueueFullError: ERROR_CODE_QUEUE_FULL,
+    JobNotFoundError: ERROR_CODE_JOB_NOT_FOUND,
+    UnsupportedLanguageError: ERROR_CODE_UNSUPPORTED_LANGUAGE,
+}
+_FASTMCP_REFUSAL_LOG_LEVEL: Final[int] = logging.DEBUG
 
 _http_session: aiohttp.ClientSession | None = None
 
@@ -70,63 +87,116 @@ async def mcp_lifespan(_app: object) -> AsyncIterator[None]:
         logger.info("MCP HTTP session closed")
 
 
-mcp: FastMCP = FastMCP("ascend-ocr", lifespan=mcp_lifespan)
+mcp: FastMCP = FastMCP("ascend-ocr", lifespan=mcp_lifespan, middleware=[McpRequestLogContextMiddleware()])
+
+
+@contextmanager
+def _mcp_error_codes() -> Iterator[None]:
+    """Answer an expected refusal with the `CODE: detail` text MCP callers read.
+
+    Raised as a ToolError so FastMCP logs its own line at debug rather than as an error with a
+    traceback, which leaves the refusal as the one warning log_refusal writes.
+
+    Raises:
+        ToolError: for every refusal in _REFUSAL_CODES, chained to the service's own error.
+    """
+    try:
+        yield
+    except tuple(_REFUSAL_CODES) as exc:
+        code = _REFUSAL_CODES[type(exc)]
+        log_refusal(code, exc)
+        raise ToolError(f"{code}: {exc}", log_level=_FASTMCP_REFUSAL_LOG_LEVEL) from exc
 
 
 @mcp.tool()
-async def ocr_process(file_uri: str, lang: str = "en") -> dict[str, object]:
+async def ocr_submit(
+    file_uri: str, lang: str = "en", quality: QualityMode = DEFAULT_QUALITY, straighten: bool = False
+) -> dict[str, object]:
     """
-    Run OCR on a file referenced by URI.
+    Submit a file referenced by URI to be read, and get an identifier back straight away.
+
+    The document is not read during this call. Poll `ocr_job_status` with the identifier
+    this returns, waiting `poll_after_seconds` between reads, and collect the Markdown
+    from the object storage address the finished state carries.
 
     Args:
         file_uri: Source URI. Supported schemes:
             - file:// (only when MCP_FILE_URI_ROOT is configured; jailed to that root).
             - http://, https:// (subject to host allowlist and private-IP block).
-        lang: Language code (e.g., 'en', 'pl').
+        lang: Language code (e.g., 'en', 'pl'). A code outside the supported list is refused with
+            UNSUPPORTED_LANGUAGE before the URI is fetched.
+        quality: 'high' (default) renders at 300 dpi for small print and dense pages; 'normal'
+            renders at 150 dpi and reads faster when the text is large.
+        straighten: false (default) reads the page as it is. true also flattens the page before
+            reading, meant for phone photos of bent, curled or crumpled paper and best with quality
+            'high'. It harms clean scans and PDFs, so leave it off for them.
 
     Returns:
-        Serialised OcrJsonResponse as a dictionary.
+        Serialised JobSubmitResponse as a dictionary.
     """
-    OCR_REQUESTS_TOTAL.labels(surface=_SURFACE, language=lang).inc()
+    OCR_REQUESTS_TOTAL.labels(surface=_SURFACE, language=request_language_label(lang)).inc()
     parsed = urlparse(file_uri)
     scheme = parsed.scheme.lower() or "(none)"
     host = parsed.hostname
 
-    try:
+    with _mcp_error_codes():
+        ensure_language_supported(lang)
         with tracer.start_as_current_span(
             "ascend-ocr.mcp.fetch",
             attributes={"scheme": scheme, "host": host or ""},
         ):
             file_bytes, filename = await _fetch_file(file_uri)
 
-        mime = sniff_mime(file_bytes)
-        shape = inspect_input(file_bytes, mime)
-        enforce_pixel_ceiling(shape)
-        enforce_page_limit(shape)
-    except UnsafeUriError as exc:
-        raise UnsafeUriError(f"{ERROR_CODE_UNSAFE_URI}: {exc}") from exc
-    except UnsupportedFileTypeError as exc:
-        raise UnsupportedFileTypeError(f"{ERROR_CODE_UNSUPPORTED_FILE_TYPE}: {exc}") from exc
-    except FileSizeExceededError as exc:
-        raise FileSizeExceededError(f"{ERROR_CODE_FILE_TOO_LARGE}: {exc}") from exc
-    except DownloadFailedError as exc:
-        raise DownloadFailedError(f"{ERROR_CODE_DOWNLOAD_FAILED}: {exc}") from exc
+        emit_mcp_audit("ocr_submit", scheme, host, len(file_bytes), "ok")
+        submitted = await job_service.submit(file_bytes, filename, lang, quality, "mcp", straighten=straighten)
 
-    emit_mcp_audit("ocr_process", scheme, host, len(file_bytes), "ok")
+    return submitted.model_dump()
 
-    effective_budget = min(shape.page_count * settings.OCR_PAGE_TIMEOUT_SECONDS, settings.OCR_REQUEST_TIMEOUT)
-    start = time.monotonic()
-    with tracer.start_as_current_span("ascend-ocr.engine.predict", attributes={"language": lang}):
-        # Captured inside the span above so the carrier points at this span, which the
-        # worker process later reattaches to as the parent of its own inference span.
-        trace_carrier = inject_trace_context()
-        try:
-            result = await dispatch_ocr_request(file_bytes, filename, lang, effective_budget, _SURFACE, trace_carrier)
-        except OcrProcessingError as exc:
-            raise OcrProcessingError(f"{ERROR_CODE_OCR_FAILED}: {exc}") from exc
-    OCR_DURATION_SECONDS.labels(surface=_SURFACE, language=lang).observe(time.monotonic() - start)
 
-    return result.model_dump()
+@mcp.tool()
+def ocr_job_status(job_id: str) -> dict[str, object]:
+    """
+    Read the state of submitted work.
+
+    Args:
+        job_id: The identifier `ocr_submit` returned.
+
+    Returns:
+        Serialised JobStatusResponse as a dictionary. While the work is waiting or
+        running it carries `poll_after_seconds`. A terminal state carries no
+        `poll_after_seconds` key at all, and a succeeded one carries the bucket, the key
+        and a time-limited URL for the Markdown.
+    """
+    with _mcp_error_codes():
+        return job_service.status(job_id).model_dump()
+
+
+@mcp.tool()
+def ocr_list_jobs() -> dict[str, object]:
+    """
+    List the work that is queued or running, in submission order.
+
+    Returns:
+        Serialised JobListResponse as a dictionary. Finished work is not listed.
+    """
+    return job_service.list_jobs().model_dump()
+
+
+@mcp.tool()
+async def ocr_cancel_job(job_id: str) -> dict[str, object]:
+    """
+    Stop work that has not finished, or forget work that has, along with its stored result.
+
+    Args:
+        job_id: The identifier `ocr_submit` returned.
+
+    Returns:
+        The identifier and the outcome, so a caller can tell the call was accepted.
+    """
+    with _mcp_error_codes():
+        await job_service.delete(job_id)
+
+    return {"job_id": job_id, "cancelled": True}
 
 
 async def _fetch_file(file_uri: str) -> tuple[bytes, str]:
@@ -266,9 +336,14 @@ def _enforce_size(byte_count: int) -> None:
 __all__ = [
     "DownloadFailedError",
     "FileSizeExceededError",
+    "JobNotFoundError",
+    "QueueFullError",
     "UnsafeUriError",
     "UnsupportedFileTypeError",
     "mcp",
     "mcp_lifespan",
-    "ocr_process",
+    "ocr_cancel_job",
+    "ocr_job_status",
+    "ocr_list_jobs",
+    "ocr_submit",
 ]

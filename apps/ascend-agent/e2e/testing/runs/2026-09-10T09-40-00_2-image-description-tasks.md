@@ -44,7 +44,7 @@ Run regardless of Run-step verdict. Every command is idempotent.
 
 ## Result summary
 
-The Bruno request `image-description-prompt.yml` returned HTTP 200 (both invocations). The response body's `content` field is a multi-paragraph, section-headed description (~700 words) that accurately names the image's concrete visual features: spiky blond hair with blue rim lighting, narrowed electric-blue glowing eyes, a dark high-collar jacket with a glowing blue geometric chest emblem, and a warm-lit night-city skyline background — all of which are directly visible in `apps/ascend-agent/e2e/fixtures/image.png`. No refusal language appears anywhere in the response. All three Expected assertions hold: HTTP 200, a detailed description well beyond a few sentences, and concrete-feature grounding with no refusal.
+The Bruno request `image-description-prompt.yml` returned HTTP 200 (both invocations). The response body's `content` field is a multi-paragraph, section-headed description (~700 words) that accurately names the image's concrete visual features: spiky blond hair with blue rim lighting, narrowed electric-blue glowing eyes, a dark high-collar jacket with a glowing blue geometric chest emblem, and a warm-lit night-city skyline background - all of which are directly visible in `apps/ascend-agent/e2e/fixtures/image.png`. No refusal language appears anywhere in the response. All three Expected assertions hold: HTTP 200, a detailed description well beyond a few sentences, and concrete-feature grounding with no refusal.
 
 Input tokens: 3544 (OpenAI `gpt-5.1-2025-11-13` call, from the re-run's captured `nativeUsage.prompt_tokens`; the canonical Run-step invocation used an identical request and was not JSON-captured)
 

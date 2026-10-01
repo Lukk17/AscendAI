@@ -18,7 +18,7 @@ graph TB
         end
 
         subgraph "reader"
-            webreader["reader/web_reader.py<br/>WebReader — strategy orchestrator"]
+            webreader["reader/web_reader.py<br/>WebReader - strategy orchestrator"]
             subgraph "strategies"
                 bs["strategies/beautifulsoup_strategy.py"]
                 traf["strategies/trafilatura_strategy.py"]

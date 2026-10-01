@@ -56,7 +56,7 @@ One verdict, with a score, instead of four booleans:
 - `ChallengeDetector.assess(status_code, headers, html)` returns a `ChallengeVerdict` carrying the score, every
   signal that fired with its weight, the vendor the signals point at when they point at one, and the intervention
   type. `is_blocked`, `has_real_content` and `is_content_accepted` keep their names and become thin readers of
-  that verdict, so the eight call sites that use them today keep working while each is moved to pass the response
+  that verdict, so the nine call sites that use them today keep working while each is moved to pass the response
   headers it already has.
 - A page is a wall when its score reaches `CHALLENGE_SCORE_THRESHOLD`, or when a definitive signal fires. A
   definitive signal is one the vendor only ever emits while serving a challenge, such as Cloudflare's
@@ -114,8 +114,8 @@ Observability that names the signal:
 
 The e2e suite gains rows that cannot pass by luck:
 
-- Spec 7's matrix gains a "Challenge walls in other vendors and languages" group: Amazon's own captcha page in five
-  more locales, gated to `intervention`, and the "pending anti-bot fix" paragraph is closed by this change. It also
+- Spec 7's matrix gains a "Challenge walls in other languages" group: Amazon's own captcha page in the five
+  capture locales `amazon.de`, `amazon.fr`, `amazon.it`, `amazon.es` and `amazon.co.jp`, gated to `intervention`, and the "pending anti-bot fix" paragraph is closed by this change. It also
   gains a "Widgets that are not walls" group: three vendor demo pages that host their own widget beside real
   content, gated to `success`, which is the false-positive guard exercised live.
 
@@ -131,15 +131,16 @@ The e2e suite gains rows that cannot pass by luck:
   test suite runs.
 - `apps/ascend-web-hunter/src/api/exceptions.py`: `ChallengeDetectedException` gains the verdict.
 - `apps/ascend-web-hunter/src/reader/strategies/curl_cffi_fetcher.py`, `playwright_strategy.py`,
-  `flaresolverr_strategy.py`, `crawlee_strategy.py`, `novnc_strategy.py` and `src/reader/web_reader.py`: the eight
-  call sites, each passing the headers it has.
+  `flaresolverr_strategy.py`, `crawlee_strategy.py`, `novnc_strategy.py` and `src/reader/web_reader.py`: the nine
+  call sites (crawlee 101, curl_cffi 123, flaresolverr 82, novnc 122 and 123, playwright 79 and 107, web_reader 407
+  and 468), each passing the headers it has.
 - `apps/ascend-web-hunter/src/config/config.py`: seven settings, listed with derivations in [design.md](design.md).
 - `apps/ascend-web-hunter/src/observability/metrics.py`: two counters and one histogram.
 - `apps/ascend-web-hunter/tests/`: the fixture corpus, its manifest, the signal tests, the corpus test, the generator
   test, and the migration test, to the module's `--cov-fail-under=100` with `--cov-branch`.
 - `apps/ascend-web-hunter/e2e/testing/7-authenticated-realworld-scraping-test.md`, its sidecar template, the
   Bruno rows under `docs/api/request/AscendAI/web-hunter/testing/realworld/`, and `e2e/README.md`.
-- Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, a new ADR-010, an amendment to ADR-001, and a new row in
+- Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, a new ADR-014, an amendment to ADR-001, and a new row in
   `docs/DEFECT_REGISTER.md`.
 
 ## Out of Scope
@@ -201,10 +202,14 @@ The e2e suite gains rows that cannot pass by luck:
 
 ### Modified Capabilities
 
-None. No capability under `openspec/specs/` covers ascend-web-hunter today. The unarchived
-`web-search-fetch-correctness` delta requires that detection is not skipped by page size, and this change keeps that
-requirement true and does not restate it. The unarchived `web-search-tier-ladder` delta requires a local CAPTCHA
-solver before human escalation, which sits after the verdict this change produces and is untouched by it.
+- `web-search-fetch-correctness`: the requirement "Challenge and login detection regardless of page size" is
+  MODIFIED. Detection still scans a bounded prefix and never skips a large page, and it now reaches its decision
+  through the scored verdict, which also reads the status, the response headers and the cookie names, so a wall in
+  a language the phrase list does not know is still a wall.
+
+The other four capabilities under `openspec/specs/` for ascend-web-hunter (`web-search-antibot-evasion`,
+`web-search-authenticated-sessions`, `web-search-caching-observability` and `web-search-extraction-quality`) state
+nothing about how a wall is recognised, so they are unchanged.
 
 ## Impact
 
@@ -221,18 +226,29 @@ in the verdict needs a test before the suite goes green. The fixture corpus adds
 
 Docs: the environment variable tables in `apps/ascend-web-hunter/AGENTS.md`, `README.md` and
 `docs/configuration.md`, which also gain the two existing `CHALLENGE_*` settings that `docs/configuration.md` does
-not list today, a new ADR-010 for the scoring model and the catalogue, an amendment to ADR-001 whose Related section
+not list today, a new ADR-014 for the scoring model and the catalogue, an amendment to ADR-001 whose Related section
 names the booleans this change replaces, and one new row in `docs/DEFECT_REGISTER.md` for the false negative spec 7
-already describes. ADR-009 is reserved by the sibling change `open-several-novnc-windows-at-once`.
+already describes. ADR-009 to ADR-012 already exist and ADR-013 belongs to the sibling change
+`open-several-novnc-windows-at-once`, which is built first.
+
+## Dependencies and Build Order
+
+The owner fixed the build order on 2026-10-01: `open-several-novnc-windows-at-once` first, then this change, then
+`enhance-web-search-tier-ladder`, then `enhance-web-search-extraction-and-tiers` (structured extraction), then
+`enhance-web-search-crawl-at-scale`. This change depends on `open-several-novnc-windows-at-once`: the five Amazon
+rows `aa` to `ae` in spec 7 each open a NoVNC window nobody solves, so they need `NOVNC_MAX_CONCURRENT_FLOWS` of at
+least 5, which only exists after that change. Both changes ship together as ascend-web-hunter 0.0.7 with one
+CHANGELOG entry, and the version bump itself belongs to the sibling change. `enhance-web-search-tier-ladder` depends
+on this change, because its new browser tiers pass their response to the same verdict.
 
 ## Relevant Skills
 
 Load before implementing:
 
-- `/python-patterns`, `/python-testing`, `/tdd-workflow`
+- `/python-patterns`, `/tdd-workflow`
 - `/security-review` for the parser on untrusted HTML, the header map, the fixture corpus and what it must not
   contain
 - `/api-design` for the verdict carried on the exception and the metric label sets
 - `/e2e-runbooks` for the spec 7 rows, the Bruno requests and the sidecar template
 - `/coding-standards`, `/code-reviewer`
-- `/architecture-decision-records` for ADR-010 and the ADR-001 amendment
+- `/architecture-decision-records` for ADR-014 and the ADR-001 amendment

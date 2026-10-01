@@ -14,8 +14,8 @@ sequenceDiagram
 
     Docker->>Uvicorn: container start
     Python->>Python: import src.main → ... → src.validator.url_validator
-    Python->>Python: blocklist_loader.load_rules() — read src/assets/fanboy-annoyance.txt from disk
-    Note over Python: eager, at import time — before create_app() runs, no network involved
+    Python->>Python: blocklist_loader.load_rules() - read src/assets/fanboy-annoyance.txt from disk
+    Note over Python: eager, at import time - before create_app() runs, no network involved
     Uvicorn->>Lifespan: startup
     Lifespan->>Lifespan: assert blocklist_loader.state is not None
     Lifespan->>MCP: enter mcp_asgi_app lifespan
@@ -27,7 +27,7 @@ sequenceDiagram
 
 The blocklist load is a hard failure only in the packaging-defect sense: if the vendored file is missing or fails
 to parse, `blocklist_loader.load_rules()` raises during module import and the process never reaches
-`create_app()`. In normal operation this cannot depend on any external host — the file ships in the image, and
+`create_app()`. In normal operation this cannot depend on any external host - the file ships in the image, and
 nothing downloads at startup. There is no `/ready` endpoint separate from `/health`; liveness is the only probe.
 
 ---
@@ -50,7 +50,7 @@ sequenceDiagram
 
 ---
 
-### Extraction escalation — BeautifulSoup hit
+### Extraction escalation - BeautifulSoup hit
 
 ```mermaid
 sequenceDiagram
@@ -78,7 +78,7 @@ sequenceDiagram
 
 ---
 
-### Extraction escalation — Cloudflare block → FlareSolverr
+### Extraction escalation - Cloudflare block → FlareSolverr
 
 ```mermaid
 sequenceDiagram
@@ -96,7 +96,7 @@ sequenceDiagram
     WR->>WR: short-circuit to 6-novnc
     note over WR: ChallengeDetectedException skips straight to NoVNC,<br/>not to FlareSolverr. FlareSolverr runs only when<br/>BeautifulSoup returns empty without raising.
     WR->>TR: extract(url)
-    TR-->>WR: "" (empty — blocked but no exception)
+    TR-->>WR: "" (empty - blocked but no exception)
     WR->>FS: extract(url)
     FS->>FlareSolverr: POST {cmd:"request.get", url:...}
     FlareSolverr-->>FS: {status:"ok", solution:{response:html, cookies:[...]}}
@@ -129,7 +129,7 @@ sequenceDiagram
 
 ---
 
-### Blocklist refresh — operator-triggered, never automatic
+### Blocklist refresh - operator-triggered, never automatic
 
 ```mermaid
 sequenceDiagram
@@ -168,6 +168,8 @@ surface.
 | Condition | HTTP status | Response |
 | :--- | :--- | :--- |
 | `HumanInterventionRequiredException` | 428 | `{status, intervention_type, vnc_url, message}` |
+| Stored session for the target no longer validates | 200 | `{url, content: "", status: "session_expired", profile, message}` |
+| `output_format=structured` asked for with `include_links` | 400 | `{detail: "output_format=structured is not available with include_links ..."}` |
 | `httpx.HTTPError` (external service) | 503 | `{detail, error}` |
 | `BlocklistValidationError` (empty refresh result) | 502 | RFC 7807 problem+json |
 | `BlocklistRefreshThrottledError` (refresh cooldown) | 429 | RFC 7807 problem+json, `Retry-After` header |

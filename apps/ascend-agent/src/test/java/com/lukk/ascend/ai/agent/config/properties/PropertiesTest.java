@@ -123,7 +123,7 @@ class PropertiesTest {
         // given
         RagProperties props = new RagProperties();
 
-        // then — defaults
+        // then - defaults
         assertThat(props.isEnabled()).isTrue();
         assertThat(props.getTopK()).isEqualTo(5);
         assertThat(props.getSimilarityThreshold()).isEqualTo(0.4d);
@@ -134,7 +134,7 @@ class PropertiesTest {
         assertThat(props.getSourceAttachments().getMaxFileSize())
                 .isEqualTo(org.springframework.util.unit.DataSize.ofMegabytes(25));
 
-        // when — setters
+        // when - setters
         props.setEnabled(false);
         props.setTopK(10);
         props.setSimilarityThreshold(0.8d);
@@ -146,7 +146,7 @@ class PropertiesTest {
         sa.setMaxFileSize(org.springframework.util.unit.DataSize.ofMegabytes(50));
         props.setSourceAttachments(sa);
 
-        // then — updated values
+        // then - updated values
         assertThat(props.isEnabled()).isFalse();
         assertThat(props.getTopK()).isEqualTo(10);
         assertThat(props.getSimilarityThreshold()).isEqualTo(0.8d);
@@ -165,7 +165,7 @@ class PropertiesTest {
         // given
         SemanticMemoryProperties props = new SemanticMemoryProperties();
 
-        // then — defaults
+        // then - defaults
         assertThat(props.isEnabled()).isTrue();
         assertThat(props.getBaseUrl()).isEqualTo("http://localhost:7020");
         assertThat(props.getSearchLimit()).isEqualTo(5);
@@ -229,24 +229,24 @@ class PropertiesTest {
         // given
         PromptCacheProperties props = new PromptCacheProperties();
 
-        // then — defaults
+        // then - defaults
         assertThat(props.isEnabled()).isTrue();
         assertThat(props.getProviders()).isEmpty();
         assertThat(props.isProviderEnabled("anthropic")).isTrue();
 
-        // when — disable anthropic per-provider but explicitly enable openai
+        // when - disable anthropic per-provider but explicitly enable openai
         props.setProviders(Map.of(
                 "anthropic", buildProviderCache(false),
                 "openai", buildProviderCache(true)));
 
-        // then — explicit enabled overrides default, explicit disabled blocks
+        // then - explicit enabled overrides default, explicit disabled blocks
         assertThat(props.isProviderEnabled("anthropic")).isFalse();
         assertThat(props.isProviderEnabled("openai")).isTrue();
 
-        // when — disable master
+        // when - disable master
         props.setEnabled(false);
 
-        // then — all disabled when master is off
+        // then - all disabled when master is off
         assertThat(props.isProviderEnabled("openai")).isFalse();
         assertThat(props.isProviderEnabled("anthropic")).isFalse();
     }
@@ -259,7 +259,7 @@ class PropertiesTest {
         // given
         ChatHistoryCompactionProperties props = new ChatHistoryCompactionProperties();
 
-        // then — defaults
+        // then - defaults
         assertThat(props.isEnabled()).isTrue();
         assertThat(props.getTurnTrigger()).isEqualTo(20);
         assertThat(props.getTokenTriggerFraction()).isEqualTo(0.5d);
@@ -292,7 +292,7 @@ class PropertiesTest {
         // given
         ChatHistoryProperties props = new ChatHistoryProperties();
 
-        // then — defaults
+        // then - defaults
         assertThat(props.getMaxSize()).isEqualTo(5);
         assertThat(props.getTtl()).isEqualTo(java.time.Duration.ofHours(24));
         assertThat(props.getRedis()).isNotNull();
@@ -325,7 +325,7 @@ class PropertiesTest {
         // given
         IngestionUploadProperties props = new IngestionUploadProperties();
 
-        // then — default
+        // then - default
         assertThat(props.getAllowedMimeTypes()).isEmpty();
 
         // when
@@ -334,7 +334,7 @@ class PropertiesTest {
         // then
         assertThat(props.getAllowedMimeTypes()).containsExactly("application/pdf", "text/markdown");
 
-        // when — null
+        // when - null
         props.setAllowedMimeTypes(null);
 
         // then

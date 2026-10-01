@@ -1,7 +1,8 @@
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import urlparse
 
 import anyio
 import httpx
@@ -39,7 +40,7 @@ mock_instance = MagicMock()
 
 
 async def mock_asgi_app(_scope, _receive, _send):
-    """Stub ASGI application — discards every call. The FastMCP HTTP mount
+    """Stub ASGI application - discards every call. The FastMCP HTTP mount
     needs *something* with the ASGI signature even though we never invoke it
     in tests."""
 
@@ -123,6 +124,25 @@ def mock_mcp_lifespan_global():
     yield
 
     main_module.mcp.session_manager.run = original_run
+
+
+@pytest.fixture
+def pinned_public_host():
+    """Stub the curl_cffi tier's connect-time pin so unit tests resolve no real name.
+
+    Every host is pinned to one public address. Tests that exercise the pin
+    itself patch `socket.getaddrinfo` instead and do not take this fixture.
+    """
+    from src.validator.url_validator import PinnedHost
+
+    def _pin(url: str) -> PinnedHost:
+        parsed = urlparse(url)
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+        return PinnedHost(host=parsed.hostname or "", port=port, addresses=("93.184.216.34",))
+
+    with patch("src.reader.strategies.curl_cffi_fetcher.pin_safe_host", side_effect=_pin):
+        yield
 
 
 @pytest_asyncio.fixture(scope="function")

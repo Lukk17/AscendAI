@@ -122,6 +122,42 @@ never retried (see ADR-009).
 
 ---
 
+### ascend-ocr client
+
+Every document reaches ascend-ocr as a job. The client posts the file and its optional language to
+`app.ascend-ocr.api-path`, expects `202 Accepted` with a job identifier, polls that job's status resource on the
+`poll_after_seconds` hint each answer carries, fetches the finished Markdown from object storage with the bucket and
+key the record names, and then deletes the job. The fetch reuses the ingestion `S3Client`
+(`app.s3.endpoint`, `app.s3.access-key`, `app.s3.secret-key`), against the bucket the record names rather than
+`app.s3.bucket`. Polling sleeps the calling `pdf-parallel-pages` worker thread, so the client creates no thread of
+its own.
+
+A submission is retried only on a definitive `503 QUEUE_FULL`, honouring `Retry-After` up to
+`app.ascend-ocr.submit-retry-max-delay` with jitter. A timeout or a connection error is never retried, because a lost
+response may be hiding a job the service already accepted. A job that ends as `failed` with `SERVICE_RESTARTED` or
+`RESULT_STORE_UNAVAILABLE` is resubmitted once, since neither reason says anything about the document. `OCR_FAILED`
+is never resubmitted.
+
+| Key                                   | Default   | Description                                                                                  |
+| :-------------------------------------- | :---------- | :--------------------------------------------------------------------------------------------- |
+| `app.ascend-ocr.base-url`             | `http://localhost:7022` | Base URL of the ascend-ocr instance. Overridden to `http://ascend-ocr:7022` in the docker profile. |
+| `app.ascend-ocr.api-path`             | `/v1/ocr/jobs` | Path of the job collection. Status and delete address `{api-path}/{job_id}`.                |
+| `app.ascend-ocr.poll-min-interval`    | `1s`      | Floor applied to the service's own poll hint.                                                |
+| `app.ascend-ocr.poll-max-interval`    | `30s`     | Cap applied to the service's own poll hint.                                                  |
+| `app.ascend-ocr.poll-timeout`         | `15m`     | Longest one document may take from submission to a terminal state. On expiry the client deletes the job and fails the page. |
+| `app.ascend-ocr.submit-retry-attempts`| `3`       | Retries after a `QUEUE_FULL` refusal. Total attempts are this plus one.                      |
+| `app.ascend-ocr.submit-retry-max-delay`| `30s`    | Upper bound on the wait between those retries, whatever `Retry-After` asks for.              |
+
+Two settings elsewhere changed meaning when the job contract arrived:
+
+- **`app.ingestion.read-timeout`** (`300000` ms) no longer bounds an OCR operation. Every call to ascend-ocr is short
+  now, being a submission, a status read or a delete, so this is a per-call timeout on short calls. What bounds one
+  document is `app.ascend-ocr.poll-timeout`.
+- **`app.document-router.pdf-parallel-pages`** (`4`) must stay at or under ascend-ocr's `OCR_JOB_QUEUE_MAX_DOCUMENTS`
+  (`8`). Above that, the fan-out fills the service's queue with its own pages and refuses itself with `QUEUE_FULL`.
+
+---
+
 ### Core Spring Boot settings
 
 Beyond providers, these YAML keys cover the rest of the agent's deployment surface. Override via the standard Spring
@@ -139,6 +175,8 @@ Boot env-var binding (uppercase, dots and dashes to underscores).
 - **`app.ingestion.auto.enabled`** (`false`). Auto-poll the object-store bucket on a schedule. Off by default to avoid
   embedding-cost surprises.
 - **`spring.ai.mcp.client.*`**. MCP server URLs for Weather, ascend-audio-scribe, ascend-web-hunter.
+- **`app.mcp.tool-cache.ttl`** (`60s`). How long the MCP tool listing is reused while the set of connected servers is
+  unchanged. `0s` lists tools on every prompt. See ADR-010.
 
 The Qdrant collections (`ascendai-768` and `ascendai-1536`) are auto-created at startup; the active collection comes
 from the chosen embedding provider's vector dimensions.

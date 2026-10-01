@@ -16,10 +16,23 @@ configuration from container logs without inspecting env vars separately.
 
 Two distinct SSRF surfaces exist and both are guarded.
 
-`is_safe_external_url` (`src/validator/url_validator.py:28`) is called by both the REST `POST /api/v2/web/read`
+`is_safe_external_url` (`src/validator/url_validator.py`) is called by both the REST `POST /api/v2/web/read`
 endpoint and the `web_read` MCP tool before any URL is passed to `WebReader`. It resolves the hostname with
 `socket.getaddrinfo` and rejects loopback, private, link-local, multicast, reserved, and unspecified addresses.
 Non-HTTP/HTTPS schemes are also rejected.
+
+The boundary check and the fetch are separated by the whole strategy chain, so the fetch path guards itself as
+well. The `curl_cffi` tiers do not follow redirects automatically: each hop is checked before it is followed, up to
+ten hops, so no hop is ever fetched before it has been validated. A relative `Location` is resolved against the URL
+of the hop that returned it first, as RFC 9110 section 10.2.2 requires, and the resolved absolute URL then faces
+that same check, so an ordinary relative redirect is followed and one that resolves onto an internal address is
+still refused. Those tiers also pin what they
+connect to. `pin_safe_host` resolves the host once, validates every address it gets back, and hands those addresses
+to libcurl through `CURLOPT_RESOLVE`, so the socket opens against an address this process authorised rather than
+against a second, possibly different, answer to a second lookup. FlareSolverr and Crawlee fetch out of process, and
+Playwright and NoVNC fetch through a browser the pool launches once, so all four keep pre-dispatch validation only
+and their rebinding window is accepted residual risk. Both halves are recorded in
+[ADR-012](../decisions/ADR-012-connect-time-address-pinning.md).
 
 The SearXNG client issues its own outbound requests, but the query is operator-configured text from the caller.
 SearXNG runs inside the trusted docker-compose network; its responses are parsed, not fetched by the service.
@@ -34,8 +47,8 @@ SearXNG runs inside the trusted docker-compose network; its responses are parsed
 2. Error-keyword scan (list in `settings.ERROR_KEYWORDS`: "Access Denied", "403 Forbidden", "Captcha", etc.).
 3. Minimum word count (`VALIDATION_MIN_WORDS`, default 10).
 4. Quality metrics: Flesch reading ease (`MIN_FLESCH_SCORE`, default 20.0) and type-token ratio
-   (`MIN_TTR`, default 0.1) via `textstat`. Errors in `textstat` are caught and logged; the content is accepted
-   if the metrics calculation fails.
+   (`MIN_TTR`, default 0.1) via `textstat`. Errors in `textstat` are caught and logged, and the content is
+   rejected when the metrics calculation fails.
 
 A strategy result is only accepted by `WebReader` if `ContentValidator.validate` returns `True`.
 
@@ -46,7 +59,7 @@ A strategy result is only accepted by `WebReader` if `ContentValidator.validate`
 `BlocklistLoader` loads the Fanboy Annoyance list from the vendored `src/assets/fanboy-annoyance.txt` and returns
 an `AdblockRules` instance; nothing is downloaded automatically. The result backs the single process-wide
 `url_validator` singleton (`src/validator/url_validator.py`), which `PlaywrightStrategy` and `CrawleeStrategy` use
-as a route filter whose `route_handler` aborts any request matching the blocklist rules — reducing noise in
+as a route filter whose `route_handler` aborts any request matching the blocklist rules - reducing noise in
 extracted content by blocking ads, trackers, and annoyance scripts before they execute in the browser. An operator
 can refresh the list from `BLOCKLIST_URL` via `POST /api/v1/blocklist/refresh`, which only takes effect if the
 download parses to at least one rule. See [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).

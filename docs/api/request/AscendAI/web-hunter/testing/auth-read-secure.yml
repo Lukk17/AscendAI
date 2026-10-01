@@ -9,7 +9,7 @@ http:
   body:
     type: json
     # Hardcoded saucedemo defaults: the inventory page + auth-only product-description markers.
-    # No secrets — saucedemo's public demo creds are hardcoded in the seed harness.
+    # No secrets - saucedemo's public demo creds are hardcoded in the seed harness.
     data: |-
       {
         "url": "https://www.saucedemo.com/inventory.html",

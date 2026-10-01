@@ -50,7 +50,7 @@ def value_error_handler(request: Request, exc: Exception) -> JSONResponse:
 def file_size_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """413 for upload / download / zip-extract size cap breaches. Distinct
     from value_error_handler because FileSizeExceededError is not a
-    ValueError subclass — clients need the 413 status to know the failure
+    ValueError subclass - clients need the 413 status to know the failure
     is request-size, not request-shape.
 
     Signature accepts `Exception` to satisfy Starlette's typing for

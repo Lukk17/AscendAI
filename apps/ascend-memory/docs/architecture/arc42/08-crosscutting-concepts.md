@@ -89,8 +89,8 @@ mem0 method. See [ADR-006](../decisions/ADR-006-mem0ai-2x-upgrade.md).
 Errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with
 `Content-Type: application/problem+json`. `ValueError` raised anywhere in the request lifecycle (unknown provider,
 missing API key, empty text, schema violation in the service layer) maps to `400` with `detail` carrying the
-service-authored message. Unhandled exceptions map to `500` with `detail` omitted — only the request path is
-surfaced — so upstream stack traces and DSNs never reach the caller. The full exception is logged with
+service-authored message. Unhandled exceptions map to `500` with `detail` omitted - only the request path is
+surfaced - so upstream stack traces and DSNs never reach the caller. The full exception is logged with
 `logger.exception` and correlated by `X-Request-ID`.
 
 `AscendMemoryClient.search` re-raises upstream failures (was previously swallowed and returned `[]`); the global

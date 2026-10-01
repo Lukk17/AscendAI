@@ -26,6 +26,7 @@ def _make_session(json_payload: dict) -> MagicMock:
 @pytest.mark.asyncio
 async def test_flaresolverr_saves_cookies_without_cf_clearance():
     """Auth cookies like li_at (no cf_clearance) must now be persisted."""
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -39,6 +40,8 @@ async def test_flaresolverr_saves_cookies_without_cf_clearance():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -49,6 +52,7 @@ async def test_flaresolverr_saves_cookies_without_cf_clearance():
     ):
         await FlareSolverrStrategy().extract("https://linkedin.com/feed")
 
+    # then
     mock_save.assert_awaited_once()
     call_args = mock_save.call_args
     cookies_arg: dict = call_args.args[1]
@@ -59,6 +63,7 @@ async def test_flaresolverr_saves_cookies_without_cf_clearance():
 @pytest.mark.asyncio
 async def test_flaresolverr_saves_cookies_with_cf_clearance():
     """Cloudflare cookies must still be saved (regression guard)."""
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -69,6 +74,8 @@ async def test_flaresolverr_saves_cookies_with_cf_clearance():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -79,12 +86,14 @@ async def test_flaresolverr_saves_cookies_with_cf_clearance():
     ):
         await FlareSolverrStrategy().extract("https://example.com")
 
+    # then
     mock_save.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_does_not_save_when_cookies_empty():
     """When FlareSolverr returns an empty cookie list, no save should happen."""
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -95,6 +104,8 @@ async def test_flaresolverr_does_not_save_when_cookies_empty():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -105,12 +116,14 @@ async def test_flaresolverr_does_not_save_when_cookies_empty():
     ):
         await FlareSolverrStrategy().extract("https://example.com")
 
+    # then
     mock_save.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_flaresolverr_injects_stored_cookies_into_payload():
     """Stored auth cookies must be injected into the FlareSolverr request payload."""
+    # given
     session = _make_session(
         {
             "status": "ok",
@@ -121,6 +134,8 @@ async def test_flaresolverr_injects_stored_cookies_into_payload():
             },
         }
     )
+
+    # when
     with (
         patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
         patch(
@@ -134,6 +149,7 @@ async def test_flaresolverr_injects_stored_cookies_into_payload():
     ):
         await FlareSolverrStrategy().extract("https://linkedin.com")
 
+    # then
     # Verify the payload sent to FlareSolverr contains the cookie array
     posted_payload = session.post.call_args.kwargs.get("json") or session.post.call_args.args[1]
     assert "cookies" in posted_payload

@@ -33,14 +33,39 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("ocr_process tool is advertised", function () {
+        test("The four job tools are advertised", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
-            const tool = envelope.result.tools.find(function (t) { return t.name === "ocr_process"; });
+            const names = envelope.result.tools.map(function (t) { return t.name; }).sort();
+            expect(names).to.include.members(["ocr_cancel_job", "ocr_job_status", "ocr_list_jobs", "ocr_submit"]);
+        });
+        test("ocr_submit takes a URI and an optional language", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const tool = envelope.result.tools.find(function (t) { return t.name === "ocr_submit"; });
             expect(tool).to.be.ok;
             expect(tool.inputSchema.properties).to.have.property("file_uri");
             expect(tool.inputSchema.properties).to.have.property("lang");
+        });
+        test("The status and cancel tools take an identifier", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            ["ocr_job_status", "ocr_cancel_job"].forEach(function (name) {
+                const tool = envelope.result.tools.find(function (t) { return t.name === name; });
+                expect(tool).to.be.ok;
+                expect(tool.inputSchema.properties).to.have.property("job_id");
+            });
+        });
+        test("The removed synchronous tool is not advertised under any name", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const names = envelope.result.tools.map(function (t) { return t.name; });
+            expect(names).to.not.include("ocr_process");
+            expect(names.filter(function (n) { return n.indexOf("process") >= 0; })).to.be.empty;
         });
 
 settings:

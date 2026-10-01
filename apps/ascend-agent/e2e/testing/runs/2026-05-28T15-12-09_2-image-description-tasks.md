@@ -29,7 +29,7 @@ Copy this file to `runs/<UTC-timestamp>_2-image-description-tasks.md` before sta
 
 ## Result summary
 
-All four Expected assertions passed. The Bruno run returned HTTP 200 in 27.5 s. The response `content` field contained a multi-section, multi-paragraph description referencing the anime-style character's spiky blond hair, electric blue glowing eyes, dark high-collared jacket, neon blue chest piece with geometric circuit-like designs, and the nighttime cityscape background — all directly matching the subject of `image.png`. The response was not a refusal; it was a detailed, specific visual analysis, confirming that the image bytes reached the vision-capable model (gpt-4o via OpenAI).
+All four Expected assertions passed. The Bruno run returned HTTP 200 in 27.5 s. The response `content` field contained a multi-section, multi-paragraph description referencing the anime-style character's spiky blond hair, electric blue glowing eyes, dark high-collared jacket, neon blue chest piece with geometric circuit-like designs, and the nighttime cityscape background - all directly matching the subject of `image.png`. The response was not a refusal; it was a detailed, specific visual analysis, confirming that the image bytes reached the vision-capable model (gpt-4o via OpenAI).
 
 Input tokens: ~6700 (as reported in response metadata: promptTokens=6675)
 

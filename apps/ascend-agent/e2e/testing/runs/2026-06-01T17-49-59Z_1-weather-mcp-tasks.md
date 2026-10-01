@@ -29,7 +29,7 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 
 ## Result summary
 
-Bruno ran `weather-mcp-prompt.yml` against the live stack and received HTTP 200 in ~4.9 s. The response `content` field read: "Here's the current weather in **Warsaw**: Temperature: 17.1°C, Wind: 5.4 km/h from ESE, Conditions: Mainly clear (WMO code 1), Is Day: Yes." All four Expected assertions pass: the status was 200, a numeric temperature value (17.1°C) was present, a weather condition word ("Mainly clear") was present, and no refusal phrases appeared. The MCP tool was demonstrably invoked — the agent returned live weather data from WeatherMCP, not a canned refusal.
+Bruno ran `weather-mcp-prompt.yml` against the live stack and received HTTP 200 in ~4.9 s. The response `content` field read: "Here's the current weather in **Warsaw**: Temperature: 17.1°C, Wind: 5.4 km/h from ESE, Conditions: Mainly clear (WMO code 1), Is Day: Yes." All four Expected assertions pass: the status was 200, a numeric temperature value (17.1°C) was present, a weather condition word ("Mainly clear") was present, and no refusal phrases appeared. The MCP tool was demonstrably invoked - the agent returned live weather data from WeatherMCP, not a canned refusal.
 
 Input tokens:
 

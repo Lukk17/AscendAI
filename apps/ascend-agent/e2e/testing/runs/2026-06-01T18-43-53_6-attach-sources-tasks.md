@@ -19,7 +19,7 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 ### Reset state
 
 - [x] Registered MinIO alias `local` inside the container
-- [x] Dropped `documents/pierogi-recipe.docx` from MinIO (object already absent — spec 5 post-run cleanup had already removed it; rm exit 1 is expected and idempotent)
+- [x] Dropped `documents/pierogi-recipe.docx` from MinIO (object already absent - spec 5 post-run cleanup had already removed it; rm exit 1 is expected and idempotent)
 - [x] Removed `int_metadata_store` rows for the pierogi fixture
 - [x] Wiped Qdrant points for `documents/pierogi-recipe.docx`
 - [x] Truncated `chat_history` rows for user `frostyAttachSourcesTest`
@@ -56,7 +56,7 @@ Run regardless of Run-step verdict (idempotent; honours Group A hermetic contrac
 
 ## Result summary
 
-All six Expected assertions passed. Step 1 returned HTTP 200 with `uploaded` containing `documents/pierogi-recipe.docx`. Step 2 returned HTTP 200 with `indexed=3, failed=0`. Step 3 returned HTTP 200 with a `sources` array of 3 entries; every entry carried non-empty `name`, `mimeType`, `downloadUrl`, and `expiresAt`; all three `downloadUrl` values used the host-reachable `http://localhost:9070/` prefix — confirming `app.s3.public-endpoint` is active. Step 4 followed the presigned URL for `pierogi-recipe.docx` and received HTTP 200 with a 13 563-byte payload matching the `sizeBytes` field. Post-run cleanup removed the pierogi fixture from MinIO, Qdrant, Postgres `int_metadata_store`, `chat_history`, and Redis, leaving the RAG state hermetically clean for spec 7.
+All six Expected assertions passed. Step 1 returned HTTP 200 with `uploaded` containing `documents/pierogi-recipe.docx`. Step 2 returned HTTP 200 with `indexed=3, failed=0`. Step 3 returned HTTP 200 with a `sources` array of 3 entries; every entry carried non-empty `name`, `mimeType`, `downloadUrl`, and `expiresAt`; all three `downloadUrl` values used the host-reachable `http://localhost:9070/` prefix - confirming `app.s3.public-endpoint` is active. Step 4 followed the presigned URL for `pierogi-recipe.docx` and received HTTP 200 with a 13 563-byte payload matching the `sizeBytes` field. Post-run cleanup removed the pierogi fixture from MinIO, Qdrant, Postgres `int_metadata_store`, `chat_history`, and Redis, leaving the RAG state hermetically clean for spec 7.
 
 Input tokens: ~4500
 

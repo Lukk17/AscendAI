@@ -313,7 +313,224 @@ cd docs/api/request/AscendAI
 bru run "ascend-agent/testing" --env ascend-local
 ```
 
-#### 4. Verify persistence and memory
+#### 4. Contract test with ascend-ocr
+
+[AscendOcrClientPactTest](src/test/java/com/lukk/ascend/ai/agent/service/ingestion/client/AscendOcrClientPactTest.java)
+is the consumer half of a Pact contract between this service (`ascend-agent`) and ascend-ocr. It drives the real
+`AscendOcrClient` against a Pact mock server and writes every interaction the client depends on to
+`contracts/pacts/ascend-agent-ascend-ocr.json` at the repository root, overwriting the previous file. The ascend-ocr
+provider verification replays that file against the real service. It runs as part of `test` and needs no Docker and no
+running service. See [contracts/README.md](../../contracts/README.md).
+
+Run only the contract test, from `apps/ascend-agent`.
+
+Bash:
+
+```bash
+./gradlew test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"
+```
+
+PowerShell:
+
+```powershell
+.\gradlew.bat test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"
+```
+
+##### Recorded OCR result fixture
+
+[AscendOcrClientLiveContractTest](src/test/java/com/lukk/ascend/ai/agent/service/ingestion/client/AscendOcrClientLiveContractTest.java)
+hands `AscendOcrClient` a result object recorded from a live ascend-ocr, so the text the client indexes is text the
+engine really produced. The fixture is
+[src/test/resources/ascend-ocr/real-ocr-result.md](src/test/resources/ascend-ocr/real-ocr-result.md). It is the
+Markdown object ascend-ocr writes to the `ocr-results` bucket for one finished job, byte for byte, because that object
+is the only part of a finished job the client reads. `.gitattributes` keeps it on LF line endings, the same bytes
+ascend-ocr writes.
+
+The committed bytes were captured on 2026-10-01 from ascend-ocr 0.3.0 with the procedure below: 31 lines of the
+Polish page read with `lang=pl`. Repeat the capture whenever the OCR engine, its models or `render_markdown` in
+`apps/ascend-ocr/src/service/result_store.py` change, so the fixture stays text the current engine produces. Entry F59
+in [docs/DEFECT_REGISTER.md](../../docs/DEFECT_REGISTER.md) records the run.
+
+The capture reads one page on the OCR engine, so it runs alone, with no end-to-end runner of any suite active. It needs:
+
+- ascend-ocr on port 7022, answering `ready` on `/ready`.
+- The object store on port 9070. The compose stack signs result links for `http://localhost:9070`
+  (`OCR_RESULT_S3_PUBLIC_ENDPOINT`), so the link works from the host.
+- `curl`. In PowerShell, call it as `curl.exe`, because `curl` in Windows PowerShell 5.1 is an alias for
+  `Invoke-WebRequest`. On Unix, `jq` reads the answers.
+
+The input is fixed: `apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1-polish.png`, language `pl`, quality
+`high`, `straighten` off. These are the calls the Bruno requests `ocr/testing/ocr-polish.yml`,
+`ocr/ocr-job-status.yml` and `ocr/testing/ocr-polish-result.yml` in `docs/api/request/AscendAI/` make. Bruno cannot
+write the object's raw bytes to a file, so the capture uses curl. Run every command from the repository root. Run
+steps 3 to 7 in one shell session, because steps 4 to 7 read the job identifier and the link that steps 3 and 5 keep
+in shell variables.
+
+1. Record the service version, which goes into the register entry that records the capture.
+
+Bash:
+
+```bash
+curl -sS http://localhost:7022/health
+```
+
+PowerShell:
+
+```powershell
+curl.exe -sS http://localhost:7022/health
+```
+
+2. Confirm the service is ready. The answer must say `"status":"ready"`.
+
+Bash:
+
+```bash
+curl -sS http://localhost:7022/ready
+```
+
+PowerShell:
+
+```powershell
+curl.exe -sS http://localhost:7022/ready
+```
+
+3. Submit the page and keep the job identifier. The variable must hold a 22-character identifier. If it is empty, the
+   service refused the submission, so print the answer without the pipe and read its `code`.
+
+Bash:
+
+```bash
+JOB_ID=$(curl -sS -F "file=@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1-polish.png;type=image/png" -F "lang=pl" -F "quality=high" -F "straighten=false" http://localhost:7022/v1/ocr/jobs | jq -r .job_id)
+```
+
+PowerShell:
+
+```powershell
+$jobId = (curl.exe -sS -F "file=@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1-polish.png;type=image/png" -F "lang=pl" -F "quality=high" -F "straighten=false" http://localhost:7022/v1/ocr/jobs | ConvertFrom-Json).job_id
+```
+
+4. Read the job state. Repeat after the `poll_after_seconds` the answer names until `state` is `succeeded`. Then check
+   that `result.language` is `pl`, `result.quality` is `high` and `result.straighten` is `false`. If the state is
+   `failed` or `cancelled`, stop. Submit again only when `retryable` is `true`.
+
+Bash:
+
+```bash
+curl -sS "http://localhost:7022/v1/ocr/jobs/$JOB_ID"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -sS "http://localhost:7022/v1/ocr/jobs/$jobId"
+```
+
+5. Keep the time-limited link to the stored object. It expires with the job record, one hour after the reading
+   finished at the default retention.
+
+Bash:
+
+```bash
+RESULT_URL=$(curl -sS "http://localhost:7022/v1/ocr/jobs/$JOB_ID" | jq -r .result.url)
+```
+
+PowerShell:
+
+```powershell
+$resultUrl = (curl.exe -sS "http://localhost:7022/v1/ocr/jobs/$jobId" | ConvertFrom-Json).result.url
+```
+
+6. Save the object over the fixture. `curl -o` writes the bytes exactly as the store holds them, with LF line endings.
+   Never use `>` for this in PowerShell: it decodes the output into lines and writes them back with CRLF endings.
+
+Bash:
+
+```bash
+curl -sS -f -o apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md "$RESULT_URL"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -sS -f -o apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md $resultUrl
+```
+
+7. Delete the job, which also removes its stored object, the same way `AscendOcrClient` cleans up after itself.
+
+Bash:
+
+```bash
+curl -sS -X DELETE "http://localhost:7022/v1/ocr/jobs/$JOB_ID"
+```
+
+PowerShell:
+
+```powershell
+curl.exe -sS -X DELETE "http://localhost:7022/v1/ocr/jobs/$jobId"
+```
+
+8. Check the file carries no carriage return. Bash must print `0`, PowerShell must print `False`.
+
+Bash:
+
+```bash
+grep -c $'\r' apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md
+```
+
+PowerShell:
+
+```powershell
+(Get-Content -Raw apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md).Contains("`r")
+```
+
+9. Check that the first line is `## Page 1` and that the text still carries `Aenaria` and `Halen Veyr`, which the test
+   asserts. The first command must print `## Page 1`. Bash must print a number above `0` for each word, PowerShell must
+   print `True`. If a word the test asserts is gone, change the assertion in the same commit as the fixture, to a word
+   the new text really carries.
+
+Bash:
+
+```bash
+head -n 1 apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md
+```
+
+```bash
+grep -c "Aenaria" apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md
+```
+
+```bash
+grep -c "Halen Veyr" apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md
+```
+
+PowerShell:
+
+```powershell
+Get-Content apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md -TotalCount 1
+```
+
+```powershell
+(Get-Content -Raw apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md).Contains("Aenaria")
+```
+
+```powershell
+(Get-Content -Raw apps/ascend-agent/src/test/resources/ascend-ocr/real-ocr-result.md).Contains("Halen Veyr")
+```
+
+10. Run the test, from `apps/ascend-agent`.
+
+Bash:
+
+```bash
+./gradlew test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientLiveContractTest"
+```
+
+PowerShell:
+
+```powershell
+.\gradlew.bat test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientLiveContractTest"
+```
+
+#### 5. Verify persistence and memory
 
 **Redis (chat history and instructions).**
 
@@ -396,8 +613,18 @@ app:
 ```
 
 The readiness banner lists each configured MCP server with a `[Connected]` or `[FAILED]` status marker under
-`MCP servers:`. FAILED clients' tools are not advertised to the LLM; the agent still serves requests using the
-remaining providers and MCP servers.
+`MCP servers:`, followed by an `Aggregate: N/M connected` counter. FAILED clients' tools are not advertised to the
+LLM; the agent still serves requests using the remaining providers and MCP servers.
+
+`spring.ai.mcp.client.toolcallback.enabled` is set to `false` so Spring AI's own unfiltered tool-callback provider
+never enters the context. `FilteredToolCallbackProvider` is then the only `ToolCallbackProvider` bean, and a FAILED
+server's tools have no route to the model. A client whose session goes stale is reconnected once per tool listing,
+serialised per client, and demoted to `FAILED` when that reconnect or the retry after it also fails.
+
+The tool listing is cached for `app.mcp.tool-cache.ttl` (default `60s`), keyed on the set of connected servers, so a
+prompt does not pay one `listTools()` round trip per server. A server dropping out or reconnecting changes the key and
+the next prompt relists at once. An MCP `tools/list_changed` notification also clears the cache. `0s` turns the cache
+off. See [ADR-010](docs/architecture/decisions/ADR-010-mcp-tool-listing-cache.md).
 
 ---
 

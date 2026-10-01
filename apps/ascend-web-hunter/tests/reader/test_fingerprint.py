@@ -36,7 +36,10 @@ def _make_browser_and_context(html: str = "<html><body>content</body></html>") -
 
 def test_default_fingerprint_is_internally_consistent() -> None:
     """locale, timezone, and geolocation must all agree on the same real-world location."""
+    # when
     fp = get_default_fingerprint()
+
+    # then
     assert isinstance(fp, Fingerprint)
     assert fp.locale.startswith("en")
     assert "America" in fp.timezone_id or "US" in fp.timezone_id or "New_York" in fp.timezone_id
@@ -48,13 +51,19 @@ def test_default_fingerprint_is_internally_consistent() -> None:
 
 
 def test_fingerprint_ua_not_empty() -> None:
+    # when
     fp = get_default_fingerprint()
+
+    # then
     assert fp.user_agent
     assert "Chrome" in fp.user_agent or "Firefox" in fp.user_agent or "Safari" in fp.user_agent
 
 
 def test_fingerprint_viewport_is_desktop() -> None:
+    # when
     fp = get_default_fingerprint()
+
+    # then
     assert fp.viewport_width >= 1280
     assert fp.viewport_height >= 720
 
@@ -62,8 +71,11 @@ def test_fingerprint_viewport_is_desktop() -> None:
 @pytest.mark.asyncio
 async def test_playwright_uses_fingerprint_locale_and_timezone() -> None:
     """PlaywrightStrategy must pass the Fingerprint's locale and timezone to new_context."""
+    # given
     fp = get_default_fingerprint()
     browser, _ = _make_browser_and_context()
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
@@ -92,6 +104,7 @@ async def test_playwright_uses_fingerprint_locale_and_timezone() -> None:
         strategy = PlaywrightStrategy(lambda: fp.user_agent, _make_url_validator(), fingerprint=fp)
         await strategy.get_html("https://example.com")
 
+    # then
     call_kwargs = browser.new_context.call_args.kwargs
     assert call_kwargs["locale"] == fp.locale
     assert call_kwargs["timezone_id"] == fp.timezone_id
@@ -101,8 +114,11 @@ async def test_playwright_uses_fingerprint_locale_and_timezone() -> None:
 @pytest.mark.asyncio
 async def test_playwright_no_proxy_when_unconfigured() -> None:
     """When proxy is not configured, new_context must NOT receive a 'proxy' kwarg."""
+    # given
     fp = get_default_fingerprint()
     browser, _ = _make_browser_and_context()
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
@@ -131,6 +147,7 @@ async def test_playwright_no_proxy_when_unconfigured() -> None:
         strategy = PlaywrightStrategy(lambda: fp.user_agent, _make_url_validator(), fingerprint=fp)
         await strategy.get_html("https://example.com")
 
+    # then
     call_kwargs = browser.new_context.call_args.kwargs
     assert "proxy" not in call_kwargs
 
@@ -138,9 +155,12 @@ async def test_playwright_no_proxy_when_unconfigured() -> None:
 @pytest.mark.asyncio
 async def test_playwright_passes_proxy_when_configured() -> None:
     """When proxy is configured, new_context must receive the proxy kwarg."""
+    # given
     fp = get_default_fingerprint()
     browser, _ = _make_browser_and_context()
     proxy = {"server": "socks5://proxy.internal:1080"}
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
@@ -169,5 +189,6 @@ async def test_playwright_passes_proxy_when_configured() -> None:
         strategy = PlaywrightStrategy(lambda: fp.user_agent, _make_url_validator(), fingerprint=fp)
         await strategy.get_html("https://example.com")
 
+    # then
     call_kwargs = browser.new_context.call_args.kwargs
     assert call_kwargs.get("proxy") == proxy

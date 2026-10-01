@@ -25,10 +25,10 @@ Spec: [9-prompt-cache-anthropic-test.md](9-prompt-cache-anthropic-test.md)
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) — warm-cache path: cacheReadInputTokens=3744 satisfies spec's OR condition
-- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) — warm-cache path: spec explicitly accepts cacheReadInputTokens > 0 on step 1 as equivalent evidence
+- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) - warm-cache path: cacheReadInputTokens=3744 satisfies spec's OR condition
+- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) - warm-cache path: spec explicitly accepts cacheReadInputTokens > 0 on step 1 as equivalent evidence
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.cacheReadInputTokens > 0` — observed 3744
+- [x] Step 2: `usage.cacheReadInputTokens > 0` - observed 3744
 
 ### Verdict
 
@@ -38,7 +38,7 @@ Spec: [9-prompt-cache-anthropic-test.md](9-prompt-cache-anthropic-test.md)
 
 Both calls returned HTTP 200. Step 1 entered the warm-cache path: `cache_creation_input_tokens=0` and `cache_read_input_tokens=3744`. The spec explicitly states that on a warm-cache cold-test (a previous identical prompt fired within the last ~5 minutes) a read instead of a creation is observed, and that either path proves the `cache_control` directive was accepted. Step 2 confirmed `cache_read_input_tokens=3744 > 0`, matching step 1's read count exactly as the spec predicts (the cached chunk did not grow between the two calls). Both responses are structurally valid JSON with `content` and `metadata.usage` fields populated.
 
-Cache creation tokens (call 1): 0 (warm-cache path — read tokens observed instead)
+Cache creation tokens (call 1): 0 (warm-cache path - read tokens observed instead)
 
 Cache read tokens (call 2): 3744
 

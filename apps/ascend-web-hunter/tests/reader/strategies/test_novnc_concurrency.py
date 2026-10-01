@@ -49,6 +49,7 @@ def _reset_novnc_flow_lock():
 
 @pytest.mark.asyncio
 async def test_second_concurrent_flow_is_rejected_then_a_new_flow_succeeds_after_release():
+    # given
     factory = _build_playwright_factory()
 
     with (
@@ -58,6 +59,8 @@ async def test_second_concurrent_flow_is_rejected_then_a_new_flow_succeeds_after
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_COOKIE_SYNC_POLL_SECONDS", 0.05),
     ):
         first = NoVNCStrategy("default")
+
+        # when / then
         with pytest.raises(HumanInterventionRequiredException):
             await first.get_html("http://site-a.example")
 
@@ -85,6 +88,7 @@ async def test_leaked_lock_self_heals_after_its_lease_expires():
     """A flow that wedges and never reaches its finally block (a hung
     browser subprocess, no exception raised) must not make the endpoint
     permanently unavailable: once the lease elapses, a new flow proceeds."""
+    # given
     hang_forever = asyncio.Event()
 
     async def wedged_monitor(url, intervention_type, profile=None):
@@ -113,4 +117,6 @@ async def test_leaked_lock_self_heals_after_its_lease_expires():
     # Let the two wedged monitor tasks (from `wedged` and `recovered`) exit
     # cleanly instead of leaking pending tasks past the end of the test.
     hang_forever.set()
+
+    # when / then
     await asyncio.sleep(0)

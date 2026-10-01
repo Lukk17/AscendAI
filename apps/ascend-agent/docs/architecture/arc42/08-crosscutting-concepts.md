@@ -35,16 +35,25 @@ Currently registered MCP services:
 
 The agent sets `spring.ai.mcp.client.initialized=false` so Spring AI's `McpClientAutoConfiguration` builds each
 `McpSyncClient` without calling `.initialize()`. The `McpClientStartupInitializer` component listens for
-`ApplicationReadyEvent` and performs the initialisation loop itself — calling `client.initialize()` on each client
+`ApplicationReadyEvent` and performs the initialisation loop itself - calling `client.initialize()` on each client
 with a per-client timeout (default `5s`, configurable via `app.mcp.startup.init-timeout`).
 
 If a client fails to initialise (connection refused, timeout, or any other error), it is recorded as `FAILED` in the
-`McpClientStatusRegistry`. A `FAILED` client's error detail is logged at `DEBUG` only; the operator-visible readiness
-banner shows `[FAILED]` next to the connection URL.
+`McpClientStatusRegistry`. Name resolution, URL resolution, and the handshake all sit inside the per-client
+try/catch, so nothing escapes the `ApplicationReadyEvent` listener and fails the application start. A `FAILED`
+client's error detail is logged at `DEBUG` only; the operator-visible readiness banner shows `[FAILED]` next to the
+connection URL.
 
 The `FilteredToolCallbackProvider` wraps the full client list. At `getToolCallbacks()` call time it builds a
 `SyncMcpToolCallbackProvider` over only the `CONNECTED` clients, so the LLM never receives a tool definition that
-routes to a `FAILED` client.
+routes to a `FAILED` client. `spring.ai.mcp.client.toolcallback.enabled` is `false`, which keeps Spring AI's own
+unfiltered provider out of the context entirely, so the filter cannot be bypassed by an injection point that
+collects `List<ToolCallbackProvider>`.
+
+A client whose MCP session has gone stale since boot surfaces as a runtime exception from `listTools()`. The
+provider reconnects it once and retries discovery, serialised per client so two concurrent prompts cannot drive
+`initialize()` on the same client at the same time. A client that still fails after that is demoted to `FAILED` in
+the registry, so it drops out of the connected set instead of costing every later request a failed discovery.
 
 The readiness banner shows one line per configured MCP server under `MCP servers:`, with `[Connected]` or `[FAILED]`
 status markers and an `Aggregate: N/M connected` summary line. This replaces the previous `MCP tools:` single-line

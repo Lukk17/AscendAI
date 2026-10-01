@@ -47,13 +47,20 @@ def chunked_audio(audio_path: str, chunk_seconds: int) -> Generator[list[str], N
     args = [
         settings.FFMPEG_PATH,
         "-y",
-        "-i", audio_path,
-        "-f", "segment",
-        "-segment_time", str(chunk_seconds),
-        "-ar", str(_SAMPLE_RATE),
-        "-ac", str(_CHANNELS),
-        "-sample_fmt", _SAMPLE_FMT,
-        "-loglevel", "error",
+        "-i",
+        audio_path,
+        "-f",
+        "segment",
+        "-segment_time",
+        str(chunk_seconds),
+        "-ar",
+        str(_SAMPLE_RATE),
+        "-ac",
+        str(_CHANNELS),
+        "-sample_fmt",
+        _SAMPLE_FMT,
+        "-loglevel",
+        "error",
         pattern,
     ]
 
@@ -77,9 +84,7 @@ def chunked_audio(audio_path: str, chunk_seconds: int) -> Generator[list[str], N
         logger.info(f"ffmpeg produced {len(chunks)} chunks in {work_dir}")
         yield chunks
     except subprocess.TimeoutExpired as exc:
-        raise OSError(
-            f"ffmpeg segmentation timed out after {settings.FFMPEG_TIMEOUT_SECONDS}s"
-        ) from exc
+        raise OSError(f"ffmpeg segmentation timed out after {settings.FFMPEG_TIMEOUT_SECONDS}s") from exc
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
         raise OSError(f"ffmpeg segmentation failed: {stderr}") from exc

@@ -28,8 +28,8 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [ ] Step 1: `usage.nativeUsage.cache_creation_input_tokens > 0` (write to ephemeral cache) — observed 0; see note below
-- [ ] Step 1: `usage.nativeUsage.cache_read_input_tokens == 0` (or absent) — observed 3900 (nonzero); see note below
+- [ ] Step 1: `usage.nativeUsage.cache_creation_input_tokens > 0` (write to ephemeral cache) - observed 0; see note below
+- [ ] Step 1: `usage.nativeUsage.cache_read_input_tokens == 0` (or absent) - observed 3900 (nonzero); see note below
 - [x] Step 2: HTTP 200
 - [x] Step 2: `usage.nativeUsage.cache_read_input_tokens > 0`
 
@@ -66,6 +66,6 @@ Duration: 00:05:02
 
 ## Additional tasks I did
 
-- Ran the Run steps three times total instead of the spec's prescribed two. The first pass (uncaptured) established prerequisites/reset were sound but I hadn't wired up response-body capture, so I could not report exact token numbers. I reset state and reran, capturing JSON output via `bru run -o <file> -f json` to `SCRATCHPAD`; the first captured-output file (`step1.json`) disappeared from disk immediately after Bruno reported writing it (cause not established — not investigated further since a retry with a different filename worked). I reset state a third time and ran the final clean step-1/step-2 pair whose numbers are reported above. All three passes used the spec's own Reset state and Post-run cleanup commands, so no state was left dangling between attempts; the run record above reflects only the final, fully-captured pair.
+- Ran the Run steps three times total instead of the spec's prescribed two. The first pass (uncaptured) established prerequisites/reset were sound but I hadn't wired up response-body capture, so I could not report exact token numbers. I reset state and reran, capturing JSON output via `bru run -o <file> -f json` to `SCRATCHPAD`; the first captured-output file (`step1.json`) disappeared from disk immediately after Bruno reported writing it (cause not established - not investigated further since a retry with a different filename worked). I reset state a third time and ran the final clean step-1/step-2 pair whose numbers are reported above. All three passes used the spec's own Reset state and Post-run cleanup commands, so no state was left dangling between attempts; the run record above reflects only the final, fully-captured pair.
 - Because of the repeated prior invocations of the identical prompt within the ~5 minute Anthropic ephemeral-cache TTL, step 1 of the final pair landed on a cache read rather than a cache write. This is the spec's own documented alternate path (see "Expected" bullet 1), not a deviation I introduced, but it is worth flagging since the template's per-item checklist (as opposed to the spec's prose) was written assuming a true cold start.
 - Deleted the scratchpad JSON capture files after use (`SCRATCHPAD/final-step1.json`, `SCRATCHPAD/final-step2.json`, `SCRATCHPAD/step1b.json`).

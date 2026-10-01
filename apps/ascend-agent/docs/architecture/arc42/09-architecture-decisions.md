@@ -13,3 +13,4 @@ All significant architecture decisions are documented as Architecture Decision R
 | [ADR-007](../decisions/ADR-007-ingestion-auto-default-off.md)                          | Ingestion auto-poller off by default.                                             | Accepted |
 | [ADR-008](../decisions/ADR-008-mcp-startup-tolerance.md)                              | MCP startup tolerance via `initialized=false` flag and deferred init loop.        | Accepted |
 | [ADR-009](../decisions/ADR-009-docling-bounded-retry-fanout-cap.md)                   | Docling conversion: bounded retry on connection failures, fan-out capped at 4.     | Accepted |
+| [ADR-010](../decisions/ADR-010-mcp-tool-listing-cache.md)                             | MCP tool listing cached per connected-server set, 60 s expiry, notification invalidation. | Accepted |

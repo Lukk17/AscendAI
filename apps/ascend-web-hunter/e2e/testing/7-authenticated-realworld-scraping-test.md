@@ -4,11 +4,11 @@
 
 Two things, both against **real sites** (no mocks):
 
-1. **A categorized real-world URL matrix** — each URL asserts its **expected verdict** (`success` / `intervention` /
+1. **A categorized real-world URL matrix** - each URL asserts its **expected verdict** (`success` / `intervention` /
    `hard-fail`). Stable canaries are **gated** (must match); live sites are **best-effort** (the response must be a
    valid terminal verdict, but which one is recorded, not gated). The retail anti-bot rows add a content gate on the
    success branch: a success must carry the requested product page, never an anti-bot interstitial or a block page.
-2. **Login → session reuse** (automated, saucedemo) — a **2-call before/after**: read the page **(1) blocked** (no
+2. **Login → session reuse** (automated, saucedemo) - a **2-call before/after**: read the page **(1) blocked** (no
    session) returns no logged-in content, then **(2) after** a scripted login + session seed returns logged-in
    content. Proves the auth session is **stored and reused**.
 
@@ -18,46 +18,46 @@ solve leaves behind. This spec has no human step and runs fully automated.
 
 ### Contract (how the service signals each verdict)
 
-- **success** — HTTP `200`, body `status="success"`, non-empty content.
-- **intervention** — HTTP `428 Precondition Required`, body `status="human_intervention_required"` + a non-empty
+- **success** - HTTP `200`, body `status="success"`, non-empty content.
+- **intervention** - HTTP `428 Precondition Required`, body `status="human_intervention_required"` + a non-empty
   `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
-- **hard-fail** — a non-2xx the SSRF / host guard fail-closes with (e.g. HTTP `400` for an unresolvable host).
+- **hard-fail** - a non-2xx the SSRF / host guard fail-closes with (e.g. HTTP `400` for an unresolvable host).
 - busy, not a verdict: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
   meaning another row's NoVNC intervention still holds the single shared browser. The runner reads the
   `Retry-After` header and the `holder_url` from the folder run's JSON output file (see Run), waits that many
   seconds, and re-runs only that row's own request file, up to 3 attempts in total, recording each attempt and
   the `holder_url` from each 409 body in the run record. Only after the third 409 is the row a FAIL.
 
-### Part 1 — Real-world URL matrix (single-call verdict)
+### Part 1 - Real-world URL matrix (single-call verdict)
 
 | # | URL | Forces | Expected | Gate |
 | :- | :-- | :----- | :------- | :--- |
-| **Easy — curl_cffi static + extraction** | | | | |
+| **Easy - curl_cffi static + extraction** | | | | |
 | a | `https://example.com/` | static fetch | success (`"example domain"`) | **gated** |
 | b | `https://en.wikipedia.org/wiki/Web_scraping` | static article | success (`"web scraping"`) | **gated** |
 | c | `https://books.toscrape.com/` | scraping sandbox | success | **gated** |
 | d | `https://news.ycombinator.com/` | minimal static HTML | success | **gated** |
-| **Medium — Playwright JS render** | | | | |
+| **Medium - Playwright JS render** | | | | |
 | e | `https://quotes.toscrape.com/js/` | JS sandbox | success (`"The world as we have created it"`) | **gated** |
 | f | `https://wp.pl` | heavy news portal | success or intervention | best-effort |
 | g | `https://old.reddit.com/r/programming/` | server-rendered Reddit | success or intervention | best-effort |
 | h | `https://stackoverflow.com/questions` | server-rendered Q&A | success or intervention | best-effort |
 | i | `https://github.com/python/cpython` | light-JS repo page | success or intervention | best-effort |
 | j | `https://www.bbc.com/news` | news + JS | success or intervention | best-effort |
-| **Hard — SPA + anti-bot** | | | | |
+| **Hard - SPA + anti-bot** | | | | |
 | k | `https://www.reddit.com/` | React SPA + bot checks | success or intervention | best-effort |
 | l | `https://justjoin.it/job-offers/remote/java?employment-type=b2b&experience-level=senior&with-salary=yes` | Next.js SPA | success or intervention | best-effort |
 | m | `https://www.glassdoor.com/Job/index.htm` | aggressive anti-bot | success or intervention | best-effort |
-| **Very hard — enterprise WAF** | | | | |
+| **Very hard - enterprise WAF** | | | | |
 | n | `https://nowsecure.nl` | Cloudflare challenge | success or intervention | best-effort |
 | o | `https://www.indeed.com/jobs?q=AI&l=usa&radius=25&fromage=7&from=searchOnDesktopSerp&start=20` | DataDome-class | success or intervention | best-effort |
 | p | `https://www.g2.com/` | Cloudflare-hard | success or intervention | best-effort |
-| **Impossible — negative** | | | | |
+| **Impossible - negative** | | | | |
 | q | `https://this-domain-does-not-exist-xyzzy.invalid/` | unresolvable host → fail-closed | hard-fail (HTTP 400) | **gated** |
-| **Login wall — intervention-only (not solved here)** | | | | |
+| **Login wall - intervention-only (not solved here)** | | | | |
 | s | `https://www.linkedin.com/jobs/search/?keywords=Java%20Developer&location=United%20States&f_AL=true` | login wall → NoVNC | success or intervention | best-effort |
 | t | `https://secure.indeed.com/auth?co=US&hl=en_US&branding=page-two-signin` | login wall → NoVNC | success or intervention | best-effort |
-| **Retail anti-bot — content-gated (a success must be the requested product page)** | | | | |
+| **Retail anti-bot - content-gated (a success must be the requested product page)** | | | | |
 | u | `{{scrap_url_allegro}}` (Allegro offer) | hard block page, no solvable challenge | success or intervention | best-effort + content-gated |
 | v | `{{scrap_url_amazon}}` (amazon.pl product) | click-through interstitial | success or intervention | best-effort + content-gated |
 | w | `{{scrap_url_amazon_com}}` (amazon.com product) | click-through interstitial | success or intervention | best-effort + content-gated |
@@ -65,14 +65,14 @@ solve leaves behind. This spec has no human step and runs fully automated.
 | y | `{{scrap_url_amazon_se}}` (amazon.se product) | click-through interstitial | success or intervention | best-effort + content-gated |
 
 > **Gated rows** (a, b, c, d, e, q) hard-assert their verdict. **Best-effort rows** assert only that the response is a
-> *valid terminal verdict* — either (`200` + `success` + content) **or** (`428` + `human_intervention_required` +
-> `vnc_url`) — never gated on which; a malformed/5xx/empty response fails them. The login behavior is fully covered by
+> *valid terminal verdict* - either (`200` + `success` + content) **or** (`428` + `human_intervention_required` +
+> `vnc_url`) - never gated on which; a malformed/5xx/empty response fails them. The login behavior is fully covered by
 > Part 2 (saucedemo, a real login + real session); LinkedIn/indeed stay here as best-effort rows (real scripted login
 > to them violates ToS / risks bans).
 >
 > **Content-gated rows** (u, v, w, x, y) are best-effort on *which* branch fires and hard-gated on *what a success
 > contains*. A `200` + `status="success"` that carries an anti-bot interstitial instead of the requested page fails
-> the row — it does not get recorded as "a valid verdict". See "Retail anti-bot rows" below.
+> the row - it does not get recorded as "a valid verdict". See "Retail anti-bot rows" below.
 
 ### Retail anti-bot rows (u, v, w, x, y)
 
@@ -86,7 +86,7 @@ is exactly what the bug produces. Each row therefore adds a second assertion tha
   (u). This half is wording-independent, so it survives Amazon rotating its interstitial copy or switching between
   the click-through and character-entry variants.
 - **Interstitial markers (must be absent).** The measured text of each locale's interstitial, plus the service's own
-  `waf_strict_phrases` and `ERROR_KEYWORDS` — the exact strings a sibling row would treat as needing intervention.
+  `waf_strict_phrases` and `ERROR_KEYWORDS` - the exact strings a sibling row would treat as needing intervention.
   Naming them turns a failure into a diagnosis rather than a bare "canary missing".
 
 Both halves were verified against captured responses: the four Amazon interstitials (fetched from each locale's
@@ -105,7 +105,7 @@ gate on.
 documented honest answer to an unsolvable challenge is the `428` intervention contract in
 `api/exception_handlers.py`, which is what row u already produces today. These rows are written against that
 behaviour. If a pending fix chooses a different shape for an honest failure, these rows will fail and that failure
-is the signal to reconcile the contract — not a licence to widen the accept-set.
+is the signal to reconcile the contract - not a licence to widen the accept-set.
 
 **Intervention handling on these rows.** Row u returns `428` on most runs, and each `428` spawns a NoVNC monitor that
 holds a headful browser for `NOVNC_TIMEOUT_SECONDS` (600 s by default). Because u is best-effort, an intervention is a
@@ -118,25 +118,25 @@ human solve.
 have on the interstitial path: a live probe of each locale's `/errors/validateCaptcha` through
 `POST /api/v2/web/read` returns HTTP `200` with `status="success"` and the interstitial as `content`. Whenever a run
 of v/w/x/y lands on an interstitial rather than the real product page, the row will FAIL until the fix that converts
-that case into an honest `428` is deployed. Row u needs no fix — Allegro's block page already escalates to
+that case into an honest `428` is deployed. Row u needs no fix - Allegro's block page already escalates to
 intervention.
 
-### Part 2 — Login → session reuse (saucedemo, AUTOMATED, 2 calls)
+### Part 2 - Login → session reuse (saucedemo, AUTOMATED, 2 calls)
 
 saucedemo.com is a **real** web app: a real form login that sets a real session cookie, captured as a real
 `storage_state` and replayed through the real browser tier. It is automatable (no human, no ban risk), so it gates
 the login-reuse behavior in CI.
 
-- **Call 1 — blocked (confirm the login wall):** read `https://www.saucedemo.com/inventory.html` with **no** session.
+- **Call 1 - blocked (confirm the login wall):** read `https://www.saucedemo.com/inventory.html` with **no** session.
   Expect HTTP 200, the content carries saucedemo's login-required message ("You can only access … when you are logged
   in") and has **none** of the authenticated-inventory product descriptions. This proves the read hit the login wall
   *before* any login is attempted.
-- **Seed:** run the harness `e2e/harness/seed_authenticated_session.py` — scripted login with saucedemo's hardcoded
+- **Seed:** run the harness `e2e/harness/seed_authenticated_session.py` - scripted login with saucedemo's hardcoded
   public credentials → capture `storage_state` → store under `session:saucedemo.com:e2e` (the key uses the
   *registrable* domain; `www.` is stripped).
-- **Call 2 — after login (fresh request):** read the same URL with `profile=e2e`. Expect HTTP 200, `status="success"`,
+- **Call 2 - after login (fresh request):** read the same URL with `profile=e2e`. Expect HTTP 200, `status="success"`,
   and content containing an **auth-only product description** (e.g. `"ringspun combed cotton"`, `"quarter-zip fleece"`,
-  `"lighting modes"`) — present only on the logged-in inventory. The stored session is **reused** through the browser
+  `"lighting modes"`) - present only on the logged-in inventory. The stored session is **reused** through the browser
   tier. (Product *titles* like "Sauce Labs Backpack" are stripped by extraction, so the markers are descriptions.)
 
 ## Prerequisites
@@ -196,13 +196,13 @@ Move into the Bruno collection root first.
 cd docs/api/request/AscendAI
 ```
 
-Part 2, Call 1 — login blocked (anonymous).
+Part 2, Call 1 - login blocked (anonymous).
 
 ```bash
 bru run "web-hunter/testing/auth-read-secure-anon.yml" --env ascend-local
 ```
 
-Part 2, Seed — scripted saucedemo login (harness not in the image; copy it in, then run).
+Part 2, Seed - scripted saucedemo login (harness not in the image; copy it in, then run).
 
 ```bash
 docker cp apps/ascend-web-hunter/e2e/harness/seed_authenticated_session.py ascend-web-hunter:/tmp/seed.py
@@ -212,7 +212,7 @@ docker cp apps/ascend-web-hunter/e2e/harness/seed_authenticated_session.py ascen
 docker exec -e PYTHONPATH=/app -w /app ascend-web-hunter python /tmp/seed.py
 ```
 
-Part 2, Call 2 — after login.
+Part 2, Call 2 - after login.
 
 ```bash
 bru run "web-hunter/testing/auth-read-secure.yml" --env ascend-local
@@ -243,7 +243,7 @@ third 409.
 
 ## Expected
 
-- **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly — a–e are `200`/`success` (+ canary where
+- **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly - a-e are `200`/`success` (+ canary where
   noted), q is the `400` hard-fail. Best-effort rows each return a valid terminal verdict (`200`/`success`/content
   **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed. A `409` with
   `status="novnc_busy"` is not a verdict: the runner reads its `Retry-After` header and `holder_url` from the
@@ -254,12 +254,12 @@ third 409.
   `content` contains the row's product-identity canary (`er-cbn1` for u, `B09D14YFR9` for v, `9780132350884` for
   w/x/y) and none of the row's interstitial / block-page markers. A `200`/`success` carrying an interstitial fails
   the row.
-- **Part 2 — login reuse:** Call 1 (anon) content has **no** auth-only inventory markers; Call 2 (after login)
+- **Part 2 - login reuse:** Call 1 (anon) content has **no** auth-only inventory markers; Call 2 (after login)
   returns `status="success"` with an auth-only product description.
 
 ## Fixtures
 
-None — and **no secrets**: saucedemo's credentials are its public demo values, hardcoded in the harness;
+None - and **no secrets**: saucedemo's credentials are its public demo values, hardcoded in the harness;
 LinkedIn/indeed are intervention-only. URLs, selectors, and markers are hardcoded
 in the harness and Bruno requests, except the five retail anti-bot rows (u, v, w, x, y), whose target URLs come from
 the collection variables `scrap_url_allegro`, `scrap_url_amazon`, `scrap_url_amazon_com`, `scrap_url_amazon_uk` and

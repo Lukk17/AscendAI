@@ -18,34 +18,45 @@ def _make_playwright_factory(mock_browser):
 
 @pytest.mark.asyncio
 async def test_start_launches_chromium_once():
+    # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
     browser.close = AsyncMock()
     factory, pw = _make_playwright_factory(browser)
 
     pool = BrowserPool()
+
+    # when
     with patch("src.runtime.browser_pool.async_playwright", return_value=factory):
         await pool.start()
         await pool.start()  # second call short-circuits
+
+    # then
     assert pw.chromium.launch.await_count == 1
 
 
 @pytest.mark.asyncio
 async def test_get_browser_returns_existing_when_connected():
+    # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
     browser.close = AsyncMock()
     factory, _ = _make_playwright_factory(browser)
 
     pool = BrowserPool()
+
+    # when
     with patch("src.runtime.browser_pool.async_playwright", return_value=factory):
         await pool.start()
         returned = await pool.get_browser()
+
+    # then
     assert returned is browser
 
 
 @pytest.mark.asyncio
 async def test_get_browser_relaunches_when_disconnected():
+    # given
     disconnected = MagicMock()
     disconnected.is_connected = MagicMock(return_value=False)
     disconnected.close = AsyncMock()
@@ -58,33 +69,46 @@ async def test_get_browser_relaunches_when_disconnected():
     pool = BrowserPool()
     with patch("src.runtime.browser_pool.async_playwright", return_value=factory1):
         await pool.start()
+
+    # when
     # Replace the global on second relaunch
     with patch("src.runtime.browser_pool.async_playwright", return_value=factory2):
         returned = await pool.get_browser()
+
+    # then
     assert returned is fresh
 
 
 @pytest.mark.asyncio
 async def test_get_browser_relaunches_when_browser_is_none():
+    # given
     fresh = MagicMock()
     fresh.is_connected = MagicMock(return_value=True)
     fresh.close = AsyncMock()
     factory, _ = _make_playwright_factory(fresh)
 
     pool = BrowserPool()
+
+    # when
     with patch("src.runtime.browser_pool.async_playwright", return_value=factory):
         returned = await pool.get_browser()
+
+    # then
     assert returned is fresh
 
 
 @pytest.mark.asyncio
 async def test_stop_is_noop_when_never_started():
+    # given
     pool = BrowserPool()
+
+    # when / then
     await pool.stop()
 
 
 @pytest.mark.asyncio
 async def test_stop_closes_browser_and_playwright():
+    # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
     browser.close = AsyncMock()
@@ -93,13 +117,18 @@ async def test_stop_closes_browser_and_playwright():
     pool = BrowserPool()
     with patch("src.runtime.browser_pool.async_playwright", return_value=factory):
         await pool.start()
+
+    # when
     await pool.stop()
+
+    # then
     browser.close.assert_awaited()
     pw.stop.assert_awaited()
 
 
 @pytest.mark.asyncio
 async def test_stop_tolerates_browser_close_error():
+    # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
     browser.close = AsyncMock(side_effect=RuntimeError("close failed"))
@@ -109,6 +138,8 @@ async def test_stop_tolerates_browser_close_error():
     pool = BrowserPool()
     with patch("src.runtime.browser_pool.async_playwright", return_value=factory):
         await pool.start()
+
+    # when / then
     await pool.stop()  # must not raise
 
 
@@ -116,6 +147,7 @@ async def test_stop_tolerates_browser_close_error():
 async def test_relaunch_tolerates_prior_playwright_stop_failure():
     """When a relaunch happens, the prior playwright instance is stopped. If that
     stop raises, the relaunch must still succeed."""
+    # given
     first_browser = MagicMock()
     first_browser.is_connected = MagicMock(return_value=False)
     first_browser.close = AsyncMock()
@@ -138,8 +170,12 @@ async def test_relaunch_tolerates_prior_playwright_stop_failure():
     pool = BrowserPool()
     with patch("src.runtime.browser_pool.async_playwright", return_value=first_factory):
         await pool.start()
+
+    # when
     with patch("src.runtime.browser_pool.async_playwright", return_value=second_factory):
         returned = await pool.get_browser()
+
+    # then
     assert returned is second_browser
 
 
@@ -149,6 +185,7 @@ async def test_get_browser_double_check_inside_lock():
     inside the lock) sees a now-connected browser and short-circuits without
     calling _launch_locked. We simulate this by populating self._browser inside
     a custom lock's __aenter__."""
+    # given
     pool = BrowserPool()
 
     connected_after_lock = MagicMock()
@@ -164,5 +201,9 @@ async def test_get_browser_double_check_inside_lock():
 
     pool._lock = _SeedingLock()
     pool._browser = None  # outer check fails → fall through to lock
+
+    # when
     result = await pool.get_browser()
+
+    # then
     assert result is connected_after_lock

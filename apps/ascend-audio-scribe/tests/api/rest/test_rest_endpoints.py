@@ -6,13 +6,14 @@ conversation_merger) and the transcript registry so the full HTTP pipeline
 end-to-end with predictable bodies.
 
 Async generators that should raise on first `__anext__` are built as
-classes implementing the async-iterator protocol — that lets the test
+classes implementing the async-iterator protocol - that lets the test
 express "yields nothing, raises immediately" without a stylistically
 unreachable `yield` after `raise`.
 """
 
 from __future__ import annotations
 
+import asyncio
 import io
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
@@ -21,9 +22,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.exception_handlers import UpstreamProviderError
+from src.config.config import settings
 from src.main import app
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Coroutine
     from pathlib import Path
 
 
@@ -80,24 +83,31 @@ class _AsyncIterRaises:
 
 
 def test_resolve_language_helper_returns_provided_value() -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
+    # when / then
     assert rest._resolve_language("pl") == "pl"
 
 
 def test_resolve_language_helper_falls_back_on_none() -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    assert rest._resolve_language(None) == rest.settings.TRANSCRIPTION_LANGUAGE
+    # when / then
+    assert rest._resolve_language(None) == settings.TRANSCRIPTION_LANGUAGE
 
 
 def test_resolve_language_helper_falls_back_on_empty() -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    assert rest._resolve_language("") == rest.settings.TRANSCRIPTION_LANGUAGE
+    # when / then
+    assert rest._resolve_language("") == settings.TRANSCRIPTION_LANGUAGE
 
 
 def test_local_endpoint_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(
@@ -105,12 +115,17 @@ def test_local_endpoint_success(monkeypatch: pytest.MonkeyPatch, client: TestCli
         "local_speech_transcription",
         _AsyncIterOver([{"text": "hi", "start": 0.0, "end": 1.0}]),
     )
+
+    # when
     response = client.post("/api/v1/transcribe/local", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 200
     assert "hi" in response.text
 
 
 def test_local_endpoint_with_timestamps(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(
@@ -118,16 +133,21 @@ def test_local_endpoint_with_timestamps(monkeypatch: pytest.MonkeyPatch, client:
         "local_speech_transcription",
         _AsyncIterOver([{"text": "ts", "start": 0.0, "end": 0.5}]),
     )
+
+    # when
     response = client.post(
         "/api/v1/transcribe/local",
         files=_multipart(),
         data={"stream": "false", "with_timestamps": "true"},
     )
+
+    # then
     assert response.status_code == 200
     assert "[0.00 - 0.50]" in response.text
 
 
 def test_local_endpoint_stream(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(
@@ -135,30 +155,44 @@ def test_local_endpoint_stream(monkeypatch: pytest.MonkeyPatch, client: TestClie
         "local_speech_transcription",
         _AsyncIterOver([{"text": "x", "start": 0.0, "end": 1.0}]),
     )
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/local", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "data:" in body
     assert "complete" in body
 
 
 def test_local_endpoint_stream_error(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "local_speech_transcription", _AsyncIterRaises(RuntimeError("boom")))
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/local", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "error" in body
 
 
 def test_local_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "local_speech_transcription", _AsyncIterRaises(RuntimeError("boom")))
+
+    # when
     response = client.post("/api/v1/transcribe/local", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 500
     body = response.json()
     assert body["type"].endswith("/internal")
@@ -168,41 +202,56 @@ def test_local_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: Test
 
 
 def test_openai_endpoint_missing_key(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
-    import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", None)
+    # given
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
+
+    # when
     response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 400
     assert response.json()["type"].endswith("/validation")
 
 
 def test_openai_endpoint_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
     monkeypatch.setattr(rest, "openai_speech_transcription", MagicMock(return_value="transcript text"))
+
+    # when
     response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 200
     assert "transcript text" in response.text
 
 
 def test_openai_endpoint_dict_response(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
     monkeypatch.setattr(
         rest,
         "openai_speech_transcription",
         MagicMock(return_value=[{"text": "x", "start": 0.0, "end": 1.0}]),
     )
+
+    # when
     response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 200
 
 
 def test_openai_endpoint_stream(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
 
     def call_with_callback(*_a: Any, **kw: Any) -> str:
         cb = kw.get("progress_callback")
@@ -211,66 +260,84 @@ def test_openai_endpoint_stream(monkeypatch: pytest.MonkeyPatch, client: TestCli
         return "done"
 
     monkeypatch.setattr(rest, "openai_speech_transcription", MagicMock(side_effect=call_with_callback))
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/openai", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "complete" in body
 
 
 def test_openai_endpoint_stream_error(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
     monkeypatch.setattr(rest, "openai_speech_transcription", MagicMock(side_effect=RuntimeError("boom")))
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/openai", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "error" in body
 
 
-def test_openai_endpoint_stream_upstream_error(
-    monkeypatch: pytest.MonkeyPatch, client: TestClient
-) -> None:
+def test_openai_endpoint_stream_upstream_error(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
-    monkeypatch.setattr(
-        rest,
-        "openai_speech_transcription",
-        MagicMock(
-            side_effect=UpstreamProviderError("OpenAI upstream call failed for model 'whisper-1'.")
-        ),
-    )
-    with client.stream(
-        "POST", "/api/v1/transcribe/openai", files=_multipart(), data={"stream": "true"}
-    ) as response:
-        body = response.read().decode()
-    assert "OpenAI upstream call failed for model 'whisper-1'." in body
-
-
-def test_openai_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
-    import src.api.rest.rest_endpoints as rest
-
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
-    monkeypatch.setattr(
-        rest, "openai_speech_transcription", MagicMock(side_effect=ValueError("bad input"))
-    )
-    response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
-    assert response.status_code == 400
-
-
-def test_openai_endpoint_upstream_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
-    import src.api.rest.rest_endpoints as rest
-
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
     monkeypatch.setattr(
         rest,
         "openai_speech_transcription",
         MagicMock(side_effect=UpstreamProviderError("OpenAI upstream call failed for model 'whisper-1'.")),
     )
+
+    # when
+    with client.stream(
+        "POST", "/api/v1/transcribe/openai", files=_multipart(), data={"stream": "true"}
+    ) as response:
+        body = response.read().decode()
+
+    # then
+    assert "OpenAI upstream call failed for model 'whisper-1'." in body
+
+
+def test_openai_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
+    import src.api.rest.rest_endpoints as rest
+
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(rest, "openai_speech_transcription", MagicMock(side_effect=ValueError("bad input")))
+
+    # when
     response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
+
+    # then
+    assert response.status_code == 400
+
+
+def test_openai_endpoint_upstream_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
+    import src.api.rest.rest_endpoints as rest
+
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(
+        rest,
+        "openai_speech_transcription",
+        MagicMock(side_effect=UpstreamProviderError("OpenAI upstream call failed for model 'whisper-1'.")),
+    )
+
+    # when
+    response = client.post("/api/v1/transcribe/openai", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 502
     assert response.json()["type"].endswith("/upstream-provider")
 
@@ -279,35 +346,50 @@ def test_openai_endpoint_upstream_error_path(monkeypatch: pytest.MonkeyPatch, cl
 
 
 def test_hf_endpoint_missing_token(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
-    import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", None)
+    # given
+    monkeypatch.setattr(settings, "HF_TOKEN", None)
+
+    # when
     response = client.post("/api/v1/transcribe/hf", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 400
 
 
 def test_hf_endpoint_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
     monkeypatch.setattr(rest, "hf_speech_transcription", MagicMock(return_value="hf-result"))
+
+    # when
     response = client.post("/api/v1/transcribe/hf", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 200
 
 
 def test_hf_endpoint_dict_response(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
     monkeypatch.setattr(rest, "hf_speech_transcription", MagicMock(return_value=[{"text": "x"}]))
+
+    # when
     response = client.post("/api/v1/transcribe/hf", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 200
 
 
 def test_hf_endpoint_stream(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
 
     def cb_call(*_a: Any, **kw: Any) -> str:
         cb = kw.get("progress_callback")
@@ -316,29 +398,39 @@ def test_hf_endpoint_stream(monkeypatch: pytest.MonkeyPatch, client: TestClient)
         return "done"
 
     monkeypatch.setattr(rest, "hf_speech_transcription", MagicMock(side_effect=cb_call))
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/hf", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "complete" in body
 
 
 def test_hf_endpoint_stream_error(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
     monkeypatch.setattr(rest, "hf_speech_transcription", MagicMock(side_effect=RuntimeError("boom")))
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/hf", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "error" in body
 
 
 def test_hf_endpoint_stream_upstream_error(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
     monkeypatch.setattr(
         rest,
         "hf_speech_transcription",
@@ -348,32 +440,46 @@ def test_hf_endpoint_stream_upstream_error(monkeypatch: pytest.MonkeyPatch, clie
             )
         ),
     )
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/hf", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "Hugging Face upstream call failed for model 'openai/whisper-large-v3'." in body
 
 
 def test_hf_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
     monkeypatch.setattr(rest, "hf_speech_transcription", MagicMock(side_effect=RuntimeError("boom")))
+
+    # when
     response = client.post("/api/v1/transcribe/hf", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 500
 
 
 def test_hf_endpoint_upstream_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
     monkeypatch.setattr(
         rest,
         "hf_speech_transcription",
         MagicMock(side_effect=UpstreamProviderError("Hugging Face upstream call failed for model 'x'.")),
     )
+
+    # when
     response = client.post("/api/v1/transcribe/hf", files=_multipart(), data={"stream": "false"})
+
+    # then
     assert response.status_code == 502
     assert response.json()["type"].endswith("/upstream-provider")
 
@@ -382,47 +488,62 @@ def test_hf_endpoint_upstream_error_path(monkeypatch: pytest.MonkeyPatch, client
 
 
 def test_audacity_rejects_non_zip(client: TestClient) -> None:
+    # when
     response = client.post(
         "/api/v1/transcribe/audacity",
         files=_multipart(filename="x.wav"),
         data={"stream": "false"},
     )
+
+    # then
     assert response.status_code == 400
 
 
 async def _ok_merge(**_kw: Any) -> str:
     import asyncio as _aio
+
     await _aio.sleep(0)
     return "[00:00:00] [speaker] hi"
 
 
 def test_audacity_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(return_value={"speaker": "/tmp/x.wav"}))
     monkeypatch.setattr(rest, "transcribe_and_merge_tracks", _ok_merge)
+
+    # when
     response = client.post(
         "/api/v1/transcribe/audacity",
         files=_multipart(filename="proj.zip"),
         data={"stream": "false", "provider": "local"},
     )
+
+    # then
     assert response.status_code == 200
 
 
 def test_audacity_no_tracks(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(return_value={}))
+
+    # when
     response = client.post(
         "/api/v1/transcribe/audacity",
         files=_multipart(filename="proj.zip"),
         data={"stream": "false", "provider": "local"},
     )
+
+    # then
     assert response.status_code == 400
 
 
 async def _progress_then_done(**kw: Any) -> str:
     import asyncio as _aio
+
     cb = kw.get("progress_callback")
     if cb:
         cb({"type": "progress", "message": "ok"})
@@ -431,10 +552,13 @@ async def _progress_then_done(**kw: Any) -> str:
 
 
 def test_audacity_stream(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(return_value={"sp": "/tmp/x.wav"}))
     monkeypatch.setattr(rest, "transcribe_and_merge_tracks", _progress_then_done)
+
+    # when
     with client.stream(
         "POST",
         "/api/v1/transcribe/audacity",
@@ -442,13 +566,18 @@ def test_audacity_stream(monkeypatch: pytest.MonkeyPatch, client: TestClient) ->
         data={"stream": "true", "provider": "local"},
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "complete" in body
 
 
 def test_audacity_stream_no_tracks(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(return_value={}))
+
+    # when
     with client.stream(
         "POST",
         "/api/v1/transcribe/audacity",
@@ -456,13 +585,18 @@ def test_audacity_stream_no_tracks(monkeypatch: pytest.MonkeyPatch, client: Test
         data={"stream": "true", "provider": "local"},
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "error" in body
 
 
 def test_audacity_stream_error(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(side_effect=RuntimeError("boom")))
+
+    # when
     with client.stream(
         "POST",
         "/api/v1/transcribe/audacity",
@@ -470,18 +604,25 @@ def test_audacity_stream_error(monkeypatch: pytest.MonkeyPatch, client: TestClie
         data={"stream": "true", "provider": "local"},
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "error" in body
 
 
 def test_audacity_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(side_effect=RuntimeError("boom")))
+
+    # when
     response = client.post(
         "/api/v1/transcribe/audacity",
         files=_multipart(filename="proj.zip"),
         data={"stream": "false", "provider": "local"},
     )
+
+    # then
     assert response.status_code == 500
 
 
@@ -489,20 +630,28 @@ def test_audacity_endpoint_error_path(monkeypatch: pytest.MonkeyPatch, client: T
 
 
 def test_download_transcript_404(client: TestClient) -> None:
+    # when
     response = client.get("/api/v1/transcribe/download/missing")
+
+    # then
     assert response.status_code == 404
 
 
 def test_download_transcript_success(
     monkeypatch: pytest.MonkeyPatch, client: TestClient, tmp_path: Path
 ) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     transcript_file = tmp_path / "out.md"
     transcript_file.write_text("body", encoding="utf-8")
     monkeypatch.setattr(rest, "get_transcript_path", MagicMock(return_value=str(transcript_file)))
     monkeypatch.setattr(rest, "cleanup_expired", MagicMock())
+
+    # when
     response = client.get("/api/v1/transcribe/download/abc")
+
+    # then
     assert response.status_code == 200
     assert response.text == "body"
 
@@ -513,9 +662,10 @@ def test_download_transcript_success(
 
 
 def test_openai_stream_drains_queue_tail(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
 
     def call_with_late_event(*_a: Any, **kw: Any) -> str:
         cb = kw.get("progress_callback")
@@ -525,17 +675,22 @@ def test_openai_stream_drains_queue_tail(monkeypatch: pytest.MonkeyPatch, client
         return "done"
 
     monkeypatch.setattr(rest, "openai_speech_transcription", MagicMock(side_effect=call_with_late_event))
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/openai", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "tail" in body
 
 
 def test_hf_stream_drains_queue_tail(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
 
     def call_with_late(*_a: Any, **kw: Any) -> str:
         cb = kw.get("progress_callback")
@@ -545,15 +700,20 @@ def test_hf_stream_drains_queue_tail(monkeypatch: pytest.MonkeyPatch, client: Te
         return "done"
 
     monkeypatch.setattr(rest, "hf_speech_transcription", MagicMock(side_effect=call_with_late))
+
+    # when
     with client.stream(
         "POST", "/api/v1/transcribe/hf", files=_multipart(), data={"stream": "true"}
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "tail" in body
 
 
 async def _two_progress_then_done(**kw: Any) -> str:
     import asyncio as _aio
+
     cb = kw.get("progress_callback")
     if cb:
         cb({"type": "progress", "message": "first"})
@@ -563,10 +723,13 @@ async def _two_progress_then_done(**kw: Any) -> str:
 
 
 def test_audacity_stream_drains_queue_tail(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(return_value={"sp": "/tmp/x.wav"}))
     monkeypatch.setattr(rest, "transcribe_and_merge_tracks", _two_progress_then_done)
+
+    # when
     with client.stream(
         "POST",
         "/api/v1/transcribe/audacity",
@@ -574,13 +737,15 @@ def test_audacity_stream_drains_queue_tail(monkeypatch: pytest.MonkeyPatch, clie
         data={"stream": "true", "provider": "local"},
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "tail" in body
 
 
 async def _slow_merge(**_kw: Any) -> str:
     import asyncio as aio
 
-    # >0.5s SSE poll timeout — exercises the wait_for TimeoutError continue.
+    # >0.5s SSE poll timeout - exercises the wait_for TimeoutError continue.
     await aio.sleep(0.7)
     return "out"
 
@@ -589,10 +754,13 @@ def test_audacity_stream_timeout_branch(monkeypatch: pytest.MonkeyPatch, client:
     """When the merge task takes time and the progress queue is empty, the
     wait_for path raises TimeoutError and the `continue` branch fires."""
 
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(return_value={"sp": "/tmp/x.wav"}))
     monkeypatch.setattr(rest, "transcribe_and_merge_tracks", _slow_merge)
+
+    # when
     with client.stream(
         "POST",
         "/api/v1/transcribe/audacity",
@@ -600,6 +768,8 @@ def test_audacity_stream_timeout_branch(monkeypatch: pytest.MonkeyPatch, client:
         data={"stream": "true", "provider": "local"},
     ) as response:
         body = response.read().decode()
+
+    # then
     assert "complete" in body
 
 
@@ -611,7 +781,7 @@ def test_audacity_stream_timeout_branch(monkeypatch: pytest.MonkeyPatch, client:
 # the generator re-raises after cancelling its background task.
 
 
-def _assert_generator_propagates_cancel(generator) -> bool:
+def _assert_generator_propagates_cancel(generator: AsyncIterator[str]) -> bool:
     """Drive an async generator until CancelledError surfaces from the
     poll loop. Each backend yields a slightly different number of preamble
     SSE events (1 for openai/hf, 2 for audacity) before entering wait_for,
@@ -636,15 +806,16 @@ def _assert_generator_propagates_cancel(generator) -> bool:
         loop.close()
 
 
-async def _cancelling_wait_for(*_a: object, **_kw: object) -> object:
-    """Stub for `asyncio.wait_for` that raises CancelledError synchronously.
-    Used to drive the SSE poll loop into its CancelledError branch. The
-    `await asyncio.sleep(0)` is a cooperative yield before raising — it
-    keeps the function genuinely async without changing observable
-    behaviour."""
+async def _cancelling_wait_for(awaitable: Coroutine[Any, Any, Any], *_a: object, **_kw: object) -> object:
+    """Stub for `asyncio.wait_for` that raises CancelledError. Used to drive
+    the SSE poll loop into its CancelledError branch. Like the real
+    `wait_for` on cancellation, it disposes of the awaitable it was handed
+    (the poll loop's `queue.get()` coroutine), so that coroutine is closed
+    rather than left never awaited."""
 
     import asyncio as aio
 
+    awaitable.close()
     await aio.sleep(0)
     raise aio.CancelledError
 
@@ -654,38 +825,48 @@ def test_openai_stream_propagates_cancellation(monkeypatch: pytest.MonkeyPatch) 
     which the generator's `except asyncio.CancelledError` clause must catch
     long enough to cancel the background task, then re-raise."""
 
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "OPENAI_API_KEY", "sk-x")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-x")
     monkeypatch.setattr(
         rest,
         "openai_speech_transcription",
         MagicMock(side_effect=_blocking_transcription_side_effect()),
     )
     monkeypatch.setattr(rest, "save_upload_to_temp_async", _async_return("/tmp/x.wav"))
-    monkeypatch.setattr(rest.asyncio, "wait_for", _cancelling_wait_for)
+    monkeypatch.setattr(asyncio, "wait_for", _cancelling_wait_for)
 
     upload = MagicMock()
     upload.close = _async_close_noop()
+
+    # when
     gen = rest._stream_openai(upload, "whisper-1", "en")
+
+    # then
     assert _assert_generator_propagates_cancel(gen)
 
 
 def test_hf_stream_propagates_cancellation(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
-    monkeypatch.setattr(rest.settings, "HF_TOKEN", "tok")
+    monkeypatch.setattr(settings, "HF_TOKEN", "tok")
     monkeypatch.setattr(
         rest,
         "hf_speech_transcription",
         MagicMock(side_effect=_blocking_transcription_side_effect()),
     )
     monkeypatch.setattr(rest, "save_upload_to_temp_async", _async_return("/tmp/x.wav"))
-    monkeypatch.setattr(rest.asyncio, "wait_for", _cancelling_wait_for)
+    monkeypatch.setattr(asyncio, "wait_for", _cancelling_wait_for)
 
     upload = MagicMock()
     upload.close = _async_close_noop()
+
+    # when
     gen = rest._stream_hf(upload, "openai/whisper-large-v3", "hf-inference")
+
+    # then
     assert _assert_generator_propagates_cancel(gen)
 
 
@@ -697,16 +878,21 @@ async def _slow_merge_for_cancel(**_kw: object) -> str:
 
 
 def test_audacity_stream_propagates_cancellation(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     import src.api.rest.rest_endpoints as rest
 
     monkeypatch.setattr(rest, "extract_tracks_from_aup", MagicMock(return_value={"sp": "/tmp/x.wav"}))
     monkeypatch.setattr(rest, "transcribe_and_merge_tracks", _slow_merge_for_cancel)
     monkeypatch.setattr(rest, "save_upload_to_temp_async", _async_return("/tmp/p.zip"))
-    monkeypatch.setattr(rest.asyncio, "wait_for", _cancelling_wait_for)
+    monkeypatch.setattr(asyncio, "wait_for", _cancelling_wait_for)
 
     upload = MagicMock()
     upload.close = _async_close_noop()
+
+    # when
     gen = rest._stream_audacity(upload, "local", "model", "en", "hf-inference")
+
+    # then
     assert _assert_generator_propagates_cancel(gen)
 
 
@@ -739,7 +925,7 @@ def _async_close_noop() -> object:
 def _blocking_transcription_side_effect() -> object:
     """Sync function used as `MagicMock(side_effect=...)` for the
     transcription stubs. Blocks long enough that the SSE poll loop
-    actually reaches `asyncio.wait_for` before the task completes — which
+    actually reaches `asyncio.wait_for` before the task completes - which
     is what triggers the CancelledError path under test."""
 
     import time as _time

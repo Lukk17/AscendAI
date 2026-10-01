@@ -6,6 +6,7 @@ import pytest
 from openai import APIError
 
 from src.api.exception_handlers import UpstreamProviderError
+from src.config.config import settings
 from src.transcription import openai_api_speach_to_text as mod
 
 
@@ -35,49 +36,61 @@ class _FakeChunks:
 
 
 def test_get_client_lazy_init(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     mod._client_instance = None
     sentinel = MagicMock()
     monkeypatch.setattr(mod, "OpenAI", lambda **_kw: sentinel)
     first = mod._get_client()
+
+    # when
     second = mod._get_client()
+
+    # then
     assert first is sentinel
     assert first is second
 
 
-def test_transcribe_single_chunk_without_timestamps(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_without_timestamps(fake_openai_client: MagicMock, tmp_path: Path) -> None:
+    # given
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     response = MagicMock()
     response.text = "hello"
     fake_openai_client.audio.transcriptions.create.return_value = response
 
+    # when
     result = mod._transcribe_single_chunk(str(chunk), "whisper-1", "en", with_timestamps=False)
+
+    # then
     assert result == "hello"
 
 
-def test_transcribe_single_chunk_no_language(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_no_language(fake_openai_client: MagicMock, tmp_path: Path) -> None:
+    # given
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     fake_openai_client.audio.transcriptions.create.return_value = MagicMock(text="x")
+
+    # when
     mod._transcribe_single_chunk(str(chunk), "whisper-1", "", with_timestamps=False)
+
+    # then
     kwargs = fake_openai_client.audio.transcriptions.create.call_args.kwargs
     assert "language" not in kwargs
 
 
-def test_transcribe_single_chunk_with_timestamps(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_with_timestamps(fake_openai_client: MagicMock, tmp_path: Path) -> None:
+    # given
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     seg = MagicMock(text="hi", start=0.0, end=1.0)
     response = MagicMock(segments=[seg])
     fake_openai_client.audio.transcriptions.create.return_value = response
 
+    # when
     result = mod._transcribe_single_chunk(str(chunk), "whisper-1", "en", with_timestamps=True)
+
+    # then
     assert isinstance(result, list)
     assert result[0]["text"] == "hi"
 
@@ -89,22 +102,27 @@ def test_transcribe_single_chunk_with_timestamps_none_segments(
     chunk; `_segments_from_response` must early-return `[]` rather than
     iterate None."""
 
+    # given
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     response = MagicMock(segments=None)
     fake_openai_client.audio.transcriptions.create.return_value = response
 
+    # when
     result = mod._transcribe_single_chunk(str(chunk), "whisper-1", "en", with_timestamps=True)
+
+    # then
     assert result == []
 
 
-def test_transcribe_single_chunk_api_error(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_api_error(fake_openai_client: MagicMock, tmp_path: Path) -> None:
+    # given
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     api_err = APIError("boom", request=MagicMock(), body=None)
     fake_openai_client.audio.transcriptions.create.side_effect = api_err
+
+    # when / then
     with pytest.raises(UpstreamProviderError, match="OpenAI upstream call failed"):
         mod._transcribe_single_chunk(str(chunk), "whisper-1", "en", with_timestamps=False)
 
@@ -112,23 +130,27 @@ def test_transcribe_single_chunk_api_error(
 def test_openai_transcript_under_limit_uses_direct_call(
     fake_openai_client: MagicMock, tmp_path: Path
 ) -> None:
+    # given
     f = tmp_path / "small.wav"
     f.write_bytes(b"x" * 100)
     response = MagicMock(text="direct")
     fake_openai_client.audio.transcriptions.create.return_value = response
 
+    # when
     result = mod.openai_transcript(str(f), "whisper-1", "en")
+
+    # then
     assert result == "direct"
 
 
-def test_openai_transcript_upstream_error_propagates(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_openai_transcript_upstream_error_propagates(fake_openai_client: MagicMock, tmp_path: Path) -> None:
+    # given
     f = tmp_path / "small.wav"
     f.write_bytes(b"x" * 100)
     api_err = APIError("boom", request=MagicMock(), body=None)
     fake_openai_client.audio.transcriptions.create.side_effect = api_err
 
+    # when / then
     with pytest.raises(UpstreamProviderError, match="OpenAI upstream call failed"):
         mod.openai_transcript(str(f), "whisper-1", "en")
 
@@ -136,8 +158,9 @@ def test_openai_transcript_upstream_error_propagates(
 def test_openai_transcript_with_chunking_text(
     fake_openai_client: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    # given
     big = tmp_path / "big.wav"
-    big.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    big.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
 
     chunk_a = tmp_path / "a.wav"
     chunk_b = tmp_path / "b.wav"
@@ -150,9 +173,11 @@ def test_openai_transcript_with_chunking_text(
     fake_openai_client.audio.transcriptions.create.side_effect = [response_a, response_b]
 
     progress: list[dict[str, Any]] = []
-    result = mod.openai_transcript(
-        str(big), "whisper-1", "en", progress_callback=progress.append
-    )
+
+    # when
+    result = mod.openai_transcript(str(big), "whisper-1", "en", progress_callback=progress.append)
+
+    # then
     assert result == "part1 part2"
     assert progress, "progress callback should have been invoked"
 
@@ -160,8 +185,9 @@ def test_openai_transcript_with_chunking_text(
 def test_openai_transcript_with_chunking_timestamps(
     fake_openai_client: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    # given
     big = tmp_path / "big.wav"
-    big.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    big.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(chunk)]))
@@ -170,7 +196,10 @@ def test_openai_transcript_with_chunking_timestamps(
     response = MagicMock(segments=[seg])
     fake_openai_client.audio.transcriptions.create.return_value = response
 
+    # when
     result = mod.openai_transcript(str(big), "whisper-1", "en", with_timestamps=True)
+
+    # then
     assert isinstance(result, list)
     assert result[0]["text"] == "t0"
 
@@ -178,12 +207,14 @@ def test_openai_transcript_with_chunking_timestamps(
 def test_openai_transcript_chunk_exceeds_limit(
     fake_openai_client: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    # given
     del fake_openai_client
     big = tmp_path / "big.wav"
-    big.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    big.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
     huge_chunk = tmp_path / "huge.wav"
-    huge_chunk.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    huge_chunk.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(huge_chunk)]))
 
+    # when / then
     with pytest.raises(ValueError, match="exceeded OpenAI size limit"):
         mod.openai_transcript(str(big), "whisper-1", "en")

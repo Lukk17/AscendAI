@@ -23,14 +23,14 @@ The connector's Entra ID app registration SHALL hold admin-consented application
 #### Scenario: Content grant alone is sufficient
 
 - **WHEN** a connector's app registration holds `Sites.Read.All` with admin consent and no directory permission of any kind
-- **THEN** in-scope items are enumerated, downloaded, and landed in MinIO
+- **THEN** in-scope items are enumerated, downloaded, and landed in object storage
 - **AND** the run completes without any permission-related failure
 
 #### Scenario: Site outside a Sites.Selected grant fails loudly
 
 - **WHEN** a connector using `Sites.Selected` is scoped to a site the app registration was not granted access to
 - **THEN** that site's items fail with a reason naming the ungranted site
-- **AND** no item from that site is landed in MinIO
+- **AND** no item from that site is landed in object storage
 - **AND** the run does not report success for that site
 
 #### Scenario: No directory permission is requested
@@ -65,12 +65,12 @@ A full re-enumeration SHALL NOT re-parse, re-chunk, or re-embed a file whose con
 
 ### Requirement: Sync scope limited to configured sites, drives, and folders
 
-The SharePoint connector SHALL sync only the sites, drives, and folders named in the connector's source scope. Configured sites SHALL be resolved to their drives via Graph; folder scoping SHALL be applied to delta results by path so items outside the configured folders are ignored entirely (no download, no MinIO write, no outcome record).
+The SharePoint connector SHALL sync only the sites, drives, and folders named in the connector's source scope. Configured sites SHALL be resolved to their drives via Graph; folder scoping SHALL be applied to delta results by path so items outside the configured folders are ignored entirely (no download, no object storage write, no outcome record).
 
 #### Scenario: Out-of-scope file ignored
 
 - **WHEN** the delta response includes a new file located outside every configured folder
-- **THEN** the file is not downloaded and it is not landed in MinIO
+- **THEN** the file is not downloaded and it is not landed in object storage
 - **AND** no per-file outcome is recorded for it
 
 #### Scenario: Folder scope honoured within a drive
@@ -91,7 +91,7 @@ The SharePoint connector SHALL download only files whose type is in the existing
 #### Scenario: Allowed document synced
 
 - **WHEN** the delta response reports a new 3 MB DOCX in scope
-- **THEN** the file is downloaded, passes the sniffed-MIME check, and lands in MinIO
+- **THEN** the file is downloaded, passes the sniffed-MIME check, and lands in object storage
 
 ### Requirement: Graph throttling compliance
 

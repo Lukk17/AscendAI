@@ -2,51 +2,80 @@
 
 ## Why
 
-The docker-compose stack is a personal-workstation setup that becomes a security incident the moment it lands on a cloud VM. Every service publishes its port to all host interfaces: Docling with its UI enabled (`compose.yaml:14-15,25`), Unstructured (`:37-38`), ascend-ocr (`:52-53`), ascend-ai-agent (`:106-107`), AscendMemory (`:153-154`), ascend-weather-mcp (`:208-209`), ascend-audio-scribe (`:227-228`), Prometheus (`:277-278`), Grafana with anonymous Editor access (`:298-302`), SearXNG (`compose.ascend-web-hunter.yaml:11-12`), FlareSolverr (`:28-29`), and ascend-web-hunter (`:64-65`). On a VM with a public IP, all twelve become unauthenticated public endpoints.
+The compose stack is a setup for one developer's workstation. On a cloud VM with a public IP it is a security incident. Line numbers below were checked against the files on 2026-10-01.
 
-On top of the exposure problem: `ascend-audio-scribe` bind-mounts the owner's Desktop into the container with `MCP_FILE_URI_ROOT=/audio` (`compose.yaml:238,243-244`), so any caller can read arbitrary Desktop files through the transcription API; `ascend-web-hunter` runs with `cap_add: SYS_ADMIN` while rendering untrusted web content (`compose.ascend-web-hunter.yaml:85-86`); the SSRF allowlists whitelist loopback (`MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1` at `compose.yaml:67` and `:236`), which defeats the guard the moment the service shares a host with anything private; credentials are hardcoded defaults (the S3-compatible object store `admin`/`password` at `apps/ascend-agent/src/main/resources/application.yaml:99-100`, Postgres `postgres`/`local` at `:360-362`, passwordless Redis, a committed SearXNG `secret_key` at `infra/searxng/settings.yml:47`); SearXNG runs with its limiter disabled and a spoofed `X-Forwarded-For=0.0.0.0` (`compose.ascend-web-hunter.yaml:71-74`); and everything is plain HTTP. None of this survives contact with an external customer's VM. The sibling `add-auth-and-identity` change fixes application-level identity; this change owns the network, TLS, and secrets layer underneath it.
+Services in `compose.yaml` publish their ports on every host interface: Docling with its UI enabled (`compose.yaml:14-15`, UI flag at `:25`), Unstructured (`:37-38`), ascend-ocr (`:58-59`), ascend-agent (`:121-122`), ascend-memory (`:180-181`), ascend-weather-mcp (`:239-240`), ascend-audio-scribe (`:266-267`), Prometheus (`:347-348`) and Grafana with anonymous Editor access (`:368-369`, anonymous flags at `:371-372`). In `compose.ascend-web-hunter.yaml`, ascend-web-hunter publishes `7021` on every interface (`:178-179`). SearXNG and FlareSolverr are already bound to `127.0.0.1` (`compose.ascend-web-hunter.yaml:26` and `:63`). The observability services loki, vector, otel-collector, tempo and container-metrics-exporter publish no host port today, and that must stay true.
+
+Further problems:
+
+- `ascend-audio-scribe` bind-mounts the owner's Desktop and a personal model cache (`compose.yaml:282-283`) and sets `MCP_FILE_URI_ROOT=/audio` (`:277`), so any caller can read Desktop files through the transcription tool.
+- `ascend-web-hunter` runs with `cap_add: SYS_ADMIN` (`compose.ascend-web-hunter.yaml:208-209`) while it renders untrusted web pages.
+- The SSRF allowlists of ascend-ocr and ascend-audio-scribe list loopback (`MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1` at `compose.yaml:81` and `:275`).
+- Credentials are committed defaults: object store `admin`/`password` in `apps/ascend-agent/src/main/resources/application.yaml:107-108` and in the ascend-ocr result store variables (`compose.yaml:77-78`), Postgres `postgres`/`local` (`application.yaml:370-371`), the built-in login `admin`/`admin` (`application.yaml:73-74`), Redis without a password, Qdrant without an API key.
+- The object store addresses are fixed: the agent uses `http://host.docker.internal:9070` with a presign address of `http://localhost:9070` (`application-docker.yaml`, `app.s3`), and ascend-ocr uses `OCR_RESULT_S3_ENDPOINT` and `OCR_RESULT_S3_PUBLIC_ENDPOINT` with the same two fixed values (`compose.yaml:74-75`).
+- Prometheus runs with `--web.enable-lifecycle` (`compose.yaml:352`), an unauthenticated reload endpoint.
+- `compose.yaml` has no log rotation. The `x-logging` anchor exists only in `compose.ascend-web-hunter.yaml:6-10`, and YAML anchors do not cross an `include:`.
+- Everything speaks plain HTTP.
+
+## Build order
+
+This change runs after group A, group B and group D, and before group C (`add-auth-and-identity`, `add-tenant-isolation`, `add-usage-metering-and-quotas`, `add-audit-and-gdpr-compliance`, `add-tenant-administration`, `add-tenant-policy`). It therefore does not depend on Keycloak or on any authentication code.
+
+Moved out of this change into `add-auth-and-identity` (the agent working on that change adds them there):
+
+- the `SECURITY_ENABLED` production guard and the `SECURITY_ENABLED` entry in `.env.example`
+- the Keycloak login and token rate limits
+- every Keycloak route
+
+Keycloak is a separate service on its own host address and port. It is never routed under a path of this gateway. `add-auth-and-identity` may give it a separate site with its own host name in `gateway/Caddyfile`.
+
+Dependency on group D: task 2.7 configures streaming for `POST /api/v1/ai/prompt/stream`, which `add-chat-streaming-and-conversations` adds. That change is built before this one, so the route exists when this change is applied.
+
+Dependency on `add-document-management-api`: public clients download RAG sources through the agent's `GET /api/v1/documents/{id}/content`, so the object store never needs to be public.
 
 ## What Changes
 
-- **Edge gateway with TLS.** A reverse proxy (design decides between Caddy, Traefik, and nginx) becomes the only service publishing to all interfaces — ports 80/443 with automatic ACME certificates on a cloud VM and a self-signed/internal certificate locally. It routes to ascend-ai-agent and (coordination point) to the Keycloak service that `add-auth-and-identity` introduces. Nothing else is publicly reachable.
-- **Env-driven port binding.** Every existing host-port publication gains a bind-address prefix defaulting to loopback (`${EXPOSE_BIND:-127.0.0.1}:port:port`), so `docker compose up` from the repo root keeps working unchanged for local dev (services stay reachable at `localhost:<port>`) while a cloud VM exposes nothing except the gateway. The main `compose.yaml` stays the single compose entry point — no `-f` flags, no second project.
-- **Secrets out of the tree.** All credentials flow from `.env`: Postgres, Redis, the S3-compatible object store, Qdrant, Grafana admin, SearXNG secret. The committed SearXNG `secret_key` is rotated out of `infra/searxng/settings.yml` and injected via env. Under the production posture the stack fails fast when a required secret is unset; no default credential works in production. `.env.example` is extended to document every variable.
-- **Personal-machine artifacts gated.** The Desktop mount and `hf-cache` bind mount become env-driven volume sources defaulting to safe named volumes, with `MCP_FILE_URI_ROOT` defaulting to disabled; the ngrok tunnel moves behind a compose profile. **BREAKING** for local dev only to the extent that the Desktop mount now requires two `.env` lines.
-- **`SYS_ADMIN` dropped.** `ascend-web-hunter` loses `cap_add: SYS_ADMIN`; Chromium gets what it actually needs via a checked-in seccomp profile plus `init: true` (design documents the analysis).
-- **SSRF allowlists tightened.** No loopback entries in shared deployments; object-store fetches go through the in-network `object-store` hostname (or the operator-configured endpoint), allowlisted explicitly via env.
-- **SearXNG limiter re-enabled** and the spoofed `X-Forwarded-For` removed; real client context arrives via the gateway.
-- **Grafana secured.** Anonymous access off, admin password from env, not publicly bound.
-- **Production posture checklist.** Healthcheck-gated `depends_on`, restart policies and resource limits reviewed, log rotation via a shared logging anchor, image pinning verified (only `ngrok/ngrok:3` floats today), and `SECURITY_ENABLED=true` required in the production posture (the auth implementation itself is `add-auth-and-identity` — referenced, not re-specified).
-- **Deployment guide.** `docs/DEPLOYMENT.md` (existing) gains a single-tenant-per-customer cloud VM section: DNS, TLS, `.env` preparation, and backup procedures for the four external data stores (Postgres, Redis, Qdrant, the S3-compatible object store).
+- Edge gateway with TLS. A Caddy 2 service is the only service that publishes on every interface, ports 80 and 443. It gets ACME certificates for a real domain and an internal certificate for `localhost`. It routes only to `ascend-agent:9917`.
+- Bind address from the environment. Every other published port becomes `"${EXPOSE_BIND:-127.0.0.1}:<host>:<container>"`. Local `docker compose up` keeps every `localhost:<port>` address. The ports already bound to `127.0.0.1` (SearXNG, FlareSolverr) move to the same form so one variable controls all of them.
+- Secrets out of the tree. Postgres, Redis, Qdrant, object store, ascend-ocr result store, Grafana admin, and the built-in login (`SECURITY_USERNAME`, `SECURITY_PASSWORD`) come from `.env`. Under the `production` Spring profile the agent refuses to start while a datastore or built-in login credential still equals its development default.
+- Object store addresses from the environment, and the object store is never public. The presign address variables of the agent and of ascend-ocr are set to the private address in production, because only containers on the private network follow those links.
+- Personal-machine artifacts become opt-in: the Desktop mount, the model cache path and `MCP_FILE_URI_ROOT`. The ngrok tunnel moves behind a compose profile.
+- `SYS_ADMIN` removed from ascend-web-hunter. A checked-in seccomp profile and `init: true` replace it.
+- SSRF allowlists with no loopback default.
+- Grafana requires a login, Prometheus loses the lifecycle endpoint.
+- Production posture: own `x-logging` anchor in `compose.yaml`, healthchecks for the services that lack them, `condition: service_healthy` for the agent, `no-new-privileges` on every service.
+- SearXNG limiter stays off by an explicit decision (design D6), so `infra/searxng/settings.yml` and its copy are not changed.
+- Deployment guide: `docs/DEPLOYMENT.md` gains a section for one cloud VM per customer.
+
+Already true in the code and not repeated by this change: `SEARXNG_SECRET` is required by compose and `infra/searxng/settings.yml` has no `secret_key`, SearXNG and FlareSolverr are bound to `127.0.0.1`, `compose.ascend-web-hunter.yaml` has its own `x-logging` anchor on every service, the ngrok image is pinned by digest, SearXNG and FlareSolverr have healthchecks, and ascend-web-hunter waits on both with `condition: service_healthy`.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `production-deployment`: network exposure model (loopback-default bindings, gateway-only public surface), TLS termination, secrets management with production fail-fast, personal-artifact gating, SSRF allowlist posture, SearXNG hardening, production readiness checklist, and the cloud VM deployment guide.
+- `production-deployment`: network exposure model, TLS at the gateway, secrets from the environment with a production startup guard, object store privacy, personal-artifact gating, SSRF allowlist posture, container hardening, observability exposure, production runtime posture and the cloud VM guide.
 
 ### Modified Capabilities
 
-- `ascend-agent-containerization`: the "ascend-ai-agent runs as a Compose service by default" requirement changes — the host port mapping becomes loopback-bound by default and public reachability moves behind the gateway; the "`.env.example` documents the secrets compose consumes" requirement expands to cover the new datastore credentials, Grafana admin password, bind-address, and volume-source variables.
+- `ascend-agent-containerization`: the agent port becomes loopback-bound by default with public access through the gateway, `depends_on` uses `condition: service_healthy`, and `.env.example` covers the new deployment variables.
 
-(`ingestion-security` was reviewed and left unchanged — its requirements cover upload hygiene inside ascend-ai-agent (filename sanitization, MIME allowlist, size limits), not deployment posture. The SSRF allowlist tightening lives in `production-deployment` because the allowlists are compose-level configuration of ascend-ocr and ascend-audio-scribe, not ascend-ai-agent ingestion behavior.)
+`ingestion-security` was reviewed and stays unchanged. It covers upload checks inside the agent, not deployment posture.
 
 ## Impact
 
-- **`compose.yaml`**: every `ports:` entry gains the `${EXPOSE_BIND:-127.0.0.1}` prefix; new `gateway` service; Grafana env block rewritten; `ascend-audio-scribe` volumes and `MCP_FILE_URI_ROOT` become env-driven; `MCP_ALLOWED_HOSTS` values become env-driven with safe defaults; `depends_on` entries upgraded to `condition: service_healthy` where healthchecks exist; new healthchecks for services lacking them; shared `x-logging` anchor for rotation.
-- **`compose.ascend-web-hunter.yaml`**: `ascend-web-hunter` loses `SYS_ADMIN`, gains seccomp profile + `init: true`; SearXNG limiter env flips; `ngrok-ascend-web-hunter` gains a profile; `ngrok/ngrok:3` pinned.
-- **New files**: gateway config (e.g. `gateway/Caddyfile` — final name per design), `security/chromium-seccomp.json`, extended `.env.example`.
-- **`infra/searxng/settings.yml`**: committed secret removed; the leaked value must be rotated.
-- **`apps/ascend-agent/src/main/resources/application.yaml` + `application-docker.yaml`**: object-store / Postgres / Redis / Qdrant credentials become env-parameterized with dev-only fallbacks; production posture rejects fallback values at startup.
-- **`AscendMemory`, `ascend-web-hunter` compose env**: Qdrant API key and Redis password wiring.
-- **Docs**: `docs/DEPLOYMENT.md` extended; root `README.md` configuration/ports section updated.
-- **Coordination**: the gateway must route to Keycloak once `add-auth-and-identity` lands its compose service; this change reserves the route but does not wire Keycloak. Application-level JWT auth, service tokens, tenant isolation, metering, and audit are owned by their sibling changes.
-- **Coordination (presign resolution)**: the gateway-only public surface holds for RAG source downloads because `add-document-management-api` moves the client-facing download path onto the agent's authenticated `GET /api/v1/documents/{id}/content` endpoint. The S3-compatible object store therefore stays loopback-bound/unexposed like every other datastore; presigned object-store URLs, if used at all, are an in-network mechanism only and are never expected to be reachable from public clients.
-- **Backwards compatibility**: local `docker compose up` from the repo root continues to bring up the full stack with all of today's `localhost:<port>` access points; the only local-dev deltas are the `.env` entries for the Desktop mount and Grafana admin password.
+- `compose.yaml`: new `gateway` service, new `x-logging` anchor applied to every service, port prefixes, Grafana environment, Prometheus command, ascend-audio-scribe volumes and `MCP_FILE_URI_ROOT`, `MCP_ALLOWED_HOSTS` and `OCR_RESULT_S3_*` from the environment, agent credentials and object store addresses passed through, new healthchecks, `depends_on` long form, `no-new-privileges`.
+- `compose.ascend-web-hunter.yaml`: port prefixes, `SYS_ADMIN` removed, seccomp profile and `init: true`, ngrok profile, `REDIS_URL` password support.
+- New files: `gateway/Caddyfile`, `security/chromium-seccomp.json`.
+- `apps/ascend-agent/src/main/resources/application.yaml` and `application-docker.yaml`: credentials and object store addresses from the environment. New startup guard class and its tests in `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/config/` and `src/test/java/...`.
+- `.env.example`, `docs/DEPLOYMENT.md`, root `README.md`, root `AGENTS.md`.
+- `apps/ascend-web-hunter/deploy-standalone/` is not changed by this change. It keeps its own documented differences.
 
 ## Relevant Skills
 
 - `/docker-patterns`
 - `/deployment-patterns`
 - `/security-review`
-- `/springboot-security`
+- `/springboot-patterns`
+- `/java-coding-standards`
+- `/tdd-workflow`
+- `/markdown-writer`

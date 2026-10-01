@@ -42,9 +42,9 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 
 ## Result summary
 
-All four programmatic assertions passed. Step 1 (Bruno `compaction-fires-prompt.yml`) returned HTTP 200 in 7161 ms — the prompt went through normally without waiting for async compaction. After the 5-second wait, the Postgres `chat_history` table for `frostyCompactionFiresTest` held exactly 9 rows: 1 `system` row whose content begins with `[Conversation summary]` (verified via `LIKE '[Conversation summary]%'`), and 8 `user`/`assistant` rows. The manual spot-check confirms the summary row mentions TechCorp, Warsaw, Spring Boot, and Rex the beagle — all four canary subjects from the seed data. Compaction fired and completed well within the 5-second budget (the async task ran during the Bruno HTTP round-trip of ~7 s total, so the summary was already present when the sleep finished).
+All four programmatic assertions passed. Step 1 (Bruno `compaction-fires-prompt.yml`) returned HTTP 200 in 7161 ms - the prompt went through normally without waiting for async compaction. After the 5-second wait, the Postgres `chat_history` table for `frostyCompactionFiresTest` held exactly 9 rows: 1 `system` row whose content begins with `[Conversation summary]` (verified via `LIKE '[Conversation summary]%'`), and 8 `user`/`assistant` rows. The manual spot-check confirms the summary row mentions TechCorp, Warsaw, Spring Boot, and Rex the beagle - all four canary subjects from the seed data. Compaction fired and completed well within the 5-second budget (the async task ran during the Bruno HTTP round-trip of ~7 s total, so the summary was already present when the sleep finished).
 
-Pre-compaction row count (after step 1): expected 23 — not directly queried mid-flight; seed had 21 + 2 new turns = 23 before compaction.
+Pre-compaction row count (after step 1): expected 23 - not directly queried mid-flight; seed had 21 + 2 new turns = 23 before compaction.
 
 Post-compaction row count (after step 3): 9 (observed)
 

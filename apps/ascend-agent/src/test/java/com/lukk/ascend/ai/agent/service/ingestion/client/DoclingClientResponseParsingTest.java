@@ -138,7 +138,7 @@ class DoclingClientResponseParsingTest {
     @Test
     @DisplayName("process falls back to text-key walker with array containing objects with text fields")
     void process_ArrayOfObjectsWithText_FallsBackToWalker() {
-        // given — response is an array of objects with "text" fields -> walkForTextKeys array path
+        // given - response is an array of objects with "text" fields -> walkForTextKeys array path
         stubChain("[{\"text\":\"page one\"},{\"text\":\"page two\"}]");
 
         // when
@@ -152,20 +152,20 @@ class DoclingClientResponseParsingTest {
     @Test
     @DisplayName("process handles object where text field is non-textual (e.g. numeric)")
     void process_TextFieldIsNumeric_SkippedByWalker() {
-        // given — "text" field IS present but NOT a string -> isTextual() = false -> skip
+        // given - "text" field IS present but NOT a string -> isTextual() = false -> skip
         stubChain("{\"text\": 42, \"other\": \"hello\"}");
 
         // when
         List<Document> docs = client.process("data".getBytes(), "test.pdf");
 
-        // then — text field is numeric -> walkForTextKeys skips it -> empty docs
+        // then - text field is numeric -> walkForTextKeys skips it -> empty docs
         assertThat(docs).isEmpty();
     }
 
     @Test
     @DisplayName("process walks object with text field plus non-text non-array child node")
     void process_ObjectWithMixedChildren_WalksAllNodes() {
-        // given — JSON with object containing text AND a numeric field (non-text, non-array node)
+        // given - JSON with object containing text AND a numeric field (non-text, non-array node)
         // The numeric child hits the "not object, not array" branch in walkForTextKeys
         stubChain("{\"items\":[{\"text\":\"extracted text\",\"page\":1}]}");
 

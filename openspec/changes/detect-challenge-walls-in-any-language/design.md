@@ -1,7 +1,9 @@
 ## Context
 
-Detection lives in `apps/ascend-web-hunter/src/reader/cloudflare/challenge_detector.py` and is called from eight
-places: `curl_cffi_fetcher.py` (tiers 1 and 2), `playwright_strategy.py` (tier 4, four calls, two of them inside a
+Detection lives in `apps/ascend-web-hunter/src/reader/cloudflare/challenge_detector.py`. Its wall decision is
+reached from nine `is_blocked` call sites: `crawlee_strategy.py` line 101, `curl_cffi_fetcher.py` line 123,
+`flaresolverr_strategy.py` line 82, `novnc_strategy.py` lines 122 and 123 (`page_blocked` and `cleared`),
+`playwright_strategy.py` lines 79 and 107 (two calls), and `web_reader.py` lines 407 and 468. The line numbers are from 2026-10-01 and are a starting point, not a contract. By file: `curl_cffi_fetcher.py` (tiers 1 and 2), `playwright_strategy.py` (tier 4, four calls, two of them inside a
 poll loop that waits `CHALLENGE_CLEAR_WAIT_SECONDS` for a Cloudflare challenge to clear on its own),
 `flaresolverr_strategy.py` (tier 3), `crawlee_strategy.py` (tier 5), `novnc_strategy.py` (the monitor's
 `_poll_captcha`, which decides when a human has cleared a page), and `web_reader.py` (the second line of defence in
@@ -71,13 +73,13 @@ class ChallengeVerdict:
 
 `is_blocked`, `has_real_content` and `is_content_accepted` keep their names and signatures, gain optional `headers`
 and `cookie_names`, and read the verdict. `is_login_required` and `is_login_redirect_url` are untouched. That is what
-lets the eight call sites keep compiling on day one while each is moved, one task at a time, to pass what it has.
+lets the nine call sites keep compiling on day one while each is moved, one task at a time, to pass what it has.
 
 A signal fires at most once per verdict, however many markers matched it. Two reCAPTCHA scripts on one page are one
 `vendor_script`. Every fired signal is kept on the verdict so the log line, the metric and the test can name it.
 
-Rejected: a boolean per new signal added beside the existing ones. Eight call sites already combine three booleans
-with `and` and `not`, and each new signal would have to be threaded through all eight with a decision about how it
+Rejected: a boolean per new signal added beside the existing ones. Nine call sites already combine three booleans
+with `and` and `not`, and each new signal would have to be threaded through all nine with a decision about how it
 combines. A score is one number with one comparison, and the combination rule lives in one place.
 
 Rejected: a machine-learned classifier. It would need the corpus this change builds before it could be trained, it
@@ -405,7 +407,7 @@ and the score in the same line rather than a second line.
    `vendor_presence` and a `vendor_presence` marker with no size gate. The `Ray ID:` regex becomes a Cloudflare
    `interstitial_structure` marker.
 3. `is_blocked(status, html)` and `is_content_accepted(status, html)` keep working with two arguments throughout,
-   so the eight call sites move in section 6 of `tasks.md` one at a time with the suite green between each.
+   so the nine call sites move in section 6 of `tasks.md` one at a time with the suite green between each.
 4. Two behaviours change, both intended and both pinned by a counterexample: a wall from a vendor the dictionary did
    not know is a wall now, and a page with a real article beside a vendor script is content now. Every other page
    keeps its verdict, and the existing detector tests stay green except those that asserted a bare substring in a

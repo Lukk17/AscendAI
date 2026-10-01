@@ -43,7 +43,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-All seven Expected assertions passed. The save turn (Step 1) returned HTTP 200. After the mandatory 5-second wait, the Qdrant scroll on `ascend_memory_1536` filtered by `user_id=frostySemanticMemoryTest` returned exactly 2 points: one with `data="User's name is Luke"` and one with `data="User is a software engineer"`, confirming both facts were extracted and persisted by mem0. Chat history was wiped between the save and recall turns (Redis DEL returned 1, Postgres DELETE removed 2 rows). The recall turn (Step 3) returned HTTP 200 with `content="Your name is Luke, and you're a software engineer."` — explicitly containing both `Luke` and `software engineer`, and not a refusal. Because chat history was fully cleared, the only source of those facts was semantic memory retrieved from Qdrant via AscendMemory.
+All seven Expected assertions passed. The save turn (Step 1) returned HTTP 200. After the mandatory 5-second wait, the Qdrant scroll on `ascend_memory_1536` filtered by `user_id=frostySemanticMemoryTest` returned exactly 2 points: one with `data="User's name is Luke"` and one with `data="User is a software engineer"`, confirming both facts were extracted and persisted by mem0. Chat history was wiped between the save and recall turns (Redis DEL returned 1, Postgres DELETE removed 2 rows). The recall turn (Step 3) returned HTTP 200 with `content="Your name is Luke, and you're a software engineer."` - explicitly containing both `Luke` and `software engineer`, and not a refusal. Because chat history was fully cleared, the only source of those facts was semantic memory retrieved from Qdrant via AscendMemory.
 
 Input tokens: ~3500
 

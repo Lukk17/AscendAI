@@ -32,7 +32,7 @@ class VisionCapabilityResolverGlobMatchingTest {
     @DisplayName("supports images denies when resolved model is blank")
     @Test
     void supportsImages_DeniesWhenResolvedModelIsBlank() {
-        // given — no provider in the AiProviderProperties map -> resolveModel returns ""
+        // given - no provider in the AiProviderProperties map -> resolveModel returns ""
         when(aiProviderProperties.getDefaultProvider()).thenReturn("openai");
         lenient().when(aiProviderProperties.getProviders()).thenReturn(Map.of());
 

@@ -1,4 +1,4 @@
-# Document summarization — run tasks template
+# Document summarization - run tasks template
 
 Spec: [3-summarization-test.md](../3-summarization-test.md)
 
@@ -13,7 +13,7 @@ Spec: [3-summarization-test.md](../3-summarization-test.md)
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 
@@ -28,7 +28,7 @@ Spec: [3-summarization-test.md](../3-summarization-test.md)
 
 ## Result summary
 
-PDFBox → Docling pipeline parsed all pages and the model produced a grounded summary in ~37s. Bruno HTTP 200. Response contains nearly every spec proper noun: `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `81` duels, `Iren Hask`, `498 A.E.` — far exceeding the three-of list threshold. No refusal.
+PDFBox → Docling pipeline parsed all pages and the model produced a grounded summary in ~37s. Bruno HTTP 200. Response contains nearly every spec proper noun: `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `81` duels, `Iren Hask`, `498 A.E.` - far exceeding the three-of list threshold. No refusal.
 
 Input tokens: ~5000
 

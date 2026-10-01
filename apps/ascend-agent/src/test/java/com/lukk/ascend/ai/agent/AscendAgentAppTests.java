@@ -16,6 +16,7 @@ class AscendAgentAppTests extends BaseIntegrationTest {
     @DisplayName("context loads")
     @Test
     void contextLoads() {
+        // then
         assertNotNull(applicationContext, "Application context should load successfully");
     }
 

@@ -16,7 +16,7 @@ for the entire transcription. The local backend had the same pattern.
 
 ## Decision
 
-Introduce `src/transcription/audio_chunker.py:chunked_audio(audio_path, chunk_seconds)` — a context manager that
+Introduce `src/transcription/audio_chunker.py:chunked_audio(audio_path, chunk_seconds)` - a context manager that
 spawns a single `ffmpeg -f segment -segment_time T -ar 16000 -ac 1 -sample_fmt s16` invocation. ffmpeg streams the
 input, normalises to 16 kHz mono 16-bit signed, and writes numbered WAV chunks to a temp directory. The context
 manager yields the chunk paths; on exit it deletes them.

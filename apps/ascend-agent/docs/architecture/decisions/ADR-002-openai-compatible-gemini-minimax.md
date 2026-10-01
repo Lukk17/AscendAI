@@ -9,9 +9,9 @@ Accepted
 AI providers expose different API formats. We need to decide which SDK/protocol type to use for each provider within the `ChatModelResolver` framework.
 
 Alternatives considered:
-1. **Native SDK per provider** — separate Spring AI starters or custom REST clients
-2. **OpenAI-compatible endpoints** — reuse `OpenAiChatModel` with different base URLs
-3. **Anthropic-compatible endpoints** — reuse `AnthropicChatModel` with different base URLs
+1. **Native SDK per provider** - separate Spring AI starters or custom REST clients
+2. **OpenAI-compatible endpoints** - reuse `OpenAiChatModel` with different base URLs
+3. **Anthropic-compatible endpoints** - reuse `AnthropicChatModel` with different base URLs
 
 ## Decision
 
@@ -29,7 +29,7 @@ The `ChatModelResolver` builds either `OpenAiChatModel` or `AnthropicChatModel` 
 
 ## Consequences
 
-- **Positive**: Only two dependencies needed — `spring-ai-starter-model-openai` and `spring-ai-starter-model-anthropic`
+- **Positive**: Only two dependencies needed - `spring-ai-starter-model-openai` and `spring-ai-starter-model-anthropic`
 - **Positive**: Uniform configuration: all providers share the same `ProviderConfig` schema regardless of type
 - **Positive**: Anthropic-type providers gain native support for thinking models (extended thinking / chain-of-thought)
 - **Negative**: Providers using `type: anthropic` may return multi-block thinking responses; handled by `ChatResponseContentResolver` (see [ADR-005](ADR-005-thinking-model-response-resolution.md))

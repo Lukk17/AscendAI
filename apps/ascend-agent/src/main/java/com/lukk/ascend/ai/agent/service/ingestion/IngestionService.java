@@ -37,7 +37,7 @@ public class IngestionService {
     private static final String PARAM_FILES = "files";
     private static final String UNSTRUCTURED_TITLE_ELEMENT = "Title";
 
-    // JSON field names in the Unstructured API response — distinct from document-metadata keys
+    // JSON field names in the Unstructured API response - distinct from document-metadata keys
     // even when the literal happens to match (the API returns objects like {"type":"Title","text":"..."}).
     private static final String JSON_TYPE = "type";
     private static final String JSON_TEXT = "text";

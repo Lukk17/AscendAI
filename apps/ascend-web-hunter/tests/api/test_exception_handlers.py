@@ -32,34 +32,55 @@ def _make_request() -> Request:
 
 @pytest.mark.asyncio
 async def test_httpx_exception_handler_returns_503():
+    # when
     response = await httpx_exception_handler(_make_request(), httpx.HTTPError("upstream"))
+
+    # then
     assert response.status_code == 503
 
 
 @pytest.mark.asyncio
 async def test_global_exception_handler_returns_500():
+    # when
     response = await global_exception_handler(_make_request(), RuntimeError("boom"))
+
+    # then
     assert response.status_code == 500
 
 
 @pytest.mark.asyncio
 async def test_human_intervention_handler_returns_428_captcha():
+    # given
     exc = HumanInterventionRequiredException(vnc_url="http://vnc", intervention_type="captcha")
+
+    # when
     response = await human_intervention_exception_handler(_make_request(), exc)
+
+    # then
     assert response.status_code == 428
 
 
 @pytest.mark.asyncio
 async def test_human_intervention_handler_returns_428_login():
+    # given
     exc = HumanInterventionRequiredException(vnc_url="http://vnc/log", intervention_type="login")
+
+    # when
     response = await human_intervention_exception_handler(_make_request(), exc)
+
+    # then
     assert response.status_code == 428
 
 
 @pytest.mark.asyncio
 async def test_novnc_flow_busy_handler_returns_409_with_retry_after():
+    # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+
+    # when
     response = await novnc_flow_busy_exception_handler(_make_request(), exc)
+
+    # then
     assert response.status_code == 409
     assert response.headers["Retry-After"] == "30"
     body = json.loads(response.body)

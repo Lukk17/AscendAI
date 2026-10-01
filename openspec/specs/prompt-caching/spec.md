@@ -87,7 +87,7 @@ If a cache-decorated provider call fails because of cache configuration (e.g., A
 
 ### Requirement: Caching is bound to the static prefix only
 
-The cached prefix SHALL contain only globally-static content: the `app.system-prompt` SystemMessage and (for the extraction path) the `EXTRACTOR_INSTRUCTION`. Per-request content — user memory, RAG-retrieved chunks, attached documents, and chat-history turns — SHALL NOT be included in the cached portion of the prompt. This guarantees that no user data crosses user-id boundaries via the cache.
+The cached prefix SHALL contain only globally-static content: the `app.system-prompt` SystemMessage and (for the extraction path) the `EXTRACTOR_INSTRUCTION`. Per-request content - user memory, RAG-retrieved chunks, attached documents, and chat-history turns - SHALL NOT be included in the cached portion of the prompt. This guarantees that no user data crosses user-id boundaries via the cache.
 
 #### Scenario: Per-request user memory is not cached
 

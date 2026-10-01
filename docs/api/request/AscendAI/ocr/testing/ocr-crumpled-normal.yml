@@ -1,0 +1,56 @@
+info:
+  name: ocr-crumpled-normal
+  type: http
+  seq: 29
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs"
+  headers:
+    - name: accept
+      value: application/json
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - "{{ocrFixtures}}/straightening-photo-crumpled-1.jpg"
+        contentType: image/jpeg
+      - name: lang
+        type: text
+        value: pl
+      - name: quality
+        type: text
+        value: normal
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Answer is 202 Accepted, not a completed reading", function () {
+            expect(res.getStatus()).to.equal(202);
+        });
+        test("Answer carries a job identifier and where to read the state", function () {
+            const body = res.getBody();
+            expect(body.job_id).to.be.a("string").with.lengthOf(22);
+            expect(body.state).to.equal("waiting");
+            expect(body.status_url).to.equal("/v1/ocr/jobs/" + body.job_id);
+            expect(res.getHeader("location")).to.equal("/v1/ocr/jobs/" + body.job_id);
+        });
+        test("A full resolution phone photo is accepted as one page, not refused for its pixel count", function () {
+            expect(res.getBody().page_count).to.equal(1);
+        });
+        test("Answer carries no page content", function () {
+            expect(res.getBody()).to.not.have.property("pages");
+        });
+    - type: post-response
+      code: |-
+        bru.setVar("ocrJobId", res.getBody().job_id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

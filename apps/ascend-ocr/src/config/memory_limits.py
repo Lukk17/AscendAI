@@ -17,7 +17,7 @@ def detect_memory_limit_mib() -> float | None:
     Mirrors `detect_cpu_limit()` in `cpu_limits.py`: read the cgroup filesystem
     directly, since that is the only place this process's own ceiling is recorded.
     Unlike the CPU limit, there is no meaningful fallback to substitute when this
-    reads as unlimited or unreadable — `os.cpu_count()` has an obvious host-wide
+    reads as unlimited or unreadable - `os.cpu_count()` has an obvious host-wide
     meaning to fall back to, but there is no host-memory figure that is safe to
     compare a single container's own budget against, so both cases return None
     ("unknown") rather than a guessed number.

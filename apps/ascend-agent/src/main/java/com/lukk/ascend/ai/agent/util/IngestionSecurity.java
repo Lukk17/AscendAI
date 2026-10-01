@@ -26,7 +26,7 @@ public final class IngestionSecurity {
      *       are resolved away before sanitization.</li>
      *   <li>Drop any path component that survived (anything before the last {@code /}).</li>
      *   <li>Strip ASCII control characters.</li>
-     *   <li>Collapse runs of {@code .} (more than one) into a single dot — neutralizes
+     *   <li>Collapse runs of {@code .} (more than one) into a single dot - neutralizes
      *       {@code ..filename} and similar disguised traversal sequences.</li>
      *   <li>Replace anything outside {@code [A-Za-z0-9._-]} with {@code _}.</li>
      *   <li>Collapse repeated underscores.</li>

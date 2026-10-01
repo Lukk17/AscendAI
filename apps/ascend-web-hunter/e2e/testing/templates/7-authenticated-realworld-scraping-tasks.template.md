@@ -17,13 +17,13 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 
 - [ ] Flushed Redis `session:*` keys so the before/after pairs start genuinely blocked.
 
-### Part 2 — Login session reuse (saucedemo, AUTOMATED)
+### Part 2 - Login session reuse (saucedemo, AUTOMATED)
 
 - [ ] Call 1 (blocked/anon): `auth-read-secure-anon.yml` → confirms the login wall (login-required message present) and NO auth-only inventory markers.
 - [ ] Seed: `seed_authenticated_session.py` (copied into the container) logged in and stored the session under `session:saucedemo.com:e2e`.
 - [ ] Call 2 (after login): `auth-read-secure.yml` → HTTP 200, `status="success"`, content contains an auth-only product description (e.g. `"ringspun combed cotton"`).
 
-### Part 1 — Real-world matrix (gated rows MUST match; best-effort record the verdict)
+### Part 1 - Real-world matrix (gated rows MUST match; best-effort record the verdict)
 
 - [ ] a `example.com` → success, `"example domain"`.
 - [ ] b `en.wikipedia.org/wiki/Web_scraping` → success, `"web scraping"`.
@@ -46,7 +46,7 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 - [ ] t `secure.indeed.com/auth?...` → valid terminal verdict recorded.
 - [ ] Any Part 1 row that answered `409`/`novnc_busy` had its `Retry-After` and `holder_url` read from the folder run's JSON output file, and only that row's own request file was re-run after waiting the `Retry-After` seconds, up to 3 attempts in total, with each attempt and each 409 body's `holder_url` recorded under Additional tasks I did. Such a row is a FAIL only after its third 409.
 
-### Part 1 — retail anti-bot rows (content-gated: a success MUST be the requested product page)
+### Part 1 - retail anti-bot rows (content-gated: a success MUST be the requested product page)
 
 - [ ] u `{{scrap_url_allegro}}` (Allegro offer) → valid terminal verdict recorded; any success contains `er-cbn1` and no block-page marker.
 - [ ] v `{{scrap_url_amazon}}` (amazon.pl) → valid terminal verdict recorded; any success contains `B09D14YFR9` and no interstitial marker.
@@ -78,4 +78,4 @@ Duration:
 <!-- Record each best-effort row's actual verdict + serving tier and any
 tier the pipeline escalated to unexpectedly. For the retail anti-bot rows (u, v, w, x, y) also record which branch
 fired per row, and for any FAIL whether the cause was a missing product canary, a tripped interstitial marker, or
-both — a success carrying an interstitial is the defect these rows exist to catch, not a flaky site. -->
+both - a success carrying an interstitial is the defect these rows exist to catch, not a flaky site. -->

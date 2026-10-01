@@ -24,11 +24,7 @@ class CenteredLevelFormatter(colorlog.ColoredFormatter):
         if level_match:
             level_text = level_match.group(2)
             centered_level = level_text.center(8)
-            formatted = (
-                formatted[: level_match.start(2)]
-                + centered_level
-                + formatted[level_match.end(2) :]
-            )
+            formatted = formatted[: level_match.start(2)] + centered_level + formatted[level_match.end(2) :]
         return formatted
 
 
@@ -66,9 +62,7 @@ def get_uvicorn_log_config() -> dict[str, Any]:
     """Generate a logging configuration dictionary for Uvicorn that uses
     CenteredLevelFormatter and the correlation filter."""
 
-    log_format = (
-        "%(log_color)s[AscendMemory] %(asctime)s - %(levelname)s - [%(request_id)s] - %(message)s"
-    )
+    log_format = "%(log_color)s[AscendMemory] %(asctime)s - %(levelname)s - [%(request_id)s] - %(message)s"
 
     return {
         "version": 1,

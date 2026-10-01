@@ -1,0 +1,56 @@
+info:
+  name: ocr-crumpled-straighten-status
+  type: http
+  seq: 31
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs/{{ocrJobId}}"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The record is the one that was asked for", function () {
+            expect(res.getBody().job_id).to.equal(bru.getEnvVar("ocrJobId") || bru.getVar("ocrJobId"));
+        });
+        test("The photo was read to completion", function () {
+            expect(res.getBody().state).to.equal("succeeded");
+        });
+        test("A terminal record carries no hint to ask again", function () {
+            const body = res.getBody();
+            expect(body).to.not.have.property("poll_after_seconds");
+        });
+        test("The result echoes the language it was read in", function () {
+            expect(res.getBody().result.language).to.equal("pl");
+        });
+        test("The result echoes the quality mode it was read in", function () {
+            expect(res.getBody().result.quality).to.equal("high");
+        });
+        test("The straightening the submission asked for is echoed back", function () {
+            expect(res.getBody().result.straighten).to.equal(true);
+        });
+        test("The result is one page, stored under the job's own key", function () {
+            const body = res.getBody();
+            expect(body.result.page_count).to.equal(1);
+            expect(body.result.key).to.equal(body.job_id + ".md");
+            expect(body.result.url).to.be.a("string").that.includes("http");
+        });
+    - type: post-response
+      code: |-
+        if (res.getBody().state === "succeeded") {
+            bru.setVar("ocrResultUrl", res.getBody().result.url);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

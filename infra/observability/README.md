@@ -102,10 +102,10 @@ Grafana auto-loads six dashboards from [grafana/dashboards/](grafana/dashboards/
 | :--- | :--- | :--- |
 | [platform-overview.json](grafana/dashboards/platform-overview.json) | Platform Overview | Request rate, 5xx error rate, p95 latency, memory (JVM heap / Python RSS) per service, container memory used vs. its configured limit (container metrics exporter), and container restart count. |
 | [infrastructure.json](grafana/dashboards/infrastructure.json) | Infrastructure | Qdrant per-collection vector and point counts. |
-| [token-cost.json](grafana/dashboards/token-cost.json) | L1 — Token Cost | LLM token usage and derived cost per provider. |
+| [token-cost.json](grafana/dashboards/token-cost.json) | L1 - Token Cost | LLM token usage and derived cost per provider. |
 | [ai-pipeline.json](grafana/dashboards/ai-pipeline.json) | AI Pipeline | MCP tool call latency and pipeline-stage timing. |
-| [cache-hit-rate.json](grafana/dashboards/cache-hit-rate.json) | L3 — Cache Hit Rate | Prompt-cache read / creation token rates per provider. |
-| [rag-quality.json](grafana/dashboards/rag-quality.json) | L2 — RAG Quality | RAG retrieval top-score distribution and related quality signals. |
+| [cache-hit-rate.json](grafana/dashboards/cache-hit-rate.json) | L3 - Cache Hit Rate | Prompt-cache read / creation token rates per provider. |
+| [rag-quality.json](grafana/dashboards/rag-quality.json) | L2 - RAG Quality | RAG retrieval top-score distribution and related quality signals. |
 
 ---
 

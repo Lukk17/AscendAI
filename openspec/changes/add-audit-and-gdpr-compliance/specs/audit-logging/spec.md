@@ -17,7 +17,7 @@ ascend-ai-agent SHALL persist audit events to a Postgres table `audit_log` creat
 
 ### Requirement: Audit events cover the security-relevant action set
 
-The system SHALL record an audit event for each of the following actions, using a closed action vocabulary: `AUTH_TOKEN_REJECTED` (a request bearing an invalid or expired token is rejected at the resource server), `CHAT_PROMPT` (a prompt request is accepted for processing), `DOCUMENT_UPLOADED`, `DOCUMENT_DELETED`, `DOCUMENT_PRESIGN_ISSUED` (a presigned download URL is handed to a caller), `INGESTION_RUN`, `MEMORY_WIPED`, `ERASURE_REQUESTED`, `ERASURE_COMPLETED`, `ADMIN_OPERATION`, and `QUOTA_REJECTED`. Each event SHALL carry the authenticated actor, the tenant when known, the outcome, and the caller's source IP when available. The `QUOTA_REJECTED` event is emitted from the quota-enforcement path owned by the `add-usage-metering-and-quotas` change through this capability's recorder.
+The system SHALL record an audit event for each of the following actions, using a closed action vocabulary: `AUTH_TOKEN_REJECTED` (a request bearing an invalid or expired token is rejected at the resource server), `CHAT_PROMPT` (a prompt request is accepted for processing), `DOCUMENT_UPLOADED`, `DOCUMENT_DELETED`, `DOCUMENT_PRESIGN_ISSUED` (a presigned download URL is handed to a caller), `INGESTION_RUN`, `MEMORY_WIPED`, `ERASURE_REQUESTED`, `ERASURE_COMPLETED`, `EXPORT_REQUESTED`, `EXPORT_COMPLETED`, `ADMIN_OPERATION`, and `QUOTA_REJECTED`. Each event SHALL carry the authenticated actor, the tenant when known, the outcome, and the caller's source IP when available. The `QUOTA_REJECTED` event is emitted from the quota-enforcement path owned by the `add-usage-metering-and-quotas` change through this capability's recorder.
 
 #### Scenario: Chat request produces an audit row
 
@@ -26,7 +26,7 @@ The system SHALL record an audit event for each of the following actions, using 
 
 #### Scenario: Presigned URL issuance is audited
 
-- **WHEN** a prompt with `attachSources=true` causes presigned MinIO download URLs to be generated
+- **WHEN** a prompt with `attachSources=true` causes presigned download URLs for the Floci `knowledge-base` bucket to be generated
 - **THEN** an audit row with `action = 'DOCUMENT_PRESIGN_ISSUED'` records the actor and the object keys (as `resource_id` / `details`), one row per issuance batch
 
 #### Scenario: Rejected token is audited
@@ -61,12 +61,12 @@ Audit events SHALL be written through an `AuditRecorder` service (Spring applica
 
 ### Requirement: ADMIN-only audit query API with filters and pagination
 
-ascend-ai-agent SHALL expose `GET /api/v1/audit` returning audit rows ordered by `occurred_at` descending, filterable by `actor`, `action`, `outcome`, and a `from`/`to` time window, paginated via `page` and `size` (size capped at 200). The endpoint SHALL require the ADMIN role (from `add-auth-and-identity`); non-admin callers receive HTTP 403.
+ascend-ai-agent SHALL expose `GET /api/v1/audit` returning audit rows ordered by `occurred_at` descending, filterable by `actor`, `action`, `outcome`, and a `from`/`to` time window, paginated via `page` and `size` (size capped at 200). The endpoint SHALL require the tenant ADMIN role (from `add-auth-and-identity`) and SHALL return only rows of the caller's own tenant. Non-admin callers receive HTTP 403. A cross-tenant query role is out of scope here and belongs to `add-tenant-administration`.
 
 #### Scenario: Admin filters by action and time window
 
 - **WHEN** an ADMIN calls `GET /api/v1/audit?action=DOCUMENT_UPLOADED&from=2026-07-01T00:00:00Z&page=0&size=50`
-- **THEN** the response is HTTP 200 with a page envelope containing only `DOCUMENT_UPLOADED` rows at or after the `from` instant, newest first
+- **THEN** the response is HTTP 200 with a page envelope containing only `DOCUMENT_UPLOADED` rows of the ADMIN's own tenant at or after the `from` instant, newest first
 
 #### Scenario: Non-admin is refused
 

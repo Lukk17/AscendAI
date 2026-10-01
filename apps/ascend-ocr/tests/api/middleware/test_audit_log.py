@@ -4,7 +4,9 @@ from collections.abc import Iterator
 import pytest
 
 from src.api.middleware.audit_log import emit_mcp_audit
-from src.api.middleware.correlation_id import set_correlation_id
+from src.api.middleware.correlation_id import mcp_request_log_context
+
+AUDITED_CORRELATION_ID = "corr-1"
 
 
 @pytest.fixture
@@ -36,29 +38,32 @@ def audit_records() -> Iterator[list[logging.LogRecord]]:
         logger.setLevel(previous_level)
 
 
-class TestEmitMcpAudit:
-    def test_emits_record_with_audit_fields(self, audit_records: list[logging.LogRecord]):
-        # Given
-        set_correlation_id("corr-1")
+@pytest.fixture
+def audited_correlation_id() -> Iterator[str]:
+    with mcp_request_log_context(AUDITED_CORRELATION_ID, None):
+        yield AUDITED_CORRELATION_ID
 
+
+class TestEmitMcpAudit:
+    def test_emits_record_with_audit_fields(
+        self, audit_records: list[logging.LogRecord], audited_correlation_id: str
+    ) -> None:
         # When
-        emit_mcp_audit("ocr_process", "http", "host.docker.internal", 1024, "ok")
+        emit_mcp_audit("ocr_submit", "http", "host.docker.internal", 1024, "ok")
 
         # Then
         record = next(r for r in audit_records if r.name == "ascend-ocr.audit")
         fields = dict(record.__dict__)
-        assert fields["audit_action"] == "ocr_process"
+        assert fields["audit_action"] == "ocr_submit"
         assert fields["audit_scheme"] == "http"
         assert fields["audit_host"] == "host.docker.internal"
         assert fields["audit_bytes"] == 1024
         assert fields["audit_outcome"] == "ok"
-        assert fields["correlation_id"] == "corr-1"
+        assert fields["correlation_id"] == audited_correlation_id
 
-    def test_emits_record_with_none_host_placeholder(
-            self, audit_records: list[logging.LogRecord]
-    ):
+    def test_emits_record_with_none_host_placeholder(self, audit_records: list[logging.LogRecord]) -> None:
         # When
-        emit_mcp_audit("ocr_process", "file", None, 256, "ok")
+        emit_mcp_audit("ocr_submit", "file", None, 256, "ok")
 
         # Then
         record = next(r for r in audit_records if r.name == "ascend-ocr.audit")

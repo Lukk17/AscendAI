@@ -43,7 +43,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-All seven Expected assertions passed. Step 1 (save turn) returned HTTP 200. After the 5-second wait, Qdrant scroll returned 2 points for user `frostySemanticMemoryTest`: one with payload `"User's name is Luke"` and one with `"User is a software engineer"`, satisfying the ≥1 point and payload content assertions. Step 2 wiped Redis (1 key deleted) and Postgres (2 rows deleted), ensuring no chat-history leakage. Step 3 (recall turn) returned HTTP 200 with `content`: `"Your name is **Luke**, and you're a **software engineer**."` — containing both `Luke` and `software engineer`, and not a refusal. The only source of those facts after history wipe was semantic memory, confirming the full save → extract → store → retrieve pipeline is working correctly.
+All seven Expected assertions passed. Step 1 (save turn) returned HTTP 200. After the 5-second wait, Qdrant scroll returned 2 points for user `frostySemanticMemoryTest`: one with payload `"User's name is Luke"` and one with `"User is a software engineer"`, satisfying the ≥1 point and payload content assertions. Step 2 wiped Redis (1 key deleted) and Postgres (2 rows deleted), ensuring no chat-history leakage. Step 3 (recall turn) returned HTTP 200 with `content`: `"Your name is **Luke**, and you're a **software engineer**."` - containing both `Luke` and `software engineer`, and not a refusal. The only source of those facts after history wipe was semantic memory, confirming the full save → extract → store → retrieve pipeline is working correctly.
 
 Input tokens: ~8000
 

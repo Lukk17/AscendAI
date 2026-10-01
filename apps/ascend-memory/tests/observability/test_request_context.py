@@ -13,12 +13,14 @@ from src.observability.request_context import (
 )
 
 
-def test_pattern_accepts_safe_ids():
+def test_pattern_accepts_safe_ids() -> None:
+    # when / then
     assert _REQUEST_ID_PATTERN.fullmatch("abc-123_45")
     assert _REQUEST_ID_PATTERN.fullmatch("x" * 128)
 
 
-def test_pattern_rejects_unsafe_ids():
+def test_pattern_rejects_unsafe_ids() -> None:
+    # when / then
     assert _REQUEST_ID_PATTERN.fullmatch("") is None
     assert _REQUEST_ID_PATTERN.fullmatch("x" * 129) is None
     assert _REQUEST_ID_PATTERN.fullmatch("bad\r\nthing") is None
@@ -49,52 +51,64 @@ class _FakeResponse:
 
 
 @pytest.mark.asyncio
-async def test_dispatch_echoes_valid_incoming_id():
+async def test_dispatch_echoes_valid_incoming_id() -> None:
+    # given
     middleware = RequestIdMiddleware(app=AsyncMock())
     request = _build_request({REQUEST_ID_HEADER: "incoming-123"})
     response = _FakeResponse()
 
+    # when
     call_next = AsyncMock(return_value=response)
     result = await middleware.dispatch(request, call_next)
 
+    # then
     assert result.headers[REQUEST_ID_HEADER] == "incoming-123"
 
 
 @pytest.mark.asyncio
-async def test_dispatch_generates_uuid_when_no_header():
+async def test_dispatch_generates_uuid_when_no_header() -> None:
+    # given
     middleware = RequestIdMiddleware(app=AsyncMock())
     request = _build_request()
     response = _FakeResponse()
 
+    # when
     call_next = AsyncMock(return_value=response)
     result = await middleware.dispatch(request, call_next)
 
+    # then
     rid = result.headers[REQUEST_ID_HEADER]
     assert len(rid) >= 16
 
 
 @pytest.mark.asyncio
-async def test_dispatch_generates_uuid_when_header_malformed():
+async def test_dispatch_generates_uuid_when_header_malformed() -> None:
+    # given
     middleware = RequestIdMiddleware(app=AsyncMock())
     request = _build_request({REQUEST_ID_HEADER: "bad\nvalue"})
     response = _FakeResponse()
 
+    # when
     call_next = AsyncMock(return_value=response)
     result = await middleware.dispatch(request, call_next)
 
+    # then
     rid = result.headers[REQUEST_ID_HEADER]
     assert rid != "bad\nvalue"
     assert "\n" not in rid
 
 
 @pytest.mark.asyncio
-async def test_dispatch_resets_context_var_after_response():
+async def test_dispatch_resets_context_var_after_response() -> None:
+    # given
     middleware = RequestIdMiddleware(app=AsyncMock())
     request = _build_request({REQUEST_ID_HEADER: "scoped"})
     response = _FakeResponse()
 
+    # when
     call_next = AsyncMock(return_value=response)
     await middleware.dispatch(request, call_next)
 
+    # then
     # The context var should reset to the default outside the request scope.
     assert request_id_ctx.get() == "-"

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-05-31
+Accepted - 2026-05-31
 
 ## Context
 
@@ -85,8 +85,8 @@ parameter caps the number of articles parsed; all parsing stops once `limit` res
 
 ## Related
 
-- `src/search/search_client.py` — `SearxngClient.search`, `_parse_html_results`.
-- `src/api/rest/rest_endpoints.py:26-38` — `GET /api/v1/web/search` calls `search_client.search`.
-- `src/api/mcp/mcp_server.py:16-28` — `web_search` MCP tool calls `search_client.search`.
-- `src/config/config.py` — `SEARXNG_BASE_URL`, `SEARCH_TIMEOUT`, `SEARXNG_USER_AGENT`.
-- `compose.ascend-web-hunter.yaml` — SearXNG service definition at port 9020.
+- `src/search/search_client.py` - `SearxngClient.search`, `_parse_html_results`.
+- `src/api/rest/rest_endpoints.py:26-38` - `GET /api/v1/web/search` calls `search_client.search`.
+- `src/api/mcp/mcp_server.py:16-28` - `web_search` MCP tool calls `search_client.search`.
+- `src/config/config.py` - `SEARXNG_BASE_URL`, `SEARCH_TIMEOUT`, `SEARXNG_USER_AGENT`.
+- `compose.ascend-web-hunter.yaml` - SearXNG service definition at port 9020.

@@ -10,11 +10,11 @@ Long conversations are summarised rather than re-sent in full or truncated away.
 The system SHALL bind a `ChatHistoryCompactionProperties` `@ConfigurationProperties` class at prefix `app.memory.chat-history.compaction` with at minimum the following keys, all backed by sensible defaults so a fresh deployment behaves correctly with zero operator configuration:
 
 - `enabled` (boolean, default `true`)
-- `turn-trigger` (int, default `20`) — fire compaction when raw turn count reaches this value.
-- `token-trigger-fraction` (double in `(0.0, 1.0]`, default `0.5`) — fire compaction when estimated input tokens reach this fraction of the resolved provider context window.
-- `keep-recent-turns` (int, default `8`) — number of most-recent turns to leave raw.
-- `max-summary-tokens` (int, default `800`) — soft cap on summary length; outputs above `1.5 ×` this value are rejected.
-- `provider-defaults` (`Map<String, String>`) — per-provider default compaction model. Defaults populated for `openai`, `anthropic`, `gemini`, `minimax`, `lmstudio`.
+- `turn-trigger` (int, default `20`) - fire compaction when raw turn count reaches this value.
+- `token-trigger-fraction` (double in `(0.0, 1.0]`, default `0.5`) - fire compaction when estimated input tokens reach this fraction of the resolved provider context window.
+- `keep-recent-turns` (int, default `8`) - number of most-recent turns to leave raw.
+- `max-summary-tokens` (int, default `800`) - soft cap on summary length; outputs above `1.5 ×` this value are rejected.
+- `provider-defaults` (`Map<String, String>`) - per-provider default compaction model. Defaults populated for `openai`, `anthropic`, `gemini`, `minimax`, `lmstudio`.
 
 #### Scenario: Defaults preserve out-of-the-box behavior
 
@@ -147,13 +147,13 @@ The compaction LLM output SHALL be a single SystemMessage whose text begins with
 
 When both `app.memory.chat-history.redis.enabled` and `app.memory.chat-history.postgres.enabled` are `false`, `PersistentChatMemory.add(...)` SHALL short-circuit before invoking the compaction service. When only one backend is enabled, the compaction service SHALL replace the prefix only in that backend.
 
-#### Scenario: Both backends disabled — compaction not invoked
+#### Scenario: Both backends disabled - compaction not invoked
 
 - **WHEN** a request adds messages with both chat-history toggles set to `false`
 - **THEN** `ChatHistoryCompactionService.maybeCompact(...)` is NOT called
 - **AND** no LLM call is dispatched
 
-#### Scenario: Redis disabled, Postgres enabled — only Postgres receives the replace
+#### Scenario: Redis disabled, Postgres enabled - only Postgres receives the replace
 
 - **WHEN** compaction fires with `redis.enabled=false`, `postgres.enabled=true`
 - **THEN** the Postgres prefix replacement (delete oldest N rows + insert one summary row) is executed inside a single transaction via `TransactionTemplate`

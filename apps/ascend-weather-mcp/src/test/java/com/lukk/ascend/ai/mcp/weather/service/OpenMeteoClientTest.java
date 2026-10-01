@@ -97,7 +97,7 @@ class OpenMeteoClientTest {
         mockServer.expect(requestTo(containsString("geocoding-api.open-meteo.com")))
                 .andRespond(withSuccess(GEO_SINGLE_RESPONSE, MediaType.APPLICATION_JSON));
 
-        // when — "AQ" is a real ISO-3166-1 alpha-2 code (Antarctica) that will not match PL
+        // when - "AQ" is a real ISO-3166-1 alpha-2 code (Antarctica) that will not match PL
         Optional<GeoResult> result = client.geocode(CITY, "AQ", LANG_EN);
 
         // then

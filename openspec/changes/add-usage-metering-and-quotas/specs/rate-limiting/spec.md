@@ -1,4 +1,4 @@
-# rate-limiting — Delta Specification
+# rate-limiting - Delta Specification
 
 ## ADDED Requirements
 

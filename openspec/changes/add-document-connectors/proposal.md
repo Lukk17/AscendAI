@@ -1,6 +1,10 @@
+## Build order
+
+This change is not part of group D. It runs after group C (add-auth-and-identity, add-tenant-isolation, add-usage-metering-and-quotas, add-audit-and-gdpr-compliance, tenant administration, tenant policy) and before add-customer-stack-installer. It also needs add-document-management-api (group D) for the document registry, `IngestionRunService` and the single-document deletion path.
+
 ## Why
 
-The only ways to get a document into the RAG knowledge base today are hand-driven: a multipart upload to `POST /api/v1/ingestion/upload` (`apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/controller/IngestionController.java`), or dropping files into the MinIO knowledge-base bucket out-of-band and calling `POST /api/v1/ingestion/run`, which scans the bucket with ETag dedupe (`service/ingestion/ManualIngestionService.java`). A Spring Integration S3 poller exists but is off by default (`config/IngestionPipelineConfig.java`, `app.ingestion.auto.enabled=false` in `application.yaml`). For a company, that model does not survive contact with reality: corporate policies, handbooks, and procedures live in SharePoint and OneDrive, they change weekly, and nobody is going to re-upload them by hand. Without automated sync the knowledge base silently goes stale, the worst failure mode for a RAG product, because answers keep coming but stop being true.
+The only ways to get a document into the RAG knowledge base today are hand-driven: a multipart upload to `POST /api/v1/ingestion/upload` (`apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/controller/IngestionController.java`), or dropping files into the object storage knowledge-base bucket out-of-band and calling `POST /api/v1/ingestion/run`, which scans the bucket with ETag dedupe (`service/ingestion/ManualIngestionService.java`). A Spring Integration S3 poller exists but is off by default (`config/IngestionPipelineConfig.java`, `app.ingestion.auto.enabled=false` in `application.yaml`). For a company, that model does not survive contact with reality: corporate policies, handbooks, and procedures live in SharePoint and OneDrive, they change weekly, and nobody is going to re-upload them by hand. Without automated sync the knowledge base silently goes stale, the worst failure mode for a RAG product, because answers keep coming but stop being true.
 
 Those documents are not uniformly readable by the company that owns them, and this version does not fix that. `docs/architecture/permission-aware-retrieval.md` and ADR-M004 through ADR-M009 settle how it is fixed: every chunk carries the list of group principals permitted to read it, and the search filters on that list. Two sibling changes own the reading side. Capturing that list from the source was this change's half, and it is deferred, because `add-auth-and-identity` mints principals only from Keycloak realm groups and a SharePoint permission entry names an Entra ID directory object id that no principal in this version can equal. A captured list would match nobody, for everybody, and under deny-by-default every synced document would be invisible to the whole company.
 
@@ -15,7 +19,7 @@ This change adds a connector framework for automated document sync from corporat
   - Scheduled incremental sync jobs per enabled connector, plus an on-demand trigger.
   - Sync-run history: one record per run with status, timing, and per-file outcomes (added / updated / deleted / skipped / failed with reason).
   - Connector CRUD REST API under `/api/v1/connectors` (ADMIN role): create, list, get, update, disable, delete, trigger-sync-now, and get sync history.
-  - Explicit design principle: a connector's only job is to land bytes and trigger the existing ingestion pipeline. All parsing stays in the existing `DocumentRouter` path (markdown parser, Docling, ascend-ocr, Unstructured). No parallel parse path, and no write to the vector store from a connector by any route.
+  - Explicit design principle: a connector's only job is to land bytes and trigger the existing ingestion pipeline. All parsing stays in the `DocumentRouter` path (markdown parser, Docling, ascend-ocr, Unstructured). The bucket scan reaches `DocumentRouter` only because add-document-management-api moves `ManualIngestionService` onto it (that change's tasks 3.2a and 3.2b). Today the bucket scan routes markdown-vs-unstructured and never calls `DocumentRouter`. No parallel parse path, and no write to the vector store from a connector by any route.
 - Company-wide visibility for synced documents:
   - Every chunk of a connector-landed document carries `acl` of `["tenant:everyone:{tenantId}"]` with `acl_source` of `tenant-default`, stamped by the ingestion producer default that `add-tenant-isolation` owns. The connector composes no access list itself, so there is exactly one producer of that principal in the system.
   - Per-document permissions captured from the source are deferred whole, with their design, their decision records, and their failure analysis preserved.
@@ -31,7 +35,7 @@ This change adds a connector framework for automated document sync from corporat
   - Scoping to selected sites, drives, and folders.
   - File-type filter aligned with the existing upload allowlist (`app.ingestion.upload.allowed-mime-types`: pdf, docx, pptx, markdown, plain text, images) and a per-file size limit.
   - Throttling compliance per Graph API guidance: honour `Retry-After` on 429/503, exponential backoff, bounded retries, with one throttle budget per run.
-- Deletion propagation: a file removed at the source is removed from MinIO and its chunks removed from Qdrant on the next sync, reusing the single-document deletion machinery owned by the sibling `add-document-management-api` change.
+- Deletion propagation: a file removed at the source is removed from object storage and its chunks removed from Qdrant on the next sync, reusing the single-document deletion machinery owned by the sibling `add-document-management-api` change.
 - Credentials encrypted at rest: connector credentials (client secrets) are stored using the same encryption mechanism family as BYOK keys in the sibling `add-usage-metering-and-quotas` change, coordinated there, not re-specified here.
 
 Follow-on connectors (Google Drive, Confluence, network share) are explicit non-goals; the framework interfaces make them additive.
@@ -40,7 +44,7 @@ Follow-on connectors (Google Drive, Confluence, network share) are explicit non-
 
 ### New Capabilities
 
-- `document-connectors`: provider-agnostic connector framework: persisted per-tenant connector configuration, scheduled and on-demand incremental sync, the company-wide visibility rule for connector-landed documents, sync-run history with per-file outcomes, the sync freshness check and its configuration invariant, deletion propagation into MinIO and Qdrant, an ADMIN-only CRUD API with its filter-chain authorization rule, encrypted credential storage, and the connector to MinIO to existing-pipeline landing contract.
+- `document-connectors`: provider-agnostic connector framework: persisted per-tenant connector configuration, scheduled and on-demand incremental sync, the company-wide visibility rule for connector-landed documents, sync-run history with per-file outcomes, the sync freshness check and its configuration invariant, deletion propagation into object storage and Qdrant, an ADMIN-only CRUD API with its filter-chain authorization rule, encrypted credential storage, and the connector to object storage to existing-pipeline landing contract.
 - `sharepoint-connector`: SharePoint/OneDrive sync via Microsoft Graph: client-credentials auth per tenant, delta-query incremental change detection with persisted delta tokens, the content application permission grants a sync actually requires, site/drive/folder scoping, file-type and size filtering aligned with the upload allowlist, and 429/503 throttling compliance with a bounded per-run budget.
 
 ### Modified Capabilities
@@ -50,7 +54,7 @@ Follow-on connectors (Google Drive, Confluence, network share) are explicit non-
 ## Impact
 
 - ascend-ai-agent (new code): `service/connector/` package (framework interfaces, sync orchestrator, scheduler, freshness check), `service/connector/sharepoint/` (Graph client, delta sync), `controller/ConnectorController.java`, JPA entities + repositories for connector config, sync runs, per-file outcomes, and delta cursors; new Liquibase changelog under `src/main/resources/db/changelog/`; `@ConfigurationProperties` for connector defaults in `application.yaml`; one filter-chain rule added to `SecurityConfig`.
-- Reused unchanged: MinIO landing via `StorageService`, the bucket scan (`ManualIngestionService`) and its ETag deduplication marker format, the `DocumentRouter` parse path, the MIME allowlist and filename sanitization from `ingestion-security`, and the access-list stamp from `add-tenant-isolation`.
+- Reused unchanged: object storage landing via `StorageService`, the bucket scan started through `IngestionRunService` (add-document-management-api) and its document registry ETag deduplication, the `DocumentRouter` parse path that the bucket scan uses once add-document-management-api is in place, the MIME allowlist and filename sanitization from `ingestion-security`, and the access-list stamp from `add-tenant-isolation`.
 - Dependencies (sibling changes): `add-auth-and-identity` (the ADMIN role that guards the API and the authenticated principal recorded on mutations), `add-tenant-isolation` (documents land under the tenant prefix and carry tenant metadata; the four access-list metadata keys, the `tenant:everyone:{tenantId}` pseudo-group and the producer default that stamps it), `add-document-management-api` (document metadata/status model and the single-document deletion path), `add-usage-metering-and-quotas` (encryption-at-rest mechanism for stored credentials).
 - External: outbound HTTPS to Microsoft Graph (`graph.microsoft.com`); customer-side Azure app registration with content application permissions only (documented in a new `docs/CONNECTORS.md`).
 - Docs: new `docs/CONNECTORS.md` setup guide including the Azure app-registration steps a customer admin must perform and the company-wide visibility statement a customer is told; root `AGENTS.md` and `apps/ascend-agent/AGENTS.md` touch-ups. Decision records for what this change decides beyond ADR-M004 through ADR-M009 live under `decisions/` in this change folder, several of them deferred under the current scope with their analysis intact.
@@ -60,9 +64,10 @@ Follow-on connectors (Google Drive, Confluence, network share) are explicit non-
 
 - `/springboot-patterns`
 - `/java-coding-standards`
-- `/jpa-patterns`
-- `/database-migrations`
 - `/api-design`
-- `/springboot-security`
-- `/springboot-tdd`
+- `/postgres-patterns`
+- `/database-migrations`
 - `/security-review`
+- `/backend-patterns`
+- `/architecture-decision-records`
+- `/tdd-workflow`

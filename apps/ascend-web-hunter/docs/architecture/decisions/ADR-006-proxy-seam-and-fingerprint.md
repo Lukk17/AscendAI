@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-06-15
+Accepted - 2026-06-15
 
 ## Context
 
@@ -23,7 +23,7 @@ Anti-bot systems on target sites (LinkedIn, Cloudflare-protected domains) detect
 
 ## Decision
 
-### D1 — Coherent `Fingerprint` value object
+### D1 - Coherent `Fingerprint` value object
 
 A single `Fingerprint` dataclass (`src/reader/fingerprint.py`) carries `user_agent`, `locale`, `timezone_id`,
 `geolocation`, `viewport_width`, and `viewport_height` as one internally consistent set. Every browser-based
@@ -37,7 +37,7 @@ The default built-in persona is "New York, English, Chrome on Windows":
 
 This eliminates the prior mismatched combinations. All three tiers now agree on the same location identity.
 
-### D2 — Optional proxy via `ProxyProvider`
+### D2 - Optional proxy via `ProxyProvider`
 
 A `ProxyProvider` singleton (`src/proxy/proxy_provider.py`) reads `PROXY_URL` from settings. When unset (the
 default), every `for_*()` method returns `None` and all tiers fetch over direct egress, unchanged. When set,
@@ -53,7 +53,7 @@ each tier receives the proxy in the format it expects:
 No proxy authentication or per-domain routing is added. If rotation or auth is needed, a proxy manager sits
 upstream and exposes a single CONNECT URL.
 
-### D3 — Patchright evaluation outcome: keep playwright-stealth
+### D3 - Patchright evaluation outcome: keep playwright-stealth
 
 `patchright` patches Chromium at the binary level and removes CDP-detectable automation flags that `playwright-stealth`
 can only hide with JavaScript. However, it is **not a clean drop-in** for this codebase as of evaluation date
@@ -61,7 +61,7 @@ can only hide with JavaScript. However, it is **not a clean drop-in** for this c
 
 - `patchright` does not publish Python stubs; mypy strict mode fails without a `[[tool.mypy.overrides]]` exemption.
 - The `playwright-stealth` `Stealth.apply_stealth_async(page)` API surface used in `PlaywrightStrategy` has no
-  equivalent single-call API in `patchright` — migration would require replacing the `browser_pool` singleton
+  equivalent single-call API in `patchright` - migration would require replacing the `browser_pool` singleton
   pattern and changing the context-creation flow in both `PlaywrightStrategy` and the NoVNC monitor.
 - `patchright` is maintained by a single contributor with no published stability guarantees.
 
@@ -71,7 +71,7 @@ tell. `patchright` should be re-evaluated when it publishes Python stubs and a s
 ## Alternatives Considered
 
 ### Alternative 1: Hardcode a single "best" user-agent and locale globally
-- **Pros**: Simpler — no `Fingerprint` class.
+- **Pros**: Simpler - no `Fingerprint` class.
 - **Cons**: No seam for per-request or per-site overrides. A site-specific persona (e.g. a mobile UA for a
   mobile-only site) would require code changes.
 - **Why not**: The `Fingerprint` dataclass is minimal overhead and gives the seam without adding complexity.
@@ -79,7 +79,7 @@ tell. `patchright` should be re-evaluated when it publishes Python stubs and a s
 ### Alternative 2: Rotate through multiple `Fingerprint` personas per request
 - **Pros**: Harder to fingerprint across requests.
 - **Cons**: Rotation is a bot-detection heuristic, not a human pattern. A human using LinkedIn always uses the
-  same browser — rotation is a signal.
+  same browser - rotation is a signal.
 - **Why not**: Out of scope per the spec ("no self-throttling, no rate-limiting"). Fingerprint coherence is the
   goal; rotation is a separate concern.
 
@@ -103,11 +103,11 @@ tell. `patchright` should be re-evaluated when it publishes Python stubs and a s
 
 ## Related
 
-- `src/reader/fingerprint.py` — `Fingerprint`, `get_default_fingerprint`.
-- `src/proxy/proxy_provider.py` — `ProxyProvider`, `proxy_provider`.
-- `src/reader/strategies/playwright_strategy.py` — consumes `Fingerprint` and `ProxyProvider`.
-- `src/reader/strategies/crawlee_strategy.py` — consumes `Fingerprint` and `ProxyProvider`.
-- `src/reader/strategies/novnc_strategy.py` — consumes `Fingerprint`.
-- `src/reader/strategies/curl_cffi_fetcher.py` — consumes `ProxyProvider`.
-- `src/reader/strategies/flaresolverr_strategy.py` — consumes `ProxyProvider`.
-- `src/config/config.py` — `PROXY_URL`.
+- `src/reader/fingerprint.py` - `Fingerprint`, `get_default_fingerprint`.
+- `src/proxy/proxy_provider.py` - `ProxyProvider`, `proxy_provider`.
+- `src/reader/strategies/playwright_strategy.py` - consumes `Fingerprint` and `ProxyProvider`.
+- `src/reader/strategies/crawlee_strategy.py` - consumes `Fingerprint` and `ProxyProvider`.
+- `src/reader/strategies/novnc_strategy.py` - consumes `Fingerprint`.
+- `src/reader/strategies/curl_cffi_fetcher.py` - consumes `ProxyProvider`.
+- `src/reader/strategies/flaresolverr_strategy.py` - consumes `ProxyProvider`.
+- `src/config/config.py` - `PROXY_URL`.

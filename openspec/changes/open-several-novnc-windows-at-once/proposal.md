@@ -100,12 +100,11 @@ Observability that names the flow:
   layout calculation. Pure enough to test to the module's 100 percent branch gate without launching a browser.
 - `apps/ascend-web-hunter/src/reader/strategies/novnc_strategy.py`: the global lock is deleted, the strategy reserves
   or joins a flow, and the monitor becomes per-flow.
-- `apps/ascend-web-hunter/src/reader/cloudflare/cookie_manager.py`: the registrable-domain calculation is promoted to
-  a module-level function so the registry can key on the same value the session store keys on, without a third copy
-  of the rule and without two more `# noqa: SLF001` call sites.
+- `apps/ascend-web-hunter/src/reader/cloudflare/cookie_manager.py`: unchanged. The registry reuses the public static
+  method `CookieManager.registrable_domain(url)`, so it keys on the same value the session store keys on.
 - `apps/ascend-web-hunter/src/api/`: the two exception bodies, the new listing endpoint on both surfaces, and the
   exception's own fields.
-- `apps/ascend-web-hunter/src/config/config.py`: nine settings, listed with their derivations in
+- `apps/ascend-web-hunter/src/config/config.py`: ten settings, listed with their derivations in
   [design.md](design.md).
 - `apps/ascend-web-hunter/src/main.py`: the sweeper task and the shutdown hook in the existing lifespan.
 - `apps/ascend-web-hunter/src/observability/metrics.py`: one gauge and three counters.
@@ -113,8 +112,11 @@ Observability that names the flow:
   module's configured `--cov-fail-under=100` with `--cov-branch`.
 - `apps/ascend-web-hunter/e2e/testing/7-authenticated-realworld-scraping-test.md` and its sidecar template: the four
   rows that answered 409 get a stated expectation, and a new gated Part 4 exercises several windows at once.
-- Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, a new ADR-009, an amendment to ADR-003, and one evidence
+- Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, a new ADR-013, an amendment to ADR-003, and one evidence
   line on F22.
+- `apps/ascend-web-hunter/pyproject.toml` and `CHANGELOG.md`: the version moves from 0.0.6 to 0.0.7 with one
+  `## [0.0.7]` entry. That one bump and that one entry also cover `detect-challenge-walls-in-any-language`, which
+  ships in the same release and adds its lines to the same entry.
 
 ## Out of Scope
 
@@ -130,7 +132,10 @@ Observability that names the flow:
 - Any change to `/ready`. A full intervention registry is not unreadiness: search and every non-intervention read
   tier still work. Stated as a requirement so nobody adds it later by reflex.
 - Automated captcha solving, and the pending anti-bot interstitial fix that rows v, w, x and y of e2e spec 7 already
-  depend on. Neither is touched here.
+  depend on. Neither is touched here. The interstitial fix is `detect-challenge-walls-in-any-language`.
+- A headed browser as an automated read tier before the human is asked. On 2026-09-10 the headed NoVNC browser
+  cleared a Cloudflare wall with nobody at the keyboard, but turning that into a tier is a separate decision. It is
+  recorded as a possible follow-up change, and nothing in this change builds or measures it.
 
 ## Risks
 
@@ -143,7 +148,7 @@ Observability that names the flow:
   in the display spec as the accepted behaviour rather than left to be discovered.
 - A wider unauthenticated surface. With one window, anyone holding the `vnc_url` could see one site. With four, they
   can see four, including any login a human is part way through. This is a real widening of ADR-003's accepted
-  posture, it is recorded in ADR-009 rather than buried, and the ADR states plainly that `VNC_PASSWORD` should be set
+  posture, it is recorded in ADR-013 rather than buried, and the ADR states plainly that `VNC_PASSWORD` should be set
   on any deployment where the tunnel is reachable by anyone but the operator.
 - A joined flow couples two callers. Caller B's outcome now depends on a window that was opened for caller A and on
   whether the human finishes it. This is the deliberate trade that keeps 409 meaning only one thing, and it is safe
@@ -175,9 +180,12 @@ Observability that names the flow:
 
 ### Modified Capabilities
 
-None. No capability under `openspec/specs/` covers ascend-web-hunter today. The three above stand on their own, and
-they deliberately do not restate anything from the unarchived `web-search-authenticated-sessions` delta, which owns
-the session store, its keys and its TTLs and is left untouched by this change.
+None. `openspec/specs/` holds five capabilities for ascend-web-hunter: `web-search-antibot-evasion`,
+`web-search-authenticated-sessions`, `web-search-caching-observability`, `web-search-extraction-quality` and
+`web-search-fetch-correctness`. None of them states the single-flow lock, the 409 busy answer, the fixed CDP port or
+the window layout, so no requirement in them changes and this change needs no MODIFIED or REMOVED delta. The three
+new capabilities above do not restate anything from `web-search-authenticated-sessions`, which owns the session
+store, its keys and its TTLs and is left untouched.
 
 ## Impact
 
@@ -195,18 +203,26 @@ a test before the suite goes green. `tests/reader/strategies/test_novnc_flow_loc
 tests, and `test_novnc_concurrency.py` is rewritten against the registry.
 
 Docs: the environment variable tables in `apps/ascend-web-hunter/AGENTS.md`, `README.md` and `docs/configuration.md`,
-a new ADR-009 for the concurrency model and its security widening, an amendment to ADR-003 whose single-flow and
+a new ADR-013 for the concurrency model and its security widening, an amendment to ADR-003 whose single-flow and
 fixed-CDP-port paragraphs this change supersedes, and one evidence line on F22 in `docs/DEFECT_REGISTER.md` recording
 that its collision cannot recur under the new model. F22 is not reopened.
+
+## Dependencies and Build Order
+
+The owner fixed the build order on 2026-10-01: this change first, then `detect-challenge-walls-in-any-language`, then
+`enhance-web-search-tier-ladder`, then `enhance-web-search-extraction-and-tiers` (structured extraction), then
+`enhance-web-search-crawl-at-scale`. This change depends on nothing unbuilt. `detect-challenge-walls-in-any-language`
+depends on it, because its spec 7 Amazon rows need a cap of at least 5. Both changes ship together as
+ascend-web-hunter 0.0.7.
 
 ## Relevant Skills
 
 Load before implementing:
 
-- `/python-patterns`, `/python-testing`, `/tdd-workflow`
+- `/python-patterns`, `/tdd-workflow`
 - `/api-design` for the two response bodies, the new listing endpoint and the 409 semantics
 - `/docker-patterns` for the display, the window manager and the per-flow browser process footprint
 - `/security-review` for the CDP port change, the widened unauthenticated VNC surface and the new listing endpoint
 - `/e2e-runbooks` for the spec 7 changes and its sidecar tasks template
 - `/coding-standards`, `/code-reviewer`
-- `/architecture-decision-records` for ADR-009 and the ADR-003 amendment
+- `/architecture-decision-records` for ADR-013 and the ADR-003 amendment

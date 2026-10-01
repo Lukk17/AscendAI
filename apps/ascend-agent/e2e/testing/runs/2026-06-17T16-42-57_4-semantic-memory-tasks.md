@@ -43,7 +43,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-All seven assertions passed. Step 1 (save turn) returned HTTP 200; the agent responded acknowledging Luke by name. After the 5-second async write delay, a Qdrant scroll on `ascend_memory_1536` filtered by `user_id=frostySemanticMemoryTest` returned 4 points — two with `"data": "User's name is Luke"` and two with `"data": "User is a software engineer"`, satisfying the ≥ 1 point and Luke+software-engineer payload assertions. After clearing both Redis and Postgres chat history (Step 2), the recall turn (Step 3) returned HTTP 200 with `content`: "Your name is Luke, and you're a software engineer." — containing both `Luke` and `software engineer` and constituting no refusal. Because all chat history was wiped before the recall, the response can only have derived the facts from semantic memory via AscendMemory + Qdrant.
+All seven assertions passed. Step 1 (save turn) returned HTTP 200; the agent responded acknowledging Luke by name. After the 5-second async write delay, a Qdrant scroll on `ascend_memory_1536` filtered by `user_id=frostySemanticMemoryTest` returned 4 points - two with `"data": "User's name is Luke"` and two with `"data": "User is a software engineer"`, satisfying the ≥ 1 point and Luke+software-engineer payload assertions. After clearing both Redis and Postgres chat history (Step 2), the recall turn (Step 3) returned HTTP 200 with `content`: "Your name is Luke, and you're a software engineer." - containing both `Luke` and `software engineer` and constituting no refusal. Because all chat history was wiped before the recall, the response can only have derived the facts from semantic memory via AscendMemory + Qdrant.
 
 Input tokens:
 

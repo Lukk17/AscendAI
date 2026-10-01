@@ -14,27 +14,27 @@ Examples:
 - `/coding-standards` before writing new code
 - `/tdd-workflow` before adding features or fixing bugs
 
-Slash commands may appear as `/name` or `/name.md` in your agent's autocomplete — use whichever your agent shows.
+Slash commands may appear as `/name` or `/name.md` in your agent's autocomplete - use whichever your agent shows.
 
 ## Subagents
 
-This project ships 26 specialised subagents — narrow-scope agents the main session delegates to. Claude Code reads
-`.claude/agents/`; OpenCode and Kilo Code both read `.opencode/agents/`. Codex CLI has no per-agent file mechanism — it
+This project ships 26 specialised subagents - narrow-scope agents the main session delegates to. Claude Code reads
+`.claude/agents/`; OpenCode and Kilo Code both read `.opencode/agents/`. Codex CLI has no per-agent file mechanism - it
 sees `AGENTS.md` plus skills only.
 
-These files are generated artifacts pulled from agent-standards. Do **not** hand-edit them — changes will be
+These files are generated artifacts pulled from agent-standards. Do **not** hand-edit them - changes will be
 overwritten on the next pull. To modify a subagent permanently, edit its canonical source in the agent-standards repo
 (`subagents/<name>.md`), regenerate there, and re-import.
 
 A few of the most-used:
 
-- `code-reviewer` — security-aware diff review before merge
-- `test-automator` — write missing tests and fix failures without weakening assertions
-- `security-auditor` — threat modelling, secure-coding review, compliance gap analysis
-- `backend-architect` — contract-first service and API design
-- `database-expert` — schema design and query / index optimisation
-- `debugger` — root-cause analysis for a single failing test or runtime error
-- `devops-troubleshooter` — live incident response with postmortem
+- `code-reviewer` - security-aware diff review before merge
+- `test-automator` - write missing tests and fix failures without weakening assertions
+- `security-auditor` - threat modelling, secure-coding review, compliance gap analysis
+- `backend-architect` - contract-first service and API design
+- `database-expert` - schema design and query / index optimisation
+- `debugger` - root-cause analysis for a single failing test or runtime error
+- `devops-troubleshooter` - live incident response with postmortem
 
 Full catalogue: see the agent-standards README's "Subagents catalog" section, or list `.claude/agents/*.md` (or
 `.opencode/agents/*.md`) in this project.
@@ -50,10 +50,10 @@ startup and use them when they're a better fit than re-deriving the answer from 
 All supported agents read this `AGENTS.md` from the project root and auto-discover skills from `.agents/skills/`.
 Start your agent from the project root:
 
-- **Claude Code** — run `claude`. Reads `.claude/CLAUDE.md`, which imports this file.
-- **Kilo Code** — reads `AGENTS.md` automatically. Optional `kilo.jsonc` for extra config.
-- **OpenCode** — reads `AGENTS.md` automatically. Optional `opencode.json` at project root.
-- **Codex CLI** — run `codex`. Reads `AGENTS.md` automatically. Global settings in `~/.codex/config.toml`.
+- **Claude Code** - run `claude`. Reads `.claude/CLAUDE.md`, which imports this file.
+- **Kilo Code** - reads `AGENTS.md` automatically. Optional `kilo.jsonc` for extra config.
+- **OpenCode** - reads `AGENTS.md` automatically. Optional `opencode.json` at project root.
+- **Codex CLI** - run `codex`. Reads `AGENTS.md` automatically. Global settings in `~/.codex/config.toml`.
 
 ## Working Principles
 
@@ -62,9 +62,9 @@ should look like*.
 
 ### 1. Think Before Coding
 
-State assumptions explicitly. When the prompt is ambiguous, surface the interpretations and ask — do not pick one
+State assumptions explicitly. When the prompt is ambiguous, surface the interpretations and ask - do not pick one
 silently and run with it. If a simpler approach exists, propose it before writing code. Stop and ask when genuinely
-unsure — a clarifying question costs less than a wrong implementation.
+unsure - a clarifying question costs less than a wrong implementation.
 
 ### 2. Simplicity First
 
@@ -85,7 +85,7 @@ Touch only what the task requires.
 - Do not "improve" adjacent code, comments, or formatting.
 - Do not refactor code that is not broken.
 - Match existing style, even if you would write it differently.
-- If you notice unrelated dead code, mention it — do not delete it.
+- If you notice unrelated dead code, mention it - do not delete it.
 - Remove imports, variables, and helpers that *your* changes orphan. Leave pre-existing dead code alone unless asked.
 
 Test: every changed line should trace directly to the request.
@@ -115,24 +115,24 @@ live under `openspec/`.
 
 The full lifecycle (run inside your agent shell):
 
-1. **Propose a change** — agent generates proposal, design, and `tasks.md` under `openspec/changes/`:
+1. **Propose a change** - agent generates proposal, design, and `tasks.md` under `openspec/changes/`:
    ```text
    /opsx:propose add dark mode support
    ```
-2. **Apply the code** — after reviewing/editing `tasks.md`, agent implements and checks off tasks:
+2. **Apply the code** - after reviewing/editing `tasks.md`, agent implements and checks off tasks:
    ```text
    /opsx:apply
    ```
-3. **Verify and refine** — pass back logs or bug reports to refine:
+3. **Verify and refine** - pass back logs or bug reports to refine:
    ```text
    /opsx:verify The toggle button is invisible on mobile. Fix it.
    ```
-4. **Archive** — once tested, merge delta specs into `openspec/specs/` and archive the change folder:
+4. **Archive** - once tested, merge delta specs into `openspec/specs/` and archive the change folder:
    ```text
    /opsx:archive
    ```
 
-Some agents render commands as `/opsx-propose.md` instead of `/opsx:propose` — both work; use what appears in your
+Some agents render commands as `/opsx-propose.md` instead of `/opsx:propose` - both work; use what appears in your
 autocomplete.
 
 Use multiline prompts when you need to include logs or detailed context with a command.
@@ -145,18 +145,18 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 
 ## Architecture
 
-- **Monorepo-level**: System overview, service interactions, deployment, ADRs — in `docs/architecture/`
-- **ascend-ai-agent internals**: Component diagrams, internal arc42, module-specific ADRs — in `apps/ascend-agent/docs/architecture/`
+- **Monorepo-level**: System overview, service interactions, deployment, ADRs - in `docs/architecture/`
+- **ascend-ai-agent internals**: Component diagrams, internal arc42, module-specific ADRs - in `apps/ascend-agent/docs/architecture/`
 
 ## Monorepo Structure
 
 | Module | Tech Stack | Port | Role |
 |---|---|---|---|
-| [ascend-ai-agent](apps/ascend-agent/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
+| [ascend-ai-agent](apps/ascend-agent/AGENTS.md) | Java 21, Spring Boot 3.5.14, Gradle | 9917 | Main API gateway, multi-provider AI, RAG pipeline, MCP client |
 | [ascend-audio-scribe](apps/ascend-audio-scribe/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7017 | MCP server for audio transcription (Whisper, OpenAI, HF) |
 | [ascend-web-hunter](apps/ascend-web-hunter/AGENTS.md) | Python 3.12, FastAPI, FastMCP | 7021 | MCP server for web search and scraping via SearXNG |
 | [AscendMemory](apps/ascend-memory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
-| [ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md) | Java 21, Spring Boot 3.5.4, Gradle | 9998 | MCP server for weather data |
+| [ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md) | Java 21, Spring Boot 3.5.14, Gradle | 9998 | MCP server for weather data |
 | [ascend-ocr](apps/ascend-ocr/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7022 | OCR service using PaddleOCR |
 
 ## External Prerequisites
@@ -174,8 +174,8 @@ These services must be running before starting docker-compose. In production the
 
 Compose is split into two project files. The second is reached only through the main file's `include:`, so every command runs against the main file with no `-f` flag and the merge puts both stacks in one Docker Desktop group:
 
-- **`compose.yaml`** (project `ascend-ai`) — main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
-- **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) — web-scraping stack, pulled in by the main file's `include:`.
+- **`compose.yaml`** (project `ascend-ai`) - main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
+- **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) - web-scraping stack, pulled in by the main file's `include:`.
 
 Both files use the same four fixed container names, `searxng`, `flaresolverr`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
 
@@ -219,7 +219,7 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 | SearXNG | 9020 (bound to 127.0.0.1) | Privacy-respecting meta search engine |
 | FlareSolverr | 8191 (bound to 127.0.0.1) | Cloudflare bypass proxy for web scraping |
 | ascend-web-hunter | 7021 | Web search & scraping MCP |
-| ngrok-ascend-web-hunter | – | Ngrok tunnel for NoVNC CAPTCHA intervention |
+| ngrok-ascend-web-hunter | - | Ngrok tunnel for NoVNC CAPTCHA intervention |
 
 ## How to Build and Run
 
@@ -244,18 +244,18 @@ docker compose up -d --build
 
 ## Cross-Module Conventions
 
-- **Java modules** (ascend-ai-agent, ascend-weather-mcp): Java 21, Spring Boot 3.5.4, Gradle, Spring AI 1.1.5.
+- **Java modules** (ascend-ai-agent, ascend-weather-mcp): Java 21, Spring Boot 3.5.14, Gradle, Spring AI 1.1.5.
 - **Python modules** (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
-- **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) — never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
+- **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) - never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
 - All services expose a `/health` endpoint for Docker healthchecks.
 - All services are containerized with Dockerfiles and wired through `compose.yaml` (with `compose.ascend-web-hunter.yaml` included for the web-scraping stack).
 - MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the ascend-ai-agent.
 
 ## End-to-End Test Suite
 
-Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-agent/e2e/`](apps/ascend-agent/e2e/README.md). Eleven numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. See [`apps/ascend-agent/e2e/README.md`](apps/ascend-agent/e2e/README.md) for the full contract and capability matrix.
+Capability-level e2e tests for the ascend-ai-agent live in [`apps/ascend-agent/e2e/`](apps/ascend-agent/e2e/README.md). Eleven numbered specs exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec is paired with a tasks-template the runner copies into `e2e/testing/runs/` per execution. Pass criteria are observable behavior only - HTTP status, response body, persisted state in the object store / Qdrant / Postgres - never log substrings. See [`apps/ascend-agent/e2e/README.md`](apps/ascend-agent/e2e/README.md) for the full contract and capability matrix.
 
-Before running any end-to-end test, in any of the six suites, ask the owner which run scenario from [`docs/E2E_RUN_SCENARIOS.md`](docs/E2E_RUN_SCENARIOS.md) they want. Always ask, and never assume one: the scenarios differ in which compose project is up, whether LM Studio must answer, whether a human needs to be at the keyboard, and how many specs run.
+Before running any end-to-end test, in any of the six suites, ask the owner which run scenario or which service suite from [`docs/E2E_RUN_SCENARIOS.md`](docs/E2E_RUN_SCENARIOS.md) they want. A scenario runs specs across every suite, and a service suite runs one service's specs alone. Always ask, and never assume one: they differ in which compose project is up, whether LM Studio must answer, whether a human needs to be at the keyboard, and how many specs run.
 
 ## IDE Compatibility
 

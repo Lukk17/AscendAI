@@ -9,7 +9,7 @@
   `"Where do I like to live?"` returns HTTP 200 and at least one structured memory entry whose `memory` field
   contains `"Helsinki"` (case-insensitive).
 - Validates that the FastMCP tool layer (`memory_insert`, `memory_search`) is wired to the same memory client as
-  REST — a memory inserted via MCP is retrievable via MCP for the same user.
+  REST - a memory inserted via MCP is retrievable via MCP for the same user.
 - Both MCP calls share one `Mcp-Session-Id` captured from a single `initialize` handshake.
 
 ## Prerequisites
@@ -104,7 +104,7 @@ The `initialize` call returns HTTP 200 with an `Mcp-Session-Id` response header 
 32 character hexadecimal session id without hyphens, as FastMCP emits it.
 
 `mcp-insert.yml` returns HTTP 200. The JSON-RPC response body has a `result` object (no `error` field). The
-`result.content` (FastMCP's structured tool return) describes ≥ 1 memory operation — the array is non-empty.
+`result.content` (FastMCP's structured tool return) describes ≥ 1 memory operation - the array is non-empty.
 
 `mcp-search.yml` returns HTTP 200. The JSON-RPC response body has a `result` object whose structured content
 contains a non-empty list of memory entries. At least one entry:

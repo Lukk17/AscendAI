@@ -5,7 +5,7 @@ storage_state, and persists it under the 'e2e' profile via the service's own
 CookieManager so the Bruno test runs can replay the session.
 
 Credentials are hardcoded per service. saucedemo's are its public demo credentials
-(shown on its own login page) — not secrets. A future service that needs real
+(shown on its own login page) - not secrets. A future service that needs real
 secret credentials should read them from the environment, never commit them here.
 """
 

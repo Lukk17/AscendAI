@@ -159,3 +159,18 @@ A retrieved passage whose source object has no document-registry row SHALL still
 - **THEN** the passage is labeled and appears in `citations` with `documentId` omitted and a non-blank `name`
 - **AND** that source does not appear in `response.sources`
 - **AND** the request returns HTTP 200
+
+### Requirement: The streaming endpoint emits a citations event
+
+When `POST /api/v1/ai/prompt/stream` serves a turn whose retrieval injected at least one labeled passage and citations are enabled, the stream SHALL contain exactly one `citations` event whose payload is `{"citations": [CitationRef, ...]}` with the same entries the synchronous response would carry for the same retrieval. The event SHALL be emitted after the last `delta` event and before the `sources` event and the terminal `done` event. When no passage was injected or citations are disabled, the stream SHALL contain no `citations` event.
+
+#### Scenario: Citations event precedes sources and done
+
+- **WHEN** a streaming prompt with `attachSources=true` retrieves two labeled passages
+- **THEN** the stream contains one `citations` event with two entries
+- **AND** the `citations` event arrives before the `sources` event and before the `done` event
+
+#### Scenario: No citations event when nothing was injected
+
+- **WHEN** a streaming prompt retrieves no passage above the threshold
+- **THEN** the stream contains no `citations` event

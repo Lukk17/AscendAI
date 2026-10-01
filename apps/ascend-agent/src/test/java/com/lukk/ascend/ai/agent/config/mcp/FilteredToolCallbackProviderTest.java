@@ -1,6 +1,7 @@
 package com.lukk.ascend.ai.agent.config.mcp;
 
 import com.lukk.ascend.ai.agent.config.properties.McpStartupProperties;
+import com.lukk.ascend.ai.agent.config.properties.McpToolCacheProperties;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpTransportSessionNotFoundException;
@@ -18,12 +19,25 @@ import org.springframework.ai.tool.definition.DefaultToolDefinition;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +57,8 @@ class FilteredToolCallbackProviderTest {
 
     private McpStartupProperties startupProperties;
 
+    private McpToolCallbackCache toolCallbackCache;
+
     private FilteredToolCallbackProvider provider;
 
     @BeforeEach
@@ -53,66 +69,82 @@ class FilteredToolCallbackProviderTest {
         when(failedClient.getClientInfo()).thenReturn(failedInfo);
 
         startupProperties = new McpStartupProperties();
-        provider = new FilteredToolCallbackProvider(List.of(connectedClient, failedClient), registry, startupProperties);
+        toolCallbackCache = new McpToolCallbackCache(registry, new McpToolCacheProperties(), Clock.systemUTC());
+        provider = new FilteredToolCallbackProvider(List.of(connectedClient, failedClient), registry, startupProperties, toolCallbackCache);
     }
 
     @Test
     @DisplayName("getToolCallbacks returns empty array when all clients are FAILED")
     void getToolCallbacks_AllClientsFailed_ReturnsEmptyArray() {
+        // given
         when(registry.connectedNames()).thenReturn(Set.of());
 
+        // when
         ToolCallback[] callbacks = provider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).isEmpty();
     }
 
     @Test
     @DisplayName("getToolCallbacks returns empty array when registry has no entries")
     void getToolCallbacks_RegistryEmpty_ReturnsEmptyArray() {
+        // given
         when(registry.connectedNames()).thenReturn(Set.of());
 
+        // when
         ToolCallback[] callbacks = provider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).isEmpty();
     }
 
     @Test
     @DisplayName("getToolCallbacks with no clients returns empty array")
     void getToolCallbacks_NoClients_ReturnsEmptyArray() {
-        FilteredToolCallbackProvider emptyProvider = new FilteredToolCallbackProvider(List.of(), registry, startupProperties);
+        // given
+        FilteredToolCallbackProvider emptyProvider = new FilteredToolCallbackProvider(List.of(), registry, startupProperties, toolCallbackCache);
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
+        // when
         ToolCallback[] callbacks = emptyProvider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).isEmpty();
     }
 
     @Test
     @DisplayName("getToolCallbacks filters out client whose name is not in connected set")
     void getToolCallbacks_OnlyConnectedClientNamesFiltered_FailedClientExcluded() {
+        // given
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(failedClient), registry, startupProperties);
+                List.of(failedClient), registry, startupProperties, toolCallbackCache);
 
+        // when
         ToolCallback[] callbacks = singleProvider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).isEmpty();
     }
 
     @Test
     @DisplayName("getToolCallbacks reconnects and retries when a CONNECTED client's session has gone stale")
     void getToolCallbacks_StaleSessionOnFirstDiscovery_ReconnectsAndReturnsToolsFromRetry() {
+        // given
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
         when(connectedClient.listTools())
                 .thenThrow(new McpTransportSessionNotFoundException("stale-session-id"))
                 .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
 
         FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
-                List.of(connectedClient), registry, startupProperties);
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
 
+        // when
         ToolCallback[] callbacks = singleProvider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).hasSize(1);
         assertThat(callbacks[0].getToolDefinition().name()).isEqualTo("transcribe");
         verify(connectedClient, times(1)).initialize();
@@ -122,28 +154,125 @@ class FilteredToolCallbackProviderTest {
     @Test
     @DisplayName("getToolCallbacks excludes a client still failing after reconnect but keeps other clients' tools")
     void getToolCallbacks_DiscoveryStillFailsAfterReconnect_ExcludesThatClientKeepsOthers() {
+        // given
         when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe", "ascend-weather-mcp"));
         when(connectedClient.listTools())
                 .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
         when(failedClient.listTools())
                 .thenThrow(new McpTransportSessionNotFoundException("stale-session-id"));
 
+        // when
         ToolCallback[] callbacks = provider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).hasSize(1);
         assertThat(callbacks[0].getToolDefinition().name()).isEqualTo("transcribe");
         verify(failedClient, times(1)).initialize();
         verify(failedClient, times(2)).listTools();
+        verify(registry).markFailed("ascend-weather-mcp");
+        verify(registry, never()).markFailed("ascend-audio-scribe");
+    }
+
+    @Test
+    @DisplayName("getToolCallbacks demotes a client to FAILED when its reconnect itself fails")
+    void getToolCallbacks_ReconnectFails_MarksClientFailedInRegistry() {
+        // given
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
+        when(connectedClient.listTools()).thenThrow(new McpTransportSessionNotFoundException("stale-session-id"));
+        doThrow(new IllegalStateException("Connection refused")).when(connectedClient).initialize();
+
+        FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
+
+        // when
+        ToolCallback[] callbacks = singleProvider.getToolCallbacks();
+
+        // then
+        assertThat(callbacks).isEmpty();
+        verify(connectedClient, times(1)).listTools();
+        verify(registry).markFailed("ascend-audio-scribe");
+    }
+
+    @Test
+    @DisplayName("getToolCallbacks leaves a recovered client CONNECTED rather than demoting it")
+    void getToolCallbacks_ReconnectRecoversClient_RegistryUntouched() {
+        // given
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
+        when(connectedClient.listTools())
+                .thenThrow(new McpTransportSessionNotFoundException("stale-session-id"))
+                .thenReturn(new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null));
+
+        // when
+        FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
+
+        // then
+        assertThat(singleProvider.getToolCallbacks()).hasSize(1);
+        verify(registry, never()).markFailed(anyString());
+    }
+
+    @Test
+    @DisplayName("two concurrent requests against one stale client reconnect it exactly once")
+    void getToolCallbacks_ConcurrentStaleDiscovery_InitializesClientOnlyOnce() throws Exception {
+        // given
+        when(registry.connectedNames()).thenReturn(Set.of("ascend-audio-scribe"));
+
+        AtomicBoolean sessionAlive = new AtomicBoolean(false);
+        AtomicInteger initializeCalls = new AtomicInteger();
+        when(connectedClient.listTools()).thenAnswer(invocation -> {
+            if (!sessionAlive.get()) {
+                throw new McpTransportSessionNotFoundException("stale-session-id");
+            }
+
+            return new McpSchema.ListToolsResult(List.of(stubTool("transcribe")), null);
+        });
+        doAnswer(invocation -> {
+            initializeCalls.incrementAndGet();
+            TimeUnit.MILLISECONDS.sleep(200);
+            sessionAlive.set(true);
+
+            return null;
+        }).when(connectedClient).initialize();
+
+        FilteredToolCallbackProvider singleProvider = new FilteredToolCallbackProvider(
+                List.of(connectedClient), registry, startupProperties, toolCallbackCache);
+
+        CountDownLatch startLine = new CountDownLatch(1);
+        Callable<ToolCallback[]> discovery = () -> {
+            startLine.await();
+
+            return singleProvider.getToolCallbacks();
+        };
+
+        // when
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ToolCallback[]> first = pool.submit(discovery);
+            Future<ToolCallback[]> second = pool.submit(discovery);
+            startLine.countDown();
+
+            // then
+            assertThat(first.get(10, TimeUnit.SECONDS)).hasSize(1);
+            assertThat(second.get(10, TimeUnit.SECONDS)).hasSize(1);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(initializeCalls).hasValue(1);
+        verify(registry, never()).markFailed(anyString());
     }
 
     @Test
     @DisplayName("sanitizeName replaces dots with underscores and delegates call() to original")
     void sanitizeName_illegalCharsInName_replacedWithUnderscore_callDelegatesToOriginal() {
+        // given
         String expectedOutput = "original-result";
         ToolCallback original = stubCallback("a.b", expectedOutput);
 
+        // when
         ToolCallback result = FilteredToolCallbackProvider.sanitizeName(original);
 
+        // then
         assertThat(result.getToolDefinition().name()).isEqualTo("a_b");
         assertThat(result.call("{}")).isEqualTo(expectedOutput);
     }
@@ -151,23 +280,29 @@ class FilteredToolCallbackProviderTest {
     @Test
     @DisplayName("sanitizeName returns original instance when name has no illegal characters")
     void sanitizeName_legalName_returnsSameInstance() {
+        // given
         ToolCallback original = stubCallback("search_web", "result");
 
+        // when
         ToolCallback result = FilteredToolCallbackProvider.sanitizeName(original);
 
+        // then
         assertThat(result).isSameAs(original);
     }
 
     @Test
     @DisplayName("disambiguateCollisions gives both 'search.web' and 'search_web' distinct names after sanitizing")
     void disambiguateCollisions_twoCallbacksWithSameSanitizedName_bothSurviveWithDistinctNames() {
+        // given
         String outputDot = "result-from-search.web";
         String outputUnderscore = "result-from-search_web";
         ToolCallback cb1 = FilteredToolCallbackProvider.sanitizeName(stubCallback("search.web", outputDot));
         ToolCallback cb2 = FilteredToolCallbackProvider.sanitizeName(stubCallback("search_web", outputUnderscore));
 
+        // when
         ToolCallback[] result = FilteredToolCallbackProvider.disambiguateCollisions(new ToolCallback[]{cb1, cb2});
 
+        // then
         assertThat(result).hasSize(2);
         String name0 = result[0].getToolDefinition().name();
         String name1 = result[1].getToolDefinition().name();
@@ -179,11 +314,14 @@ class FilteredToolCallbackProviderTest {
     @Test
     @DisplayName("disambiguateCollisions appends _2 to the second occurrence of a colliding name")
     void disambiguateCollisions_collision_secondOccurrenceSuffixedWith_2() {
+        // given
         ToolCallback cb1 = stubCallback("a_b", "first");
         ToolCallback cb2 = stubCallback("a_b", "second");
 
+        // when
         ToolCallback[] result = FilteredToolCallbackProvider.disambiguateCollisions(new ToolCallback[]{cb1, cb2});
 
+        // then
         assertThat(result[0].getToolDefinition().name()).isEqualTo("a_b");
         assertThat(result[1].getToolDefinition().name()).isEqualTo("a_b_2");
         assertThat(result[0].call("{}")).isEqualTo("first");

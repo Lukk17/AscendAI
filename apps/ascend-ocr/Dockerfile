@@ -20,7 +20,7 @@ COPY src/ src/
 RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \
     python3.11 -m pip install --no-cache-dir .
 
-RUN DISABLE_AUTO_LOGGING_CONFIG=1 python3.11 -c "from paddleocr import PaddleOCR; PaddleOCR(lang='en', enable_mkldnn=False); PaddleOCR(lang='pl', enable_mkldnn=False)"
+RUN DISABLE_AUTO_LOGGING_CONFIG=1 python3.11 -c "from src.service.ocr_service import preload_models; preload_models()"
 
 
 FROM python:3.11.12-slim AS runtime
@@ -66,4 +66,4 @@ LABEL org.opencontainers.image.title="ascend-ocr" \
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
     CMD curl --fail --silent http://localhost:7022/health || exit 1
 
-CMD ["python3.11", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "7022"]
+CMD ["python3.11", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "7022", "--ws", "none"]

@@ -15,6 +15,13 @@ AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-ocr, and ascend-wea
 - **WHEN** `GET /api/v1/memory/search` is called with `Authorization: Bearer <the configured token>`
 - **THEN** the request is processed normally (non-401 response)
 
+#### Scenario: OCR job routes reject tokenless calls
+
+- **WHEN** `POST /v1/ocr/jobs`, `GET /v1/ocr/jobs/{job_id}`, `GET /v1/ocr/jobs` or `DELETE /v1/ocr/jobs/{job_id}` is called on ascend-ocr without an `Authorization` header while `SERVICE_AUTH_TOKEN` is set
+- **THEN** the response status is 401
+- **AND** no job record is created, read, listed or cancelled
+- **AND** `GET /health` and `GET /ready` still answer without a token
+
 #### Scenario: Wrong token is rejected
 
 - **WHEN** any protected REST endpoint on any of the five services is called with `Authorization: Bearer wrong-value`

@@ -9,36 +9,45 @@ from src.session.session_manager import SessionInfo, SessionManager
 
 @pytest.mark.asyncio
 async def test_mcp_web_search_returns_results():
+    # given
     mock_results = [{"title": "MCP", "url": "url"}]
+
+    # when
     with patch(
         "src.api.mcp.mcp_server.search_client.search",
         new_callable=AsyncMock,
     ) as mock_search:
         mock_search.return_value = mock_results
         result = await web_search("query", 5)
+
+    # then
     assert result == mock_results
 
 
 @pytest.mark.asyncio
 async def test_mcp_web_search_empty_query_raises():
+    # when / then
     with pytest.raises(ValueError, match="empty"):
         await web_search("")
 
 
 @pytest.mark.asyncio
 async def test_mcp_web_search_whitespace_only_raises():
+    # when / then
     with pytest.raises(ValueError, match="empty"):
         await web_search("   ")
 
 
 @pytest.mark.asyncio
 async def test_mcp_web_search_too_long_raises():
+    # when / then
     with pytest.raises(ValueError, match="maximum length"):
         await web_search("x" * 501)
 
 
 @pytest.mark.asyncio
 async def test_mcp_web_read_unsafe_url_raises():
+    # when / then
     with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
         with pytest.raises(ValueError, match="non-routable"):
             await web_read("http://127.0.0.1")
@@ -46,7 +55,10 @@ async def test_mcp_web_read_unsafe_url_raises():
 
 @pytest.mark.asyncio
 async def test_mcp_web_read_calls_read_when_include_links_false():
+    # given
     mock_content = {"content": "MCP Content", "status": "success", "mode": "1-beautifulsoup"}
+
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch(
@@ -57,17 +69,23 @@ async def test_mcp_web_read_calls_read_when_include_links_false():
     ):
         result = await web_read("http://mcp.com")
 
+    # then
     assert result == mock_content
-    mock_read.assert_awaited_once_with("http://mcp.com", heavy_mode=False, profile=None)
+    mock_read.assert_awaited_once_with(
+        "http://mcp.com", heavy_mode=False, profile=None, output_format="text", tier=None
+    )
 
 
 @pytest.mark.asyncio
 async def test_mcp_web_read_calls_read_with_links_when_include_links_true():
+    # given
     mock_result = {
         "content": "Job title [1]",
         "links": {1: "https://example.com/job1"},
         "status": "success",
     }
+
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch(
@@ -78,13 +96,19 @@ async def test_mcp_web_read_calls_read_with_links_when_include_links_true():
     ):
         result = await web_read("http://mcp.com", include_links=True, link_filter="/job/")
 
+    # then
     assert result["status"] == "success"
-    mock_read.assert_awaited_once_with("http://mcp.com", "/job/", heavy_mode=False, profile=None)
+    mock_read.assert_awaited_once_with(
+        "http://mcp.com", "/job/", heavy_mode=False, profile=None, output_format="text", tier=None
+    )
 
 
 @pytest.mark.asyncio
 async def test_mcp_web_read_catches_human_intervention_and_returns_structured_payload():
+    # given
     exc = HumanInterventionRequiredException(vnc_url="http://vnc/x", intervention_type="captcha")
+
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch(
@@ -95,6 +119,7 @@ async def test_mcp_web_read_catches_human_intervention_and_returns_structured_pa
     ):
         result = await web_read("http://mcp.com")
 
+    # then
     assert result["status"] == "human_intervention_required"
     assert result["intervention_type"] == "captcha"
     assert result["vnc_url"] == "http://vnc/x"
@@ -103,7 +128,10 @@ async def test_mcp_web_read_catches_human_intervention_and_returns_structured_pa
 
 @pytest.mark.asyncio
 async def test_mcp_web_read_human_intervention_on_links_branch():
+    # given
     exc = HumanInterventionRequiredException(vnc_url="http://vnc/y", intervention_type="login")
+
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch(
@@ -114,12 +142,16 @@ async def test_mcp_web_read_human_intervention_on_links_branch():
     ):
         result = await web_read("http://mcp.com", include_links=True)
 
+    # then
     assert result["intervention_type"] == "login"
 
 
 @pytest.mark.asyncio
 async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload():
+    # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch(
@@ -130,6 +162,7 @@ async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload():
     ):
         result = await web_read("http://mcp.com")
 
+    # then
     assert result["status"] == "novnc_busy"
     assert result["holder_url"] == "http://in-flight.example"
     assert result["holder_profile"] == "default"
@@ -142,6 +175,7 @@ async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload():
 
 @pytest.mark.asyncio
 async def test_mcp_session_establish_returns_human_intervention_payload():
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch.object(
@@ -152,6 +186,7 @@ async def test_mcp_session_establish_returns_human_intervention_payload():
     ):
         result = await session_establish("http://example.com")
 
+    # then
     assert result["status"] == "human_intervention_required"
     assert result["intervention_type"] == "login"
     assert result["vnc_url"] == "http://vnc:7900"
@@ -160,6 +195,7 @@ async def test_mcp_session_establish_returns_human_intervention_payload():
 
 @pytest.mark.asyncio
 async def test_mcp_session_establish_unsafe_url_raises():
+    # when / then
     with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
         with pytest.raises(ValueError, match="non-routable"):
             await session_establish("http://10.0.0.1")
@@ -167,13 +203,17 @@ async def test_mcp_session_establish_unsafe_url_raises():
 
 @pytest.mark.asyncio
 async def test_mcp_session_establish_returns_novnc_busy_payload():
+    # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch.object(SessionManager, "establish", new=AsyncMock(side_effect=exc)),
     ):
         result = await session_establish("http://example.com")
 
+    # then
     assert result["status"] == "novnc_busy"
     assert result["holder_url"] == "http://in-flight.example"
     assert result["holder_profile"] == "default"
@@ -186,15 +226,19 @@ async def test_mcp_session_establish_returns_novnc_busy_payload():
 
 @pytest.mark.asyncio
 async def test_mcp_session_status_returns_info():
+    # given
     info = SessionInfo(
         status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default"
     )
+
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch.object(SessionManager, "status", new=AsyncMock(return_value=info)),
     ):
         result = await session_status("http://example.com")
 
+    # then
     assert result["url"] == "http://example.com"
     assert result["status"] == "active"
     assert result["auth_ttl_remaining_seconds"] == 3600.0
@@ -202,6 +246,7 @@ async def test_mcp_session_status_returns_info():
 
 @pytest.mark.asyncio
 async def test_mcp_session_status_unsafe_url_raises():
+    # when / then
     with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
         with pytest.raises(ValueError, match="non-routable"):
             await session_status("http://10.0.0.1")
@@ -214,6 +259,7 @@ async def test_mcp_session_status_unsafe_url_raises():
 
 @pytest.mark.asyncio
 async def test_mcp_session_clear_returns_cleared_status():
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch.object(SessionManager, "clear", new=AsyncMock(return_value=True)),
@@ -221,6 +267,7 @@ async def test_mcp_session_clear_returns_cleared_status():
     ):
         result = await session_clear("http://example.com")
 
+    # then
     assert result["status"] == "cleared"
     assert result["existed"] is True
     assert result["cleared_cache_entries"] == 1
@@ -228,6 +275,7 @@ async def test_mcp_session_clear_returns_cleared_status():
 
 @pytest.mark.asyncio
 async def test_mcp_session_clear_is_idempotent_when_nothing_stored():
+    # when
     with (
         patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
         patch.object(SessionManager, "clear", new=AsyncMock(return_value=False)),
@@ -235,11 +283,13 @@ async def test_mcp_session_clear_is_idempotent_when_nothing_stored():
     ):
         result = await session_clear("http://never-stored.example.com")
 
+    # then
     assert result["existed"] is False
 
 
 @pytest.mark.asyncio
 async def test_mcp_session_clear_unsafe_url_raises():
+    # when / then
     with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
         with pytest.raises(ValueError, match="non-routable"):
             await session_clear("http://10.0.0.1")

@@ -64,7 +64,7 @@ class StorageServiceTest {
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenThrow(new RuntimeException("S3 Error"));
 
-        // when & then
+        // then
         assertThrows(IOException.class, () -> storageService.uploadFile(key, inputStream, size));
     }
 }

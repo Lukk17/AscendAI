@@ -52,9 +52,9 @@ Run regardless of Run-step verdict. Every command is idempotent.
 
 Step 1 returned HTTP 200 with a normal chat completion referencing the seeded fact (Rex the beagle rescued from a Praga shelter), confirming the pre-compaction history stayed visible to the model. After a 5-second settle, Step 3 confirmed `chat_history` for `frostyCompactionIdempotencyTest` grew from the seeded 9 rows to exactly 11 (the new user+assistant pair), and the `[Conversation summary]` row count stayed at exactly 1, confirming compaction did not re-fire. Bruno request duration was 6501ms, consistent with a single normal chat call and no additional async compaction LLM call inflating the window.
 
-Row count after step 3: 11 (expected 11) — PASS
+Row count after step 3: 11 (expected 11) - PASS
 
-Summary row count after step 3: 1 (expected 1) — PASS
+Summary row count after step 3: 1 (expected 1) - PASS
 
 Input tokens:
 

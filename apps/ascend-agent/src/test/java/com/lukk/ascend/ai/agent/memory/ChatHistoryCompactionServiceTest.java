@@ -7,11 +7,14 @@ import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.model.ChatHistory;
 import com.lukk.ascend.ai.agent.repository.ChatHistoryRepository;
 import com.lukk.ascend.ai.agent.service.provider.ChatModelResolver;
+import com.lukk.ascend.ai.agent.test.LogCapture;
 import com.lukk.ascend.ai.agent.test.TestConstants;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.ListOperations;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -53,6 +57,9 @@ class ChatHistoryCompactionServiceTest {
     private ChatHistoryCompactionProperties compactionProperties;
     private ChatHistoryProperties historyProperties;
     private ChatHistoryCompactionService service;
+
+    @RegisterExtension
+    final LogCapture logs = LogCapture.forClass(ChatHistoryCompactionService.class);
 
     @BeforeEach
     void setUp() {
@@ -126,7 +133,7 @@ class ChatHistoryCompactionServiceTest {
         // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
 
-        // then — trigger fired and we tried to resolve the model; no persistence (LLM call failed)
+        // then - trigger fired and we tried to resolve the model; no persistence (LLM call failed)
         verify(chatModelResolver).resolve("anthropic");
         verifyNoInteractions(transactionTemplate);
     }
@@ -134,7 +141,7 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("maybeCompact skips LLM call when history already has a summary and raw turns are below trigger")
     void maybeCompact_AlreadySummarisedAndBelowTriggerWithoutTheSummary_NoLlmCall() {
-        // given — 1 summary + 18 raw turns -> turns(history) - 1 = 18 < 20 => skip
+        // given - 1 summary + 18 raw turns -> turns(history) - 1 = 18 < 20 => skip
         List<ChatHistory> hist = new ArrayList<>();
         hist.add(summary());
         hist.addAll(buildHistory(18));
@@ -224,8 +231,12 @@ class ChatHistoryCompactionServiceTest {
         when(repository.findAllHistoryOrdered(CONVERSATION_ID))
                 .thenThrow(new RuntimeException("postgres down"));
 
+        // when
+        ThrowingCallable maybeCompact = () -> service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
+
         // then
-        service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
+        assertThatCode(maybeCompact).doesNotThrowAnyException();
+        assertThat(logs.messages()).contains("[Compaction] failed for conversation '" + CONVERSATION_ID + "': postgres down");
     }
 
     @Test
@@ -234,7 +245,7 @@ class ChatHistoryCompactionServiceTest {
         // given
         when(repository.findAllHistoryOrdered(CONVERSATION_ID)).thenReturn(buildHistory(5));
 
-        // when — 5 turns, well below trigger -> no resolution, no LLM
+        // when - 5 turns, well below trigger -> no resolution, no LLM
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, null);
 
         // then

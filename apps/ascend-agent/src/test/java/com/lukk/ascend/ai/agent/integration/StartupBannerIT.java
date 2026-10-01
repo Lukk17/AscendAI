@@ -18,6 +18,7 @@ import org.springframework.boot.availability.ReadinessState;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +31,7 @@ import static org.mockito.Mockito.when;
  * <p>Strategy: attach a Logback {@link ListAppender} to the {@code StartupLogConfig}
  * logger before re-publishing the readiness event. The original event already fired
  * during context start (before the appender attached), so we re-fire it inside the
- * test and capture the second emission. The handler is idempotent — it just logs.
+ * test and capture the second emission. The handler is idempotent - it just logs.
  */
 class StartupBannerIT extends TestcontainersBase {
 
@@ -63,15 +64,17 @@ class StartupBannerIT extends TestcontainersBase {
 
     @Test
     void banner_reportsStructureWithStatusMarkersAndPromptEndpoint() {
+        // when
         // Re-publish readiness so the @EventListener writes to our freshly attached appender.
         AvailabilityChangeEvent.publish(applicationContext, ReadinessState.ACCEPTING_TRAFFIC);
 
+        // then
         String banner = appender.list.stream()
                 .map(ILoggingEvent::getFormattedMessage)
                 .reduce("", (a, b) -> a + "\n" + b);
 
-        // Banner must be emitted with the four backing-service labels and the MCP tools line.
-        // We assert structure, not connectivity — BackingServicesIT covers actual reachability,
+        // Banner must be emitted with the four backing-service labels and the MCP servers section.
+        // We assert structure, not connectivity - BackingServicesIT covers actual reachability,
         // and this IT must not flake when a singleton container's port races the JVM's resolver.
         assertThat(banner).contains("Application '");
         assertThat(banner).contains("Postgres:");
@@ -80,12 +83,17 @@ class StartupBannerIT extends TestcontainersBase {
         assertThat(banner).contains("S3 (Floci):");
         assertThat(banner).contains("AscendMemory:");
         assertThat(banner).contains("Chat history:");
-        assertThat(banner).contains("MCP servers:");
-        assertThat(banner).contains("[Connected]");
-        assertThat(banner).contains("[FAILED]");
-        assertThat(banner).contains("Aggregate:");
 
-        // Each backing-service line carries one of the status markers — this guards against
+        // The MCP section is the authoritative view of integration state, so assert the real
+        // line format rather than the bare presence of a status word the database and cache
+        // lines already satisfy.
+        assertThat(mcpSectionLines(banner)).containsExactly(
+                "      ascend-audio-scribe:  http://localhost:7017 [Connected]",
+                "      ascend-weather-mcp:   http://localhost:9998 [FAILED]",
+                "      Aggregate: 1/2 connected");
+        assertThat(banner).doesNotContain("MCP tools");
+
+        // Each backing-service line carries one of the status markers - this guards against
         // an accidental refactor that drops the [Connected]/[FAILED]/[Warning]/[Disabled] tag.
         assertThat(banner).containsPattern("(\\[Connected]|\\[FAILED]|\\[Warning]|\\[Disabled])");
 
@@ -94,17 +102,39 @@ class StartupBannerIT extends TestcontainersBase {
         assertThat(banner).contains("/api/v1/ai/prompt");
     }
 
+    private static List<String> mcpSectionLines(String banner) {
+        List<String> lines = new ArrayList<>();
+        boolean inSection = false;
+        for (String line : banner.split("\\R")) {
+            if (line.equals("    MCP servers:")) {
+                inSection = true;
+                continue;
+            }
+            if (inSection) {
+                if (line.isBlank()) {
+                    break;
+                }
+                lines.add(line);
+            }
+        }
+
+        return lines;
+    }
+
     @Test
     void banner_isSkippedForNonAcceptingTrafficStates() {
+        // given
         // Sanity check: the listener early-returns for non-ACCEPTING_TRAFFIC events,
         // so re-publishing a different readiness/liveness state must not emit the banner.
         AvailabilityChangeEvent.publish(applicationContext, ReadinessState.REFUSING_TRAFFIC);
         AvailabilityChangeEvent.publish(applicationContext, LivenessState.CORRECT);
 
+        // when
         boolean hasBanner = appender.list.stream()
                 .map(ILoggingEvent::getFormattedMessage)
                 .anyMatch(msg -> msg.contains("MAIN PROMPT ENDPOINT"));
 
+        // then
         assertThat(hasBanner).isFalse();
     }
 }

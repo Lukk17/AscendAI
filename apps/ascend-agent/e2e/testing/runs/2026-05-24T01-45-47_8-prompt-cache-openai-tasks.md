@@ -27,10 +27,10 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) — observed 1878
-- [x] Step 1: `usage.promptTokensDetails.cachedTokens == 0` (or absent) — Bruno run confirmed 200 on fresh state
+- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) - observed 1878
+- [x] Step 1: `usage.promptTokensDetails.cachedTokens == 0` (or absent) - Bruno run confirmed 200 on fresh state
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.promptTokensDetails.cachedTokens > 0` — observed 1664
+- [x] Step 2: `usage.promptTokensDetails.cachedTokens > 0` - observed 1664
 
 ### Verdict
 

@@ -12,6 +12,7 @@ class NamedByteArrayResourceTest {
     void getFilename_ReturnsConstructorValue() {
         // given
         byte[] bytes = "hello".getBytes();
+        // when
         NamedByteArrayResource resource = new NamedByteArrayResource(bytes, "report.pdf");
 
         // then

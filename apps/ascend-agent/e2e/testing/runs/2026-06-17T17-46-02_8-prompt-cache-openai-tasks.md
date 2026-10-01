@@ -25,10 +25,10 @@ Spec: [8-prompt-cache-openai-test.md](8-prompt-cache-openai-test.md)
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) — observed 2799
-- [x] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run) — observed 2688 (non-zero; spec permits this)
+- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) - observed 2799
+- [x] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run) - observed 2688 (non-zero; spec permits this)
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0` — observed 2944
+- [x] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0` - observed 2944
 
 ### Verdict
 
@@ -36,7 +36,7 @@ Spec: [8-prompt-cache-openai-test.md](8-prompt-cache-openai-test.md)
 
 ## Result summary
 
-Both calls returned HTTP 200. Step 1 showed `promptTokens=2799` (well above the 1024 threshold), confirming OpenAI's auto-cache can fire. Step 1 also showed `cached_tokens=2688` — non-zero, which the spec explicitly permits when the server-side TTL from a prior local run has not expired. Step 2 showed `cached_tokens=2944 > 0`, confirming the prompt cache is wired end-to-end. The `nativeUsage` block is present in both responses with the correct snake_case field names (`prompt_tokens_details.cached_tokens`). Both responses have full `usage` blocks with stable structure.
+Both calls returned HTTP 200. Step 1 showed `promptTokens=2799` (well above the 1024 threshold), confirming OpenAI's auto-cache can fire. Step 1 also showed `cached_tokens=2688` - non-zero, which the spec explicitly permits when the server-side TTL from a prior local run has not expired. Step 2 showed `cached_tokens=2944 > 0`, confirming the prompt cache is wired end-to-end. The `nativeUsage` block is present in both responses with the correct snake_case field names (`prompt_tokens_details.cached_tokens`). Both responses have full `usage` blocks with stable structure.
 
 Input tokens (call 1): 2799
 

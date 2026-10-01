@@ -101,13 +101,13 @@ public class WeatherToolService {
             description = """
                     Get a multi-day weather forecast for a city via Open-Meteo. Returns a list of daily entries, each
                     containing max/min temperature, precipitation sum, and weather code. 'days' controls how many days
-                    ahead to forecast (1–16, default 7). Temperature unit defaults to celsius. Use countryCode to
+                    ahead to forecast (1-16, default 7). Temperature unit defaults to celsius. Use countryCode to
                     disambiguate common city names.""")
     public ForecastResult getForecast(
             @ToolParam(description = "The name of a city, e.g. 'Warsaw'") String city,
             @ToolParam(description = "Optional ISO-3166-1 alpha-2 country code to disambiguate the city, e.g. 'PL'",
                     required = false) String countryCode,
-            @ToolParam(description = "Number of forecast days, 1–16 (default 7)", required = false) Integer days,
+            @ToolParam(description = "Number of forecast days, 1-16 (default 7)", required = false) Integer days,
             @ToolParam(description = "Temperature unit: 'celsius' (default) or 'fahrenheit'",
                     required = false) String unit,
             @ToolParam(description = "Open-Meteo language code (e.g. 'en', 'de', 'fr', 'it', 'es', 'pt', 'ru')",
@@ -205,7 +205,7 @@ public class WeatherToolService {
     @Tool(name = "weather_air_quality",
             description = """
                     Get current air quality data for a city via the Open-Meteo Air Quality API. Returns PM10,
-                    PM2.5 (both in µg/m³), US AQI, and European AQI. No temperature unit parameter — air quality
+                    PM2.5 (both in µg/m³), US AQI, and European AQI. No temperature unit parameter - air quality
                     metrics have fixed units. Use countryCode to disambiguate common city names.""")
     public AirQualityResult getAirQuality(
             @ToolParam(description = "The name of a city, e.g. 'Warsaw'") String city,
@@ -249,10 +249,10 @@ public class WeatherToolService {
                     Geocode a place name and return up to 'limit' candidate locations via the Open-Meteo Geocoding API.
                     Each candidate contains the resolved name, country, country code, latitude, and longitude.
                     Useful when the LLM needs to disambiguate ambiguous place names (e.g. 'Paris' → list of matches to
-                    show the user). 'limit' defaults to 5, range 1–10.""")
+                    show the user). 'limit' defaults to 5, range 1-10.""")
     public GeocodeResult geocode(
             @ToolParam(description = "The place name to geocode, e.g. 'Paris'") String query,
-            @ToolParam(description = "Maximum number of candidates to return, 1–10 (default 5)",
+            @ToolParam(description = "Maximum number of candidates to return, 1-10 (default 5)",
                     required = false) Integer limit,
             @ToolParam(description = "Open-Meteo language code (e.g. 'en', 'de', 'fr', 'it', 'es', 'pt', 'ru')",
                     required = false) String language) {

@@ -55,9 +55,7 @@ def memory_insert(
         if not text or not text.strip():
             raise ValueError("text must not be empty")
         if len(text) > settings.MAX_MEMORY_TEXT_LENGTH:
-            raise ValueError(
-                f"text exceeds maximum length of {settings.MAX_MEMORY_TEXT_LENGTH} characters"
-            )
+            raise ValueError(f"text exceeds maximum length of {settings.MAX_MEMORY_TEXT_LENGTH} characters")
 
         resolved_provider = resolve_provider(provider)
         effective_user_id = user_id or settings.DEFAULT_USER_ID
@@ -91,9 +89,7 @@ def memory_search(
         if not query or not query.strip():
             raise ValueError("query must not be empty")
         if len(query) > settings.MAX_QUERY_LENGTH:
-            raise ValueError(
-                f"query exceeds maximum length of {settings.MAX_QUERY_LENGTH} characters"
-            )
+            raise ValueError(f"query exceeds maximum length of {settings.MAX_QUERY_LENGTH} characters")
         if limit < 1 or limit > settings.MAX_SEARCH_LIMIT:
             raise ValueError(f"limit must be between 1 and {settings.MAX_SEARCH_LIMIT}")
 

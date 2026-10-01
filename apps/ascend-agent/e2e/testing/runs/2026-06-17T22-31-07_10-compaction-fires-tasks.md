@@ -42,7 +42,7 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 
 ## Result summary
 
-Step 1 returned HTTP 200 in 4997 ms — a normal chat completion for `frostyCompactionFiresTest` adding 2 rows (1 user + 1 assistant), bringing the total to 23. After the 5-second async compaction window, Postgres `chat_history` for `frostyCompactionFiresTest` contains exactly 9 rows: 1 `system` row whose content begins `[Conversation summary]`, and 8 `user`/`assistant` rows. The summary text references Rex the beagle, Warsaw, TechCorp, and Spring Boot — all four canary terms from the seeded conversation — confirming that the compaction model read and condensed the seeded turns correctly. All four programmatic assertions passed.
+Step 1 returned HTTP 200 in 4997 ms - a normal chat completion for `frostyCompactionFiresTest` adding 2 rows (1 user + 1 assistant), bringing the total to 23. After the 5-second async compaction window, Postgres `chat_history` for `frostyCompactionFiresTest` contains exactly 9 rows: 1 `system` row whose content begins `[Conversation summary]`, and 8 `user`/`assistant` rows. The summary text references Rex the beagle, Warsaw, TechCorp, and Spring Boot - all four canary terms from the seeded conversation - confirming that the compaction model read and condensed the seeded turns correctly. All four programmatic assertions passed.
 
 Pre-compaction row count (after step 1): 23 (21 seeded + 2 new turns)
 
@@ -69,5 +69,5 @@ Duration: 00:02:08
 ## Additional tasks I did
 
 - Read `AscendAgent/src/main/resources/application.yaml` to confirm compaction defaults (`enabled=true`, `turn-trigger=20`, `keep-recent-turns=8`) since `/actuator/configprops` returned no useful output.
-- Fetched full summary row content from Postgres to verify all four canary terms (Rex, Warsaw, TechCorp, Spring Boot) appear — confirmed present.
+- Fetched full summary row content from Postgres to verify all four canary terms (Rex, Warsaw, TechCorp, Spring Boot) appear - confirmed present.
 - The `docker exec redis rm` invocation without `sh -c` failed on the first attempt (Docker Desktop on Windows resolved the path against the host temp dir instead of the container filesystem). Retried with `sh -c "rm ..."` which succeeded. No impact on seed validity.

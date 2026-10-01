@@ -4,10 +4,10 @@
 
 `POST /api/v2/web/session/clear` is the operator-recovery path for a poisoned session: it deletes the stored
 session for a `url` + `profile` and any in-process cached read results for that domain, and it is documented as
-idempotent — it always returns HTTP 200 whether or not a session existed. Two behaviours are gated:
+idempotent - it always returns HTTP 200 whether or not a session existed. Two behaviours are gated:
 
 - **Clearing an existing session** removes the Redis record and reports `existed=true`.
-- **Clearing a session that was never stored** is a no-op, not an error — it still returns HTTP 200 with
+- **Clearing a session that was never stored** is a no-op, not an error - it still returns HTTP 200 with
   `existed=false`. This is deliberate per the endpoint's own docstring and must not regress into a 404 or 500.
 
 Both calls are asserted on response body plus persisted Redis state, never on log output.
@@ -62,7 +62,7 @@ docker exec redis redis-cli EXISTS "session:example.net:default"
 docker exec redis redis-cli EXISTS "session:example.com:default"
 ```
 
-Expect `0` for both. If either returns `1`, a previous run of this spec did not clean up — delete it before
+Expect `0` for both. If either returns `1`, a previous run of this spec did not clean up - delete it before
 continuing.
 
 ```bash
@@ -114,6 +114,17 @@ docker exec redis redis-cli EXISTS "session:example.net:default"
 
 Expect `1`.
 
+Remove the copied seed file now that the record is in Redis. Nothing after this point reads `/tmp`, and leaving the
+copy in the container would carry one run's state into the next. The `sh -c` wrapper is the same guard the seed
+command above uses, and here it keeps the container path intact, because Git Bash on Windows rewrites a bare
+`/tmp/...` argument into a host path before Docker ever sees it.
+
+```bash
+docker exec redis sh -c "rm /tmp/session-clear-seed.json"
+```
+
+Expect no output.
+
 ## Run
 
 Move into the Bruno collection root first.
@@ -122,13 +133,13 @@ Move into the Bruno collection root first.
 cd docs/api/request/AscendAI
 ```
 
-Call 1 — clear the session just seeded for `example.net`.
+Call 1 - clear the session just seeded for `example.net`.
 
 ```bash
 bru run "web-hunter/testing/session-clear-existing.yml" --env ascend-local
 ```
 
-Call 2 — clear `example.com`, which has never carried a session (the idempotent / no-op path).
+Call 2 - clear `example.com`, which has never carried a session (the idempotent / no-op path).
 
 ```bash
 bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
@@ -146,7 +157,7 @@ bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
 
   Expect `0`.
 
-- **Call 2 (idempotent no-op):** HTTP 200 — not 404, not 500. Body `status` equals `"cleared"`, `url` equals
+- **Call 2 (idempotent no-op):** HTTP 200 - not 404, not 500. Body `status` equals `"cleared"`, `url` equals
   `"https://example.com/"`, `existed` equals `false`, `cleared_cache_entries` equals `0`. Redis never held
   `session:example.com:default` before or after the call:
 
@@ -168,7 +179,7 @@ bru run "web-hunter/testing/session-clear-idempotent.yml" --env ascend-local
 
 ## Fixtures
 
-[fixtures/session-clear-seed.json](../fixtures/session-clear-seed.json) — a synthetic minimal `storage_state`
+[fixtures/session-clear-seed.json](../fixtures/session-clear-seed.json) - a synthetic minimal `storage_state`
 record for `example.net`, not a captured real login. `clear_session` only checks whether a Redis key exists; it
 never inspects the record's contents, so the fixture's shape only needs to match what `save_storage_state`
 would have written, not come from a real browser session.

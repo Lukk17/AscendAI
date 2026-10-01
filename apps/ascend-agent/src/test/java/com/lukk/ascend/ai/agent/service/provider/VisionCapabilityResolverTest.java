@@ -34,7 +34,7 @@ class VisionCapabilityResolverTest {
     @Test
     @DisplayName("supportsImages returns true when model matches a prefix wildcard pattern like claude-*")
     void supportsImages_WhenProviderHasGlob_AndModelMatchesPrefixWildcard_ThenTrue() {
-        // given — claude-* matches claude-sonnet-4-6
+        // given - claude-* matches claude-sonnet-4-6
         when(visionProperties.getProviders()).thenReturn(Map.of("anthropic", List.of("claude-*")));
 
         // when
@@ -47,44 +47,52 @@ class VisionCapabilityResolverTest {
     @Test
     @DisplayName("supportsImages returns true when model matches a gpt-4o* prefix glob")
     void supportsImages_WhenGptPrefixGlobMatches_ThenTrue() {
-        // given — gpt-4o* matches gpt-4o-mini
+        // given - gpt-4o* matches gpt-4o-mini
         when(visionProperties.getProviders()).thenReturn(Map.of("openai", List.of("gpt-4o*")));
 
+        // when
         boolean supports = resolver.supportsImages("openai", "gpt-4o-mini");
 
+        // then
         assertThat(supports).isTrue();
     }
 
     @Test
     @DisplayName("supportsImages returns true when model matches a middle-wildcard pattern like *-vl-*")
     void supportsImages_WhenMiddleWildcardMatches_ThenTrue() {
-        // given — *-vl-* matches qwen3-vl-4b
+        // given - *-vl-* matches qwen3-vl-4b
         when(visionProperties.getProviders()).thenReturn(Map.of("lmstudio", List.of("*-vl-*")));
 
+        // when
         boolean supports = resolver.supportsImages("lmstudio", "qwen3-vl-4b");
 
+        // then
         assertThat(supports).isTrue();
     }
 
     @Test
     @DisplayName("supportsImages returns false when model does not match the provider's glob pattern")
     void supportsImages_WhenGlobDoesNotMatchModel_ThenFalse() {
-        // given — claude-* does NOT match gpt-4o
+        // given - claude-* does NOT match gpt-4o
         when(visionProperties.getProviders()).thenReturn(Map.of("anthropic", List.of("claude-*")));
 
+        // when
         boolean supports = resolver.supportsImages("anthropic", "gpt-4o");
 
+        // then
         assertThat(supports).isFalse();
     }
 
     @Test
     @DisplayName("supportsImages returns false when the provider has an empty pattern list")
     void supportsImages_WhenProviderHasEmptyPatternList_ThenFalse() {
-        // given — empty list means no images allowed
+        // given - empty list means no images allowed
         when(visionProperties.getProviders()).thenReturn(Map.of("minimax", List.of()));
 
+        // when
         boolean supports = resolver.supportsImages("minimax", "MiniMax-M2.7");
 
+        // then
         assertThat(supports).isFalse();
     }
 
@@ -97,8 +105,10 @@ class VisionCapabilityResolverTest {
         cfg.setModel(null);
         when(aiProviderProperties.getProviders()).thenReturn(Map.of("anthropic", cfg));
 
+        // when
         boolean supports = resolver.supportsImages("anthropic", null);
 
+        // then
         assertThat(supports).isFalse();
     }
 
@@ -108,29 +118,36 @@ class VisionCapabilityResolverTest {
         // given
         when(visionProperties.getProviders()).thenReturn(Map.of("anthropic", List.of("claude-*")));
 
+        // when
         boolean supports = resolver.supportsImages("unknown-provider", "some-model");
 
+        // then
         assertThat(supports).isFalse();
     }
 
     @Test
     @DisplayName("supportsImages returns true when model exactly matches a pattern with no wildcards")
     void supportsImages_WhenExactPatternMatches_ThenTrue() {
-        // given — pattern without wildcards is an exact match
+        // given - pattern without wildcards is an exact match
         when(visionProperties.getProviders()).thenReturn(Map.of("openai", List.of("gpt-4o-mini")));
 
+        // when
         boolean supports = resolver.supportsImages("openai", "gpt-4o-mini");
 
+        // then
         assertThat(supports).isTrue();
     }
 
     @Test
     @DisplayName("supportsImages returns false when exact pattern does not match a different model")
     void supportsImages_WhenExactPatternDoesNotMatchDifferentModel_ThenFalse() {
+        // given
         when(visionProperties.getProviders()).thenReturn(Map.of("openai", List.of("gpt-4o-mini")));
 
+        // when
         boolean supports = resolver.supportsImages("openai", "gpt-4o");
 
+        // then
         assertThat(supports).isFalse();
     }
 }

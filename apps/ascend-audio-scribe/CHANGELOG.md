@@ -8,6 +8,28 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.9.3] - 2026-10-01
+
+### Changed
+- OpenTelemetry goes from 1.42.1 to 1.44.0 (opentelemetry-api, opentelemetry-sdk,
+  opentelemetry-exporter-otlp) and opentelemetry-instrumentation-fastapi from 0.63b1 to 0.65b0.
+- httpx2 2.13.1 joins the development extras, because Starlette's test client now asks for httpx2
+  instead of httpx.
+- The source is reformatted with ruff format at the configured 110 character line length. No behaviour
+  changes.
+- The test suite carries type annotations on its helpers, fixtures and tests.
+
+### Fixed
+- The documentation did not say the local backend cannot run on macOS. AGENTS.md and the README now say
+  that the pinned CUDA 12.6 PyTorch builds exist only for Windows and Linux on x86_64, that the OpenAI and
+  Hugging Face backends work everywhere, and that on macOS the PyTorch step is skipped and the test suite
+  still runs. AGENTS.md gains the Linux and macOS commands, and the README gains a step that runs the tests.
+- The install commands quote ".[dev]", because zsh reads an unquoted [dev] as a glob.
+- Dashes in comments, docstrings, documentation, the agent skill file, the architecture decisions and the
+  end-to-end specs are plain hyphens or commas now.
+- The end-to-end README points at this module's own entry under the service suites of
+  docs/E2E_RUN_SCENARIOS.md.
+
 ## [0.9.2]
 
 ### Fixed

@@ -1,4 +1,4 @@
-# AGENTS.md — ascend-ai-agent
+# AGENTS.md - ascend-ai-agent
 
 ## Project Overview
 
@@ -7,7 +7,7 @@ The ascend-ai-agent is the central Spring Boot API gateway for the AscendAI plat
 ## Tech Stack
 
 - **Language**: Java 21
-- **Framework**: Spring Boot 3.5.4
+- **Framework**: Spring Boot 3.5.14
 - **Build Tool**: Gradle (`build.gradle.kts`)
 - **Key Libraries**: Spring AI 1.1.5, Qdrant client 1.13.0, CommonMark 0.28.0, PDFBox 3.0.7, Liquibase
 
@@ -17,7 +17,7 @@ The ascend-ai-agent is the central Spring Boot API gateway for the AscendAI plat
 # Build
 ./gradlew build
 
-# Run (port 9917) — only if the monorepo's docker compose stack isn't already running this
+# Run (port 9917) - only if the monorepo's docker compose stack isn't already running this
 # service as a container (compose.yaml's ascend-agent service, also port 9917). Both routes
 # genuinely work. Running both at once fights over the port. Check first:
 # docker compose ps ascend-agent
@@ -26,7 +26,7 @@ The ascend-ai-agent is the central Spring Boot API gateway for the AscendAI plat
 # Run unit tests
 ./gradlew test
 
-# Run integration tests (Testcontainers — Postgres/Redis/Qdrant/object storage)
+# Run integration tests (Testcontainers - Postgres/Redis/Qdrant/object storage)
 ./gradlew integrationTest
 
 # Run a single test class
@@ -36,9 +36,28 @@ The ascend-ai-agent is the central Spring Boot API gateway for the AscendAI plat
 docker build -t ascend-ai-agent:latest .
 ```
 
+## Contract test with ascend-ocr
+
+`AscendOcrClientPactTest` is the Pact consumer test for the ascend-ocr REST API. It runs inside `test`, needs no
+Docker, and writes `contracts/pacts/ascend-agent-ascend-ocr.json` at the repository root, which the ascend-ocr provider
+verification replays. The provider state names in it are shared with that verification, so a renamed state breaks the
+provider side. Run only the contract test, from `apps/ascend-agent`.
+
+Linux or macOS:
+
+```bash
+./gradlew test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"
+```
+
+Windows PowerShell:
+
+```powershell
+.\gradlew.bat test --tests "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest"
+```
+
 ## End-to-end tests
 
-Capability-level e2e tests live in [`e2e/`](e2e/README.md). Eleven numbered specs (`1-weather-mcp` through `11-compaction-idempotency`) exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec asserts only observable behavior — HTTP status, response body, persisted state in the object store / Qdrant / Postgres — never log substrings. Each spec has a sidecar `<N>-<feature>-tasks.template.md` the runner copies into `e2e/testing/runs/` per run.
+Capability-level e2e tests live in [`e2e/`](e2e/README.md). Eleven numbered specs (`1-weather-mcp` through `11-compaction-idempotency`) exercise the agent against a live stack via the Bruno collection at `docs/api/request/AscendAI/`. Each spec asserts only observable behavior - HTTP status, response body, persisted state in the object store / Qdrant / Postgres - never log substrings. Each spec has a sidecar `<N>-<feature>-tasks.template.md` the runner copies into `e2e/testing/runs/` per run.
 
 Quick invocation:
 
@@ -73,7 +92,7 @@ See [`e2e/README.md`](e2e/README.md) for the full contract, capability matrix, a
 | `service/memory/` | Memory service orchestration |
 | `util/` | Utility classes |
 
-**Configuration**: `src/main/resources/application.yaml` — all provider URLs, model names, Qdrant settings, object-storage credentials, Redis, PostgreSQL.
+**Configuration**: `src/main/resources/application.yaml` - all provider URLs, model names, Qdrant settings, object-storage credentials, Redis, PostgreSQL.
 
 **Database migrations**: Liquibase changelogs in `src/main/resources/db/changelog/`.
 
@@ -91,10 +110,10 @@ Defaults match `application.yaml`. Any other model the provider accepts works at
 
 ## Key Dependencies
 
-- PostgreSQL (port 5432, database `ascend_ai`) — external prerequisite
-- Redis (port 6379) for chat history cache — external prerequisite
-- Qdrant (port 6333) for vector embeddings — external prerequisite
-- Object storage (locally: Floci, port 9070) for document storage — external prerequisite
+- PostgreSQL (port 5432, database `ascend_ai`) - external prerequisite
+- Redis (port 6379) for chat history cache - external prerequisite
+- Qdrant (port 6333) for vector embeddings - external prerequisite
+- Object storage (locally: Floci, port 9070) for document storage - external prerequisite
 - AscendMemory (port 7020) for semantic memory REST API
 - MCP servers: ascend-audio-scribe (7017), ascend-weather-mcp (9998), ascend-web-hunter (7021)
 

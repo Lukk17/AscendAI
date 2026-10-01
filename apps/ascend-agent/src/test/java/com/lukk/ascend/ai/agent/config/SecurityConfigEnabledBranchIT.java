@@ -30,6 +30,7 @@ class SecurityConfigEnabledBranchIT extends BaseIntegrationTest {
     @Test
     @DisplayName("securityFilterChain bean is created when securityEnabled=true (covers the if-true branch)")
     void securityFilterChain_SecurityEnabled_BeanCreated() {
+        // then
         assertThat(securityFilterChain).isNotNull();
     }
 }

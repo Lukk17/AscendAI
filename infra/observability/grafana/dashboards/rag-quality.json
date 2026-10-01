@@ -6,7 +6,7 @@
     { "type": "datasource", "id": "loki", "name": "Loki", "version": "1.0.0" }
   ],
   "annotations": { "list": [] },
-  "description": "L2 RAG Quality — similarity score distribution, miss rate, ingestion throughput, and warning log lines.",
+  "description": "L2 RAG Quality - similarity score distribution, miss rate, ingestion throughput, and warning log lines.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -94,7 +94,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "RAG retrieval miss rate — fraction of chunks below the similarity threshold. Metric: rag_retrieval_hits_total{above_threshold}. A spike here means embeddings are drifting or the threshold is too high.",
+      "description": "RAG retrieval miss rate - fraction of chunks below the similarity threshold. Metric: rag_retrieval_hits_total{above_threshold}. A spike here means embeddings are drifting or the threshold is too high.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -200,7 +200,7 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "L2 — RAG Quality",
+  "title": "L2 - RAG Quality",
   "uid": "ascend-rag-quality",
   "version": 1
 }

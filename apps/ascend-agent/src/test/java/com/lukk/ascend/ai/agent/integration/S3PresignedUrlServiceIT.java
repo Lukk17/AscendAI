@@ -38,13 +38,16 @@ class S3PresignedUrlServiceIT extends TestcontainersBase {
 
     @Test
     void presignedUrl_resolvesAgainstFlociWithoutCredentialValidation() throws Exception {
+        // given
         s3Client.putObject(
                 PutObjectRequest.builder().bucket(BUCKET).key(KEY).build(),
                 RequestBody.fromBytes(CONTENT));
 
+        // when
         SourceRef ref = new SourceRef(BUCKET, KEY, "presign-it.txt", "text/plain");
         List<SourceFile> sources = presignedUrlService.presignAll(List.of(ref));
 
+        // then
         assertThat(sources).hasSize(1);
         String downloadUrl = sources.getFirst().downloadUrl();
         assertThat(downloadUrl).contains("X-Amz-Signature");

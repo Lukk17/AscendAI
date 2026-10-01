@@ -9,7 +9,7 @@
 - The response body (the `.md` transcript content) contains at least one of the canary substrings `Q3`, `Acme`, `Adam`, `Friday`, or `migration` (case-insensitive). The asserted phrase is the invented sentence recorded into
   `meeting-clip.wav`; at least one distinctive word being present proves the audio bytes were actually transcribed
   through the OpenAI Whisper API rather than served from a cache or canned response.
-- The request consumes paid OpenAI quota — the test is not safe to run with `OPENAI_API_KEY` unset; the endpoint
+- The request consumes paid OpenAI quota - the test is not safe to run with `OPENAI_API_KEY` unset; the endpoint
   short-circuits to HTTP 500 with `"OPENAI_API_KEY is not configured on the server."` when the key is missing.
 
 ## Prerequisites

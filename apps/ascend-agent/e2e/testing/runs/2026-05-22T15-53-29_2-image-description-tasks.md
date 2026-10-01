@@ -8,7 +8,7 @@ Copy this file to `runs/<UTC-timestamp>_2-image-description-tasks.md` before sta
 
 ### Prerequisites
 
-- [x] Bruno CLI present (`bru --version` returns a version) — 3.3.0
+- [x] Bruno CLI present (`bru --version` returns a version) - 3.3.0
 - [x] AscendAgent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [x] Fixture `AscendAgent/e2e/fixtures/image.png` exists
 
@@ -19,7 +19,7 @@ Copy this file to `runs/<UTC-timestamp>_2-image-description-tasks.md` before sta
 ### Expected
 
 - [x] HTTP 200
-- [x] Response `content` is a detailed description (more than a few sentences) — 8 labelled sections, ~600 words covering character pose, hair, eyes, clothing, lighting, background, and mood
+- [x] Response `content` is a detailed description (more than a few sentences) - 8 labelled sections, ~600 words covering character pose, hair, eyes, clothing, lighting, background, and mood
 - [x] Response `content` references concrete visual features of `image.png`: spiky blond hair, glowing electric-blue eyes, dark jacket with cyan circuit/armor chest emblem, nighttime city backdrop with warm orange distant lights
 - [x] Response `content` is NOT a refusal like "I don't see an image" or "I'm unable to view images"
 

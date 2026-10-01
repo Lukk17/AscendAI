@@ -164,7 +164,7 @@ public class ChatExecutor {
 
     /**
      * Resolves a never-null {@link MimeType} for the uploaded image. Order:
-     * 1. Try {@code Content-Type} header — but reject obviously broken values
+     * 1. Try {@code Content-Type} header - but reject obviously broken values
      * ({@code null}, blank, no slash, "file", "application/octet-stream").
      * 2. Try filename extension (.jpg, .jpeg, .png, .webp, .gif).
      * 3. Default to {@code image/png}.
@@ -178,10 +178,10 @@ public class ChatExecutor {
             try {
                 return MimeType.valueOf(contentType);
             } catch (InvalidMimeTypeException e) {
-                log.info("Invalid image Content-Type '{}' — falling back to filename extension", contentType);
+                log.info("Invalid image Content-Type '{}' - falling back to filename extension", contentType);
             }
         } else if (StringUtils.hasText(contentType)) {
-            log.info("Suspect image Content-Type '{}' — falling back to filename extension", contentType);
+            log.info("Suspect image Content-Type '{}' - falling back to filename extension", contentType);
         }
 
         String filename = image.getOriginalFilename();
@@ -190,7 +190,7 @@ public class ChatExecutor {
             return byExtension;
         }
 
-        log.info("Could not infer image MIME from Content-Type or filename '{}' — defaulting to image/png", filename);
+        log.info("Could not infer image MIME from Content-Type or filename '{}' - defaulting to image/png", filename);
 
         return MimeTypeUtils.IMAGE_PNG;
     }

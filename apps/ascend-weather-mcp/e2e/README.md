@@ -1,12 +1,12 @@
 # ascend-weather-mcp: end-to-end capability tests
 
 Manual / AI-runnable e2e suite for the ascend-weather-mcp standalone module. Each test exercises **one MCP tool** end-to-end
-against a live ascend-weather-mcp container on port 9998. Assertions are observable behaviour only — HTTP status codes,
+against a live ascend-weather-mcp container on port 9998. Assertions are observable behaviour only - HTTP status codes,
 JSON-RPC response body shape and content. The only persisted state ascend-weather-mcp holds is the in-process Caffeine cache;
 it has no database, no Redis, no Qdrant, no object store. Where a test requires a cold cache, the reset step is to restart
 the container.
 
-Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+Before running this suite, or any other e2e suite, pick a run scenario or a service suite from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md). To run only this suite, use its entry under [Service suites](../../../docs/E2E_RUN_SCENARIOS.md#ascend-weather-mcp-service-suite).
 
 ## What's here
 
@@ -17,7 +17,7 @@ apps/ascend-weather-mcp/e2e/
 │   └── README.md
 └── testing/                             # numbered specs + templates/ + runs/
     ├── README.md
-    ├── 1-invalid-input-test.md          # immutable spec (lowest cost — no internet egress)
+    ├── 1-invalid-input-test.md          # immutable spec (lowest cost - no internet egress)
     ├── 2-current-structured-contract-test.md
     ├── 3-current-city-not-found-test.md
     ├── 4-forecast-happy-path-test.md
@@ -80,12 +80,12 @@ fields) and **Additional tasks I did** (anything done outside the spec). The run
 
 ## Parallelism and execution order
 
-ascend-weather-mcp holds no per-user state — only the in-process Caffeine cache keyed by tool arguments. The two execution
+ascend-weather-mcp holds no per-user state - only the in-process Caffeine cache keyed by tool arguments. The two execution
 constraints:
 
 | Constraint | Tests | Why |
 | :--- | :--- | :--- |
-| **Cold cache required** | 7 | Test 7 (country-code disambiguation) makes two calls for `Warsaw` with different `countryCode` parameters; both share the geocoding cache key prefix `warsaw\|`. To prove disambiguation works rather than cache-warm artefact, the container must be restarted between the two probes — or the two probes must run before either populates the cache. The spec restarts the container. |
+| **Cold cache required** | 7 | Test 7 (country-code disambiguation) makes two calls for `Warsaw` with different `countryCode` parameters; both share the geocoding cache key prefix `warsaw\|`. To prove disambiguation works rather than cache-warm artefact, the container must be restarted between the two probes - or the two probes must run before either populates the cache. The spec restarts the container. |
 | **No cross-test interference** | 1-6 | All other tests are read-only against Open-Meteo and write only to the cache. They can run in any order, in parallel or serial. |
 
 Recommended layout: run test 1 first (offline, fail-fast on validator bugs without burning egress), then tests 2-6

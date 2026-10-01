@@ -10,7 +10,7 @@ class ApiErrorTest {
     @Test
     @DisplayName("accessors return values set via constructor")
     void accessors_ReturnConstructedValues() {
-        // given
+        // when
         ApiError e = new ApiError(400, "bad", "boom");
 
         // then

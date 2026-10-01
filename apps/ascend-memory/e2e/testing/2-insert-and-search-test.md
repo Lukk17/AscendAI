@@ -8,8 +8,8 @@
 - `GET /api/v1/memory/search?user_id=frostyMemoryInsertSearchTest&query=Where+do+I+like+to+live%3F` returns HTTP 200
   and a non-empty JSON array.
 - At least one entry in the search result has a `memory` field whose string value contains the substring
-  `"Reykjavik"` (case-insensitive). This proves the round-trip — insert → embed → store → semantic search →
-  retrieve — works against the configured embedding backend and Qdrant.
+  `"Reykjavik"` (case-insensitive). This proves the round-trip - insert → embed → store → semantic search →
+  retrieve - works against the configured embedding backend and Qdrant.
 - The retrieved memory belongs to the test's `user_id` (mem0 returns `user_id="frostyMemoryInsertSearchTest"`
   alongside each memory; user-scope is observed at retrieval time).
 
@@ -84,7 +84,7 @@ Expect HTTP 200 with `{"status":"success", ...}`.
 ## Expected
 
 `insert-reykjavik.yml` returns HTTP 200. The response body is a JSON array (mem0's `add` return shape). The array
-is non-empty — at least one entry has a string `id` field. (The exact size depends on whether `MEM0_INFER_MEMORY`
+is non-empty - at least one entry has a string `id` field. (The exact size depends on whether `MEM0_INFER_MEMORY`
 is enabled; either way, ≥ 1 entry is returned when the insert succeeds.)
 
 `search-reykjavik.yml` returns HTTP 200. The response body is a JSON array. The array is non-empty, and:

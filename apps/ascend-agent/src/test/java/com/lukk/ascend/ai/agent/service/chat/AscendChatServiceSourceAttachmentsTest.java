@@ -126,17 +126,18 @@ class AscendChatServiceSourceAttachmentsTest {
         BuiltUserMessage userMessage = new BuiltUserMessage("prompt text", List.of(), false);
         when(contextAssembler.buildUserMessage(anyString(), any(), any())).thenReturn(userMessage);
 
-        // when — must not throw
+        // when - must not throw
         AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, "openai", false, null);
 
+        // then
         assertThat(response.content()).isEqualTo("reply");
     }
 
     @Test
     @DisplayName("prompt resolves embeddingProvider from provider config when null is passed")
     void prompt_NullEmbeddingProvider_ResolvedFromProviderConfig() {
-        // given — provider has a defaultEmbedding configured
+        // given - provider has a defaultEmbedding configured
         AiProviderProperties.ProviderConfig config = new AiProviderProperties.ProviderConfig();
         config.setDefaultEmbedding("lmstudio");
         when(aiProviderProperties.getProviders()).thenReturn(Map.of("openai", config));
@@ -148,6 +149,7 @@ class AscendChatServiceSourceAttachmentsTest {
         AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, null, false, CompactionOverride.EMPTY);
 
+        // then
         assertThat(response.content()).isEqualTo("reply");
     }
 }

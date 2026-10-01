@@ -5,12 +5,12 @@
 - `weather_current` for `city="Warsaw"` with no `countryCode` returns `location.countryCode="PL"` and a latitude band
   consistent with Warsaw, Poland (~52.23°N).
 - `weather_current` for the same `city="Warsaw"` with `countryCode="US"` returns `location.countryCode="US"` and a
-  latitude band consistent with one of the US Warsaws (Warsaw, IN ~41.24°N; Warsaw, NY ~42.74°N; Warsaw, MO ~38.25°N
-  — all in 38–43°N, distinct from PL's 52°N band).
+  latitude band consistent with one of the US Warsaws (Warsaw, IN ~41.24°N; Warsaw, NY ~42.74°N; Warsaw, MO ~38.25°N,
+  all in 38-43°N, distinct from PL's 52°N band).
 - Both calls return `status="ok"`.
 - The two responses have distinct `location.latitude` values (mathematically must differ if the dominant matches are
   different cities).
-- The `temperature.value` of the two responses are independent reads — they CAN coincide by accident but the two
+- The `temperature.value` of the two responses are independent reads - they CAN coincide by accident but the two
   geocoding lookups MUST resolve different coordinates.
 
 ## Prerequisites
@@ -99,15 +99,15 @@ First call (no `countryCode`):
 
 - `status` equals `"ok"`.
 - `location.countryCode` equals `"PL"`.
-- `location.latitude` is within 51.5–53.0.
-- `location.longitude` is within 20.5–22.0.
+- `location.latitude` is within 51.5-53.0.
+- `location.longitude` is within 20.5-22.0.
 
 Second call (`countryCode="US"`):
 
 - `status` equals `"ok"`.
 - `location.countryCode` equals `"US"`.
-- `location.latitude` is within 38.0–43.0.
-- `location.longitude` is within -95.0 — -75.0 (US continental).
+- `location.latitude` is within 38.0-43.0.
+- `location.longitude` is between -95.0 and -75.0 (US continental).
 
 Cross-call assertions:
 

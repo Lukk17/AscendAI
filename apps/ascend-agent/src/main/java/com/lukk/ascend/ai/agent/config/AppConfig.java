@@ -28,6 +28,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.time.Clock;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -35,7 +36,7 @@ import java.util.concurrent.Executors;
 
 @Configuration
 @EnableConfigurationProperties({VectorStoreProperties.class, VisionCapabilityProperties.class})
-// CGLIB proxies (proxyTargetClass=true) — PersistentChatMemory implements
+// CGLIB proxies (proxyTargetClass=true) - PersistentChatMemory implements
 // ChatMemory but is injected as the concrete type by ChatHistoryService for
 // the 4-arg add() overload that's not on the ChatMemory interface. JDK
 // proxies (the default) would only expose the interface and break wiring.
@@ -46,6 +47,11 @@ public class AppConfig {
     @Bean
     public Executor taskExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
     }
 
     @Bean

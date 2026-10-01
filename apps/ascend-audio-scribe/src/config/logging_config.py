@@ -24,11 +24,7 @@ class CenteredLevelFormatter(colorlog.ColoredFormatter):
         if level_match:
             level_text = level_match.group(2)
             centered_level = level_text.center(8)
-            formatted = (
-                formatted[: level_match.start(2)]
-                + centered_level
-                + formatted[level_match.end(2) :]
-            )
+            formatted = formatted[: level_match.start(2)] + centered_level + formatted[level_match.end(2) :]
         return formatted
 
 

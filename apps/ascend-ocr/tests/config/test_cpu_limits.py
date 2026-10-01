@@ -131,10 +131,7 @@ class TestDetectCpuLimitNoCgroup:
 
 
 class TestApplyCpuThreadLimit:
-    def test_sets_paddle_env_var_and_caps_opencv(self, monkeypatch):
-        # Given
-        monkeypatch.delenv("PADDLE_PDX_CPU_NUM_THREADS", raising=False)
-
+    def test_caps_opencv_and_returns_the_limit(self):
         # When
         with (
             patch("src.config.cpu_limits.detect_cpu_limit", return_value=4),
@@ -144,12 +141,11 @@ class TestApplyCpuThreadLimit:
 
         # Then
         assert result == 4
-        assert cpu_limits.os.environ["PADDLE_PDX_CPU_NUM_THREADS"] == "4"
         mock_cv2.setNumThreads.assert_called_once_with(4)
 
-    def test_does_not_override_operator_supplied_env_var(self, monkeypatch):
+    def test_leaves_the_paddle_env_var_alone_because_paddle_never_reads_it(self, monkeypatch):
         # Given
-        monkeypatch.setenv("PADDLE_PDX_CPU_NUM_THREADS", "99")
+        monkeypatch.delenv("PADDLE_PDX_CPU_NUM_THREADS", raising=False)
 
         # When
         with (
@@ -159,4 +155,4 @@ class TestApplyCpuThreadLimit:
             apply_cpu_thread_limit()
 
         # Then
-        assert cpu_limits.os.environ["PADDLE_PDX_CPU_NUM_THREADS"] == "99"
+        assert "PADDLE_PDX_CPU_NUM_THREADS" not in cpu_limits.os.environ

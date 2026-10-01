@@ -27,10 +27,10 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) — warm-cache path observed: `cache_read_input_tokens=3345` (prior identical call within 5-min TTL). Spec explicitly accommodates: "Either path proves the cache_control directive was accepted."
-- [ ] Step 1: `usage.cacheReadInputTokens == 0` (or absent) — observed `cache_read_input_tokens=3345` (warm-cache hit, not a cold start). Spec prose overrides: warm-cache = read on call 1 is the accepted alternate path; template checkbox is conservative. Per spec Expected: cacheCreationInputTokens > 0 OR cacheReadInputTokens > 0 — satisfied.
+- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) - warm-cache path observed: `cache_read_input_tokens=3345` (prior identical call within 5-min TTL). Spec explicitly accommodates: "Either path proves the cache_control directive was accepted."
+- [ ] Step 1: `usage.cacheReadInputTokens == 0` (or absent) - observed `cache_read_input_tokens=3345` (warm-cache hit, not a cold start). Spec prose overrides: warm-cache = read on call 1 is the accepted alternate path; template checkbox is conservative. Per spec Expected: cacheCreationInputTokens > 0 OR cacheReadInputTokens > 0 - satisfied.
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.cacheReadInputTokens > 0` — observed `cache_read_input_tokens=3345`
+- [x] Step 2: `usage.cacheReadInputTokens > 0` - observed `cache_read_input_tokens=3345`
 
 ### Verdict
 
@@ -38,7 +38,7 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 
 ## Result summary
 
-Both calls returned HTTP 200. Step 1 entered the warm-cache path: `cache_read_input_tokens=3345`, `cache_creation_input_tokens=0`. The spec's Expected section explicitly documents this case: "on a warm-cache cold-test you observe a read instead of a creation — Either path proves the cache_control directive was accepted." Step 2 confirmed `cache_read_input_tokens=3345 > 0` (with an additional incremental `cache_creation_input_tokens=818` for the newly added chat-history turn). The `cache_control` directive is unambiguously wired: Anthropic accepted and served the cached system-prompt chunk in both calls. All spec assertions are satisfied; the single unticked template checkbox (`cacheReadInputTokens == 0` on step 1) reflects the warm-cache alternate path the spec prose explicitly permits.
+Both calls returned HTTP 200. Step 1 entered the warm-cache path: `cache_read_input_tokens=3345`, `cache_creation_input_tokens=0`. The spec's Expected section explicitly documents this case: "on a warm-cache cold-test you observe a read instead of a creation - Either path proves the cache_control directive was accepted." Step 2 confirmed `cache_read_input_tokens=3345 > 0` (with an additional incremental `cache_creation_input_tokens=818` for the newly added chat-history turn). The `cache_control` directive is unambiguously wired: Anthropic accepted and served the cached system-prompt chunk in both calls. All spec assertions are satisfied; the single unticked template checkbox (`cacheReadInputTokens == 0` on step 1) reflects the warm-cache alternate path the spec prose explicitly permits.
 
 Cache creation tokens (call 1): 0 (warm-cache hit; cache was pre-populated within the 5-min TTL)
 

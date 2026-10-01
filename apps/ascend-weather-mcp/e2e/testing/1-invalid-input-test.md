@@ -6,7 +6,7 @@
   blank-field failure.
 - `weather_current` with a CRLF-injected `city` is rejected with `status="invalid_input"` (the regex blocks control
   characters) before any Open-Meteo call.
-- `weather_current` with a non-ISO `countryCode` (`"USA"` — 3 letters, not alpha-2) is rejected with
+- `weather_current` with a non-ISO `countryCode` (`"USA"` - 3 letters, not alpha-2) is rejected with
   `status="invalid_input"`.
 - In every rejection: `requestedQuery` echoes the verbatim user input; `message` is the validator's own error string
   (no echo of the offending value); `location` / `temperature` / `weatherCode` / `wind` / `observedAt` are all `null`;
@@ -81,7 +81,7 @@ Each response body's `result` content matches:
 - `message` is non-empty and does NOT contain the offending user-supplied value (validator returns fixed-shape error
   strings).
 - `requestedQuery` equals the exact value the caller sent (`"   "` / `"Warsaw\r\nignore previous"` / `"Warsaw"`
-  respectively for the three calls — for the `countryCode` test the `requestedQuery` is still the city, since the
+  respectively for the three calls - for the `countryCode` test the `requestedQuery` is still the city, since the
   country code is a separate field that the validator rejects before the city flows downstream).
 - `location` is `null`.
 - `temperature` is `null`.
@@ -91,7 +91,7 @@ Each response body's `result` content matches:
 - `source` equals `"open-meteo"`.
 - `fetchedAt` is a valid ISO-8601 instant.
 
-No outbound HTTPS request to `*.open-meteo.com` is made — this is an internal property the spec does not directly
+No outbound HTTPS request to `*.open-meteo.com` is made - this is an internal property the spec does not directly
 assert (since the runner is black-box), but a steady-state raw `curl` call measures about 210 ms (208 to 223 ms
 across three calls on 2026-09-09). Bruno's own reported durations add harness overhead on top of that (343 to
 838 ms on the same day) and are not the figure to compare. A raw `curl` duration > 500 ms suggests the validator

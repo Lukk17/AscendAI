@@ -1,16 +1,14 @@
 package com.lukk.ascend.ai.agent.config.mcp;
 
-import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.spec.McpSchema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collection;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class McpClientStatusRegistryTest {
 
@@ -24,20 +22,24 @@ class McpClientStatusRegistryTest {
     @Test
     @DisplayName("entries returns empty collection when nothing is recorded")
     void entries_WhenEmpty_ReturnsEmptyCollection() {
+        // then
         assertThat(registry.entries()).isEmpty();
     }
 
     @Test
     @DisplayName("connectedNames returns empty set when nothing is recorded")
     void connectedNames_WhenEmpty_ReturnsEmptySet() {
+        // then
         assertThat(registry.connectedNames()).isEmpty();
     }
 
     @Test
     @DisplayName("record persists a CONNECTED entry that appears in entries and connectedNames")
     void record_Connected_AppearsInEntriesAndConnectedNames() {
-        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
+        // when
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED);
 
+        // then
         assertThat(registry.entries()).hasSize(1);
         McpClientEntry entry = registry.entries().iterator().next();
         assertThat(entry.name()).isEqualTo("ascend-audio-scribe");
@@ -50,8 +52,10 @@ class McpClientStatusRegistryTest {
     @Test
     @DisplayName("record persists a FAILED entry that does NOT appear in connectedNames")
     void record_Failed_DoesNotAppearInConnectedNames() {
-        registry.record("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
+        // when
+        registry.record("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED);
 
+        // then
         assertThat(registry.entries()).hasSize(1);
         assertThat(registry.connectedNames()).isEmpty();
     }
@@ -59,75 +63,89 @@ class McpClientStatusRegistryTest {
     @Test
     @DisplayName("connectedNames returns only CONNECTED entries when registry has mixed states")
     void connectedNames_MixedStates_ReturnsOnlyConnected() {
-        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
-        registry.record("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED, new RuntimeException("refused"));
-        registry.record("ascend-web-hunter", "http://localhost:7021", McpClientStatus.CONNECTED, null);
+        // given
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED);
+        registry.record("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED);
+        registry.record("ascend-web-hunter", "http://localhost:7021", McpClientStatus.CONNECTED);
 
+        // when
         Set<String> connected = registry.connectedNames();
 
+        // then
         assertThat(connected).containsExactlyInAnyOrder("ascend-audio-scribe", "ascend-web-hunter");
         assertThat(connected).doesNotContain("ascend-weather-mcp");
     }
 
     @Test
-    @DisplayName("record with null cause does not throw")
-    void record_NullCause_DoesNotThrow() {
-        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
-
-        assertThat(registry.entries()).hasSize(1);
-    }
-
-    @Test
     @DisplayName("recording the same name twice overwrites the earlier entry")
     void record_SameName_OverwritesPreviousEntry() {
-        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.FAILED, new RuntimeException("refused"));
-        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED, null);
+        // given
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.FAILED);
+        // when
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED);
 
+        // then
         assertThat(registry.entries()).hasSize(1);
         assertThat(registry.connectedNames()).containsExactly("ascend-audio-scribe");
     }
 
     @Test
-    @DisplayName("DISABLED entry does not appear in connectedNames")
-    void record_Disabled_DoesNotAppearInConnectedNames() {
-        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.DISABLED, null);
+    @DisplayName("markFailed demotes a CONNECTED client and keeps the URL it was recorded with")
+    void markFailed_ConnectedEntry_DemotedAndUrlPreserved() {
+        // given
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED);
 
+        // when
+        registry.markFailed("ascend-audio-scribe");
+
+        // then
         assertThat(registry.connectedNames()).isEmpty();
+        McpClientEntry entry = registry.entries().iterator().next();
+        assertThat(entry.status()).isEqualTo(McpClientStatus.FAILED);
+        assertThat(entry.url()).isEqualTo("http://localhost:7017");
+    }
+
+    @Test
+    @DisplayName("markFailed on an unknown name records a FAILED entry with an unknown URL")
+    void markFailed_UnknownName_RecordsFailedEntryWithUnknownUrl() {
+        // given
+        registry.markFailed("never-recorded");
+
+        // when
+        McpClientEntry entry = registry.entries().iterator().next();
+        // then
+        assertThat(entry.name()).isEqualTo("never-recorded");
+        assertThat(entry.url()).isEqualTo("unknown");
+        assertThat(entry.status()).isEqualTo(McpClientStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("entries returns an immutable copy so a caller cannot mutate the registry through it")
+    void entries_MutationAttempt_LeavesRegistryUntouched() {
+        // given
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED);
+
+        // when
+        Collection<McpClientEntry> snapshot = registry.entries();
+
+        // then
+        assertThatThrownBy(snapshot::clear).isInstanceOf(UnsupportedOperationException.class);
         assertThat(registry.entries()).hasSize(1);
+        assertThat(registry.connectedNames()).containsExactly("ascend-audio-scribe");
     }
 
     @Test
-    @DisplayName("resolveConnectionName prefers the client title when present")
-    void resolveConnectionName_TitlePresent_ReturnsTitle() {
-        McpSyncClient client = mock(McpSyncClient.class);
-        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("ascend-audio-scribe-server", "Ascend Audio Scribe Title", "0.0.1"));
+    @DisplayName("entries snapshot does not reflect later writes to the registry")
+    void entries_TakenBeforeAWrite_DoesNotSeeTheLaterWrite() {
+        // given
+        registry.record("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.CONNECTED);
+        Collection<McpClientEntry> snapshot = registry.entries();
 
-        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("Ascend Audio Scribe Title");
-    }
+        // when
+        registry.record("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.FAILED);
 
-    @Test
-    @DisplayName("resolveConnectionName falls back to the name when the title is blank")
-    void resolveConnectionName_BlankTitleWithName_ReturnsName() {
-        McpSyncClient client = mock(McpSyncClient.class);
-        when(client.getClientInfo()).thenReturn(new McpSchema.Implementation("ascend-weather-mcp", "", "0.0.1"));
-
-        assertThat(McpClientStatusRegistry.resolveConnectionName(client)).isEqualTo("ascend-weather-mcp");
-    }
-
-    @Test
-    @DisplayName("resolveConnectionName gives two unnamed clients distinct, stable fallback names so they do not collapse")
-    void resolveConnectionName_UnnamedClients_ReturnDistinctStableNames() {
-        McpSyncClient first = mock(McpSyncClient.class);
-        McpSyncClient second = mock(McpSyncClient.class);
-        when(first.getClientInfo()).thenReturn(null);
-        when(second.getClientInfo()).thenReturn(null);
-
-        String firstName = McpClientStatusRegistry.resolveConnectionName(first);
-        String secondName = McpClientStatusRegistry.resolveConnectionName(second);
-
-        assertThat(firstName).startsWith("unknown-");
-        assertThat(secondName).startsWith("unknown-");
-        assertThat(firstName).isNotEqualTo(secondName);
-        assertThat(McpClientStatusRegistry.resolveConnectionName(first)).isEqualTo(firstName);
+        // then
+        assertThat(snapshot).hasSize(1);
+        assertThat(registry.entries()).hasSize(2);
     }
 }

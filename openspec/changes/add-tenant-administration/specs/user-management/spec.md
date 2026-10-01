@@ -16,12 +16,12 @@ ascend-ai-agent SHALL expose `/api/v1/admin/users` supporting invite, list, role
 
 ### Requirement: Inviting a user provisions a Keycloak user and sends a set-password email
 
-An invite SHALL create a Keycloak user in the caller's tenant group with the default role `USER`, and SHALL trigger Keycloak's built-in set-password / verify-email action email so the invitee sets their own credentials. ascend-ai-agent SHALL never receive or store the invitee's password. The invited user's token, once they log in, SHALL carry the caller's tenant as its `tenant` claim.
+An invite SHALL create a Keycloak user whose `tenant` attribute is the caller's tenant (taken from the caller's resolved tenant context, never from the request), with the default role `USER` and no group, and SHALL trigger Keycloak's built-in set-password / verify-email action email, sent through the realm SMTP settings, so the invitee sets their own credentials. ascend-ai-agent SHALL never receive or store the invitee's password. The invited user's token, once they log in, SHALL carry the caller's tenant as its `tenant` claim.
 
 #### Scenario: Invite creates a least-privilege user and emails them
 
 - **WHEN** a tenant `ADMIN` of `acme` invites `newuser@acme.example`
-- **THEN** a Keycloak user is created in group `/tenants/acme` with role `USER` and no other role
+- **THEN** a Keycloak user is created with attribute `tenant` = `acme`, role `USER` and no other role, and no group
 - **AND** a set-password action email is triggered for that address
 
 #### Scenario: Invited user's token carries the tenant
@@ -31,7 +31,7 @@ An invite SHALL create a Keycloak user in the caller's tenant group with the def
 
 ### Requirement: Role assignment and account state are managed per tenant
 
-A tenant `ADMIN` SHALL be able to promote a user to `ADMIN`, demote back to `USER`, and enable or disable an account, all scoped to their tenant, with each change reflected in Keycloak. Removing a user SHALL disable or delete the Keycloak account, and MAY chain the per-user erasure job (`add-audit-and-gdpr-compliance`) when the caller requests data removal. Every invite, role change, enable/disable, and removal SHALL emit an audit event.
+A tenant `ADMIN` SHALL be able to promote a user to `ADMIN`, demote back to `USER`, and enable or disable an account, all scoped to their tenant, with each change reflected in Keycloak. Removing a user SHALL disable the Keycloak account and clear its personal attributes, and SHALL NOT delete the account, and MAY chain the per-user erasure job (`add-audit-and-gdpr-compliance`) when the caller requests data removal. Every invite, role change, enable/disable, and removal SHALL emit an audit event.
 
 #### Scenario: Promotion reflected in Keycloak
 
@@ -42,5 +42,5 @@ A tenant `ADMIN` SHALL be able to promote a user to `ADMIN`, demote back to `USE
 #### Scenario: Remove with data erasure
 
 - **WHEN** a tenant `ADMIN` removes a user requesting data removal
-- **THEN** the Keycloak account is disabled or deleted
+- **THEN** the Keycloak account is disabled and still exists
 - **AND** a per-user erasure job is started for that user

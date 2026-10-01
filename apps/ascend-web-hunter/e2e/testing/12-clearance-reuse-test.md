@@ -154,7 +154,7 @@ PowerShell:
 Unix:
 
 ```bash
-python3 -c "import json; r = json.load(open('/tmp/clearance-cold-run.json'))[0]['results'][0]['response']; print(r['data']['mode'], r['responseTime'])"
+"$(command -v python3 || command -v python)" -c "import json, sys; r = json.load(open(sys.argv[1]))[0]['results'][0]['response']; print(r['data']['mode'], r['responseTime'])" /tmp/clearance-cold-run.json
 ```
 
 3. Capture check.
@@ -191,7 +191,7 @@ PowerShell:
 Unix:
 
 ```bash
-python3 -c "import json; r = json.load(open('/tmp/clearance-reuse-run.json'))[0]['results'][0]['response']; print(r['data']['mode'], r['responseTime'])"
+"$(command -v python3 || command -v python)" -c "import json, sys; r = json.load(open(sys.argv[1]))[0]['results'][0]['response']; print(r['data']['mode'], r['responseTime'])" /tmp/clearance-reuse-run.json
 ```
 
 ## Expected

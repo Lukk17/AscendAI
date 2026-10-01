@@ -114,10 +114,11 @@ class StartupLogConfigTest {
         stubToolProvider(buildToolProvider("weather_current"));
         StartupLogConfig spy = spyWithProbeStubbedOk(new StartupLogConfig(env, toolCallbackProvider, EMPTY_BANNER));
 
-        // when / then
+        // when
         try (MockedStatic<InetAddress> inetMock = mockStatic(InetAddress.class)) {
             inetMock.when(InetAddress::getLocalHost).thenThrow(new UnknownHostException("no host"));
             String log = spy.buildStartupLog();
+            // then
             assertThat(log).contains("localhost");
         }
     }

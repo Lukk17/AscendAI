@@ -10,7 +10,7 @@ jacoco {
     toolVersion = libs.versions.jacoco.get()
 }
 
-version = "0.1.1"
+version = "0.1.2"
 
 java {
     toolchain {
@@ -74,7 +74,7 @@ dependencies {
     // Security
     implementation(libs.spring.boot.starter.security)
 
-    // Actuator — health + prometheus metrics
+    // Actuator - health + prometheus metrics
     implementation(libs.spring.boot.starter.actuator)
     implementation(libs.micrometer.registry.prometheus)
     implementation(libs.micrometer.tracing.bridge.otel)
@@ -101,6 +101,7 @@ dependencies {
     testImplementation(libs.testcontainers.junit)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.qdrant)
+    testImplementation(libs.pact.consumer.junit5)
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.h2)
 }
@@ -115,6 +116,11 @@ tasks.test {
     useJUnitPlatform {
         excludeTags("integration")
     }
+    val pactsDir = rootDir.resolve("../../contracts/pacts").normalize()
+    systemProperty("pact.rootDir", pactsDir.absolutePath)
+    systemProperty("pact.writer.overwrite", "true")
+    systemProperty("pact_do_not_track", "true")
+    outputs.dir(pactsDir)
     finalizedBy(tasks.jacocoTestReport)
 }
 
@@ -127,6 +133,7 @@ tasks.register<Test>("integrationTest") {
     shouldRunAfter(tasks.test)
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
+    maxHeapSize = "2g"
     // Optional override for environments where Testcontainers' auto-detection picks the wrong pipe.
     // When unset (default), Testcontainers detects from the active Docker context.
     //   ./gradlew integrationTest -Pdocker.host=npipe:////./pipe/docker_engine

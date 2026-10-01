@@ -26,6 +26,7 @@ class EmbeddingProviderPropertiesBindingTest {
     @Test
     @DisplayName("app.embedding default provider binds to the configured YAML value, not null")
     void defaultProvider_BindsFromApplicationYaml() {
+        // then
         assertThat(embeddingProviderProperties.getDefaultProvider()).isEqualTo("lmstudio");
     }
 }

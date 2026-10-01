@@ -36,7 +36,7 @@ def _load_model(model_path: str) -> Any:
     import torch
     from faster_whisper import WhisperModel
 
-    global _model_instance, _model_path_loaded  # noqa: PLW0603 — module cache
+    global _model_instance, _model_path_loaded  # noqa: PLW0603 - module cache
 
     with _model_lock:
         if _model_instance is not None and _model_path_loaded == model_path:
@@ -85,7 +85,7 @@ async def local_speech_transcription_stream(
 ) -> AsyncIterator[dict[str, Any]]:
     """Per-segment async generator. Chunks the audio on disk via ffmpeg,
     transcribes each chunk under the GPU semaphore, and yields segments as
-    they arrive — SSE sees the first segment within seconds rather than at
+    they arrive - SSE sees the first segment within seconds rather than at
     the very end of the job."""
 
     chunk_seconds = settings.CHUNK_LENGTH_MINUTES * 60

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-05-31
+Accepted - 2026-05-31
 
 ## Context
 
@@ -37,7 +37,7 @@ the resolved VNC URL. It does not return content. The `human_intervention_except
 The MCP tool docstring (`src/api/mcp/mcp_server.py:40-41`) instructs the agent to display the `vnc_url` to the
 user when `status` is `human_intervention_required`. The MCP surface catches
 `HumanInterventionRequiredException` explicitly in `web_read` and returns the same structured payload as a tool
-result — without that catch, FastMCP marks the call as a generic tool error and the docstring contract is
+result - without that catch, FastMCP marks the call as a generic tool error and the docstring contract is
 silently broken.
 
 Before raising, `NoVNCStrategy` spawns a background `asyncio.Task` (`_monitor_for_cookies`,
@@ -121,10 +121,10 @@ need revisiting. See `code-reviewer` and `security-auditor` reports from 2026-05
 
 ## Related
 
-- `src/reader/strategies/novnc_strategy.py` — `NoVNCStrategy`, `_monitor_for_cookies`, `_resolve_public_vnc_url`,
+- `src/reader/strategies/novnc_strategy.py` - `NoVNCStrategy`, `_monitor_for_cookies`, `_resolve_public_vnc_url`,
   `_fetch_ngrok_url`.
-- `src/api/exceptions.py` — `HumanInterventionRequiredException`.
-- `src/api/exception_handlers.py:35-48` — 428 handler.
-- `src/config/config.py` — `PUBLIC_VNC_URL`, `SELENIUM_BROWSER_VNC_URL`, `SELENIUM_BROWSER_CDP_URL`,
+- `src/api/exceptions.py` - `HumanInterventionRequiredException`.
+- `src/api/exception_handlers.py:35-48` - 428 handler.
+- `src/config/config.py` - `PUBLIC_VNC_URL`, `SELENIUM_BROWSER_VNC_URL`, `SELENIUM_BROWSER_CDP_URL`,
   `NOVNC_TIMEOUT_SECONDS`.
-- [ADR-002](ADR-002-cloudflare-cookie-persistence-redis.md) — cookie persistence that makes human solves durable.
+- [ADR-002](ADR-002-cloudflare-cookie-persistence-redis.md) - cookie persistence that makes human solves durable.

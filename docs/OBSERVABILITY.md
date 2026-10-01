@@ -12,13 +12,13 @@ AscendAI ships a full three-pillar observability stack (metrics, logs, traces) a
 | Logs | Vector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
 | Traces | OTel Collector + Tempo + Grafana | http://localhost:7078 → Explore → Tempo |
 
-All seven observability containers start automatically with `docker compose up`. There is no profile flag required — observability is always-on.
+All seven observability containers start automatically with `docker compose up`. There is no profile flag required - observability is always-on.
 
 ---
 
 ## How to Reach Grafana
 
-Open http://localhost:7078 in a browser. Grafana is configured with anonymous read-only Viewer access — no login required. The three datasources (Prometheus, Loki, Tempo) are provisioned at startup. The six dashboards below are loaded from `infra/observability/grafana/dashboards/` and visible under the Dashboards menu immediately after the stack starts.
+Open http://localhost:7078 in a browser. Grafana is configured with anonymous read-only Viewer access - no login required. The three datasources (Prometheus, Loki, Tempo) are provisioned at startup. The six dashboards below are loaded from `infra/observability/grafana/dashboards/` and visible under the Dashboards menu immediately after the stack starts.
 
 ---
 
@@ -29,9 +29,9 @@ Open http://localhost:7078 in a browser. Grafana is configured with anonymous re
 | Platform Overview | `ascend-platform-overview` | Are services up? Are requests latent or erroring? |
 | AI Pipeline | `ascend-ai-pipeline` | Are tokens flowing? RAG hitting? Tool calls latent? |
 | Infrastructure | `ascend-infrastructure` | Is Qdrant growing? Postgres connections healthy? |
-| L1 — Token Cost | `ascend-token-cost` | What is each provider costing per day? |
-| L2 — RAG Quality | `ascend-rag-quality` | Top-K score distribution; miss-rate trends; ingestion throughput |
-| L3 — Cache Hit Rate | `ascend-cache-hit-rate` | Is the prompt-caching change actually saving money? |
+| L1 - Token Cost | `ascend-token-cost` | What is each provider costing per day? |
+| L2 - RAG Quality | `ascend-rag-quality` | Top-K score distribution; miss-rate trends; ingestion throughput |
+| L3 - Cache Hit Rate | `ascend-cache-hit-rate` | Is the prompt-caching change actually saving money? |
 
 To jump directly to a dashboard: http://localhost:7078/d/<uid>
 
@@ -59,13 +59,13 @@ Prometheus scrapes every 15 seconds. Scrape targets are in `infra/observability/
 
 **Data-layer exporters**
 
-- `postgres-exporter` at :9187 — `pg_stat_activity_count`, `pg_database_size_bytes`, `pg_stat_bgwriter_*`.
-- `redis-exporter` at :9121 — `redis_commands_processed_total`, `redis_memory_used_bytes`, `redis_connected_clients`.
-- Qdrant at host port :6333/metrics — `qdrant_collections_vectors_count`, `qdrant_collection_payload_storage_bytes`.
+- `postgres-exporter` at :9187 - `pg_stat_activity_count`, `pg_database_size_bytes`, `pg_stat_bgwriter_*`.
+- `redis-exporter` at :9121 - `redis_commands_processed_total`, `redis_memory_used_bytes`, `redis_connected_clients`.
+- Qdrant at host port :6333/metrics - `qdrant_collections_vectors_count`, `qdrant_collection_payload_storage_bytes`.
 
 ### Logs
 
-Vector reads Docker container stdout/stderr via the Docker socket and ships to Loki with labels `service` (from `container_name`) and `source` (`docker`). No code changes are required in any service — they just write to stdout.
+Vector reads Docker container stdout/stderr via the Docker socket and ships to Loki with labels `service` (from `container_name`) and `source` (`docker`). No code changes are required in any service - they just write to stdout.
 
 To query logs in Grafana: Explore → Loki → `{service="ascend-ai-agent"}`.
 
@@ -90,10 +90,10 @@ Every custom metric emitted by ascend-ai-agent. Micrometer converts dot-separate
 |---|---|---|---|---|
 | `gen_ai.client.token.usage` | `gen_ai_client_token_usage_total` | counter (auto, Spring AI) | `gen_ai_system`, `gen_ai_request_model`, `gen_ai_token_type` | AI Pipeline, L1 Token Cost |
 | `memory.extraction.parse_failed` | `memory_extraction_parse_failed_total` | counter | `provider`, `model` | AI Pipeline |
-| `memory.insert.failed` | `memory_insert_failed_total` | counter | `embedding_provider`, `reason` | — |
-| `memory.search.duration` | `memory_search_duration_seconds_*` | timer | `embedding_provider`, `outcome` | — |
+| `memory.insert.failed` | `memory_insert_failed_total` | counter | `embedding_provider`, `reason` | - |
+| `memory.search.duration` | `memory_search_duration_seconds_*` | timer | `embedding_provider`, `outcome` | - |
 | `rag.retrieval.hits` | `rag_retrieval_hits_total` | counter | `provider`, `embedding_provider`, `above_threshold` | AI Pipeline, L2 RAG Quality |
-| `rag.retrieval.duration` | `rag_retrieval_duration_seconds_*` | timer | `provider`, `outcome` | — |
+| `rag.retrieval.duration` | `rag_retrieval_duration_seconds_*` | timer | `provider`, `outcome` | - |
 | `rag.last_top_score` | `rag_last_top_score` | gauge | `provider` | L2 RAG Quality |
 | `rag.top_score` | `rag_top_score_bucket` | histogram | `provider` | L2 RAG Quality |
 | `mcp.tool.duration` | `mcp_tool_duration_seconds_*` | timer | `tool`, `outcome` | AI Pipeline |
@@ -102,7 +102,7 @@ Every custom metric emitted by ascend-ai-agent. Micrometer converts dot-separate
 | `prompt_cache.tokens.creation` | `prompt_cache_tokens_creation_total` | counter | `provider` (Anthropic only) | L3 Cache Hit Rate |
 | `prompt_cache.tokens.total` | `prompt_cache_tokens_total` | counter | `provider` | L3 Cache Hit Rate |
 
-Allowed values for `outcome` tag: `ok`, `error`, `timeout`, `rate_limited`. Never use free-form strings — see Cardinality Rules below.
+Allowed values for `outcome` tag: `ok`, `error`, `timeout`, `rate_limited`. Never use free-form strings - see Cardinality Rules below.
 
 ---
 

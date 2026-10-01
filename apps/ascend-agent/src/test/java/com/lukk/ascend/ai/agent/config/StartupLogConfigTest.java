@@ -1,5 +1,8 @@
 package com.lukk.ascend.ai.agent.config;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.lukk.ascend.ai.agent.config.mcp.McpClientEntry;
@@ -11,6 +14,7 @@ import com.lukk.ascend.ai.agent.config.properties.ChatHistoryProperties;
 import com.lukk.ascend.ai.agent.config.properties.EmbeddingProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.SemanticMemoryProperties;
 import io.qdrant.client.QdrantClient;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
@@ -35,13 +40,16 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +82,9 @@ class StartupLogConfigTest {
 
     private StartupLogConfig config;
 
+    private Logger startupLogger;
+    private ListAppender<ILoggingEvent> appender;
+
     @BeforeEach
     void setUp() {
         aiProviderProperties = new AiProviderProperties();
@@ -103,7 +114,7 @@ class StartupLogConfigTest {
                 semanticMemoryProperties, chatHistoryProperties, compactionProperties,
                 qdrantClientProvider, mcpRegistry);
 
-        // Stub env calls used in onReadinessChange — use eq() consistently so Mockito sees uniform matchers
+        // Stub env calls used in onReadinessChange - use eq() consistently so Mockito sees uniform matchers
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("local.server.port"), org.mockito.ArgumentMatchers.anyString())).thenReturn("9917");
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("server.servlet.context-path"), org.mockito.ArgumentMatchers.eq(""))).thenReturn("");
         when(env.getProperty("server.ssl.key-store")).thenReturn(null);
@@ -116,6 +127,16 @@ class StartupLogConfigTest {
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("app.s3.bucket"), org.mockito.ArgumentMatchers.anyString())).thenReturn("knowledge-base");
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("app.s3.endpoint"), org.mockito.ArgumentMatchers.anyString())).thenReturn("http://localhost:9070");
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("spring.datasource.url"), org.mockito.ArgumentMatchers.anyString())).thenReturn("jdbc:postgresql://localhost/ascend_ai");
+
+        startupLogger = (Logger) LoggerFactory.getLogger(StartupLogConfig.class);
+        appender = new ListAppender<>();
+        appender.start();
+        startupLogger.addAppender(appender);
+    }
+
+    @AfterEach
+    void detachAppender() {
+        startupLogger.detachAppender(appender);
     }
 
     @Test
@@ -127,8 +148,11 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // when — must not throw even if DB is unavailable
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Postgres:  postgresql://localhost/ascend_ai [FAILED]");
     }
 
     @Test
@@ -148,6 +172,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Redis:        redis://localhost:6379 [FAILED]");
     }
 
     @Test
@@ -160,8 +187,11 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // when — should not throw
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Redis:        redis://localhost:6379 [Warning (no connection factory)]");
     }
 
     @Test
@@ -180,6 +210,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Qdrant:       localhost:6334 [FAILED]");
     }
 
     @Test
@@ -194,6 +227,9 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      Qdrant:       localhost:6334 [Warning (no client bean)]");
     }
 
     @Test
@@ -210,19 +246,58 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      S3 (Floci):   http://localhost:9070/knowledge-base [FAILED]");
     }
 
     @Test
-    @DisplayName("onReadinessChange renders MCP servers section with registry entries")
-    void onReadinessChange_McpRegistryHasEntries_RendersMcpServersSection() throws Exception {
-        // given — registry already has one CONNECTED and one FAILED entry (configured per-test via mcpRegistry mock in setUp)
+    @DisplayName("onReadinessChange renders one aligned MCP line per registry entry with its status marker")
+    void onReadinessChange_McpRegistryHasEntries_RendersOneAlignedLinePerEntry() throws Exception {
+        // given
+        when(mcpRegistry.entries()).thenReturn(List.of(
+                new McpClientEntry("ascend-weather-mcp", "http://localhost:9998", McpClientStatus.CONNECTED),
+                new McpClientEntry("ascend-audio-scribe", "http://localhost:7017", McpClientStatus.FAILED)
+        ));
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
 
-        // when — must not throw
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        List<String> mcpLines = mcpSectionLines(capturedBanner());
+        assertThat(mcpLines).containsExactly(
+                "      ascend-audio-scribe:  http://localhost:7017 [FAILED]",
+                "      ascend-weather-mcp:   http://localhost:9998 [Connected]",
+                "      Aggregate: 1/2 connected");
+    }
+
+    @Test
+    @DisplayName("onReadinessChange aligns the URL column across MCP entries of differing name length")
+    void onReadinessChange_McpNamesOfDifferentLength_AlignsUrlColumn() throws Exception {
+        // given
+        when(mcpRegistry.entries()).thenReturn(List.of(
+                new McpClientEntry("a", "http://localhost:1", McpClientStatus.CONNECTED),
+                new McpClientEntry("much-longer-name", "http://localhost:2", McpClientStatus.CONNECTED)
+        ));
+        stubDatabaseSuccess();
+        stubRedisSuccess();
+        stubQdrantSuccess();
+        stubS3Success();
+
+        // when
+        config.onReadinessChange(readinessEvent());
+
+        // then
+        List<String> serverLines = mcpSectionLines(capturedBanner()).stream()
+                .filter(line -> line.contains("http://"))
+                .toList();
+        assertThat(serverLines).hasSize(2);
+        assertThat(serverLines.get(0).indexOf("http://"))
+                .isEqualTo(serverLines.get(1).indexOf("http://"));
     }
 
     @Test
@@ -237,12 +312,15 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(mcpSectionLines(capturedBanner())).containsExactly("      (none registered)");
     }
 
     @Test
-    @DisplayName("onReadinessChange logs disabled for AscendMemory when semanticMemory.enabled=false")
-    void onReadinessChange_AscendMemoryDisabled_LogsDisabled() throws Exception {
-        // given — semanticMemoryProperties.enabled = false (default in setUp)
+    @DisplayName("onReadinessChange no longer emits the superseded single-line MCP tools summary")
+    void onReadinessChange_AnyRegistryState_OmitsLegacyMcpToolsLine() throws Exception {
+        // given
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
@@ -250,23 +328,44 @@ class StartupLogConfigTest {
 
         // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).doesNotContain("MCP tools");
+    }
+
+    @Test
+    @DisplayName("onReadinessChange logs disabled for AscendMemory when semanticMemory.enabled=false")
+    void onReadinessChange_AscendMemoryDisabled_LogsDisabled() throws Exception {
+        // given - semanticMemoryProperties.enabled = false (default in setUp)
+        stubDatabaseSuccess();
+        stubRedisSuccess();
+        stubQdrantSuccess();
+        stubS3Success();
+
+        // when
+        config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      AscendMemory: http://localhost:7020 [Disabled]");
     }
 
     @Test
     @DisplayName("onReadinessChange logs FAILED for AscendMemory when HTTP probe throws")
     void onReadinessChange_AscendMemoryProbeFails_LogsFailedStatus() throws Exception {
-        // given — enable semantic memory so the HTTP probe actually runs
+        // given - enable semantic memory so the HTTP probe actually runs
         semanticMemoryProperties.setEnabled(true);
-        semanticMemoryProperties.setBaseUrl("http://localhost:7020");
+        semanticMemoryProperties.setBaseUrl("http://127.0.0.1:29999");
 
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
         stubS3Success();
 
-        // The probe uses an actual RestClient pointing at a non-listening port – it will throw.
-        // We just verify it doesn't propagate.
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      AscendMemory: http://127.0.0.1:29999 [FAILED]");
     }
 
     @Test
@@ -276,13 +375,18 @@ class StartupLogConfigTest {
         AvailabilityChangeEvent<ReadinessState> event = mock();
         when(event.getState()).thenReturn(ReadinessState.REFUSING_TRAFFIC);
 
-        // when — no interactions expected
+        // when
         config.onReadinessChange(event);
+
+        // then
+        assertThat(appender.list).isEmpty();
+        verifyNoInteractions(dataSource, redisTemplate, s3Client, qdrantClientProvider, mcpRegistry);
     }
 
     @Test
     @DisplayName("onReadinessChange uses https protocol when SSL key-store is configured")
     void onReadinessChange_SslConfigured_UsesHttps() throws Exception {
+        // given
         when(env.getProperty("server.ssl.key-store")).thenReturn("/path/to/keystore.p12");
 
         stubDatabaseSuccess();
@@ -290,13 +394,18 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
+        // when
         config.onReadinessChange(readinessEvent());
-        // Verifies the https branch in the protocol selection
+
+        // then
+        assertThat(capturedBanner()).contains("      Local:     https://localhost:")
+                .contains("      POST  https://localhost:");
     }
 
     @Test
     @DisplayName("onReadinessChange logs active profiles when profiles array is non-empty")
     void onReadinessChange_ActiveProfiles_LogsJoinedProfiles() throws Exception {
+        // given
         when(env.getActiveProfiles()).thenReturn(new String[]{"prod", "cloud"});
 
         stubDatabaseSuccess();
@@ -304,12 +413,17 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("    Profile(s): prod, cloud");
     }
 
     @Test
     @DisplayName("onReadinessChange logs provider lines as none when chat providers is null")
     void onReadinessChange_NullChatProviders_LogsNoneConfigured() throws Exception {
+        // given
         aiProviderProperties.setProviders(null);
 
         stubDatabaseSuccess();
@@ -317,12 +431,17 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner().lines()).containsSequence("    Chat providers (default = openai):", "      (none configured)");
     }
 
     @Test
     @DisplayName("onReadinessChange logs provider lines as none when embedding providers is null")
     void onReadinessChange_NullEmbeddingProviders_LogsNoneConfigured() throws Exception {
+        // given
         embeddingProviderProperties.setProviders(null);
 
         stubDatabaseSuccess();
@@ -330,12 +449,17 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner().lines()).containsSequence("    Embedding providers (default = openai):", "      (none configured)");
     }
 
     @Test
     @DisplayName("onReadinessChange logs compaction as enabled with provider defaults")
     void onReadinessChange_CompactionEnabled_LogsEnabledState() throws Exception {
+        // given
         compactionProperties.setEnabled(true);
         compactionProperties.setTurnTrigger(20);
         compactionProperties.setTokenTriggerFraction(0.5);
@@ -347,12 +471,18 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains(
+                "    Compaction:   [Enabled] (trigger: 20 turns / 50% context, keep: 8 turns, defaults: openai=gpt-4o-mini)");
     }
 
     @Test
     @DisplayName("onReadinessChange logs providers when at least one provider is configured")
     void onReadinessChange_ProvidersConfigured_LogsProviderLines() throws Exception {
+        // given
         AiProviderProperties.ProviderConfig pc = new AiProviderProperties.ProviderConfig();
         pc.setType("openai");
         pc.setModel("gpt-4o");
@@ -368,12 +498,19 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner())
+                .contains("      - openai     type=openai model=gpt-4o")
+                .contains("      - openai     dims=1536 model=text-embedding-3-small collection=ascendai-1536");
     }
 
     @Test
     @DisplayName("onReadinessChange logs Disabled for both Redis and Postgres when both are disabled")
     void onReadinessChange_BothChatHistoryBackendsDisabled_LogsDisabledToggles() throws Exception {
+        // given
         chatHistoryProperties.getRedis().setEnabled(false);
         chatHistoryProperties.getPostgres().setEnabled(false);
 
@@ -382,12 +519,17 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("    Chat history: Redis [Disabled], Postgres [Disabled]");
     }
 
     @Test
     @DisplayName("onReadinessChange logs Warning for AscendMemory when HTTP probe returns non-200 status")
     void onReadinessChange_AscendMemoryNon200_LogsWarning() throws Exception {
+        // given
         // Enable semantic memory and point it at a URL that returns non-200
         // Use WireMock would be ideal. However, since we can't start a server easily in a unit test,
         // we test the "connection refused" path (same as FAILED) for this scenario.
@@ -402,10 +544,40 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // must not throw
+        // when
         config.onReadinessChange(readinessEvent());
+
+        // then
+        assertThat(capturedBanner()).contains("      AscendMemory: http://127.0.0.1:29999 [FAILED]");
     }
 
+
+    private String capturedBanner() {
+        return appender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .filter(message -> message.contains("MAIN PROMPT ENDPOINT"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Startup banner was not emitted"));
+    }
+
+    private static List<String> mcpSectionLines(String banner) {
+        List<String> lines = new ArrayList<>();
+        boolean inSection = false;
+        for (String line : banner.split("\\R")) {
+            if (line.equals("    MCP servers:")) {
+                inSection = true;
+                continue;
+            }
+            if (inSection) {
+                if (line.isBlank()) {
+                    break;
+                }
+                lines.add(line);
+            }
+        }
+
+        return lines;
+    }
 
     private AvailabilityChangeEvent<ReadinessState> readinessEvent() {
         AvailabilityChangeEvent<ReadinessState> event = mock();

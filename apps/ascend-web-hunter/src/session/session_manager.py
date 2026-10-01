@@ -79,9 +79,8 @@ class SessionManager:
         ttl_remaining = await cookie_manager.get_auth_ttl_remaining(url, effective_profile)
 
         if ttl_remaining <= 0:
-            domain = cookie_manager._get_domain(url)  # noqa: SLF001
-            record = await cookie_manager._load_record(domain, effective_profile)  # noqa: SLF001
-            auth_status: SessionStatus = "none" if record is None else "expired"
+            stored = await cookie_manager.has_session_record(url, effective_profile)
+            auth_status: SessionStatus = "expired" if stored else "none"
             return SessionInfo(
                 status=auth_status,
                 auth_ttl_remaining=0.0,
@@ -89,11 +88,7 @@ class SessionManager:
                 profile=effective_profile,
             )
 
-        domain = cookie_manager._get_domain(url)  # noqa: SLF001
-        record = await cookie_manager._load_record(domain, effective_profile)  # noqa: SLF001
-        last_validated: float | None = None
-        if record and "auth" in record:
-            last_validated = record["auth"].get("saved_at")
+        last_validated = await cookie_manager.get_auth_saved_at(url, effective_profile)
 
         return SessionInfo(
             status="active",

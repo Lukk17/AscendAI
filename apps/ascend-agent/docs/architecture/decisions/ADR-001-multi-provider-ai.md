@@ -9,9 +9,9 @@ Accepted
 The ascend-ai-agent originally used a single `ChatClient` bean wired to LM Studio. To support multiple AI providers (OpenAI, Gemini, Anthropic, MiniMax) without restarting the application, we need a mechanism for per-request provider and model selection.
 
 Alternatives considered:
-1. **Spring Profiles** — one profile per provider, requires restart to switch
-2. **Multiple `ChatClient` beans** — N named beans, selected via qualifier
-3. **`ChatModelResolver` with per-request resolution** — dynamic provider map
+1. **Spring Profiles** - one profile per provider, requires restart to switch
+2. **Multiple `ChatClient` beans** - N named beans, selected via qualifier
+3. **`ChatModelResolver` with per-request resolution** - dynamic provider map
 
 ## Decision
 

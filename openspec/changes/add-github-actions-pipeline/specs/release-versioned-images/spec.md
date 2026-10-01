@@ -1,111 +1,136 @@
 ## ADDED Requirements
 
-### Requirement: Release is manual, with a stack version and per-app selection
+### Requirement: Release is manual, with per-app selection and an optional stack release
 
-`release.yaml` SHALL be triggered exclusively via `workflow_dispatch`. It SHALL NOT trigger on Git tag pushes, on schedule, on push to any branch, or on pull-request events. The dispatch inputs SHALL be a required `stack_version` string (e.g. `1.1.1`, naming the monorepo release `ascend-ai_1.1.1`) and one boolean per app selecting whether that app is released. The workflow file SHALL use the `.yaml` extension.
+`release.yaml` SHALL be triggered exclusively via `workflow_dispatch`. It SHALL NOT trigger on Git tag pushes, on schedule, on push to any branch, or on pull-request events. The dispatch inputs SHALL be a required boolean `create_github_release` (default `true`), an optional `stack_version` string (e.g. `1.1.1`, naming the monorepo release `ascend-ai_1.1.1`), and one required boolean per app (`release_ascend_agent`, `release_ascend_weather_mcp`, `release_ascend_audio_scribe`, `release_ascend_web_hunter`, `release_ascend_memory`, `release_ascend_ocr`, each default `false`). The run SHALL fail before any build when no app is selected, and, when `create_github_release` is ticked, when `stack_version` is empty. The workflow file SHALL use the `.yaml` extension.
 
 #### Scenario: Manual dispatch releases only the selected apps
 
 - **WHEN** the operator dispatches with `stack_version=1.1.1`, `release_ascend_agent=true`, `release_ascend_audio_scribe=true`, and the other four app booleans `false`
-- **THEN** only `ascend-ai-agent` and `ascend-audio-scribe` images are built and pushed
+- **THEN** only the `ascend-agent` and `ascend-audio-scribe` images are built and pushed
 - **AND** `ascend-weather-mcp`, `ascend-web-hunter`, `ascend-memory`, and `ascend-ocr` are not built and their images are untouched
+
+#### Scenario: No app selected fails early
+
+- **WHEN** the operator dispatches with every app boolean `false`
+- **THEN** the `prepare` job fails and nothing is built or pushed
+
+#### Scenario: Image-only run consumes no stack version
+
+- **WHEN** the operator dispatches with `create_github_release=false`, an empty `stack_version`, and one app selected
+- **THEN** that app's images are built and pushed
+- **AND** the `release` job is skipped, so no Git tag and no GitHub Release are created
 
 #### Scenario: Tag push does not trigger the release
 
 - **WHEN** a Git tag `ascend-ai_1.1.1` is pushed directly without using the dispatch UI
 - **THEN** the `Release` workflow does NOT trigger and no images are pushed
 
-### Requirement: Image version is read from each app's committed manifest
+### Requirement: Image version is read from each app's committed CHANGELOG.md
 
-For each selected app the workflow SHALL read the version already committed in that app's manifest — `version` in `build.gradle.kts` for Java services (`ascend-ai-agent`, `ascend-weather-mcp`), `[project].version` in `pyproject.toml` for Python services (`ascend-audio-scribe`, `ascend-web-hunter`, `AscendMemory`, `ascend-ocr`) — and SHALL use that value as the Docker image tag. The workflow SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit the manifest.
+For each selected app the workflow SHALL read the version from the topmost `## [x.y.z]` entry of `apps/<app>/CHANGELOG.md`, using one extractor for all six apps, and SHALL use `v<version>` as the Docker image tag. The run SHALL fail when an entry cannot be read. The workflow SHALL NOT read the `version` in `build.gradle.kts` or `pyproject.toml`, SHALL NOT accept a per-app version input, SHALL NOT override the version via a build property or build-arg, and SHALL NOT edit any file.
 
-#### Scenario: Tag equals the manifest version
+#### Scenario: Tag equals the changelog version
 
-- **WHEN** `apps/ascend-agent/build.gradle.kts` declares `version = "1.3.0"` and `ascend-ai-agent` is selected for release
-- **THEN** the pushed image is tagged `lukk17/ascend-ai-ascend-agent:1.3.0`
-- **AND** `apps/ascend-agent/build.gradle.kts` on disk is unchanged after the run
+- **WHEN** the top entry of `apps/ascend-agent/CHANGELOG.md` is `## [1.3.0]` and `ascend-agent` is selected for release
+- **THEN** the pushed images are tagged `lukk17/ascend-ai-ascend-agent:v1.3.0` and `ghcr.io/lukk17/ascend-ai-ascend-agent:v1.3.0`
+- **AND** `apps/ascend-agent/CHANGELOG.md` on disk is unchanged after the run
 
-#### Scenario: Python manifest version
+#### Scenario: Manifest version is ignored
 
-- **WHEN** `apps/ascend-audio-scribe/pyproject.toml` declares `[project] version = "0.2.1"` and `ascend-audio-scribe` is selected
-- **THEN** the pushed image is tagged `lukk17/ascend-ai-ascend-audio-scribe:0.2.1`
-- **AND** `apps/ascend-audio-scribe/pyproject.toml` on disk is unchanged after the run
+- **WHEN** `apps/ascend-audio-scribe/pyproject.toml` says `version = "0.2.0"`, the top entry of `apps/ascend-audio-scribe/CHANGELOG.md` is `## [0.2.1]`, and `ascend-audio-scribe` is selected
+- **THEN** the pushed images are tagged `v0.2.1`
+- **AND** the mismatch causes no failure
 
 ### Requirement: Release makes no commits
 
-The release workflow SHALL NOT create, amend, or push any commit. It SHALL only create a Git tag and a GitHub Release. No manifest, changelog, or version file SHALL be written back to the repository by the workflow.
+The release workflow SHALL NOT create, amend, or push any commit. It SHALL only create a Git tag and a GitHub Release, and only when `create_github_release` is ticked. No manifest, changelog, or version file SHALL be written back to the repository by the workflow.
 
 #### Scenario: No commit after release
 
 - **WHEN** a release of any set of apps completes successfully
 - **THEN** the default branch has no new commit authored by the workflow
-- **AND** the only refs created are the tag `ascend-ai_<stack_version>` and its GitHub Release
+- **AND** the only refs created are the tag `ascend-ai_<stack_version>` and its GitHub Release, or none for an image-only run
 
-### Requirement: Bump guard against the previous stack release
+### Requirement: Bump guard against the registries
 
-For each selected app, the workflow SHALL compare the app's current manifest version against that app's version at the previous `ascend-ai_*` Git tag. If a selected app's version is unchanged from the previous stack release, the workflow SHALL fail before any image is pushed, with a message naming the offending app. When no previous `ascend-ai_*` tag exists (first release), this guard SHALL be skipped.
+For each selected app, after logging in and before building, the workflow SHALL check whether `<image>:v<version>` exists on Docker Hub (`lukk17/ascend-ai-<service>`) and on GHCR (`ghcr.io/lukk17/ascend-ai-<service>`). Found on both registries SHALL fail that app's job with a message asking for a new `CHANGELOG.md` entry. Found on neither SHALL proceed. Found on exactly one SHALL log a warning and proceed, completing the missing registry. A lookup that fails for any reason other than a missing manifest SHALL fail that app's job without pushing. The guard SHALL NOT depend on git history.
 
-#### Scenario: Selected app not bumped fails the run
+#### Scenario: Already published version fails the app
 
-- **WHEN** the previous release `ascend-ai_1.1.0` recorded `ascend-weather-mcp` at `1.0.0`, the current `apps/ascend-weather-mcp/build.gradle.kts` still says `1.0.0`, and `ascend-weather-mcp` is selected for release
-- **THEN** the workflow fails in the prepare stage with a message identifying `ascend-weather-mcp` as not bumped
-- **AND** no `docker login` or image push occurs for any app
+- **WHEN** `ascend-weather-mcp` v1.0.0 exists on both Docker Hub and GHCR and the changelog still says `## [1.0.0]` and `ascend-weather-mcp` is selected
+- **THEN** its `build-and-push` job fails naming `ascend-weather-mcp` and asking for a new changelog entry
+- **AND** no image is pushed for it
 
-#### Scenario: Selected app correctly bumped proceeds
+#### Scenario: New version proceeds
 
-- **WHEN** `ascend-weather-mcp` was `1.0.0` at the previous stack tag and its manifest now says `1.1.0`, and it is selected
-- **THEN** the guard passes and `lukk17/ascend-ai-ascend-weather-mcp:1.1.0` is built and pushed
+- **WHEN** the changelog says `## [1.1.0]` and `v1.1.0` exists on neither registry
+- **THEN** the guard passes and the images are built and pushed
 
-#### Scenario: First release skips the guard
+#### Scenario: Incomplete earlier publish is completed
 
-- **WHEN** no `ascend-ai_*` tag exists yet and apps are selected for release
-- **THEN** the guard is skipped and each selected app ships at its current manifest version
+- **WHEN** `v1.1.0` exists on Docker Hub but not on GHCR
+- **THEN** the job logs a warning and pushes to both registries
 
-### Requirement: Released images are tagged version + latest
+#### Scenario: Registry lookup error fails closed
 
-Each selected app's image SHALL be pushed to Docker Hub at `lukk17/ascend-ai-<service>:<manifest-version>` and also `lukk17/ascend-ai-<service>:latest`, where the service identifier is the full service name (e.g., ascend-agent, ascend-audio-scribe, ascend-weather-mcp, ascend-memory, ascend-ocr, ascend-web-hunter). For example, ascend-agent publishes to `lukk17/ascend-ai-ascend-agent:<manifest-version>` and `lukk17/ascend-ai-ascend-agent:latest`. Unselected apps SHALL NOT have their `:latest` tag modified.
+- **WHEN** the lookup fails with an authentication or network error
+- **THEN** the job fails without pushing
 
-#### Scenario: Released app updates latest
+### Requirement: Released images are pushed to two registries, tagged version and latest
 
-- **WHEN** `ascend-ai-agent` is released at manifest version `1.3.0`
-- **THEN** both `lukk17/ascend-ai-ascend-agent:1.3.0` and `lukk17/ascend-ai-ascend-agent:latest` point at the new image
+Each selected app's image SHALL be built once and pushed to `lukk17/ascend-ai-<service>:v<version>`, `lukk17/ascend-ai-<service>:latest`, `ghcr.io/lukk17/ascend-ai-<service>:v<version>` and `ghcr.io/lukk17/ascend-ai-<service>:latest`, where `<service>` is the service key (`ascend-agent`, `ascend-weather-mcp`, `ascend-audio-scribe`, `ascend-web-hunter`, `ascend-memory`, `ascend-ocr`). Unselected apps SHALL NOT have their `latest` tag modified.
+
+#### Scenario: Released app updates latest on both registries
+
+- **WHEN** `ascend-agent` is released at changelog version `1.3.0`
+- **THEN** `lukk17/ascend-ai-ascend-agent:v1.3.0`, `lukk17/ascend-ai-ascend-agent:latest`, `ghcr.io/lukk17/ascend-ai-ascend-agent:v1.3.0` and `ghcr.io/lukk17/ascend-ai-ascend-agent:latest` all point at the new image
 
 #### Scenario: Unselected app latest untouched
 
 - **WHEN** `ascend-ocr` is not selected in a release
-- **THEN** `lukk17/ascend-ai-ascend-ocr:latest` is unchanged by the run
+- **THEN** `lukk17/ascend-ai-ascend-ocr:latest` and `ghcr.io/lukk17/ascend-ai-ascend-ocr:latest` are unchanged by the run
 
-### Requirement: Docker Hub authentication via repository secrets
+### Requirement: Registry authentication and least privilege
 
-The workflow SHALL log in to Docker Hub using `docker/login-action@v3` with `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets before any push. Credentials SHALL NOT appear in plaintext in logs.
+The workflow SHALL log in to Docker Hub using `docker/login-action@v3` with the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets, and to GHCR using `docker/login-action@v3` with the automatic `GITHUB_TOKEN`, before any push. The workflow SHALL declare `permissions: { contents: write }` at workflow level, and the `build-and-push` job SHALL narrow it to `contents: read` and `packages: write`. Credentials SHALL NOT appear in plaintext in logs.
 
 #### Scenario: Missing token fails before push
 
 - **WHEN** `DOCKERHUB_TOKEN` is not configured and a release is dispatched
-- **THEN** `docker/login-action@v3` fails and no `docker buildx build --push` step runs
+- **THEN** the Docker Hub login step fails and no build-and-push step runs for that app
 
 ### Requirement: Aggregated monorepo release record listing every app version
 
-After all selected apps push successfully, the workflow SHALL create the Git tag `ascend-ai_<stack_version>` and a GitHub Release (via `softprops/action-gh-release@v2`) whose body lists the current manifest version of **all six** apps — marking which were released in this run — together with `generate_release_notes: true` PR notes. The workflow SHALL reject a `stack_version` whose `ascend-ai_<stack_version>` tag already exists.
+When `create_github_release` is ticked and every selected app pushed successfully, the workflow SHALL create the Git tag `ascend-ai_<stack_version>` and a GitHub Release (via `softprops/action-gh-release@v2`) whose body lists the current changelog version of all six apps, marking which were released in this run, together with `generate_release_notes: true` PR notes. The release SHALL NOT be a draft or a prerelease. The `prepare` job SHALL reject a `stack_version` whose `ascend-ai_<stack_version>` tag already exists, before any build.
 
 #### Scenario: Release notes list all app versions
 
-- **WHEN** a release of `ascend-ai-agent` (1.3.0) and `ascend-audio-scribe` (0.2.1) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 1.0.0, ascend-web-hunter 1.2.0, ascend-memory 0.4.0, ascend-ocr 0.1.0
+- **WHEN** a release of `ascend-agent` (0.1.3) and `ascend-audio-scribe` (0.9.4) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 0.0.4, ascend-web-hunter 0.0.6, ascend-memory 0.1.3, ascend-ocr 0.3.0
 - **THEN** a GitHub Release tagged `ascend-ai_1.1.1` is created
-- **AND** its body lists all six apps with their current versions, marking `ascend-ai-agent` and `ascend-audio-scribe` as released this run
+- **AND** its body lists all six apps with their current versions, marking `ascend-agent` and `ascend-audio-scribe` as released
 - **AND** the release is not a draft
 
 #### Scenario: Reusing a stack version is rejected
 
-- **WHEN** a release `ascend-ai_1.1.1` already exists and the operator dispatches `stack_version=1.1.1` again
-- **THEN** the workflow fails because the tag already exists, before pushing any image
+- **WHEN** a release `ascend-ai_1.1.1` already exists and the operator dispatches `stack_version=1.1.1` again with `create_github_release` ticked
+- **THEN** the `prepare` job fails because the tag already exists, before building or pushing any image
 
-### Requirement: Multi-arch builds use QEMU + Buildx with per-service GHA cache
+### Requirement: Multi-arch builds use QEMU and Buildx with per-service GHA cache
 
-Each selected app SHALL build with `docker/setup-qemu-action@v3`, `docker/setup-buildx-action@v3`, and `docker/build-push-action@v6` configured `platforms: linux/amd64,linux/arm64` with GHA build cache scoped per service (`cache-from`/`cache-to: type=gha,scope=<service>,mode=max`), and `strategy.fail-fast: false`.
+Each selected app SHALL build with `docker/setup-qemu-action@v3`, `docker/setup-buildx-action@v3`, and `docker/build-push-action@v6` configured `platforms: linux/amd64,linux/arm64` with GHA build cache scoped per service (`cache-from: type=gha,scope=<service>` and `cache-to: type=gha,scope=<service>,mode=max`), and `strategy.fail-fast: false`.
 
 #### Scenario: One app failing does not abort the others
 
 - **WHEN** two apps are selected and one app's build fails
 - **THEN** the other selected app still attempts its build (fail-fast disabled)
-- **AND** the overall run concludes `failure` and the `release` job (tag + GitHub Release) does NOT run
+- **AND** the overall run concludes `failure` and the `release` job (tag and GitHub Release) does NOT run
+
+### Requirement: A manual release is never cancelled by another
+
+The workflow SHALL declare `concurrency` with group `release-${{ inputs.stack_version || github.run_id }}` and `cancel-in-progress: false`.
+
+#### Scenario: Image-only runs do not share a group
+
+- **WHEN** two image-only runs with an empty `stack_version` are dispatched one after the other
+- **THEN** each run uses its own run identifier as the group and neither cancels the other

@@ -57,7 +57,7 @@ Under the secured posture, ascend-ai-agent SHALL permit unauthenticated access O
 
 ### Requirement: Dev profile preserves the open local workflow
 
-When the Spring profile `dev` is active, ascend-ai-agent SHALL permit all requests without a token and SHALL synthesize an identity from `app.user.default-id` carrying both `USER` and `ADMIN` roles and a principal set of `tenant:everyone:default` and `local:group:dev-all`, so local single-user runs and the Bruno collection work without an identity provider and a locally-ingested corpus is actually retrievable. The agent SHALL log a WARN at startup stating that authentication is disabled. The default and `docker` postures SHALL require JWTs. The legacy `app.security.enabled` flag and the `app.security.user` HTTP Basic block SHALL be removed.
+When the Spring profile `dev` is active, ascend-ai-agent SHALL permit all requests without a token and SHALL synthesize an identity from `app.user.default-id` carrying both `USER` and `ADMIN` roles and a principal set of `tenant:everyone:default` and `local:group:dev-all`, so local single-user runs and the Bruno collection work without an identity provider and a locally-ingested corpus is actually retrievable. The agent SHALL log a WARN at startup stating that authentication is disabled. The default and `docker` postures SHALL require JWTs. The legacy `app.security.enabled` flag and the `app.security.user` HTTP Basic block SHALL be removed, together with their `@ConfigurationProperties` binding and the `SECURITY_ENABLED`, `SECURITY_USERNAME` and `SECURITY_PASSWORD` environment variables they read.
 
 #### Scenario: Dev profile accepts tokenless requests
 

@@ -19,5 +19,5 @@ Keep `SemanticMemoryClient` as a direct REST client (`RestClient` → `http://lo
 - **Positive**: Stable, tested integration path
 - **Positive**: `SemanticMemoryClient` can handle persistence-specific logic (save/update/delete) that MCP tool semantics are not designed for
 - **Positive**: No dependency on MCP server stability for memory operations
-- **Negative**: Memory is not available as an LLM-invocable tool — the ascend-ai-agent must explicitly call it during context assembly
+- **Negative**: Memory is not available as an LLM-invocable tool - the ascend-ai-agent must explicitly call it during context assembly
 - **Note**: The default configuration (`lmstudio` embedding provider) requires LM Studio running locally on port 1234. Configuring `openai` or `gemini` as the embedding provider eliminates this dependency (see ADR-006).

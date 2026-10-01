@@ -12,7 +12,7 @@
   HTML parser path is intact).
 
 `"OpenStreetMap"` is chosen as a stable, widely-indexed term that virtually every meta-search engine ranks
-highly — minimising flakiness from upstream result churn.
+highly - minimising flakiness from upstream result churn.
 
 ## Prerequisites
 
@@ -52,12 +52,12 @@ $json = curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | C
 **Unix:**
 
 ```bash
-curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | python3 -c "import json, sys; d = json.load(sys.stdin); print(f\"{len(d.get('results', []))} results, {len(d.get('unresponsive_engines', []))} blocked engines\")"
+curl -fsS "http://localhost:9020/search?q=openstreetmap&format=json" | "$(command -v python3 || command -v python)" -c "import json, sys; d = json.load(sys.stdin); print(f\"{len(d.get('results', []))} results, {len(d.get('unresponsive_engines', []))} blocked engines\")"
 ```
 
 Expect a non-zero results count. If results is `0` and the unresponsive-engines list shows access-denied /
 CAPTCHA across all enabled engines, the residential / shared egress IP is being walled by upstream search
-providers — the ascend-web-hunter service itself is healthy but this test cannot exercise the end-to-end happy
+providers - the ascend-web-hunter service itself is healthy but this test cannot exercise the end-to-end happy
 path. Mark this run **BLOCKED** (not FAIL) and re-run when an upstream is reachable; the suspended_times in
 `infra/searxng/settings.yml` are set to seconds-to-minutes so recovery is fast once the upstreams release the IP.
 
@@ -90,8 +90,8 @@ HTTP 200. The JSON body matches:
     be present).
 - At least one entry's `title` or `content`, lowercased, contains `"openstreetmap"`.
 
-Total call duration is typically 1–5 s (SearXNG fan-out time). A duration > 30 s indicates upstream engines are
-timing out — investigate SearXNG health before declaring FAIL.
+Total call duration is typically 1-5 s (SearXNG fan-out time). A duration > 30 s indicates upstream engines are
+timing out - investigate SearXNG health before declaring FAIL.
 
 **Environmental BLOCKED:** if the JSON prereq above returned `0 results` and the same IP cannot reach any
 upstream engine, the run was never able to exercise the end-to-end happy path. Report the verdict as

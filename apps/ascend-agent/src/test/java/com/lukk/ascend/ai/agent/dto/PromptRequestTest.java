@@ -10,7 +10,7 @@ class PromptRequestTest {
     @Test
     @DisplayName("accessors return values set via canonical constructor")
     void accessors_ReturnConstructedValues() {
-        // given
+        // when
         PromptRequest req = new PromptRequest("hello", "http://img", "http://doc");
 
         // then

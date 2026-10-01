@@ -30,9 +30,9 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ### Expected
 
-- [x] Step 1: HTTP 200, response references seeded facts (Rex / Warsaw / TechCorp) — response: "Your dog is Rex, a beagle rescued from a shelter in Praga (a district in Warsaw)."
-- [x] Step 3: `chat_history` row count equals exactly 11 (9 pre-seeded + 2 new) — observed 11
-- [x] Step 3: exactly 1 `[Conversation summary]` row exists (NO second summary written) — observed 1
+- [x] Step 1: HTTP 200, response references seeded facts (Rex / Warsaw / TechCorp) - response: "Your dog is Rex, a beagle rescued from a shelter in Praga (a district in Warsaw)."
+- [x] Step 3: `chat_history` row count equals exactly 11 (9 pre-seeded + 2 new) - observed 11
+- [x] Step 3: exactly 1 `[Conversation summary]` row exists (NO second summary written) - observed 1
 
 ### Verdict
 
@@ -40,7 +40,7 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ## Result summary
 
-Seed applied: 9 rows (1 summary + 8 raw). Prompt sent (HTTP 200), response correctly cited Rex rescued from Praga in Warsaw. After 5s: total=11 (9+2 new user+assistant rows), summary count still=1 — compaction correctly did not re-fire.
+Seed applied: 9 rows (1 summary + 8 raw). Prompt sent (HTTP 200), response correctly cited Rex rescued from Praga in Warsaw. After 5s: total=11 (9+2 new user+assistant rows), summary count still=1 - compaction correctly did not re-fire.
 
 Row count after step 3: 11
 

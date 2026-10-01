@@ -204,12 +204,12 @@ jobs:
 
           # Checked against both registries this stack publishes to. A tag
           # present on both is a completed prior release of this exact
-          # version — fail and ask for a new CHANGELOG.md entry. Present on
-          # neither is the normal case — proceed. Present on exactly one is
+          # version - fail and ask for a new CHANGELOG.md entry. Present on
+          # neither is the normal case - proceed. Present on exactly one is
           # treated as an incomplete prior publish (for example Docker Hub
           # succeeded and GHCR failed on a transient auth/network error) and
           # is completed rather than blocked, since the code a bumped
-          # CHANGELOG.md entry would gate is unchanged either way — the
+          # CHANGELOG.md entry would gate is unchanged either way - the
           # pull-request changelog check already refuses to merge module
           # changes without a version bump, so nothing here re-ships altered
           # content under an old version number.

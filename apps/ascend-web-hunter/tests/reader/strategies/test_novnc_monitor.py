@@ -28,9 +28,12 @@ def _build_playwright_factory(*, cookies=None, page_url="http://test.com", goto_
 
 @pytest.mark.asyncio
 async def test_monitor_breaks_early_when_url_changes():
+    # given
     factory, browser, _ctx, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}], page_url="http://test.com/dashboard"
     )
+
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
@@ -44,17 +47,22 @@ async def test_monitor_breaks_early_when_url_changes():
         ),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
+
+    # then
     mock_save.assert_awaited()
     browser.close.assert_awaited()
 
 
 @pytest.mark.asyncio
 async def test_monitor_handles_goto_failure_and_still_polls():
+    # given
     factory, browser, _ctx, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}],
         page_url="http://test.com/done",
         goto_error=True,
     )
+
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
@@ -68,18 +76,23 @@ async def test_monitor_handles_goto_failure_and_still_polls():
         ),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
+
+    # then
     browser.close.assert_awaited()
 
 
 @pytest.mark.asyncio
 async def test_monitor_swallows_transient_cookie_sync_error():
     """When storage_state() raises transiently the loop swallows the error and keeps going."""
+    # given
     factory, browser, context, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}], page_url="http://test.com/done"
     )
     # First call raises; the except block (lines 88-89) catches it and continues.
     # Second call succeeds and the URL change causes an early break.
     context.storage_state = AsyncMock(side_effect=[RuntimeError("transient"), {"cookies": [], "origins": []}])
+
+    # when
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(
@@ -94,26 +107,34 @@ async def test_monitor_swallows_transient_cookie_sync_error():
         patch("src.reader.strategies.novnc_strategy.asyncio.sleep", new=AsyncMock()),
     ):
         await _monitor_for_cookies("http://test.com?login=1", "login")
+
+    # then
     browser.close.assert_awaited()
 
 
 @pytest.mark.asyncio
 async def test_monitor_handles_outer_exception_and_closes_browser_in_finally():
+    # given
     pw = MagicMock()
     pw.chromium.launch = AsyncMock(side_effect=RuntimeError("launch failed"))
     factory = MagicMock()
     factory.__aenter__ = AsyncMock(return_value=pw)
     factory.__aexit__ = AsyncMock(return_value=False)
+
+    # when / then
     with patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory):
         await _monitor_for_cookies("http://test.com", "captcha")
 
 
 @pytest.mark.asyncio
 async def test_monitor_browser_close_failure_is_tolerated():
+    # given
     factory, browser, _ctx, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}], page_url="http://test.com/done"
     )
     browser.close = AsyncMock(side_effect=RuntimeError("close failed"))
+
+    # when / then
     with (
         patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=factory),
         patch(

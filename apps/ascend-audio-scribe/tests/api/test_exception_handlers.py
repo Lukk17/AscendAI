@@ -23,38 +23,52 @@ def _make_request(path: str = "/") -> Request:
 
 
 def test_value_error_handler_returns_400_problem_json() -> None:
+    # when
     response = value_error_handler(_make_request(), ValueError("oops"))
+
+    # then
     assert response.status_code == 400
     assert response.media_type == PROBLEM_JSON
-    body = response.body.decode()
+    body = bytes(response.body).decode()
     assert "oops" in body
     assert "/validation" in body
 
 
 def test_file_size_error_handler_returns_413_problem_json() -> None:
+    # when
     response = file_size_error_handler(_make_request(), FileSizeExceededError("too big"))
+
+    # then
     assert response.status_code == 413
     assert response.media_type == PROBLEM_JSON
-    body = response.body.decode()
+    body = bytes(response.body).decode()
     assert "too big" in body
     assert "/file-too-large" in body
 
 
 def test_upstream_provider_error_handler_returns_502_problem_json() -> None:
+    # when
     response = upstream_provider_error_handler(
         _make_request(), UpstreamProviderError("Hugging Face upstream call failed for model 'x'.")
     )
+
+    # then
     assert response.status_code == 502
     assert response.media_type == PROBLEM_JSON
-    body = response.body.decode()
+    body = bytes(response.body).decode()
     assert "Hugging Face upstream call failed" in body
     assert "/upstream-provider" in body
 
 
 def test_global_exception_handler_redacts_detail() -> None:
+    # given
     sentinel = "UPSTREAM_LEAK_MARKER"
+
+    # when
     response = global_exception_handler(_make_request("/x"), RuntimeError(sentinel))
+
+    # then
     assert response.status_code == 500
-    body = response.body.decode()
+    body = bytes(response.body).decode()
     assert sentinel not in body
     assert "/x" in body

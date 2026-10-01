@@ -8,19 +8,19 @@ Common failure modes and the commands that diagnose them. For architectural rati
 ### Reinstalling Python dependencies
 
 Run each command from inside an activated venv. The sequence: list installed packages, uninstall them,
-remove the list, reinstall. `pip` commands are identical in both shells; only the file-deletion step
+remove the list, reinstall. The `python -m pip` commands are identical in both shells; only the file-deletion step
 differs between bash (`rm`) and PowerShell (`Remove-Item`).
 
 Step 1: snapshot installed packages.
 
 ```bash
-pip freeze > uninstall.txt
+python -m pip freeze > uninstall.txt
 ```
 
 Step 2: uninstall them all.
 
 ```bash
-pip uninstall -y -r uninstall.txt
+python -m pip uninstall -y -r uninstall.txt
 ```
 
 Step 3: remove the snapshot file.
@@ -40,7 +40,7 @@ Remove-Item uninstall.txt
 Step 4: reinstall.
 
 ```bash
-pip install -e .[dev]
+python -m pip install -e ".[dev]"
 ```
 
 ---
@@ -63,6 +63,11 @@ If the install fails on Linux without root, run with `sudo` or use the Docker im
 `/health` is liveness only and does not touch dependencies. `/ready` runs an actual `PING` against
 `REDIS_URL`. Check the URL matches what's reachable from inside the container, and that Redis is bound to an
 interface the container can see.
+
+For a native run outside Docker, point `REDIS_URL` at `127.0.0.1` rather than `localhost`. Where `localhost`
+resolves to the IPv6 address first, as measured on a Windows host, the asyncio Redis client times out against a
+Redis that listens on IPv4 only and the cookie store falls back to memory. `127.0.0.1` behaves the same on
+Windows, Linux and macOS, which is why it is the default.
 
 `docker exec` is identical in both shells.
 

@@ -38,7 +38,7 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 
 ## Result summary
 
-Both Expected assertions were met. Call 1 (cache-miss seed): HTTP 200, `promptTokens` = 1540 (exceeds the 1024 threshold required for OpenAI auto prefix cache), `nativeUsage.prompt_tokens_details.cached_tokens` = 0 — correct for a first call with a fresh chat history. Call 2 (cache-hit probe), sent ~51 seconds after call 1: HTTP 200, `promptTokens` = 1872, `nativeUsage.prompt_tokens_details.cached_tokens` = **1664** — strongly positive, confirming that OpenAI's automatic prefix cache fired. The `add-prompt-caching` change is wired correctly end-to-end: the `CustomMetadata` fix (removing the `extends ChatResponseMetadata` that caused duplicate JSON keys clobbering real values) allows `nativeUsage` to surface with real token counts, and the second call correctly reports 1664 cached tokens.
+Both Expected assertions were met. Call 1 (cache-miss seed): HTTP 200, `promptTokens` = 1540 (exceeds the 1024 threshold required for OpenAI auto prefix cache), `nativeUsage.prompt_tokens_details.cached_tokens` = 0 - correct for a first call with a fresh chat history. Call 2 (cache-hit probe), sent ~51 seconds after call 1: HTTP 200, `promptTokens` = 1872, `nativeUsage.prompt_tokens_details.cached_tokens` = **1664** - strongly positive, confirming that OpenAI's automatic prefix cache fired. The `add-prompt-caching` change is wired correctly end-to-end: the `CustomMetadata` fix (removing the `extends ChatResponseMetadata` that caused duplicate JSON keys clobbering real values) allows `nativeUsage` to surface with real token counts, and the second call correctly reports 1664 cached tokens.
 
 Input tokens (call 1): 1540
 

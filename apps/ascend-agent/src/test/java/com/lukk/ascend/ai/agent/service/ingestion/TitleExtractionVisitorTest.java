@@ -30,7 +30,7 @@ class TitleExtractionVisitorTest {
     @DisplayName("visit should return null when no heading exists")
     @Test
     void visit_ShouldReturnNull_WhenNoHeadingExists() {
-        // given
+        // when
         TitleExtractionVisitor visitor = new TitleExtractionVisitor();
 
         // then

@@ -15,17 +15,26 @@ def reset_seen_domains() -> None:
 
 
 def test_known_domain_returns_registrable_domain() -> None:
+    # when
     result = domain_label("https://linkedin.com/in/person")
+
+    # then
     assert result == "linkedin.com"
 
 
 def test_same_domain_returns_same_label_on_repeat() -> None:
+    # given
     label1 = domain_label("https://example.com/a")
+
+    # when
     label2 = domain_label("https://example.com/b")
+
+    # then
     assert label1 == label2 == "example.com"
 
 
 def test_domains_beyond_cap_return_other() -> None:
+    # when
     with pytest.MonkeyPatch().context() as mp:
         mp.setattr("src.observability.domain_label.settings.DOMAIN_METRIC_CARDINALITY_CAP", 2)
         dl_module._seen_domains.clear()
@@ -34,11 +43,13 @@ def test_domains_beyond_cap_return_other() -> None:
         domain_label("https://site2.com/")
         result = domain_label("https://site3.com/")
 
+    # then
     assert result == "other"
 
 
 def test_previously_seen_domain_keeps_label_after_cap_is_reached() -> None:
     """Domains admitted before the cap was hit keep their real label even after cap."""
+    # when
     with pytest.MonkeyPatch().context() as mp:
         mp.setattr("src.observability.domain_label.settings.DOMAIN_METRIC_CARDINALITY_CAP", 2)
         dl_module._seen_domains.clear()
@@ -47,29 +58,40 @@ def test_previously_seen_domain_keeps_label_after_cap_is_reached() -> None:
         domain_label("https://site2.com/")  # fills the cap
         label_first_again = domain_label("https://site1.com/")
 
+    # then
     assert label_first == "site1.com"
     assert label_first_again == "site1.com"
 
 
 def test_domain_label_bare_hostname_without_scheme() -> None:
     """When the URL has no '://' the raw input is used as the label (line 23 else branch)."""
+    # when
     result = domain_label("example.com")
+
+    # then
     assert result == "example.com"
 
 
 def test_domain_label_ip_address_fallback() -> None:
     """When tldextract cannot extract a registrable domain (e.g. bare IP), the
     fallback extracts the host from the URL string via split('/')."""
+    # when
     result = domain_label("http://192.168.1.1/path")
+
+    # then
     assert result == "192.168.1.1"
 
 
 def test_strategy_counter_includes_domain_label() -> None:
     """The domain label must be accepted by STRATEGY_ATTEMPTS_TOTAL (3-label metric)."""
+    # given
     from src.observability.metrics import STRATEGY_ATTEMPTS_TOTAL
 
     STRATEGY_ATTEMPTS_TOTAL.labels(strategy="1-beautifulsoup", outcome="success", domain="example.com").inc()
     from prometheus_client import generate_latest
 
+    # when
     payload = generate_latest().decode()
+
+    # then
     assert 'domain="example.com"' in payload

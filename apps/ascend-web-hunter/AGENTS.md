@@ -1,4 +1,4 @@
-# AGENTS.md — ascend-web-hunter
+# AGENTS.md - ascend-web-hunter
 
 ## Project Overview
 
@@ -8,26 +8,66 @@ ascend-web-hunter is an MCP server and REST API for web search and content extra
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.0.5
+- **Version**: 0.0.6
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands
 
 Every command below runs through this module's own virtual environment at `.venv/` (created via
-`python -m venv .venv`, see docs/running.md) — never the system Python or pip. Windows interpreter:
+`python -m venv .venv`, see docs/running.md) - never the system Python or pip. Windows interpreter:
 `.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
 
+Install dependencies, Windows:
+
+```powershell
+.venv/Scripts/python.exe -m pip install -e ".[dev]"
+```
+
+Linux/macOS:
+
 ```bash
-# Install dependencies
-.venv/Scripts/pip.exe install -e .[dev]
+.venv/bin/python -m pip install -e ".[dev]"
+```
 
-# Run the server (port 7021)
-.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7021 --reload
+Install the Playwright Chromium build, Windows:
 
-# Run tests with the configured 100% branch-coverage gate
-.venv/Scripts/pytest.exe --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+```powershell
+.venv/Scripts/python.exe -m playwright install chromium
+```
 
-# Docker
+Linux/macOS (`--with-deps` also installs the system libraries Chromium needs, and may ask for sudo):
+
+```bash
+.venv/bin/python -m playwright install --with-deps chromium
+```
+
+Run the server (port 7021), Windows:
+
+```powershell
+.venv/Scripts/python.exe -m uvicorn src.main:app --host 0.0.0.0 --port 7021 --reload
+```
+
+Linux/macOS:
+
+```bash
+.venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 7021 --reload
+```
+
+Run tests with the configured 100% branch-coverage gate, Windows:
+
+```powershell
+.venv/Scripts/python.exe -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+```
+
+Linux/macOS:
+
+```bash
+.venv/bin/python -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+```
+
+Docker, identical on every platform:
+
+```bash
 docker build -t ascend-web-hunter:latest .
 ```
 
@@ -38,10 +78,10 @@ docker build -t ascend-web-hunter:latest .
 - MCP Server: FastMCP tools exposed via Streamable HTTP
 
 **Multi-tiered extraction strategy** (escalation order):
-1. `curl_cffi` — fast, lightweight HTTP client
-2. FlareSolverr — Cloudflare bypass proxy
-3. Playwright — headless browser automation
-4. NoVNC — human intervention for complex CAPTCHAs (via Ngrok tunnel)
+1. `curl_cffi` - fast, lightweight HTTP client
+2. FlareSolverr - Cloudflare bypass proxy
+3. Playwright - headless browser automation
+4. NoVNC - human intervention for complex CAPTCHAs (via Ngrok tunnel)
 
 **Key Features**:
 - SearXNG integration for privacy-respecting meta-search
@@ -60,15 +100,15 @@ docker build -t ascend-web-hunter:latest .
 
 ## Environment Variables
 
-- `SEARXNG_BASE_URL` — SearXNG endpoint (default: `http://searxng:8080`)
-- `API_PORT` — Service port (default: 7021)
-- `FLARESOLVERR_URL` — FlareSolverr endpoint
-- `REDIS_URL` — Redis connection string
-- `BLOCKLIST_URL` — Ad blocklist source. Only reached by `POST /api/v1/blocklist/refresh`; never fetched at startup
-- `BLOCKLIST_PATH` — Path to the vendored blocklist file (default `src/assets/fanboy-annoyance.txt`), loaded at
+- `SEARXNG_BASE_URL` - SearXNG endpoint (default: `http://searxng:8080`)
+- `API_PORT` - Service port (default: 7021)
+- `FLARESOLVERR_URL` - FlareSolverr endpoint
+- `REDIS_URL` - Redis connection string
+- `BLOCKLIST_URL` - Ad blocklist source. Only reached by `POST /api/v1/blocklist/refresh`; never fetched at startup
+- `BLOCKLIST_PATH` - Path to the vendored blocklist file (default `src/assets/fanboy-annoyance.txt`), loaded at
   startup and overwritten in place by a refresh
-- `VALIDATION_MIN_WORDS` — Minimum words for valid content
-- `VNC_PASSWORD` — Password for the NoVNC desktop. Consumed by `docker-entrypoint.sh`, not by `config.py`. Unset means
+- `VALIDATION_MIN_WORDS` - Minimum words for valid content
+- `VNC_PASSWORD` - Password for the NoVNC desktop. Consumed by `docker-entrypoint.sh`, not by `config.py`. Unset means
   x11vnc runs with `-nopw` and the container logs a warning at boot. Required in the standalone deployment. The VNC
   protocol truncates it to 8 characters.
 

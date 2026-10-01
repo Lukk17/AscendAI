@@ -37,12 +37,15 @@ def _make_browser_and_context(html: str = "<html><body>content</body></html>") -
 @pytest.mark.asyncio
 async def test_playwright_injects_storage_state_when_present():
     """When a session is stored, new_context must be called with storage_state."""
+    # given
     stored_state: dict[str, Any] = {
         "cookies": [{"name": "li_at", "value": "TOKEN", "domain": ".linkedin.com", "path": "/"}],
         "origins": [],
     }
 
     browser, context = _make_browser_and_context()
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
@@ -70,6 +73,7 @@ async def test_playwright_injects_storage_state_when_present():
         strategy = PlaywrightStrategy(lambda: "DefaultUA", _make_url_validator())
         await strategy.get_html("https://linkedin.com/feed")
 
+    # then
     call_kwargs = browser.new_context.call_args.kwargs
     assert "storage_state" in call_kwargs
     assert call_kwargs["storage_state"] == stored_state
@@ -78,7 +82,10 @@ async def test_playwright_injects_storage_state_when_present():
 @pytest.mark.asyncio
 async def test_playwright_omits_storage_state_when_absent():
     """When no session is stored, new_context must NOT receive storage_state."""
+    # given
     browser, context = _make_browser_and_context()
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
@@ -106,5 +113,6 @@ async def test_playwright_omits_storage_state_when_absent():
         strategy = PlaywrightStrategy(lambda: "DefaultUA", _make_url_validator())
         await strategy.get_html("https://example.com")
 
+    # then
     call_kwargs = browser.new_context.call_args.kwargs
     assert "storage_state" not in call_kwargs

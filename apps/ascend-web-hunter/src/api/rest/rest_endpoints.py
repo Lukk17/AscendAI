@@ -1,10 +1,10 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from src.reader.cloudflare.cookie_manager import cookie_manager
-from src.reader.web_reader import WebReader
+from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
 from src.validator.url_validator import is_safe_external_url
@@ -24,6 +24,20 @@ class ReadRequest(BaseModel):
     link_filter: str | None = None
     heavy_mode: bool = False
     profile: str | None = None
+    output_format: OutputFormat = Field(
+        default="text",
+        description=(
+            "'text' returns the flat content field. 'structured' adds title, author, date and "
+            "sitename alongside it, and is not available together with include_links."
+        ),
+    )
+    tier: TierName | None = Field(
+        default=None,
+        description=(
+            "Start the extraction chain at this tier instead of where heavy_mode and the stored "
+            "session's producer would start it. Escalation continues through the tiers after it."
+        ),
+    )
 
 
 class SessionEstablishRequest(BaseModel):
@@ -77,19 +91,30 @@ _LOGIN_EXAMPLE = {
     "vnc_url": "http://localhost:7900",
     "message": "Manual Login authentication required. Please visit: http://localhost:7900",
 }
+_SESSION_EXPIRED_EXAMPLE = {
+    "url": "https://example.com/feed",
+    "content": "",
+    "status": "session_expired",
+    "profile": "work",
+    "message": (
+        "Stored session for example.com (profile=work) is no longer valid. "
+        "Re-establish it with the session establish operation, then read again."
+    ),
+}
 
 
 @rest_router_v2.post(
     "/read",
     responses={
         200: {
-            "description": "Successful extraction or Captcha required",
+            "description": "Successful extraction, Captcha required, or an expired stored session",
             "content": {
                 "application/json": {
                     "examples": {
                         "success": {"value": _SUCCESS_EXAMPLE},
                         "captcha": {"value": _CAPTCHA_EXAMPLE},
                         "login": {"value": _LOGIN_EXAMPLE},
+                        "session_expired": {"value": _SESSION_EXPIRED_EXAMPLE},
                     },
                 },
             },
@@ -109,15 +134,31 @@ async def read_url_v2(request: ReadRequest) -> dict[str, Any]:
             status_code=400,
             detail="URL resolves to a private, loopback, link-local, or otherwise non-routable address",
         )
+    if request.include_links and request.output_format == "structured":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "output_format=structured is not available with include_links: the annotated-links "
+                "response carries the flat content shape plus a link map"
+            ),
+        )
     if request.include_links:
         result = await web_reader.read_with_links(
             url_str,
             request.link_filter,
             heavy_mode=request.heavy_mode,
             profile=request.profile,
+            output_format=request.output_format,
+            tier=request.tier,
         )
     else:
-        result = await web_reader.read(url_str, heavy_mode=request.heavy_mode, profile=request.profile)
+        result = await web_reader.read(
+            url_str,
+            heavy_mode=request.heavy_mode,
+            profile=request.profile,
+            output_format=request.output_format,
+            tier=request.tier,
+        )
 
     return {"url": url_str, **result}
 
@@ -169,7 +210,7 @@ async def clear_session(request: SessionClearRequest) -> dict[str, Any]:
         )
 
     existed = await session_manager.clear(url_str, request.profile)
-    domain = cookie_manager._get_domain(url_str)  # noqa: SLF001
+    domain = cookie_manager.registrable_domain(url_str)
     cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
 
     return {

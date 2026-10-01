@@ -24,7 +24,7 @@ Every `<N>-<capability>-test.md` file is the **immutable spec** for one test and
    payload contents. NOT log substrings.
 6. **Fixtures.** Paths to local files the test reads (none for the current suite).
 
-Each spec has a matching `<N>-<capability>-tasks.template.md` in the [templates/](templates/) subdirectory — the
+Each spec has a matching `<N>-<capability>-tasks.template.md` in the [templates/](templates/) subdirectory - the
 **checkbox template** for a run. The runner never edits the spec or the template directly. Before starting a run,
 it copies the template from `templates/` into [runs/](runs/) with a timestamped filename, ticks boxes as it
 progresses, fills in `Result summary` and `Verdict`, and logs anything done outside the spec under
@@ -65,11 +65,11 @@ be run on its own.
    plus automated saucedemo login-reuse. Two parts, both automated, no human step. Runs after test 6 because its
    reset flushes every `session:*` key.
 8. [8-session-clear-test.md](8-session-clear-test.md). `POST /api/v2/web/session/clear` against a seeded and an
-   unseeded session. Redis-only, no egress — cheapest test in the suite alongside 1 and 4. Do not run in parallel
+   unseeded session. Redis-only, no egress - cheapest test in the suite alongside 1 and 4. Do not run in parallel
    with test 10.
 9. [9-session-status-test.md](9-session-status-test.md). `POST /api/v2/web/session/status` across its `none`,
-   `expired`, and `active` states. Redis-only, no egress — same cost tier as 1, 4, and 8.
-10. [10-session-establish-test.md](10-session-establish-test.md). `POST /api/v2/web/session/establish` — asserts
+   `expired`, and `active` states. Redis-only, no egress - same cost tier as 1, 4, and 8.
+10. [10-session-establish-test.md](10-session-establish-test.md). `POST /api/v2/web/session/establish` - asserts
     the immediate response, plus a live-verified finding: the background monitor's "cleared" check accepts any
     unchallenged page, so it captures a session within seconds even though nobody solved a challenge. Launches a
     real headful Playwright browser that can be held by a background monitor for up to 10 minutes. Highest per-run

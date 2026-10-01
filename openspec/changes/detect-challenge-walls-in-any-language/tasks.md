@@ -59,8 +59,9 @@ and it gates calling the change done.
       `vendor_script` once and `interstitial_structure` once. Verify with a test counting fired signal ids.
 - [ ] 3.4 Assert header handling is case-insensitive and tolerant: `CF-Mitigated`, `cf-mitigated` and a header map
       of `None` all behave as specified. Verify with a parametrised test.
-- [ ] 3.5 Measure Amazon's live captcha page form action on `amazon.com`, `amazon.pl`, `amazon.de`, `amazon.fr` and
-      `amazon.co.jp` with a direct `curl -sS` of `/errors/validateCaptcha` and record the `action` attribute of the
+- [ ] 3.5 Measure Amazon's live captcha page form action on the five capture locales `amazon.de`, `amazon.fr`,
+      `amazon.it`, `amazon.es` and `amazon.co.jp`, and on the four spec 7 already measured (`amazon.com`,
+      `amazon.pl`, `amazon.co.uk` and `amazon.se`), with a direct `curl -sS` of `/errors/validateCaptcha` and record the `action` attribute of the
       form in each response in the source file's `notes` for the Amazon vendor. Keep whichever path or paths the
       responses carry and drop the other. Verify by the recorded responses being the fixtures captured in task 8.3
       and by the corpus test firing `interstitial_structure` on each.
@@ -106,8 +107,8 @@ and it gates calling the change done.
       same page through `curl_cffi`. Add each captured translation to the source file with its provenance. Verify by
       the corpus fixtures from task 8.2 firing `phrase_title` or `phrase_body` for every captured language, and by
       writing the answer to Open Question 3 into `design.md` with the two captures as evidence.
-- [ ] 5.3 Capture the Amazon phrases from each marketplace's captcha page, extending the four locales spec 7 already
-      measured, and add them with provenance. Verify by the corpus test firing the phrase on each locale fixture.
+- [ ] 5.3 Capture the Amazon phrases from the captcha page of the five capture locales in task 3.5, extending the
+      four locales spec 7 already measured, and add them with provenance. Verify by the corpus test firing the phrase on each locale fixture.
 - [ ] 5.4 Implement `phrase_title` and `phrase_body` over the normalised title and the normalised visible text of the
       prefix. Verify with a test that a phrase in the title fires `phrase_title` and not `phrase_body`, that the
       Polish translation the dictionary already carries fires on a Polish fixture, and that an article quoting
@@ -164,8 +165,8 @@ and it gates calling the change done.
 - [ ] 8.2 Capture the Cloudflare walls: the managed challenge through `curl_cffi` with its 403 and headers, and the
       rendered challenge through Playwright in `en`, `pl`, `de`, `fr`, `ja` and `ar`. Verify by the corpus test
       asserting `definitive_header` on the curl capture and `interstitial_structure` on each rendered capture.
-- [ ] 8.3 Capture the Amazon captcha page from the five marketplaces in task 3.5 plus the four spec 7 already
-      measured. Verify by the corpus test asserting `interstitial_structure` and `captcha_input` on each.
+- [ ] 8.3 Capture the Amazon captcha page from the five capture locales in task 3.5 (`amazon.de`, `amazon.fr`,
+      `amazon.it`, `amazon.es`, `amazon.co.jp`) plus the four spec 7 already measured. Verify by the corpus test asserting `interstitial_structure` and `captcha_input` on each.
 - [ ] 8.4 Capture one real wall for each vendor with a public one: the Google reCAPTCHA demo spec 7 Part 3 uses, the
       hCaptcha demo, and a GeeTest, MTCaptcha, Friendly Captcha and Arkose page where a public one serves the widget
       as the page's whole purpose. Verify by the corpus test asserting each vendor's `vendor_script` and the wall
@@ -194,10 +195,12 @@ and it gates calling the change done.
       Question 1 with the run date. Verify the table has one row per manifest entry and that every wall has a
       positive margin and every counterexample a negative one.
 - [ ] 9.2 Run the full gate and record the figure:
-      `.venv/Scripts/pytest.exe --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100`. Verify it
+      `.venv/Scripts/python.exe -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100`
+      on Windows, or the same through `.venv/bin/python` on Linux and macOS. Verify it
       passes at 100 percent branch coverage with no `# pragma: no cover` and no `# noqa` added anywhere in this
       change.
-- [ ] 9.3 Run `.venv/Scripts/ruff.exe check .` and `.venv/Scripts/mypy.exe src scripts`. Verify both are clean, with
+- [ ] 9.3 Run `.venv/Scripts/python.exe -m ruff check .` and `.venv/Scripts/python.exe -m mypy src scripts`
+      (`.venv/bin/python` on Linux and macOS). Verify both are clean, with
       no suppression added.
 - [ ] 9.4 Measure the cost of `assess` on the largest fixture in the corpus and on the largest page in spec 7's
       matrix, with `time.perf_counter` around one hundred calls each, and record both figures in `design.md`
@@ -211,11 +214,11 @@ and it gates calling the change done.
       `docs/challenge-detection.md` describing the families, the weights, the threshold and the capture rules, linked
       from `docs/README.md`. Verify each of the nine names appears in all three tables and that the new page is
       reachable from the documentation map.
-- [ ] 10.2 Write `docs/architecture/decisions/ADR-010-scored-challenge-detection.md` in the existing ADR format:
+- [ ] 10.2 Write `docs/architecture/decisions/ADR-014-scored-challenge-detection.md` in the existing ADR format:
       the scoring model, the family order, the definitive signals, the guard, the generated catalogue and its
       provenance rule, and the corpus as the admission rule, with the rejected alternatives from `design.md`
       Decisions 1, 2 and 4. Verify the file follows the structure of ADR-003 and ADR-008 and is added to the
-      decisions `README.md` index, and that ADR-009 is left to the sibling change.
+      decisions `README.md` index, and that ADR-013 is the sibling change's record and is not touched.
 - [ ] 10.3 Amend ADR-001 rather than superseding it: its Related section names `is_blocked`, `is_login_required` and
       `is_login_redirect_url`, and its Decision section says `ChallengeDetectedException` short-circuits to NoVNC.
       Point the Related entry at `assess` and the verdict, dated, and leave the rest intact. Verify ADR-001's status
@@ -224,8 +227,10 @@ and it gates calling the change done.
       paragraph describes, moved to Fixed with this change's commit once it lands, and one Found and not fixed row
       for `ERROR_KEYWORDS` failing validation on an article that mentions a captcha, with the measurement that shows
       it. Verify both rows follow the register's column layout and that no other row is touched.
-- [ ] 10.5 Update `CHANGELOG.md` and the version in `pyproject.toml` together, per the register's F44 rule. Verify
-      the two agree.
+- [ ] 10.5 Add this change's lines to the `## [0.0.7]` entry in `apps/ascend-web-hunter/CHANGELOG.md` that
+      `open-several-novnc-windows-at-once` task 10.5 created, and do not bump the version again: `pyproject.toml`
+      already reads `0.0.7`, per the register's F44 rule that the two move together. Verify `pyproject.toml` reads
+      `0.0.7` and the CHANGELOG holds exactly one `## [0.0.7]` heading that names both changes.
 
 ## 11. End-to-end spec 7
 
@@ -252,8 +257,9 @@ and it gates calling the change done.
       `realworld-af-...` through `realworld-ah-...` asserting HTTP 200, `status="success"` and the page's own canary
       phrase. Verify each runs with `bru run "<file>" --env ascend-local` against a live stack.
 - [ ] 11.5 Add a note to the spec's intervention handling section that rows `aa` to `ae` each spawn a NoVNC monitor
-      that no human is expected to solve, so the run must respect `NOVNC_MAX_CONCURRENT_FLOWS` once the sibling
-      change lands, and until then must run them serially. Verify against the Concurrency section, which must say the
+      that no human is expected to solve. State as a prerequisite that the matrix runs with
+      `NOVNC_MAX_CONCURRENT_FLOWS` of at least 5, which the sibling change `open-several-novnc-windows-at-once`
+      provides and which is built before this change. Verify against the Concurrency section, which must say the
       five rows mutate the session keys for five Amazon marketplaces.
 - [ ] 11.6 Update `e2e/testing/templates/7-authenticated-realworld-scraping-tasks.template.md` with rows `aa` to
       `ah` and the changed paragraph. Verify the template's row set matches the spec's row set exactly, item for item.

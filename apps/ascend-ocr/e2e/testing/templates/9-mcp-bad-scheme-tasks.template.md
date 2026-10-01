@@ -1,4 +1,4 @@
-# MCP unsupported scheme rejection: run tasks template
+# MCP bad scheme rejection: run tasks template
 
 Spec: [../9-mcp-bad-scheme-test.md](../9-mcp-bad-scheme-test.md)
 
@@ -10,6 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_9-mcp-bad-scheme-tasks.md` before sta
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
+- [ ] `/ready` reports `jobs_queued` 0 and `jobs_running` 0
 
 ### Reset state
 
@@ -17,13 +18,22 @@ Copy this file to `../runs/<UTC-timestamp>_9-mcp-bad-scheme-tasks.md` before sta
 
 ### Run
 
-- [ ] Step 1: `curl.exe -fsS -i -X POST http://localhost:7022/mcp ... initialize ...` returns HTTP 200 with an `Mcp-Session-Id` header, capture the session id (32 character hexadecimal session id without hyphens)
-- [ ] Send `mcp-bad-scheme.yml` via `bru run` with `--env-var "mcp_session_id=<captured session id>"` and wait for HTTP 200
+- [ ] `initialize` handshake returns an `mcp-session-id` header
+- [ ] `notifications/initialized` sent with `ocr/testing/mcp-initialized.yml` and that session id, HTTP 202 with an empty body
+- [ ] Step 1: send `ocr/testing/mcp-bad-scheme.yml` with that session id
+- [ ] Step 2: send `ocr/testing/mcp-bad-scheme-data.yml` with that session id
+- [ ] Step 3: send `ocr/testing/mcp-bad-scheme-windows-path.yml` with that session id
+- [ ] Step 4: send `ocr/testing/ocr-jobs-list-empty.yml`
 
 ### Expected
 
-- [ ] Step 1 returns HTTP 200 and the `Mcp-Session-Id` header value is non-empty
-- [ ] Step 2 returns HTTP 200 carrying a JSON-RPC error envelope referencing `UNSAFE_URI` semantics (scheme `ftp://` is rejected)
+- [ ] Steps 1 to 3: HTTP 200 at the transport, each with a JSON-RPC error frame or an `isError` result
+- [ ] Steps 1 to 3: each answer carries `UNSAFE_URI`
+- [ ] Steps 1 to 3: no `job_id` is issued
+- [ ] Step 1: the message carries `Unsupported URI scheme: 'ftp'`
+- [ ] Step 2: the message carries `Unsupported URI scheme: 'data'`
+- [ ] Step 3: the message carries `Unsupported URI scheme: 'c'`
+- [ ] Step 4: HTTP 200 with `{"jobs": []}`
 
 ### Verdict
 
@@ -33,9 +43,9 @@ Copy this file to `../runs/<UTC-timestamp>_9-mcp-bad-scheme-tasks.md` before sta
 
 
 
-Input tokens: 0
+Input tokens:
 
-Output tokens: 0
+Output tokens:
 
 Start (UTC):
 

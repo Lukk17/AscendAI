@@ -12,7 +12,7 @@ class UploadResponseTest {
     @DisplayName("accessors return constructed values")
     @Test
     void accessors_ReturnConstructedValues() {
-        // given
+        // when
         UploadResponse r = new UploadResponse(List.of("a"), List.of("b"));
 
         // then

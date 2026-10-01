@@ -92,7 +92,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact does nothing when only Redis is enabled but history list is empty")
     void maybeCompact_RedisOnlyAndHistoryEmpty_SkipsCompaction() {
-        // given — postgres is off, redis is on; repository returns empty since postgres is off
+        // given - postgres is off, redis is on; repository returns empty since postgres is off
         historyProperties.getPostgres().setEnabled(false);
         historyProperties.getRedis().setEnabled(true);
 
@@ -112,7 +112,7 @@ class ChatHistoryCompactionServiceTriggersTest {
         historyProperties.getPostgres().setEnabled(true);
         List<ChatHistory> history = buildHistory(15);
         when(repository.findAllHistoryOrdered(CONV_ID)).thenReturn(history);
-        when(chatModelResolver.resolve(PROVIDER)).thenThrow(new IllegalArgumentException("test – provider unavailable"));
+        when(chatModelResolver.resolve(PROVIDER)).thenThrow(new IllegalArgumentException("test - provider unavailable"));
 
         // when
         service.maybeCompact(CONV_ID, PROVIDER, CompactionOverride.EMPTY);
@@ -126,7 +126,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact fires when only token threshold is exceeded (turns below turn trigger)")
     void maybeCompact_TokenTriggered_TriesToInvokeChatModel() {
-        // given — 5 turns (below turn-trigger of 10), but very long content -> token-trigger fires
+        // given - 5 turns (below turn-trigger of 10), but very long content -> token-trigger fires
         // Each row has enough characters to push estimated tokens over 50% of lmstudio's 8192 window
         List<ChatHistory> history = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
@@ -136,7 +136,7 @@ class ChatHistoryCompactionServiceTriggersTest {
         when(repository.findAllHistoryOrdered(CONV_ID)).thenReturn(history);
         when(chatModelResolver.resolve(anyString())).thenThrow(new IllegalArgumentException("unavailable"));
 
-        // when — use lmstudio as provider (8192 context window) so token trigger fires at 4096 tokens
+        // when - use lmstudio as provider (8192 context window) so token trigger fires at 4096 tokens
         service.maybeCompact(CONV_ID, "lmstudio", CompactionOverride.EMPTY);
 
         // then
@@ -147,7 +147,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact fires when first entry is a summary but remaining turns exceed trigger")
     void maybeCompact_AlreadySummarisedAndRemainingTurnsAboveTrigger_TriesToInvokeChatModel() {
-        // given — 1 summary + 12 raw turns: turns-1 = 12 >= trigger(10) -> should proceed
+        // given - 1 summary + 12 raw turns: turns-1 = 12 >= trigger(10) -> should proceed
         List<ChatHistory> hist = new ArrayList<>();
         hist.add(summary());
         hist.addAll(buildHistory(12));
@@ -165,7 +165,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact skips LLM call when first entry is a summary and turns-1 is below trigger")
     void maybeCompact_AlreadySummarisedAndTurnsMinusOneBelowTrigger_SkipsCompaction() {
-        // given — turns = turnTrigger (10), alreadySummarised = true, turns-1 = 9 < 10 -> no compaction
+        // given - turns = turnTrigger (10), alreadySummarised = true, turns-1 = 9 < 10 -> no compaction
         List<ChatHistory> hist = new ArrayList<>();
         hist.add(summary());
         hist.addAll(buildHistory(9)); // 1 summary + 9 raw = 10 total
@@ -195,7 +195,7 @@ class ChatHistoryCompactionServiceTriggersTest {
         // when
         service.maybeCompact(CONV_ID, PROVIDER, CompactionOverride.EMPTY);
 
-        // then — service still resolves the model (prefixCount=11 >= 1)
+        // then - service still resolves the model (prefixCount=11 >= 1)
         verify(chatModelResolver).resolve(PROVIDER);
     }
 
@@ -237,7 +237,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact skips persistence when summariser output exceeds hard-cap token count")
     void maybeCompact_SummariserExceedsHardCap_SkipsPersistence() {
-        // given — maxSummaryTokens = 400, hardCap = 600 tokens -> 2400 chars; produce a string much longer
+        // given - maxSummaryTokens = 400, hardCap = 600 tokens -> 2400 chars; produce a string much longer
         String oversized = "A".repeat(12_000); // ~3000 tokens
         ChatResponse bigResponse = buildChatResponseWithContent("[Conversation summary] " + oversized);
         List<ChatHistory> history = buildHistory(12);
@@ -256,7 +256,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact proceeds to persistence when summariser output is missing the marker (auto-prepend)")
     void maybeCompact_SummariserMissingMarker_AutoPrepends() {
-        // given — no [Conversation summary] prefix -> service prepends it and proceeds
+        // given - no [Conversation summary] prefix -> service prepends it and proceeds
         // only postgres, simpler assertions
         historyProperties.getRedis().setEnabled(false);
         ChatResponse markerlessResponse = buildChatResponseWithContent("Short valid summary without marker.");
@@ -337,7 +337,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact skips when prefixCount is 0 (single history entry triggers token threshold)")
     void maybeCompact_SingleEntryTokenTriggered_PrefixCountZeroSkips() {
-        // given — keepRecent=5 > 1 turn -> prefixCount=0; very low tokenFraction fires token trigger with 1 entry
+        // given - keepRecent=5 > 1 turn -> prefixCount=0; very low tokenFraction fires token trigger with 1 entry
         compactionProperties.setKeepRecentTurns(5);
         compactionProperties.setTurnTrigger(100);
         compactionProperties.setTokenTriggerFraction(0.00001);
@@ -351,7 +351,7 @@ class ChatHistoryCompactionServiceTriggersTest {
         // when
         service.maybeCompact(CONV_ID, PROVIDER, CompactionOverride.EMPTY);
 
-        // then — prefixCount = 0 < 1 -> skip (no LLM call)
+        // then - prefixCount = 0 < 1 -> skip (no LLM call)
         verifyNoInteractions(chatModelResolver);
     }
 
@@ -365,14 +365,14 @@ class ChatHistoryCompactionServiceTriggersTest {
                 new ChatHistory(2L, CONV_ID, "assistant", "1234", LocalDateTime.now())
         );
 
-        // then — only "1234" / 4 = 1
+        // then - only "1234" / 4 = 1
         assertThat(service.estimateTokens(hist)).isEqualTo(1);
     }
 
     @Test
     @DisplayName("isSummary returns false when role is not system")
     void isSummary_NonSystemRole_ReturnsFalse() {
-        // given — isSummary is private; exercise via decideCompaction with history starting with a user row
+        // given - isSummary is private; exercise via decideCompaction with history starting with a user row
         ChatHistory userRow = new ChatHistory(1L, CONV_ID, "user",
                 ChatHistoryCompactionService.SUMMARY_MARKER + " foo", LocalDateTime.now());
         List<ChatHistory> hist = new ArrayList<>();
@@ -381,7 +381,7 @@ class ChatHistoryCompactionServiceTriggersTest {
         when(repository.findAllHistoryOrdered(CONV_ID)).thenReturn(hist);
         when(chatModelResolver.resolve(PROVIDER)).thenThrow(new IllegalArgumentException("unavailable"));
 
-        // when — 13 turns total, first is NOT a summary -> compaction fires
+        // when - 13 turns total, first is NOT a summary -> compaction fires
         service.maybeCompact(CONV_ID, PROVIDER, CompactionOverride.EMPTY);
 
         // then
@@ -391,7 +391,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("isSummary returns false when system role content does not start with SUMMARY_MARKER")
     void isSummary_SystemRoleButNoMarker_ReturnsFalse() {
-        // given — system role but content does not start with SUMMARY_MARKER
+        // given - system role but content does not start with SUMMARY_MARKER
         ChatHistory regularSystem = new ChatHistory(1L, CONV_ID, "system",
                 "Regular system message without marker", LocalDateTime.now());
         List<ChatHistory> hist = new ArrayList<>();
@@ -403,14 +403,14 @@ class ChatHistoryCompactionServiceTriggersTest {
         // when
         service.maybeCompact(CONV_ID, PROVIDER, CompactionOverride.EMPTY);
 
-        // then — isSummary returns false -> alreadySummarised=false -> compaction can proceed
+        // then - isSummary returns false -> alreadySummarised=false -> compaction can proceed
         verify(chatModelResolver).resolve(PROVIDER);
     }
 
     @Test
     @DisplayName("isSummary returns false when content is null")
     void isSummary_NullContent_ReturnsFalse() {
-        // given — system role but content is null
+        // given - system role but content is null
         ChatHistory nullContent = new ChatHistory(1L, CONV_ID, "system", null, LocalDateTime.now());
         List<ChatHistory> hist = new ArrayList<>();
         hist.add(nullContent);
@@ -428,7 +428,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("maybeCompact invokes summariser without model when provider has no default model")
     void maybeCompact_ProviderWithNoDefaultModel_InvokesSummariserWithoutModel() {
-        // given — "gemini" is not in providerDefaults -> model = null -> invokeSummariser skips defaultOptions
+        // given - "gemini" is not in providerDefaults -> model = null -> invokeSummariser skips defaultOptions
         historyProperties.getRedis().setEnabled(false);
         List<ChatHistory> history = buildHistory(12);
         when(repository.findAllHistoryOrdered(CONV_ID)).thenReturn(history);
@@ -470,7 +470,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("resolveTarget uses default provider model when override has provider only (no model)")
     void resolveTarget_OverrideProviderOnlyUnknownProvider_UsesNullModel() {
-        // then — override provider not in providerDefaults -> model is null
+        // then - override provider not in providerDefaults -> model is null
         var t = service.resolveTarget(PROVIDER, new CompactionOverride("unknownprovider", null));
         assertThat(t.provider()).isEqualTo("unknownprovider");
         assertThat(t.model()).isNull();
@@ -479,7 +479,7 @@ class ChatHistoryCompactionServiceTriggersTest {
     @Test
     @DisplayName("applyToPostgres skips deleteAllById when prefix has no IDs")
     void applyToPostgres_EmptyPrefixIds_SkipsDeleteAllById() {
-        // given — prefix rows have null IDs -> idsToDelete will be empty
+        // given - prefix rows have null IDs -> idsToDelete will be empty
         historyProperties.getRedis().setEnabled(false);
         historyProperties.getPostgres().setEnabled(true);
         List<ChatHistory> hist = new ArrayList<>();
@@ -499,7 +499,7 @@ class ChatHistoryCompactionServiceTriggersTest {
         // when
         service.maybeCompact(CONV_ID, PROVIDER, CompactionOverride.EMPTY);
 
-        // then — deleteAllById should NOT be called because ids are null (filtered out)
+        // then - deleteAllById should NOT be called because ids are null (filtered out)
         verify(transactionTemplate).executeWithoutResult(any());
         verify(repository, never()).deleteAllById(any());
     }

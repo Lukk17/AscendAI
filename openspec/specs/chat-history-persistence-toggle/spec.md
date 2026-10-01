@@ -7,7 +7,7 @@ Each chat-history backend can be switched off on its own. The Redis cache and th
 ## Requirements
 ### Requirement: Independent chat-history backend toggles
 
-The agent SHALL bind two independent configuration flags — `app.memory.chat-history.redis.enabled` and `app.memory.chat-history.postgres.enabled` — via a `@ConfigurationProperties` class named `ChatHistoryProperties` at prefix `app.memory.chat-history`. Both flags MUST default to `true` so that existing deployments observe unchanged behavior on upgrade.
+The agent SHALL bind two independent configuration flags - `app.memory.chat-history.redis.enabled` and `app.memory.chat-history.postgres.enabled` - via a `@ConfigurationProperties` class named `ChatHistoryProperties` at prefix `app.memory.chat-history`. Both flags MUST default to `true` so that existing deployments observe unchanged behavior on upgrade.
 
 #### Scenario: Defaults preserve current behavior
 - **WHEN** the operator deploys the new build with no changes to `application.yaml`
@@ -24,7 +24,7 @@ The agent SHALL bind two independent configuration flags — `app.memory.chat-hi
 
 `PersistentChatMemory.get(conversationId, lastN)` and `PersistentChatMemory.get(conversationId)` SHALL gate the Redis cache lookup on `redis.enabled` and the Postgres hydrate fallback on `postgres.enabled`. When both flags are `false`, both methods SHALL return `Collections.emptyList()` without contacting any backend.
 
-#### Scenario: Redis disabled, Postgres enabled — reads from Postgres only
+#### Scenario: Redis disabled, Postgres enabled - reads from Postgres only
 - **WHEN** a caller invokes `get("frosty", 10)`
 - **AND** `redis.enabled=false`, `postgres.enabled=true`
 - **THEN** `redisTemplate.opsForList().range(...)` is NOT called
@@ -32,14 +32,14 @@ The agent SHALL bind two independent configuration flags — `app.memory.chat-hi
 - **AND** the returned list reflects Postgres content
 - **AND** no Redis hydrate step is attempted
 
-#### Scenario: Redis enabled, Postgres disabled — Redis-only with no archive fallback
+#### Scenario: Redis enabled, Postgres disabled - Redis-only with no archive fallback
 - **WHEN** a caller invokes `get("frosty", 10)`
 - **AND** `redis.enabled=true`, `postgres.enabled=false`
 - **AND** the Redis list at key `chat:frosty` is empty
 - **THEN** `ChatHistoryRepository.findRecentHistory(...)` is NOT called
 - **AND** the returned list is empty
 
-#### Scenario: Both disabled — empty list, no backend contact
+#### Scenario: Both disabled - empty list, no backend contact
 - **WHEN** a caller invokes `get("frosty", 10)` or `get("frosty")`
 - **AND** both `redis.enabled=false` and `postgres.enabled=false`
 - **THEN** no Redis call is made
@@ -50,14 +50,14 @@ The agent SHALL bind two independent configuration flags — `app.memory.chat-hi
 
 `PersistentChatMemory.add(conversationId, messages)` SHALL gate `redisTemplate.opsForList().rightPush(...)`, `trim(...)`, and `expire(...)` on `redis.enabled`, and gate the call to `persistToDb(...)` on `postgres.enabled`. When both flags are `false`, `add(...)` SHALL be a no-op (no exception thrown, no INFO log per call).
 
-#### Scenario: Both disabled — add is a no-op
+#### Scenario: Both disabled - add is a no-op
 - **WHEN** a caller invokes `add("frosty", List.of(userMessage, assistantMessage))`
 - **AND** both `redis.enabled=false` and `postgres.enabled=false`
 - **THEN** `redisTemplate` is not invoked
 - **AND** `repository.save(...)` is not invoked (directly or via `@Async persistToDb`)
 - **AND** no exception is thrown
 
-#### Scenario: Postgres disabled — Redis writes, no archive
+#### Scenario: Postgres disabled - Redis writes, no archive
 - **WHEN** a caller invokes `add("frosty", List.of(msg))`
 - **AND** `redis.enabled=true`, `postgres.enabled=false`
 - **THEN** `redisTemplate.opsForList().rightPush(...)` is called once

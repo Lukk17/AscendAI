@@ -205,7 +205,7 @@ class S3PresignedUrlServiceTest {
         // when
         List<SourceFile> result = clamped.presignAll(List.of(ref));
 
-        // then — expiresAt should be approximately 1 hour out, not 2
+        // then - expiresAt should be approximately 1 hour out, not 2
         assertThat(result).hasSize(1);
         long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.getFirst().expiresAt()).getSeconds();
         assertThat(secondsToExpiry).isBetween(3500L, 3700L);
@@ -234,7 +234,7 @@ class S3PresignedUrlServiceTest {
         // when
         List<SourceFile> result = clamped.presignAll(List.of(ref));
 
-        // then — clamped to 1 minute = 60s (not 10s)
+        // then - clamped to 1 minute = 60s (not 10s)
         assertThat(result).hasSize(1);
         long secondsToExpiry = java.time.Duration.between(java.time.Instant.now(), result.getFirst().expiresAt()).getSeconds();
         assertThat(secondsToExpiry).isBetween(50L, 70L);

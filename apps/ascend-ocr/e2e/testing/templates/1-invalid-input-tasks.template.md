@@ -1,4 +1,4 @@
-# Invalid input rejection: run tasks template
+# Invalid input: run tasks template
 
 Spec: [../1-invalid-input-test.md](../1-invalid-input-test.md)
 
@@ -10,6 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
+- [ ] `/ready` reports `jobs_queued` 0 and `jobs_running` 0
 
 ### Reset state
 
@@ -17,16 +18,19 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 ### Run
 
-- [ ] Send `ocr-invalid-no-file.yml` via `bru run` and wait for the response
+- [ ] Step 1: send `ocr/testing/ocr-invalid-no-file.yml` via `bru run`
+- [ ] Step 2: send `ocr/testing/ocr-unsupported-language.yml` via `bru run`
+- [ ] Step 3: send `ocr/testing/ocr-jobs-list-empty.yml` via `bru run`
 
 ### Expected
 
-- [ ] HTTP status equals `422`
-- [ ] Response body is JSON with a top-level `detail` array
-- [ ] At least one `detail` entry has `loc` containing `"file"`
-
-Diagnostic, not a checkbox: note the per-call duration if it looks unusually high, but it is not a verdict input
-(Bruno's own startup/encoding overhead dominates the figure — see spec).
+- [ ] Step 1: HTTP 422
+- [ ] Step 1: the body carries FastAPI's validation detail, not a job record
+- [ ] Step 1: no `job_id` in the body
+- [ ] Step 2: HTTP 400 with `code="UNSUPPORTED_LANGUAGE"`
+- [ ] Step 2: `detail` contains `Supported languages:` and not `korean`
+- [ ] Step 2: no `job_id`, no `state` and no `Location` header
+- [ ] Step 3: HTTP 200 with `{"jobs": []}`
 
 ### Verdict
 
@@ -36,9 +40,9 @@ Diagnostic, not a checkbox: note the per-call duration if it looks unusually hig
 
 
 
-Input tokens: 0
+Input tokens:
 
-Output tokens: 0
+Output tokens:
 
 Start (UTC):
 

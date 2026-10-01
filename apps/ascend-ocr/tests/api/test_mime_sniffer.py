@@ -20,17 +20,17 @@ class TestSniffMime:
             (b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 10, "image/webp"),
         ],
     )
-    def test_known_signatures(self, data: bytes, expected: str):
-        # Then
+    def test_known_signatures(self, data: bytes, expected: str) -> None:
+        # When / Then
         assert sniff_mime(data) == expected
 
     def test_unknown_signature_raises(self):
-        # Then
+        # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(b"plain text content with no known magic prefix")
 
     def test_empty_bytes_raises(self):
-        # Then
+        # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(b"")
 
@@ -38,11 +38,11 @@ class TestSniffMime:
         # Given a RIFF container that is not WEBP
         data = b"RIFF\x00\x00\x00\x00WAVE" + b"\x00" * 10
 
-        # Then
+        # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(data)
 
     def test_short_riff_payload_is_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(b"RIFF")

@@ -9,9 +9,9 @@ Accepted
 The ascend-ai-agent needs to extend LLM capabilities with external tools (audio transcription, weather, web search). We need a standard protocol for tool discovery, invocation, and result handling.
 
 Alternatives considered:
-1. **Custom REST endpoints per tool** — N integrations, each with custom request/response mapping
-2. **Spring AI Function Calling** — Java functions registered as beans
-3. **Model Context Protocol (MCP)** — standardized tool discovery via `SyncMcpToolCallbackProvider`
+1. **Custom REST endpoints per tool** - N integrations, each with custom request/response mapping
+2. **Spring AI Function Calling** - Java functions registered as beans
+3. **Model Context Protocol (MCP)** - standardized tool discovery via `SyncMcpToolCallbackProvider`
 
 ## Decision
 
@@ -19,8 +19,8 @@ Use Spring AI's MCP client (`spring-ai-starter-mcp-client-webflux`) with Streama
 
 ## Consequences
 
-- **Positive**: Standardized protocol — any MCP-compliant service is automatically discovered
-- **Positive**: Language-agnostic — MCP services can be Java (ascend-weather-mcp), Python (ascend-audio-scribe, WebHunter), or any other language
+- **Positive**: Standardized protocol - any MCP-compliant service is automatically discovered
+- **Positive**: Language-agnostic - MCP services can be Java (ascend-weather-mcp), Python (ascend-audio-scribe, WebHunter), or any other language
 - **Positive**: Adding a new tool = deploying a service + adding one URL to YAML
 - **Negative**: Startup dependency on all MCP services being available
 - **Negative**: Synchronous MCP calls block the virtual thread during tool execution

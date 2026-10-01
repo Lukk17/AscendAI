@@ -50,19 +50,27 @@ def patch_cookies_none():
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_returns_html(patch_cookies_none):
+async def test_curl_cffi_fetcher_returns_html(patch_cookies_none, pinned_public_host):
+    # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
+
+    # when
     with patch(
         "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
         return_value=session,
     ):
         result = await fetch_with_curl_cffi("http://test.com", lambda: "ua", "TestStrat")
+
+    # then
     assert result == SAMPLE_HTML
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_uses_cached_cookies():
+async def test_curl_cffi_fetcher_uses_cached_cookies(pinned_public_host):
+    # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
+
+    # when
     with (
         patch(
             "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_flat_cookies",
@@ -78,6 +86,8 @@ async def test_curl_cffi_fetcher_uses_cached_cookies():
         ),
     ):
         result = await fetch_with_curl_cffi("http://test.com", lambda: "fallback", "TestStrat")
+
+    # then
     assert result == SAMPLE_HTML
     call = session.get.call_args
     assert call.kwargs["headers"]["User-Agent"] == "cached-ua"
@@ -85,8 +95,11 @@ async def test_curl_cffi_fetcher_uses_cached_cookies():
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none):
+async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none, pinned_public_host):
+    # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
+
+    # when
     with (
         patch(
             "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
@@ -99,12 +112,17 @@ async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none):
     ):
         with pytest.raises(ChallengeDetectedException) as exc:
             await fetch_with_curl_cffi("http://test.com", lambda: "ua", "TestStrat")
+
+    # then
     assert exc.value.intervention_type == "login"
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_raises_on_waf_block(patch_cookies_none):
+async def test_curl_cffi_fetcher_raises_on_waf_block(patch_cookies_none, pinned_public_host):
+    # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
+
+    # when
     with (
         patch(
             "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
@@ -121,46 +139,62 @@ async def test_curl_cffi_fetcher_raises_on_waf_block(patch_cookies_none):
     ):
         with pytest.raises(ChallengeDetectedException) as exc:
             await fetch_with_curl_cffi("http://test.com", lambda: "ua", "TestStrat")
+
+    # then
     assert exc.value.intervention_type == "captcha"
 
 
 @pytest.mark.asyncio
 async def test_curl_cffi_fetcher_returns_empty_on_transport_error(patch_cookies_none):
+    # when
     with patch(
         "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
         side_effect=RuntimeError("net"),
     ):
         result = await fetch_with_curl_cffi("http://test.com", lambda: "ua", "TestStrat")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
-async def test_beautifulsoup_extract_strips_noise(patch_cookies_none):
+async def test_beautifulsoup_extract_strips_noise(patch_cookies_none, pinned_public_host):
+    # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     strategy = BeautifulSoupStrategy(lambda: "ua")
+
+    # when
     with patch(
         "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
         return_value=session,
     ):
         result = await strategy.extract("http://test.com")
+
+    # then
     assert "Text" in result
     assert "bad" not in result
 
 
 @pytest.mark.asyncio
 async def test_beautifulsoup_extract_empty_html(patch_cookies_none):
+    # when
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.fetch_with_curl_cffi",
         new=AsyncMock(return_value=""),
     ):
         strategy = BeautifulSoupStrategy(lambda: "ua")
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_trafilatura_extract(patch_cookies_none):
+    # given
     long_text = "Extracted content. " * 20  # 380 chars, well above READABILITY_FALLBACK_MIN_CHARS
+
+    # when
     with (
         patch(
             "src.reader.strategies.trafilatura_strategy.fetch_with_curl_cffi",
@@ -173,17 +207,22 @@ async def test_trafilatura_extract(patch_cookies_none):
     ):
         strategy = TrafilaturaStrategy(lambda: "ua")
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == long_text
 
 
 @pytest.mark.asyncio
 async def test_trafilatura_extract_empty_html():
+    # when
     with patch(
         "src.reader.strategies.trafilatura_strategy.fetch_with_curl_cffi",
         new=AsyncMock(return_value=""),
     ):
         strategy = TrafilaturaStrategy(lambda: "ua")
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == ""
 
 
@@ -192,6 +231,7 @@ async def test_trafilatura_extract_falls_back_to_readability_when_trafilatura_re
     patch_cookies_none,
 ):
     """When trafilatura returns None the readability fallback content is returned instead of empty string."""
+    # when
     with (
         patch(
             "src.reader.strategies.trafilatura_strategy.fetch_with_curl_cffi",
@@ -215,6 +255,8 @@ async def test_trafilatura_extract_falls_back_to_readability_when_trafilatura_re
     ):
         strategy = TrafilaturaStrategy(lambda: "ua")
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == "<p>Fallback content</p>"
 
 
@@ -250,9 +292,12 @@ def _wire_browser_pool(monkeypatch, page) -> None:
 
 @pytest.mark.asyncio
 async def test_playwright_extract_happy_path(monkeypatch):
+    # given
     page = _build_playwright_page_mock("<html><body>content</body></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)
     _wire_browser_pool(monkeypatch, page)
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -269,14 +314,19 @@ async def test_playwright_extract_happy_path(monkeypatch):
     ):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == "Extracted"
 
 
 @pytest.mark.asyncio
 async def test_playwright_extract_returns_empty_when_trafilatura_none(monkeypatch):
+    # given
     page = _build_playwright_page_mock("<html></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)
     _wire_browser_pool(monkeypatch, page)
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -293,13 +343,18 @@ async def test_playwright_extract_returns_empty_when_trafilatura_none(monkeypatc
     ):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == ""
 
 
 @pytest.mark.asyncio
 async def test_playwright_raises_challenge_on_login_redirect_url(monkeypatch):
+    # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
+
+    # when
     with patch(
         "src.reader.strategies.playwright_strategy.Stealth",
         return_value=MagicMock(apply_stealth_async=AsyncMock()),
@@ -307,13 +362,18 @@ async def test_playwright_raises_challenge_on_login_redirect_url(monkeypatch):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com?login=1")
+
+    # then
     assert exc.value.intervention_type == "login"
 
 
 @pytest.mark.asyncio
 async def test_playwright_raises_challenge_on_login_wall_during_poll(monkeypatch):
+    # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -331,14 +391,19 @@ async def test_playwright_raises_challenge_on_login_wall_during_poll(monkeypatch
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "login"
 
 
 @pytest.mark.asyncio
 async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch):
+    # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
     perf_values = iter([0.0, 100.0, 100.0])
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -360,6 +425,8 @@ async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "captcha"
 
 
@@ -367,9 +434,12 @@ async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch):
 async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkeypatch):
     """A Cloudflare JS challenge that auto-clears within the budget must NOT escalate:
     the headful tier keeps polling, the challenge resolves, and content is returned."""
+    # given
     page = _build_playwright_page_mock("<html><body>content</body></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)
     _wire_browser_pool(monkeypatch, page)
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -394,17 +464,22 @@ async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkey
     ):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == "Extracted"
 
 
 @pytest.mark.asyncio
 async def test_playwright_escalates_when_challenge_never_clears(monkeypatch):
     """A challenge still present after the auto-clear budget escalates to NoVNC."""
+    # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
     # perf values: poll_start (0.0), loop check 1 (0.0), challenge check 1 (2.0 < 3.0) → wait,
     # loop check 2 (0.0), challenge check 2 (5.0 >= 3.0) → raise.
     perf_values = iter([0.0, 0.0, 2.0, 0.0, 5.0])
+
+    # when
     with (
         patch("src.reader.strategies.playwright_strategy.settings.CHALLENGE_CLEAR_WAIT_SECONDS", 3),
         patch("src.reader.strategies.playwright_strategy.settings.EXTRACT_TIMEOUT", 30),
@@ -428,6 +503,8 @@ async def test_playwright_escalates_when_challenge_never_clears(monkeypatch):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "captcha"
     assert page.wait_for_timeout.await_count >= 1
 
@@ -435,9 +512,12 @@ async def test_playwright_escalates_when_challenge_never_clears(monkeypatch):
 @pytest.mark.asyncio
 async def test_playwright_still_blocked_after_deadline_raises_not_returns_html(monkeypatch):
     """The post-loop captcha re-check must raise even if the poll loop exited by deadline."""
+    # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
     perf_values = iter([0.0, 100.0, 100.0])
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -459,11 +539,14 @@ async def test_playwright_still_blocked_after_deadline_raises_not_returns_html(m
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "captcha"
 
 
 @pytest.mark.asyncio
 async def test_playwright_raises_late_login_wall(monkeypatch):
+    # given
     page = _build_playwright_page_mock("<html></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)
     _wire_browser_pool(monkeypatch, page)
@@ -474,6 +557,7 @@ async def test_playwright_raises_late_login_wall(monkeypatch):
         call_count[0] += 1
         return call_count[0] > 1  # only the late-stage call returns True
 
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -491,6 +575,8 @@ async def test_playwright_raises_late_login_wall(monkeypatch):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "login"
 
 
@@ -498,11 +584,14 @@ async def test_playwright_raises_late_login_wall(monkeypatch):
 async def test_playwright_retries_after_transient_content_read_error(monkeypatch):
     """A transient PlaywrightError while reading page.content() during polling must be
     swallowed and retried rather than propagated to the caller."""
+    # given
     html = "<html><body>content</body></html>"
     page = _build_playwright_page_mock(html)
     page.content = AsyncMock(side_effect=[PlaywrightError("frame detached"), html, html])
     page.wait_for_load_state = AsyncMock(return_value=None)
     _wire_browser_pool(monkeypatch, page)
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -519,6 +608,8 @@ async def test_playwright_retries_after_transient_content_read_error(monkeypatch
     ):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == "Extracted"
     assert page.wait_for_timeout.await_count >= 1
 
@@ -527,9 +618,12 @@ async def test_playwright_retries_after_transient_content_read_error(monkeypatch
 async def test_playwright_retries_after_transient_networkidle_wait_error(monkeypatch):
     """A transient PlaywrightError while waiting for the networkidle load state during
     polling must be swallowed and retried rather than propagated to the caller."""
+    # given
     page = _build_playwright_page_mock("<html><body>content</body></html>")
     page.wait_for_load_state = AsyncMock(side_effect=[PlaywrightError("networkidle timeout"), None])
     _wire_browser_pool(monkeypatch, page)
+
+    # when
     with (
         patch(
             "src.reader.strategies.playwright_strategy.Stealth",
@@ -546,6 +640,8 @@ async def test_playwright_retries_after_transient_networkidle_wait_error(monkeyp
     ):
         strategy = PlaywrightStrategy(lambda: "ua", MagicMock())
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == "Extracted"
 
 
@@ -554,6 +650,7 @@ async def test_playwright_retries_after_transient_networkidle_wait_error(monkeyp
 
 @pytest.mark.asyncio
 async def test_crawlee_strategy_extract_returns_trafilatura_result():
+    # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
         patch(
@@ -568,11 +665,14 @@ async def test_crawlee_strategy_extract_returns_trafilatura_result():
         mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
         strategy = CrawleeStrategy(MagicMock())
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == "Crawlee"
 
 
 @pytest.mark.asyncio
 async def test_crawlee_strategy_raises_challenge_on_login_wall():
+    # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
         patch(
@@ -588,11 +688,14 @@ async def test_crawlee_strategy_raises_challenge_on_login_wall():
         strategy = CrawleeStrategy(MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "login"
 
 
 @pytest.mark.asyncio
 async def test_crawlee_strategy_raises_challenge_on_waf_block():
+    # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
         patch(
@@ -612,11 +715,14 @@ async def test_crawlee_strategy_raises_challenge_on_waf_block():
         strategy = CrawleeStrategy(MagicMock())
         with pytest.raises(ChallengeDetectedException) as exc:
             await strategy.get_html("http://test.com")
+
+    # then
     assert exc.value.intervention_type == "captcha"
 
 
 @pytest.mark.asyncio
 async def test_crawlee_handle_request_playwright_context():
+    # given
     from crawlee.crawlers import PlaywrightCrawlingContext
 
     strategy = CrawleeStrategy(MagicMock())
@@ -624,13 +730,18 @@ async def test_crawlee_handle_request_playwright_context():
     context.page = MagicMock()
     context.page.content = AsyncMock(return_value="<html>from playwright</html>")
     result_container = {"html": ""}
+
+    # when
     await strategy._handle_crawlee_request(context, result_container)
+
+    # then
     assert "playwright" in result_container["html"]
 
 
 @pytest.mark.asyncio
 async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_raises():
     """When page.content() raises, _handle_crawlee_request must fall back to get_snapshot()."""
+    # given
     from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
 
     strategy = CrawleeStrategy(MagicMock())
@@ -641,7 +752,11 @@ async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_r
     snapshot.html = "<html>snapshot</html>"
     context.get_snapshot = AsyncMock(return_value=snapshot)
     result_container = {"html": ""}
+
+    # when
     await strategy._handle_crawlee_request(context, result_container)
+
+    # then
     assert result_container["html"] == "<html>snapshot</html>"
     context.get_snapshot.assert_awaited_once()
 
@@ -651,6 +766,7 @@ async def test_crawlee_decorated_handlers_executed():
     """The crawlee strategy registers two decorated inner functions
     (request_handler and enable_adblock). Capture them and invoke directly so
     their bodies are covered."""
+    # given
     captured: dict[str, Any] = {}
 
     def capture_default(fn):
@@ -681,7 +797,10 @@ async def test_crawlee_decorated_handlers_executed():
     context_playwright.page.content = AsyncMock(return_value="<html>x</html>")
     context_playwright.page.route = AsyncMock()
 
+    # when
     await captured["pre_nav"](context_playwright)
+
+    # then
     context_playwright.page.route.assert_awaited_once()
 
     container_handler = captured["default"]
@@ -693,6 +812,7 @@ async def test_crawlee_decorated_handlers_executed():
 
 @pytest.mark.asyncio
 async def test_crawlee_extract_empty_when_trafilatura_none():
+    # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
         patch(
@@ -707,4 +827,6 @@ async def test_crawlee_extract_empty_when_trafilatura_none():
         mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
         strategy = CrawleeStrategy(MagicMock())
         result = await strategy.extract("http://test.com")
+
+    # then
     assert result == ""

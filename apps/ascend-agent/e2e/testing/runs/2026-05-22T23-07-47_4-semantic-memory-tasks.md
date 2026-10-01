@@ -43,7 +43,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-HTTP 200 for both save and retrieve. Qdrant scroll returned 2 points: payload data "Luke" and "software engineer" (separate extraction points). Recall response: "You're Luke, a software engineer." Chat history fully cleared between save and retrieve — recall came exclusively from semantic memory.
+HTTP 200 for both save and retrieve. Qdrant scroll returned 2 points: payload data "Luke" and "software engineer" (separate extraction points). Recall response: "You're Luke, a software engineer." Chat history fully cleared between save and retrieve - recall came exclusively from semantic memory.
 
 Input tokens: save=109 (estimated), retrieve=69
 

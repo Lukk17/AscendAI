@@ -74,7 +74,7 @@ See the Amendment below for the Microsoft and Google directory risks this decisi
 
 ---
 
-### Amendment — 2026-09-04
+### Amendment - 2026-09-04
 
 Scope was narrowed after this decision was first accepted. The original decision resolved membership by reading a provider's own group claim or by calling that provider's transitive membership endpoint, against a customer's own Microsoft Entra ID or Google Workspace directory. The owner has since decided that, for this version, group data lives in Keycloak and nowhere else: an administrator creates a group in the realm and assigns people to it, and the token carries those groups directly. Reading membership from a customer's own directory, whether brokered through Keycloak or looked up directly, is deferred, not abandoned.
 

@@ -9,27 +9,60 @@ ascend-audio-scribe is a speech-to-text microservice that dynamically selects tr
 ## Build & Run Commands
 
 Every command below runs through this module's own virtual environment at `.venv/` (created via
-`python -m venv .venv`, see README.md) — never the system Python or pip. Windows interpreter:
+`python -m venv .venv`, see README.md) - never the system Python or pip. Windows interpreter:
 `.venv/Scripts/python.exe`; Linux/macOS: `.venv/bin/python`.
+
+Platform support: `pytorch-requirements.txt` pins CUDA 12.6 builds of PyTorch, which exist only for Windows and Linux
+on x86_64 and cannot be installed on macOS. The local (faster-whisper) backend therefore needs Windows or Linux with
+an NVIDIA GPU. The OpenAI and Hugging Face backends need no PyTorch and work on any platform, including macOS. The
+local backend imports `torch` only when it loads a model, and the test suite replaces `torch` with a stub, so on macOS
+skip the PyTorch step and install the project alone. Everything else, the test suite included, then works.
+
+Windows:
 
 ```bash
 # Install dependencies (pytorch first, then the project)
-.venv/Scripts/pip.exe install -r pytorch-requirements.txt
-.venv/Scripts/pip.exe install -e .[dev]
+.venv/Scripts/python.exe -m pip install -r pytorch-requirements.txt
+.venv/Scripts/python.exe -m pip install -e .[dev]
 
 # Run the server (port 7017)
-.venv/Scripts/uvicorn.exe src.main:app --host 0.0.0.0 --port 7017 --reload
+.venv/Scripts/python.exe -m uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
 
 # Run all tests
-.venv/Scripts/pytest.exe
+.venv/Scripts/python.exe -m pytest
 
 # Run a single test file
-.venv/Scripts/pytest.exe tests/transcription/test_openai_api_speach_to_text.py
+.venv/Scripts/python.exe -m pytest tests/transcription/test_openai_api_speach_to_text.py
 
 # Run a single test
-.venv/Scripts/pytest.exe tests/transcription/test_openai_api_speach_to_text.py::test_name -v
+.venv/Scripts/python.exe -m pytest tests/transcription/test_openai_api_speach_to_text.py::test_name -v
+```
 
-# Docker
+Linux/macOS (the extra is quoted because zsh treats an unquoted `[dev]` as a glob):
+
+```bash
+# Install PyTorch first (Linux with an NVIDIA GPU only, skip this line on macOS)
+.venv/bin/python -m pip install -r pytorch-requirements.txt
+
+# Install the project
+.venv/bin/python -m pip install -e ".[dev]"
+
+# Run the server (port 7017)
+.venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 7017 --reload
+
+# Run all tests
+.venv/bin/python -m pytest
+
+# Run a single test file
+.venv/bin/python -m pytest tests/transcription/test_openai_api_speach_to_text.py
+
+# Run a single test
+.venv/bin/python -m pytest tests/transcription/test_openai_api_speach_to_text.py::test_name -v
+```
+
+Docker, identical on every platform:
+
+```bash
 docker build -t ascend-audio-scribe:latest .
 ```
 

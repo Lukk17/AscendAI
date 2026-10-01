@@ -1,9 +1,9 @@
 """Lightweight circuit breaker for external dependencies.
 
 Three states:
-  CLOSED  — normal operation; failures are counted.
-  OPEN    — dependency is considered failing; calls short-circuit immediately.
-  HALF_OPEN — one probe call is allowed; success closes, failure re-opens.
+  CLOSED  - normal operation; failures are counted.
+  OPEN    - dependency is considered failing; calls short-circuit immediately.
+  HALF_OPEN - one probe call is allowed; success closes, failure re-opens.
 """
 
 import logging

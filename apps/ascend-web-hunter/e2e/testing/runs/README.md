@@ -35,7 +35,7 @@ Group all tests from one sweep under the same timestamp; one timestamp = one ful
 6. Compute `Duration = End - Start` and record it as `HH:MM:SS`. **Wall-clock for the whole test** (prereqs + reset +
    run + verify), NOT just the Bruno request duration.
 7. Fill **Input tokens** and **Output tokens** with your best estimate of the LLM tokens consumed across the run.
-   ascend-web-hunter tests do not invoke any LLM — leave these as 0.
+   ascend-web-hunter tests do not invoke any LLM - leave these as 0.
 8. Write the **Result summary** paragraph and the **Verdict** (PASS or FAIL).
 9. If any step was done outside the spec (extra diagnostics, retries, manual inspection), log it under
    **Additional tasks I did**.

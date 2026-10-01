@@ -5,7 +5,7 @@ from fastmcp import FastMCP
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
 from src.reader.cloudflare.cookie_manager import cookie_manager
-from src.reader.web_reader import WebReader
+from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
 from src.validator.url_validator import is_safe_external_url
@@ -40,11 +40,15 @@ async def web_read(
     link_filter: str | None = None,
     heavy_mode: bool = False,
     profile: str | None = None,
+    output_format: OutputFormat = "text",
+    tier: TierName | None = None,
 ) -> dict[str, Any]:
     """
     Read (scrape) the content of a web page.
     IMPORTANT: If the status returned is `human_intervention_required`, display the `vnc_url` to the user
     and ask them to open it in their browser to manually solve the Captcha or log into the required account.
+    If the status returned is `session_expired`, the stored login for that site has lapsed: call
+    `session_establish` for the same url and profile, then read again.
     Args:
         url: The URL to read.
         include_links: When True, returns annotated content with inline [N] link markers
@@ -53,15 +57,35 @@ async def web_read(
                      this string are included in the link map (e.g. '/job-offer/').
         heavy_mode: If True, skips lightweight strategies and jumps straight to advanced browser strategies.
         profile: Optional session profile label (e.g. 'work', 'personal') for multi-account sites.
+        output_format: 'text' for the flat content field, 'structured' to also get title, author,
+                       date and sitename. Not available together with include_links.
+        tier: Start the extraction chain at this tier ('1-beautifulsoup', '2-trafilatura',
+              '3-flaresolverr', '4-playwright_stealth', '5-crawlee_adaptive', '6-novnc') instead of
+              where heavy_mode and the stored session would start it. Escalation continues after it.
     """
     if not is_safe_external_url(url):
         raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
 
+    if include_links and output_format == "structured":
+        raise ValueError(
+            "output_format=structured is not available with include_links: the annotated-links "
+            "response carries the flat content shape plus a link map"
+        )
+
     try:
         if include_links:
-            return await web_reader.read_with_links(url, link_filter, heavy_mode=heavy_mode, profile=profile)
+            return await web_reader.read_with_links(
+                url,
+                link_filter,
+                heavy_mode=heavy_mode,
+                profile=profile,
+                output_format=output_format,
+                tier=tier,
+            )
 
-        return await web_reader.read(url, heavy_mode=heavy_mode, profile=profile)
+        return await web_reader.read(
+            url, heavy_mode=heavy_mode, profile=profile, output_format=output_format, tier=tier
+        )
     except HumanInterventionRequiredException as exc:
         HUMAN_INTERVENTION_TOTAL.labels(intervention_type=exc.intervention_type).inc()
 
@@ -147,7 +171,7 @@ async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
         raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
 
     existed = await session_manager.clear(url, profile)
-    domain = cookie_manager._get_domain(url)  # noqa: SLF001
+    domain = cookie_manager.registrable_domain(url)
     cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
 
     return {

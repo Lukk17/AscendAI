@@ -1,9 +1,12 @@
 package com.lukk.ascend.ai.agent.service.cache;
 
+import com.lukk.ascend.ai.agent.test.LogCapture;
 import com.lukk.ascend.ai.agent.test.TestConstants;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.metadata.Usage;
@@ -12,12 +15,16 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class OpenAiPromptCacheStrategyTest {
 
     private final OpenAiPromptCacheStrategy strategy = new OpenAiPromptCacheStrategy("openai", new SimpleMeterRegistry());
+
+    @RegisterExtension
+    final LogCapture logs = LogCapture.forClass(OpenAiPromptCacheStrategy.class);
 
     @Test
     @DisplayName("buildOptions returns generic ChatOptions with the model set for a valid model name")
@@ -41,8 +48,12 @@ class OpenAiPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome does not throw when response is null")
     void recordOutcome_NullResponse_DoesNotThrow() {
+        // when
+        ThrowingCallable recordOutcome = () -> strategy.recordOutcome("u", null);
+
         // then
-        strategy.recordOutcome("u", null);
+        assertThatCode(recordOutcome).doesNotThrowAnyException();
+        assertThat(logs.messages()).isEmpty();
     }
 
     @Test
@@ -56,8 +67,12 @@ class OpenAiPromptCacheStrategyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
+
+        // then
+        assertThat(logs.messages()).singleElement().asString()
+                .endsWith("provider=openai user=" + TestConstants.DEFAULT_USER_ID + " hit=true cached_tokens=512 prompt_tokens=1024");
     }
 
     @Test
@@ -71,8 +86,12 @@ class OpenAiPromptCacheStrategyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
+        // when
+        ThrowingCallable recordOutcome = () -> strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
+
         // then
-        strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
+        assertThatCode(recordOutcome).doesNotThrowAnyException();
+        assertThat(logs.messages()).isEmpty();
     }
 
     @Test

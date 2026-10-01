@@ -1,8 +1,8 @@
-# ADR-001: Multi-tier extraction strategy — six strategies in fixed escalation order
+# ADR-001: Multi-tier extraction strategy - six strategies in fixed escalation order
 
 ## Status
 
-Accepted — 2026-05-31
+Accepted - 2026-05-31
 
 ## Context
 
@@ -23,12 +23,12 @@ automation is exhausted.
 
 | Key | Strategy class | Cost |
 | :--- | :--- | :--- |
-| `1-beautifulsoup` | `BeautifulSoupStrategy` | Low — `curl_cffi` impersonating Chrome120 + BeautifulSoup parse |
-| `2-trafilatura` | `TrafilaturaStrategy` | Low — same HTTP client, Trafilatura extraction |
-| `3-flaresolverr` | `FlareSolverrStrategy` | Medium — external FlareSolverr proxy call |
-| `4-playwright_stealth` | `PlaywrightStrategy` | High — headless Chromium + `playwright-stealth` |
-| `5-crawlee_adaptive` | `CrawleeStrategy` | High — Crawlee AdaptivePlaywrightCrawler |
-| `6-novnc` | `NoVNCStrategy` | Human — raises `HumanInterventionRequiredException` |
+| `1-beautifulsoup` | `BeautifulSoupStrategy` | Low - `curl_cffi` impersonating Chrome120 + BeautifulSoup parse |
+| `2-trafilatura` | `TrafilaturaStrategy` | Low - same HTTP client, Trafilatura extraction |
+| `3-flaresolverr` | `FlareSolverrStrategy` | Medium - external FlareSolverr proxy call |
+| `4-playwright_stealth` | `PlaywrightStrategy` | High - headless Chromium + `playwright-stealth` |
+| `5-crawlee_adaptive` | `CrawleeStrategy` | High - Crawlee AdaptivePlaywrightCrawler |
+| `6-novnc` | `NoVNCStrategy` | Human - raises `HumanInterventionRequiredException` |
 
 The loop in `WebReader.read` (`src/reader/web_reader.py:81-88`) iterates the dict in insertion order, tries each
 strategy, and validates the extracted content via `ContentValidator`. The first strategy that produces content
@@ -69,7 +69,7 @@ continuing the loop.
 
 ### Positive
 - Fast path (strategies 1 and 2) handles the majority of plain-HTML pages with minimal latency.
-- Escalation is transparent to callers; they get content or a 428 — they do not see the strategy that ran.
+- Escalation is transparent to callers; they get content or a 428 - they do not see the strategy that ran.
 - Adding a new strategy requires one new class implementing `BaseStrategy` and one dict entry; no routing changes.
 
 ### Negative
@@ -85,9 +85,9 @@ continuing the loop.
 
 ## Related
 
-- `src/reader/web_reader.py` — `WebReader.read`, `WebReader._execute_strategy`.
-- `src/reader/strategies/` — all six strategy implementations.
-- `src/reader/cloudflare/challenge_detector.py` — `ChallengeDetector.is_blocked`, `is_login_required`,
+- `src/reader/web_reader.py` - `WebReader.read`, `WebReader._execute_strategy`.
+- `src/reader/strategies/` - all six strategy implementations.
+- `src/reader/cloudflare/challenge_detector.py` - `ChallengeDetector.is_blocked`, `is_login_required`,
   `is_login_redirect_url`.
-- `src/validator/content_validator.py` — `ContentValidator.validate` governs whether a strategy result is accepted.
-- [ADR-003](ADR-003-novnc-ngrok-captcha-intervention.md) — covers the NoVNC end of the chain.
+- `src/validator/content_validator.py` - `ContentValidator.validate` governs whether a strategy result is accepted.
+- [ADR-003](ADR-003-novnc-ngrok-captcha-intervention.md) - covers the NoVNC end of the chain.

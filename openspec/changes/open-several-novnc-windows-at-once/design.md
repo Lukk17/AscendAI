@@ -79,11 +79,9 @@ on (`session:{domain}:{profile}`). Two consequences follow directly and neither 
 - Two live flows can never write the same session record, because two live flows can never share a key.
 - A second request for a key that already has a live flow is asking for a record another flow is already producing.
 
-Today `_get_domain` is a private static method on `CookieManager`, reached from `session_manager.py` with
-`# noqa: SLF001`. It is promoted to a module-level `registrable_domain(url)` in `cookie_manager.py`, with the static
-method delegating to it so no existing caller changes behaviour. The registry uses the public function, and the two
-existing `# noqa: SLF001` call sites for this one function are cleaned up in the same task. This is DRY on a rule that
-would otherwise have a third implementation.
+`CookieManager.registrable_domain(url)` is already a public static method in `cookie_manager.py`, and
+`rest_endpoints.py` and `mcp_server.py` already call it without any `# noqa: SLF001`. The registry calls the same
+public method. No promotion and no clean-up is needed, and the rule keeps one implementation.
 
 ### Decision 3: A duplicate joins, it does not get a 409
 
@@ -275,7 +273,7 @@ It is a GET because it takes no input, unlike the other session operations which
 paginated and does not need to be: the collection is bounded by `NOVNC_MAX_CONCURRENT_FLOWS`, which is stated in the
 response itself. It returns no cookies, no storage state and no page content. It does return the `vnc_url`, which the
 428 body already returns unauthenticated on the same service, so the disclosure is not new, and it is recorded in
-ADR-009 alongside the rest of the posture.
+ADR-013 alongside the rest of the posture.
 
 ### Decision 10: Readiness does not change
 
@@ -353,4 +351,5 @@ caller reported, find the window it opened, and find the capture it eventually p
    and the clearance the headed browser captured (`produced_by` `6-novnc`, `cf_clearance` present, same user agent)
    did not replay through headless Playwright. Whether an unattended headed slot should become an automated tier
    before the human is asked, and whether a clearance produced by a headed browser must be replayed by a headed
-   browser, is left to this change's implementation to measure.
+   browser, is out of scope for this change. The owner recorded it on 2026-10-01 as a possible follow-up change.
+   Nothing here builds or measures it.

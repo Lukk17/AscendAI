@@ -53,11 +53,11 @@ Dockerfile's `COPY src/ src/`. Nothing downloads it automatically. The load happ
 time: `src/validator/url_validator.py` builds a single process-wide `url_validator` singleton from
 `blocklist_loader.load_rules()`, and every `WebReader` (REST and MCP) shares that one instance. A missing or
 unparsable file at that point is a packaging defect, not a state to recover from, so `load_rules()` raises loudly
-and the service fails to start — see [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).
+and the service fails to start - see [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).
 
 `POST /api/v1/blocklist/refresh` (`src/api/rest/blocklist_endpoints.py`) is the only path that reaches
 `BLOCKLIST_URL`. It downloads, parses, and only overwrites the on-disk file and reassigns `url_validator.rules` if
 parsing yields at least one rule; a network or validation failure leaves the previously loaded blocklist serving
 requests unchanged. `GET /api/v1/blocklist/status` reports the current rule count and how long ago it was loaded
-without changing anything. Neither endpoint is exposed on the MCP surface — refreshing the blocklist is a
+without changing anything. Neither endpoint is exposed on the MCP surface - refreshing the blocklist is a
 deliberate operator action, not something a calling agent should trigger.

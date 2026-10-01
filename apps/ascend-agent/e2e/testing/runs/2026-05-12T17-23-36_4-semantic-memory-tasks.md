@@ -1,4 +1,4 @@
-# Semantic memory — run tasks template
+# Semantic memory - run tasks template
 
 Spec: [4-semantic-memory-test.md](../4-semantic-memory-test.md)
 
@@ -21,9 +21,9 @@ Spec: [4-semantic-memory-test.md](../4-semantic-memory-test.md)
 
 ### Run
 
-- [x] Step 1 — sent `memory-test-save.yml` and waited for HTTP 200
-- [x] Step 2 — re-cleared Redis `chat:frosty` and Postgres `chat_history` for frosty
-- [x] Step 3 — sent `memory-test-retrieve.yml` and waited for HTTP 200
+- [x] Step 1 - sent `memory-test-save.yml` and waited for HTTP 200
+- [x] Step 2 - re-cleared Redis `chat:frosty` and Postgres `chat_history` for frosty
+- [x] Step 3 - sent `memory-test-retrieve.yml` and waited for HTTP 200
 
 ### Expected
 

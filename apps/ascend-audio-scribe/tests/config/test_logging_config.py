@@ -24,19 +24,32 @@ def _record(level: int = logging.INFO, msg: str = "hello") -> logging.LogRecord:
 
 
 def test_centered_level_formatter_pads_level() -> None:
+    # given
     fmt = CenteredLevelFormatter("%(log_color)s - %(levelname)s - %(message)s", log_colors=_LOG_COLORS)
+
+    # when
     formatted = fmt.format(_record(logging.INFO))
+
+    # then
     assert "  INFO  " in formatted
 
 
 def test_centered_level_formatter_passthrough_when_no_match() -> None:
+    # given
     fmt = CenteredLevelFormatter("%(log_color)s%(message)s", log_colors=_LOG_COLORS)
+
+    # when
     formatted = fmt.format(_record(msg="plain"))
+
+    # then
     assert "plain" in formatted
 
 
 def test_correlation_filter_injects_request_id() -> None:
+    # given
     token = request_id_ctx.set("req-x")
+
+    # when / then
     try:
         record = _record()
         assert CorrelationFilter().filter(record) is True
@@ -46,15 +59,19 @@ def test_correlation_filter_injects_request_id() -> None:
 
 
 def test_setup_logging_installs_correlation_filter() -> None:
+    # when
     setup_logging()
+
+    # then
     root = logging.getLogger()
-    assert any(
-        isinstance(f, CorrelationFilter) for h in root.handlers for f in h.filters
-    )
+    assert any(isinstance(f, CorrelationFilter) for h in root.handlers for f in h.filters)
 
 
 def test_uvicorn_log_config_shape() -> None:
+    # when
     cfg = get_uvicorn_log_config()
+
+    # then
     assert cfg["version"] == 1
     assert "correlation" in cfg["filters"]
     assert "default" in cfg["formatters"]
@@ -62,4 +79,5 @@ def test_uvicorn_log_config_shape() -> None:
 
 
 def test_get_logger() -> None:
+    # when / then
     assert isinstance(get_logger("x"), logging.Logger)

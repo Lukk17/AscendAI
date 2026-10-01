@@ -8,6 +8,51 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `build.gradle.kts` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.1.2] - 2026-10-01
+
+### Changed
+- The ascend-ocr client uses the job interface. It posts the file and the optional language to
+  app.ascend-ocr.api-path, now /v1/ocr/jobs, expects 202 with a job identifier, polls the job on the
+  poll_after_seconds hint held between poll-min-interval (1s) and poll-max-interval (30s), reads the
+  finished Markdown from object storage at the bucket and key the job names, and then deletes the job.
+  This release needs ascend-ocr 0.3.0 and ascend-ocr 0.3.0 needs this release, because each one removed
+  the other's old half of the contract. Ship and roll back the two together.
+- The result is read with the ingestion S3 client (app.s3.endpoint, app.s3.access-key,
+  app.s3.secret-key) from the bucket the job names, not from app.s3.bucket, so those credentials need read
+  access to ascend-ocr's ocr-results bucket.
+- A submission is retried only on 503 QUEUE_FULL, at most app.ascend-ocr.submit-retry-attempts (3) more
+  times, honouring Retry-After up to submit-retry-max-delay (30s) with jitter. A timeout or a connection
+  error is never retried, because a lost answer may hide a job the service already accepted. A job that
+  fails with SERVICE_RESTARTED or RESULT_STORE_UNAVAILABLE is submitted once more, OCR_FAILED never is,
+  and a job still unfinished after poll-timeout (15m) is deleted and fails its page.
+- app.ingestion.read-timeout no longer bounds an OCR operation, it bounds each short call.
+  app.document-router.pdf-parallel-pages (4) has to stay at or under ascend-ocr's
+  OCR_JOB_QUEUE_MAX_DOCUMENTS (8), or the agent fills the queue with its own pages and is refused with
+  QUEUE_FULL.
+- The MCP tool listing is reused for app.mcp.tool-cache.ttl (60s) while the set of connected servers stays
+  the same, and dropped at once when a server sends a tools-changed notification. Before, every prompt
+  listed the tools of every server first. 0s restores that. A server restarted inside the 60 seconds can
+  fail the first tool call made on its old session. See ADR-010.
+- The OCR test fixtures changed with the contract. The recorded answer of the removed endpoint
+  (real-ocr-response.json) and its OpenAPI snapshot (openapi-contract.json) are deleted, and
+  AscendOcrClientLiveContractTest reads real-ocr-result.md, the Markdown object ascend-ocr stores for one
+  finished job. Those bytes were captured from ascend-ocr 0.3.0 through the job interface on 2026-10-01
+  with the procedure in the README, the Polish page read with lang=pl (F59, formerly A33).
+
+### Added
+- AscendOcrClientPactTest, the Pact consumer contract test for the ascend-ocr job interface. It runs inside
+  test with no Docker and no running service, and writes contracts/pacts/ascend-agent-ascend-ocr.json at the
+  repository root for the ascend-ocr provider verification. It adds the test-only dependency
+  au.com.dius.pact.consumer:junit5 4.6.21, and turns Pact's usage tracking off.
+
+### Fixed
+- AGENTS.md named Spring Boot 3.5.4 and an application.yaml comment named Spring AI 1.1.4. The build uses
+  Spring Boot 3.5.14 and Spring AI 1.1.5, and both texts say so now.
+- Dashes in comments, log messages, documentation, end-to-end run records and the system prompt text in
+  application.yaml are plain hyphens or commas now. The system prompt says the same thing as before.
+- The end-to-end README points at this module's own entry under the service suites of
+  docs/E2E_RUN_SCENARIOS.md.
+
 ## [0.1.1]
 
 ### Fixed

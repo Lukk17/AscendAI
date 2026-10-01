@@ -4,7 +4,7 @@
 
 ### Requirement: Page provenance survives from parser to index
 
-Every parser that returns per-page structure SHALL preserve the page number as structured chunk metadata on the documents it produces, rather than flattening pages into a single text blob. This SHALL hold for the Unstructured API path (elements grouped by their reported page number), the OCR path (one document per returned page, using the page number the OCR service reports rather than an inferred one), and the per-page PDF routing path (the page number the router already computes when it slices the file).
+Every parser that returns per-page structure SHALL preserve the page number as structured chunk metadata on the documents it produces, rather than flattening pages into a single text blob. This SHALL hold for the Unstructured API path (elements grouped by their reported page number), the OCR path (the ascend-ocr result Markdown split on its `## Page N` headings into one document per page, using the number in the heading rather than an inferred one, with the heading line removed from the chunk text), and the per-page PDF routing path (the page number the router already computes when it slices the file).
 
 A parser response that carries no page information for some or all of its content SHALL produce documents without page metadata rather than a guessed page. Ingestion SHALL NOT fail because page information is absent.
 
@@ -16,9 +16,10 @@ A parser response that carries no page information for some or all of its conten
 
 #### Scenario: Scanned PDF keeps the OCR service's page numbers
 
-- **WHEN** a scanned two-page PDF is ingested through the OCR path and the OCR service reports `page_number` 1 and 2
+- **WHEN** a scanned two-page PDF is ingested through the OCR path and the result Markdown contains the headings `## Page 1` and `## Page 2`
 - **THEN** the stored chunks carry those page numbers
-- **AND** the page numbers are the ones the service reported, not positions inferred from the order of the response
+- **AND** the page numbers are the ones in the headings, not positions inferred from the order of the text
+- **AND** no stored chunk text contains a `## Page` heading line
 
 #### Scenario: Office document parsed by the Unstructured path
 

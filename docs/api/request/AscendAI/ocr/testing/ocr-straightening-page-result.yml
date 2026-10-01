@@ -1,0 +1,145 @@
+info:
+  name: ocr-straightening-page-result
+  type: http
+  seq: 33
+
+http:
+  method: GET
+  url: "{{ocrResultUrl}}"
+  headers:
+    - name: accept
+      value: text/markdown
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const STRAIGHTENING_PAGE_CANARIES = [
+            "test page for straightening",
+            "invoice 2026-0917",
+            "harbour lane bakery",
+            "hlb-4471",
+            "rye sourdough loaves",
+            "poppy seed rolls",
+            "oat and honey biscuits",
+            "subtotal 207.00 eur",
+            "total due 254.61 eur",
+            "pl61 1090 1014 0000 0712 1981 2874",
+            "quote the order reference",
+            "gęślą",
+            "brzęczyszczykiewicz",
+            "pingüino wenceslao",
+            "señora muñoz",
+            "quick brown fox jumps over the lazy dog",
+            "five dozen liquor jugs",
+            "qx-5083-01",
+            "orders@harbourlane.example",
+            "keep refrigerated below 6 degrees",
+            "marta kowalczyk"
+        ];
+        const STRAIGHTENING_PAGE_LINES = [
+            "Test page for straightening, ascend-ocr",
+            "Invoice 2026-0917 issued on 25 September 2026",
+            "Customer: Harbour Lane Bakery, 14 Mill Street",
+            "Order reference HLB-4471, delivery window 08:00 to 10:30",
+            "Item 1: rye sourdough loaves, 24 pieces, 3.40 EUR each",
+            "Item 2: poppy seed rolls, 60 pieces, 0.85 EUR each",
+            "Item 3: oat and honey biscuits, 12 boxes, 6.20 EUR each",
+            "Subtotal 207.00 EUR, VAT 23 percent 47.61 EUR",
+            "Total due 254.61 EUR within 14 days of this invoice",
+            "IBAN PL61 1090 1014 0000 0712 1981 2874",
+            "Payment title must quote the order reference above",
+            "Zażółć gęślą jaźń, pchnąć w tę łódź jeża lub ośm skrzyń fig",
+            "Grzegorz Brzęczyszczykiewicz, Chrząszczyżewoszyce, powiat Łękołody",
+            "El pingüino Wenceslao hizo kilómetros bajo exhaustiva lluvia",
+            "¿Dónde está la señora Muñoz? ¡Llegó ayer a Córdoba!",
+            "The quick brown fox jumps over the lazy dog 0123456789",
+            "Pack my box with five dozen liquor jugs, then ship by Friday",
+            "Serial numbers: QX-5082-77, QX-5082-78, QX-5083-01",
+            "Contact: orders@harbourlane.example, phone +48 512 334 906",
+            "Notes: keep refrigerated below 6 degrees, do not stack",
+            "Signed on behalf of the supplier by Marta Kowalczyk"
+        ];
+        const ALLOWED_MINIMUM_CANARIES_FOUND = [15, 21];
+        const DEFAULT_MINIMUM_CANARIES_FOUND = 21;
+        const MINIMUM_LINE_SIMILARITY = 0.8;
+        function normalise(text) {
+            return String(text).toLowerCase().replace(/\s+/g, " ").trim();
+        }
+        function readText() {
+            return normalise(res.getBody());
+        }
+        function minimumCanariesFound() {
+            const supplied = bru.getEnvVar("straighteningMinCanaries");
+            if (supplied === undefined || supplied === null || String(supplied).trim() === "") {
+                return DEFAULT_MINIMUM_CANARIES_FOUND;
+            }
+            return Number(supplied);
+        }
+        function levenshtein(left, right) {
+            let previous = [];
+            for (let column = 0; column <= right.length; column++) {
+                previous.push(column);
+            }
+            for (let row = 1; row <= left.length; row++) {
+                const current = [row];
+                for (let column = 1; column <= right.length; column++) {
+                    const substitution = previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1);
+                    current.push(Math.min(previous[column] + 1, current[column - 1] + 1, substitution));
+                }
+                previous = current;
+            }
+            return previous[right.length];
+        }
+        function similarity(left, right) {
+            const longest = Math.max(left.length, right.length);
+            if (longest === 0) {
+                return 1;
+            }
+            return 1 - levenshtein(left, right) / longest;
+        }
+        function readCandidateLines() {
+            const lines = String(res.getBody()).split("\n")
+                .filter(function (line) { return line.indexOf("## Page ") !== 0; })
+                .map(normalise)
+                .filter(function (line) { return line.length > 0; });
+            const joinedNeighbours = lines.slice(1).map(function (line, index) { return lines[index] + " " + line; });
+            return lines.concat(joinedNeighbours);
+        }
+        test("The time-limited link fetches the stored object", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The photo is one page of text", function () {
+            const headings = String(res.getBody()).split("\n").filter(function (line) { return line.indexOf("## Page ") === 0; });
+            expect(String(res.getBody()).split("\n")[0]).to.equal("## Page 1");
+            expect(headings).to.deep.equal(["## Page 1"]);
+        });
+        test("The spec's canary threshold is one this request knows", function () {
+            expect(ALLOWED_MINIMUM_CANARIES_FOUND).to.include(minimumCanariesFound());
+        });
+        test("Enough of the 21 canary phrases are found exactly", function () {
+            const text = readText();
+            const missing = STRAIGHTENING_PAGE_CANARIES.filter(function (canary) { return !text.includes(canary); });
+            const found = STRAIGHTENING_PAGE_CANARIES.length - missing.length;
+            console.log("canaries found " + found + " of 21, missing: " + JSON.stringify(missing));
+            expect(found, "found " + found + " of 21, missing: " + JSON.stringify(missing)).to.be.at.least(minimumCanariesFound());
+        });
+        test("Every one of the page's 21 lines is present", function () {
+            const candidates = readCandidateLines();
+            const absent = STRAIGHTENING_PAGE_LINES.map(normalise).map(function (expected) {
+                const best = candidates.reduce(function (highest, candidate) { return Math.max(highest, similarity(expected, candidate)); }, 0);
+                return { line: expected, best: Math.round(best * 1000) / 1000 };
+            }).filter(function (match) { return match.best < MINIMUM_LINE_SIMILARITY; });
+            expect(absent, "lines below " + MINIMUM_LINE_SIMILARITY + " similarity: " + JSON.stringify(absent)).to.deep.equal([]);
+        });
+        test("The object carries no front matter", function () {
+            expect(String(res.getBody()).indexOf("---")).to.not.equal(0);
+            expect(String(res.getBody())).to.not.include("schema_version");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

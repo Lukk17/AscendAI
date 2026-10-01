@@ -1,6 +1,6 @@
 """Hugging Face Inference transcription path.
 
-Same ffmpeg-segment chunking strategy as OpenAI — no pydub buffer.
+Same ffmpeg-segment chunking strategy as OpenAI - no pydub buffer.
 """
 
 from __future__ import annotations
@@ -45,9 +45,7 @@ def _transcribe_single_chunk(client: InferenceClient, audio_chunk_path: str, mod
         return text
     except HfHubHTTPError as exc:
         logger.exception(f"Hugging Face API error for model '{model}'")
-        raise UpstreamProviderError(
-            f"Hugging Face upstream call failed for model '{model}'."
-        ) from exc
+        raise UpstreamProviderError(f"Hugging Face upstream call failed for model '{model}'.") from exc
 
 
 def hf_transcript(
@@ -82,32 +80,42 @@ def hf_transcript(
                 chunk_num = idx + 1
                 chunk_size_mb = os.path.getsize(chunk_path) / 1024 / 1024
                 if progress_callback:
-                    progress_callback({
-                        "type": "progress",
-                        "message": f"Transcribing chunk {chunk_num}/{num_chunks}",
-                        "data": {"chunk": chunk_num, "total": num_chunks, "size_mb": round(chunk_size_mb, 2)},
-                    })
+                    progress_callback(
+                        {
+                            "type": "progress",
+                            "message": f"Transcribing chunk {chunk_num}/{num_chunks}",
+                            "data": {
+                                "chunk": chunk_num,
+                                "total": num_chunks,
+                                "size_mb": round(chunk_size_mb, 2),
+                            },
+                        }
+                    )
 
                 chunk_start = time.monotonic()
                 text = _transcribe_single_chunk(client, chunk_path, model)
                 elapsed = time.monotonic() - chunk_start
 
                 if with_timestamps:
-                    full_segments.append({
-                        "text": text,
-                        "start": idx * chunk_seconds,
-                        "end": (idx + 1) * chunk_seconds,
-                    })
+                    full_segments.append(
+                        {
+                            "text": text,
+                            "start": idx * chunk_seconds,
+                            "end": (idx + 1) * chunk_seconds,
+                        }
+                    )
                 else:
                     full_text.append(text)
 
                 logger.info(f"Chunk {chunk_num}/{num_chunks} complete in {elapsed:.2f}s.")
                 if progress_callback:
-                    progress_callback({
-                        "type": "progress",
-                        "message": f"Chunk {chunk_num}/{num_chunks} complete in {elapsed:.2f}s",
-                        "data": {"chunk": chunk_num, "total": num_chunks, "elapsed_s": round(elapsed, 2)},
-                    })
+                    progress_callback(
+                        {
+                            "type": "progress",
+                            "message": f"Chunk {chunk_num}/{num_chunks} complete in {elapsed:.2f}s",
+                            "data": {"chunk": chunk_num, "total": num_chunks, "elapsed_s": round(elapsed, 2)},
+                        }
+                    )
     except (ValueError, OSError, UpstreamProviderError):
         # Service-authored exceptions propagate as-is; the global RFC 7807
         # handler maps them to 400 / 502 / etc.

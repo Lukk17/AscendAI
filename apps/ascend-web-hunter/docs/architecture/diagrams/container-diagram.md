@@ -1,4 +1,4 @@
-# ascend-web-hunter — Diagrams
+# ascend-web-hunter - Diagrams
 
 ---
 
@@ -12,7 +12,7 @@ graph TB
     Agent["ascend-agent<br/>(Spring Boot, Java 21)<br/>:9917"]
     Human["Human operator<br/>(browser / VNC client)"]
 
-    subgraph "ascend-web-hunter service — :7021"
+    subgraph "ascend-web-hunter service - :7021"
         REST["REST surface<br/>GET /api/v1/web/search<br/>POST /api/v2/web/read"]
         MCP["MCP surface<br/>POST /mcp<br/>(web_search, web_read tools)"]
         WR["WebReader<br/>(strategy orchestrator)"]
@@ -102,7 +102,7 @@ sequenceDiagram
     Guard-->>MCP: True (public IP)
     MCP->>WR: read(url)
 
-    note over WR,CV: Happy path — strategy 1 succeeds
+    note over WR,CV: Happy path - strategy 1 succeeds
 
     WR->>S1: extract(url)
     S1->>Redis: get_session_data("target.com") → None
@@ -112,9 +112,9 @@ sequenceDiagram
     WR-->>MCP: {content, status="success", mode="1-beautifulsoup"}
     MCP-->>Agent: JSON-RPC result
 
-    note over WR,CV: Escalation path — Cloudflare block detected at strategy 1
+    note over WR,CV: Escalation path - Cloudflare block detected at strategy 1
 
-    WR->>S1: extract(url) — second request to a CF-protected page
+    WR->>S1: extract(url) - second request to a CF-protected page
     S1->>S1: ChallengeDetector.is_blocked(200, html) → True
     S1-->>WR: raises ChallengeDetectedException
     WR->>S6: short-circuit to NoVNC (ChallengeDetectedException)

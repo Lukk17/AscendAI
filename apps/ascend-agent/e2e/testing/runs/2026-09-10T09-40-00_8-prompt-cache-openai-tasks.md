@@ -28,10 +28,10 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) — observed 2213
-- [x] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run) — observed 0
+- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) - observed 2213
+- [x] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run) - observed 0
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0` — observed 2304
+- [x] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0` - observed 2304
 
 ### Post-run cleanup
 
@@ -50,7 +50,7 @@ Run regardless of Run-step verdict. Every command is idempotent.
 
 Both Run steps returned HTTP 200 with a well-formed `usage` block. Step 1 (fresh cache, `chat_history` and Redis
 keys reset immediately before): `promptTokens = 2213` (>= 1024), `nativeUsage.prompt_tokens_details.cached_tokens =
-0` — a genuine cache miss, matching the fresh-cache expectation. Step 2, run immediately after step 1 (well within
+0` - a genuine cache miss, matching the fresh-cache expectation. Step 2, run immediately after step 1 (well within
 the ~5 minute OpenAI prefix-cache TTL, same exact prompt/provider/model/user): `nativeUsage.prompt_tokens_details.
 cached_tokens = 2304 > 0`, comfortably above the spec's "high hundreds at minimum" bar and in fact covering nearly
 all of step 2's `promptTokens = 2556`. Both Bruno-embedded test scripts (`Status code is 200`, `usage block is

@@ -26,7 +26,7 @@ import org.springframework.security.web.SecurityFilterChain;
  * {@code app.security.user.username} / {@code app.security.user.password}.
  *
  * <p>For real deployments swap the in-memory user manager for an OAuth2
- * resource-server, JWT, or Keycloak adapter — that's a separate change.
+ * resource-server, JWT, or Keycloak adapter - that's a separate change.
  */
 @Configuration
 @EnableWebSecurity

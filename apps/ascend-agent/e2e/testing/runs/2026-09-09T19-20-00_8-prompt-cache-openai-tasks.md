@@ -68,4 +68,4 @@ Duration: 00:01:52
 
 - Ran step 1 twice against the live agent: once with the default reporter to confirm HTTP 200 / embedded test-script pass, once with `--output <scratchpad>/step1.json --format json` to capture the actual `metadata.usage` values (the default reporter does not print response bodies). Step 2 was run once, directly with the JSON-capture flags, since the plain-reporter confirmation was already established by step 1's pattern. The JSON-capture invocation is the one "Run" above ticks for each step.
 - Deleted the two scratch JSON files (`step1.json`, `step2.json`) from the scratchpad directory after extracting the needed values; not left behind.
-- Both Bruno requests' own embedded test scripts ("Status code is 200", "usage block is present with a cacheable prompt size") passed on both steps — no discrepancy with the spec's Expected assertions to report.
+- Both Bruno requests' own embedded test scripts ("Status code is 200", "usage block is present with a cacheable prompt size") passed on both steps - no discrepancy with the spec's Expected assertions to report.

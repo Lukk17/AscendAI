@@ -43,9 +43,7 @@ UserIdQuery = Annotated[
     ),
 ]
 ProviderQuery = Annotated[str | None, Query(max_length=32)]
-SearchQuery = Annotated[
-    str, Query(min_length=1, max_length=settings.MAX_QUERY_LENGTH)
-]
+SearchQuery = Annotated[str, Query(min_length=1, max_length=settings.MAX_QUERY_LENGTH)]
 SearchLimitQuery = Annotated[int, Query(ge=1, le=settings.MAX_SEARCH_LIMIT)]
 MemoryIdQuery = Annotated[str, Query(min_length=1, max_length=256)]
 
@@ -76,9 +74,7 @@ async def search_memory(
         outcome = "error"
         raise
     finally:
-        MEMORY_SEARCH_DURATION_SECONDS.labels(provider=resolved_provider).observe(
-            time.monotonic() - started
-        )
+        MEMORY_SEARCH_DURATION_SECONDS.labels(provider=resolved_provider).observe(time.monotonic() - started)
         MEMORY_SEARCH_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
     return result
 
@@ -128,9 +124,7 @@ async def insert_memory(request: InsertRequest) -> list[dict[str, Any]]:
         outcome = "error"
         raise
     finally:
-        MEMORY_INSERT_DURATION_SECONDS.labels(provider=resolved_provider).observe(
-            time.monotonic() - started
-        )
+        MEMORY_INSERT_DURATION_SECONDS.labels(provider=resolved_provider).observe(time.monotonic() - started)
         MEMORY_INSERT_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
     return result
 

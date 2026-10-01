@@ -20,7 +20,7 @@ class ProviderConfig(TypedDict):
 # `provider=...`) to its Qdrant collection (collections are dimension-keyed,
 # so providers sharing dims share the collection), the env-var Settings keys
 # holding base_url and api_key, and the mem0 LLM provider to instantiate.
-# LM Studio gets mem0's native `lmstudio` LLM provider — it knows the
+# LM Studio gets mem0's native `lmstudio` LLM provider - it knows the
 # response_format quirks natively, so the old OpenAILLM monkey-patch is gone.
 PROVIDER_CONFIGS: dict[str, ProviderConfig] = {
     "lmstudio": {

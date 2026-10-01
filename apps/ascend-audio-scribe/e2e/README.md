@@ -1,13 +1,13 @@
 # ascend-audio-scribe: end-to-end capability tests
 
 Manual / AI-runnable e2e suite for the ascend-audio-scribe speech-to-text microservice. Each test exercises **one capability**
-end-to-end against a live ascend-audio-scribe container on port 7017. Assertions are observable behaviour only — HTTP status
+end-to-end against a live ascend-audio-scribe container on port 7017. Assertions are observable behaviour only - HTTP status
 codes, response `.md` body content (canary phrase substring match), JSON-RPC tool-result shape. ascend-audio-scribe holds no
 persisted database, no Redis, no Qdrant, no object store; the only state it keeps is a TTL-bounded `/tmp` transcript-download
 cache. Where a test could be polluted by leftover `.md` files, the reset step is to delete `/tmp/transcript_*.md`
 inside the container.
 
-Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+Before running this suite, or any other e2e suite, pick a run scenario or a service suite from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md). To run only this suite, use its entry under [Service suites](../../../docs/E2E_RUN_SCENARIOS.md#ascend-audio-scribe-service-suite).
 
 ## What's here
 
@@ -18,7 +18,7 @@ apps/ascend-audio-scribe/e2e/
 │   └── README.md
 └── testing/                             # numbered specs + templates/ + runs/
     ├── README.md
-    ├── 1-invalid-input-test.md          # immutable spec (lowest cost — no external API egress)
+    ├── 1-invalid-input-test.md          # immutable spec (lowest cost - no external API egress)
     ├── 2-transcribe-openai-test.md
     ├── 3-transcribe-hf-test.md
     ├── 4-mcp-tools-list-test.md
@@ -96,7 +96,7 @@ there roll up into per-provider dollar cost in [docs/E2E_COST.md](../../../docs/
 
 ## Parallelism and execution order
 
-ascend-audio-scribe holds no per-user state — only TTL-bounded `.md` files in `/tmp` keyed by random UUIDs. The execution
+ascend-audio-scribe holds no per-user state - only TTL-bounded `.md` files in `/tmp` keyed by random UUIDs. The execution
 constraints:
 
 | Constraint | Tests | Why |
@@ -118,7 +118,7 @@ transcribe call.
    `present`. Never `printenv` the raw value. This check proves the variable is set without printing it.
 5. For test 3: `docker exec ascend-audio-scribe sh -c '[ -n "$HF_TOKEN" ] && echo present || echo missing'` prints `present`.
    Never `printenv` the raw value. This check proves the variable is set without printing it.
-6. For test 5: the object store is reachable at `http://localhost:9070` — its spec's Reset state uploads the fixture
+6. For test 5: the object store is reachable at `http://localhost:9070` - its spec's Reset state uploads the fixture
    to the `e2e-fixtures` bucket over a plain `PUT`, no container mount required.
 
 ## Running tests

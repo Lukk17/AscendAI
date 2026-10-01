@@ -4,7 +4,7 @@ The manual / AI-runnable e2e suite for ascend-ai-agent. Each test exercises one 
 stack and asserts only **observable behaviour**. HTTP status codes, response-body content, persisted state in the
 object store, Qdrant, and Postgres. Logs are diagnostic, not pass criteria.
 
-Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+Before running this suite, or any other e2e suite, pick a run scenario or a service suite from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md). To run only this suite, use its entry under [Service suites](../../../docs/E2E_RUN_SCENARIOS.md#ascend-agent-service-suite).
 
 ---
 
@@ -98,7 +98,7 @@ Every spec follows the same template:
    every row, key, object and vector point the run created, including any semantic-memory points AscendMemory's
    background extractor wrote for that user (the extractor runs after every prompt, whether or not the prompt
    concerns memory). Run regardless of Run-step verdict (idempotent). Group A (`5-rag`, `6-attach-sources`,
-   `7-rag-dedup`) additionally relies on this for their serial chain — spec 6 must not have to clean up spec 5's
+   `7-rag-dedup`) additionally relies on this for their serial chain - spec 6 must not have to clean up spec 5's
    leftovers, spec 7 must not have to clean up spec 6's leftovers.
 6. **Expected.** Observable behaviour only: HTTP status, response content, object listings, Qdrant scrolls, Postgres
    rows. No log substrings.
@@ -122,9 +122,9 @@ groups.
 
 | Group | Tests | Why this grouping | Parallelism within group |
 | :---- | :---- | :---------------- | :----------------------- |
-| **A — RAG suite** | 5, 6, 7 | Share the object-store bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. Each spec is **symmetrically hermetic**: `Reset state` (pre) drops its own artifacts before running, `Post-run cleanup` (post) drops them again after. No spec reaches into another spec's state. | **Strict serial: 5 → 6 → 7.** |
-| **B — fast tests** | 1, 2, 3, 4 | Unique user-ids; no RAG / object-store writes. Single-prompt or two-prompt flows. | Sequential within one agent, or parallel across multiple agents — either works. |
-| **C — cache + compaction** | 8, 9, 10, 11 | Unique user-ids; isolated chat-history slots. Tests 10 / 11 apply their own seed scripts before running. | Sequential within one agent, or parallel — either works. |
+| **A - RAG suite** | 5, 6, 7 | Share the object-store bucket and the `ascendai-1536` Qdrant collection. `POST /api/v1/ingestion/run` scans the whole bucket and writes to `int_metadata_store` with idempotency-by-ETag; two concurrent runs race on the unique constraint. Each spec is **symmetrically hermetic**: `Reset state` (pre) drops its own artifacts before running, `Post-run cleanup` (post) drops them again after. No spec reaches into another spec's state. | **Strict serial: 5 → 6 → 7.** |
+| **B - fast tests** | 1, 2, 3, 4 | Unique user-ids; no RAG / object-store writes. Single-prompt or two-prompt flows. | Sequential within one agent, or parallel across multiple agents - either works. |
+| **C - cache + compaction** | 8, 9, 10, 11 | Unique user-ids; isolated chat-history slots. Tests 10 / 11 apply their own seed scripts before running. | Sequential within one agent, or parallel - either works. |
 | Docling-bound: run alone, no runner of any suite active | 3, 5, 6, 7 | Cross-cutting constraint on top of the groups. Spec 3 converts a PDF inline through docling-serve and specs 5, 6 and 7 ingest PDF and DOCX through it. docling's worker is single-threaded per page, so any other runner on the host, from this suite or from any other module's sweep, competes for the core it runs on: the OCR suite measured the same single-threaded effect on 2026-09-10, 59.2 seconds on a quiet host against 160.9 seconds on a loaded one for one fixture. docling also peaks close to its own compose memory limit (defect register A3 and A38), so a second runner costs memory headroom as well as time. | Each of the four runs alone. Start one only when nothing else is running anywhere, and start nothing else until it has returned. |
 
 The three groups themselves are fully independent: no user-id overlap, no object-store / Qdrant collision (groups B and C
@@ -140,7 +140,7 @@ Total wall-clock is the B / C phase plus the sum of the four docling-bound specs
 came in around ~13 minutes on a quiet host, and groups B and C finish in 3-5 minutes. Do not start another module's sweep
 while a docling-bound spec is in flight, and do not start a docling-bound spec while one is running elsewhere.
 
-A single-process sequential run is also valid for debugging — just run tests 1 through 11 in numeric order. The
+A single-process sequential run is also valid for debugging - just run tests 1 through 11 in numeric order. The
 parallel layout only matters when you care about wall-clock.
 
 #### Do not, under any circumstances

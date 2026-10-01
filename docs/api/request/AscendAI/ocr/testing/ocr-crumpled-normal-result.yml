@@ -1,0 +1,40 @@
+info:
+  name: ocr-crumpled-normal-result
+  type: http
+  seq: 34
+
+http:
+  method: GET
+  url: "{{ocrResultUrl}}"
+  headers:
+    - name: accept
+      value: text/markdown
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("The time-limited link fetches the stored object", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The photo is one page", function () {
+            const lines = String(res.getBody()).split("\n");
+            const headings = lines.filter(function (line) { return line.indexOf("## Page ") === 0; });
+            expect(lines[0]).to.equal("## Page 1");
+            expect(headings).to.deep.equal(["## Page 1"]);
+        });
+        test("The page carries text under its heading", function () {
+            const lines = String(res.getBody()).split("\n").slice(1);
+            expect(lines.filter(function (line) { return line.trim().length > 0; })).to.not.be.empty;
+        });
+        test("The object carries no front matter", function () {
+            expect(String(res.getBody()).indexOf("---")).to.not.equal(0);
+            expect(String(res.getBody())).to.not.include("schema_version");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

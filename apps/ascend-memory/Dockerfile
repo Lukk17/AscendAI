@@ -45,7 +45,7 @@ ENV PYTHONUNBUFFERED=1 \
     HOME=/home/ascend \
     MEM0_DIR=/home/ascend/.mem0
 
-# curl is the only runtime-required system package — kept for HEALTHCHECK.
+# curl is the only runtime-required system package - kept for HEALTHCHECK.
 # Create a real home for the non-root user so mem0 (which calls
 # os.path.expanduser("~") at import time to choose its working directory)
 # has a writable target. MEM0_DIR pins it explicitly even if expanduser

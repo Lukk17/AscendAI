@@ -22,13 +22,13 @@ an HTTP client.
 Install dependencies:
 
 ```bash
-pip install -e .[dev]
+python -m pip install -e .[dev]
 ```
 
 Start the server on port 7020:
 
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 7020 --reload
+python -m uvicorn src.main:app --host 0.0.0.0 --port 7020 --reload
 ```
 
 Build and run with Docker:

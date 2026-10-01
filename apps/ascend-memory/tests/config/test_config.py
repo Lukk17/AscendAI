@@ -13,8 +13,11 @@ from src.config.config import (
 )
 
 
-def test_settings_defaults():
+def test_settings_defaults() -> None:
+    # when
     fresh = Settings()
+
+    # then
     assert fresh.API_PORT == 7020
     assert fresh.API_HOST == "0.0.0.0"
     assert fresh.QDRANT_HOST == "localhost"
@@ -22,26 +25,34 @@ def test_settings_defaults():
     assert fresh.MEM0_LLM_MODEL == "meta-llama-3.1-8b-instruct"
 
 
-def test_settings_env_override():
+def test_settings_env_override() -> None:
+    # given
     env_vars = {
         "API_PORT": "9090",
         "QDRANT_HOST": "qdrant-prod",
         "MEM0_DEFAULT_PROVIDER": "openai",
     }
     with patch.dict(os.environ, env_vars):
+        # when
         fresh = Settings()
+
+        # then
         assert fresh.API_PORT == 9090
         assert fresh.QDRANT_HOST == "qdrant-prod"
         assert fresh.MEM0_DEFAULT_PROVIDER == "openai"
 
 
-def test_supported_providers_is_sorted_and_complete():
+def test_supported_providers_is_sorted_and_complete() -> None:
+    # when
     providers = supported_providers()
+
+    # then
     assert providers == sorted(PROVIDER_CONFIGS.keys())
     assert set(providers) == {"lmstudio", "openai", "gemini"}
 
 
-def test_provider_config_returns_each_provider_block():
+def test_provider_config_returns_each_provider_block() -> None:
+    # when / then
     for name in supported_providers():
         cfg = provider_config(name)
         assert cfg["embedding_model"]
@@ -52,18 +63,22 @@ def test_provider_config_returns_each_provider_block():
         assert cfg["llm_provider"] in {"lmstudio", "openai"}
 
 
-def test_provider_config_raises_keyerror_for_unknown():
+def test_provider_config_raises_keyerror_for_unknown() -> None:
+    # when / then
     with pytest.raises(KeyError):
         provider_config("not-a-real-provider")
 
 
-def test_provider_settings_value_reads_from_settings_object():
+def test_provider_settings_value_reads_from_settings_object() -> None:
+    # when / then
     assert provider_settings_value("LMSTUDIO_BASE_URL") == settings.LMSTUDIO_BASE_URL
 
 
-def test_lmstudio_provider_uses_lmstudio_llm_backend():
+def test_lmstudio_provider_uses_lmstudio_llm_backend() -> None:
+    # when / then
     assert provider_config("lmstudio")["llm_provider"] == "lmstudio"
 
 
-def test_gemini_provider_uses_openai_compatible_llm_backend():
+def test_gemini_provider_uses_openai_compatible_llm_backend() -> None:
+    # when / then
     assert provider_config("gemini")["llm_provider"] == "openai"

@@ -16,6 +16,8 @@
 | [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, refreshed only on operator request | Accepted | Vendored file goes stale silently until someone calls refresh or rebuilds the image |
 | [ADR-009](../decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) | Recall pass when the precision extraction is thin against the page | Accepted | A length ratio cannot tell dropped content from sidebars, so some news articles pay a second pass for no gain |
 | [ADR-010](../decisions/ADR-010-producer-aware-session-replay.md) | Route a stored session by who produced it | Accepted | Only FlareSolverr has a special-cased branch; a future WAF-cookie-earning tier needs its own |
+| [ADR-011](../decisions/ADR-011-caller-selectable-starting-tier.md) | A caller may name the tier the chain starts at | Accepted | A caller can now pick a worse tier than the service would have picked |
+| [ADR-012](../decisions/ADR-012-connect-time-address-pinning.md) | Pin the validated address through to connect time | Accepted | Only the in-process curl_cffi tier can be pinned; four tiers keep the rebinding window |
 
 ---
 

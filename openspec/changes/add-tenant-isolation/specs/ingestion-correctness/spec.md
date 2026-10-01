@@ -20,7 +20,7 @@ When a user re-uploads a document with the same sanitized filename via `POST /ap
 
 - **WHEN** tenant `acme` uploads `handbook.pdf` and tenant `globex` uploads a different `handbook.pdf`
 - **THEN** both documents' chunks exist in the collection, distinguished by `metadata.tenant_id`
-- **AND** neither upload overwrites the other's MinIO object (keys `tenant/acme/documents/handbook.pdf` and `tenant/globex/documents/handbook.pdf`)
+- **AND** neither upload overwrites the other's object-store object (keys `tenant/acme/documents/handbook.pdf` and `tenant/globex/documents/handbook.pdf`)
 
 #### Scenario: Re-upload in one tenant leaves the other tenant intact
 

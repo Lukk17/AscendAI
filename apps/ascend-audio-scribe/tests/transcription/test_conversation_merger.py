@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -7,6 +8,7 @@ from src.transcription import conversation_merger as cm
 
 
 def test_format_elapsed_time() -> None:
+    # when / then
     assert cm.format_elapsed_time(0) == "[00:00:00]"
     assert cm.format_elapsed_time(3661) == "[01:01:01]"
     assert cm.format_elapsed_time(59.4) == "[00:00:59]"
@@ -33,15 +35,20 @@ class _AsyncIterOver:
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
         cm,
         "local_speech_transcription",
-        _AsyncIterOver([
-            {"text": "a", "start": 0.0, "end": 1.0},
-            {"text": "b", "start": 1.0, "end": 2.0},
-        ]),
+        _AsyncIterOver(
+            [
+                {"text": "a", "start": 0.0, "end": 1.0},
+                {"text": "b", "start": 1.0, "end": 2.0},
+            ]
+        ),
     )
     progress: list[dict[str, Any]] = []
+
+    # when
     segments = await cm._transcribe_one_track(
         track_name="t1",
         track_wav="a.wav",
@@ -53,6 +60,8 @@ async def test_transcribe_one_track_local(monkeypatch: pytest.MonkeyPatch) -> No
         hf_provider="hf-inference",
         progress_callback=progress.append,
     )
+
+    # then
     assert len(segments) == 2
     assert all(s["speaker"] == "t1" for s in segments)
     assert progress
@@ -60,11 +69,14 @@ async def test_transcribe_one_track_local(monkeypatch: pytest.MonkeyPatch) -> No
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
-        cm.asyncio,
+        asyncio,
         "to_thread",
         AsyncMock(return_value=[{"text": "a", "start": 0.0, "end": 1.0}]),
     )
+
+    # when
     segments = await cm._transcribe_one_track(
         track_name="t",
         track_wav="x.wav",
@@ -76,16 +88,21 @@ async def test_transcribe_one_track_openai(monkeypatch: pytest.MonkeyPatch) -> N
         hf_provider="hf-inference",
         progress_callback=None,
     )
+
+    # then
     assert segments[0]["speaker"] == "t"
 
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_hf(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(
-        cm.asyncio,
+        asyncio,
         "to_thread",
         AsyncMock(return_value=[{"text": "h", "start": 0.0, "end": 1.0}]),
     )
+
+    # when
     segments = await cm._transcribe_one_track(
         track_name="t",
         track_wav="x.wav",
@@ -97,11 +114,14 @@ async def test_transcribe_one_track_hf(monkeypatch: pytest.MonkeyPatch) -> None:
         hf_provider="hf-inference",
         progress_callback=None,
     )
+
+    # then
     assert segments[0]["speaker"] == "t"
 
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_unknown_provider() -> None:
+    # when / then
     with pytest.raises(ValueError, match="Unknown provider"):
         await cm._transcribe_one_track(
             track_name="t",
@@ -118,7 +138,10 @@ async def test_transcribe_one_track_unknown_provider() -> None:
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_hf_handles_str(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cm.asyncio, "to_thread", AsyncMock(return_value="plain"))
+    # given
+    monkeypatch.setattr(asyncio, "to_thread", AsyncMock(return_value="plain"))
+
+    # when
     segments = await cm._transcribe_one_track(
         track_name="t",
         track_wav="x.wav",
@@ -130,12 +153,17 @@ async def test_transcribe_one_track_hf_handles_str(monkeypatch: pytest.MonkeyPat
         hf_provider="hf-inference",
         progress_callback=None,
     )
+
+    # then
     assert segments == []
 
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_openai_handles_str(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cm.asyncio, "to_thread", AsyncMock(return_value="plain text result"))
+    # given
+    monkeypatch.setattr(asyncio, "to_thread", AsyncMock(return_value="plain text result"))
+
+    # when
     segments = await cm._transcribe_one_track(
         track_name="t",
         track_wav="x.wav",
@@ -147,41 +175,55 @@ async def test_transcribe_one_track_openai_handles_str(monkeypatch: pytest.Monke
         hf_provider="hf-inference",
         progress_callback=None,
     )
+
+    # then
     assert segments == []
 
 
 async def _stub_track(**kw: Any) -> list[dict[str, Any]]:
     import asyncio as _aio
+
     await _aio.sleep(0)
     offset = float(kw["track_num"])
-    return [{
-        "text": f"line-{kw['track_name']}",
-        "start": offset,
-        "end": offset + 1,
-        "speaker": kw["track_name"],
-    }]
+    return [
+        {
+            "text": f"line-{kw['track_name']}",
+            "start": offset,
+            "end": offset + 1,
+            "speaker": kw["track_name"],
+        }
+    ]
 
 
 @pytest.mark.asyncio
 async def test_transcribe_and_merge_tracks_combines(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(cm, "_transcribe_one_track", _stub_track)
+
+    # when
     out = await cm.transcribe_and_merge_tracks(
         {"alice": "a.wav", "bob": "b.wav"}, provider="local", model="m", language="en"
     )
+
+    # then
     assert "alice" in out
     assert "bob" in out
 
 
 async def _empty_track(**kw: Any) -> list[dict[str, Any]]:
     import asyncio as _aio
+
     await _aio.sleep(0)
     return [{"text": "", "start": 0.0, "end": 1.0, "speaker": kw["track_name"]}]
 
 
 @pytest.mark.asyncio
 async def test_transcribe_and_merge_tracks_strips_blank(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
     monkeypatch.setattr(cm, "_transcribe_one_track", _empty_track)
-    out = await cm.transcribe_and_merge_tracks(
-        {"t1": "x.wav"}, provider="local", model="m", language="en"
-    )
+
+    # when
+    out = await cm.transcribe_and_merge_tracks({"t1": "x.wav"}, provider="local", model="m", language="en")
+
+    # then
     assert out == ""

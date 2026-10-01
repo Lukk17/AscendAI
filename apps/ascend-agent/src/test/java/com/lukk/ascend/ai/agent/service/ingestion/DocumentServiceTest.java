@@ -90,15 +90,17 @@ class DocumentServiceTest {
     @Test
     @DisplayName("removeOldDocuments does nothing when the documents list is null")
     void removeOldDocuments_NullList_DoesNothing() {
+        // when
         documentService.removeOldDocuments(null, vectorStore);
 
+        // then
         verify(vectorStore, never()).delete(any(Filter.Expression.class));
     }
 
     @Test
     @DisplayName("removeOldDocuments does not delete when source metadata value is not a String")
     void removeOldDocuments_SourceNotString_DoesNotCallDelete() {
-        // given — source is an Integer; instanceof String fails
+        // given - source is an Integer; instanceof String fails
         Document doc = new Document("text", Map.of("source", 42));
 
         // when

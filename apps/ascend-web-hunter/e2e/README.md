@@ -1,13 +1,13 @@
 # ascend-web-hunter: end-to-end capability tests
 
 Manual / AI-runnable e2e suite for the ascend-web-hunter module. Each test exercises **one capability** end-to-end
-against a live ascend-web-hunter container on port 7021. Assertions are observable behaviour only — HTTP status
+against a live ascend-web-hunter container on port 7021. Assertions are observable behaviour only - HTTP status
 codes, JSON response body shape and content, the MCP `tools/list` enumeration, and the MCP `tools/call` payload.
 ascend-web-hunter keeps no per-user state beyond a Redis-backed session cache keyed by URL / extraction context;
 the search path itself is stateless. Where a test needs reproducible upstream conditions, the reset step calls
 the appropriate Redis key wipe.
 
-Before running this suite, or any other e2e suite, pick a run scenario from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md).
+Before running this suite, or any other e2e suite, pick a run scenario or a service suite from [docs/E2E_RUN_SCENARIOS.md](../../../docs/E2E_RUN_SCENARIOS.md). To run only this suite, use its entry under [Service suites](../../../docs/E2E_RUN_SCENARIOS.md#ascend-web-hunter-service-suite).
 
 ## What's here
 
@@ -22,7 +22,7 @@ apps/ascend-web-hunter/e2e/
 │   └── seed_authenticated_session.py
 └── testing/                             # numbered specs + templates/ + runs/
     ├── README.md
-    ├── 1-invalid-input-test.md          # immutable spec (lowest cost — no SearXNG, no internet egress)
+    ├── 1-invalid-input-test.md          # immutable spec (lowest cost - no SearXNG, no internet egress)
     ├── 2-search-happy-path-test.md
     ├── 3-read-example-com-test.md
     ├── 4-mcp-tools-list-test.md
@@ -59,9 +59,9 @@ sufficient); `4` only needs the ascend-web-hunter process itself; `5` needs Sear
 FlareSolverr plus outbound HTTPS to real sites for a per-tier regression sweep (curl_cffi, FlareSolverr, Playwright);
 `7` needs FlareSolverr, a real-world URL matrix and the saucedemo login-seed harness under
 [harness/](harness/seed_authenticated_session.py), with no human step; `8` and
-`9` only need the ascend-web-hunter process and Redis reachable via `docker exec` — no outbound egress at all; `10`
+`9` only need the ascend-web-hunter process and Redis reachable via `docker exec` - no outbound egress at all; `10`
 needs no egress either but launches a real headful Playwright browser held by a background monitor for up to 10
-minutes — see its own spec for why that keeps it out of the cheap tier despite not touching SearXNG, FlareSolverr,
+minutes - see its own spec for why that keeps it out of the cheap tier despite not touching SearXNG, FlareSolverr,
 or any external site. Spec `11` needs FlareSolverr, NoVNC and a human to tick the hCaptcha widget on the democaptcha
 demo form, and asserts the capture that solve leaves behind, so it runs last and only on a human's go. Spec `12`
 needs FlareSolverr and outbound HTTPS to one Cloudflare-protected site, and proves the stored clearance is reused on
@@ -110,7 +110,7 @@ zero-cost row rather than tracking tokens here.
 
 ## Parallelism and execution order
 
-ascend-web-hunter holds no per-user state in Postgres or Qdrant — only a Redis session cache for the extraction
+ascend-web-hunter holds no per-user state in Postgres or Qdrant - only a Redis session cache for the extraction
 pipeline plus an in-process blocklist. The execution constraints:
 
 | Constraint | Tests | Why |
@@ -137,7 +137,7 @@ human's go, because its human solve needs the main session and the single NoVNC 
 
 ## Prerequisites before any test
 
-1. Docker compose stack up: the `ascend-scrapper` project group needs to be running — `ascend-web-hunter`,
+1. Docker compose stack up: the `ascend-scrapper` project group needs to be running - `ascend-web-hunter`,
    `searxng`, and `flaresolverr` containers all healthy.
 2. `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
 3. `curl -fsS "http://localhost:9020/search?q=test&format=html"` returns HTTP 200 with HTML content (proves SearXNG
@@ -190,10 +190,10 @@ Numbered by setup cost. Easiest first.
 | 3  | [testing/3-read-example-com-test.md](testing/3-read-example-com-test.md) | `POST /api/v2/web/read` with `https://www.example.com/` returns HTTP 200, `status="success"`, and the extracted content contains `"Example Domain"`. |
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | MCP `tools/list` returns an entry with `name="web_search"` and one with `name="web_read"`, each carrying a `query` (or `url`) parameter in its input schema. |
 | 5  | [testing/5-mcp-search-test.md](testing/5-mcp-search-test.md) | MCP `tools/call` for `web_search` with a stable query returns a structured result containing ≥ 1 entry with `title`, `url`, `content`. |
-| 6  | [testing/6-tiered-scraping-test.md](testing/6-tiered-scraping-test.md) | `POST /api/v2/web/read` against a tier-mapped list (Wikipedia static, `scrapingcourse.com` Cloudflare, `quotes.toscrape.com/js/` JS-rendered) returns HTTP 200 `status="success"` with the per-tier canary content. Highest egress cost — needs FlareSolverr + Playwright, runs last. |
+| 6  | [testing/6-tiered-scraping-test.md](testing/6-tiered-scraping-test.md) | `POST /api/v2/web/read` against a tier-mapped list (Wikipedia static, `scrapingcourse.com` Cloudflare, `quotes.toscrape.com/js/` JS-rendered) returns HTTP 200 `status="success"` with the per-tier canary content. Highest egress cost - needs FlareSolverr + Playwright, runs last. |
 | 7  | [testing/7-authenticated-realworld-scraping-test.md](testing/7-authenticated-realworld-scraping-test.md) | Two automated parts, no human step. Part 1: a difficulty-graded real-world URL matrix (easy/medium/hard/very-hard static+JS+WAF → `success`, dead domain → `hard-fail` HTTP 400, LinkedIn/indeed-auth login walls → `intervention` HTTP 428) where gated canaries hard-assert and live sites assert a valid terminal verdict (success or intervention). Five retail anti-bot rows (Allegro plus Amazon PL/US/UK/SE product pages) are best-effort on which branch fires and content-gated on the success branch: a `200`/`success` must carry the requested product page's identity canary (ISBN-13 / ASIN / model code) and none of the measured interstitial or block-page markers, so an anti-bot interstitial can never be recorded as a successful scrape. A row answering HTTP 409 with `status="novnc_busy"` is not a verdict: the runner waits the response's `Retry-After` seconds and re-runs the row, up to 3 attempts in total, records each attempt and each 409 body's `holder_url` in the run record, and fails the row only on the third 409. Part 2: a 2-call login-reuse behaviour, where a scripted login on a stable SPA (`saucedemo.com`, public demo creds hardcoded, no secrets) seeds `storage_state` and proves browser-tier authenticated capture and replay. The human-solved hCaptcha that used to be Part 3 is test 11. |
 | 8  | [testing/8-session-clear-test.md](testing/8-session-clear-test.md) | `POST /api/v2/web/session/clear`, the operator-recovery path for a poisoned session. A session seeded directly in Redis for `example.net` is removed (`existed=true`, key gone from Redis afterward). A call against `example.com`, which never carried one, is a documented no-op (HTTP 200, `existed=false`, not a 404 or 500). No FlareSolverr, Playwright, or human needed, so it is the cheapest test in the suite alongside 1 and 4. Do not run in parallel with test 10: its `session:example.net:e2e-establish` key would appear in the `session:*` scan this test compares before and after. |
-| 9  | [testing/9-session-status-test.md](testing/9-session-status-test.md) | `POST /api/v2/web/session/status` across all three states its own type declares: `none` for a URL that never carried a session, `expired` for one seeded with a `saved_at` outside the 14-day auth TTL, and `active` for the same key re-seeded with a fresh `saved_at`. Redis-only, no egress — same cost tier as 1, 4, and 8. |
+| 9  | [testing/9-session-status-test.md](testing/9-session-status-test.md) | `POST /api/v2/web/session/status` across all three states its own type declares: `none` for a URL that never carried a session, `expired` for one seeded with a `saved_at` outside the 14-day auth TTL, and `active` for the same key re-seeded with a fresh `saved_at`. Redis-only, no egress - same cost tier as 1, 4, and 8. |
 | 10 | [testing/10-session-establish-test.md](testing/10-session-establish-test.md) | `POST /api/v2/web/session/establish`, the proactive counterpart to passive NoVNC capture. Asserts the immediate response (`status="login_required"`, echoed `target`, non-empty `vnc_url`), plus a live-verified finding this spec documents rather than assumes: the background monitor's "cleared" check accepts any unchallenged page, so it captures an (often empty) session on the very first poll, about 15 seconds in, even though nobody solved a challenge. Makes no priced call and needs no human, but launches a real headful Playwright browser that can be held by a background monitor for up to 10 minutes, the highest per-run resource cost in this module's suite. Do not run in parallel with test 8 (the `session:example.net:e2e-establish` key this test writes would appear in the `session:*` scan test 8 compares before and after) or with itself. See the spec's own cost note. |
 | 11 | [testing/11-captcha-solve-and-capture-test.md](testing/11-captcha-solve-and-capture-test.md) | Human-solved hCaptcha and its capture on the democaptcha demo form (`https://democaptcha.com/demo-form-eng/hcaptcha.html`), whose `hcaptcha.com/1/api.js` script is a block signature for every automated tier. Call 1 with no session answers HTTP 428, `status="human_intervention_required"` and a `vnc_url` the main agent prints for the human. After the human ticks the widget and submits the form through NoVNC, `session:democaptcha.com:default` holds the `hmt_id` cookie hCaptcha sets on the checkbox click (proof a human acted, not that the image task was solved). Reuse of the capture is not asserted here: the form renders its widget on every load, so a second read of it can never show reuse (register A60), and spec 12 proves reuse on a site whose wall disappears once the clearance is stored. Runs alone, last, main session only, on a human's go. |
 | 12 | [testing/12-clearance-reuse-test.md](testing/12-clearance-reuse-test.md) | Stored Cloudflare clearance reused on a second read of the same site, fully automated. Call 1 reads `https://www.scrapingcourse.com/cloudflare-challenge` with no stored session and must answer HTTP 200, `status="success"` and at least 50 characters of content (measured 2026-09-10: `3-flaresolverr` in 25.2 seconds), leaving `session:scrapingcourse.com:default` behind with a `cf_clearance` cookie in its `waf` entry. Call 2 reads the same page as `?reuse=1`, a different address so the reader's five-minute in-memory read cache cannot answer it, and must answer HTTP 200, `status="success"`, at least 50 characters of content, no `vnc_url`, never a 428, and faster than Call 1. Both calls' `mode` and duration go into the run record. A 428 on Call 2 is a FAIL and is register defect A61 until its fix lands. Runs after test 6, which reads the same site, and not alongside tests 6, 7, 8 or 10. No human. |

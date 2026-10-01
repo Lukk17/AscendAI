@@ -19,7 +19,7 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 ### Reset state
 
 - [x] Registered MinIO alias `local` inside the container
-- [x] Dropped `documents/pierogi-recipe.docx` from MinIO (object did not exist — clean state confirmed)
+- [x] Dropped `documents/pierogi-recipe.docx` from MinIO (object did not exist - clean state confirmed)
 - [x] Removed `int_metadata_store` rows for the pierogi fixture
 - [x] Wiped Qdrant points for `documents/pierogi-recipe.docx`
 - [x] Truncated `chat_history` rows for user `frostyAttachSourcesTest`
@@ -29,7 +29,7 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 - [x] Step 1: sent `rag-ingestion-upload.yml`, HTTP 200
 - [x] Step 2: sent `rag-ingestion-run.yml`, HTTP 200 with `indexed >= 1`
-- [x] Step 3: sent `attach-sources-prompt.yml`, HTTP 200 (via minimax — anthropic returned 502 on known MCP tool-name defect)
+- [x] Step 3: sent `attach-sources-prompt.yml`, HTTP 200 (via minimax - anthropic returned 502 on known MCP tool-name defect)
 - [x] Step 4: captured `response.sources[0].downloadUrl`, issued GET against it
 
 ### Expected

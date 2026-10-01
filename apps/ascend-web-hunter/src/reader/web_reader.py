@@ -3,7 +3,7 @@ import logging
 import random
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from src.api.exceptions import (
     ChallengeDetectedException,
@@ -29,12 +29,24 @@ from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
+from src.session.session_manager import session_manager
 from src.validator.content_validator import ContentValidator
 from src.validator.url_validator import url_validator
 
 logger = logging.getLogger(__name__)
 
 NOVNC_STRATEGY_NAME = "6-novnc"
+SESSION_EXPIRED_STATUS = "session_expired"
+
+TierName = Literal[
+    "1-beautifulsoup",
+    "2-trafilatura",
+    "3-flaresolverr",
+    "4-playwright_stealth",
+    "5-crawlee_adaptive",
+    "6-novnc",
+]
+OutputFormat = Literal["text", "structured"]
 
 
 def _cache_key(
@@ -43,11 +55,12 @@ def _cache_key(
     include_links: bool,
     profile: str | None,
     output_format: str | None,
+    tier: TierName | None = None,
 ) -> str:
     """Return a string key that uniquely identifies a read request for cache-aside."""
     return (
         f"{url}|heavy={heavy_mode}|links={include_links}"
-        f"|profile={profile or ''}|fmt={output_format or 'text'}"
+        f"|profile={profile or ''}|fmt={output_format or 'text'}|tier={tier or ''}"
     )
 
 
@@ -107,12 +120,19 @@ class WebReader:
             NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME],
         }
 
+    @staticmethod
+    def _from_tier(strategies: dict[str, BaseStrategy], tier: TierName) -> dict[str, BaseStrategy]:
+        """Return *tier* and every tier after it, so escalation still runs from there."""
+        names = list(strategies)
+
+        return {name: strategies[name] for name in names[names.index(tier) :]}
+
     async def _select_strategies(
         self,
         url: str,
-        prefer_browser: bool,
         heavy_mode: bool,
         profile: str | None = None,
+        tier: TierName | None = None,
     ) -> dict[str, BaseStrategy]:
         strategies = self._build_strategies(profile)
 
@@ -122,7 +142,12 @@ class WebReader:
             )
             return {NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME]}
 
-        if not prefer_browser:
+        # An explicit tier is the most specific instruction a caller can give, so it
+        # outranks heavy_mode and the producer-aware routing below (ADR-011).
+        if tier is not None:
+            return self._from_tier(strategies, tier)
+
+        if not await self._prefer_browser(url, heavy_mode, profile):
             return strategies
 
         if not heavy_mode:
@@ -134,6 +159,39 @@ class WebReader:
                 }
 
         return self._browser_tiers(strategies)
+
+    @staticmethod
+    async def _session_expired(url: str, profile: str | None) -> bool:
+        """True when a login was captured for this target and no longer validates.
+
+        A target nobody logged into, including one holding only a WAF clearance,
+        is never gated here: it has no session to expire and reads anonymously
+        exactly as it always did.
+        """
+        if not await cookie_manager.has_auth_cookies(url, profile):
+            return False
+
+        return not await session_manager.validate(url, profile)
+
+    @staticmethod
+    def _create_session_expired_response(url: str, profile: str | None) -> dict[str, Any]:
+        domain = cookie_manager.registrable_domain(url)
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        logger.info(
+            "WebReader: stored session for %s (profile=%s) is no longer valid; refusing to read anonymously",
+            domain,
+            effective_profile,
+        )
+
+        return {
+            "content": "",
+            "status": SESSION_EXPIRED_STATUS,
+            "profile": effective_profile,
+            "message": (
+                f"Stored session for {domain} (profile={effective_profile}) is no longer valid. "
+                f"Re-establish it with the session establish operation, then read again."
+            ),
+        }
 
     async def _has_stored_session(self, url: str, profile: str | None) -> bool:
         return await cookie_manager.get_storage_state(url, profile) is not None
@@ -196,7 +254,7 @@ class WebReader:
         stale_keys = [
             key
             for key in self._memory_cache
-            if cookie_manager._get_domain(key.split("|", 1)[0]) == domain  # noqa: SLF001
+            if cookie_manager.registrable_domain(key.split("|", 1)[0]) == domain
         ]
         for key in stale_keys:
             del self._memory_cache[key]
@@ -212,9 +270,13 @@ class WebReader:
         url: str,
         heavy_mode: bool = False,
         profile: str | None = None,
-        output_format: str | None = None,
+        output_format: OutputFormat | None = None,
+        tier: TierName | None = None,
     ) -> dict[str, Any]:
-        key = _cache_key(url, heavy_mode, False, profile, output_format)
+        if await self._session_expired(url, profile):
+            return self._create_session_expired_response(url, profile)
+
+        key = _cache_key(url, heavy_mode, False, profile, output_format, tier)
         cached = self._cache_get(key)
         if cached is not None:
             READ_CACHE_HITS_TOTAL.inc()
@@ -222,9 +284,8 @@ class WebReader:
 
             return cached
 
-        logger.info("Reading URL: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
-        prefer_browser = await self._prefer_browser(url, heavy_mode, profile)
-        strategies_to_run = await self._select_strategies(url, prefer_browser, heavy_mode, profile)
+        logger.info("Reading URL: %s (heavy_mode: %s, profile: %s, tier: %s)", url, heavy_mode, profile, tier)
+        strategies_to_run = await self._select_strategies(url, heavy_mode, profile, tier)
         started_at = time.perf_counter()
         budget_exhausted = False
 
@@ -259,9 +320,13 @@ class WebReader:
         link_filter: str | None = None,
         heavy_mode: bool = False,
         profile: str | None = None,
-        output_format: str | None = None,
+        output_format: OutputFormat | None = None,
+        tier: TierName | None = None,
     ) -> dict[str, Any]:
-        key = _cache_key(url, heavy_mode, True, profile, output_format)
+        if await self._session_expired(url, profile):
+            return self._create_session_expired_response(url, profile)
+
+        key = _cache_key(url, heavy_mode, True, profile, output_format, tier)
         cached = self._cache_get(key)
         if cached is not None:
             READ_CACHE_HITS_TOTAL.inc()
@@ -269,9 +334,14 @@ class WebReader:
 
             return cached
 
-        logger.info("Reading URL with links: %s (heavy_mode: %s, profile: %s)", url, heavy_mode, profile)
-        prefer_browser = await self._prefer_browser(url, heavy_mode, profile)
-        strategies_to_run = await self._select_strategies(url, prefer_browser, heavy_mode, profile)
+        logger.info(
+            "Reading URL with links: %s (heavy_mode: %s, profile: %s, tier: %s)",
+            url,
+            heavy_mode,
+            profile,
+            tier,
+        )
+        strategies_to_run = await self._select_strategies(url, heavy_mode, profile, tier)
         started_at = time.perf_counter()
         budget_exhausted = False
 

@@ -29,7 +29,7 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 
 ## Result summary
 
-HTTP 200. Response content: "Temperature: 16.5°C", "Partly cloudy (WMO code 1)". MCP tool was invoked — live weather data returned for Warsaw. No refusal phrases present.
+HTTP 200. Response content: "Temperature: 16.5°C", "Partly cloudy (WMO code 1)". MCP tool was invoked - live weather data returned for Warsaw. No refusal phrases present.
 
 Input tokens: 0 (MCP tool, not LLM tokens tracked)
 

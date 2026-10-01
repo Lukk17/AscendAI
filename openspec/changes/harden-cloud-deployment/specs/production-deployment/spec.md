@@ -4,178 +4,181 @@
 
 ### Requirement: The edge gateway is the only publicly bound service
 
-`compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
+`compose.yaml` SHALL define a `gateway` service (Caddy 2, image pinned by version and digest) that is the only compose service publishing ports on all host interfaces: `80` and `443`. The gateway SHALL terminate TLS, through ACME when `ASCEND_DOMAIN` is a real domain and through Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset. Its configuration SHALL live in `gateway/Caddyfile` and SHALL proxy only to `ascend-agent:9917`. The gateway SHALL NOT route to Grafana or the object store, and SHALL NOT route any path of the agent's site to Keycloak. Keycloak is a separate service on its own host address and port, defined by `add-auth-and-identity`, which may add Keycloak to `gateway/Caddyfile` only as a separate site address with its own host name.
 
 #### Scenario: External port scan shows only 80 and 443
 
-- **WHEN** the stack runs on a cloud VM and an external host port-scans the VM's public IP
+- **WHEN** the stack runs on a cloud VM and an external host scans the VM's public IP
 - **THEN** only ports 80 and 443 accept connections
-- **AND** direct connection attempts to 9917, 7020, 7017, 7021, 7022, 9998, 5001, 9080, 9020, 8191, 7077, and 7078 from outside the VM fail
+- **AND** connections from outside the VM to 9917, 7020, 7017, 7021, 7022, 9998, 5001, 9080, 9020, 8191, 7077 and 7078 fail
 
-#### Scenario: ascend-ai-agent is reachable through the gateway over TLS
+#### Scenario: The agent is reachable through the gateway over TLS
 
-- **WHEN** a client sends `POST https://<ASCEND_DOMAIN>/api/v1/ai/prompt` with a valid request body
-- **THEN** the gateway terminates TLS and proxies the request to `ascend-agent:9917`
-- **AND** the response is the same as a direct in-network call to ascend-ai-agent
+- **WHEN** a client sends `GET https://<ASCEND_DOMAIN>/actuator/health`
+- **THEN** the gateway terminates TLS, proxies to `ascend-agent:9917`, and returns HTTP 200
 
-#### Scenario: Local dev gets a working TLS endpoint without a domain
+#### Scenario: Local TLS works without a domain
 
-- **WHEN** a developer runs `docker compose up` with `ASCEND_DOMAIN` unset
+- **WHEN** a developer runs `docker compose up -d` with `ASCEND_DOMAIN` unset
 - **THEN** the gateway serves `https://localhost` with a certificate from Caddy's internal CA
-- **AND** no ACME requests leave the machine
+- **AND** no ACME request leaves the machine
+
+### Requirement: The gateway streams Server-Sent Events without buffering
+
+The gateway SHALL proxy `POST /api/v1/ai/prompt/stream` (added by `add-chat-streaming-and-conversations`) without buffering the response and without a proxy timeout that ends a normal stream early.
+
+#### Scenario: A stream passes through the gateway unbuffered
+
+- **WHEN** a client calls `POST /api/v1/ai/prompt/stream` through the gateway and the agent emits `delta` events over several seconds
+- **THEN** the client receives each `delta` event as it is produced
+- **AND** the connection stays open until the terminal `done` event
 
 ### Requirement: Internal service ports bind to loopback by default
 
-Every host-port publication in `compose.yaml` and `compose.ascend-web-hunter.yaml` except the gateway's SHALL use the form `"${EXPOSE_BIND:-127.0.0.1}:<host-port>:<container-port>"`. With `EXPOSE_BIND` unset the port binds to `127.0.0.1` only. The main `compose.yaml` SHALL remain the single compose entry point (no `-f` flag, no second compose project), and `docker compose up` from the repo root SHALL continue to bring up the full stack.
+Every host-port publication in `compose.yaml` and `compose.ascend-web-hunter.yaml` except the gateway's SHALL use the form `"${EXPOSE_BIND:-127.0.0.1}:<host-port>:<container-port>"`. The services loki, vector, otel-collector, tempo, container-metrics-exporter and the bundled redis SHALL publish no host port. `compose.yaml` SHALL stay the single compose entry point.
 
 #### Scenario: Fresh clone binds services to loopback
 
-- **WHEN** a developer clones the repo, prepares `.env` from `.env.example`, and runs `docker compose up -d --build`
+- **WHEN** a developer prepares `.env` from `.env.example` and runs `docker compose up -d --build`
 - **THEN** `docker inspect` shows every published port except the gateway's bound to `127.0.0.1`
-- **AND** `http://localhost:7020/health` (and the other localhost port URLs documented in the README) still respond as before
+- **AND** `http://localhost:7020/health` and the other documented `localhost` addresses still respond
 
 #### Scenario: Loopback binding blocks LAN access
 
-- **WHEN** another machine on the same network attempts `http://<host-LAN-IP>:7020/health`
-- **THEN** the connection is refused or times out
-- **AND** the same request from the host itself via `localhost` succeeds
+- **WHEN** another machine on the same network requests `http://<host-LAN-IP>:7020/health`
+- **THEN** the connection fails
+- **AND** the same request from the host through `localhost` succeeds
 
-### Requirement: Credentials flow from environment with production fail-fast
+### Requirement: Credentials flow from the environment with a production startup guard
 
-All credentials consumed by the stack SHALL be sourced from environment variables backed by `.env`: Postgres user/password, Redis password, S3 access/secret keys, Qdrant API key, Grafana admin user/password, and the SearXNG secret. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` required form so `docker compose up` fails immediately when they are unset. Datastore credentials MAY carry dev defaults in `application.yaml` (`${VAR:devdefault}`), but ascend-ai-agent SHALL refuse to start under the `production` Spring profile while any datastore credential still equals its known dev default. The SearXNG `secret_key` SHALL be removed from `infra/searxng/settings.yml` and injected via the `SEARXNG_SECRET` env var; the previously committed value SHALL be treated as compromised and rotated.
+Every credential the stack consumes SHALL come from environment variables backed by `.env`: Postgres user and password, Redis password, Qdrant API key, object store access and secret key, ascend-ocr result store keys, Grafana admin user and password, the SearXNG secret, and the built-in login `SECURITY_USERNAME` and `SECURITY_PASSWORD`. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` form. Other credentials MAY keep development defaults, but under the `production` Spring profile ascend-agent SHALL refuse to start while any object store, Postgres, Redis, Qdrant or built-in login credential equals its development default, and the error SHALL name the property without printing its value.
 
-#### Scenario: Missing required secret fails compose up
+#### Scenario: Missing required secret fails compose
 
 - **WHEN** an operator runs `docker compose up` with `GRAFANA_ADMIN_PASSWORD` unset
-- **THEN** compose exits with an error naming the missing variable before any container starts
+- **THEN** compose exits with an error naming the variable before any container starts
 
-#### Scenario: Production profile rejects dev-default credentials
+#### Scenario: Production profile rejects development defaults
 
-- **WHEN** ascend-ai-agent starts with the `production` Spring profile active and `S3_SECRET_KEY` still resolving to the dev default `password`
-- **THEN** the application fails startup with an error naming the offending credential
-- **AND** with real values set for every datastore credential the application starts normally
+- **WHEN** ascend-agent starts with the `production` profile active and `S3_SECRET_KEY` unset so the value is `password`
+- **THEN** startup fails with an error naming `app.s3.secret-key`
+- **AND** with real values for every guarded credential the application starts
 
-#### Scenario: No working secret remains in the tree
+#### Scenario: Development profile keeps working without variables
 
-- **WHEN** a reviewer greps the repository for the old SearXNG `secret_key` value and for `access-key: admin` / `secret-key: password` as literal committed values
-- **THEN** no committed file contains a credential that a production deployment would accept
-- **AND** `infra/searxng/settings.yml` contains no `secret_key` entry
+- **WHEN** ascend-agent starts without the `production` profile and with none of the credential variables set
+- **THEN** it starts with the development defaults
+
+### Requirement: The object store is never public
+
+The gateway SHALL have no route to the object store, and the object store SHALL NOT be published on a public interface by any file of this repository. The object store addresses of the agent (`S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`) and of ascend-ocr (`OCR_RESULT_S3_ENDPOINT`, `OCR_RESULT_S3_PUBLIC_ENDPOINT`) SHALL come from the environment with today's local values as defaults. The deployment guide SHALL require both public endpoint variables to equal the private object store address in production, because only containers on the private network follow presigned links. Public clients SHALL download RAG sources through the agent's `GET /api/v1/documents/{id}/content`.
+
+#### Scenario: Presigned links point at the private address in production
+
+- **WHEN** a production deployment sets `S3_PUBLIC_ENDPOINT` and `OCR_RESULT_S3_PUBLIC_ENDPOINT` to the private object store address
+- **THEN** the agent still reads ascend-ocr results through the presigned link
+- **AND** the presigned link does not resolve from outside the VM
 
 ### Requirement: Personal-machine artifacts are opt-in
 
-The compose files SHALL contain no personal absolute paths. The `ascend-audio-scribe` volumes SHALL use env-interpolated sources with named-volume defaults (`${HF_CACHE_ROOT:-hf-cache}:/hf-cache`, `${ASCEND_AUDIO_SCRIBE_MEDIA_ROOT:-ascend-audio-scribe-media}:/audio`), and `MCP_FILE_URI_ROOT` SHALL default to empty (`${ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT:-}`), which disables `file://` URIs. The `ngrok-ascend-web-hunter` service SHALL be gated behind a compose profile so it does not start by default.
+The compose files SHALL contain no personal absolute paths. ascend-audio-scribe volumes SHALL be `${HF_CACHE_ROOT:-hf-cache}:/hf-cache` and `${ASCEND_AUDIO_SCRIBE_MEDIA_ROOT:-ascend-audio-scribe-media}:/audio`, and `MCP_FILE_URI_ROOT` SHALL be `${ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT:-}`, where empty disables `file://`. `ngrok-ascend-web-hunter` SHALL sit behind the `captcha-intervention` compose profile.
 
-#### Scenario: Default deployment cannot read host files via transcription
+#### Scenario: Default deployment cannot read host files
 
-- **WHEN** the stack starts with `ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT` and `ASCEND_AUDIO_SCRIBE_MEDIA_ROOT` unset
-- **AND** a caller sends the ascend-audio-scribe MCP tool a `file:///audio/anything.mp3` URI
-- **THEN** the request is rejected because `file://` support is disabled
-- **AND** `/audio` inside the container is an empty named volume, not a host directory
+- **WHEN** the stack starts with the three variables unset and a caller sends ascend-audio-scribe a `file:///audio/anything.mp3` URI
+- **THEN** the request is rejected because `file://` is disabled
+- **AND** `/audio` is an empty named volume
 
-#### Scenario: Owner restores the Desktop workflow via .env
+#### Scenario: Owner restores the Desktop workflow
 
-- **WHEN** the repo owner sets `ASCEND_AUDIO_SCRIBE_MEDIA_ROOT` to a host path and `ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT=/audio` in `.env` and restarts the service
-- **THEN** `file://` transcription of files in that directory works as it did before this change
+- **WHEN** the owner sets `ASCEND_AUDIO_SCRIBE_MEDIA_ROOT` to a host path and `ASCEND_AUDIO_SCRIBE_FILE_URI_ROOT=/audio` and recreates the service
+- **THEN** `file://` transcription of files in that directory works
 
 #### Scenario: Ngrok does not start by default
 
-- **WHEN** a developer runs `docker compose up -d`
-- **THEN** `ngrok-ascend-web-hunter` is not created
-- **AND** activating its profile (via `COMPOSE_PROFILES` in `.env`) starts it
+- **WHEN** a developer runs `docker compose up -d` without `captcha-intervention` in `COMPOSE_PROFILES`
+- **THEN** no `ngrok-ascend-web-hunter` container is created
+- **AND** ascend-web-hunter still reports healthy
 
 ### Requirement: ascend-web-hunter runs without SYS_ADMIN
 
-The `ascend-web-hunter` service SHALL NOT declare `cap_add: SYS_ADMIN`. Chromium sandboxing SHALL instead be enabled by a checked-in seccomp profile (`security/chromium-seccomp.json`) referenced via `security_opt`, together with `init: true` for child-process reaping. The existing `shm_size: 2gb` SHALL be retained.
+`ascend-web-hunter` SHALL NOT declare `cap_add: SYS_ADMIN`. It SHALL use the checked-in seccomp profile `security/chromium-seccomp.json` through `security_opt`, `no-new-privileges:true` and `init: true`, and SHALL keep `shm_size: 2gb`.
 
 #### Scenario: Capability removed while extraction still works
 
-- **WHEN** the `ascend-web-hunter` container is inspected after `docker compose up`
-- **THEN** `docker inspect` shows no added capabilities and the custom seccomp profile applied
-- **AND** the Playwright extraction tier successfully renders a JavaScript-heavy page end-to-end
+- **WHEN** the rebuilt container is inspected
+- **THEN** it has no added capability and the custom seccomp profile applied
+- **AND** the Playwright tier renders a JavaScript-heavy page
 
-### Requirement: SSRF allowlists exclude loopback by default
+### Requirement: SSRF allowlists have no loopback default
 
-`MCP_ALLOWED_HOSTS` on `ascend-ocr` and `ascend-audio-scribe` SHALL be env-driven with the default `object-store` (`${MCP_ALLOWED_HOSTS:-object-store}`). The committed compose files SHALL NOT list `localhost`, `127.0.0.1`, or `host.docker.internal` as allowlist defaults. Local-dev topologies where the S3-compatible object store runs on the Docker host SHALL opt in per machine by setting `MCP_ALLOWED_HOSTS` in `.env`, and this opt-in SHALL be documented in `.env.example` and the deployment guide.
+`MCP_ALLOWED_HOSTS` on ascend-ocr and ascend-audio-scribe SHALL be `${MCP_ALLOWED_HOSTS:-}`. The committed compose files SHALL NOT list `localhost`, `127.0.0.1` or `host.docker.internal` as a default. Local development opts in with `MCP_ALLOWED_HOSTS=host.docker.internal` in `.env`, and a cloud deployment lists only the private object store host.
 
-#### Scenario: Loopback fetch is blocked by default
+#### Scenario: Host fetch is blocked by default
 
-- **WHEN** the stack runs with `MCP_ALLOWED_HOSTS` unset and a caller asks ascend-ocr's MCP tool to fetch `http://127.0.0.1:9070/some-object`
-- **THEN** the request is rejected with `UNSAFE_URI`
+- **WHEN** `MCP_ALLOWED_HOSTS` is unset and a caller submits `http://host.docker.internal:9070/x` to ascend-ocr's `ocr_submit`
+- **THEN** the call fails with `UNSAFE_URI`
 
-#### Scenario: In-network object-store fetch succeeds
+#### Scenario: Opt-in allows the local object store
 
-- **WHEN** the S3-compatible object store is reachable at hostname `object-store` on the compose network and a caller supplies an `http://object-store:...` presigned URL
-- **THEN** the fetch is permitted by the default allowlist and OCR/transcription proceeds
+- **WHEN** `.env` sets `MCP_ALLOWED_HOSTS=host.docker.internal` and a caller submits a presigned URL on that host
+- **THEN** the fetch is allowed and the job proceeds
 
-### Requirement: SearXNG runs with its limiter enabled and real client context
+### Requirement: SearXNG stays private with its limiter off
 
-The `ascend-web-hunter` environment SHALL set `SEARXNG_LIMITER=true` and SHALL NOT set the spoofed `SEARXNG_X_FORWARDED_FOR` / `SEARXNG_X_REAL_IP` constants. ascend-web-hunter SHALL forward the client context it received (originating from the gateway's `X-Forwarded-For`) on its SearXNG requests.
+SearXNG SHALL be reachable only on the compose network and on host loopback. Its limiter SHALL stay off, as `infra/searxng/settings.yml` documents, because every caller reaches it from the ascend-web-hunter container address. `infra/searxng/settings.yml` and its byte-identical copy `apps/ascend-web-hunter/deploy-standalone/searxng/settings.yml` SHALL stay identical.
 
-#### Scenario: Limiter is active
+#### Scenario: SearXNG is not reachable from outside
 
-- **WHEN** SearXNG starts via `docker compose up`
-- **THEN** its effective configuration reports the limiter enabled
-- **AND** search requests from ascend-web-hunter carry a real forwarded client address, not `0.0.0.0`
+- **WHEN** an external host connects to port 9020 on the VM
+- **THEN** the connection fails
+- **AND** a search through ascend-web-hunter still returns results
 
-### Requirement: Observability UIs require authentication and are not publicly bound
+### Requirement: Observability services require login or stay unpublished
 
-Grafana SHALL run with `GF_AUTH_ANONYMOUS_ENABLED=false` and admin credentials from env (`GF_SECURITY_ADMIN_USER`, `GF_SECURITY_ADMIN_PASSWORD`). Prometheus SHALL NOT run with `--web.enable-lifecycle`. Both SHALL be loopback-bound per the port-binding requirement, reachable on a VM only via SSH tunnel or an explicitly enabled gateway route.
+Grafana SHALL run with `GF_AUTH_ANONYMOUS_ENABLED=false` and admin credentials from the environment. Prometheus SHALL NOT run with `--web.enable-lifecycle`. Grafana and Prometheus SHALL be loopback-bound. loki, vector, otel-collector, tempo and container-metrics-exporter SHALL publish no port and SHALL run with `no-new-privileges:true`.
 
 #### Scenario: Anonymous Grafana access is refused
 
-- **WHEN** a client requests a Grafana dashboard URL without logging in
-- **THEN** Grafana redirects to its login page instead of rendering the dashboard
-- **AND** logging in with the credentials from `.env` succeeds
+- **WHEN** a client requests a Grafana dashboard without logging in
+- **THEN** Grafana redirects to its login page
+- **AND** the credentials from `.env` log in
 
-### Requirement: Gateway enforces edge limits and streams SSE without buffering
-
-The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfaces it fronts — a per-client connection cap and a request-rate limit covering the Keycloak login and token endpoints and a global fallback — with thresholds overridable via environment. The gateway SHALL proxy the `POST /api/v1/ai/prompt/stream` route without buffering the response and with a read timeout long enough that a normal token stream is never truncated by the proxy, so Server-Sent Events reach the client as they are produced.
-
-#### Scenario: Token-endpoint abuse is rate-limited at the edge
-
-- **WHEN** a single client sends a burst of requests to the Keycloak token endpoint exceeding the configured edge rate limit
-- **THEN** the gateway rejects the excess with HTTP 429 before they reach the upstream
-
-#### Scenario: SSE stream passes through the gateway unbuffered
-
-- **WHEN** a client calls `POST /api/v1/ai/prompt/stream` through the gateway and the agent emits `delta` events over several seconds
-- **THEN** the client receives `delta` events incrementally as they are produced
-- **AND** the gateway does not close the connection before the terminal `done` event on a normal-length generation
-
-#### Scenario: Prometheus config cannot be reloaded over HTTP
+#### Scenario: Prometheus cannot be reloaded over HTTP
 
 - **WHEN** a client sends `POST http://localhost:7077/-/reload`
-- **THEN** the request is rejected because the lifecycle endpoint is disabled
+- **THEN** the request is rejected
 
 ### Requirement: Compose declares production runtime posture
 
-`compose.yaml` SHALL apply a shared `x-logging` anchor (json-file driver, `max-size: 10m`, `max-file: 3`) to every service; SHALL upgrade `depends_on` entries to `condition: service_healthy` wherever the dependency defines a healthcheck; SHALL define healthchecks for `docling-serve`, `unstructured-api`, `ascend-weather-mcp`, `searxng`, `flaresolverr`, `prometheus`, and `grafana`; SHALL pin every image to a specific version (including `ngrok/ngrok`); and SHALL pass `SECURITY_ENABLED=${SECURITY_ENABLED:-false}` to ascend-ai-agent, with the production checklist in the deployment guide requiring `SECURITY_ENABLED=true`.
+`compose.yaml` SHALL define its own `x-logging` anchor (json-file, `max-size: 10m`, `max-file: 3`) and apply it to every service it defines, because anchors do not cross `include:`. It SHALL define healthchecks for every service it defines, SHALL make ascend-agent wait on ascend-memory, docling-serve and unstructured-api with `condition: service_healthy`, SHALL set `no-new-privileges:true` on every service, and SHALL pin every pulled image by version and digest.
 
 #### Scenario: Agent waits for healthy dependencies
 
 - **WHEN** `docker compose up -d` starts the stack from cold
-- **THEN** `ascend-ai-agent` is not started until `ascend-memory`, `docling-serve`, and `unstructured-api` report healthy
+- **THEN** ascend-agent starts only after ascend-memory, docling-serve and unstructured-api report healthy
 
-#### Scenario: Log output is rotation-bounded
+#### Scenario: Log output is bounded
 
-- **WHEN** any service container is inspected
-- **THEN** its logging config shows the json-file driver with `max-size: 10m` and `max-file: 3`
+- **WHEN** any container of the stack is inspected
+- **THEN** its logging uses the json-file driver with `max-size: 10m` and `max-file: 3`
 
-#### Scenario: No floating image tags
+#### Scenario: No floating image
 
-- **WHEN** a reviewer lists every `image:` line across both compose files
-- **THEN** every pulled image carries an exact version tag (no `latest`, no bare major tag)
+- **WHEN** a reviewer lists every pulled `image:` line in both compose files
+- **THEN** each one carries a version tag and a digest
 
-### Requirement: The deployment guide covers single-tenant cloud VM deployment
+### Requirement: The deployment guide covers one cloud VM per customer
 
-`docs/DEPLOYMENT.md` SHALL gain a cloud VM deployment section covering: DNS setup for `ASCEND_DOMAIN`, TLS issuance via the gateway (ACME) and the local internal-CA fallback, preparing `.env` from `.env.example` with every required secret, the production checklist (`SECURITY_ENABLED=true`, no dev-default credentials, external port scan), and backup/restore procedures for the four external data stores (Postgres, Redis, Qdrant, the S3-compatible object store) for both co-located-container and managed-service topologies.
+`docs/DEPLOYMENT.md` SHALL describe: DNS for `ASCEND_DOMAIN`, TLS through the gateway and the local internal CA, `.env` preparation, which stack provides the four data stores, the production checklist (`production` Spring profile, no development credentials, public endpoint variables set to the private object store address, external port scan), and backup and restore steps for Postgres, Redis, Qdrant and the object store for container and managed-service topologies.
 
-#### Scenario: An operator can deploy from the guide alone
+#### Scenario: An operator deploys from the guide alone
 
-- **WHEN** an operator with a fresh VM, a domain, and the four data stores follows the guide top to bottom
-- **THEN** the stack comes up serving `https://<domain>` with only 80/443 publicly open, and every checklist item is verifiable with a command given in the guide
+- **WHEN** an operator with a fresh VM, a domain and the four data stores follows the guide
+- **THEN** the stack serves `https://<domain>` with only 80 and 443 open
+- **AND** every checklist item has a command that verifies it
 
 #### Scenario: Backups are documented per store
 
 - **WHEN** a reader opens the backup section
-- **THEN** it contains a concrete backup and restore procedure for each of Postgres, Redis, Qdrant, and the S3-compatible object store
+- **THEN** it gives a backup and a restore procedure for each of Postgres, Redis, Qdrant and the object store

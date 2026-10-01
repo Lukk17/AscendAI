@@ -149,7 +149,7 @@ class Settings(BaseSettings):
         description="Public Internet-facing VNC URL (can be Ngrok api string)",
     )
     REDIS_URL: str = Field(
-        default="redis://localhost:6379/0",
+        default="redis://127.0.0.1:6379/0",
         description="Redis connection URL for cookie storage",
     )
 
@@ -200,7 +200,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Group 4 — Anti-bot evasion: proxy seam (off by default)
+    # Group 4 - Anti-bot evasion: proxy seam (off by default)
     PROXY_URL: str = Field(
         default="",
         description=(
@@ -209,7 +209,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Group 5 — Extraction quality: readability fallback threshold
+    # Group 5 - Extraction quality: readability fallback threshold
     READABILITY_FALLBACK_MIN_CHARS: int = Field(
         default=200,
         description=(
@@ -229,13 +229,13 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Group 7 — Caching: read-result cache TTL
+    # Group 7 - Caching: read-result cache TTL
     READ_CACHE_TTL_SECONDS: int = Field(
         default=300,
         description="TTL in seconds for the read-result cache-aside entries (default 5 min).",
     )
 
-    # Group 7 — Observability: per-domain metric label cardinality cap
+    # Group 7 - Observability: per-domain metric label cardinality cap
     DOMAIN_METRIC_CARDINALITY_CAP: int = Field(
         default=50,
         description=(
@@ -244,7 +244,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Group 7 — Circuit breaker thresholds
+    # Group 7 - Circuit breaker thresholds
     BREAKER_FAILURE_THRESHOLD: int = Field(
         default=3,
         description="Consecutive failures before a circuit breaker opens.",

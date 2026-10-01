@@ -2,7 +2,7 @@
 
 ### Requirement: Document registry records every knowledge-base document
 
-The agent SHALL maintain a Liquibase-managed document registry in PostgreSQL that records, for every document in the knowledge base: a stable document id, the MinIO object key, display name, size in bytes, MIME type, source (`upload`, `bucket-scan`, or a connector-provided value), ingestion status (`UPLOADED`, `INDEXING`, `INDEXED`, `FAILED`, `DELETING`), failure reason when failed, and per-collection chunk count, ETag, and last-indexed-at. `POST /api/v1/ingestion/upload` SHALL register or update the row at upload time; ingestion runs SHALL upsert rows for every object they visit and update index state on success or failure.
+The agent SHALL maintain a Liquibase-managed document registry in PostgreSQL that records, for every document in the knowledge base: a stable document id, the stored object key, display name, size in bytes, MIME type, source (`upload`, `bucket-scan`, or a connector-provided value), ingestion status (`UPLOADED`, `INDEXING`, `INDEXED`, `FAILED`, `DELETING`), failure reason when failed, and per-collection chunk count, ETag, and last-indexed-at. `POST /api/v1/ingestion/upload` SHALL register or update the row at upload time; ingestion runs SHALL upsert rows for every object they visit and update index state on success or failure.
 
 #### Scenario: Upload registers a document
 
@@ -66,14 +66,14 @@ The agent SHALL expose `GET /api/v1/documents/{id}` returning the full registry 
 
 ### Requirement: Document deletion removes storage, vectors, and metadata
 
-The agent SHALL expose `DELETE /api/v1/documents/{id}` which removes, in order: the document's Qdrant chunks (filter `source == <object key>`) from every collection recorded in its index state, the MinIO object, and finally the registry row. The endpoint SHALL return 204 on completion, 404 for an unknown id, and 409 when the document's status is `INDEXING`. After deletion, subsequent RAG retrievals SHALL NOT return chunks for the deleted document.
+The agent SHALL expose `DELETE /api/v1/documents/{id}` which removes, in order: the document's Qdrant chunks (filter `source == <object key>`) from every collection recorded in its index state, the stored object, and finally the registry row. The endpoint SHALL return 204 on completion, 404 for an unknown id, and 409 when the document's status is `INDEXING`. After deletion, subsequent RAG retrievals SHALL NOT return chunks for the deleted document.
 
 #### Scenario: Delete removes vectors from both collections
 
 - **WHEN** a document indexed into both `ascendai-768` and `ascendai-1536` is deleted via `DELETE /api/v1/documents/{id}`
 - **THEN** the response status is 204
 - **AND** the count of Qdrant points with `metadata.source == <object key>` is zero in both collections
-- **AND** the MinIO object no longer exists in the `knowledge-base` bucket
+- **AND** the stored object no longer exists in the `knowledge-base` bucket
 - **AND** `GET /api/v1/documents/{id}` returns 404
 
 #### Scenario: Delete rejected while indexing
@@ -84,23 +84,23 @@ The agent SHALL expose `DELETE /api/v1/documents/{id}` which removes, in order: 
 
 ### Requirement: Deletion is retryable and safe mid-chat
 
-Deletion SHALL set the document's status to `DELETING` before executing removal steps, each of which is idempotent. A failure part-way SHALL leave the row in `DELETING`, and repeating the DELETE SHALL re-execute the remaining steps to completion. The agent SHALL NOT track or revoke presigned source URLs already handed out in chat responses: they stop resolving once the MinIO object is removed and expire within the configured presign TTL regardless. In-flight chat turns that already retrieved the document's chunks SHALL complete normally.
+Deletion SHALL set the document's status to `DELETING` before executing removal steps, each of which is idempotent. A failure part-way SHALL leave the row in `DELETING`, and repeating the DELETE SHALL re-execute the remaining steps to completion. The agent SHALL NOT track or revoke presigned source URLs already handed out in chat responses: they stop resolving once the stored object is removed and expire within the configured presign TTL regardless. In-flight chat turns that already retrieved the document's chunks SHALL complete normally.
 
 #### Scenario: Retry after partial failure completes the delete
 
-- **WHEN** a delete removes the Qdrant chunks but fails before removing the MinIO object
+- **WHEN** a delete removes the Qdrant chunks but fails before removing the stored object
 - **THEN** `GET /api/v1/documents/{id}` shows status `DELETING`
-- **AND** repeating `DELETE /api/v1/documents/{id}` removes the MinIO object and the registry row and returns 204
+- **AND** repeating `DELETE /api/v1/documents/{id}` removes the stored object and the registry row and returns 204
 
 #### Scenario: Previously issued presigned link after delete
 
 - **WHEN** a chat response included a presigned source URL for a document that is subsequently deleted
 - **THEN** the delete succeeds without waiting for or revoking the URL
-- **AND** the URL stops returning the object content (MinIO reports the object missing or the link expires at its TTL)
+- **AND** the URL stops returning the object content (the object store reports the object missing or the link expires at its TTL)
 
 ### Requirement: Single-document re-index through the DocumentRouter path
 
-The agent SHALL expose `POST /api/v1/documents/{id}/reindex` which re-processes exactly one document: fetch the object bytes from MinIO, process via `DocumentRouter.routeAndProcess` (extension-based routing to Markdown, Docling, ascend-ocr, Unstructured, or per-page PDF dispatch), split, remove the document's prior chunks for the target collection, and add the new chunks. Reindex SHALL bypass ETag deduplication, SHALL execute asynchronously returning HTTP 202 with a run id, SHALL set the document's status to `INDEXING` while running, and SHALL return 404 for unknown ids and 409 when the document's status is `DELETING`.
+The agent SHALL expose `POST /api/v1/documents/{id}/reindex` which re-processes exactly one document: fetch the object bytes from object storage, process via `DocumentRouter.routeAndProcess` (extension-based routing to Markdown, Docling, ascend-ocr, Unstructured, or per-page PDF dispatch), split, remove the document's prior chunks for the target collection, and add the new chunks. Reindex SHALL bypass ETag deduplication, SHALL execute asynchronously returning HTTP 202 with a run id, SHALL set the document's status to `INDEXING` while running, and SHALL return 404 for unknown ids and 409 when the document's status is `DELETING`.
 
 #### Scenario: Reindex replaces chunks
 
@@ -111,7 +111,7 @@ The agent SHALL expose `POST /api/v1/documents/{id}/reindex` which re-processes 
 
 #### Scenario: Reindex ignores unchanged ETag
 
-- **WHEN** a document is reindexed without its MinIO object having changed
+- **WHEN** a document is reindexed without its stored object having changed
 - **THEN** the run processes the document anyway (it is not skipped as a duplicate)
 
 #### Scenario: Reindex rejected during deletion
@@ -122,14 +122,14 @@ The agent SHALL expose `POST /api/v1/documents/{id}/reindex` which re-processes 
 
 ### Requirement: Authenticated document content download
 
-The agent SHALL expose `GET /api/v1/documents/{id}/content` which streams the bytes of the document's MinIO object back through the agent with the object's `Content-Type` and a `Content-Disposition` naming the display name. The endpoint SHALL resolve the object key from the registry, fetch it from MinIO server-side, and stream it without redirecting the caller to MinIO. It SHALL return 404 for an unknown id and 404 once the document has been deleted. This endpoint is offered alongside the presigned object-store URL that `rag-source-attachments` already guarantees, not instead of it: every source entry carries both, so a client picks whichever suits its network and never implements a fallback. Authorization (authenticated caller) and per-tenant ownership enforcement are layered by the sibling changes (`add-auth-and-identity`, `add-tenant-isolation`).
+The agent SHALL expose `GET /api/v1/documents/{id}/content` which streams the bytes of the document's stored object back through the agent with the object's `Content-Type` and a `Content-Disposition` naming the display name. The endpoint SHALL resolve the object key from the registry, fetch it from object storage server-side, and stream it without redirecting the caller to object storage. It SHALL return 404 for an unknown id and 404 once the document has been deleted. This endpoint is offered alongside the presigned object-store URL that `rag-source-attachments` already guarantees, not instead of it: every source entry carries both, so a client picks whichever suits its network and never implements a fallback. Authorization (authenticated caller) and per-tenant ownership enforcement are layered by the sibling changes (`add-auth-and-identity`, `add-tenant-isolation`).
 
 #### Scenario: Content download streams the object through the agent
 
 - **WHEN** `GET /api/v1/documents/{id}/content` is invoked for an indexed document
 - **THEN** the response status is 200 with the object's `Content-Type`
 - **AND** the body is the file's bytes
-- **AND** the response is served by the agent (no HTTP redirect to a MinIO host)
+- **AND** the response is served by the agent (no HTTP redirect to an object storage host)
 
 #### Scenario: Content download after deletion
 

@@ -66,3 +66,14 @@ The app SHALL implement a custom `ChatController` (extending the `flutter_chat_c
 #### Scenario: Controller disposes cleanly
 - **WHEN** the user navigates away from the chat screen
 - **THEN** the controller SHALL cancel any active server-sent events connection and release resources
+
+### Requirement: The app connects directly to a configurable agent address
+The app SHALL be a standalone client that calls the ascend-ai-agent API directly at a base URL set at build time with `--dart-define=ASCEND_API_URL=<url>`, defaulting to `http://localhost:9917` for local development. The app SHALL NOT depend on a reverse proxy or on being served by the agent. On the web build, streaming SHALL read the response body of the `POST /api/v1/ai/prompt/stream` request through fetch-based streaming (`package:web`), never `EventSource` and never `dart:html`.
+
+#### Scenario: Phone on the same network
+- **WHEN** the app is built with `--dart-define=ASCEND_API_URL=http://192.168.1.20:9917` and run on a phone on the same network as the agent host
+- **THEN** listing conversations and sending a streamed prompt SHALL succeed against that address
+
+#### Scenario: Web build streams through fetch
+- **WHEN** the web build sends a prompt
+- **THEN** the app SHALL issue one `POST` to `/api/v1/ai/prompt/stream` and render `delta` events as they arrive

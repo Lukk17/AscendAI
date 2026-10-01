@@ -31,6 +31,9 @@ docs/
 | [ADR-007](architecture/decisions/ADR-007-structured-output-and-readability-fallback.md) | Structured article output (`output_format=structured`) and readability-lxml fallback for thin extractions. |
 | [ADR-008](architecture/decisions/ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, loaded from disk only, refreshed solely via `POST /api/v1/blocklist/refresh`. |
 | [ADR-009](architecture/decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) | A trafilatura recall pass when the precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (0.75) of the page's plain text, longer result wins. |
+| [ADR-010](architecture/decisions/ADR-010-producer-aware-session-replay.md) | Every session record names the tier that produced it; a FlareSolverr-produced clearance is replayed by FlareSolverr first. |
+| [ADR-011](architecture/decisions/ADR-011-caller-selectable-starting-tier.md) | A caller may name the tier the escalation chain starts at, and escalation continues from there. |
+| [ADR-012](architecture/decisions/ADR-012-connect-time-address-pinning.md) | The in-process fetch connects to the address its own SSRF lookup validated; the other tiers keep pre-dispatch validation. |
 
 The [architecture/decisions/README.md](architecture/decisions/README.md) lists the same set with status flags.
 

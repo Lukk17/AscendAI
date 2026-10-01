@@ -1,6 +1,8 @@
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 from prometheus_client.multiprocess import MultiProcessCollector
 
+from src.config.config import settings
+
 _ENGINE_WARMUP_METRIC_NAME = "ascendocr_engine_warmup_duration_seconds"
 _ENGINE_WARMUP_COUNT_SAMPLE = f"{_ENGINE_WARMUP_METRIC_NAME}_count"
 
@@ -17,6 +19,14 @@ OCR_REQUESTS_TOTAL: Counter = Counter(
     labelnames=("surface", "language"),
 )
 
+UNSUPPORTED_LANGUAGE_LABEL: str = "unsupported"
+
+
+def request_language_label(language: str) -> str:
+    """The language a request is counted under: itself when supported, one fixed value when it will be refused."""
+    return language if language in settings.SUPPORTED_LANGUAGES else UNSUPPORTED_LANGUAGE_LABEL
+
+
 OCR_ERRORS_TOTAL: Counter = Counter(
     "ascendocr_ocr_errors_total",
     "OCR errors by code and surface.",
@@ -25,8 +35,8 @@ OCR_ERRORS_TOTAL: Counter = Counter(
 
 ENGINE_CACHE_EVICTIONS_TOTAL: Counter = Counter(
     "ascendocr_engine_cache_evictions_total",
-    "Number of engine cache evictions per language.",
-    labelnames=("language",),
+    "Number of engine cache evictions, labelled by the evicted detection/recognition model pair.",
+    labelnames=("engine",),
 )
 
 ENGINE_WARMUP_DURATION_SECONDS: Histogram = Histogram(
@@ -41,17 +51,6 @@ MCP_DOWNLOAD_DURATION_SECONDS: Histogram = Histogram(
     "MCP file fetch duration in seconds, partitioned by outcome.",
     labelnames=("outcome",),
     buckets=(0.1, 0.5, 1.0, 5.0, 10.0, 30.0),
-)
-
-OCR_QUEUE_DEPTH: Gauge = Gauge(
-    "ascendocr_ocr_queue_depth",
-    "Requests currently waiting on the admission gate for a free worker.",
-)
-
-OCR_QUEUE_WAIT_SECONDS: Histogram = Histogram(
-    "ascendocr_ocr_queue_wait_seconds",
-    "Time a request spent waiting on the admission gate before being dispatched or refused.",
-    buckets=(0.1, 0.5, 1.0, 5.0, 15.0, 30.0, 60.0, 120.0),
 )
 
 OCR_PAGE_DURATION_SECONDS: Histogram = Histogram(
@@ -75,6 +74,49 @@ POOL_REBUILDS_TOTAL: Counter = Counter(
     "ascendocr_pool_rebuilds_total",
     "Worker pool rebuilds, by trigger reason and outcome.",
     labelnames=("reason", "outcome"),
+)
+
+JOBS_TOTAL: Counter = Counter(
+    "ascendocr_jobs_total",
+    "Jobs that reached a terminal state, by that state.",
+    labelnames=("outcome",),
+)
+
+JOB_QUEUE_DOCUMENTS: Gauge = Gauge(
+    "ascendocr_job_queue_documents",
+    "Documents currently waiting in the job queue.",
+)
+
+JOB_QUEUE_PAGES: Gauge = Gauge(
+    "ascendocr_job_queue_pages",
+    "Pages currently waiting in the job queue.",
+)
+
+JOB_QUEUE_WAIT_SECONDS: Histogram = Histogram(
+    "ascendocr_job_queue_wait_seconds",
+    "Time a job spent waiting in the queue before it started being read.",
+    buckets=(1.0, 5.0, 15.0, 60.0, 300.0, 900.0, 1800.0, 3600.0),
+)
+
+JOB_DURATION_SECONDS: Histogram = Histogram(
+    "ascendocr_job_duration_seconds",
+    "Time a job spent being read, from the first page to its terminal state.",
+    buckets=(5.0, 15.0, 60.0, 300.0, 900.0, 1800.0, 3600.0),
+)
+
+JOBS_RETAINED: Gauge = Gauge(
+    "ascendocr_jobs_retained",
+    "Finished job records currently retained.",
+)
+
+RESULT_UPLOAD_ATTEMPTS_TOTAL: Counter = Counter(
+    "ascendocr_result_upload_attempts_total",
+    "Attempts to write a finished result to the object store.",
+)
+
+RESULT_UPLOAD_FAILURES_TOTAL: Counter = Counter(
+    "ascendocr_result_upload_failures_total",
+    "Attempts to write a finished result to the object store that failed.",
 )
 
 

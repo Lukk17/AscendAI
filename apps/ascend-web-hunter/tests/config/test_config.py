@@ -8,14 +8,24 @@ from src.config.config import Settings
 
 
 def test_settings_defaults():
-    # given
-    # When initializing settings without env vars
+    # when
     settings = Settings()
 
     # then
     assert settings.API_PORT == 7021
     assert settings.API_HOST == "0.0.0.0"
     assert settings.SEARXNG_BASE_URL == "http://localhost:9020"
+
+
+def test_redis_url_default_uses_ipv4_loopback_not_localhost(monkeypatch):
+    # given
+    monkeypatch.delenv("REDIS_URL", raising=False)
+
+    # when
+    settings = Settings(_env_file=None)
+
+    # then
+    assert settings.REDIS_URL == "redis://127.0.0.1:6379/0"
 
 
 def test_settings_env_override():
@@ -30,8 +40,7 @@ def test_settings_env_override():
 
 
 def test_blocklist_path_defaults_to_vendored_asset():
-    # given
-    # When initializing settings without env vars
+    # when
     settings = Settings()
 
     # then

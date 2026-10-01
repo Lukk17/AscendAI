@@ -8,8 +8,8 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 - [ ] 1.2 Add `PAGE`, `CHUNK_INDEX` and `CHUNK_COUNT` to `service/ingestion/IngestionMetadataKeys.java` with the same javadoc convention as the existing keys. Verify: `IngestionMetadataKeys` compiles and no producer references a page key literal anywhere else (grep for the literal returns only this class).
 - [ ] 1.3 Rewrite `IngestionService.parseUnstructuredResponse` to group elements by their page number and emit one `Document` per page, each carrying `source`, `title`, `type` and `page`, keeping the existing title-extraction behavior (first `Title` element wins, filename fallback). Verify: a unit test over the 1.1 PDF fixture asserts one document per page, page numbers ascending from 1, and no text lost against the current single-blob output.
 - [ ] 1.4 Handle elements that report no page number in `parseUnstructuredResponse` by emitting them as a document without `page` rather than assigning one. Verify: a unit test over a fixture with a page-less element asserts that element's text is present in a document whose metadata has no `page` key, and ingestion returns normally.
-- [ ] 1.5 Rewrite `AscendOcrClient.parseResponse` to emit one `Document` per entry in the `pages` array, stamping `page` from that entry's `page_number` field rather than from its position in the array. Verify: a unit test feeds a response whose `page_number` values are `[2, 1]` in that order and asserts the emitted documents carry pages 2 and 1, not 1 and 2.
-- [ ] 1.6 Keep `AscendOcrClient` emitting nothing for a response with an empty `pages` array or no text, as today. Verify: the existing empty-response unit test still passes unchanged.
+- [ ] 1.5 Change `AscendOcrClient.toDocuments` (`apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/service/ingestion/client/AscendOcrClient.java`) to split the fetched result Markdown on its `## Page N` headings (the format written by `apps/ascend-ocr/src/service/result_store.py`) into one `Document` per page, stamping `page = N` from the heading and removing the heading line from the text. Text before the first heading becomes a document without `page`. `process`, `submitJob`, `awaitTerminalState` and `fetchResult` stay unchanged. Verify: a unit test `AscendOcrClientPageSplitTest` feeds a three-page result and asserts three documents with pages 1, 2, 3, and that no document text contains `## Page`.
+- [ ] 1.6 Pin the heading format in that test with a literal fixture copied from a real ascend-ocr result, and keep the existing empty-result behavior (no text yields no document). Verify: `./gradlew test --tests "*AscendOcrClient*"` is green and `AscendOcrClientPactTest` passes with no edit to the test or to `contracts/pacts/ascend-agent-ascend-ocr.json`.
 
 ## 2. Router source identity and per-page stamping
 
@@ -25,9 +25,8 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 
 ## 4. Corpus ingestion parity
 
-- [ ] 4.1 Confirm which change owns routing the bucket-scan path through `DocumentRouter` (design.md open question 1), and record the answer in this file before implementing. Verify: the answer is written here as a one-line note naming the owning change.
-- [ ] 4.2 Assuming the sibling owns the routing, verify only the provenance outcome on the corpus path: a PDF that entered through a bucket-scan run carries the same `page`, `chunk_index` and `chunk_count` as the same file uploaded directly. Verify: an integration test (Testcontainers MinIO plus Qdrant) ingests the same three-page PDF by both routes and asserts the stored payloads match on those three fields.
-- [ ] 4.3 If the sibling does not own it, route `ManualIngestionService.ingestObject` through `DocumentRouter.routeAndProcess` in place of its markdown-versus-unstructured branch, keeping the existing dedupe, skip and failure accounting. Verify: an integration test asserts a scanned PDF dropped into the bucket is ingested with per-page metadata rather than as one flat document.
+- [ ] 4.1 add-document-management-api owns routing the bucket-scan path through `DocumentRouter` (its tasks 3.2a and 3.2b, settled 2026-10-01). Before starting, confirm that change is implemented. Verify: `ManualIngestionService` calls `DocumentRouter.routeAndProcess` for every scanned object.
+- [ ] 4.2 Verify the provenance outcome on the corpus path: a PDF that entered through a bucket-scan run carries the same `page`, `chunk_index` and `chunk_count` as the same file uploaded directly. Verify: an integration test (Testcontainers Floci plus Qdrant) ingests the same three-page PDF by both routes and asserts the stored payloads match on those three fields.
 
 ## 5. Reindex
 
@@ -52,6 +51,11 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 - [ ] 7.5 Emit citations independently of `attachSources`. Verify: a MockMvc test sends a prompt with no `attachSources` field and asserts the response has `citations` and no `sources` key.
 - [ ] 7.6 Add `app.rag.citations.enabled` to `config/properties/RagProperties.java` and `application.yaml`, defaulting to enabled, gating both the labels and the array. Verify: a test with the property set to false asserts the response has no `citations` key and the injected context contains no label.
 
+## 7b. Streaming citations event
+
+- [ ] 7b.1 Requires add-chat-streaming-and-conversations to be implemented. Add a `citations` SSE event DTO in `dto/` with payload `{"citations": [CitationRef, ...]}` and emit it from the streaming path in `service/chat/` after the last `delta` and before `sources` and `done`, only when citations are enabled and at least one passage was injected. Verify: an SSE integration test with `attachSources=true` asserts the event order `delta...`, `citations`, `sources`, `done`, and a second test with no retrieval asserts no `citations` event.
+- [ ] 7b.2 Document the `citations` event in the OpenAPI description of the stream operation. Verify: `/v3/api-docs` lists five event types for the stream operation.
+
 ## 8. Ingestion time on the source entry
 
 - [ ] 8.1 Add `ingestedAt` to `dto/SourceFile.java` and populate it in `S3PresignedUrlService` from the document registry's last-indexed timestamp for that document. Verify: a unit test asserts the field is the registry value and is present on every returned entry.
@@ -65,9 +69,9 @@ Tasks marked REINDEX REQUIRED produce their full observable behavior only for do
 
 ## 10. Architecture decision records
 
-- [ ] 10.1 Write `apps/ascend-agent/docs/architecture/decisions/ADR-010-passage-level-citation-granularity.md` in the house format (title, Status with date, Context, Decision, Consequences, Related), recording why the retrieved passage is the citation unit rather than the document or a character range, and what each rejected option cost. Verify: the file exists, follows the section order of ADR-009, and is referenced from design.md decision D1.
-- [ ] 10.2 Write `apps/ascend-agent/docs/architecture/decisions/ADR-011-provenance-carried-from-parser-to-index.md` recording that page and ordinal provenance is stamped by the producer that knows it and carried as chunk metadata, why re-deriving it at query time was rejected, and the reindex consequence. Verify: the file exists, follows the same format, and is referenced from design.md decision D3.
-- [ ] 10.3 Confirm the two new records do not renumber or contradict ADR-001 through ADR-009. Verify: the decisions directory lists ADR-001 to ADR-011 with no gap and no duplicate number.
+- [ ] 10.1 Write `apps/ascend-agent/docs/architecture/decisions/ADR-<NNN>-passage-level-citation-granularity.md`, where `<NNN>` is the next free number at implementation time (ADR-010 is taken), in the house format (title, Status with date, Context, Decision, Consequences, Related), recording why the retrieved passage is the citation unit rather than the document or a character range, and what each rejected option cost. Verify: the file exists, follows the section order of ADR-009, and is referenced from design.md decision D1.
+- [ ] 10.2 Write `apps/ascend-agent/docs/architecture/decisions/ADR-<NNN>-provenance-carried-from-parser-to-index.md` with the next free number after 10.1, recording that page and ordinal provenance is stamped by the producer that knows it and carried as chunk metadata, why re-deriving it at query time was rejected, and the reindex consequence. Verify: the file exists, follows the same format, and is referenced from design.md decision D3.
+- [ ] 10.3 Confirm the two new records do not renumber or contradict any existing record. Verify: the decisions directory has no gap and no duplicate number, and its index lists both new records.
 
 ## 11. Documentation and API surface
 

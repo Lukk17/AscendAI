@@ -1,7 +1,7 @@
 name: ascend-local
 variables:
   - name: baseUrl
-    value: localhost
+    value: 127.0.0.1
   - name: protocol
     value: http
   - name: mcp_session_id

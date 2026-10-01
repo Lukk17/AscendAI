@@ -1,0 +1,1085 @@
+{
+  "consumer": {
+    "name": "ascend-agent"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process throws naming UNSUPPORTED_FILE_TYPE when the service refuses a text file",
+        "text": [
+
+        ]
+      },
+      "description": "a submission of a text file",
+      "key": "ed7b7526",
+      "pending": false,
+      "request": {
+        "body": {
+          "content": "LS1hc2NlbmQtYWdlbnQtcGFjdC1ib3VuZGFyeQ0KQ29udGVudC1EaXNwb3NpdGlvbjogZm9ybS1kYXRhOyBuYW1lPSJmaWxlIjsgZmlsZW5hbWU9Im5vdGVzLnR4dCINCkNvbnRlbnQtVHlwZTogdGV4dC9wbGFpbg0KDQpwbGFpbiB0ZXh0LCBub3QgYW4gaW1hZ2UNCi0tYXNjZW5kLWFnZW50LXBhY3QtYm91bmRhcnktLQ0K",
+          "contentType": "multipart/form-data; boundary=ascend-agent-pact-boundary; charset=ISO-8859-1",
+          "contentTypeHint": "DEFAULT",
+          "encoded": "base64"
+        },
+        "headers": {
+          "Content-Type": [
+            "multipart/form-data; charset=ISO-8859-1; boundary=ascend-agent-pact-boundary"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/v1/ocr/jobs"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "code": "UNSUPPORTED_FILE_TYPE"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 400
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process throws on OCR_FAILED without submitting the document again",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a job that failed with OCR_FAILED",
+      "key": "f6863c09",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} has failed",
+          "params": {
+            "errorCode": "OCR_FAILED",
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "error_code": "OCR_FAILED",
+            "error_reason": "The job failed with OCR_FAILED",
+            "state": "failed"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.error_reason": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process submits the document a second time after RESULT_STORE_UNAVAILABLE and then throws",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a job that failed with RESULT_STORE_UNAVAILABLE",
+      "key": "2d6c6d69",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} has failed",
+          "params": {
+            "errorCode": "RESULT_STORE_UNAVAILABLE",
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "error_code": "RESULT_STORE_UNAVAILABLE",
+            "error_reason": "The job failed with RESULT_STORE_UNAVAILABLE",
+            "state": "failed"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.error_reason": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process submits the document a second time after SERVICE_RESTARTED and then throws",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a job that failed with SERVICE_RESTARTED",
+      "key": "d53b1db1",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} has failed",
+          "params": {
+            "errorCode": "SERVICE_RESTARTED",
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "error_code": "SERVICE_RESTARTED",
+            "error_reason": "The job failed with SERVICE_RESTARTED",
+            "state": "failed"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.error_reason": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process submits the file and its language, reads the stored result and deletes the job",
+        "text": [
+
+        ]
+      },
+      "description": "a delete of a succeeded job",
+      "key": "8c2627a6",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} has succeeded",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "status": 204
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process still returns the document when deleting the finished job is refused",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a succeeded job",
+      "key": "5e659cbd",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} has succeeded",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "result": {
+              "bucket": "ocr-results",
+              "key": "tQ3v9ZkLx2Wm8aPbR5cN0g.md"
+            },
+            "state": "succeeded"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.result.bucket": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": ".+"
+                }
+              ]
+            },
+            "$.result.key": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": ".+"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process deletes a job still running when its poll timeout expires and then throws",
+        "text": [
+
+        ]
+      },
+      "description": "a delete of a running job",
+      "key": "90c09e9c",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} is running",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "status": 204
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process deletes a job still running when its poll timeout expires and then throws",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a running job",
+      "key": "c1b86d73",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} is running",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "poll_after_seconds": 1,
+            "state": "running"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.poll_after_seconds": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process deletes a job still waiting when its poll timeout expires and then throws",
+        "text": [
+
+        ]
+      },
+      "description": "a delete of a waiting job",
+      "key": "695518e8",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} is waiting",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "status": 204
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process deletes a job still waiting when its poll timeout expires and then throws",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a waiting job",
+      "key": "9a4ce7bf",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} is waiting",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "job_id": "tQ3v9ZkLx2Wm8aPbR5cN0g",
+            "poll_after_seconds": 1,
+            "state": "waiting"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.job_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[A-Za-z0-9_-]{22}"
+                }
+              ]
+            },
+            "$.poll_after_seconds": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process throws when the job was cancelled",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a cancelled job",
+      "key": "6ec0a86e",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "job {jobId} was cancelled",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "state": "cancelled"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process still returns the document when deleting the finished job is refused",
+        "text": [
+
+        ]
+      },
+      "description": "a delete of a job that does not exist",
+      "key": "1ccb5d09",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no job {jobId} exists",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "status": 404
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process throws when the service no longer knows the job it is reading",
+        "text": [
+
+        ]
+      },
+      "description": "a status read of a job that does not exist",
+      "key": "5288a160",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no job {jobId} exists",
+          "params": {
+            "jobId": "tQ3v9ZkLx2Wm8aPbR5cN0g"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "code": "JOB_NOT_FOUND"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 404
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process submits the file and its language, reads the stored result and deletes the job",
+        "text": [
+
+        ]
+      },
+      "description": "a submission of a PNG in English",
+      "key": "975560a6",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the queue has room"
+        }
+      ],
+      "request": {
+        "body": {
+          "content": "LS1hc2NlbmQtYWdlbnQtcGFjdC1ib3VuZGFyeQ0KQ29udGVudC1EaXNwb3NpdGlvbjogZm9ybS1kYXRhOyBuYW1lPSJmaWxlIjsgZmlsZW5hbWU9Imludm9pY2UucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAAAAACoWZBhAAAAD0lEQVR4XmP4DwcMtGcCAGgtY50iD1mwAAAAAElFTkSuQmCCDQotLWFzY2VuZC1hZ2VudC1wYWN0LWJvdW5kYXJ5DQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImxhbmciDQpDb250ZW50LVR5cGU6IHRleHQvcGxhaW47Y2hhcnNldD1VVEYtOA0KDQplbg0KLS1hc2NlbmQtYWdlbnQtcGFjdC1ib3VuZGFyeS0tDQo=",
+          "contentType": "multipart/form-data; boundary=ascend-agent-pact-boundary; charset=ISO-8859-1",
+          "contentTypeHint": "DEFAULT",
+          "encoded": "base64"
+        },
+        "headers": {
+          "Content-Type": [
+            "multipart/form-data; charset=ISO-8859-1; boundary=ascend-agent-pact-boundary"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/v1/ocr/jobs"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "job_id": "tQ3v9ZkLx2Wm8aPbR5cN0g",
+            "state": "waiting"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ],
+          "Location": [
+            "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.job_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[A-Za-z0-9_-]{22}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            },
+            "Location": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^/v1/ocr/jobs/[A-Za-z0-9_-]{22}$"
+                }
+              ]
+            }
+          }
+        },
+        "status": 202
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process throws naming UNSUPPORTED_LANGUAGE when the service refuses the language",
+        "text": [
+
+        ]
+      },
+      "description": "a submission of a PNG in the unsupported language xx",
+      "key": "55199630",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the queue has room"
+        }
+      ],
+      "request": {
+        "body": {
+          "content": "LS1hc2NlbmQtYWdlbnQtcGFjdC1ib3VuZGFyeQ0KQ29udGVudC1EaXNwb3NpdGlvbjogZm9ybS1kYXRhOyBuYW1lPSJmaWxlIjsgZmlsZW5hbWU9Imludm9pY2UucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAAAAACoWZBhAAAAD0lEQVR4XmP4DwcMtGcCAGgtY50iD1mwAAAAAElFTkSuQmCCDQotLWFzY2VuZC1hZ2VudC1wYWN0LWJvdW5kYXJ5DQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImxhbmciDQpDb250ZW50LVR5cGU6IHRleHQvcGxhaW47Y2hhcnNldD1VVEYtOA0KDQp4eA0KLS1hc2NlbmQtYWdlbnQtcGFjdC1ib3VuZGFyeS0tDQo=",
+          "contentType": "multipart/form-data; boundary=ascend-agent-pact-boundary; charset=ISO-8859-1",
+          "contentTypeHint": "DEFAULT",
+          "encoded": "base64"
+        },
+        "headers": {
+          "Content-Type": [
+            "multipart/form-data; charset=ISO-8859-1; boundary=ascend-agent-pact-boundary"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/v1/ocr/jobs"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "code": "UNSUPPORTED_LANGUAGE"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 400
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process deletes a job still waiting when its poll timeout expires and then throws",
+        "text": [
+
+        ]
+      },
+      "description": "a submission of a PNG without a language",
+      "key": "59189124",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the queue has room"
+        }
+      ],
+      "request": {
+        "body": {
+          "content": "LS1hc2NlbmQtYWdlbnQtcGFjdC1ib3VuZGFyeQ0KQ29udGVudC1EaXNwb3NpdGlvbjogZm9ybS1kYXRhOyBuYW1lPSJmaWxlIjsgZmlsZW5hbWU9Imludm9pY2UucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAAAAACoWZBhAAAAD0lEQVR4XmP4DwcMtGcCAGgtY50iD1mwAAAAAElFTkSuQmCCDQotLWFzY2VuZC1hZ2VudC1wYWN0LWJvdW5kYXJ5LS0NCg==",
+          "contentType": "multipart/form-data; boundary=ascend-agent-pact-boundary; charset=ISO-8859-1",
+          "contentTypeHint": "DEFAULT",
+          "encoded": "base64"
+        },
+        "headers": {
+          "Content-Type": [
+            "multipart/form-data; charset=ISO-8859-1; boundary=ascend-agent-pact-boundary"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/v1/ocr/jobs"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "job_id": "tQ3v9ZkLx2Wm8aPbR5cN0g",
+            "state": "waiting"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ],
+          "Location": [
+            "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.job_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[A-Za-z0-9_-]{22}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            },
+            "Location": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^/v1/ocr/jobs/[A-Za-z0-9_-]{22}$"
+                }
+              ]
+            }
+          }
+        },
+        "status": 202
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "testname": "com.lukk.ascend.ai.agent.service.ingestion.client.AscendOcrClientPactTest.process retries a queue-full refusal up to the configured attempts and then throws naming QUEUE_FULL",
+        "text": [
+
+        ]
+      },
+      "description": "a submission of a PNG while the queue is full",
+      "key": "a312c603",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the queue is full"
+        }
+      ],
+      "request": {
+        "body": {
+          "content": "LS1hc2NlbmQtYWdlbnQtcGFjdC1ib3VuZGFyeQ0KQ29udGVudC1EaXNwb3NpdGlvbjogZm9ybS1kYXRhOyBuYW1lPSJmaWxlIjsgZmlsZW5hbWU9Imludm9pY2UucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAAAAACoWZBhAAAAD0lEQVR4XmP4DwcMtGcCAGgtY50iD1mwAAAAAElFTkSuQmCCDQotLWFzY2VuZC1hZ2VudC1wYWN0LWJvdW5kYXJ5LS0NCg==",
+          "contentType": "multipart/form-data; boundary=ascend-agent-pact-boundary; charset=ISO-8859-1",
+          "contentTypeHint": "DEFAULT",
+          "encoded": "base64"
+        },
+        "headers": {
+          "Content-Type": [
+            "multipart/form-data; charset=ISO-8859-1; boundary=ascend-agent-pact-boundary"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/v1/ocr/jobs"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "code": "QUEUE_FULL",
+            "detail": "Queue is full, retry later"
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ],
+          "Retry-After": [
+            "1"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.detail": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            },
+            "Retry-After": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^\\d+$"
+                }
+              ]
+            }
+          }
+        },
+        "status": 503
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.6.21"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "ascend-ocr"
+  }
+}

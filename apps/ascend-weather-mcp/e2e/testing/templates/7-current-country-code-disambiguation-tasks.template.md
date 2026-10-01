@@ -29,14 +29,14 @@ First call (no `countryCode`):
 
 - [ ] `status="ok"`
 - [ ] `location.countryCode="PL"`
-- [ ] `location.latitude` in 51.5–53.0
-- [ ] `location.longitude` in 20.5–22.0
+- [ ] `location.latitude` in 51.5-53.0
+- [ ] `location.longitude` in 20.5-22.0
 
 Second call (`countryCode="US"`):
 
 - [ ] `status="ok"`
 - [ ] `location.countryCode="US"`
-- [ ] `location.latitude` in 38.0–43.0
+- [ ] `location.latitude` in 38.0-43.0
 - [ ] `location.longitude` in -95.0 to -75.0
 
 Cross-call:

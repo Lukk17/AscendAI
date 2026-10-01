@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr"
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs"
   headers:
     - name: accept
       value: application/json
@@ -21,14 +21,21 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("Status code is 422", function () {
+        test("A submission with no file is rejected before any work is queued", function () {
             expect(res.getStatus()).to.equal(422);
         });
-        test("detail is a non-empty array naming the missing file field", function () {
+        test("The body carries the validation detail naming the missing file, not a job record", function () {
             const body = res.getBody();
             expect(body.detail).to.be.an("array").that.is.not.empty;
-            const fileError = body.detail.find(function (d) { return Array.isArray(d.loc) && d.loc.includes("file"); });
-            expect(fileError).to.be.ok;
+            const fileError = body.detail.find(function (entry) {
+                return Array.isArray(entry.loc) && entry.loc[entry.loc.length - 1] === "file";
+            });
+            expect(fileError, JSON.stringify(body.detail)).to.be.ok;
+            expect(fileError.type).to.equal("missing");
+            expect(body).to.not.have.property("state");
+        });
+        test("No identifier is issued", function () {
+            expect(res.getBody()).to.not.have.property("job_id");
         });
 
 settings:

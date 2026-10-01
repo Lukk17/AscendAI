@@ -15,7 +15,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 
@@ -30,7 +30,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ## Result summary
 
-Both Bruno runs returned HTTP 200. The response `content` field contained a fully structured, multi-section summary grounded in the PDF source document. Eleven of the twelve spec-listed proper nouns were present in the response: `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.` (only `81 duels` was not mentioned). The response was not a refusal — it was a coherent, detailed narrative summary citing specific facts from the chronicle. The document pipeline (PDFBox -> Docling) processed the PDF and injected content into the prompt context successfully. Model used: MiniMax-M2.7. Total tokens consumed by the model: 6297 (5745 prompt + 552 completion).
+Both Bruno runs returned HTTP 200. The response `content` field contained a fully structured, multi-section summary grounded in the PDF source document. Eleven of the twelve spec-listed proper nouns were present in the response: `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.` (only `81 duels` was not mentioned). The response was not a refusal - it was a coherent, detailed narrative summary citing specific facts from the chronicle. The document pipeline (PDFBox -> Docling) processed the PDF and injected content into the prompt context successfully. Model used: MiniMax-M2.7. Total tokens consumed by the model: 6297 (5745 prompt + 552 completion).
 
 Input tokens: 5745
 
@@ -47,5 +47,5 @@ Duration: 00:05:20
 ## Additional tasks I did
 
 - Re-ran Bruno a second time with `--output /tmp/bru-summarization-output.json` to capture the full response body JSON for proper noun verification (first Bruno run confirmed HTTP 200 but did not surface response body to stdout).
-- Attempted a direct curl equivalent as a diagnostic; curl returned HTTP 422 ("Failed to route PDF page") — this is a known content-type handling difference between Bruno's multipart form and a raw curl invocation. The Bruno run is the authoritative test per the spec.
+- Attempted a direct curl equivalent as a diagnostic; curl returned HTTP 422 ("Failed to route PDF page") - this is a known content-type handling difference between Bruno's multipart form and a raw curl invocation. The Bruno run is the authoritative test per the spec.
 - Checked the startup readiness banner via the actuator health endpoint; `{"status":"UP"}` confirmed, no FAILED dependency rows visible.
