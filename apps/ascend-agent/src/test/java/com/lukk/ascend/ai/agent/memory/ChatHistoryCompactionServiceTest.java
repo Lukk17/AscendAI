@@ -224,7 +224,7 @@ class ChatHistoryCompactionServiceTest {
         when(repository.findAllHistoryOrdered(CONVERSATION_ID))
                 .thenThrow(new RuntimeException("postgres down"));
 
-        // then
+        // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
     }
 

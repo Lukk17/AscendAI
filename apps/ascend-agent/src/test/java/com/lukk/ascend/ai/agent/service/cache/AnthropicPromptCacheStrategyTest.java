@@ -66,7 +66,7 @@ class AnthropicPromptCacheStrategyTest {
         when(md.getUsage()).thenReturn(usage);
         when(usage.getNativeUsage()).thenReturn(new Object());
 
-        // then
+        // when
         strategy.recordOutcome("u", response);
     }
 
@@ -76,7 +76,7 @@ class AnthropicPromptCacheStrategyTest {
         // given - cache hit: cacheRead > 0, cacheCreate == 0
         ChatResponse response = anthropicResponse(487, 0, 612);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
     }
 
@@ -86,7 +86,7 @@ class AnthropicPromptCacheStrategyTest {
         // given - cold start: both cacheRead and cacheCreate are 0
         ChatResponse response = anthropicResponse(0, 0, 612);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
     }
 
@@ -96,7 +96,7 @@ class AnthropicPromptCacheStrategyTest {
         // given - cache write: cacheCreate > 0, cacheRead == 0 (first population of cache)
         ChatResponse response = anthropicResponse(0, 350, 612);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
     }
 
@@ -106,7 +106,7 @@ class AnthropicPromptCacheStrategyTest {
         // given - mixed: cache was partially warmed so both counters > 0
         ChatResponse response = anthropicResponse(312, 100, 1024);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
     }
 

@@ -58,11 +58,13 @@ class McpStartupTimeoutIT extends TestcontainersBase {
     @Test
     @DisplayName("A server that accepts the connection but never answers the handshake is recorded FAILED")
     void registry_WhenHandshakeStalls_RecordsFailedForThatConnection() {
+        // when
         McpClientEntry stalling = statusRegistry.entries().stream()
                 .filter(entry -> entry.name().equals(STALLING_CONNECTION))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No registry entry recorded for " + STALLING_CONNECTION));
 
+        // then
         assertThat(ACCEPTED_CONNECTIONS)
                 .as("the stand-in server must have accepted the TCP connection, otherwise this is a "
                         + "connection-refused scenario rather than a stalled handshake")
@@ -75,8 +77,10 @@ class McpStartupTimeoutIT extends TestcontainersBase {
     @Test
     @DisplayName("A stalled client advertises no tools")
     void toolCallbackProvider_WhenHandshakeStalled_ReturnsEmptyCallbacks() {
+        // when
         ToolCallback[] callbacks = toolCallbackProvider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).isEmpty();
     }
 

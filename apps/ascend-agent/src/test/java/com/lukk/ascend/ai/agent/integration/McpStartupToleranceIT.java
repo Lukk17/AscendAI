@@ -90,14 +90,17 @@ class McpStartupToleranceIT extends TestcontainersBase {
     @Test
     @DisplayName("Spring context refreshes successfully when the configured MCP server is unreachable")
     void contextRefreshes_WhenMcpServerUnreachable_DoesNotFail() {
+        // then
         assertThat(applicationContext).isNotNull();
     }
 
     @Test
     @DisplayName("Registry records FAILED status for the unreachable MCP server")
     void registry_WhenMcpServerUnreachable_RecordsFailedStatus() {
+        // when
         Collection<McpClientEntry> entries = statusRegistry.entries();
 
+        // then
         assertThat(entries).isNotEmpty();
         assertThat(entries).allMatch(e -> e.status() == McpClientStatus.FAILED);
     }
@@ -105,8 +108,10 @@ class McpStartupToleranceIT extends TestcontainersBase {
     @Test
     @DisplayName("Registry keys every entry by the bare connection name and carries its configured URL")
     void registry_RealSpringAiWiring_HoldsConnectionNamesAndConfiguredUrls() {
+        // when
         Collection<McpClientEntry> entries = statusRegistry.entries();
 
+        // then
         assertThat(entries)
                 .extracting(McpClientEntry::name)
                 .containsExactlyInAnyOrderElementsOf(CONFIGURED_CONNECTIONS.keySet());
@@ -117,17 +122,21 @@ class McpStartupToleranceIT extends TestcontainersBase {
     @Test
     @DisplayName("FilteredToolCallbackProvider returns empty callbacks when all MCP clients are FAILED")
     void toolCallbackProvider_WhenAllClientsFailed_ReturnsEmptyCallbacks() {
+        // when
         ToolCallback[] callbacks = toolCallbackProvider.getToolCallbacks();
 
+        // then
         assertThat(callbacks).isEmpty();
     }
 
     @Test
     @DisplayName("The context holds no unfiltered MCP tool-callback provider that could bypass the status filter")
     void applicationContext_ToolCallbackProviderBeans_ContainOnlyTheFilteredWrapper() {
+        // when
         Collection<ToolCallbackProvider> providers =
                 applicationContext.getBeansOfType(ToolCallbackProvider.class).values();
 
+        // then
         assertThat(providers).hasSize(1);
         assertThat(providers).allSatisfy(p -> assertThat(p).isInstanceOf(FilteredToolCallbackProvider.class));
         assertThat(applicationContext.getBeanNamesForType(SyncMcpToolCallbackProvider.class)).isEmpty();
@@ -137,8 +146,10 @@ class McpStartupToleranceIT extends TestcontainersBase {
     @Test
     @DisplayName("Prompt endpoint returns 200 while every configured MCP server is unreachable")
     void promptEndpoint_WhenAllMcpClientsFailed_Returns200() throws Exception {
+        // given
         when(chatModelResolver.resolve(anyString())).thenReturn(new StubChatModel());
 
+        // then
         mockMvc.perform(multipart("/api/v1/ai/prompt")
                         .param("prompt", "Say hello")
                         .param("provider", "lmstudio")

@@ -128,36 +128,45 @@ class ChatContextAssemblerMemoryFilteringTest {
     @Test
     @DisplayName("buildSystemMessages null items list returns no memory block")
     void buildSystemMessages_NullItemsList_ReturnsNoMemoryBlock() {
+        // given
         // This exercises items == null path in buildSemanticMemoryBlock
         when(semanticMemoryClient.search(USER_ID, USER_PROMPT, 5, EMBED_PROVIDER)).thenReturn(null);
 
+        // when
         String result = assembler.buildSystemMessage(USER_ID, USER_PROMPT, EMBED_PROVIDER);
 
+        // then
         assertThat(result).doesNotContain("User memory (may be relevant):");
     }
 
     @Test
     @DisplayName("buildSystemMessages with non-blank instructions logs YES state")
     void buildSystemMessages_NonBlankInstructions_LogsYesState() {
+        // given
         // The log statement at line 47: instructions != null && !instructions.isBlank() ? "YES" : "NO"
         when(userInstructionService.getInstructions(USER_ID)).thenReturn("Be precise.");
         when(semanticMemoryClient.search(USER_ID, USER_PROMPT, 5, EMBED_PROVIDER)).thenReturn(List.of());
 
+        // when
         String result = assembler.buildSystemMessage(USER_ID, USER_PROMPT, EMBED_PROVIDER);
 
+        // then
         assertThat(result).contains("Be precise.");
     }
 
     @Test
     @DisplayName("buildSystemMessages logs NO for instructions when instructions is blank (not null)")
     void buildSystemMessages_BlankInstructions_LogsNoState() {
+        // given
         // instructions != null && !instructions.isBlank() = true && false = false -> "NO" in log
         // blank, not null
         when(userInstructionService.getInstructions(USER_ID)).thenReturn("   ");
         when(semanticMemoryClient.search(USER_ID, USER_PROMPT, 5, EMBED_PROVIDER)).thenReturn(List.of());
 
+        // when
         String result = assembler.buildSystemMessage(USER_ID, USER_PROMPT, EMBED_PROVIDER);
 
+        // then
         // Still builds the system message, log says NO for instructions
         assertThat(result).contains(SYSTEM_PROMPT);
     }

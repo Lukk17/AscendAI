@@ -80,7 +80,7 @@ class AppConfigVectorStoreInitTest {
         VectorStoreProperties props = new VectorStoreProperties();
         props.setCollections(List.of());
 
-        // then
+        // when
         CommandLineRunner runner = config.initVectorStore(qdrant, props);
         runner.run();
     }
@@ -97,7 +97,7 @@ class AppConfigVectorStoreInitTest {
         VectorStoreProperties props = new VectorStoreProperties();
         props.setCollections(List.of());
 
-        // then
+        // when
         CommandLineRunner runner = config.initVectorStore(qdrant, props);
         runner.run();
     }
@@ -119,7 +119,7 @@ class AppConfigVectorStoreInitTest {
         col.setSize(1536);
         props.setCollections(List.of(col));
 
-        // then
+        // when
         CommandLineRunner runner = config.initVectorStore(qdrant, props);
         runner.run();
     }

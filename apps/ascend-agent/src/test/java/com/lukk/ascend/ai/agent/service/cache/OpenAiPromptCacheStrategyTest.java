@@ -56,7 +56,7 @@ class OpenAiPromptCacheStrategyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
     }
 
@@ -71,7 +71,7 @@ class OpenAiPromptCacheStrategyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome(TestConstants.DEFAULT_USER_ID, response);
     }
 

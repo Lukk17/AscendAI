@@ -90,8 +90,10 @@ class DocumentServiceTest {
     @Test
     @DisplayName("removeOldDocuments does nothing when the documents list is null")
     void removeOldDocuments_NullList_DoesNothing() {
+        // when
         documentService.removeOldDocuments(null, vectorStore);
 
+        // then
         verify(vectorStore, never()).delete(any(Filter.Expression.class));
     }
 

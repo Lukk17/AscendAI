@@ -155,7 +155,7 @@ class PersistentChatMemoryMessageMappingTest {
         // given
         doThrow(new RuntimeException("db down")).when(repository).save(any());
 
-        // then
+        // when
         memory.persistToDb(CONVO_ID, new UserMessage("text"));
     }
 
@@ -167,6 +167,7 @@ class PersistentChatMemoryMessageMappingTest {
             "false, false"
     })
     void get_RespectsBackendToggles_ForAllFourCombinations(boolean redisOn, boolean postgresOn) {
+        // given
         properties.getRedis().setEnabled(redisOn);
         properties.getPostgres().setEnabled(postgresOn);
 
@@ -180,8 +181,10 @@ class PersistentChatMemoryMessageMappingTest {
             lenient().when(repository.findRecentHistory(CONVO_ID, 5)).thenReturn(List.of(row));
         }
 
+        // when
         List<Message> result = memory.get(CONVO_ID, 10);
 
+        // then
         if (!redisOn && !postgresOn) {
             assertThat(result).isEmpty();
             verifyNoInteractions(redisTemplate);
@@ -210,14 +213,17 @@ class PersistentChatMemoryMessageMappingTest {
             "false, false"
     })
     void add_RespectsBackendToggles_ForAllFourCombinations(boolean redisOn, boolean postgresOn) {
+        // given
         properties.getRedis().setEnabled(redisOn);
         properties.getPostgres().setEnabled(postgresOn);
         if (redisOn) {
             when(redisTemplate.opsForList()).thenReturn(listOperations);
         }
 
+        // when
         memory.add(CONVO_ID, List.of(new UserMessage("hello")));
 
+        // then
         if (redisOn) {
             verify(listOperations).rightPush(eq(REDIS_KEY), any());
             verify(listOperations).trim(REDIS_KEY, 0, 4);
@@ -253,7 +259,7 @@ class PersistentChatMemoryMessageMappingTest {
         doThrow(new RuntimeException("compaction blew up"))
                 .when(compactionService).maybeCompact(any(), any(), any());
 
-        // then - compaction failures never break the user's turn
+        // when - compaction failures never break the user's turn
         memory.add(CONVO_ID, List.of(new UserMessage("hi")));
     }
 

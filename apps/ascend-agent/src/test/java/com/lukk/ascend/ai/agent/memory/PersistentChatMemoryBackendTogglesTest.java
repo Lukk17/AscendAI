@@ -87,7 +87,7 @@ class PersistentChatMemoryBackendTogglesTest {
         properties.getPostgres().setEnabled(false);
         recreateMemory();
 
-        // then
+        // when
         memory.add(CONV_ID, List.of(new UserMessage("hello")));
     }
 
@@ -186,7 +186,7 @@ class PersistentChatMemoryBackendTogglesTest {
         recreateMemory();
         when(redisTemplate.opsForList()).thenReturn(listOperations);
 
-        // then
+        // when
         memory.add(CONV_ID, List.of(new UserMessage("message")));
     }
 
@@ -222,7 +222,7 @@ class PersistentChatMemoryBackendTogglesTest {
         compactionProperties.setEnabled(true);
         recreateMemory();
 
-        // then
+        // when
         memory.logToggleState();
     }
 
@@ -235,7 +235,7 @@ class PersistentChatMemoryBackendTogglesTest {
         compactionProperties.setEnabled(false);
         recreateMemory();
 
-        // then
+        // when
         memory.logToggleState();
     }
 
@@ -248,7 +248,7 @@ class PersistentChatMemoryBackendTogglesTest {
         compactionProperties.setEnabled(true);
         recreateMemory();
 
-        // then
+        // when
         memory.logToggleState();
     }
 

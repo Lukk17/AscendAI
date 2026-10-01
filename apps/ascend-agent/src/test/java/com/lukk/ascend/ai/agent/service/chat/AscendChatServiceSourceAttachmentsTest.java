@@ -130,6 +130,7 @@ class AscendChatServiceSourceAttachmentsTest {
         AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, "openai", false, null);
 
+        // then
         assertThat(response.content()).isEqualTo("reply");
     }
 
@@ -148,6 +149,7 @@ class AscendChatServiceSourceAttachmentsTest {
         AiResponse response = ascendChatService.prompt("hello", null, null, TestConstants.DEFAULT_USER_ID,
                 "openai", null, null, false, CompactionOverride.EMPTY);
 
+        // then
         assertThat(response.content()).isEqualTo("reply");
     }
 }

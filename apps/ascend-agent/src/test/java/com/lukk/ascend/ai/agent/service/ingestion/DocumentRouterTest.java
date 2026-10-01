@@ -80,13 +80,16 @@ class DocumentRouterTest {
     @ParameterizedTest
     @ValueSource(strings = {"docx", "xlsx", "pptx", "html"})
     void routeAndProcess_WhenDoclingFileType_ThenRouteToDocling(String extension) {
+        // given
         byte[] bytes = "test".getBytes();
         String filename = "file." + extension;
         Document mockDoc = new Document("docling text");
         when(doclingClient.process(bytes, filename)).thenReturn(List.of(mockDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(bytes, filename, "application/octet-stream");
 
+        // then
         assertThat(result).containsExactly(mockDoc);
         verify(doclingClient).process(bytes, filename);
     }
@@ -94,13 +97,16 @@ class DocumentRouterTest {
     @ParameterizedTest
     @ValueSource(strings = {"png", "jpg", "jpeg", "tiff", "bmp", "webp"})
     void routeAndProcess_WhenImageFile_ThenRouteToAscendOcr(String extension) {
+        // given
         byte[] bytes = "image_bytes".getBytes();
         String filename = "scan." + extension;
         Document mockDoc = new Document("ocr text");
         when(ascendOcrClient.process(bytes, filename, null)).thenReturn(List.of(mockDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(bytes, filename, "image/" + extension);
 
+        // then
         assertThat(result).containsExactly(mockDoc);
         verify(ascendOcrClient).process(bytes, filename, null);
     }
@@ -108,15 +114,18 @@ class DocumentRouterTest {
     @Test
     @DisplayName("routeAndProcess keeps a canary intact through the OCR Markdown headings and the chunking below it")
     void routeAndProcess_WhenOcrMarkdownIsChunked_ThenCanarySurvives() {
+        // given
         byte[] bytes = "scan_bytes".getBytes();
         String filename = "scan.png";
         String markdown = ocrMarkdownWithCanary();
         when(ascendOcrClient.process(bytes, filename, null))
                 .thenReturn(List.of(new Document(markdown, Map.of("source", filename, "type", "ascendocr"))));
 
+        // when
         List<Document> routed = documentRouter.routeAndProcess(bytes, filename, "image/png");
         List<Document> chunks = productionChunker().splitDocuments(routed);
 
+        // then
         assertThat(chunks).hasSizeGreaterThan(1);
         assertThat(chunks).anySatisfy(chunk -> assertThat(chunk.getText()).contains(CANARY));
         verify(ascendOcrClient).process(bytes, filename, null);
@@ -125,14 +134,17 @@ class DocumentRouterTest {
     @ParameterizedTest
     @ValueSource(strings = {"eml", "msg", "epub", "rtf", "xml", "odt"})
     void routeAndProcess_WhenUnstructuredFileType_ThenRouteToUnstructured(String extension) {
+        // given
         byte[] bytes = "content".getBytes();
         String filename = "file." + extension;
         Document mockDoc = new Document("unstructured text");
         when(ingestionService.processUnstructured(any(InputStream.class), eq(filename)))
                 .thenReturn(List.of(mockDoc));
 
+        // when
         List<Document> result = documentRouter.routeAndProcess(bytes, filename, "application/octet-stream");
 
+        // then
         assertThat(result).containsExactly(mockDoc);
         verify(ingestionService).processUnstructured(any(InputStream.class), eq(filename));
     }

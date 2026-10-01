@@ -112,6 +112,7 @@ class ManualIngestionServiceIOExceptionTest {
                 .isInstanceOf(com.lukk.ascend.ai.agent.exception.IngestionException.class)
                 .hasMessageContaining("Failed to read S3 object");
 
+        // then
         // And the metadata marker should be removed
         verify(metadataStore).remove(anyString());
     }

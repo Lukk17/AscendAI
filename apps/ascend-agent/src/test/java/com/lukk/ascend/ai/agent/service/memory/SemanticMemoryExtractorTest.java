@@ -232,42 +232,54 @@ class SemanticMemoryExtractorTest {
         @Test
         @DisplayName("extractFactsFromJson returns all facts from a thinking response with embedded JSON")
         void extractFactsFromJson_WhenThinkingResponseWithEmbeddedJson_ThenReturnsAllFacts() {
+            // given
             String thinking = "Thus we have two facts: \"User's name is Luke\" and "
                     + "\"User is a software engineer\". The list is: "
                     + "[\"User's name is Luke\", \"User is a software engineer\"]";
 
+            // when
             List<String> facts = parserExtractor.extractFactsFromJson(thinking);
 
+            // then
             assertThat(facts).containsExactly("User's name is Luke", "User is a software engineer");
         }
 
         @Test
         @DisplayName("extractFactsFromJson returns all facts from a pure JSON array input")
         void extractFactsFromJson_WhenPureJsonArray_ThenReturnsAllFacts() {
+            // given
             String pureJson = "[\"User's name is Luke\", \"User is a software engineer\"]";
 
+            // when
             List<String> facts = parserExtractor.extractFactsFromJson(pureJson);
 
+            // then
             assertThat(facts).containsExactly("User's name is Luke", "User is a software engineer");
         }
 
         @Test
         @DisplayName("extractFactsFromJson returns empty without throwing when input has no JSON array")
         void extractFactsFromJson_WhenNoJsonArrayAtAll_ThenReturnsEmptyAndDoesNotThrow() {
+            // given
             String prose = "Thus we have two facts: User's name is Luke and User is a software engineer...";
 
+            // when
             List<String> facts = parserExtractor.extractFactsFromJson(prose);
 
+            // then
             assertThat(facts).isEmpty();
         }
 
         @Test
         @DisplayName("extractFactsFromJson extracts a single fact from a markdown-fenced JSON array")
         void extractFactsFromJson_WhenMarkdownFencedJson_ThenReturnsSingleFact() {
+            // given
             String fenced = "```json\n[\"fact one\"]\n```";
 
+            // when
             List<String> facts = parserExtractor.extractFactsFromJson(fenced);
 
+            // then
             assertThat(facts).containsExactly("fact one");
         }
     }

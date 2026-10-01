@@ -86,7 +86,7 @@ class SemanticMemoryClientBlankUserIdTest {
         // given
         properties.setEnabled(false);
 
-        // then
+        // when
         client.insertMemory(TestConstants.DEFAULT_USER_ID, "some fact", "lmstudio");
     }
 
@@ -96,7 +96,7 @@ class SemanticMemoryClientBlankUserIdTest {
         // given
         properties.setEnabled(false);
 
-        // then
+        // when
         client.wipeUserMemory(TestConstants.DEFAULT_USER_ID, "lmstudio");
     }
 
@@ -106,7 +106,7 @@ class SemanticMemoryClientBlankUserIdTest {
         // given
         properties.setEnabled(false);
 
-        // then
+        // when
         client.deleteMemory(TestConstants.DEFAULT_USER_ID, "mem-123", "lmstudio");
     }
 

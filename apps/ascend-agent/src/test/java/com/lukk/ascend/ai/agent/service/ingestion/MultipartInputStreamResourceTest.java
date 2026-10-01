@@ -16,6 +16,7 @@ class MultipartInputStreamResourceTest {
     void getFilename_ReturnsConstructorValue() {
         // given
         InputStream is = new ByteArrayInputStream("data".getBytes());
+        // when
         MultipartInputStreamResource res = new MultipartInputStreamResource(is, "doc.pdf");
 
         // then

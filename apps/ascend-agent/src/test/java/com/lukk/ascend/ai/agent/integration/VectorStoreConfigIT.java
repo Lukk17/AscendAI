@@ -41,6 +41,7 @@ class VectorStoreConfigIT {
 
         @Test
         void defaultVectorStore_mapsTo_ascendai768() {
+            // then
             assertThat(embeddingProviderProperties.getDefaultProvider()).isEqualTo("lmstudio");
             assertThat(embeddingProviderProperties.getActiveDimensions()).isEqualTo(768);
             assertThat(embeddingProviderProperties.getActiveCollectionName()).isEqualTo("ascendai-768");
@@ -57,6 +58,7 @@ class VectorStoreConfigIT {
         void perProviderStores_useDistinctCollectionsByDimensions() {
             // The provider→store map must contain entries for every configured provider,
             // each keyed at the dimension-derived collection (ascendai-{dims}).
+            // then
             assertThat(embeddingProviderStoreMap.get("lmstudio")).isNotNull();
             assertThat(embeddingProviderStoreMap.get("openai")).isNotNull();
             // Different beans for different providers - the Map.toMap factory above must not collapse them.
@@ -85,10 +87,12 @@ class VectorStoreConfigIT {
 
         @Test
         void defaultVectorStore_mapsTo_ascendai1536() {
+            // given
             assertThat(embeddingProviderProperties.getDefaultProvider()).isEqualTo("openai");
             assertThat(embeddingProviderProperties.getActiveDimensions()).isEqualTo(1536);
             assertThat(embeddingProviderProperties.getActiveCollectionName()).isEqualTo("ascendai-1536");
 
+            // then
             assertThat(embeddingProviderStoreMap).containsKey("openai");
             assertThat(vectorStore).isSameAs(embeddingProviderStoreMap.get("openai"));
 

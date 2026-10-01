@@ -27,7 +27,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome("user", response);
     }
 
@@ -41,7 +41,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome("user", response);
     }
 
@@ -55,7 +55,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome("user", response);
     }
 
@@ -95,7 +95,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome("user", response);
     }
 
@@ -109,7 +109,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then - logs hit=false (cold-start / no cache read)
+        // when - logs hit=false (cold-start / no cache read)
         strategy.recordOutcome("user", response);
     }
 
@@ -126,7 +126,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then - uses 0 for prompt_tokens (null branch of ternary)
+        // when - uses 0 for prompt_tokens (null branch of ternary)
         strategy.recordOutcome("user", response);
     }
 
@@ -139,7 +139,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome("user", response);
     }
 }

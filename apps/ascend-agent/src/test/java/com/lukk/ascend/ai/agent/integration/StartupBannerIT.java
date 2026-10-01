@@ -64,9 +64,11 @@ class StartupBannerIT extends TestcontainersBase {
 
     @Test
     void banner_reportsStructureWithStatusMarkersAndPromptEndpoint() {
+        // when
         // Re-publish readiness so the @EventListener writes to our freshly attached appender.
         AvailabilityChangeEvent.publish(applicationContext, ReadinessState.ACCEPTING_TRAFFIC);
 
+        // then
         String banner = appender.list.stream()
                 .map(ILoggingEvent::getFormattedMessage)
                 .reduce("", (a, b) -> a + "\n" + b);
@@ -121,15 +123,18 @@ class StartupBannerIT extends TestcontainersBase {
 
     @Test
     void banner_isSkippedForNonAcceptingTrafficStates() {
+        // given
         // Sanity check: the listener early-returns for non-ACCEPTING_TRAFFIC events,
         // so re-publishing a different readiness/liveness state must not emit the banner.
         AvailabilityChangeEvent.publish(applicationContext, ReadinessState.REFUSING_TRAFFIC);
         AvailabilityChangeEvent.publish(applicationContext, LivenessState.CORRECT);
 
+        // when
         boolean hasBanner = appender.list.stream()
                 .map(ILoggingEvent::getFormattedMessage)
                 .anyMatch(msg -> msg.contains("MAIN PROMPT ENDPOINT"));
 
+        // then
         assertThat(hasBanner).isFalse();
     }
 }

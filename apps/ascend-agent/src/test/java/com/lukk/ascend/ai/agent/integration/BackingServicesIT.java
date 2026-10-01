@@ -43,29 +43,37 @@ class BackingServicesIT extends TestcontainersBase {
 
     @Test
     void postgres_isReachableAndSchemaInitialized() {
+        // given
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         Integer one = jdbc.queryForObject("SELECT 1", Integer.class);
         assertThat(one).isEqualTo(1);
 
         // Liquibase changelog should have run on context startup
+        // when
         List<String> tables = jdbc.queryForList(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'",
                 String.class);
+        // then
         assertThat(tables).isNotEmpty();
     }
 
     @Test
     void redis_isReachableViaTemplate() {
+        // given
         redisTemplate.opsForValue().set("it:smoke:key", "hello");
+        // when
         String value = redisTemplate.opsForValue().get("it:smoke:key");
+        // then
         assertThat(value).isEqualTo("hello");
         redisTemplate.delete("it:smoke:key");
     }
 
     @Test
     void qdrant_isReachableAndCollectionsExist() throws Exception {
+        // when
         List<String> collections = qdrantClient.listCollectionsAsync().get();
         // initVectorStore CommandLineRunner should have created both
+        // then
         assertThat(collections).contains("ascendai-768", "ascendai-1536");
     }
 
@@ -73,13 +81,16 @@ class BackingServicesIT extends TestcontainersBase {
     void objectStore_isReachableAndBucketCreated() throws Exception {
         // app.s3.bucket = knowledge-base; BucketInitConfig (a separate startup runner)
         // creates it at boot. If the runner ran successfully, the HeadBucket call returns 200.
+        // when
         HeadBucketResponse response = s3Client.headBucket(
                 HeadBucketRequest.builder().bucket("knowledge-base").build());
+        // then
         assertThat(response.sdkHttpResponse().statusCode()).isEqualTo(200);
     }
 
     @Test
     void restClientBuilder_producesUsableClient() {
+        // then
         assertThat(restClient).isNotNull();
     }
 }

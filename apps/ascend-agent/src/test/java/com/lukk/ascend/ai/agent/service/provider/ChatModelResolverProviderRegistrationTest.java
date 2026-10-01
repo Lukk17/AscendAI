@@ -109,7 +109,7 @@ class ChatModelResolverProviderRegistrationTest {
         props.setProviders(Map.of("openai", config));
         ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
 
-        // then - HTTP/1.1 branch is exercised without throwing
+        // when - HTTP/1.1 branch is exercised without throwing
         resolver.initializeProviders();
     }
 
@@ -129,7 +129,7 @@ class ChatModelResolverProviderRegistrationTest {
         props.setProviders(Map.of("anthropic", config));
         ChatModelResolver resolver = new ChatModelResolver(props, new ToolCallTracker());
 
-        // then - default timeout branch exercised without throwing
+        // when - default timeout branch exercised without throwing
         resolver.initializeProviders();
     }
 }

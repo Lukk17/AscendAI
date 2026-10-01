@@ -100,6 +100,7 @@ class SemanticMemoryExtractorCacheRetryTest {
         // give virtual thread time to finish
         Thread.sleep(300);
 
+        // then
         verify(chatModel, org.mockito.Mockito.atLeastOnce()).call(any(Prompt.class));
     }
 
@@ -126,10 +127,12 @@ class SemanticMemoryExtractorCacheRetryTest {
         when(chatModelResolver.resolve("openai")).thenReturn(chatModel);
         when(chatModel.call(any(Prompt.class))).thenThrow(new RuntimeException("unrelated error"));
 
+        // when
         extractor.extract(TestConstants.DEFAULT_USER_ID, "prompt", "openai", "gpt-4o-mini", "openai");
 
         Thread.sleep(300);
 
+        // then
         // called exactly once (no retry), then handleExtractionError swallows it
         verify(chatModel).call(any(Prompt.class));
     }
@@ -160,10 +163,12 @@ class SemanticMemoryExtractorCacheRetryTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn("[]");
 
+        // when
         extractor.extract(TestConstants.DEFAULT_USER_ID, "prompt", "openai", "gpt-4o-mini", "openai");
 
         Thread.sleep(300);
 
+        // then
         verify(chatModel).call(any(Prompt.class));
     }
 
@@ -194,10 +199,12 @@ class SemanticMemoryExtractorCacheRetryTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn("[]");
 
+        // when
         extractor.extract(TestConstants.DEFAULT_USER_ID, "prompt", "openai", "gpt-4o-mini", "openai");
 
         Thread.sleep(300);
 
+        // then
         verify(chatModel).call(any(Prompt.class));
     }
 
@@ -243,11 +250,13 @@ class SemanticMemoryExtractorCacheRetryTest {
                 .thenReturn(goodResp);
         when(chatResponseContentResolver.resolveContent(goodResp)).thenReturn("[]");
 
+        // when
         // null model → extractionModel = null → on retry: fallback = null (StringUtils.hasText(null) = false)
         extractor.extract(TestConstants.DEFAULT_USER_ID, "I love coding", "openai", null, "openai");
 
         Thread.sleep(300);
 
+        // then
         verify(chatModel, org.mockito.Mockito.atLeastOnce()).call(any(Prompt.class));
     }
 
@@ -280,11 +289,13 @@ class SemanticMemoryExtractorCacheRetryTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn("[]");
 
+        // when
         // null model → extractionModel = null → invokeExtractor(..., null, null) hits the false branch
         extractor.extract(TestConstants.DEFAULT_USER_ID, "some text", "openai", null, "openai");
 
         Thread.sleep(300);
 
+        // then
         verify(chatModel).call(any(Prompt.class));
     }
 

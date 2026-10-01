@@ -60,12 +60,15 @@ class McpToolCallbackCacheTest {
     @Test
     @DisplayName("two consecutive prompts with an unchanged connected set list each server's tools once")
     void getToolCallbacks_ConnectedSetUnchanged_ListsToolsOnce() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         registry.record(WEATHER, WEATHER_URL, McpClientStatus.CONNECTED);
 
+        // when
         ToolCallback[] first = provider.getToolCallbacks();
         ToolCallback[] second = provider.getToolCallbacks();
 
+        // then
         assertThat(toolNames(first)).containsExactlyInAnyOrder("transcribe", "weather_current");
         assertThat(toolNames(second)).containsExactlyInAnyOrder("transcribe", "weather_current");
         verify(scribeClient, times(1)).listTools();
@@ -75,13 +78,16 @@ class McpToolCallbackCacheTest {
     @Test
     @DisplayName("a server joining the connected set forces a fresh listing that includes its tools")
     void getToolCallbacks_ConnectedSetChanges_ListsToolsAgain() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         registry.record(WEATHER, WEATHER_URL, McpClientStatus.FAILED);
         assertThat(toolNames(provider.getToolCallbacks())).containsExactly("transcribe");
 
+        // when
         registry.record(WEATHER, WEATHER_URL, McpClientStatus.CONNECTED);
         ToolCallback[] afterReconnect = provider.getToolCallbacks();
 
+        // then
         assertThat(toolNames(afterReconnect)).containsExactlyInAnyOrder("transcribe", "weather_current");
         verify(scribeClient, times(2)).listTools();
         verify(weatherClient, times(1)).listTools();
@@ -90,24 +96,29 @@ class McpToolCallbackCacheTest {
     @Test
     @DisplayName("a server the registry marks failed loses its tools on the very next prompt")
     void getToolCallbacks_ServerMarkedFailed_ItsToolsDisappearOnNextPrompt() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         registry.record(WEATHER, WEATHER_URL, McpClientStatus.CONNECTED);
         assertThat(toolNames(provider.getToolCallbacks())).containsExactlyInAnyOrder("transcribe", "weather_current");
 
+        // when
         registry.markFailed(WEATHER);
         ToolCallback[] afterFailure = provider.getToolCallbacks();
 
+        // then
         assertThat(toolNames(afterFailure)).containsExactly("transcribe");
     }
 
     @Test
     @DisplayName("a listing that demotes a server is not cached under the connected set it started from")
     void getToolCallbacks_ListingDemotesServer_NextPromptListsAgainThenCaches() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         registry.record(WEATHER, WEATHER_URL, McpClientStatus.CONNECTED);
         when(weatherClient.listTools()).thenThrow(new McpTransportSessionNotFoundException("stale-session-id"));
         doThrow(new IllegalStateException("Connection refused")).when(weatherClient).initialize();
 
+        // then
         assertThat(toolNames(provider.getToolCallbacks())).containsExactly("transcribe");
         assertThat(toolNames(provider.getToolCallbacks())).containsExactly("transcribe");
         assertThat(toolNames(provider.getToolCallbacks())).containsExactly("transcribe");
@@ -120,6 +131,7 @@ class McpToolCallbackCacheTest {
     @Test
     @DisplayName("the cached listing is served until the expiry and relisted once it has passed")
     void getToolCallbacks_ExpiryPassed_ListsToolsAgain() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         provider.getToolCallbacks();
 
@@ -127,9 +139,11 @@ class McpToolCallbackCacheTest {
         provider.getToolCallbacks();
         verify(scribeClient, times(1)).listTools();
 
+        // when
         clock.advance(Duration.ofMillis(1));
         ToolCallback[] afterExpiry = provider.getToolCallbacks();
 
+        // then
         assertThat(toolNames(afterExpiry)).containsExactly("transcribe");
         verify(scribeClient, times(2)).listTools();
     }
@@ -137,33 +151,40 @@ class McpToolCallbackCacheTest {
     @Test
     @DisplayName("a zero expiry disables caching so every prompt lists tools")
     void getToolCallbacks_ZeroTtl_ListsToolsEveryPrompt() {
+        // given
         McpToolCacheProperties disabled = new McpToolCacheProperties();
         disabled.setTtl(Duration.ZERO);
         FilteredToolCallbackProvider uncached = new FilteredToolCallbackProvider(List.of(scribeClient), registry,
                 new McpStartupProperties(), new McpToolCallbackCache(registry, disabled, clock));
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
 
+        // when
         uncached.getToolCallbacks();
         uncached.getToolCallbacks();
 
+        // then
         verify(scribeClient, times(2)).listTools();
     }
 
     @Test
     @DisplayName("an MCP tools-changed notification invalidates the cache before the expiry")
     void onToolsChanged_NotificationReceived_NextPromptListsToolsAgain() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         provider.getToolCallbacks();
 
+        // when
         toolCallbackCache.onToolsChanged(new McpToolsChangedEvent(SCRIBE, List.of()));
         provider.getToolCallbacks();
 
+        // then
         verify(scribeClient, times(2)).listTools();
     }
 
     @Test
     @DisplayName("a tools-changed notification arriving mid-listing keeps that listing out of the cache")
     void onToolsChanged_ArrivesDuringListing_ListingIsNotCached() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         McpSchema.ListToolsResult staleListing = listing("transcribe");
         doAnswer(invocation -> {
@@ -172,22 +193,27 @@ class McpToolCallbackCacheTest {
             return staleListing;
         }).doReturn(listing("transcribe")).when(scribeClient).listTools();
 
+        // when
         provider.getToolCallbacks();
         provider.getToolCallbacks();
         provider.getToolCallbacks();
 
+        // then
         verify(scribeClient, times(2)).listTools();
     }
 
     @Test
     @DisplayName("a caller mutating the returned array does not change what the next prompt receives")
     void getToolCallbacks_CallerMutatesResult_CacheUnaffected() {
+        // given
         registry.record(SCRIBE, SCRIBE_URL, McpClientStatus.CONNECTED);
         ToolCallback[] first = provider.getToolCallbacks();
         first[0] = null;
 
+        // when
         ToolCallback[] second = provider.getToolCallbacks();
 
+        // then
         assertThat(toolNames(second)).containsExactly("transcribe");
     }
 

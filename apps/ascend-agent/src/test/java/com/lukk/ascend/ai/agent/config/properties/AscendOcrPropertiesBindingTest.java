@@ -31,6 +31,7 @@ class AscendOcrPropertiesBindingTest {
     @Test
     @DisplayName("the shipped configuration points the client at the job endpoint with its polling window")
     void shippedConfiguration_BindsFromApplicationYaml() {
+        // then
         assertThat(properties.getBaseUrl()).isEqualTo("http://localhost:7022");
         assertThat(properties.getApiPath()).isEqualTo("/v1/ocr/jobs");
         assertThat(properties.getPollMinInterval()).isEqualTo(Duration.ofSeconds(1));
@@ -43,6 +44,7 @@ class AscendOcrPropertiesBindingTest {
     @Test
     @DisplayName("every property key binds to its own field, so a renamed key cannot pass unnoticed")
     void everyKey_BindsToItsField() {
+        // given
         MapConfigurationPropertySource source = new MapConfigurationPropertySource(Map.of(
                 "app.ascend-ocr.base-url", "http://ascend-ocr.test:7022",
                 "app.ascend-ocr.api-path", "/v2/ocr/jobs",
@@ -52,8 +54,10 @@ class AscendOcrPropertiesBindingTest {
                 "app.ascend-ocr.submit-retry-attempts", "7",
                 "app.ascend-ocr.submit-retry-max-delay", "45s"));
 
+        // when
         AscendOcrProperties bound = new Binder(source).bind("app.ascend-ocr", AscendOcrProperties.class).get();
 
+        // then
         assertThat(bound.getBaseUrl()).isEqualTo("http://ascend-ocr.test:7022");
         assertThat(bound.getApiPath()).isEqualTo("/v2/ocr/jobs");
         assertThat(bound.getPollMinInterval()).isEqualTo(Duration.ofSeconds(2));
@@ -66,8 +70,10 @@ class AscendOcrPropertiesBindingTest {
     @Test
     @DisplayName("every property has a default, so a deployment that configures none still reaches ascend-ocr")
     void everyProperty_HasADefault() {
+        // when
         AscendOcrProperties defaults = new AscendOcrProperties();
 
+        // then
         assertThat(defaults.getBaseUrl()).isEqualTo("http://localhost:7022");
         assertThat(defaults.getApiPath()).isEqualTo("/v1/ocr/jobs");
         assertThat(defaults.getPollMinInterval()).isEqualTo(Duration.ofSeconds(1));
@@ -80,6 +86,7 @@ class AscendOcrPropertiesBindingTest {
     @Test
     @DisplayName("the per-page fan-out stays within the number of documents ascend-ocr will queue")
     void pdfParallelPages_StaysWithinTheServiceDocumentBound() {
+        // then
         assertThat(pdfParallelPages).isBetween(1, OCR_JOB_QUEUE_MAX_DOCUMENTS);
     }
 

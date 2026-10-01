@@ -26,7 +26,7 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then
+        // when
         strategy.recordOutcome("user", response);
     }
 
@@ -40,7 +40,7 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then - returns early without logging (cachedTokens == null -> extractCachedTokens returns null)
+        // when - returns early without logging (cachedTokens == null -> extractCachedTokens returns null)
         strategy.recordOutcome("user", response);
     }
 
@@ -55,7 +55,7 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then - logs hit=false
+        // when - logs hit=false
         strategy.recordOutcome("user", response);
     }
 
@@ -87,7 +87,7 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then - uses 0 for prompt_tokens (null ternary branch)
+        // when - uses 0 for prompt_tokens (null ternary branch)
         strategy.recordOutcome("user", response);
     }
 }

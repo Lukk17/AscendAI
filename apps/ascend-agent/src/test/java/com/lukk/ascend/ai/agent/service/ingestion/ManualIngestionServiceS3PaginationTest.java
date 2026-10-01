@@ -237,7 +237,7 @@ class ManualIngestionServiceS3PaginationTest {
         when(documentService.splitDocuments(any())).thenReturn(List.of(new Document("chunk")));
         when(vectorStoreResolver.resolve("openai")).thenReturn(vectorStore);
 
-        // then
+        // when
         manualIngestionService.run(Optional.empty(), "openai");
     }
 

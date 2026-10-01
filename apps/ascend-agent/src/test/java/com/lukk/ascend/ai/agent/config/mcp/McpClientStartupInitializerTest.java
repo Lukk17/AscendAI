@@ -48,11 +48,14 @@ class McpClientStartupInitializerTest {
     @Test
     @DisplayName("initialize records every client that handshakes successfully as CONNECTED with its configured URL")
     void initialize_AllClientsHandshake_RecordsConnectedWithConfiguredUrls() {
+        // given
         McpSyncClient audioScribe = clientNamed(AUDIO_SCRIBE);
         McpSyncClient weather = clientNamed(WEATHER);
 
+        // when
         initializerFor(audioScribe, weather).initialize();
 
+        // then
         verify(audioScribe).initialize();
         verify(weather).initialize();
         assertThat(registry.connectedNames()).containsExactlyInAnyOrder(AUDIO_SCRIBE, WEATHER);
@@ -66,12 +69,15 @@ class McpClientStartupInitializerTest {
     @Test
     @DisplayName("initialize isolates a failing client so the remaining clients still connect")
     void initialize_OneClientRefusesConnection_OtherClientsStillConnect() {
+        // given
         McpSyncClient audioScribe = clientNamed(AUDIO_SCRIBE);
         McpSyncClient weather = clientNamed(WEATHER);
         doThrow(new IllegalStateException("Connection refused")).when(weather).initialize();
 
+        // when
         initializerFor(audioScribe, weather).initialize();
 
+        // then
         assertThat(registry.connectedNames()).containsExactly(AUDIO_SCRIBE);
         assertThat(entryFor(WEATHER).status()).isEqualTo(McpClientStatus.FAILED);
         assertThat(entryFor(WEATHER).url()).isEqualTo(WEATHER_URL);
@@ -80,6 +86,7 @@ class McpClientStartupInitializerTest {
     @Test
     @DisplayName("initialize records FAILED and returns within the configured timeout when a handshake stalls")
     void initialize_HandshakeStalls_RecordsFailedWithinTimeout() {
+        // given
         startupProperties.setInitTimeout(Duration.ofMillis(100));
         McpSyncClient stalling = clientNamed(WEATHER);
         doAnswer(invocation -> {
@@ -87,10 +94,12 @@ class McpClientStartupInitializerTest {
             return null;
         }).when(stalling).initialize();
 
+        // when
         long startedAt = System.nanoTime();
         initializerFor(stalling).initialize();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startedAt);
 
+        // then
         assertThat(entryFor(WEATHER).status()).isEqualTo(McpClientStatus.FAILED);
         assertThat(registry.connectedNames()).isEmpty();
         assertThat(elapsed).isLessThan(Duration.ofSeconds(1));
@@ -99,10 +108,13 @@ class McpClientStartupInitializerTest {
     @Test
     @DisplayName("initialize records an unconfigured connection name with an unknown URL rather than failing")
     void initialize_ClientNameNotInConnectionMap_RecordsUnknownUrl() {
+        // given
         McpSyncClient orphan = clientNamed("not-configured");
 
+        // when
         initializerFor(orphan).initialize();
 
+        // then
         assertThat(entryFor("not-configured").url()).isEqualTo(UNKNOWN_URL);
         assertThat(entryFor("not-configured").status()).isEqualTo(McpClientStatus.CONNECTED);
     }
@@ -110,47 +122,59 @@ class McpClientStartupInitializerTest {
     @Test
     @DisplayName("initialize records an unknown URL when the configured connection carries no url")
     void initialize_ConnectionWithoutUrl_RecordsUnknownUrl() {
+        // given
         streamableHttpProperties.getConnections().put(WEATHER,
                 new McpStreamableHttpClientProperties.ConnectionParameters(null, "/mcp"));
         McpSyncClient weather = clientNamed(WEATHER);
 
+        // when
         initializerFor(weather).initialize();
 
+        // then
         assertThat(entryFor(WEATHER).url()).isEqualTo(UNKNOWN_URL);
     }
 
     @Test
     @DisplayName("initialize records an unknown URL when no streamable-http connections are configured at all")
     void initialize_EmptyConnectionMap_RecordsUnknownUrl() {
+        // given
         streamableHttpProperties.getConnections().clear();
         McpSyncClient weather = clientNamed(WEATHER);
 
+        // when
         initializerFor(weather).initialize();
 
+        // then
         assertThat(entryFor(WEATHER).url()).isEqualTo(UNKNOWN_URL);
     }
 
     @Test
     @DisplayName("initialize records an unknown URL when the connection map itself is absent")
     void initialize_NullConnectionMap_RecordsUnknownUrl() {
+        // given
         McpStreamableHttpClientProperties propertiesWithoutMap = mock(McpStreamableHttpClientProperties.class);
         when(propertiesWithoutMap.getConnections()).thenReturn(null);
         McpSyncClient weather = clientNamed(WEATHER);
 
+        // when
         new McpClientStartupInitializer(List.of(weather), registry, startupProperties, propertiesWithoutMap)
                 .initialize();
 
+        // then
         assertThat(entryFor(WEATHER).url()).isEqualTo(UNKNOWN_URL);
     }
 
     @Test
     @DisplayName("initialize records a client whose name cannot be resolved without letting the exception escape")
     void initialize_NameResolutionThrows_RecordsFallbackEntryAndDoesNotPropagate() {
+        // given
         McpSyncClient broken = mock(McpSyncClient.class);
         when(broken.getClientInfo()).thenThrow(new IllegalStateException("transport gone"));
 
+        // when
         initializerFor(broken).initialize();
 
+        // then
         verify(broken, never()).initialize();
         Collection<McpClientEntry> entries = registry.entries();
         assertThat(entries).hasSize(1);
@@ -163,8 +187,10 @@ class McpClientStartupInitializerTest {
     @Test
     @DisplayName("initialize with no configured clients records nothing and does not throw")
     void initialize_NoClients_RecordsNothing() {
+        // when
         initializerFor().initialize();
 
+        // then
         assertThat(registry.entries()).isEmpty();
     }
 

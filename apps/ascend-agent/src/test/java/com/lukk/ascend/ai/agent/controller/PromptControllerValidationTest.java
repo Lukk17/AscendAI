@@ -220,9 +220,11 @@ class PromptControllerValidationTest {
     @Test
     @DisplayName("prompt uses the header user-id when header is not blank (non-null, non-blank)")
     void prompt_NonBlankHeader_UsesHeader() {
+        // when
         // Explicitly test the non-null AND non-blank case for userId
         ResponseEntity<?> response = controller.prompt("hello", null, null, null, null, null, null, null, null, "actual-user");
 
+        // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 

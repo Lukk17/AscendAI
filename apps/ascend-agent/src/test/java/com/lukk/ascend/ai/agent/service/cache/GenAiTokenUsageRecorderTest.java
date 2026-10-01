@@ -104,8 +104,9 @@ class GenAiTokenUsageRecorderTest {
         // given
         MeterRegistry registry = new SimpleMeterRegistry();
 
-        // when / then - no exception, no counters registered
+        // when
         GenAiTokenUsageRecorder.record(registry, null, "openai");
+        // then - no exception, no counters registered
         assertThat(registry.find("gen_ai.client.token.usage").counters()).isEmpty();
     }
 
@@ -119,8 +120,9 @@ class GenAiTokenUsageRecorderTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // when / then - no exception, no counters registered
+        // when
         GenAiTokenUsageRecorder.record(registry, response, "openai");
+        // then - no exception, no counters registered
         assertThat(registry.find("gen_ai.client.token.usage").counters()).isEmpty();
     }
 
