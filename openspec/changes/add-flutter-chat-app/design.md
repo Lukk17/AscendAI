@@ -1,6 +1,6 @@
 ## Context
 
-AscendAI is a multi-module monorepo with Java and Python backend services but no user-facing frontend. The ascend-ai-agent exposes a REST API on port 9917 for AI prompts (with multipart file support), a specced server-sent events streaming endpoint, and a conversation management REST API. See proposal.md for the full motivation. The `flutter_chat_ui` library (v2.11.1) provides the chat widget, `flutter_chat_core` provides message models and the `ChatController` interface.
+AscendAI is a multi-module monorepo with Java and Python backend services but no user-facing frontend. The ascend-ai-agent exposes a REST API on port 9917 for AI prompts (with multipart file support), a specced server-sent events streaming endpoint, and a conversation management REST API. See proposal.md for the full motivation. The `flutter_chat_ui` library provides the chat widget, `flutter_chat_core` provides message models and the `ChatController` interface.
 
 ## Goals / Non-Goals
 
@@ -22,7 +22,7 @@ AscendAI is a multi-module monorepo with Java and Python backend services but no
 
 ### 1. Module placement and naming
 
-The Flutter module lives at `AscendChat/` in the monorepo root, following the existing flat layout (`apps/ascend-agent/`, `apps/ascend-audio-scribe/`, `apps/ascend-web-hunter/`, etc.). The `pubspec.yaml` project name is `ascend_chat`.
+The Flutter module lives at `apps/ascend-chat/`, beside the other modules under `apps/`. The `pubspec.yaml` project name is `ascend_chat`. It is a standalone client: it is not served by the agent and not placed behind a reverse proxy. It calls the agent directly at `ASCEND_API_URL`, set with `--dart-define` at build time (default `http://localhost:9917`).
 
 **Alternatives considered:**
 - Nested under `apps/ascend-agent/frontend/`: rejected because ascend-ai-agent is a Gradle project and mixing Flutter build artifacts into it creates tooling conflicts.
@@ -30,7 +30,7 @@ The Flutter module lives at `AscendChat/` in the monorepo root, following the ex
 
 ### 2. State management with Riverpod
 
-The app uses `flutter_riverpod` for dependency injection and state management. Providers expose the API client, the current conversation state, the theme mode, and provider/model selection. Riverpod was chosen because it supports code generation for compile-time safety, handles async state natively, and integrates cleanly with the `ChatController` lifecycle.
+The app uses `flutter_riverpod` with the current API only: `Provider` for the config and API client, `Notifier`/`NotifierProvider` for synchronous state (theme, prompt settings) and `AsyncNotifier`/`AsyncNotifierProvider` for loaded state (conversation list). The legacy `StateNotifierProvider` and `ChangeNotifierProvider` are not used.
 
 **Alternatives considered:**
 - `provider` (already a dependency of `flutter_chat_ui`): simpler but lacks async state primitives and compile-time safety.
@@ -38,7 +38,7 @@ The app uses `flutter_riverpod` for dependency injection and state management. P
 
 ### 3. HTTP and server-sent events client
 
-The app uses the `http` package for REST calls and `dart:io`/`dart:html` `HttpClient` (via a platform-conditional wrapper) for server-sent events consumption. The server-sent events stream is consumed by reading the chunked response body line-by-line, parsing `event:` and `data:` fields, and dispatching typed events to the `ChatController`.
+The app uses the `http` package for REST calls. The streaming endpoint is a multipart `POST`, so `EventSource` (GET only, no body) cannot be used. One platform-independent SSE parser turns a `Stream<List<int>>` into typed events (`delta`, `citations`, `sources`, `done`, `error`) by reading `event:` and `data:` lines. Two byte sources feed it behind a conditional import: on native platforms `http.Client.send` with a `MultipartRequest` and its `StreamedResponse.stream`, and on web `fetch` from `package:web` reading `response.body` through a `ReadableStreamDefaultReader`. `dart:html` is not used.
 
 **Alternatives considered:**
 - `dio`: feature-rich but adds a large dependency tree; the `http` package covers all needed functionality.
@@ -72,21 +72,26 @@ The app uses the `file_picker` package for cross-platform file selection (images
 
 Theme preference (dark, light, auto) is stored using `shared_preferences`. On startup, the app reads the stored preference and applies it before the first frame renders.
 
-### 8. Containerization
+### 8. Direct connection, CORS and phone access
 
-The web build is containerized with a multi-stage Dockerfile: Flutter SDK stage builds the web app, then an nginx stage serves the static assets. The container is added to `compose.yaml` as `ascend-chat` on a configurable port (default 3000).
+There is no container, no nginx and no compose service for the app. The owner wants a separate client that can connect from a phone, so the address of the agent is a build-time setting and the app talks to it directly.
+
+The web build runs on a different origin than the agent, so the agent gains a CORS configuration (`config/CorsConfig.java`) whose allowed origins come from `app.cors.allowed-origins` (empty by default, so nothing changes until an operator sets it). It allows `GET`, `POST`, `PATCH`, `DELETE`, the `Content-Type` and `X-User-Id` headers, and exposes `Location`. Native apps do not need CORS.
+
+A phone reaches the agent at `http://<host LAN address>:9917`. The agent's compose service `ascend-agent` must publish 9917 on all interfaces (not only 127.0.0.1) for that, and the host firewall must allow it. Android blocks clear-text HTTP by default, so the Android debug build allows clear-text traffic through a debug-only network security config, and iOS gets an `NSAllowsLocalNetworking` entry. Both are documented in `apps/ascend-chat/README.md`.
 
 **Alternatives considered:**
-- No containerization: inconsistent with the rest of the monorepo where every module has a Dockerfile.
+- Serve the web build from nginx with an `/api` proxy: rejected by the owner, it ties the app to one deployment and does not help a phone.
+- Serve it from the agent: rejected by the owner, the app must be separate.
 
 ## Risks / Trade-offs
 
 - **[Backend dependency]** The Flutter app depends on the streaming and conversation endpoints from the `add-chat-streaming-and-conversations` change, which may not be implemented yet. Mitigation: the API client layer is behind an interface, and mock implementations can be used during frontend development.
-- **[SSE on web]** Server-sent events consumption via `dart:html` `EventSource` has different semantics than the `dart:io` `HttpClient` approach. Mitigation: a platform-conditional SSE client that uses `EventSource` on web and raw HTTP streaming on native platforms.
+- **[SSE on web]** `EventSource` cannot send a POST body. Mitigation: fetch-based streaming through `package:web` on web, `http` streaming on native, one shared parser.
+- **[Open CORS]** A wide allowed-origins list lets any site call the agent from a browser. Mitigation: empty by default, explicit origins only, never `*` together with credentials.
 - **[No offline mode]** If the backend is unreachable, the app shows errors instead of cached content. This is acceptable for a first iteration since the app is designed for use on the same network as the backend.
-- **[flutter_chat_ui version lock]** Pinning to `^2.11.1` means the app inherits any breaking changes in the 2.x line. Mitigation: version is declared in `pubspec.yaml` with a caret constraint, allowing patch updates but not major bumps.
+- **[Stale pins]** Versions in this plan go stale. Mitigation: task 1.2 re-checks every dependency on pub.dev at implementation time and pins the current stable release.
 
 ## Open Questions
 
-- What port should the containerized web build be exposed on? Defaulting to 3000 until confirmed.
-- Should the app support system tray or menu bar integration on desktop platforms? Deferring to a follow-up change.
+- Should the app support system tray or menu bar integration on desktop platforms? Deferred to a later change.

@@ -20,7 +20,7 @@ The app SHALL allow users to download or open source documents referenced in a r
 
 #### Scenario: Tapping a source reference
 - **WHEN** the user taps on a source document reference
-- **THEN** the app SHALL open the presigned download URL from the `downloadUrl` or `contentPath` field in the device's default handler (browser or file viewer)
+- **THEN** the app SHALL open the presigned `downloadUrl` of that source in the device's default handler (browser or file viewer)
 
 ### Requirement: Attach sources toggle
 The app SHALL provide a toggle to control whether source references are requested from the backend.
@@ -32,3 +32,12 @@ The app SHALL provide a toggle to control whether source references are requeste
 #### Scenario: Disabling attach sources
 - **WHEN** the user disables the attach-sources toggle
 - **THEN** subsequent prompt requests SHALL omit the `attachSources` field or set it to `false`
+
+### Requirement: Citations are shown as tappable labels
+When an assistant message has a `citations` event, the app SHALL render each citation label (for example `[S1]`) as a tappable label under the message. Tapping a label SHALL show the citation's document name and its page or chunk position when present, and SHALL offer to open the matching source's `downloadUrl` when the source list carries that document.
+
+#### Scenario: Tapping a citation label
+- **WHEN** an assistant message carries a citation `[S1]` for page 4 of `handbook.pdf` and the user taps `[S1]`
+- **THEN** the app SHALL show `handbook.pdf` and page 4
+- **AND** the app SHALL offer to open the source's `downloadUrl`
+

@@ -2,8 +2,8 @@
 
 Documents enter the RAG knowledge base through exactly two hand-driven paths today:
 
-1. `POST /api/v1/ingestion/upload` (`controller/IngestionController.java`): multipart upload, filename sanitization (`util/IngestionSecurity`), Tika MIME sniffing against `app.ingestion.upload.allowed-mime-types`, then a `StorageService` write into MinIO under `markdown/` or `documents/`.
-2. Out-of-band drops into the MinIO bucket followed by `POST /api/v1/ingestion/run`. `service/ingestion/ManualIngestionService.java` scans the bucket, dedupes on ETag via a `ConcurrentMetadataStore` (`manual-ingestion:<key>:<etag>` markers), and pushes content through `IngestionService` / `DocumentRouter` into Qdrant.
+1. `POST /api/v1/ingestion/upload` (`controller/IngestionController.java`): multipart upload, filename sanitization (`util/IngestionSecurity`), Tika MIME sniffing against `app.ingestion.upload.allowed-mime-types`, then a `StorageService` write into object storage under `markdown/` or `documents/`.
+2. Out-of-band drops into the object storage bucket followed by `POST /api/v1/ingestion/run`. `service/ingestion/ManualIngestionService.java` scans the bucket, dedupes on ETag via a `ConcurrentMetadataStore` (`manual-ingestion:<key>:<etag>` markers), and pushes content through `IngestionService` / `DocumentRouter` into Qdrant.
 
 A Spring Integration S3 poller exists (`config/IngestionPipelineConfig.java`) but is disabled by default (`app.ingestion.auto.enabled=false`). Downstream parsing is already rich: `DocumentRouter` routes to the markdown parser, Docling, ascend-ocr, or Unstructured, with per-page PDF classification. There is no connector or sync concept anywhere in the codebase.
 
@@ -18,8 +18,8 @@ For this version, therefore, a document a connector syncs is visible to everyone
 Dependencies on sibling changes (their scope is not re-specified here):
 
 - `add-auth-and-identity`: provides the `ADMIN` role that guards the connector API and the authenticated principal recorded on connector mutations. It does not provide a directory identifier, a directory-namespaced principal, or a cross-provider identity link in this version, and nothing in this change depends on one.
-- `add-tenant-isolation`: provides the tenant prefix under which connector-fetched objects land in MinIO, the tenant metadata carried into Qdrant chunks, the `acl` / `acl_source` / `acl_version` / `acl_synced_at` metadata keys, the mandatory keyword payload index on `acl`, the `tenant:everyone:{tenantId}` pseudo-group, the ingestion producer default that stamps it, and the filter composition that reads all of it. Connector configuration rows are tenant-scoped using the same tenant key.
-- `add-document-management-api`: owns the document metadata/status model and the single-document deletion machinery (MinIO object + Qdrant chunks + metadata row). Deletion propagation in this change calls that path; it does not build its own.
+- `add-tenant-isolation`: provides the tenant prefix under which connector-fetched objects land in object storage, the tenant metadata carried into Qdrant chunks, the `acl` / `acl_source` / `acl_version` / `acl_synced_at` metadata keys, the mandatory keyword payload index on `acl`, the `tenant:everyone:{tenantId}` pseudo-group, the ingestion producer default that stamps it, and the filter composition that reads all of it. Connector configuration rows are tenant-scoped using the same tenant key.
+- `add-document-management-api`: owns the document metadata/status model and the single-document deletion machinery (stored object + Qdrant chunks + metadata row). Deletion propagation in this change calls that path; it does not build its own.
 - `add-usage-metering-and-quotas`: owns the encryption-at-rest mechanism (BYOK key handling). Connector client secrets are stored with the same mechanism family; this change consumes it, it does not re-specify encryption.
 
 ## Goals / Non-Goals
@@ -51,13 +51,13 @@ Non-Goals:
 
 Decision numbers are stable. A decision that has been deferred keeps its number and moves to the Deferred section, so a cross-reference from a sibling change or a decision record still lands on the right text.
 
-### D1: Connector to MinIO to existing pipeline; no parallel parse path
+### D1: Connector to object storage to existing pipeline; no parallel parse path
 
-A connector's contract is bytes. The source file's bytes are written to MinIO under the tenant prefix (markdown to the markdown folder, everything else to the documents folder, same routing rule as `IngestionController.determineFolder`) and the existing ingestion scan is triggered for the affected prefix. Parsing, chunking, and embedding stay the existing pipeline's job, and so does composing the access list those chunks carry (D18).
+A connector's contract is bytes. The source file's bytes are written to object storage under the tenant prefix (markdown to the markdown folder, everything else to the documents folder, same routing rule as `IngestionController.determineFolder`) and a bucket-scan run is started for the affected prefix through `IngestionRunService` from add-document-management-api, the same entry point `POST /api/v1/ingestion/run` uses. The sync run waits for that ingestion run to reach a terminal state (polling the run record, bounded by the connector's sync timeout) before it records per-file outcomes, so `ADDED`, `UPDATED`, `SKIPPED` and `FAILED` reflect what ingestion actually did. The bucket scan reaches `DocumentRouter` only because add-document-management-api moves `ManualIngestionService` onto it (that change's tasks 3.2a and 3.2b). Today the bucket scan routes markdown-vs-unstructured and never calls `DocumentRouter`. Parsing, chunking, and embedding stay the existing pipeline's job, and so does composing the access list those chunks carry (D18).
 
-*Why:* one parse path means one set of parser bugs, one dedup semantics, one metrics surface. The alternative, connectors calling `IngestionService` directly with in-memory streams, would bypass the dedup and the MinIO source-of-truth, and would make the `add-document-management-api` metadata model inconsistent (documents in Qdrant with no MinIO object).
+*Why:* one parse path means one set of parser bugs, one dedup semantics, one metrics surface. The alternative, connectors calling `IngestionService` directly with in-memory streams, would bypass the dedup and the object storage source-of-truth, and would make the `add-document-management-api` metadata model inconsistent (documents in Qdrant with no stored object).
 
-*Consequence:* connector-fetched files pass the same hygiene as uploads, filename sanitization from `util/IngestionSecurity` and MIME sniffing against `app.ingestion.upload.allowed-mime-types`, applied by the framework before the MinIO write, so a compromised or misconfigured source cannot smuggle disallowed content types past the controller-level checks.
+*Consequence:* connector-fetched files pass the same hygiene as uploads, filename sanitization from `util/IngestionSecurity` and MIME sniffing against `app.ingestion.upload.allowed-mime-types`, applied by the framework before the object storage write, so a compromised or misconfigured source cannot smuggle disallowed content types past the controller-level checks.
 
 *Consequence:* a connector never writes to the vector store. Not through the ingestion pipeline's own path, and not around it. The carve-out that a payload-only access-list update would have needed is deferred with the capture work (Deferred D11), so in this version the rule holds without exception and the framework interfaces expose no vector-store handle at all.
 
@@ -66,20 +66,20 @@ The second half this contract carried before the scope cut, a per-item access li
 ### D2: Framework shape: `DocumentConnector` interface + sync orchestrator
 
 - `DocumentConnector` (interface, `service/connector/`): `ConnectorType type()`, `ChangeSet fetchChanges(ConnectorConfig, SyncCursor)` returning added/modified/deleted entries plus the next cursor. Each entry carries the source item id, path, and content version. Implementations are stateless; all state lives in the database.
-- `ConnectorSyncOrchestrator` (framework): loads due connectors, resolves credentials, calls `fetchChanges`, applies hygiene, MinIO writes, and deletion propagation, records the sync run and per-file outcomes, persists the new cursor only after the run completes; a failed run keeps the previous cursor so the next run retries the same window.
+- `ConnectorSyncOrchestrator` (framework): loads due connectors, resolves credentials, calls `fetchChanges`, applies hygiene, object storage writes, and deletion propagation, records the sync run and per-file outcomes, persists the new cursor only after the run completes; a failed run keeps the previous cursor so the next run retries the same window.
 - Scheduling via Spring's `@Scheduled` tick (every minute) that scans for connectors whose `next_run_at` has passed, guarded by `ShedLock`-style DB row locking (`SELECT ... FOR UPDATE SKIP LOCKED` on the connector row) so multiple agent instances never double-sync one connector. Per-connector schedule stored as a cron expression.
 
 The `AccessListSource` interface this design carried is deferred with the capture work it exists for (Deferred D7). The reason it was a separate interface from `DocumentConnector` rather than a method on it, that capture has its own throttling profile, its own failure modes, and its own schedule, is preserved there and is the reason the split returns rather than being reconsidered.
 
 *Why not Quartz:* a full scheduler dependency for "run N connectors on a cron" is overkill (KISS); the DB-row claim gives multi-instance safety without extra infrastructure. *Why not Spring Integration poller reuse:* `IngestionPipelineConfig` polls one bucket with one filter; connectors need per-source cursors, credentials, and run history, which is a different problem.
 
-### D3: Data model (Liquibase, new changelog in `db/changelog/`)
+### D3: Data model (Liquibase, new changelog in `db/changelog/` numbered with the next free number at implementation time, Spring Data JDBC entities, never JPA)
 
 Four tables, all tenant-scoped:
 
 - `connector`: id (UUID), tenant id, type (enum string, first value `SHAREPOINT`), display name, credentials reference (FK/opaque handle into the encrypted credential store from `add-usage-metering-and-quotas`), source scope (JSONB: site/drive/folder identifiers, provider-specific shape validated by the connector implementation), cron schedule, maximum sync age, enabled flag, `last_successful_sync_at`, `stale` flag, created/updated audit columns, `next_run_at`.
 - `connector_sync_run`: id, connector FK, trigger (`SCHEDULED` | `MANUAL` | `FRESHNESS_CHECK`), status (`RUNNING` | `SUCCEEDED` | `PARTIAL` | `FAILED`), started/finished timestamps, counters (added / updated / deleted / skipped / failed), error summary.
-- `connector_sync_file_outcome`: id, sync-run FK, source item id, source path, action (`ADDED` | `UPDATED` | `DELETED` | `SKIPPED` | `FAILED`), MinIO key, failure reason (nullable).
+- `connector_sync_file_outcome`: id, sync-run FK, source item id, source path, action (`ADDED` | `UPDATED` | `DELETED` | `SKIPPED` | `FAILED`), object key, failure reason (nullable).
 - `connector_sync_cursor`: connector FK (+ per-drive discriminator for SharePoint, since Graph issues one delta token per drive), opaque content cursor value, updated timestamp.
 
 *Why JSONB scope instead of typed columns:* each provider scopes differently (SharePoint: site/drive/folder; Google Drive: shared-drive/folder; Confluence: space). A typed-per-provider table set would multiply migrations per connector; a JSONB blob validated by the owning connector keeps additions additive (OCP).
@@ -93,7 +93,7 @@ The permission columns on the cursor, `permissions_confirmed_through` and `permi
 - Auth: MSAL-style client-credentials flow per tenant (Entra ID app registration; tenant id + client id + encrypted client secret in the credential store). Token cached in memory until expiry; never persisted, never logged.
 - Change detection: `GET /drives/{drive-id}/root/delta` (scoped to configured folders by filtering returned paths). First run is a full enumeration (delta with no token); subsequent runs pass the stored `deltaLink` token and receive only created/modified/deleted items. Deleted items arrive as entries with a `deleted` facet.
 - Scoping: configured sites are resolved to drives via `GET /sites/{site-id}/drives`; folder scoping filters delta results by path prefix. Items outside scope are ignored (not recorded as skipped, they are not part of the connector's universe).
-- Filtering: file MIME (from Graph item metadata, re-verified by Tika sniff before the MinIO write per D1) must be in `app.ingestion.upload.allowed-mime-types`; file size must not exceed the connector's size limit (default aligned with the multipart limits from `ingestion-security`). Filtered files are recorded as `SKIPPED` with reason.
+- Filtering: file MIME (from Graph item metadata, re-verified by Tika sniff before the object storage write per D1) must be in `app.ingestion.upload.allowed-mime-types`; file size must not exceed the connector's size limit (default aligned with the multipart limits from `ingestion-security`). Filtered files are recorded as `SKIPPED` with reason.
 - Throttling: on HTTP 429 or 503 with `Retry-After`, sleep the advised interval; without the header, exponential backoff with jitter, bounded retries per request and a bounded total-throttle budget per run. Exceeding the budget ends the run as `PARTIAL` with the cursor unadvanced past the completed window. This follows Microsoft's published throttling guidance for Graph.
 
 One throttling budget, not two. The separate permission budget is deferred with the permission reads it protected (Deferred D8, Deferred D9), and it returns with them, because the argument for splitting the budget was that a permission storm must not starve document landing and there are no permission requests to storm.
@@ -104,7 +104,7 @@ One throttling budget, not two. The separate permission budget is deferred with 
 
 ### D5: Deletion propagation reuses `add-document-management-api`
 
-When a delta entry carries the deleted facet, the orchestrator maps source item to MinIO key (recorded in the file-outcome history and in the document metadata model owned by `add-document-management-api`) and invokes that change's single-document deletion path, which removes the MinIO object, the Qdrant chunks for that source, and the metadata row. This change adds only the mapping and the trigger; if `add-document-management-api` has not shipped, this change is blocked on it (declared dependency, not an inline re-implementation).
+When a delta entry carries the deleted facet, the orchestrator maps source item to object key (recorded in the file-outcome history and in the document metadata model owned by `add-document-management-api`) and invokes that change's single-document deletion path, which removes the stored object, the Qdrant chunks for that source, and the metadata row. This change adds only the mapping and the trigger; if `add-document-management-api` has not shipped, this change is blocked on it (declared dependency, not an inline re-implementation).
 
 ### D6: Credentials: reference, not value
 
@@ -134,7 +134,7 @@ Three things follow from the connector composing nothing, and each is the reason
 
 There is one producer of `tenant:everyone:{tenantId}` in the system. `add-tenant-isolation` owns the helper that builds it, validates it against the principal format, and computes its version. A connector that assembled the same value would be a second implementation of one piece of knowledge, and the failure mode of a divergence is not a compile error, it is a chunk whose list is syntactically valid and matches nobody.
 
-`acl_source` says `tenant-default` and not `sharepoint`, because the list did not come from SharePoint. An `acl_source` of `sharepoint` on a list nothing at SharePoint decided would be a lie told in a payload field an operator uses to answer "where did this grant come from", and the day capture lands it would be indistinguishable from a genuinely captured list. Whether a document arrived through a connector is answerable from its MinIO key and its document metadata, which is where that question belongs.
+`acl_source` says `tenant-default` and not `sharepoint`, because the list did not come from SharePoint. An `acl_source` of `sharepoint` on a list nothing at SharePoint decided would be a lie told in a payload field an operator uses to answer "where did this grant come from", and the day capture lands it would be indistinguishable from a genuinely captured list. Whether a document arrived through a connector is answerable from its object key and its document metadata, which is where that question belongs.
 
 The connector framework therefore has no access-list code path at all in this version, rather than a stubbed one. There is no capture interface with a company-wide implementation, no cap check that can never fire, and no version comparison whose two sides are always equal. Machinery that cannot fail is machinery whose tests prove nothing, and it is worse than absent, because the next reader takes its presence as evidence that capture works.
 
@@ -154,7 +154,7 @@ The freshness check, then:
 - A connector past its maximum sync age is marked stale on its configuration row. The flag is returned by the connector read and list endpoints, and it is exposed as a gauge: seconds since the last successful sync, per connector, plus a count of stale connectors.
 - A connector that syncs successfully clears the flag on that run.
 - The check records a run with trigger `FRESHNESS_CHECK` only when a connector's stale state changes, so a long outage produces one row rather than one per tick.
-- It writes nothing to MinIO and nothing to Qdrant, and it does not read the source. That independence is the property the sweep had that is worth keeping: the thing that failed is the sync, so the control that notices must not depend on the sync working.
+- It writes nothing to object storage and nothing to Qdrant, and it does not read the source. That independence is the property the sweep had that is worth keeping: the thing that failed is the sync, so the control that notices must not depend on the sync working.
 - Its own run never moves `last_successful_sync_at`. Only a `SCHEDULED` or `MANUAL` run does. Without that, a check completing successfully would look like a successful sync and clear the very condition it was recording, which is a two-line bug with a symptom of a connector that is never stale.
 
 The configuration invariant survives with a new pair of values. A connector's maximum sync age has to be greater than the interval its cron schedule fires on, or a healthy connector marks itself stale on its first check. The framework rejects that configuration at write time rather than discovering it at check time, because that particular misconfiguration is silent until every connector reads stale at once.
@@ -190,7 +190,7 @@ Every deferred decision keeps its number. A sibling change or a decision record 
 
 ### Deferred D3a: The `connector_item_acl` table
 
-`connector_item_acl`: connector FK, source item id, MinIO key, `acl_version`, `acl_synced_at`, the container id the list was inherited from (nullable, D9), and the captured principal list. This is the connector-side record of what was last written onto that item's chunks. It exists so the four-way branch in D11 can compare against a stored value without reading Qdrant per item, and so the staleness sweep in D14 has something cheaper than the vector store to scan.
+`connector_item_acl`: connector FK, source item id, object key, `acl_version`, `acl_synced_at`, the container id the list was inherited from (nullable, D9), and the captured principal list. This is the connector-side record of what was last written onto that item's chunks. It exists so the four-way branch in D11 can compare against a stored value without reading Qdrant per item, and so the staleness sweep in D14 has something cheaper than the vector store to scan.
 
 *Why a connector-side access-list record at all:* the authoritative copy of an access list is the chunk payload in Qdrant, and it stays that way. Reading it back per item per run would mean a Qdrant round trip for every file in a large drive on every sync, on the sync path, to answer a question a local row answers for free. The row is a cache of what was written, reconciled by the sweep, and the sweep is what catches it drifting.
 
@@ -302,7 +302,7 @@ The cap is 64 principals per list, matching ADR-M004 and ADR-M007. An item whose
 
 Truncating an allow list silently denies people access they actually have. The symptom is a person who cannot find a document they can open in SharePoint, and that symptom is indistinguishable from a bug in retrieval, in embedding, in chunking, or in the model. It costs a debugging session across four subsystems. A capture failure costs a line in a sync history with a file name attached. There is no version of quietly dropping the last few principals that is cheaper to operate than that.
 
-This is also why the cap check runs before the MinIO write and before the dedup key is recorded, so a capped item leaves no half-state a later run reads as complete.
+This is also why the cap check runs before the object storage write and before the dedup key is recorded, so a capped item leaves no half-state a later run reads as complete.
 
 A connector-landed list in this version holds exactly one principal, so a cap of 64 cannot be reached by any input the connector can produce. The check is deferred here rather than kept as a guard that cannot fire. The read-side cap that `add-tenant-isolation` enforces on any list it composes is unaffected and stays where it is, which is the right place for a guard that a direct upload's administrator-assigned list can genuinely breach.
 
@@ -360,7 +360,7 @@ Whether an item granted directly to individual people, with no group entry at al
 - [Freshness check marks a healthy connector stale because the maximum sync age was configured below the connector's cron interval]: the framework refuses that configuration at write time rather than discovering it at check time, and the message names both values.
 - [Delta token invalidation (Graph returns `410 Gone` / `resyncRequired`)]: the orchestrator resets the content cursor and performs a full re-enumeration, and the content dedup marker makes re-landing unchanged bytes a no-op.
 - [Deletion propagation ordering, file deleted and re-added between syncs]: process delta entries in Graph-returned order per item id, since Graph collapses per-item history in a delta page, so the last state wins.
-- [Filename collisions, two source files sanitize to the same MinIO key]: connector keys include a source-scoped path segment (sanitized relative path, not just the leaf name) under the tenant prefix. Collisions within one connector then require identical relative paths, which the source itself forbids.
+- [Filename collisions, two source files sanitize to the same object key]: connector keys include a source-scoped path segment (sanitized relative path, not just the leaf name) under the tenant prefix. Collisions within one connector then require identical relative paths, which the source itself forbids.
 - [Scheduler drift with multiple agent instances]: the DB-row claim (`FOR UPDATE SKIP LOCKED`) makes each due connector run exactly once per due tick, and the same claim covers the freshness check so two instances cannot both flip one connector's flag.
 - [Secret leakage via logs or API echoes]: write-only credential fields, reference-only persistence, explicit test asserting no credential material appears in logs at any level during a sync (including failure paths).
 - [The connector endpoints are reachable by any authenticated caller, because `add-auth-and-identity`'s filter-chain matrix leaves every path it does not name at merely authenticated and the administrative prefix rule it used to carry was removed with the identity-link endpoints]: this change adds its own filter-chain rule for `/api/v1/connectors/**` requiring `ADMIN`, in `SecurityConfig` where the sibling keeps the single visible source of truth, with a test asserting 401 unauthenticated and 403 for `USER` on every endpoint including the sync trigger. A connector row holds a customer's Graph credentials reference and its scope, so an authenticated non-administrator reaching that surface is a credential-adjacent exposure and not only a tidiness question.
@@ -378,9 +378,9 @@ Whether an item granted directly to individual people, with no group entry at al
 
 ## Open Questions
 
-1. Should sync-run history have a retention policy (row count or age cap per connector), or is unbounded history acceptable for the first iteration? Default proposal: cap at the last 50 runs per connector, prune on write.
-2. Does `add-tenant-isolation` expose the tenant MinIO prefix as an injectable component this change can call, or is the prefix convention-only? To confirm when that change's design lands; the orchestrator assumes an injectable prefix resolver.
-3. The default maximum sync age, which is the number that decides how long a connector may be silently broken before an operator sees a stale flag. It should be a small multiple of the default cron interval rather than a round number picked in isolation, and it is stated in `docs/CONNECTORS.md`.
+1. Settled 2026-10-01: sync-run history is capped at the last 50 runs per connector, pruned on run insert.
+2. Settled 2026-10-01: the orchestrator depends on an injectable `TenantPrefixResolver` interface. add-tenant-isolation provides the implementation. Until then a test double supplies it.
+3. Settled 2026-10-01: the default maximum sync age is 3 times the interval of the default cron schedule, computed at startup from that schedule, and stated in `docs/CONNECTORS.md`.
 4. Whether the Google Drive change feed's inline permissions hold under the partial-response field selection a connector would actually use. The Drive change resource carries the File resource and the File resource carries a permissions array, which is the basis for ADR-015, but that was not confirmed against the `changes.list` reference itself. It needs verifying before a Google Drive connector is planned, and it is dormant rather than urgent under the current scope, since neither connector reads permissions here.
 
 Three further open questions belong to capture and are parked in the Deferred section rather than left here, since none of them can arise in this version.

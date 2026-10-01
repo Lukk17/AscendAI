@@ -13,7 +13,7 @@ Doing conversations now also unblocks the parallel changes: `add-tenant-isolatio
 
 ## What Changes
 
-- **New SSE streaming endpoint** `POST /api/v1/ai/prompt/stream` (multipart/form-data, same fields as `/prompt` plus optional `conversationId`) emitting `text/event-stream` with a defined event schema: `delta` (token fragments), `sources` (RAG source attachments when `attachSources=true`), `done` (terminal event carrying metadata + conversationId), `error` (terminal failure event). Backed by `ChatClient.stream()` through the existing provider-resolution, context-assembly, prompt-cache, and history-persistence pipeline. The `sources` event carries the same `SourceFile` shape as the synchronous response, which under the presign-resolution amendment means the registry `documentId` and the relative `contentPath` (`/api/v1/documents/{id}/content`) rather than a presigned MinIO URL.
+- **New SSE streaming endpoint** `POST /api/v1/ai/prompt/stream` (multipart/form-data, same fields as `/prompt` plus optional `conversationId`) emitting `text/event-stream` with a defined event schema: `delta` (token fragments), `sources` (RAG source attachments when `attachSources=true`), `done` (terminal event carrying metadata + conversationId), `error` (terminal failure event). Backed by `ChatClient.stream()` through the existing provider-resolution, context-assembly, prompt-cache, and history-persistence pipeline. The `sources` event carries the same `SourceFile` shape as the synchronous response, which means the mandatory presigned `downloadUrl` and `expiresAt` plus the registry `documentId` and the relative `contentPath` (`/api/v1/documents/{id}/content`), per add-document-management-api design D8.
 - **Existing synchronous endpoint unchanged** - `POST /api/v1/ai/prompt` keeps its exact request/response shape; it gains only the optional `conversationId` form field and a `conversationId` echo inside response metadata (additive).
 - **New `conversations` table** (Liquibase): `id` (UUID), `tenant_id` (nullable placeholder for `add-tenant-isolation`), `user_id`, `title`, `created_at`, `updated_at`. `chat_history` gains an indexed `conversation_id` foreign key.
 - **Chat memory re-keyed by conversation id** - Redis key becomes `chat:<conversationId>` where the id is the conversation UUID; Postgres reads/writes filter on `conversation_id`. Compaction and semantic-memory extraction keep working, now scoped per conversation (extraction remains user-scoped, as memories belong to the user).
@@ -38,20 +38,25 @@ Doing conversations now also unblocks the parallel changes: `add-tenant-isolatio
 
 ## Impact
 
-- **New code (ascend-ai-agent)**: streaming controller method + SSE event DTOs (`controller/`, `dto/`), `ConversationController` + request/response DTOs, `Conversation` entity + `ConversationRepository` (`model/`, `repository/`), `ConversationService` (resolution, auto-title, delete cascade) in `service/`, streaming execution path beside `ChatExecutor` in `service/chat/`.
-- **Changed code (ascend-ai-agent)**: `PromptController` (new `conversationId` field), `AscendChatService` / `ChatHistoryService` / `PersistentChatMemory` (conversation-id keying), `CustomMetadata` (additive `conversationId`), `ChatHistoryRepository` (conversation-keyed queries), `ChatHistoryCompactionService` (unchanged trigger logic, conversation-scoped ids flow through).
-- **Database**: new Liquibase changelog `02-conversations.xml` under `apps/ascend-agent/src/main/resources/db/changelog/` - `conversations` table, `chat_history.conversation_id` column + backfill + FK + index.
+- **New code (ascend-ai-agent)**: streaming controller method + SSE event DTOs (`controller/`, `dto/`), `ConversationController` + request/response DTOs, `Conversation` Spring Data JDBC entity + `ConversationRepository` (`CrudRepository`, paginated reads as hand-written native `@Query`) (`model/`, `repository/`), `ConversationService` (resolution, auto-title, delete cascade) in `service/`, streaming execution path beside `ChatExecutor` in `service/chat/`.
+- **Changed code (ascend-ai-agent)**: `PromptController` (new `conversationId` field), `AscendChatService` / `ChatHistoryService` / `PersistentChatMemory` (conversation-id keying), `CustomMetadata` (additive `conversationId`), `ChatHistoryRepository` (conversation-keyed queries), `model/ChatHistory` (new `conversationId` field), `memory/ChatHistoryCompactionService` (unchanged trigger logic, `applyToPostgres` writes both `user_id` and `conversation_id` on the summary row).
+- **Database**: new Liquibase changelog `<NN>-conversations.xml` (`<NN>` is the next free number at implementation time) under `apps/ascend-agent/src/main/resources/db/changelog/` - `conversations` table, `chat_history.conversation_id` column + backfill + FK + index.
 - **Dependencies**: none new - Spring MVC supports `Flux<ServerSentEvent>` return types with Reactor already on the classpath via Spring AI.
 - **Docs / API collection**: `apps/ascend-agent/AGENTS.md` API description, Bruno requests under `docs/api/request/AscendAI/ascend-agent/` for the stream endpoint and conversation CRUD.
 - **Sibling changes**: identity stays `X-User-Id` until `add-auth-and-identity` lands (JWT-supplied userId slots into the same parameter); `tenant_id` column ships nullable and unused until `add-tenant-isolation`.
 - **Depends on `add-document-management-api`** (build-order): the `sources` event carries the registry `documentId` and the `/api/v1/documents/{id}/content` path from the presign-resolution amendment, so the document registry and the content endpoint from that change must be in place before this change's `sources` event is implemented. The `delta`/`done`/`error` events and the conversation model have no such dependency.
 - **Tests**: SSE integration test (delta + done event assertions), conversation CRUD + ownership tests, Liquibase migration test over pre-existing `chat_history` rows, regression test that the synchronous endpoint response is byte-compatible.
 
+## Build order
+
+Second in group D: add-document-management-api, then this change, then add-passage-level-citations, then add-flutter-chat-app. The `sources` event needs the registry and the content path from add-document-management-api. The `citations` event belongs to add-passage-level-citations, not to this change.
+
 ## Relevant Skills
 
 - `/springboot-patterns`
 - `/java-coding-standards`
 - `/api-design`
-- `/jpa-patterns`
+- `/postgres-patterns`
 - `/database-migrations`
-- `/springboot-tdd`
+- `/tdd-workflow`
+- `/architecture-decision-records`

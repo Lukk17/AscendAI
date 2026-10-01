@@ -76,15 +76,16 @@ The stream is `text/event-stream` with SSE `event:` names and JSON `data:` paylo
 | Event     | Payload                                                                        | Cardinality                      |
 | --------- | ------------------------------------------------------------------------------ | -------------------------------- |
 | `delta`   | `{"content": "<token fragment>"}`                                             | 0..n, in generation order        |
-| `sources` | `{"sources": [SourceFile...]}` (same `SourceFile` shape as the sync response - `documentId` + `contentPath`, per the presign-resolution amendment)  | 0..1, only when `attachSources`  |
+| `sources` | `{"sources": [SourceFile...]}` (same `SourceFile` shape as the sync response: `downloadUrl`, `expiresAt`, `documentId`, `contentPath`, per add-document-management-api D8)  | 0..1, only when `attachSources`  |
 | `done`    | `{"metadata": CustomMetadata, "conversationId": "<uuid>"}`                     | exactly 1 on success, terminal   |
 | `error`   | `{"status": <int>, "code": "<machine code>", "message": "<human text>"}`      | exactly 1 on failure, terminal   |
 
 - Named events (rather than one event type with a discriminator field) map directly onto `EventSource`/Flutter SSE
   client listeners and keep each payload minimal.
 - `done` carries the metadata + conversationId so `attachSources` and token-usage reporting keep working; `sources` is
-  emitted before `done` once RAG resolution and registry-id resolution complete (the client downloads each source
-  through the authenticated `/api/v1/documents/{id}/content` endpoint, not a presigned MinIO URL).
+  emitted before `done` once RAG resolution and registry-id resolution complete (the client may open the presigned `downloadUrl`
+  or fetch the authenticated `/api/v1/documents/{id}/content` path, both are always present).
+  add-passage-level-citations later adds a `citations` event, emitted before `sources`; that change owns it.
 - Errors after the stream has started cannot change the HTTP status (already 200, headers sent) - hence the terminal
   `error` event mirrors the `ApiError` shape (`status`, `code`, `message`). Pre-stream validation failures (unknown
   `compactionProvider`, vision-unsupported image, unknown `conversationId`) are rejected before any SSE bytes are
@@ -98,7 +99,7 @@ WebFlux.
 
 - Alternative: `SseEmitter` + manual thread - rejected: `ChatClient.stream()` already yields a `Flux<ChatResponse>`, so
   bridging to `SseEmitter` adds a hand-rolled subscription/completion/error state machine for no benefit.
-- Alternative: migrate the app to WebFlux - rejected as massively out of scope (blocking JPA/Redis/MinIO stack).
+- Alternative: migrate the app to WebFlux - rejected as massively out of scope (blocking Spring Data JDBC, Redis and object storage stack).
 - The post-stream side effects (history save, compaction dispatch, semantic-memory extraction) run in the `Flux`
   completion hook on a bounded-elastic scheduler, accumulating the full assistant text from the deltas, so persisted
   history is identical to the sync path's.
@@ -109,7 +110,7 @@ WebFlux.
 
 ### D4 - Conversation entity and identity resolution
 
-New table `conversations` (Liquibase changelog `02-conversations.xml`):
+New table `conversations` (Liquibase changelog `<NN>-conversations.xml`, where `<NN>` is the next free changelog number at implementation time):
 
 | Column       | Type          | Notes                                                        |
 | ------------ | ------------- | ------------------------------------------------------------ |
@@ -166,7 +167,7 @@ Per `/api-design` conventions - plural nouns, pagination via `page`/`size`, most
 
 ### D6 - Migration of existing history
 
-Changelog `02-conversations.xml` (SQL changesets where Liquibase XML lacks the construct):
+Changelog `<NN>-conversations.xml` (SQL changesets where Liquibase XML lacks the construct):
 
 1. Create `conversations`; add nullable `chat_history.conversation_id`.
 2. Backfill: `INSERT INTO conversations (id, user_id, title, created_at, updated_at) SELECT gen_random_uuid(),
@@ -204,7 +205,7 @@ the backfill (additive column only).
 
 ## Migration Plan
 
-1. Ship changelog `02-conversations.xml` (create + backfill + constraints) - runs automatically via Liquibase on boot.
+1. Ship changelog `<NN>-conversations.xml` (create + backfill + constraints) - runs automatically via Liquibase on boot.
 2. Deploy the agent build where callers of `PersistentChatMemory` pass conversation UUIDs.
 3. Old Redis keys age out via TTL; no manual step.
 4. Rollback: revert the deployment; Liquibase rollback drops `conversations` and the `conversation_id` column -

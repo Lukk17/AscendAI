@@ -37,7 +37,7 @@ Document-level attribution was the cheap option and is what the `sources` array 
 
 The passage is the natural unit because it is exactly the unit of evidence: it is what was retrieved, what was scored, and what the model actually read. It is also the only unit that is stable under re-parse, since page numbers and ordinals are re-derived by the same pipeline that produced them.
 
-This decision is recorded as ADR-010.
+This decision is recorded as an ADR taking the next free number in `apps/ascend-agent/docs/architecture/decisions/` at implementation time.
 
 ### D2. The label is `S` plus an integer, assigned per response
 
@@ -51,13 +51,13 @@ Labels are scoped to a single response and assigned by descending score with a d
 
 Each parser that knows a page number stamps it on the document it emits, and the splitter stamps the ordinal. `IngestionMetadataKeys` gains `PAGE`, `CHUNK_INDEX` and `CHUNK_COUNT` alongside the existing `SOURCE`, `TITLE` and `TYPE`, so the vocabulary stays in one place.
 
-Concretely: the Unstructured path groups elements by their reported page number and emits one document per page instead of one per file. The OCR path emits one document per entry in the `pages` array, using the `page_number` that service already returns. `DocumentRouter` stamps the page number it computes when it slices the PDF, overwriting whatever the downstream client stamped rather than parsing it back out of the synthetic filename.
+Concretely: the Unstructured path groups elements by their reported page number and emits one document per page instead of one per file. The OCR path splits the result Markdown inside `AscendOcrClient.toDocuments` on its `## Page N` headings (written by `apps/ascend-ocr/src/service/result_store.py`): one document per heading, `page = N`, and the heading line itself removed from the chunk text. Text before the first heading, if any, becomes a document without `page`. A unit test pins the heading format, so a change on the ascend-ocr side fails loudly. `AscendOcrClientPactTest` is not touched, because the split runs after the HTTP exchange the pact covers. `DocumentRouter` stamps the page number it computes when it slices the PDF, overwriting whatever the downstream client stamped rather than parsing it back out of the synthetic filename.
 
 Alternative considered: reconstruct the page at query time by re-parsing the source object and locating the chunk text in it. Rejected outright. It re-runs OCR or Docling on every answer, it is fuzzy matching rather than a fact, and it produces a different answer after any parser upgrade.
 
 Alternative considered: keep one document per file and store a page map, meaning a list of character ranges to page numbers, in that document's metadata. Rejected because the splitter would then need to interpret the map to decide each chunk's page, which puts parsing knowledge into the splitter and breaks the moment a parser emits pages out of order.
 
-This decision is recorded as ADR-011.
+This decision is recorded as an ADR taking the next free number after the D1 record at implementation time.
 
 ### D4. The router owns the source identity for per-page work
 
@@ -107,7 +107,7 @@ This change last. On the `rag-source-attachments` capability it modifies `Source
 
 If the order changes, the concrete consequence is bounded and named: this change's `SourceFile DTO shape` delta must be re-edited to drop `documentId` and `contentPath`, `documentId` must become optional on every citation, `ingestedAt` needs another source, and the routing half of the corpus fix must be pulled into this change's tasks.
 
-The streaming sibling, `add-chat-streaming-and-conversations`, emits a `sources` event with the same `SourceFile` shape. It needs a matching `citations` event, which is recorded as an open question below rather than specified here.
+The streaming sibling, `add-chat-streaming-and-conversations`, emits a `sources` event with the same `SourceFile` shape. This change owns the matching `citations` event on the streaming endpoint. Its payload is `{"citations": [CitationRef, ...]}` with the same shape as the synchronous array, it is emitted at most once, after the last `delta` and before `sources` and `done`, and only when citations are enabled and retrieval injected at least one passage.
 
 ## Risks / Trade-offs
 
@@ -127,6 +127,6 @@ The streaming sibling, `add-chat-streaming-and-conversations`, emits a `sources`
 
 ## Open Questions
 
-1. `add-document-management-api` contradicts itself on whether the bucket-scan route is aligned onto `DocumentRouter`. Its design D5 says aligning it is "deliberately left out of scope", while its tasks 3.2a and 3.2b and its `ingestion-correctness` delta all require it. This change assumes the requirement wins, since a spec delta outranks a design note. If the design note wins instead, the routing fix moves into this change's tasks and the corpus provenance requirement here cannot be satisfied without it. Deferrable because it changes which change owns one task, not what the end state is.
-2. The streaming `sources` event specified by `add-chat-streaming-and-conversations` has no `citations` counterpart. Whichever of the two changes archives second should add it, and the event's placement relative to `sources` and the terminal event needs deciding there rather than here. Deferrable because the synchronous contract is unaffected.
-3. The archived `rag-retrieval` spec states that the similarity threshold is applied server-side in the `SearchRequest`, while the code deliberately passes `0.0` and filters in Java so near-miss scores stay loggable. This change relies on the Java-side filtering only to the extent that it needs the kept list in score order, which both variants provide, so it is not blocked either way. Someone should reconcile the spec with the code, and it is not this change.
+1. Settled 2026-10-01: add-document-management-api owns the bucket-scan routing through `DocumentRouter`. Its design D5 now states it.
+2. Settled 2026-10-01: this change owns the streaming `citations` event (see the streaming paragraph above).
+3. The archived `rag-retrieval` spec states that the similarity threshold is applied server-side in the `SearchRequest`, while the code deliberately passes `0.0` and filters in Java so near-miss scores stay loggable. This change relies on the Java-side filtering only to the extent that it needs the kept list in score order, which both variants provide, so it is not blocked either way. Reconciling that spec with the code is outside this change.

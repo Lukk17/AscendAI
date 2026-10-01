@@ -28,7 +28,7 @@ The stream SHALL consist of named SSE events with JSON data payloads, in this or
 optional single `sources` event, and exactly one terminal event (`done` on success, `error` on failure).
 
 - `delta` - `{"content": "<token fragment>"}`; the concatenation of all `delta` payloads in order SHALL equal the full assistant answer text.
-- `sources` - `{"sources": [SourceFile, ...]}` using the same `SourceFile` JSON shape as the synchronous response (per the presign-resolution amendment, each entry carries the registry `documentId` and the relative `contentPath` `/api/v1/documents/{id}/content`, not a presigned MinIO URL); emitted at most once, before the terminal event, and only when `attachSources=true`.
+- `sources` - `{"sources": [SourceFile, ...]}` using the same `SourceFile` JSON shape as the synchronous response (each entry carries the same fields as a synchronous source entry: the mandatory non-blank presigned `downloadUrl` and `expiresAt`, plus the registry `documentId` and the relative `contentPath` `/api/v1/documents/{id}/content` (add-document-management-api design D8)); emitted at most once, before the terminal event, and only when `attachSources=true`.
 - `done` - `{"metadata": <CustomMetadata>, "conversationId": "<uuid>"}`; terminal success event, always exactly one per successful stream.
 - `error` - `{"status": <int>, "code": "<machine-readable code>", "message": "<human-readable text>"}`; terminal failure event.
 
@@ -50,7 +50,7 @@ No event other than these four types SHALL be emitted.
 
 - **WHEN** a caller sends `attachSources=true` to the stream endpoint and RAG retrieval returns at least one chunk above the similarity threshold
 - **THEN** exactly one `sources` event is emitted before the `done` event
-- **AND** each entry in its `sources` array contains non-blank `documentId`, `name`, `mimeType`, and `contentPath` fields
+- **AND** each entry in its `sources` array contains non-blank `documentId`, `name`, `mimeType`, `contentPath`, `downloadUrl`, and `expiresAt` fields
 
 #### Scenario: No sources event when attachSources is omitted
 

@@ -39,13 +39,24 @@
 
 ### Requirement: Run history is queryable
 
-The agent SHALL expose `GET /api/v1/ingestion/runs` returning recent runs newest-first, including reindex runs. The endpoint SHALL accept a `limit` query parameter (default 20, maximum 100).
+The agent SHALL expose `GET /api/v1/ingestion/runs` returning recent runs newest-first, including reindex runs. The endpoint SHALL accept a `limit` query parameter (default 20, maximum 100) and an optional `state` filter (`QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`). The agent SHALL delete finished runs whose `finished_at` is older than the retention window `app.ingestion.run-retention` (default 30 days) and SHALL never delete a run that is still `QUEUED` or `RUNNING`.
 
 #### Scenario: History lists recent runs newest-first
 
 - **WHEN** three runs have executed and `GET /api/v1/ingestion/runs?limit=2` is invoked
 - **THEN** the response contains the 2 most recent runs ordered newest-first
 - **AND** each entry carries the run id, state, and counts
+
+#### Scenario: History filtered by state
+
+- **WHEN** `GET /api/v1/ingestion/runs?state=FAILED` is invoked
+- **THEN** every returned run has state `FAILED`
+
+#### Scenario: Old finished runs are pruned
+
+- **WHEN** the retention job runs and one `COMPLETED` run finished 31 days ago while one `RUNNING` run started 40 days ago
+- **THEN** the completed run is deleted
+- **AND** the running run is kept
 
 ### Requirement: Bucket-scan ingestion routes every object through DocumentRouter
 
