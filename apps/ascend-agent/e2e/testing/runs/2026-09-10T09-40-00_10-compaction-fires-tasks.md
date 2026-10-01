@@ -13,7 +13,7 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 - [x] Postgres responds to `SELECT 1`
 - [x] Redis `PING` returns `PONG`
 - [x] Seed scripts `seed-compaction-fires.sql` + `seed-compaction-fires.redis` exist
-- [x] Default compaction config in effect (`enabled=true`, `turn-trigger=20`, `keep-recent-turns=8`) — configprops not exposed, trusted defaults per spec instruction
+- [x] Default compaction config in effect (`enabled=true`, `turn-trigger=20`, `keep-recent-turns=8`) - configprops not exposed, trusted defaults per spec instruction
 
 ### Reset state
 
@@ -21,7 +21,7 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 - [x] Applied `seed-compaction-fires.redis` to Redis (DEL, 21x RPUSH, 1 more command)
 - [x] Verified Postgres has 21 rows for `frostyCompactionFiresTest`
 - [x] Verified Redis list `chat:frostyCompactionFiresTest` has 21 entries
-- [x] Deleted Redis key `user:frostyCompactionFiresTest:instructions` (seeds don't touch it) — returned 0, key was absent
+- [x] Deleted Redis key `user:frostyCompactionFiresTest:instructions` (seeds don't touch it) - returned 0, key was absent
 
 ### Run
 
@@ -35,7 +35,7 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 - [x] Step 3: `chat_history` row count for `frostyCompactionFiresTest` equals exactly 9 (confirmed: 9)
 - [x] Step 3: exactly 1 row has `role='system'` and content begins with `[Conversation summary]` (confirmed: 1, most-recent row by created_at is this row)
 - [x] Step 3: exactly 8 rows have `role IN ('user', 'assistant')` (confirmed: 8)
-- [x] (Manual spot-check) summary content references Rex / Warsaw / TechCorp / Spring Boot — all four present in the summary text
+- [x] (Manual spot-check) summary content references Rex / Warsaw / TechCorp / Spring Boot - all four present in the summary text
 
 ### Post-run cleanup
 
@@ -54,7 +54,7 @@ Run regardless of Run-step verdict. Every command is idempotent.
 
 Sent one prompt as `frostyCompactionFiresTest` on top of the 21-row seed; step 1 returned HTTP 200 with a normal chat completion (both embedded Bruno tests passed). After a 5-second wait, `chat_history` for the user held exactly 9 rows: exactly 1 `role='system'` row whose content begins with `[Conversation summary]` and is the most-recent row by `created_at`, and exactly 8 rows with `role IN ('user','assistant')`. The summary text (manual spot-check only, not asserted programmatically) mentions Rex, Warsaw, TechCorp and Spring Boot as the spec expects. All four Expected assertions hold; Verdict PASS.
 
-Pre-compaction row count (after step 1): expected 23 (not queried directly — spec's Run section doesn't call for a query between steps 1 and 3; async compaction had already reduced it to 9 by the time step 3 ran)
+Pre-compaction row count (after step 1): expected 23 (not queried directly - spec's Run section doesn't call for a query between steps 1 and 3; async compaction had already reduced it to 9 by the time step 3 ran)
 
 Post-compaction row count (after step 3): 9 (confirmed)
 

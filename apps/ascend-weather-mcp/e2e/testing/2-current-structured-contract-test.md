@@ -90,11 +90,11 @@ That entry's `inputSchema.properties` advertises `city` (required), `countryCode
 - `requestedQuery` is `null`.
 - `location.name` is non-empty and contains "Warsaw" (case-insensitive).
 - `location.countryCode` equals `"PL"`.
-- `location.latitude` is numeric and within 51.5–53.0 (Warsaw, PL band).
-- `location.longitude` is numeric and within 20.5–22.0.
+- `location.latitude` is numeric and within 51.5-53.0 (Warsaw, PL band).
+- `location.longitude` is numeric and within 20.5-22.0.
 - `temperature.value` is a finite number.
 - `temperature.unit` equals `"celsius"`.
-- `weatherCode` is an integer in 0–99 (WMO code range).
+- `weatherCode` is an integer in 0-99 (WMO code range).
 - `wind.speed` is a non-null number ≥ 0.
 - `wind.unit` equals `"km/h"`.
 - `observedAt` is a non-empty string.

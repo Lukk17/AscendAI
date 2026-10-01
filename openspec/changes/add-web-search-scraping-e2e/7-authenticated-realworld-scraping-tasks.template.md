@@ -17,21 +17,21 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 
 - [ ] Flushed Redis `session:*` keys so the before/after pairs start genuinely blocked.
 
-### Part 3 — CAPTCHA human-solve + capture (HUMAN, run by the MAIN agent, FIRST on the main session)
+### Part 3 - CAPTCHA human-solve + capture (HUMAN, run by the MAIN agent, FIRST on the main session)
 
-- [ ] Run by the **main agent** (NOT a fanned-out e2e-runner subagent — its output never reaches the user).
+- [ ] Run by the **main agent** (NOT a fanned-out e2e-runner subagent - its output never reaches the user).
 - [ ] Call 1 (blocked): `captcha-clearance-blocked.yml` → HTTP 428, `status="human_intervention_required"` + non-empty `vnc_url`.
 - [ ] Main agent **printed the `vnc_url` verbatim in the chat** for the human to open.
 - [ ] Human solve: opened the `vnc_url`, solved the reCAPTCHA in the NoVNC browser; confirmed back to the agent.
 - [ ] Capture check: `docker exec redis redis-cli GET "session:google.com:default"` → JSON whose `auth` entry contains a `_GRECAPTCHA` cookie.
 
-### Part 2 — Login session reuse (saucedemo, AUTOMATED)
+### Part 2 - Login session reuse (saucedemo, AUTOMATED)
 
 - [ ] Call 1 (blocked/anon): `auth-read-secure-anon.yml` → confirms the login wall (login-required message present) and NO auth-only inventory markers.
 - [ ] Seed: `seed_authenticated_session.py` (copied into the container) logged in and stored the session under `session:saucedemo.com:e2e`.
 - [ ] Call 2 (after login): `auth-read-secure.yml` → HTTP 200, `status="success"`, content contains an auth-only product description (e.g. `"ringspun combed cotton"`).
 
-### Part 1 — Real-world matrix (gated rows MUST match; best-effort record the verdict)
+### Part 1 - Real-world matrix (gated rows MUST match; best-effort record the verdict)
 
 - [ ] a `example.com` → success, `"example domain"`.
 - [ ] b `en.wikipedia.org/wiki/Web_scraping` → success, `"web scraping"`.

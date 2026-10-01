@@ -29,7 +29,7 @@ Copy this file to `runs/<UTC-timestamp>_2-image-description-tasks.md` before sta
 
 ## Result summary
 
-All four Expected assertions passed. The agent returned HTTP 200 with a rich, multi-section description of the fixture image (an anime-style male character with spiky blond hair, glowing electric-blue eyes, a neon blue chest piece, and a dark jacket, set against a night cityscape with warm orange horizon). The response ran to approximately 900 words covering character pose, facial expression, hair, outfit, lighting, and background — well beyond "a few sentences." No refusal language was present. The model used was gpt-5.1-2025-11-13 via OpenAI, consuming 6,481 prompt tokens and 974 completion tokens (7,455 total) as reported in the response metadata.
+All four Expected assertions passed. The agent returned HTTP 200 with a rich, multi-section description of the fixture image (an anime-style male character with spiky blond hair, glowing electric-blue eyes, a neon blue chest piece, and a dark jacket, set against a night cityscape with warm orange horizon). The response ran to approximately 900 words covering character pose, facial expression, hair, outfit, lighting, and background - well beyond "a few sentences." No refusal language was present. The model used was gpt-5.1-2025-11-13 via OpenAI, consuming 6,481 prompt tokens and 974 completion tokens (7,455 total) as reported in the response metadata.
 
 Input tokens: ~2000 (runner LLM calls, estimated)
 

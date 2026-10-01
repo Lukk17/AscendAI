@@ -65,7 +65,7 @@ public class PromptController {
 
             @Parameter(description = "Embedding provider for RAG similarity search. Available: lmstudio (768-dim), gemini (768-dim), openai (1536-dim). "
                     + "Defaults to EMBEDDING_PROVIDER env var (lmstudio). "
-                    + "Must be compatible with the chat provider — lmstudio↔openai combinations return 400.",
+                    + "Must be compatible with the chat provider - lmstudio↔openai combinations return 400.",
                     example = "lmstudio")
             @RequestParam(value = "embeddingProvider", required = false) String embeddingProvider,
 

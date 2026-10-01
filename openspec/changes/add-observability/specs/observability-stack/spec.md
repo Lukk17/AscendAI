@@ -65,7 +65,7 @@
 
 ### Requirement: Observability stack is always-on (no opt-out profile)
 
-The `prometheus`, `grafana`, `vector`, `loki`, `otel-collector`, `tempo`, `postgres-exporter`, and `redis-exporter` services in `compose.yaml` SHALL run by default with no `profiles:` attribute. There SHALL NOT be a `--profile no-observability` opt-out — observability is part of the always-on happy path. Operators who do not want it must comment the services out manually.
+The `prometheus`, `grafana`, `vector`, `loki`, `otel-collector`, `tempo`, `postgres-exporter`, and `redis-exporter` services in `compose.yaml` SHALL run by default with no `profiles:` attribute. There SHALL NOT be a `--profile no-observability` opt-out - observability is part of the always-on happy path. Operators who do not want it must comment the services out manually.
 
 #### Scenario: Default install includes all observability containers
 

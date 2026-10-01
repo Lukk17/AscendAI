@@ -59,7 +59,7 @@ class VectorStoreConfigIT {
             // each keyed at the dimension-derived collection (ascendai-{dims}).
             assertThat(embeddingProviderStoreMap.get("lmstudio")).isNotNull();
             assertThat(embeddingProviderStoreMap.get("openai")).isNotNull();
-            // Different beans for different providers — the Map.toMap factory above must not collapse them.
+            // Different beans for different providers - the Map.toMap factory above must not collapse them.
             assertThat(embeddingProviderStoreMap.get("lmstudio"))
                     .isNotSameAs(embeddingProviderStoreMap.get("openai"));
         }

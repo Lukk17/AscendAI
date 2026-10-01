@@ -1,4 +1,4 @@
-# Design — add-tenant-administration
+# Design - add-tenant-administration
 
 ## Context
 
@@ -24,29 +24,29 @@ The go-to-market is single-tenant-per-customer dedicated stacks first, multi-ten
 
 ## Decisions
 
-### D1 — Keycloak group-per-tenant carries the `tenant` claim
+### D1 - Keycloak group-per-tenant carries the `tenant` claim
 
 Each tenant maps to a Keycloak group `/tenants/{tenantId}` with a group attribute `tenant = {tenantId}`. A group-membership protocol mapper (added to the realm export) copies that attribute into the `tenant` token claim. A user belongs to exactly one tenant group, so their token carries exactly one `tenant`. This keeps the claim source declarative in Keycloak rather than hand-managed per user, and makes "move a user to another tenant" a group change, not a claim edit.
 
-- Alternative considered: a `tenant` user attribute set per user — rejected because it duplicates the value on every user and drifts; the group attribute is one source of truth per tenant.
+- Alternative considered: a `tenant` user attribute set per user - rejected because it duplicates the value on every user and drifts; the group attribute is one source of truth per tenant.
 
-### D2 — `PLATFORM_ADMIN` is a new realm role, additive to the export
+### D2 - `PLATFORM_ADMIN` is a new realm role, additive to the export
 
 Tenant lifecycle is a cross-tenant privilege, so it cannot be the tenant-scoped `ADMIN`. A new realm role `PLATFORM_ADMIN` gates `/api/v1/admin/tenants`. On a dedicated single-tenant stack it is held by the operator; under multi-tenancy it is the control-plane role. Tenant `ADMIN` (already defined by `add-auth-and-identity`) gates `/api/v1/admin/users` and is always constrained to the caller's own tenant server-side, never a path/body-supplied tenant.
 
-### D3 — ascend-ai-agent talks to Keycloak through the Admin REST API with a service account
+### D3 - ascend-ai-agent talks to Keycloak through the Admin REST API with a service account
 
 Provisioning (create group, create user, assign role, trigger invite email) happens through Keycloak's Admin REST API. ascend-ai-agent authenticates with a dedicated confidential client using client-credentials (service account with the `manage-users` / `manage-clients` realm-management roles it needs, nothing more). The secret follows the deployment secret conventions from `harden-cloud-deployment`.
 
 - Invitation flow: create the user disabled-until-verified, then trigger Keycloak's `execute-actions-email` with `UPDATE_PASSWORD` (and `VERIFY_EMAIL`) so Keycloak sends the branded set-password email. ascend-ai-agent never handles the password.
 
-### D4 — Tenant status lives in Postgres; suspension is enforced at tenant-context resolution
+### D4 - Tenant status lives in Postgres; suspension is enforced at tenant-context resolution
 
 The `tenants` table (from `add-tenant-isolation`) gains a `status` column (`ACTIVE` / `SUSPENDED`). Suspension is enforced where the tenant is already resolved: `add-tenant-isolation`'s tenant-context resolver adds "resolved tenant is `SUSPENDED` → 403". This is one enforcement point covering every data-plane operation (chat, ingest, RAG, memory), rather than scattering checks per endpoint. Suspending also disables the tenant's Keycloak users so new logins fail and existing tokens stop being reissued; the Postgres check is the immediate backstop for already-issued tokens until they expire.
 
-### D5 — Delete is erase-then-deprovision, ordered and audited
+### D5 - Delete is erase-then-deprovision, ordered and audited
 
-Deleting a tenant is destructive and ordered: (1) suspend, (2) run the per-tenant erasure job (`add-audit-and-gdpr-compliance`) to zero-residue, (3) delete the Keycloak group and its users, (4) remove the `tenants` row. Each step is audited. If erasure is not yet available (that change not implemented), delete is refused with a clear error rather than leaving orphaned data — delete depends on erasure being present.
+Deleting a tenant is destructive and ordered: (1) suspend, (2) run the per-tenant erasure job (`add-audit-and-gdpr-compliance`) to zero-residue, (3) delete the Keycloak group and its users, (4) remove the `tenants` row. Each step is audited. If erasure is not yet available (that change not implemented), delete is refused with a clear error rather than leaving orphaned data - delete depends on erasure being present.
 
 ## Risks / Trade-offs
 

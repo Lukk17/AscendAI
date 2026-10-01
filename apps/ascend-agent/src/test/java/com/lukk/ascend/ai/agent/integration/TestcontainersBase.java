@@ -96,7 +96,7 @@ public abstract class TestcontainersBase {
         registry.add("spring.ai.vectorstore.qdrant.port", QDRANT::getGrpcPort);
         registry.add("spring.ai.vectorstore.qdrant.use-tls", () -> false);
 
-        // Floci (S3-compatible object store) — credentials are unauthenticated placeholders
+        // Floci (S3-compatible object store) - credentials are unauthenticated placeholders
         // that match application.yaml, since Floci does not validate them at all.
         registry.add("app.s3.endpoint",
                 () -> "http://" + FLOCI.getHost() + ":" + FLOCI.getMappedPort(FLOCI_EDGE_PORT));
@@ -104,7 +104,7 @@ public abstract class TestcontainersBase {
         registry.add("app.s3.secret-key", () -> "password");
         registry.add("app.s3.bucket", () -> "knowledge-base");
 
-        // AscendMemory sidecar — point at a port that won't bind, so the optional
+        // AscendMemory sidecar - point at a port that won't bind, so the optional
         // search returns empty rather than blocking. Tests that exercise memory
         // should override this to point at a stub server.
         registry.add("app.memory.semantic.base-url", () -> "http://localhost:1");

@@ -1,4 +1,4 @@
-## 1. Database — conversations schema and backfill
+## 1. Database - conversations schema and backfill
 
 - [ ] 1.1 Create `apps/ascend-agent/src/main/resources/db/changelog/02-conversations.xml` and register it in `db.changelog-master.yaml`: changeset creating `conversations` (`id` UUID PK, `tenant_id` VARCHAR(255) nullable, `user_id` VARCHAR(255) not null, `title` VARCHAR(255) not null, `created_at` / `updated_at` TIMESTAMP not null) plus index on `user_id`
 - [ ] 1.2 Changeset adding nullable `chat_history.conversation_id` (UUID)
@@ -6,7 +6,7 @@
 - [ ] 1.4 Constraint changesets (separate from backfill): `NOT NULL` on `conversation_id`, FK to `conversations.id`, index `idx_chat_history_conversation_id`; add `rollback` blocks to every changeset in 1.1-1.4
 - [ ] 1.5 Migration test (Testcontainers Postgres): seed pre-migration `chat_history` rows for two users at changelog level 01, run Liquibase, assert one `Imported conversation` row per user and every history row linked with non-null `conversation_id`
 
-## 2. Domain — conversation entity, repository, service
+## 2. Domain - conversation entity, repository, service
 
 - [ ] 2.1 Add `Conversation` JPA entity in `model/` and `ConversationRepository` in `repository/` (finders: page by `user_id` ordered by `updated_at` desc, `findByIdAndUserId`, top-1 by `user_id` ordered by `updated_at` desc)
 - [ ] 2.2 Add conversation-keyed queries to `ChatHistoryRepository`: recent history by `conversation_id`, paginated chronological messages by `conversation_id`, bulk delete by `conversation_id`
@@ -23,7 +23,7 @@
 - [ ] 3.4 Update existing `PersistentChatMemory` / `ChatHistoryService` / compaction tests for conversation-UUID keying; add a test that two conversations of one user have isolated histories
 - [ ] 3.5 Confirm semantic-memory extraction still receives the userId (not the conversation id) in `AscendChatService`
 
-## 4. Prompt endpoints — conversationId field
+## 4. Prompt endpoints - conversationId field
 
 - [ ] 4.1 Add optional `conversationId` `@RequestParam` to `PromptController.prompt(...)` with `@Parameter` docs; resolve via `ConversationService` and return 404 `ApiError` for unknown/foreign ids before any model call
 - [ ] 4.2 Add `conversationId` to `CustomMetadata` (additive, `@JsonInclude(NON_NULL)` preserved) and populate it on the synchronous response
@@ -45,7 +45,7 @@
 - [ ] 6.3 Enforce user scoping on every operation (foreign id → 404) using the same `X-User-Id` / default-id resolution as `PromptController`
 - [ ] 6.4 OpenAPI annotations for all five operations
 
-## 7. Tests — integration
+## 7. Tests - integration
 
 - [ ] 7.1 SSE integration test (Testcontainers stack, stubbed/local provider): POST to `/api/v1/ai/prompt/stream`, assert `Content-Type: text/event-stream`, at least one `delta` event, exactly one terminal `done` event carrying `conversationId`, and that concatenated deltas equal the persisted assistant message
 - [ ] 7.2 SSE error-path tests: pre-stream 400 for unknown `compactionProvider` as plain JSON; mid-stream provider failure produces exactly one `error` event and no `done`

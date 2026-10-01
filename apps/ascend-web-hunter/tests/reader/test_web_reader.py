@@ -142,7 +142,7 @@ async def test_read_routes_browser_first_and_skips_flaresolverr_for_non_flaresol
     """A61: a clearance the browser itself earned (NoVNC, a login seed), or a
     stored session with no recorded producer at all (a pre-fix record, or a
     caller that omitted the field), must not be replayed through
-    FlareSolverr — the browser tiers stay first, exactly like today."""
+    FlareSolverr - the browser tiers stay first, exactly like today."""
     flaresolverr_mock = AsyncMock(return_value="flaresolverr must not run for this producer")
     beautifulsoup_mock = AsyncMock(return_value="cheap tiers must not run when a session is stored")
     with (

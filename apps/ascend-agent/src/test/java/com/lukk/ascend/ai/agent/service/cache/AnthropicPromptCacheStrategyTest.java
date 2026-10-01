@@ -73,7 +73,7 @@ class AnthropicPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome logs cache read tokens on a cache hit")
     void recordOutcome_AnthropicHit_LogsCacheReadTokens() {
-        // given — cache hit: cacheRead > 0, cacheCreate == 0
+        // given - cache hit: cacheRead > 0, cacheCreate == 0
         ChatResponse response = anthropicResponse(487, 0, 612);
 
         // then
@@ -83,7 +83,7 @@ class AnthropicPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome logs zeroes on a cold-start cache miss")
     void recordOutcome_AnthropicMiss_LogsZeroes() {
-        // given — cold start: both cacheRead and cacheCreate are 0
+        // given - cold start: both cacheRead and cacheCreate are 0
         ChatResponse response = anthropicResponse(0, 0, 612);
 
         // then
@@ -93,7 +93,7 @@ class AnthropicPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome logs cacheCreate tokens on first cache population (write only)")
     void recordOutcome_AnthropicWrite_LogsCacheCreateTokens() {
-        // given — cache write: cacheCreate > 0, cacheRead == 0 (first population of cache)
+        // given - cache write: cacheCreate > 0, cacheRead == 0 (first population of cache)
         ChatResponse response = anthropicResponse(0, 350, 612);
 
         // then
@@ -103,7 +103,7 @@ class AnthropicPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome handles both cacheRead and cacheCreate being non-zero in a partial hit")
     void recordOutcome_AnthropicHitAndWrite_BothNonZero() {
-        // given — mixed: cache was partially warmed so both counters > 0
+        // given - mixed: cache was partially warmed so both counters > 0
         ChatResponse response = anthropicResponse(312, 100, 1024);
 
         // then

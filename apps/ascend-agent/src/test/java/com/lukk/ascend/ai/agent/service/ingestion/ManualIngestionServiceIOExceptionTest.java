@@ -91,7 +91,7 @@ class ManualIngestionServiceIOExceptionTest {
     @Test
     @DisplayName("ingestObject rethrows as IngestionException when ResponseInputStream close throws IOException")
     void ingestObject_IOExceptionOnStreamClose_WrapsAndRethrows() throws Exception {
-        // given — a ResponseInputStream whose close() throws IOException, triggering the IOException catch
+        // given - a ResponseInputStream whose close() throws IOException, triggering the IOException catch
         S3Object obj = S3Object.builder().key("markdown/broken.md").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
@@ -107,7 +107,7 @@ class ManualIngestionServiceIOExceptionTest {
         when(vectorStoreResolver.resolve(anyString())).thenReturn(mock(org.springframework.ai.vectorstore.VectorStore.class));
         org.mockito.Mockito.doThrow(new IOException("close failed")).when(mockStream).close();
 
-        // when — IOException from stream.close() -> caught by IOException block -> rethrown as IngestionException
+        // when - IOException from stream.close() -> caught by IOException block -> rethrown as IngestionException
         assertThatThrownBy(() -> service.run(Optional.empty(), "openai"))
                 .isInstanceOf(com.lukk.ascend.ai.agent.exception.IngestionException.class)
                 .hasMessageContaining("Failed to read S3 object");

@@ -1,4 +1,4 @@
-# ascend-web-hunter — Architecture Documentation
+# ascend-web-hunter - Architecture Documentation
 
 > As of commit `cdbb447` (2026-05-31). Code SHA is the anchor; treat anything older with suspicion.
 

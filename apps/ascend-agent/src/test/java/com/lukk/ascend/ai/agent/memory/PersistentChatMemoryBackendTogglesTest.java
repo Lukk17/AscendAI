@@ -203,7 +203,7 @@ class PersistentChatMemoryBackendTogglesTest {
                 "{\"role\":\"user\",\"content\":\"msg5\"}"
         ));
 
-        // when — request only last 2
+        // when - request only last 2
         List<Message> result = memory.get(CONV_ID, 2);
 
         // then

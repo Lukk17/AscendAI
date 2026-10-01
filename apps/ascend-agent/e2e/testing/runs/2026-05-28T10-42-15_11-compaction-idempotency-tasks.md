@@ -40,11 +40,11 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ## Result summary
 
-All three Expected assertions passed. Step 1: Bruno returned HTTP 200 in ~2.7 s; the response body was `"Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)."`, referencing the seeded facts (Rex the dog, Praga shelter). Step 3: after a 5-second wait, `chat_history` row count for `frostyCompactionIdempotencyTest` was exactly **11** (9 pre-seeded + 1 new user + 1 new assistant). The `[Conversation summary]` row count remained exactly **1** — no second compaction fired, confirming idempotency of the compaction guard when the post-summary turn count (10) is below the trigger threshold (20).
+All three Expected assertions passed. Step 1: Bruno returned HTTP 200 in ~2.7 s; the response body was `"Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)."`, referencing the seeded facts (Rex the dog, Praga shelter). Step 3: after a 5-second wait, `chat_history` row count for `frostyCompactionIdempotencyTest` was exactly **11** (9 pre-seeded + 1 new user + 1 new assistant). The `[Conversation summary]` row count remained exactly **1** - no second compaction fired, confirming idempotency of the compaction guard when the post-summary turn count (10) is below the trigger threshold (20).
 
-Row count after step 3: expected 11 — observed **11**
+Row count after step 3: expected 11 - observed **11**
 
-Summary row count after step 3: expected 1 — observed **1**
+Summary row count after step 3: expected 1 - observed **1**
 
 Input tokens: ~8000
 

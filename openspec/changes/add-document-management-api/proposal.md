@@ -11,13 +11,13 @@ The sibling changes `add-auth-and-identity` (ADMIN role) and `add-tenant-isolati
 ## What Changes
 
 - **New document registry**: a Liquibase-managed `documents` table (plus per-collection index state) becomes the source of truth for every knowledge-base document: object key, display name, size, MIME type, source, ingestion status, per-collection chunk count and ETag, last-indexed-at, failure reason. `POST /api/v1/ingestion/upload` registers rows on upload; ingestion runs update them.
-- **`GET /api/v1/documents`** — paginated listing from the registry (name, size, MIME type, status, chunk count, last indexed at, source).
-- **`GET /api/v1/documents/{id}`** — document detail including per-document ingestion outcome and failure reason.
-- **`DELETE /api/v1/documents/{id}`** — removes Qdrant chunks (both collections where present), the MinIO object, and the registry row, in a retryable order; already-issued presigned source links are not revoked and simply stop resolving / expire.
-- **`GET /api/v1/documents/{id}/content`** — authenticated, ownership-scoped download that streams the document's MinIO object bytes back through the agent. It is added alongside the presigned source URL, not in place of it: `AiResponse.sources[*]` (synchronous) and the streaming `sources` event gain the registry document id and this relative content path, while the mandatory non-blank `downloadUrl` and `expiresAt` that `rag-source-attachments` guarantees today stay exactly as they are. A caller therefore never has to implement two ways of fetching the same source (coordinated with `harden-cloud-deployment`'s gateway-only surface, `add-chat-streaming-and-conversations`'s `sources` event, and `add-tenant-isolation`'s ownership check).
-- **`POST /api/v1/documents/{id}/reindex`** — single-document re-run through the `DocumentRouter` path, replacing prior chunks; returns a run id.
-- **BREAKING**: `POST /api/v1/ingestion/run` becomes asynchronous — returns HTTP 202 with a run id instead of blocking and returning `ManualIngestionResult` counts.
-- **`GET /api/v1/ingestion/runs/{id}`** — run status (`QUEUED` / `RUNNING` / `COMPLETED` / `FAILED`) with counts and per-file failures; **`GET /api/v1/ingestion/runs`** — small run-history listing.
+- **`GET /api/v1/documents`** - paginated listing from the registry (name, size, MIME type, status, chunk count, last indexed at, source).
+- **`GET /api/v1/documents/{id}`** - document detail including per-document ingestion outcome and failure reason.
+- **`DELETE /api/v1/documents/{id}`** - removes Qdrant chunks (both collections where present), the MinIO object, and the registry row, in a retryable order; already-issued presigned source links are not revoked and simply stop resolving / expire.
+- **`GET /api/v1/documents/{id}/content`** - authenticated, ownership-scoped download that streams the document's MinIO object bytes back through the agent. It is added alongside the presigned source URL, not in place of it: `AiResponse.sources[*]` (synchronous) and the streaming `sources` event gain the registry document id and this relative content path, while the mandatory non-blank `downloadUrl` and `expiresAt` that `rag-source-attachments` guarantees today stay exactly as they are. A caller therefore never has to implement two ways of fetching the same source (coordinated with `harden-cloud-deployment`'s gateway-only surface, `add-chat-streaming-and-conversations`'s `sources` event, and `add-tenant-isolation`'s ownership check).
+- **`POST /api/v1/documents/{id}/reindex`** - single-document re-run through the `DocumentRouter` path, replacing prior chunks; returns a run id.
+- **BREAKING**: `POST /api/v1/ingestion/run` becomes asynchronous - returns HTTP 202 with a run id instead of blocking and returning `ManualIngestionResult` counts.
+- **`GET /api/v1/ingestion/runs/{id}`** - run status (`QUEUED` / `RUNNING` / `COMPLETED` / `FAILED`) with counts and per-file failures; **`GET /api/v1/ingestion/runs`** - small run-history listing.
 - `ManualIngestionService` dedupe moves from `INT_METADATA_STORE` markers to registry ETag comparison; the Spring Integration streaming pipeline (`config/IngestionPipelineConfig.java`) keeps its metadata-store filter untouched.
 - Authorization (ADMIN for delete / reindex / run) and tenant scoping are consumed from the sibling changes, not re-specified here; the schema reserves room for the ownership column (see design Context).
 
@@ -25,11 +25,11 @@ The sibling changes `add-auth-and-identity` (ADMIN role) and `add-tenant-isolati
 
 ### New Capabilities
 
-- `document-management`: CRUD visibility and control over the RAG knowledge base — document registry, paginated listing, per-document detail and status, delete across MinIO + Qdrant + metadata, single-document re-index.
+- `document-management`: CRUD visibility and control over the RAG knowledge base - document registry, paginated listing, per-document detail and status, delete across MinIO + Qdrant + metadata, single-document re-index.
 
 ### Modified Capabilities
 
-- `ingestion-correctness`: ingestion runs become asynchronous jobs with observable status — `POST /api/v1/ingestion/run` returns 202 + run id; run status carries counts and per-file failures; a bounded run history is queryable. (Delta adds requirements; no existing requirement covered run semantics.)
+- `ingestion-correctness`: ingestion runs become asynchronous jobs with observable status - `POST /api/v1/ingestion/run` returns 202 + run id; run status carries counts and per-file failures; a bounded run history is queryable. (Delta adds requirements; no existing requirement covered run semantics.)
 - `rag-source-attachments`: source attachments gain the registry document id and the relative `/api/v1/documents/{id}/content` path as additional mandatory fields, on top of the mandatory non-blank `downloadUrl` and `expiresAt` the capability already guarantees. Both download paths are always present, so the client chooses one and implements only that one. (This is the download-mechanism half of the presign-resolution amendment. `add-tenant-isolation` layers the per-tenant ownership check onto the same endpoint.)
 
 ## Impact

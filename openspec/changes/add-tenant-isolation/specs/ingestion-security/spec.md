@@ -2,12 +2,12 @@
 
 ### Requirement: Filename sanitization before storage
 
-The ingestion controller SHALL sanitize the user-supplied filename before using it in any storage key (S3 object key, local path, Qdrant `source` metadata). Sanitization SHALL replace any character outside `[A-Za-z0-9._-]` with `_`, strip leading dots (no `.htaccess`-style hidden files), collapse repeated separators, and cap the length at 200 characters. The resulting storage key SHALL be prefixed with `tenant/{tenantId}/` where `{tenantId}` is the tenant resolved from the request's tenant context — never from user input — followed by the existing folder segment (`markdown/` or `documents/`) and the sanitized filename. Uploads without a resolved tenant context SHALL be rejected.
+The ingestion controller SHALL sanitize the user-supplied filename before using it in any storage key (S3 object key, local path, Qdrant `source` metadata). Sanitization SHALL replace any character outside `[A-Za-z0-9._-]` with `_`, strip leading dots (no `.htaccess`-style hidden files), collapse repeated separators, and cap the length at 200 characters. The resulting storage key SHALL be prefixed with `tenant/{tenantId}/` where `{tenantId}` is the tenant resolved from the request's tenant context - never from user input - followed by the existing folder segment (`markdown/` or `documents/`) and the sanitized filename. Uploads without a resolved tenant context SHALL be rejected.
 
 #### Scenario: Path-traversal attempt is neutralized
 
 - **WHEN** a user of tenant `acme` uploads a file named `../../etc/passwd.txt`
-- **THEN** the stored S3 key contains `_.._.._etc_passwd.txt` (or equivalent) — no `/` separators or leading dots survive in the filename segment
+- **THEN** the stored S3 key contains `_.._.._etc_passwd.txt` (or equivalent) - no `/` separators or leading dots survive in the filename segment
 - **AND** the upload does NOT write outside `tenant/acme/`
 
 #### Scenario: Unicode and control characters

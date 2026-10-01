@@ -13,7 +13,7 @@ import java.io.InputStream;
 /**
  * Detects an upload's true MIME type by reading the first bytes of the file
  * with Apache Tika. The client-supplied {@code Content-Type} is never trusted
- * — an attacker can label a payload as anything, so the allowlist check has to
+ * - an attacker can label a payload as anything, so the allowlist check has to
  * sniff the bytes server-side.
  *
  * <p>Falls back to the client-supplied header (or {@code application/octet-stream})

@@ -25,10 +25,10 @@ Spec: [8-prompt-cache-openai-test.md](8-prompt-cache-openai-test.md)
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) — observed: 2462
-- [x] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run) — observed: 0
+- [x] Step 1: `usage.promptTokens >= 1024` (clears OpenAI auto-cache threshold) - observed: 2462
+- [x] Step 1: `usage.nativeUsage.prompt_tokens_details.cached_tokens == 0` (or absent on a fresh-cache run; non-zero acceptable when OpenAI's server-side TTL hasn't expired from a prior local run) - observed: 0
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0` — observed: 2688
+- [x] Step 2: `usage.nativeUsage.prompt_tokens_details.cached_tokens > 0` - observed: 2688
 
 ### Verdict
 

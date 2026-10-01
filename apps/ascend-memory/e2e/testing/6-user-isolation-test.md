@@ -10,7 +10,7 @@
   whose `user_id` is `"frostyMemoryIsolationUserA"` and **no entry** whose `memory` field contains
   the canary substring `"Tromsø"` (case-insensitive).
 - Proves that mem0's user-scope filter prevents memories written by user A from appearing in user
-  B's search results — cross-user memory leakage does not occur.
+  B's search results - cross-user memory leakage does not occur.
 
 ## Prerequisites
 
@@ -84,7 +84,7 @@ Expect HTTP 200 with `{"status":"success", ...}`.
 ## Expected
 
 `insert-isolation-user-a.yml` returns HTTP 200. The response body is a JSON array (mem0's `add`
-return shape). The array is non-empty — at least one entry has a string `id` field.
+return shape). The array is non-empty - at least one entry has a string `id` field.
 
 `search-isolation-user-b.yml` returns HTTP 200. The response body is a JSON array (possibly empty).
 The isolation invariant holds when **all** of the following are true:

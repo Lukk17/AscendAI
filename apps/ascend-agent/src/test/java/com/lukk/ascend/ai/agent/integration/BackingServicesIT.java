@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * once the Testcontainers URLs are wired in.
  *
  * <p>The MCP client and chat providers are disabled in {@link TestcontainersBase}, so
- * these tests don't touch external networks — only the data layer.
+ * these tests don't touch external networks - only the data layer.
  */
 class BackingServicesIT extends TestcontainersBase {
 

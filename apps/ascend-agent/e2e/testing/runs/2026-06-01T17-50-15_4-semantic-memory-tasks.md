@@ -43,7 +43,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-All seven Expected assertions passed. Step 1 (save turn, prompt "Hello, my name is Luke. I am a software engineer.") returned HTTP 200 in 2.2 s. After a 5-second wait for the async Qdrant write, a scroll on `ascend_memory_1536` filtered by `user_id=frostySemanticMemoryTest` returned 2 points: one with `data: "User's name is Luke"` and one with `data: "User is a software engineer"` — ≥ 1 point, and across the two points both `Luke` and `software engineer` are present. Step 2 cleared Redis and Postgres chat history. Step 3 (recall turn, prompt "What is my name and what do I do?") returned HTTP 200 with `content: "Your name is **Luke** and you're a **software engineer**."` — both required terms present, no refusal. Chat history was empty at recall time, confirming the response was sourced entirely from semantic memory.
+All seven Expected assertions passed. Step 1 (save turn, prompt "Hello, my name is Luke. I am a software engineer.") returned HTTP 200 in 2.2 s. After a 5-second wait for the async Qdrant write, a scroll on `ascend_memory_1536` filtered by `user_id=frostySemanticMemoryTest` returned 2 points: one with `data: "User's name is Luke"` and one with `data: "User is a software engineer"` - ≥ 1 point, and across the two points both `Luke` and `software engineer` are present. Step 2 cleared Redis and Postgres chat history. Step 3 (recall turn, prompt "What is my name and what do I do?") returned HTTP 200 with `content: "Your name is **Luke** and you're a **software engineer**."` - both required terms present, no refusal. Chat history was empty at recall time, confirming the response was sourced entirely from semantic memory.
 
 Input tokens:
 

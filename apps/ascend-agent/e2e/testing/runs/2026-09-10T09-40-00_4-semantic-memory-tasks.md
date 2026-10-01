@@ -8,7 +8,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ### Prerequisites
 
-- [x] Bruno CLI present (`bru --version` returns a version) — 3.4.0
+- [x] Bruno CLI present (`bru --version` returns a version) - 3.4.0
 - [x] ascend-ai-agent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [x] AscendMemory `/health` returns HTTP 200 with `{"status":"ok"}`
 - [x] Qdrant `/healthz` returns HTTP 200
@@ -30,7 +30,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 ### Expected
 
 - [x] After step 1: HTTP 200
-- [x] After step 1: Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` returns ≥ 1 point — 2 points
+- [x] After step 1: Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` returns ≥ 1 point - 2 points
 - [x] After step 1: across all Qdrant points returned for `frostySemanticMemoryTest`, the payloads together contain `Luke` and `software engineer` (point 1 data="User's name is Luke", point 2 data="User is a software engineer")
 - [x] After step 3: HTTP 200
 - [x] After step 3: Response `content` contains `Luke`

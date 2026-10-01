@@ -23,7 +23,7 @@ Both `ChatExecutor` and `SemanticMemoryExtractor` use this resolver instead of d
 
 ## Consequences
 
-- **Positive**: Backward-compatible with OpenAI-type (single generation) — last = first, identical behavior
+- **Positive**: Backward-compatible with OpenAI-type (single generation) - last = first, identical behavior
 - **Positive**: Automatically handles any future thinking-model additions without code changes
-- **Positive**: Follows DRY — single extraction point used by all `ChatResponse` consumers
+- **Positive**: Follows DRY - single extraction point used by all `ChatResponse` consumers
 - **Negative**: Assumes the actual answer is always the last non-blank generation, which holds for all currently supported Anthropic-type providers

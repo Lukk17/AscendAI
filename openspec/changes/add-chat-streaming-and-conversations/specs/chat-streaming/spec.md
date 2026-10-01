@@ -5,9 +5,9 @@
 ### Requirement: SSE streaming prompt endpoint
 
 The agent SHALL expose `POST /api/v1/ai/prompt/stream` consuming `multipart/form-data` and producing
-`text/event-stream`. The endpoint SHALL accept the same form fields as `POST /api/v1/ai/prompt` — `prompt` (required),
+`text/event-stream`. The endpoint SHALL accept the same form fields as `POST /api/v1/ai/prompt` - `prompt` (required),
 `image`, `document`, `provider`, `model`, `embeddingProvider`, `attachSources`, `compactionProvider`,
-`compactionModel` — plus the optional `conversationId` field, and the `X-User-Id` header with the same default-id
+`compactionModel` - plus the optional `conversationId` field, and the `X-User-Id` header with the same default-id
 fallback. The response SHALL be a Server-Sent Events stream whose events follow the schema defined in the
 "SSE event schema" requirement. The endpoint SHALL be documented in the OpenAPI specification.
 
@@ -27,10 +27,10 @@ fallback. The response SHALL be a Server-Sent Events stream whose events follow 
 The stream SHALL consist of named SSE events with JSON data payloads, in this order: zero or more `delta` events, an
 optional single `sources` event, and exactly one terminal event (`done` on success, `error` on failure).
 
-- `delta` — `{"content": "<token fragment>"}`; the concatenation of all `delta` payloads in order SHALL equal the full assistant answer text.
-- `sources` — `{"sources": [SourceFile, ...]}` using the same `SourceFile` JSON shape as the synchronous response (per the presign-resolution amendment, each entry carries the registry `documentId` and the relative `contentPath` `/api/v1/documents/{id}/content`, not a presigned MinIO URL); emitted at most once, before the terminal event, and only when `attachSources=true`.
-- `done` — `{"metadata": <CustomMetadata>, "conversationId": "<uuid>"}`; terminal success event, always exactly one per successful stream.
-- `error` — `{"status": <int>, "code": "<machine-readable code>", "message": "<human-readable text>"}`; terminal failure event.
+- `delta` - `{"content": "<token fragment>"}`; the concatenation of all `delta` payloads in order SHALL equal the full assistant answer text.
+- `sources` - `{"sources": [SourceFile, ...]}` using the same `SourceFile` JSON shape as the synchronous response (per the presign-resolution amendment, each entry carries the registry `documentId` and the relative `contentPath` `/api/v1/documents/{id}/content`, not a presigned MinIO URL); emitted at most once, before the terminal event, and only when `attachSources=true`.
+- `done` - `{"metadata": <CustomMetadata>, "conversationId": "<uuid>"}`; terminal success event, always exactly one per successful stream.
+- `error` - `{"status": <int>, "code": "<machine-readable code>", "message": "<human-readable text>"}`; terminal failure event.
 
 No event other than these four types SHALL be emitted.
 
@@ -60,8 +60,8 @@ No event other than these four types SHALL be emitted.
 ### Requirement: Pre-stream validation fails as plain JSON, mid-stream failure as terminal error event
 
 The stream endpoint SHALL run all pre-model request validation before any SSE bytes are written and SHALL report
-those failures as plain JSON `ApiError` responses with the corresponding HTTP status — unknown `compactionProvider`
-(400), image sent to a non-vision model (415), unknown or foreign `conversationId` (404) — exactly as the synchronous
+those failures as plain JSON `ApiError` responses with the corresponding HTTP status - unknown `compactionProvider`
+(400), image sent to a non-vision model (415), unknown or foreign `conversationId` (404) - exactly as the synchronous
 endpoint does. Failures that occur after streaming has begun SHALL be reported as a single terminal `error` event; the
 stream SHALL then be closed and no further events emitted.
 

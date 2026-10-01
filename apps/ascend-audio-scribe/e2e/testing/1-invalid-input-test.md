@@ -7,7 +7,7 @@
 - The validation `detail` array has at least one entry naming `file` in its `loc` path (e.g. `loc: ["body", "file"]`)
   and a `type` value that identifies a missing-field error (FastAPI emits `missing` on Pydantic v2; older versions
   emit `value_error.missing`).
-- The error short-circuits inside FastAPI's request parser **before** `transcribe_openai_endpoint` runs — no outbound
+- The error short-circuits inside FastAPI's request parser **before** `transcribe_openai_endpoint` runs - no outbound
   HTTPS request to `api.openai.com` is made, no OpenAI quota is consumed, no `.md` file is written to the
   ascend-audio-scribe `/tmp` cache.
 - `Content-Type` of the response is `application/json` (FastAPI default for validation errors), NOT `text/markdown`.
@@ -58,7 +58,7 @@ The response body parses as JSON and matches:
   `value_error.missing` shapes).
 - `Content-Type` response header starts with `application/json`.
 
-No call should have been made to `api.openai.com` — this is an internal property the spec does not directly assert
+No call should have been made to `api.openai.com` - this is an internal property the spec does not directly assert
 (the runner is black-box), but a steady-state run takes < 200 ms. A duration > 1 s suggests the request reached the
 handler and an OpenAI call was attempted; investigate before declaring PASS.
 

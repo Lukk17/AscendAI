@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-05-31
+Accepted - 2026-05-31
 
 ## Context
 
@@ -91,9 +91,9 @@ start of every request and inject the stored cookies and User-Agent into the out
 
 ## Related
 
-- `src/reader/cloudflare/cookie_manager.py` — `CookieManager`, `registrable_domain`, `get_session_data`,
+- `src/reader/cloudflare/cookie_manager.py` - `CookieManager`, `registrable_domain`, `get_session_data`,
   `save_session_data`.
-- `src/reader/strategies/beautifulsoup_strategy.py:29-37` — reads and injects cached session data.
-- `src/reader/strategies/trafilatura_strategy.py:27-36` — reads and injects cached session data.
-- `src/reader/strategies/flaresolverr_strategy.py:53-56` — saves `cf_clearance` after a successful solve.
-- `src/config/config.py` — `REDIS_URL` (default `redis://127.0.0.1:6379/0`).
+- `src/reader/strategies/beautifulsoup_strategy.py:29-37` - reads and injects cached session data.
+- `src/reader/strategies/trafilatura_strategy.py:27-36` - reads and injects cached session data.
+- `src/reader/strategies/flaresolverr_strategy.py:53-56` - saves `cf_clearance` after a successful solve.
+- `src/config/config.py` - `REDIS_URL` (default `redis://127.0.0.1:6379/0`).

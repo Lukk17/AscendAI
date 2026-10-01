@@ -293,7 +293,7 @@ class WeatherToolServiceTest {
     @Test
     @DisplayName("treats blank-but-non-null country code as absent and proceeds with geocoding")
     void getCurrentWeather_blankCountryCode_treatedAsAbsent() {
-        // given — blank country code isBlank() == true → treated as absent (valid)
+        // given - blank country code isBlank() == true → treated as absent (valid)
         when(client.geocode(CITY_WARSAW, null, LANG_EN)).thenReturn(Optional.empty());
 
         // when
@@ -333,7 +333,7 @@ class WeatherToolServiceTest {
     @Test
     @DisplayName("returns invalid_input with requestedQuery when country code is unknown ISO code")
     void getCurrentWeather_unknownIsoCountryCode_returnsInvalidInput() {
-        // when — "ZZ" is two letters but not a real ISO-3166-1 alpha-2 code
+        // when - "ZZ" is two letters but not a real ISO-3166-1 alpha-2 code
         CurrentWeatherResult result = service.getCurrentWeather(CITY_WARSAW, "ZZ", null, null);
 
         // then

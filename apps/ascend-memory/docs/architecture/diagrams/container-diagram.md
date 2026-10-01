@@ -1,4 +1,4 @@
-# C4 Container Diagram — AscendMemory
+# C4 Container Diagram - AscendMemory
 
 ```mermaid
 graph TB

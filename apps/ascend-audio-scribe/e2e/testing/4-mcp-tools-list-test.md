@@ -11,7 +11,7 @@
 - `transcribe_local` and `transcribe_audacity` also advertise `model`, `language` (optional).
 - `transcribe_openai` advertises `model`, `language` (optional).
 - `transcribe_hf` advertises `model`, `hf_provider` (optional).
-- No external API (OpenAI, Hugging Face) is invoked. `tools/list` is a pure protocol probe — running the test
+- No external API (OpenAI, Hugging Face) is invoked. `tools/list` is a pure protocol probe - running the test
   without `OPENAI_API_KEY` / `HF_TOKEN` still passes; the tool definitions are advertised regardless of which
   providers are configured.
 

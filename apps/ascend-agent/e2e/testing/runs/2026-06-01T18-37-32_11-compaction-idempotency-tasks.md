@@ -40,7 +40,7 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ## Result summary
 
-Step 1 returned HTTP 200 in 3.5 s. The response body `content` field read "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)." — correctly citing Rex and Warsaw from the seeded chat history. Step 3 Postgres queries confirmed: total row count = 11 (9 pre-seeded + 1 user + 1 assistant from the new prompt), and exactly 1 `[Conversation summary]` row remains (no second compaction fired). Both assertions match the Expected section exactly. The compaction idempotency guard functioned correctly: 10 turns past the existing summary is less than the trigger of 20, so no re-compaction occurred.
+Step 1 returned HTTP 200 in 3.5 s. The response body `content` field read "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)." - correctly citing Rex and Warsaw from the seeded chat history. Step 3 Postgres queries confirmed: total row count = 11 (9 pre-seeded + 1 user + 1 assistant from the new prompt), and exactly 1 `[Conversation summary]` row remains (no second compaction fired). Both assertions match the Expected section exactly. The compaction idempotency guard functioned correctly: 10 turns past the existing summary is less than the trigger of 20, so no re-compaction occurred.
 
 Row count after step 3: 11 (expected 11) ✓
 

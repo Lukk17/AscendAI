@@ -109,7 +109,7 @@ async def test_auth_ttl_expiry_hides_auth_cookies_but_waf_remains():
     if result is not None:
         names = {c["name"] for c in result.get("cookies", [])}
         assert "li_at" not in names
-    # If waf is also expired, result is None — both outcomes are correct.
+    # If waf is also expired, result is None - both outcomes are correct.
 
 
 @pytest.mark.asyncio

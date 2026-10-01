@@ -87,14 +87,14 @@ class IngestionControllerUploadValidationTest {
     @Test
     @DisplayName("skips empty file entries and uploads only non-empty files from a mixed list")
     void uploadDocument_SkipsEmptyEntries_WhenMixedListProvided() throws IOException {
-        // given — hits the "if (file.isEmpty()) continue;" branch in the loop
+        // given - hits the "if (file.isEmpty()) continue;" branch in the loop
         MockMultipartFile empty = new MockMultipartFile("file", "skip.md", "text/markdown", new byte[0]);
         MockMultipartFile good = new MockMultipartFile("file", "ok.md", "text/markdown", "x".getBytes());
 
         // when
         ResponseEntity<?> response = controller.uploadDocument(List.of(empty, good));
 
-        // then — verify only the good file was uploaded
+        // then - verify only the good file was uploaded
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         org.mockito.Mockito.verify(storageService).uploadFile(eq("markdown/ok.md"), any(), org.mockito.ArgumentMatchers.anyLong());
     }
@@ -134,7 +134,7 @@ class IngestionControllerUploadValidationTest {
         // when
         ResponseEntity<?> response = controller.uploadDocument(List.of(broken));
 
-        // then — no file successfully uploaded -> 415 with failures listed
+        // then - no file successfully uploaded -> 415 with failures listed
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         assertThat(response.getBody())
                 .asInstanceOf(InstanceOfAssertFactories.type(ApiError.class))
@@ -257,7 +257,7 @@ class IngestionControllerUploadValidationTest {
     @Test
     @DisplayName("routes file with null original filename to documentsFolder")
     void uploadDocument_NullFilename_RoutesToDocumentsFolder() {
-        // given — MockMultipartFile with no filename will be sanitized to unknown_file -> documents/ folder
+        // given - MockMultipartFile with no filename will be sanitized to unknown_file -> documents/ folder
         MockMultipartFile f = new MockMultipartFile("file", (String) null, "application/pdf", "data".getBytes());
 
         // when

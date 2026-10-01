@@ -33,7 +33,7 @@ def _factory(page_url: str, *, goto_ok: bool = True):
 
 @pytest.mark.asyncio
 async def test_monitor_exits_via_timeout_loop_condition():
-    """With NOVNC_TIMEOUT_SECONDS=0 the while loop body executes zero times — the
+    """With NOVNC_TIMEOUT_SECONDS=0 the while loop body executes zero times - the
     timeout-exit branch (51->75) is the only path to the finally."""
     factory, browser, _ = _factory("http://test.com?login=1")
     with (

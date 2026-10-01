@@ -97,7 +97,7 @@ class DocumentIngestionServiceTest {
     @DisplayName("process document null original filename uses document fallback")
     @Test
     void processDocument_NullOriginalFilename_UsesDocumentFallback() throws IOException {
-        // given — file is not empty but getOriginalFilename() returns null
+        // given - file is not empty but getOriginalFilename() returns null
         MultipartFile mockFile = mock(MultipartFile.class);
         when(mockFile.isEmpty()).thenReturn(false);
         when(mockFile.getOriginalFilename()).thenReturn(null);

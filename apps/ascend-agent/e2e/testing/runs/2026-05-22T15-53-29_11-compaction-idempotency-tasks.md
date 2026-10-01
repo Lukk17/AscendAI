@@ -40,9 +40,9 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ## Result summary
 
-Row count after step 3: 11 (expected 11) — PASS
+Row count after step 3: 11 (expected 11) - PASS
 
-Summary row count after step 3: 1 (expected 1, no second compaction triggered) — PASS
+Summary row count after step 3: 1 (expected 1, no second compaction triggered) - PASS
 
 The prompt asked about the dog's name and rescue origin; the seeded summary contains both Rex and Praga shelter details, confirming the model had the summary in context.
 

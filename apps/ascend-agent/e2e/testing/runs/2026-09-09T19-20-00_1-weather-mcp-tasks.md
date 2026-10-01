@@ -44,7 +44,7 @@ Run regardless of Run-step verdict. Every command is idempotent.
 
 ## Result summary
 
-All four Expected assertions held. The Bruno request returned HTTP 200. The persisted `chat_history` row for `frostyWeatherMcpTest` shows the assistant response "The current weather in Warsaw, Poland: **Temperature:** 25.4°C, **Conditions:** Partly cloudy, **Wind:** 14.0 km/h from the northwest (315°)" — a numeric temperature, a weather condition word, and no refusal phrasing. Bruno's own embedded test script also reported both its assertions passing ("Status code is 200", "Weather content carries a real temperature and condition, not a refusal"). The MCP tool was clearly invoked given the specific, real-time-shaped data (exact wind bearing, timestamped observation) rather than a generic refusal.
+All four Expected assertions held. The Bruno request returned HTTP 200. The persisted `chat_history` row for `frostyWeatherMcpTest` shows the assistant response "The current weather in Warsaw, Poland: **Temperature:** 25.4°C, **Conditions:** Partly cloudy, **Wind:** 14.0 km/h from the northwest (315°)" - a numeric temperature, a weather condition word, and no refusal phrasing. Bruno's own embedded test script also reported both its assertions passing ("Status code is 200", "Weather content carries a real temperature and condition, not a refusal"). The MCP tool was clearly invoked given the specific, real-time-shaped data (exact wind bearing, timestamped observation) rather than a generic refusal.
 
 Input tokens: not available (Bruno CLI output does not surface token counts for this provider/model combination)
 

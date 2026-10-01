@@ -2,14 +2,14 @@
 
 ## Status
 
-Accepted — 2026-05-08
+Accepted - 2026-05-08
 
 ## Context
 
 ascend-ai-agent has two ingestion paths into the Qdrant RAG store:
 
-1. **Manual** — operator uploads via `POST /api/v1/ingestion/upload` (or drops files into the S3-compatible object store directly), then explicitly calls `POST /api/v1/ingestion/run` to scan and embed.
-2. **Auto-poller** — a background Spring Integration `@InboundChannelAdapter` polls the object-store bucket on a fixed interval and ingests new or changed files without operator action.
+1. **Manual** - operator uploads via `POST /api/v1/ingestion/upload` (or drops files into the S3-compatible object store directly), then explicitly calls `POST /api/v1/ingestion/run` to scan and embed.
+2. **Auto-poller** - a background Spring Integration `@InboundChannelAdapter` polls the object-store bucket on a fixed interval and ingests new or changed files without operator action.
 
 Both paths share the same downstream pipeline (`DocumentRouter` → splitter → embedder → vector store). The question is which one is the default.
 
@@ -40,8 +40,8 @@ The auto-poller is gated behind `app.ingestion.auto.enabled` and **defaults to `
 
 ## Related
 
-- `app.ingestion.auto.enabled` — `application.yaml`
-- `IngestionPipelineConfig.IngestionFlow` — `@ConditionalOnProperty(prefix = "app.ingestion.auto", name = "enabled", havingValue = "true")`
-- `ManualIngestionService` — manual `/run` path
-- `docs/INGESTION.md` — operator-facing description of both paths
+- `app.ingestion.auto.enabled` - `application.yaml`
+- `IngestionPipelineConfig.IngestionFlow` - `@ConditionalOnProperty(prefix = "app.ingestion.auto", name = "enabled", havingValue = "true")`
+- `ManualIngestionService` - manual `/run` path
+- `docs/INGESTION.md` - operator-facing description of both paths
 - OpenSpec change `fix-ascend-ai-agent-bugs`, Bug 11

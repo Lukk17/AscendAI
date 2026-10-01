@@ -114,7 +114,7 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute retries without cache options when isCacheConfigError returns true")
     void execute_WhenCacheConfigError_RetriesWithoutCache() {
-        // given — strategy that claims all exceptions are cache config errors
+        // given - strategy that claims all exceptions are cache config errors
         PromptCacheStrategy alwaysCacheError = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -145,7 +145,7 @@ class ChatExecutorBranchCoverageTest {
         // when
         AiResponse result = chatExecutor.execute(USER_ID, "sys", USER_TEXT, List.of(), null, PROVIDER, MODEL);
 
-        // then — second invocation succeeded
+        // then - second invocation succeeded
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
     }
 
@@ -224,7 +224,7 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute rethrows RuntimeException when isCacheConfigError returns false")
     void execute_CacheErrorFalse_Rethrows() {
-        // given — strategy that says it's NOT a cache error (default NoopPromptCacheStrategy)
+        // given - strategy that says it's NOT a cache error (default NoopPromptCacheStrategy)
         when(chatModelResolver.resolve(PROVIDER)).thenReturn(chatModel);
         when(toolCallbackProvider.getToolCallbacks()).thenReturn(new org.springframework.ai.tool.function.FunctionToolCallback[0]);
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class)))
@@ -247,7 +247,7 @@ class ChatExecutorBranchCoverageTest {
         when(chatModel.call(any(org.springframework.ai.chat.prompt.Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
-        // when — null history passed
+        // when - null history passed
         AiResponse result = chatExecutor.execute(USER_ID, msgs, USER_TEXT, null, null, PROVIDER, MODEL);
 
         assertThat(result.content()).isEqualTo(TestConstants.TEST_RESPONSE_CONTENT);
@@ -276,7 +276,7 @@ class ChatExecutorBranchCoverageTest {
     @Test
     @DisplayName("execute with null history and non-null options passes both correctly")
     void execute_NullHistoryWithNonNullOptions_Succeeds() {
-        // given — strategy returns non-null options AND history is null
+        // given - strategy returns non-null options AND history is null
         PromptCacheStrategy anthStrategy = anthropicStrategyWithCacheOptions();
         when(cacheStrategyResolver.resolve(any())).thenReturn(anthStrategy);
         when(chatModelResolver.resolve("anthropic")).thenReturn(chatModel);
@@ -286,7 +286,7 @@ class ChatExecutorBranchCoverageTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(resp);
         when(chatResponseContentResolver.resolveContent(resp)).thenReturn(TestConstants.TEST_RESPONSE_CONTENT);
 
-        // when — null history AND non-null options (covers: if (options != null) { promptBuilder.options(options); })
+        // when - null history AND non-null options (covers: if (options != null) { promptBuilder.options(options); })
         AiResponse result = chatExecutor.execute(USER_ID, "sys", USER_TEXT, null, null, "anthropic", "claude-sonnet-4-5");
 
         // then

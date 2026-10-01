@@ -15,7 +15,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 
@@ -30,7 +30,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ## Result summary
 
-The Bruno request POSTed `argent-saga-chronicle.pdf` to `POST /api/v1/ai/prompt` (user `frostySummarizationTest`, provider MiniMax-M2.7) and received HTTP 200 in ~23 seconds. The `content` field returned a well-structured markdown summary titled "The Argent Saga – Condensed Summary" containing 8 or more of the spec's expected proper nouns: `Aenaria Solveh`, `Halen Veyr`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, and `Vorsh-Ka the Quiet`. The response is a coherent, multi-section narrative grounded in the fixture document's content and contains no refusal language. All four Expected assertions pass. The PDF was parsed page-by-page through Docling and the extracted text was injected into the prompt context as verified by the presence of the proper nouns that could only have come from the document.
+The Bruno request POSTed `argent-saga-chronicle.pdf` to `POST /api/v1/ai/prompt` (user `frostySummarizationTest`, provider MiniMax-M2.7) and received HTTP 200 in ~23 seconds. The `content` field returned a well-structured markdown summary titled "The Argent Saga - Condensed Summary" containing 8 or more of the spec's expected proper nouns: `Aenaria Solveh`, `Halen Veyr`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, and `Vorsh-Ka the Quiet`. The response is a coherent, multi-section narrative grounded in the fixture document's content and contains no refusal language. All four Expected assertions pass. The PDF was parsed page-by-page through Docling and the extracted text was injected into the prompt context as verified by the presence of the proper nouns that could only have come from the document.
 
 Input tokens:
 

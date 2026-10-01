@@ -34,12 +34,12 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 ### Expected
 
-- [x] Step 1: response `uploaded` field includes `documents/pierogi-recipe.docx` — OBSERVED: `["markdown/markdown-canary.md","documents/banana-price-poland.pdf","documents/pierogi-recipe.docx"]`
-- [x] Step 2: response `indexed >= 1` and `failed == 0` — OBSERVED: `{"indexed":1,"skipped":4,"failed":0}` after re-clearing metadata (see Additional tasks)
-- [x] Step 3: response body has a `sources` array with at least 1 entry — OBSERVED: 3 entries (pierogi-recipe.docx + 2 dedup fixtures still in Qdrant)
-- [x] Step 3: first entry has non-empty `name`, `mimeType`, `downloadUrl`, `expiresAt` — OBSERVED: all fields present on all 3 entries
-- [x] Step 3: `downloadUrl` host portion equals `localhost:9070`, NOT `host.docker.internal:9070` — OBSERVED: all downloadUrls start with `http://localhost:9070`
-- [x] Step 4: HTTP 200, downloaded file non-empty — OBSERVED: 13563 bytes written to /tmp/attach-sources-payload
+- [x] Step 1: response `uploaded` field includes `documents/pierogi-recipe.docx` - OBSERVED: `["markdown/markdown-canary.md","documents/banana-price-poland.pdf","documents/pierogi-recipe.docx"]`
+- [x] Step 2: response `indexed >= 1` and `failed == 0` - OBSERVED: `{"indexed":1,"skipped":4,"failed":0}` after re-clearing metadata (see Additional tasks)
+- [x] Step 3: response body has a `sources` array with at least 1 entry - OBSERVED: 3 entries (pierogi-recipe.docx + 2 dedup fixtures still in Qdrant)
+- [x] Step 3: first entry has non-empty `name`, `mimeType`, `downloadUrl`, `expiresAt` - OBSERVED: all fields present on all 3 entries
+- [x] Step 3: `downloadUrl` host portion equals `localhost:9070`, NOT `host.docker.internal:9070` - OBSERVED: all downloadUrls start with `http://localhost:9070`
+- [x] Step 4: HTTP 200, downloaded file non-empty - OBSERVED: 13563 bytes written to /tmp/attach-sources-payload
 
 ### Verdict
 
@@ -64,4 +64,4 @@ Duration: 00:13:00
 ## Additional tasks I did
 
 - Had to re-delete `int_metadata_store` row for pierogi-recipe.docx and re-run ingestion because the first Bruno rag-ingestion-run returned HTTP 500 (transient), then the second direct curl returned `indexed:0,skipped:5` (metadata was re-created by upload). Cleared metadata and re-ran: `indexed:1,failed:0`.
-- Noted that sources[] contains 3 entries (not 1) because the dedup fixtures (helena.md, grandma.md) were already in Qdrant from a prior run and semantic search matched all pierogi content. Spec requires >= 1 entry and the pierogi-recipe.docx entry is present — PASS.
+- Noted that sources[] contains 3 entries (not 1) because the dedup fixtures (helena.md, grandma.md) were already in Qdrant from a prior run and semantic search matched all pierogi content. Spec requires >= 1 entry and the pierogi-recipe.docx entry is present - PASS.

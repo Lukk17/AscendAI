@@ -83,5 +83,5 @@ dominant size contributor.
 `src/assets/fanboy-annoyance.txt` ships inside the image via the same `COPY src/ src/` that already carries
 `src/assets/user_agents.json`; no separate `COPY` step exists for it. A blocklist refreshed via
 `POST /api/v1/blocklist/refresh` writes back to that same in-container path, so it only persists across a
-container restart if that path is bind-mounted or volume-mounted to somewhere durable — this deployment does not
+container restart if that path is bind-mounted or volume-mounted to somewhere durable - this deployment does not
 mount one, so a restart reverts to whatever was last baked into the image.

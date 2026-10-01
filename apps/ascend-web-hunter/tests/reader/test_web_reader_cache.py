@@ -30,7 +30,7 @@ async def test_cache_hit_skips_strategy_chain() -> None:
 
     assert result1["status"] == "success"
     assert result2["status"] == "success"
-    assert call_count == 1, "strategy chain ran more than once — cache did not work"
+    assert call_count == 1, "strategy chain ran more than once - cache did not work"
 
 
 @pytest.mark.asyncio
@@ -80,7 +80,7 @@ async def test_cache_entry_expires_after_ttl() -> None:
         # First call: cache is stale (stored_at=0.0, TTL=1, now >> 1), should re-run chain
         await reader.read(url)
 
-    assert call_count == 1, "stale cache should have been expired — chain must re-run"
+    assert call_count == 1, "stale cache should have been expired - chain must re-run"
 
 
 @pytest.mark.asyncio
@@ -174,7 +174,7 @@ def test_clear_cache_for_domain_returns_zero_when_nothing_matches() -> None:
 
 @pytest.mark.asyncio
 async def test_cache_is_isolated_per_reader_instance() -> None:
-    """Each WebReader instance has its own in-process cache — they do not share state."""
+    """Each WebReader instance has its own in-process cache - they do not share state."""
     reader1 = WebReader()
     reader2 = WebReader()
 
@@ -209,7 +209,7 @@ async def test_cache_is_isolated_per_reader_instance() -> None:
         await reader1.read("https://shared.example.com/")
 
     with patch.object(reader2, "_execute_strategy", side_effect=_fake2):
-        # reader2 has no cache entry — must call chain
+        # reader2 has no cache entry - must call chain
         await reader2.read("https://shared.example.com/")
 
     assert count1 == 1

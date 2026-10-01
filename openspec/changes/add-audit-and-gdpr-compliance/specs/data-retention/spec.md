@@ -26,7 +26,7 @@ Audit rows SHALL be retained for a separately configured window `app.retention.a
 
 ### Requirement: Retention matrix is documented
 
-`docs/COMPLIANCE.md` SHALL contain a retention matrix listing every user-data store and its bound: Postgres chat data (`app.retention.chat-history`, default 180d), Postgres audit log (`app.retention.audit-log`, default 730d), Redis chat cache (existing `app.memory.chat-history.ttl`), Loki logs (168h), Prometheus metrics (72h), Tempo traces (168h), and the stores bounded only by erasure (MinIO documents, Qdrant vectors, AscendMemory memories — retained until deleted or erased).
+`docs/COMPLIANCE.md` SHALL contain a retention matrix listing every user-data store and its bound: Postgres chat data (`app.retention.chat-history`, default 180d), Postgres audit log (`app.retention.audit-log`, default 730d), Redis chat cache (existing `app.memory.chat-history.ttl`), Loki logs (168h), Prometheus metrics (72h), Tempo traces (168h), and the stores bounded only by erasure (MinIO documents, Qdrant vectors, AscendMemory memories - retained until deleted or erased).
 
 #### Scenario: Matrix present and complete
 

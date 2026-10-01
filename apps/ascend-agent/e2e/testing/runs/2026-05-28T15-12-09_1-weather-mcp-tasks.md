@@ -29,7 +29,7 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 
 ## Result summary
 
-All four Expected assertions passed. The Bruno run returned HTTP 200. The response `content` field read: "Temperature: 19.9°C" (numeric temperature present), "Partly cloudy (WMO code 1)" (weather condition word present), and "A pleasant late-spring afternoon in Warsaw with a bit of a breeze!" — containing no refusal phrases. The WeatherMCP `getCurrentWeather` tool was demonstrably invoked end-to-end, routing through the AscendAgent to Warsaw live weather data.
+All four Expected assertions passed. The Bruno run returned HTTP 200. The response `content` field read: "Temperature: 19.9°C" (numeric temperature present), "Partly cloudy (WMO code 1)" (weather condition word present), and "A pleasant late-spring afternoon in Warsaw with a bit of a breeze!" - containing no refusal phrases. The WeatherMCP `getCurrentWeather` tool was demonstrably invoked end-to-end, routing through the AscendAgent to Warsaw live weather data.
 
 Input tokens: 3200
 

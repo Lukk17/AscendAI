@@ -50,14 +50,14 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processMarkdown extracts basename for title when filename has no path separator")
     void processMarkdown_FilenameWithoutPath_UsesBareFilenameAsTitle() throws java.io.IOException {
-        // given — markdown with no H1, filename is just "readme.md" (no slash)
+        // given - markdown with no H1, filename is just "readme.md" (no slash)
         String markdown = "Some content without a heading.";
         try (InputStream stream = new ByteArrayInputStream(markdown.getBytes(StandardCharsets.UTF_8))) {
 
             // when
             List<Document> docs = ingestionService.processMarkdown(stream, "readme.md");
 
-            // then — title falls back to the full filename since there's no slash
+            // then - title falls back to the full filename since there's no slash
             assertThat(docs).hasSize(1);
             assertThat(docs.getFirst().getMetadata().get("title")).isEqualTo("readme.md");
         }
@@ -112,7 +112,7 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured uses non-Title element text but falls back to filename for title")
     void processUnstructured_ElementsWithoutTitleType_UsesFallbackTitle() throws java.io.IOException {
-        // given — no element has type "Title", so title falls back to basename
+        // given - no element has type "Title", so title falls back to basename
         stubUnstructured("[{\"type\":\"NarrativeText\",\"text\":\"Some body text.\"}]");
 
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
@@ -128,7 +128,7 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured skips elements that lack a text field")
     void processUnstructured_ElementWithNoTextField_SkippedFromText() throws java.io.IOException {
-        // given — second element has no "text" field; only first contributes
+        // given - second element has no "text" field; only first contributes
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"My Title\"},{\"type\":\"Image\"}]");
 
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {
@@ -144,7 +144,7 @@ class IngestionServiceTitleExtractionTest {
     @Test
     @DisplayName("processUnstructured ignores Title element with blank text when extracting title")
     void processUnstructured_TitleElementWithBlankText_FallsBackToFilename() throws java.io.IOException {
-        // given — Title element has blank text candidate
+        // given - Title element has blank text candidate
         stubUnstructured("[{\"type\":\"Title\",\"text\":\"   \"},{\"type\":\"NarrativeText\",\"text\":\"body\"}]");
 
         try (InputStream stream = new ByteArrayInputStream("data".getBytes())) {

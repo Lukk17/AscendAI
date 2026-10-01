@@ -20,12 +20,12 @@ service URLs (`http://qdrant:6333/`, `http://redis:6379/`), or read host secrets
 
 The MCP `audio_uri` parameter only accepts two schemes, each guarded:
 
-1. `http(s)://` — `_validate_http_target` resolves the hostname via `socket.getaddrinfo` and rejects any IP that
+1. `http(s)://` - `_validate_http_target` resolves the hostname via `socket.getaddrinfo` and rejects any IP that
    matches `ipaddress.ip_address(...).is_private | is_loopback | is_link_local | is_multicast | is_reserved |
    is_unspecified`. Hostnames listed in `MCP_ALLOWED_HOSTS` bypass the check (for the host-published S3-compatible
    object store, reached via `host.docker.internal`). Unresolvable hostnames are rejected. The download path streams
    with `MAX_DOWNLOAD_BYTES` enforcement.
-2. `file://` — disabled by default. Requires `MCP_FILE_URI_ROOT` to be set; URIs are resolved under the root via
+2. `file://` - disabled by default. Requires `MCP_FILE_URI_ROOT` to be set; URIs are resolved under the root via
    `pathlib.Path.resolve()` and rejected if `is_relative_to(root)` is False (catches `..` traversal even with
    symlinks).
 

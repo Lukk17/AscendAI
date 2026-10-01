@@ -4,7 +4,7 @@
 
 ### Requirement: The edge gateway is the only publicly bound service
 
-`compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS — via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset — and SHALL reverse-proxy application traffic to `ascend-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
+`compose.yaml` SHALL define a `gateway` service (Caddy 2, version-pinned image) that is the only compose service publishing ports on all host interfaces: `0.0.0.0:80` and `0.0.0.0:443`. The gateway SHALL terminate TLS - via ACME when `ASCEND_DOMAIN` is a real domain, via Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset - and SHALL reverse-proxy application traffic to `ascend-agent:9917` over the compose network. The gateway config SHALL live in a checked-in file (`gateway/Caddyfile`) and SHALL reserve a commented route for the Keycloak service introduced by the `add-auth-and-identity` change. The gateway SHALL set `X-Forwarded-For` and `X-Forwarded-Proto` on proxied requests.
 
 #### Scenario: External port scan shows only 80 and 443
 
@@ -129,7 +129,7 @@ Grafana SHALL run with `GF_AUTH_ANONYMOUS_ENABLED=false` and admin credentials f
 
 ### Requirement: Gateway enforces edge limits and streams SSE without buffering
 
-The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfaces it fronts — a per-client connection cap and a request-rate limit covering the Keycloak login and token endpoints and a global fallback — with thresholds overridable via environment. The gateway SHALL proxy the `POST /api/v1/ai/prompt/stream` route without buffering the response and with a read timeout long enough that a normal token stream is never truncated by the proxy, so Server-Sent Events reach the client as they are produced.
+The edge gateway SHALL apply coarse abuse-limiting to the unauthenticated surfaces it fronts - a per-client connection cap and a request-rate limit covering the Keycloak login and token endpoints and a global fallback - with thresholds overridable via environment. The gateway SHALL proxy the `POST /api/v1/ai/prompt/stream` route without buffering the response and with a read timeout long enough that a normal token stream is never truncated by the proxy, so Server-Sent Events reach the client as they are produced.
 
 #### Scenario: Token-endpoint abuse is rate-limited at the edge
 

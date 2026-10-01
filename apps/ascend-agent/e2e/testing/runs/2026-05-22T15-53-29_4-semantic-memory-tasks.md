@@ -43,7 +43,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-mem0 extracted only `"Luke"` from the save prompt "Hello, my name is Luke. I am a software engineer." — the occupation fact was not stored. Qdrant scroll returned 1 point with `data: "Luke"` only. Retrieve response: "Your name is Luke. I don't have any details about what you do stored in your memory." — confirms Luke is recalled but occupation is absent.
+mem0 extracted only `"Luke"` from the save prompt "Hello, my name is Luke. I am a software engineer." - the occupation fact was not stored. Qdrant scroll returned 1 point with `data: "Luke"` only. Retrieve response: "Your name is Luke. I don't have any details about what you do stored in your memory." - confirms Luke is recalled but occupation is absent.
 
 Failing assertions:
 1. Qdrant payload does not contain "software engineer" (only `"Luke"` stored by mem0)

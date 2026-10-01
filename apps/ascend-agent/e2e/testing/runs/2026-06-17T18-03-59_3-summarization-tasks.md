@@ -15,7 +15,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 
@@ -30,7 +30,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ## Result summary
 
-All three attempts returned HTTP 422 with `{"message":"Failed to route PDF page: argent-saga-chronicle.pdf","status":422,"error":"Unprocessable Entity"}`. Docling Serve experienced a child process crash (`Child process [N] died`) on every attempt — confirmed in container logs for all three runs. On each attempt Docling successfully converted several pages (pages 2, 3, 5 converted with HTTP 200 responses at the Docling level) but a worker process died while handling one of the parallel page-conversion jobs (page 4's layout pipeline), causing AscendAgent to receive a Docling error and surface a 422 to the caller. The memory bump to shm_size 2g / memory 2-6g did NOT prevent the crashes; all three attempts failed identically. None of the Expected assertions (HTTP 200, coherent summary, proper nouns) were satisfied.
+All three attempts returned HTTP 422 with `{"message":"Failed to route PDF page: argent-saga-chronicle.pdf","status":422,"error":"Unprocessable Entity"}`. Docling Serve experienced a child process crash (`Child process [N] died`) on every attempt - confirmed in container logs for all three runs. On each attempt Docling successfully converted several pages (pages 2, 3, 5 converted with HTTP 200 responses at the Docling level) but a worker process died while handling one of the parallel page-conversion jobs (page 4's layout pipeline), causing AscendAgent to receive a Docling error and surface a 422 to the caller. The memory bump to shm_size 2g / memory 2-6g did NOT prevent the crashes; all three attempts failed identically. None of the Expected assertions (HTTP 200, coherent summary, proper nouns) were satisfied.
 
 Input tokens:
 

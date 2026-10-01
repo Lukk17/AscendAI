@@ -13,7 +13,7 @@
 - The `web_read` entry's `inputSchema.properties` advertises a `url` parameter (required) and the optional
   `include_links`, `link_filter`, `heavy_mode` parameters.
 
-This test does NOT exercise SearXNG or any upstream extraction tier — it only verifies the MCP server's
+This test does NOT exercise SearXNG or any upstream extraction tier - it only verifies the MCP server's
 self-description. No outbound HTTPS is required.
 
 ## Prerequisites

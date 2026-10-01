@@ -1,4 +1,4 @@
-# Tasks — update-docs-and-architecture
+# Tasks - update-docs-and-architecture
 
 ## 1. Monorepo architecture and ADRs
 
@@ -35,4 +35,4 @@
 
 ## 7. Pending-aware pass
 
-- [ ] 7.1 For any dependency not yet shipped, document what exists and mark the rest pending — never describe unshipped behavior as shipped
+- [ ] 7.1 For any dependency not yet shipped, document what exists and mark the rest pending - never describe unshipped behavior as shipped

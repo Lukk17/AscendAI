@@ -16,7 +16,7 @@ The ascend-ai-agent routes chat requests to multiple AI providers (lmstudio, ope
 
 Before this change, `SemanticMemoryClient` always called `ascend-memory` without specifying a provider. AscendMemory used a single hardcoded Qdrant collection (`ascend_memory`) with the lmstudio 768-dim model. When the active embedding provider was `openai` (1536 dims), inserting or searching in the 768-dim collection caused dimension mismatches or returned irrelevant results.
 
-Additionally, `SemanticMemoryExtractor` used a provider-configured `memoryExtractionModel` regardless of what model the user had actually requested — causing failures when users sent requests with vision-only models (e.g., `qwen3-vl-4b`) that cannot process text-only extraction prompts.
+Additionally, `SemanticMemoryExtractor` used a provider-configured `memoryExtractionModel` regardless of what model the user had actually requested - causing failures when users sent requests with vision-only models (e.g., `qwen3-vl-4b`) that cannot process text-only extraction prompts.
 
 ## Decision
 
@@ -50,9 +50,9 @@ When a thinking model (e.g., MiniMax-M2.7) returns reasoning text with a JSON ar
 
 ## Consequences
 
-- **Positive**: Dimension-safe memory — searches and inserts always target a collection with the correct vector size
+- **Positive**: Dimension-safe memory - searches and inserts always target a collection with the correct vector size
 - **Positive**: No silent data loss when switching between 768-dim and 1536-dim providers
 - **Positive**: Memory extraction works with vision models and thinking models
 - **Positive**: `MEM0_DEFAULT_PROVIDER` env var in AscendMemory controls the fallback when no provider is specified, making it easy to switch defaults without code changes
-- **Negative**: Memories are collection-scoped — a user's memories stored via `lmstudio` are not visible when searching with `openai` (different Qdrant collections). Cross-provider memory queries are not supported.
+- **Negative**: Memories are collection-scoped - a user's memories stored via `lmstudio` are not visible when searching with `openai` (different Qdrant collections). Cross-provider memory queries are not supported.
 - **Negative**: Switching a deployment's default embedding provider requires re-inserting existing memories into the new collection.

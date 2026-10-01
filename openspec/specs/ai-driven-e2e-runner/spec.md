@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Defines the contract that lets an AI agent (or a human) execute the ascend-ai-agent's capability-level e2e suite end-to-end against a live stack, capture per-run evidence, and emit reviewable PASS/FAIL verdicts as committed markdown artifacts. Pass criteria are observable behavior — HTTP status, response-body content, persisted state in Floci / Qdrant / Postgres — never log substrings.
+Defines the contract that lets an AI agent (or a human) execute the ascend-ai-agent's capability-level e2e suite end-to-end against a live stack, capture per-run evidence, and emit reviewable PASS/FAIL verdicts as committed markdown artifacts. Pass criteria are observable behavior - HTTP status, response-body content, persisted state in Floci / Qdrant / Postgres - never log substrings.
 
 ## Requirements
 
 ### Requirement: Numbered immutable specs under `apps/ascend-agent/e2e/testing/`
 
-The system SHALL ship one capability spec per testable behavior under `apps/ascend-agent/e2e/testing/`, named `<N>-<feature>-test.md`. The number prefix orders specs by setup cost (smallest first). Each spec is immutable across runs — the runner never edits it. Every spec follows the fixed template: **What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures**.
+The system SHALL ship one capability spec per testable behavior under `apps/ascend-agent/e2e/testing/`, named `<N>-<feature>-test.md`. The number prefix orders specs by setup cost (smallest first). Each spec is immutable across runs - the runner never edits it. Every spec follows the fixed template: **What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures**.
 
 #### Scenario: Specs are number-prefixed and immutable
 
@@ -24,7 +24,7 @@ The system SHALL ship one capability spec per testable behavior under `apps/asce
 
 ### Requirement: Sidecar tasks-template per spec
 
-For every spec the system SHALL ship a paired `<N>-<feature>-tasks.template.md` file that lists each prerequisite check, reset command, run step, expected check, and verdict as a markdown checkbox. The template is immutable — runners never edit it in place. At the bottom the template carries a **Result summary** section ending with `Input tokens:`, `Output tokens:`, `Start (UTC):`, `End (UTC):`, `Duration:` fields the runner fills in, plus an **Additional tasks I did** section for out-of-spec work.
+For every spec the system SHALL ship a paired `<N>-<feature>-tasks.template.md` file that lists each prerequisite check, reset command, run step, expected check, and verdict as a markdown checkbox. The template is immutable - runners never edit it in place. At the bottom the template carries a **Result summary** section ending with `Input tokens:`, `Output tokens:`, `Start (UTC):`, `End (UTC):`, `Duration:` fields the runner fills in, plus an **Additional tasks I did** section for out-of-spec work.
 
 #### Scenario: Template mirrors its spec one-to-one
 
@@ -48,7 +48,7 @@ For each execution the runner SHALL copy the matching template to `apps/ascend-a
 - **THEN** `git status` does not list it as untracked because `apps/ascend-agent/e2e/testing/runs/*` is gitignored (with `!.../runs/README.md` exception)
 - **AND** the operator MAY `git add -f` a specific run record to ship it as an audit example
 
-### Requirement: Behavior-only pass criteria — no log assertions
+### Requirement: Behavior-only pass criteria - no log assertions
 
 Every spec's **Expected** section SHALL assert only observable behavior, meaning HTTP status codes, response-body content matches, and persisted state in the S3-compatible object store / Qdrant / Postgres / Redis. The spec SHALL NOT include assertions of the form "ascend-ai-agent log shows ..." or any log-substring check. Log lines are diagnostic for triage, not pass criteria.
 
@@ -60,7 +60,7 @@ Every spec's **Expected** section SHALL assert only observable behavior, meaning
 
 ### Requirement: Bruno CLI is the canonical invocation
 
-The runner SHALL execute each test's HTTP request via the Bruno CLI (`bru run "ascend-agent/testing/<request>.yml" --env ascend-local`) against the collection root at `docs/api/request/AscendAI/`. The Bruno request file is the single source of truth for default provider, model, embedding provider, prompt text, and file attachments. Specs SHALL NOT duplicate these defaults — they refer to "the request's Bruno defaults".
+The runner SHALL execute each test's HTTP request via the Bruno CLI (`bru run "ascend-agent/testing/<request>.yml" --env ascend-local`) against the collection root at `docs/api/request/AscendAI/`. The Bruno request file is the single source of truth for default provider, model, embedding provider, prompt text, and file attachments. Specs SHALL NOT duplicate these defaults - they refer to "the request's Bruno defaults".
 
 #### Scenario: Spec does not override Bruno defaults
 
@@ -112,7 +112,7 @@ Where the system writes asynchronously after an HTTP response returns (e.g. Mem0
 
 ### Requirement: Run record captures token usage and total wall-clock duration
 
-Each run record SHALL include, under **Result summary**, fields for `Input tokens` (prompt tokens consumed by the AI runner across the full test), `Output tokens` (completion tokens generated), `Start (UTC)` (ISO 8601 instant before the first prerequisite check), `End (UTC)` (instant after the last verification step), and `Duration` (HH:MM:SS = End − Start). Duration SHALL reflect total per-test wall-clock — prerequisites + reset + run + verify — not just the Bruno request duration.
+Each run record SHALL include, under **Result summary**, fields for `Input tokens` (prompt tokens consumed by the AI runner across the full test), `Output tokens` (completion tokens generated), `Start (UTC)` (ISO 8601 instant before the first prerequisite check), `End (UTC)` (instant after the last verification step), and `Duration` (HH:MM:SS = End − Start). Duration SHALL reflect total per-test wall-clock - prerequisites + reset + run + verify - not just the Bruno request duration.
 
 #### Scenario: Duration captures the full test, not the Bruno call
 

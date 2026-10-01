@@ -42,9 +42,9 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 
 ## Result summary
 
-All four Expected assertions passed. Step 1 (Bruno `compaction-fires-prompt.yml`) returned HTTP 200 with a normal chat completion (7.9 s). After the 5-second async compaction wait, Postgres `chat_history` for `frostyCompactionFiresTest` contained exactly 9 rows: 1 `system` row whose content begins with `[Conversation summary]` and 8 rows with `role IN ('user', 'assistant')`. The summary row (the most-recent by `created_at`) reads: "[Conversation summary] The user is a backend engineer at TechCorp based in Warsaw who primarily works with Spring Boot daily. They experienced a deployment failure last Tuesday caused by a bad Liquibase change. They are currently considering migrating one of their services from Spring Boot to Quarkus. Outside of work, the user has a beagle named Rex..." — satisfying the manual spot-check for Rex, Warsaw, TechCorp, and Spring Boot.
+All four Expected assertions passed. Step 1 (Bruno `compaction-fires-prompt.yml`) returned HTTP 200 with a normal chat completion (7.9 s). After the 5-second async compaction wait, Postgres `chat_history` for `frostyCompactionFiresTest` contained exactly 9 rows: 1 `system` row whose content begins with `[Conversation summary]` and 8 rows with `role IN ('user', 'assistant')`. The summary row (the most-recent by `created_at`) reads: "[Conversation summary] The user is a backend engineer at TechCorp based in Warsaw who primarily works with Spring Boot daily. They experienced a deployment failure last Tuesday caused by a bad Liquibase change. They are currently considering migrating one of their services from Spring Boot to Quarkus. Outside of work, the user has a beagle named Rex..." - satisfying the manual spot-check for Rex, Warsaw, TechCorp, and Spring Boot.
 
-Pre-compaction row count (after step 1): 23 (21 seeded + 2 from this turn — confirmed by the seed DELETE+INSERT output)
+Pre-compaction row count (after step 1): 23 (21 seeded + 2 from this turn - confirmed by the seed DELETE+INSERT output)
 
 Post-compaction row count (after step 3): 9
 

@@ -1,4 +1,4 @@
-# byok-provider-keys — Delta Specification
+# byok-provider-keys - Delta Specification
 
 ## ADDED Requirements
 
@@ -18,7 +18,7 @@ ascend-ai-agent SHALL store per-tenant provider API keys in a Liquibase-managed 
 
 ### Requirement: Provider-key management API is ADMIN-only and write-only
 
-ascend-ai-agent SHALL expose `ADMIN`-role endpoints under `/api/v1/tenants/{tenantId}/provider-keys`: upsert a key for a provider, list configured keys, and delete a key. Read responses SHALL contain only provider name, `last4`, and timestamps — never the key itself, in any encoding. Non-`ADMIN` callers SHALL receive `403`.
+ascend-ai-agent SHALL expose `ADMIN`-role endpoints under `/api/v1/tenants/{tenantId}/provider-keys`: upsert a key for a provider, list configured keys, and delete a key. Read responses SHALL contain only provider name, `last4`, and timestamps - never the key itself, in any encoding. Non-`ADMIN` callers SHALL receive `403`.
 
 #### Scenario: Stored key is never returned
 

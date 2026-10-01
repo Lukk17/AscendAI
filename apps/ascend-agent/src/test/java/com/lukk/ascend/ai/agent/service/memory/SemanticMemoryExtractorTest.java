@@ -173,7 +173,7 @@ class SemanticMemoryExtractorTest {
     @Test
     @DisplayName("extract parses facts from an embedded JSON array inside thinking model reasoning text")
     void extract_WhenThinkingModelReturnsReasoningWithEmbeddedJson_ThenExtractsFactsFromEmbeddedArray() throws JsonProcessingException {
-        // given — simulates the MiniMax-M2.7 bug: resolver returns thinking text with JSON embedded
+        // given - simulates the MiniMax-M2.7 bug: resolver returns thinking text with JSON embedded
         setupProviderConfig("MiniMax-M2.7");
         when(chatModelResolver.resolve(DEFAULT_PROVIDER)).thenReturn(chatModel);
 
@@ -275,7 +275,7 @@ class SemanticMemoryExtractorTest {
     @Test
     @DisplayName("extract logs a WARN tally line when some fact insertions fail")
     void insertFactsWithTally_WhenSomeFail_ThenLogsWarnTallyLine() throws JsonProcessingException {
-        // given — 2 facts, 2nd insert throws
+        // given - 2 facts, 2nd insert throws
         setupProviderConfig("meta-llama-3.1-8b-instruct");
         when(chatModelResolver.resolve(DEFAULT_PROVIDER)).thenReturn(chatModel);
 

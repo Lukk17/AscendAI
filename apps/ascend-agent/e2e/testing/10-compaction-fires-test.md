@@ -156,7 +156,7 @@ The seed file the Reset section copied into the `redis` container is already rem
 - Step 3: exactly **1** row has `role='system'` and `content` starts with `[Conversation summary]`.
 - Step 3: exactly **8** rows have `role IN ('user', 'assistant')`.
 - The summary row's content (manually inspected) reasonably reflects the seeded conversation. Mentions Rex the beagle, Warsaw, TechCorp, Spring Boot. NOT asserted programmatically.
-- Compaction completed within 5 seconds wall-clock (the cheap-model call typically takes 0.5–2 seconds; budget 5s for headroom).
+- Compaction completed within 5 seconds wall-clock (the cheap-model call typically takes 0.5-2 seconds; budget 5s for headroom).
 
 ## Fixtures
 

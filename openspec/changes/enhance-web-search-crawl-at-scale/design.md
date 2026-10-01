@@ -1,4 +1,4 @@
-# Design — enhance-web-search-crawl-at-scale
+# Design - enhance-web-search-crawl-at-scale
 
 ## Context
 
@@ -19,29 +19,29 @@ ascend-web-hunter is a per-URL reader. The platform has a document-ingestion pip
 - Building, running, or reselling proxies.
 - Per-URL result caching and change-monitoring (dropped by product decision).
 - Competing on proxy-network scale; the honest ceiling is hundreds of thousands of pages per job.
-- Any parallel parse path — the connector lands bytes and reuses the ingestion pipeline like every other connector.
+- Any parallel parse path - the connector lands bytes and reuses the ingestion pipeline like every other connector.
 
 ## Decisions
 
-### D1 — Async crawl jobs, results to MinIO, mirroring the ingestion-run pattern
+### D1 - Async crawl jobs, results to MinIO, mirroring the ingestion-run pattern
 
 A crawl request (seed URLs, include/exclude patterns, max depth, page budget, optional extraction schema) returns a job id immediately; status is polled; a terminal webhook is optional. Results are written to MinIO as markdown or NDJSON. This matches the async-run shape `add-document-management-api` uses, so operators and the eventual Flutter client see one consistent job idiom.
 
-### D2 — Redis frontier, horizontal workers, politeness first
+### D2 - Redis frontier, horizontal workers, politeness first
 
-The URL frontier lives in Redis: a per-domain queue with crawl-delay and a per-domain concurrency cap, seeded from sitemaps when present, honouring robots.txt (toggleable per job for internal sites the customer owns). Scale is adding ascend-web-hunter worker containers that consume the same frontier — no central coordinator beyond Redis. Politeness is a first-class default, not an afterthought, because an impolite crawler gets the deployment's IP banned.
+The URL frontier lives in Redis: a per-domain queue with crawl-delay and a per-domain concurrency cap, seeded from sitemaps when present, honouring robots.txt (toggleable per job for internal sites the customer owns). Scale is adding ascend-web-hunter worker containers that consume the same frontier - no central coordinator beyond Redis. Politeness is a first-class default, not an afterthought, because an impolite crawler gets the deployment's IP banned.
 
-### D3 — Incremental recrawl via content hash + conditional requests
+### D3 - Incremental recrawl via content hash + conditional requests
 
 Each fetched URL stores a content hash and the server's ETag / Last-Modified. A recrawl issues conditional requests; a 304 or an unchanged hash short-circuits before extraction and embedding. This makes "keep the knowledge base fresh" cheap enough to run often.
 
-### D4 — Bring-your-own-proxy hook, off by default
+### D4 - Bring-your-own-proxy hook, off by default
 
-The proxy seam from `enhance-web-search-scraping` is extended with a config hook for customer-supplied proxy credentials, engaged only when a job's scale requires it. ascend-web-hunter never runs or resells proxies — this keeps the on-prem story clean and the abuse liability with the proxy vendor the customer chose. With no proxy configured, crawling works exactly as today, capped at lower volume.
+The proxy seam from `enhance-web-search-scraping` is extended with a config hook for customer-supplied proxy credentials, engaged only when a job's scale requires it. ascend-web-hunter never runs or resells proxies - this keeps the on-prem story clean and the abuse liability with the proxy vendor the customer chose. With no proxy configured, crawling works exactly as today, capped at lower volume.
 
-### D5 — The `web` connector plugs into the existing connector framework
+### D5 - The `web` connector plugs into the existing connector framework
 
-The scrape-to-RAG capability is a `web` connector type in `add-document-connectors`, not a new pipeline. Its config is seed URLs / patterns / schedule; on each scheduled run it triggers an ascend-web-hunter crawl, lands the output in the tenant's MinIO prefix, and triggers the existing ingestion — the framework's land-bytes-then-ingest contract. Source-page deletion propagates through the framework's deletion path (owned by `add-document-management-api`). No parallel parse path, tenant isolation inherited from the framework.
+The scrape-to-RAG capability is a `web` connector type in `add-document-connectors`, not a new pipeline. Its config is seed URLs / patterns / schedule; on each scheduled run it triggers an ascend-web-hunter crawl, lands the output in the tenant's MinIO prefix, and triggers the existing ingestion - the framework's land-bytes-then-ingest contract. Source-page deletion propagates through the framework's deletion path (owned by `add-document-management-api`). No parallel parse path, tenant isolation inherited from the framework.
 
 ## Risks / Trade-offs
 

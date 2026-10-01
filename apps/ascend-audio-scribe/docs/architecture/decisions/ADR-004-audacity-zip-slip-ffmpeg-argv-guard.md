@@ -14,7 +14,7 @@ vectors were unguarded:
    members like `../../../etc/cron.d/payload`, absolute Windows paths, or symlinks could overwrite arbitrary host
    files.
 2. **ffmpeg argv injection**: track filenames extracted from the zip are passed positionally to `subprocess.run`. A
-   filename starting with `-` is interpreted by ffmpeg as a flag — and ffmpeg supports `http://`, `concat:`, `lavfi`
+   filename starting with `-` is interpreted by ffmpeg as a flag - and ffmpeg supports `http://`, `concat:`, `lavfi`
    protocols that turn into SSRF / arbitrary-command vectors.
 
 Plus `subprocess.run` calls had no `timeout=`, so a wedged ffmpeg (corrupt input, network mount stall) could block

@@ -93,7 +93,7 @@ class ManualIngestionServiceS3PaginationTest {
         // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
-        // then — blank key doesn't even hit shouldIngestKey, just returns
+        // then - blank key doesn't even hit shouldIngestKey, just returns
         assertThat(result.indexed).isZero();
     }
 
@@ -116,7 +116,7 @@ class ManualIngestionServiceS3PaginationTest {
         // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
-        // then — skipped=1 (from "irrelevant/skip.txt"), both pages fetched
+        // then - skipped=1 (from "irrelevant/skip.txt"), both pages fetched
         assertThat(result.skipped).isEqualTo(1);
     }
 
@@ -163,7 +163,7 @@ class ManualIngestionServiceS3PaginationTest {
     @Test
     @DisplayName("run increments failed counter and removes metadata when IOException is thrown")
     void run_IOExceptionFromStream_IncrementsFailedAndRemovesMetadata() throws Exception {
-        // given — IOException is wrapped as IngestionException and rethrown so metadata marker is removed
+        // given - IOException is wrapped as IngestionException and rethrown so metadata marker is removed
         S3Object obj = S3Object.builder().key("documents/report.docx").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
@@ -205,7 +205,7 @@ class ManualIngestionServiceS3PaginationTest {
     @Test
     @DisplayName("run uses 'unknown' as version when S3 object has no ETag and no lastModified")
     void run_NoEtagNoLastModified_UsesUnknownVersion() throws Exception {
-        // given — no eTag and no lastModified -> version = "unknown"
+        // given - no eTag and no lastModified -> version = "unknown"
         S3Object obj = S3Object.builder().key("markdown/notes.md").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
@@ -226,7 +226,7 @@ class ManualIngestionServiceS3PaginationTest {
     @Test
     @DisplayName("run uses 'unknown' version when S3 object has a blank ETag")
     void run_BlankEtagAndNoLastModified_UsesUnknownVersion() throws Exception {
-        // given — blank eTag (not null) and no lastModified -> falls through to "unknown"
+        // given - blank eTag (not null) and no lastModified -> falls through to "unknown"
         S3Object obj = S3Object.builder().key("markdown/notes.md").eTag("").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
@@ -265,7 +265,7 @@ class ManualIngestionServiceS3PaginationTest {
     @Test
     @DisplayName("run ingests file in markdown folder that does not end with .md extension")
     void run_MarkdownFolderTxtFile_IncludedForIngestion() throws Exception {
-        // given — key doesn't end with .md but IS in markdownFolder -> shouldIngestKey=true via second condition
+        // given - key doesn't end with .md but IS in markdownFolder -> shouldIngestKey=true via second condition
         S3Object obj = S3Object.builder().key("markdown/readme.txt").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
@@ -300,7 +300,7 @@ class ManualIngestionServiceS3PaginationTest {
     @Test
     @DisplayName("run does not loop when continuation token is blank")
     void run_BlankContinuationToken_DoesNotLoop() {
-        // given — nextContinuationToken() returns "" (blank) -> while condition false -> single page
+        // given - nextContinuationToken() returns "" (blank) -> while condition false -> single page
         S3Object obj = S3Object.builder().key("irrelevant/skip.txt").build();
         ListObjectsV2Response firstPage = ListObjectsV2Response.builder()
                 .contents(List.of(obj))
@@ -311,7 +311,7 @@ class ManualIngestionServiceS3PaginationTest {
         // when
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.empty(), "openai");
 
-        // then — "irrelevant" path skipped
+        // then - "irrelevant" path skipped
         assertThat(result.skipped).isEqualTo(1);
     }
 
@@ -343,7 +343,7 @@ class ManualIngestionServiceS3PaginationTest {
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of()).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
 
-        // when — blank prefix -> filter(p -> !p.isBlank()) removes it -> no prefix set on builder
+        // when - blank prefix -> filter(p -> !p.isBlank()) removes it -> no prefix set on builder
         ManualIngestionService.ManualIngestionResult result = manualIngestionService.run(Optional.of("   "), "openai");
 
         // then

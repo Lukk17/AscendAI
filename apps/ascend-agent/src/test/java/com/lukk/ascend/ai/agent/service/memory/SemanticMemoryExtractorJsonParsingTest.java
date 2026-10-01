@@ -115,7 +115,7 @@ class SemanticMemoryExtractorJsonParsingTest {
     @Test
     @DisplayName("extractFactsFromJson handles nested arrays by returning the last outermost array")
     void extractFactsFromJson_NestedArrays_ReturnsLastOutermostArray() {
-        // given — JSON with nested array inside a string element
+        // given - JSON with nested array inside a string element
         String response = "[\"value with \\\"inner quote\\\"\"]";
 
         // when
@@ -129,7 +129,7 @@ class SemanticMemoryExtractorJsonParsingTest {
     @Test
     @DisplayName("extractFactsFromJson returns empty list when candidate JSON array contains non-strings")
     void extractFactsFromJson_ArrayWithNonStrings_ReturnsEmptyList() {
-        // given — integers parse as strings in Jackson, so just verify no throw
+        // given - integers parse as strings in Jackson, so just verify no throw
         String response = "Some text [1, 2, 3] more text";
 
         // then
@@ -146,17 +146,17 @@ class SemanticMemoryExtractorJsonParsingTest {
     @Test
     @DisplayName("extractFactsFromJson handles unmatched closing bracket (] with depth=0)")
     void extractFactsFromJson_UnmatchedClosingBracket_HandledGracefully() {
-        // given — '] before any [' -> consume() branch where c==']' && depth==0 -> do nothing
+        // given - '] before any [' -> consume() branch where c==']' && depth==0 -> do nothing
         String response = "] some text [\"fact\"]";
 
-        // then — the ']' at position 0 is ignored (depth=0), then '[\"fact\"]' is found and parsed
+        // then - the ']' at position 0 is ignored (depth=0), then '[\"fact\"]' is found and parsed
         assertThat(extractor.extractFactsFromJson(response)).containsExactly("fact");
     }
 
     @Test
     @DisplayName("extractFactsFromJson handles nested brackets in content string")
     void extractFactsFromJson_NestedBracketsInString_ParsesOutermostArray() {
-        // given — string containing [] inside quotes; inString flag prevents inner brackets from counting
+        // given - string containing [] inside quotes; inString flag prevents inner brackets from counting
         String response = "[\"user has [special] characters\"]";
 
         // when

@@ -8,7 +8,7 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 ### Prerequisites
 
-- [x] Bruno CLI present (`bru --version` returns a version) — 3.4.0
+- [x] Bruno CLI present (`bru --version` returns a version) - 3.4.0
 - [x] AscendAgent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [x] Qdrant `/healthz` returns HTTP 200
 - [x] MinIO `/minio/health/live` returns HTTP 200
@@ -20,10 +20,10 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 - [x] Registered MinIO alias `local` inside the container
 - [x] Dropped `documents/pierogi-recipe.docx` from MinIO
-- [x] Removed `int_metadata_store` rows for the pierogi fixture — DELETE 1
-- [x] Wiped Qdrant points for `documents/pierogi-recipe.docx` — operation acknowledged
-- [x] Truncated `chat_history` rows for user `frostyAttachSourcesTest` — DELETE 2
-- [x] Deleted Redis key `chat:frostyAttachSourcesTest` — 1 key deleted
+- [x] Removed `int_metadata_store` rows for the pierogi fixture - DELETE 1
+- [x] Wiped Qdrant points for `documents/pierogi-recipe.docx` - operation acknowledged
+- [x] Truncated `chat_history` rows for user `frostyAttachSourcesTest` - DELETE 2
+- [x] Deleted Redis key `chat:frostyAttachSourcesTest` - 1 key deleted
 
 ### Run
 
@@ -34,12 +34,12 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 ### Expected
 
-- [x] Step 1: response `uploaded` field includes `documents/pierogi-recipe.docx` — confirmed in `uploaded` array
-- [x] Step 2: response `indexed >= 1` and `failed == 0` — Qdrant count=1 for pierogi.docx confirmed
-- [x] Step 3: response body has a `sources` array with at least 1 entry — 3 entries (pierogi.docx + two dedup markdown fixtures from Qdrant)
-- [x] Step 3: first entry has non-empty `name`, `mimeType`, `downloadUrl`, `expiresAt` — all fields present
-- [x] Step 3: `downloadUrl` host portion equals `localhost:9070`, NOT `host.docker.internal:9070` — confirmed for all 3 entries
-- [x] Step 4: HTTP 200, downloaded file non-empty — 13563 bytes
+- [x] Step 1: response `uploaded` field includes `documents/pierogi-recipe.docx` - confirmed in `uploaded` array
+- [x] Step 2: response `indexed >= 1` and `failed == 0` - Qdrant count=1 for pierogi.docx confirmed
+- [x] Step 3: response body has a `sources` array with at least 1 entry - 3 entries (pierogi.docx + two dedup markdown fixtures from Qdrant)
+- [x] Step 3: first entry has non-empty `name`, `mimeType`, `downloadUrl`, `expiresAt` - all fields present
+- [x] Step 3: `downloadUrl` host portion equals `localhost:9070`, NOT `host.docker.internal:9070` - confirmed for all 3 entries
+- [x] Step 4: HTTP 200, downloaded file non-empty - 13563 bytes
 
 ### Verdict
 
@@ -47,7 +47,7 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 ## Result summary
 
-Attach-sources returned 3 sources (2 dedup markdown fixtures from a prior shared-bucket run + the pierogi.docx). The spec requires at least 1 entry with a valid presigned URL pointing to localhost:9070 — all entries satisfy that. The pierogi.docx source's `name` is `documents/pierogi-recipe.docx` (filename fallback; Unstructured did not extract a title from the .docx). Per spec: "note it but treat HTTP 200 + correct downloadUrl + presigned download as the pass criteria." Presigned URL returned 13563 bytes (valid .docx). Provider: Anthropic claude-sonnet-4-6.
+Attach-sources returned 3 sources (2 dedup markdown fixtures from a prior shared-bucket run + the pierogi.docx). The spec requires at least 1 entry with a valid presigned URL pointing to localhost:9070 - all entries satisfy that. The pierogi.docx source's `name` is `documents/pierogi-recipe.docx` (filename fallback; Unstructured did not extract a title from the .docx). Per spec: "note it but treat HTTP 200 + correct downloadUrl + presigned download as the pass criteria." Presigned URL returned 13563 bytes (valid .docx). Provider: Anthropic claude-sonnet-4-6.
 
 Input tokens: 1252
 

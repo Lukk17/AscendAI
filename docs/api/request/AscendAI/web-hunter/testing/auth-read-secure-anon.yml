@@ -10,7 +10,7 @@ http:
     type: json
     # Same URL and heavy_mode as auth-read-secure.yml but NO profile field.
     # The service has no session for this request, so it should see the login
-    # page or an intervention signal — never the authenticated inventory content.
+    # page or an intervention signal - never the authenticated inventory content.
     data: |-
       {
         "url": "https://www.saucedemo.com/inventory.html",

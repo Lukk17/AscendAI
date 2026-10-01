@@ -126,7 +126,7 @@ class ChatHistoryCompactionServiceTest {
         // when
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, CompactionOverride.EMPTY);
 
-        // then — trigger fired and we tried to resolve the model; no persistence (LLM call failed)
+        // then - trigger fired and we tried to resolve the model; no persistence (LLM call failed)
         verify(chatModelResolver).resolve("anthropic");
         verifyNoInteractions(transactionTemplate);
     }
@@ -134,7 +134,7 @@ class ChatHistoryCompactionServiceTest {
     @Test
     @DisplayName("maybeCompact skips LLM call when history already has a summary and raw turns are below trigger")
     void maybeCompact_AlreadySummarisedAndBelowTriggerWithoutTheSummary_NoLlmCall() {
-        // given — 1 summary + 18 raw turns -> turns(history) - 1 = 18 < 20 => skip
+        // given - 1 summary + 18 raw turns -> turns(history) - 1 = 18 < 20 => skip
         List<ChatHistory> hist = new ArrayList<>();
         hist.add(summary());
         hist.addAll(buildHistory(18));
@@ -234,7 +234,7 @@ class ChatHistoryCompactionServiceTest {
         // given
         when(repository.findAllHistoryOrdered(CONVERSATION_ID)).thenReturn(buildHistory(5));
 
-        // when — 5 turns, well below trigger -> no resolution, no LLM
+        // when - 5 turns, well below trigger -> no resolution, no LLM
         service.maybeCompact(CONVERSATION_ID, PRIMARY_PROVIDER, null);
 
         // then

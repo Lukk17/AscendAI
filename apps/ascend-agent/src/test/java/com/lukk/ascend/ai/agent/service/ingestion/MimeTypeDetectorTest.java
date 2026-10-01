@@ -96,7 +96,7 @@ class MimeTypeDetectorTest {
     @Test
     @DisplayName("detect identifies zip bytes as zip even when the declared content type claims PDF")
     void detect_ZipDisguisedAsPdf_StillDetectedAsZip() {
-        // given — Tika trusts the bytes, not the client header
+        // given - Tika trusts the bytes, not the client header
         byte[] zipBytes = new byte[]{0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00};
         MockMultipartFile file = new MockMultipartFile("file", "evil.pdf", "application/pdf", zipBytes);
 
@@ -116,7 +116,7 @@ class MimeTypeDetectorTest {
         // when
         String result = detector.detect(file, "empty.txt");
 
-        // then — Tika without bytes will use the filename hint or return generic
+        // then - Tika without bytes will use the filename hint or return generic
         assertThat(result).isNotBlank().isEqualTo(result.toLowerCase());
     }
 
@@ -153,7 +153,7 @@ class MimeTypeDetectorTest {
     @Test
     @DisplayName("detect falls back to client content type when Tika returns null")
     void detect_TikaReturnsNull_FallsBackToClientContentType() throws Exception {
-        // given — inject a mock Tika instance that returns null from detect()
+        // given - inject a mock Tika instance that returns null from detect()
         org.apache.tika.Tika mockTika = org.mockito.Mockito.mock(org.apache.tika.Tika.class);
         org.mockito.Mockito.when(mockTika.detect(
                         org.mockito.ArgumentMatchers.any(java.io.InputStream.class),
@@ -165,7 +165,7 @@ class MimeTypeDetectorTest {
         // when
         String result = detector.detect(file, "test.pdf");
 
-        // then — Tika returned null -> fallback -> use client content type
+        // then - Tika returned null -> fallback -> use client content type
         assertThat(result).isEqualTo("application/pdf");
     }
 }

@@ -9,7 +9,7 @@
 - The response body (the `.md` transcript content) contains at least one of the canary substrings `Q3`, `Acme`, `Adam`, `Friday`, or `migration` (case-insensitive). The asserted phrase is the invented sentence recorded into
   `meeting-clip.wav`; at least one distinctive word being present proves the audio bytes were actually transcribed
   through the Hugging Face Inference API.
-- The request consumes Hugging Face inference quota — the test is not safe to run with `HF_TOKEN` unset; the endpoint
+- The request consumes Hugging Face inference quota - the test is not safe to run with `HF_TOKEN` unset; the endpoint
   short-circuits to HTTP 500 with `"HF_TOKEN is not configured on the server."` when the token is missing.
 
 ## Prerequisites

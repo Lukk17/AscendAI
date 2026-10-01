@@ -64,7 +64,7 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
 @pytest.mark.asyncio
 async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
     """The captcha monitor must persist the session only after a cf_clearance cookie
-    appears, then stop — never overwrite a good clearance on later polls."""
+    appears, then stop - never overwrite a good clearance on later polls."""
     from src.reader.strategies import novnc_strategy as ns
 
     page = MagicMock()
@@ -104,7 +104,7 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
     ):
         await ns._monitor_for_cookies("https://nowsecure.nl/", "captcha")
 
-    # Saved exactly once — on the poll where cf_clearance appeared — then broke out.
+    # Saved exactly once - on the poll where cf_clearance appeared - then broke out.
     mock_save.assert_awaited_once()
     saved_state = mock_save.await_args.args[1]
     assert any(c["name"] == "cf_clearance" for c in saved_state["cookies"])

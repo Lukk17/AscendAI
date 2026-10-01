@@ -47,7 +47,7 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 ## Result summary
 
-All six Expected assertions passed. Step 1 (upload) returned HTTP 200 with `uploaded` containing `documents/pierogi-recipe.docx`. Step 2 (ingestion run) returned HTTP 200 with `indexed: 3`, `failed: 0`. Step 3 (attach-sources prompt) returned HTTP 200 with a `sources` array of 2 entries; the first entry (`name: "Grandma Maria's pierogi recipe (e2e dedup fixture)"`) and second entry (`name: "pierogi-recipe.docx"`) both had non-empty `name`, `mimeType`, `downloadUrl`, and `expiresAt` fields. Both `downloadUrl` values used `http://localhost:9070` as the host — confirming the `app.s3.public-endpoint` override is correctly in effect. Step 4 followed the presigned URL for `pierogi-recipe.docx` and received HTTP 200 with a 13,563-byte `.docx` blob.
+All six Expected assertions passed. Step 1 (upload) returned HTTP 200 with `uploaded` containing `documents/pierogi-recipe.docx`. Step 2 (ingestion run) returned HTTP 200 with `indexed: 3`, `failed: 0`. Step 3 (attach-sources prompt) returned HTTP 200 with a `sources` array of 2 entries; the first entry (`name: "Grandma Maria's pierogi recipe (e2e dedup fixture)"`) and second entry (`name: "pierogi-recipe.docx"`) both had non-empty `name`, `mimeType`, `downloadUrl`, and `expiresAt` fields. Both `downloadUrl` values used `http://localhost:9070` as the host - confirming the `app.s3.public-endpoint` override is correctly in effect. Step 4 followed the presigned URL for `pierogi-recipe.docx` and received HTTP 200 with a 13,563-byte `.docx` blob.
 
 Input tokens: ~25000
 

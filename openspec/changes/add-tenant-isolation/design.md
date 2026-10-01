@@ -19,7 +19,7 @@ ascend-ai-agent today is effectively a single-tenant application that happens to
 **Goals:**
 
 - Hard, fail-closed data isolation between tenants across Qdrant, MinIO, Redis, Postgres, and AscendMemory.
-- Zero cross-tenant reads: a similarity search, presign, history load, instruction load, or memory search can never return another tenant's data — even under bugs like userId collision or forged form fields.
+- Zero cross-tenant reads: a similarity search, presign, history load, instruction load, or memory search can never return another tenant's data - even under bugs like userId collision or forged form fields.
 - Zero unpermitted within-tenant reads: a similarity search or presign inside the caller's own tenant can only return chunks whose access list intersects the caller's resolved principal set, and a chunk with no list is returned to nobody.
 - One filter composition point carrying both axes, so there is a single place a filter can be got wrong rather than two things that each believe they own filtering.
 - In-place upgrade for existing deployments via a `default` tenant backfill; no data loss, no manual data surgery.
@@ -33,7 +33,7 @@ ascend-ai-agent today is effectively a single-tenant application that happens to
 - The administrator surface for assigning narrower lists to direct uploads. Direct uploads land on `tenant:everyone:{tenantId}` here, and who owns that surface is an open question in the permission-aware retrieval design.
 - Per-tenant quotas or usage metering (owned by `add-usage-metering-and-quotas`).
 - Tenant-aware audit logging or GDPR export/erasure (owned by `add-audit-and-gdpr-compliance`).
-- Physical isolation (separate databases/collections/buckets per tenant) — this change delivers logical isolation within shared infrastructure.
+- Physical isolation (separate databases/collections/buckets per tenant) - this change delivers logical isolation within shared infrastructure.
 - Changes to AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-weather-mcp, or ascend-ocr service code.
 
 ## Decisions
@@ -42,24 +42,24 @@ ascend-ai-agent today is effectively a single-tenant application that happens to
 
 Shared collections/bucket/tables with a mandatory `tenant_id` discriminator, enforced at every read and write path.
 
-- **Alternative — collection/bucket/schema per tenant**: stronger blast-radius isolation, but Qdrant collection count grows with tenants × embedding dims, MinIO bucket limits bite, Liquibase per-schema migration multiplies, and per-request provider routing (`VectorStoreResolver`) would need a second dimension. Rejected as disproportionate for the current scale; the fail-closed filter gives the same observable guarantee.
+- **Alternative - collection/bucket/schema per tenant**: stronger blast-radius isolation, but Qdrant collection count grows with tenants × embedding dims, MinIO bucket limits bite, Liquibase per-schema migration multiplies, and per-request provider routing (`VectorStoreResolver`) would need a second dimension. Rejected as disproportionate for the current scale; the fail-closed filter gives the same observable guarantee.
 - The discriminator approach also matches what apps/ascend-memory/mem0 already does with `user_id`, so one mechanism covers all stores.
 - The same reasoning applies harder to the access axis, and is why it is a second payload field rather than a second partitioning: groups are far more numerous than tenants, so a collection per group would multiply collections by groups times embedding dimensions. Qdrant offers no per-principal authorization model to fall back on, which is recorded upstream as ADR-M009.
 
 ### 2. Fail-closed tenant context
 
-Every tenant-scoped operation requires a resolved tenant id. When `TenantContext` is empty (unauthenticated path, misconfiguration, internal caller that forgot to propagate), the operation throws — it never degrades to an unfiltered query or a shared key. HTTP surfaces this as 401/403 (per the auth change's error contract); service-layer callers get an exception.
+Every tenant-scoped operation requires a resolved tenant id. When `TenantContext` is empty (unauthenticated path, misconfiguration, internal caller that forgot to propagate), the operation throws - it never degrades to an unfiltered query or a shared key. HTTP surfaces this as 401/403 (per the auth change's error contract); service-layer callers get an exception.
 
 The principal set gets identical treatment. Similarity search and source presigning additionally require a resolved principal set, and when `PrincipalContext` is empty they throw for the same reason and in the same way. In particular they do not degrade to a search filtered by tenant alone, which would be the natural-looking shortcut and is exactly the leak this change exists to close: a tenant-only search hands the caller every document their company owns, including the ones the company deliberately restricted.
 
 An empty resolved set and an unresolved set are different things and must not be conflated in code. An empty set is a successful answer that legitimately matches nothing, and it arises for real callers, for example one whose identity link is broken and who is left holding only `tenant:everyone`. An unresolved set is a failure. Representing the accessor's result as an `Optional<Set<Principal>>`, rather than as a possibly-empty set, keeps the two distinguishable at the type level.
 
-- **Alternative — fall back to `default` tenant when context is missing**: rejected. A silent fallback turns a propagation bug into a cross-tenant leak into the default tenant's pool. The `default` tenant is a migration target only, reached through normal authenticated context like any other tenant.
+- **Alternative - fall back to `default` tenant when context is missing**: rejected. A silent fallback turns a propagation bug into a cross-tenant leak into the default tenant's pool. The `default` tenant is a migration target only, reached through normal authenticated context like any other tenant.
 - **Alternative, fall back to a tenant-only filter when the principal set is missing**: rejected for the same shape of reason. It degrades an authorization failure into a successful-looking response that over-shares inside the tenant, and it is invisible: the request returns 200, the answer is fluent, and nothing indicates that the access axis was skipped.
 
 ### 3. Tenant id format: constrained slug
 
-`tenant_id` is `[a-z0-9-]{1,64}`, validated at the trust boundary. This makes it safe to embed in Redis keys (`:`-delimited), S3 key prefixes (`/`-delimited), Qdrant payload values, and the `{tenantId}:{userId}` composite sent to AscendMemory — no escaping layer anywhere. The reserved id `default` is created by migration.
+`tenant_id` is `[a-z0-9-]{1,64}`, validated at the trust boundary. This makes it safe to embed in Redis keys (`:`-delimited), S3 key prefixes (`/`-delimited), Qdrant payload values, and the `{tenantId}:{userId}` composite sent to AscendMemory - no escaping layer anywhere. The reserved id `default` is created by migration.
 
 ### 4. Qdrant: metadata stamp + one composed Spring AI FilterExpression
 
@@ -103,9 +103,9 @@ Object keys become `tenant/{tenantId}/markdown/...` and `tenant/{tenantId}/docum
 
 ### 7. AscendMemory: tenant-qualified user id, qualified inside `SemanticMemoryClient`
 
-The agent sends `{tenantId}:{userId}` as `user_id` on every insert/search/wipe/delete. Qualification happens in one place — `SemanticMemoryClient` composes the id from `TenantContext` — so no call site can forget it (single choke point, mirrors how the client already owns snake_case naming).
+The agent sends `{tenantId}:{userId}` as `user_id` on every insert/search/wipe/delete. Qualification happens in one place - `SemanticMemoryClient` composes the id from `TenantContext` - so no call site can forget it (single choke point, mirrors how the client already owns snake_case naming).
 
-- **Alternative — add a `tenant_id` parameter to the AscendMemory API**: rejected. It widens the API surface of a service that would still have to trust the caller (ascend-ai-agent is the only client inside the trust boundary), and namespacing the existing partition key achieves identical isolation with zero Python changes.
+- **Alternative - add a `tenant_id` parameter to the AscendMemory API**: rejected. It widens the API surface of a service that would still have to trust the caller (ascend-ai-agent is the only client inside the trust boundary), and namespacing the existing partition key achieves identical isolation with zero Python changes.
 
 ### 8. Migration: single Liquibase changelog, backfill to `default`
 
@@ -115,7 +115,7 @@ Qdrant and MinIO backfills are not Liquibase's job. A one-shot migration task (a
 
 The access-list stamp is not optional and it is not a later step. Under deny-by-default a point that carries a tenant and no access list is retrievable by nobody, so a tenant-only backfill would leave a single-company deployment upgrading in place with a corpus that is present, indexed, paid for, and invisible. Stamping `tenant:everyone:default` reproduces today's behaviour deliberately, as a grant anybody can see in the payload, rather than reproducing it by omission. It is the same thing ADR-M006 folds in as a migration step under the deny-by-default rule.
 
-Until the task runs, pre-existing vectors are invisible to search (fail-closed, decision 2) — visible degradation, not silent leakage.
+Until the task runs, pre-existing vectors are invisible to search (fail-closed, decision 2) - visible degradation, not silent leakage.
 
 ### 9. The presigned link stays mandatory under the tenant prefix check (owner decision, 2026-09-03)
 
@@ -172,14 +172,14 @@ They are drafted inside this change folder so the change carries its own rationa
 
 ## Migration Plan
 
-1. Deploy with the new Liquibase changelog — Postgres tables/columns/indexes backfilled to `default` automatically at boot.
+1. Deploy with the new Liquibase changelog - Postgres tables/columns/indexes backfilled to `default` automatically at boot.
 2. Run the one-shot data migration task: in one pass over both collections, stamp `tenant_id='default'` and `acl=["tenant:everyone:default"]` with `acl_source='tenant-default'`, a matching `acl_version`, and `acl_synced_at`; create the keyword payload indexes on `tenant_id` and on `acl`; move MinIO objects under `tenant/default/`; optionally re-key AscendMemory entries. The tenant stamp and the access-list stamp are one step, because a point carrying only the first is retrievable by nobody.
 3. Verify, in this order: a `default`-tenant user holding `tenant:everyone:default` retrieves pre-existing documents; a second tenant's user gets zero hits for the same query; a `default`-tenant user whose principal set does not contain `tenant:everyone:default` also gets zero hits, which proves the access conjunct is doing work rather than being satisfied by everyone.
 4. Rollback: the Liquibase columns are additive (old code ignores them); reverting the agent image restores pre-tenant behavior against Postgres/Redis. The Qdrant payload stamps are additive too, so old code ignores them and the payload indexes are harmless if nothing filters on them. Reverting after the MinIO move requires re-running the move task in reverse (task supports `--direction=down`).
 
 ## Open Questions
 
-- Exact name and package of the tenant context accessor delivered by `add-auth-and-identity` — this design assumes `TenantContext.currentTenantId()`; align once that change's design is finalized.
+- Exact name and package of the tenant context accessor delivered by `add-auth-and-identity` - this design assumes `TenantContext.currentTenantId()`; align once that change's design is finalized.
 - Exact name, package, and return type of the principal set accessor delivered by `add-auth-and-identity`: this design assumes `PrincipalContext.currentPrincipals()` returning an `Optional` of a principal set, so unresolved and empty stay distinguishable (decision 2). Align once that change's design is finalized; if it returns a bare set, this change adds the distinction at its own boundary rather than losing it.
 - Who owns the administrator surface for assigning narrower access lists to direct uploads. Until it exists, direct uploads land on `tenant:everyone:{tenantId}`, which is correct and coarse. The open question is recorded in `docs/architecture/permission-aware-retrieval.md` and sits between `add-tenant-administration` and `add-document-management-api`.
 - Whether the one-shot Qdrant/MinIO migration task ships as a Spring Boot CLI runner (`--spring.main.web-application-type=none`) or an admin-only HTTP endpoint; leaning CLI runner to keep it off the API surface. Decide at implementation.

@@ -32,7 +32,7 @@ against environment variables and `.env`. The source of truth is
 The blocklist is loaded from disk at startup and never downloaded automatically. `BLOCKLIST_PATH` points at the
 file vendored into the repository and the container image (`src/assets/fanboy-annoyance.txt`); a missing or
 corrupt file there is a packaging defect and the service refuses to start. `BLOCKLIST_URL` is only reached by
-`POST /api/v1/blocklist/refresh`, an explicit operator action — see
+`POST /api/v1/blocklist/refresh`, an explicit operator action - see
 [the architecture decision record](architecture/decisions/ADR-008-blocklist-vendored-not-fetched.md).
 
 | Variable | Default | Purpose |

@@ -103,7 +103,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
     @Test
     @DisplayName("retrieve uses IngestionMetadataKeys.SOURCE fallback when 'key' metadata is absent")
     void retrieve_KeyMetadataAbsent_FallsBackToSourceMetadata() {
-        // given — no "key" in metadata, only "source"
+        // given - no "key" in metadata, only "source"
         setupRag(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         Document doc = mockDoc("Content.", 0.9, Map.of("source", "docs/readme.md"));
@@ -120,7 +120,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
     @Test
     @DisplayName("retrieve uses IngestionMetadataKeys.TITLE as displayName fallback when displayName is absent")
     void retrieve_DisplayNameAbsent_FallsBackToTitleMetadata() {
-        // given — "title" is present as fallback for displayName
+        // given - "title" is present as fallback for displayName
         setupRag(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         Document doc = mockDoc("Content.", 0.9, Map.of("key", "file.pdf", "title", "My Document Title"));
@@ -191,7 +191,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
     @Test
     @DisplayName("retrieve skips source tracking for chunk with no key/source metadata (both null)")
     void retrieve_NoKeyAndNoSource_OmitsFromSources() {
-        // given — no "key" and no "source" in metadata -> key remains null -> skipped
+        // given - no "key" and no "source" in metadata -> key remains null -> skipped
         setupRag(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         Document doc = mockDoc("Orphan content.", 0.9, java.util.Collections.emptyMap());
@@ -208,7 +208,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
     @Test
     @DisplayName("retrieve skips source tracking when META_KEY value is a blank string (not null)")
     void retrieve_BlankMetaKeyValue_OmitsFromSources() {
-        // given — META_KEY value is "" (blank, not null) -> key.isBlank() is true -> skipped
+        // given - META_KEY value is "" (blank, not null) -> key.isBlank() is true -> skipped
         setupRag(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         java.util.Map<String, Object> meta = new java.util.HashMap<>();
@@ -227,7 +227,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
     @Test
     @DisplayName("retrieve handles metadata where key value is null (stringMeta returns null)")
     void retrieve_MetaValueNull_StringMetaReturnsNull() {
-        // given — metadata contains "key" but its value is null
+        // given - metadata contains "key" but its value is null
         setupRag(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         java.util.Map<String, Object> meta = new java.util.HashMap<>();
@@ -238,14 +238,14 @@ class RagRetrievalServiceMetadataFallbacksTest {
         // when
         RagRetrievalResult result = service.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
-        // then — "key" value is null -> stringMeta returns null -> tries SOURCE fallback -> also null -> skipped
+        // then - "key" value is null -> stringMeta returns null -> tries SOURCE fallback -> also null -> skipped
         assertThat(result.sources()).isEmpty();
     }
 
     @Test
     @DisplayName("retrieve skips document whose score is below threshold in the filter lambda")
     void retrieve_ScoreBelowThreshold_DocumentFilteredOut() {
-        // given — score 0.5 < threshold 0.75 -> filtered out by lambda
+        // given - score 0.5 < threshold 0.75 -> filtered out by lambda
         setupRag(0.75, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         Document belowThreshold = mockDoc("below-threshold content", 0.5, Map.of("source", "low.pdf"));
@@ -263,7 +263,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
     @Test
     @DisplayName("retrieve handles null metadata map (stringMeta with null meta)")
     void retrieve_NullMetadataMap_StringMetaReturnsNull() {
-        // given — getMetadata() returns null -> stringMeta(null, ...) returns null
+        // given - getMetadata() returns null -> stringMeta(null, ...) returns null
         setupRag(0.4, 4000);
         when(vectorStoreResolver.resolve(EMBED_PROVIDER)).thenReturn(vectorStore);
         Document doc = mockDoc("content", 0.9, null);
@@ -272,7 +272,7 @@ class RagRetrievalServiceMetadataFallbacksTest {
         // when
         RagRetrievalResult result = service.retrieve(DEFAULT_QUERY, EMBED_PROVIDER);
 
-        // then — null metadata -> key is null -> skipped from sources, but content still in context
+        // then - null metadata -> key is null -> skipped from sources, but content still in context
         assertThat(result.context()).contains("content");
         assertThat(result.sources()).isEmpty();
     }

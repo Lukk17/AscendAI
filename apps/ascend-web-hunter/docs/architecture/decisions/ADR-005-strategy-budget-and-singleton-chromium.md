@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-05-31
+Accepted - 2026-05-31
 
 ## Context
 
@@ -105,5 +105,5 @@ The recursion is bounded to depth 2 by construction.
 - `src/runtime/browser_pool.py:BrowserPool`.
 - `src/observability/metrics.py:READ_BUDGET_EXHAUSTED_TOTAL`, `STRATEGY_ATTEMPTS_TOTAL`, `STRATEGY_DURATION_SECONDS`.
 - `src/config/config.py:READ_TOTAL_BUDGET`, `PLAYWRIGHT_HEADLESS`.
-- [ADR-001](ADR-001-multi-tier-extraction-strategy.md) — the strategy chain this budget applies to.
-- [ADR-003](ADR-003-novnc-ngrok-captcha-intervention.md) — NoVNC, the terminal strategy.
+- [ADR-001](ADR-001-multi-tier-extraction-strategy.md) - the strategy chain this budget applies to.
+- [ADR-003](ADR-003-novnc-ngrok-captcha-intervention.md) - NoVNC, the terminal strategy.

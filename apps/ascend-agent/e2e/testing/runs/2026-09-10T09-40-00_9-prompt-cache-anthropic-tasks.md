@@ -28,9 +28,9 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.nativeUsage.cache_creation_input_tokens > 0` OR `usage.nativeUsage.cache_read_input_tokens > 0` (a true cold start pays a cache write, a warm cache from an identical prompt within the last ~5 minutes shows a read instead, either proves the `cache_control` directive was accepted) — observed cache_creation_input_tokens=3228, cache_read_input_tokens=0
+- [x] Step 1: `usage.nativeUsage.cache_creation_input_tokens > 0` OR `usage.nativeUsage.cache_read_input_tokens > 0` (a true cold start pays a cache write, a warm cache from an identical prompt within the last ~5 minutes shows a read instead, either proves the `cache_control` directive was accepted) - observed cache_creation_input_tokens=3228, cache_read_input_tokens=0
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.nativeUsage.cache_read_input_tokens > 0` — observed cache_read_input_tokens=3228 (matches step-1's cache_creation_input_tokens=3228 exactly), cache_creation_input_tokens=0
+- [x] Step 2: `usage.nativeUsage.cache_read_input_tokens > 0` - observed cache_read_input_tokens=3228 (matches step-1's cache_creation_input_tokens=3228 exactly), cache_creation_input_tokens=0
 
 ### Post-run cleanup
 
@@ -53,7 +53,7 @@ Cache creation tokens (call 1): 3228
 
 Cache read tokens (call 2): 3228
 
-Output tokens: 369 (call 1), 369 (call 2) — from response `metadata.usage.nativeUsage.output_tokens`, not LLM-runner token accounting
+Output tokens: 369 (call 1), 369 (call 2) - from response `metadata.usage.nativeUsage.output_tokens`, not LLM-runner token accounting
 
 Start (UTC): 2026-09-10T08:05:12Z
 

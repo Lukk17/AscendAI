@@ -8,7 +8,7 @@ Copy this file to `runs/<UTC-timestamp>_6-attach-sources-tasks.md` before starti
 
 ### Prerequisites
 
-- [x] Bruno CLI present (`bru --version` returns a version) — 3.4.0
+- [x] Bruno CLI present (`bru --version` returns a version) - 3.4.0
 - [x] ascend-ai-agent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [x] Qdrant `/healthz` returns HTTP 200
 - [x] Object store `curl -fsS http://localhost:9070/_floci/health` returns HTTP 200 with `"s3":"running"`
@@ -22,9 +22,9 @@ Step 1 uploads three objects, so the reset covers the same three keys as the Pos
 - [x] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"` returned HTTP 204
 - [x] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"` returned HTTP 204
 - [x] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"` returned HTTP 204
-- [x] Removed `int_metadata_store` rows for all three keys (pierogi, banana, markdown-canary) — DELETE 0 (already clean)
-- [x] Wiped Qdrant points for all three `source` values in collection `ascendai-1536` — acknowledged
-- [x] Truncated `chat_history` rows for user `frostyAttachSourcesTest` — DELETE 0 (already clean)
+- [x] Removed `int_metadata_store` rows for all three keys (pierogi, banana, markdown-canary) - DELETE 0 (already clean)
+- [x] Wiped Qdrant points for all three `source` values in collection `ascendai-1536` - acknowledged
+- [x] Truncated `chat_history` rows for user `frostyAttachSourcesTest` - DELETE 0 (already clean)
 - [x] Deleted Redis key `chat:frostyAttachSourcesTest`
 - [x] Deleted Redis key `user:frostyAttachSourcesTest:instructions`
 
@@ -38,11 +38,11 @@ Step 1 uploads three objects, so the reset covers the same three keys as the Pos
 ### Expected
 
 - [x] Step 1: response `uploaded` field includes `documents/pierogi-recipe.docx`
-- [x] Step 2: response `indexed >= 1` and `failed == 0` — indexed=3, failed=0
-- [x] Step 3: response body has a `sources` array with at least 1 entry — 1 entry
-- [x] Step 3: first entry has non-empty `name`, `mimeType`, `downloadUrl`, `expiresAt` — name=pierogi-recipe.docx, mimeType=application/octet-stream, expiresAt=2026-09-10T08:07:07.260283449Z
-- [x] Step 3: `downloadUrl` host portion equals `localhost:9070`, NOT `host.docker.internal:9070` — verified `http://localhost:9070`
-- [x] Step 4: HTTP 200, downloaded file non-empty — 13563 bytes, identified as "Microsoft Word 2007+" (.docx)
+- [x] Step 2: response `indexed >= 1` and `failed == 0` - indexed=3, failed=0
+- [x] Step 3: response body has a `sources` array with at least 1 entry - 1 entry
+- [x] Step 3: first entry has non-empty `name`, `mimeType`, `downloadUrl`, `expiresAt` - name=pierogi-recipe.docx, mimeType=application/octet-stream, expiresAt=2026-09-10T08:07:07.260283449Z
+- [x] Step 3: `downloadUrl` host portion equals `localhost:9070`, NOT `host.docker.internal:9070` - verified `http://localhost:9070`
+- [x] Step 4: HTTP 200, downloaded file non-empty - 13563 bytes, identified as "Microsoft Word 2007+" (.docx)
 
 ### Post-run cleanup
 
@@ -51,9 +51,9 @@ Run regardless of Run-step verdict (idempotent; honours Group A hermetic contrac
 - [x] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/pierogi-recipe.docx"` returned HTTP 204
 - [x] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/documents/banana-price-poland.pdf"` returned HTTP 204
 - [x] `curl -fsS -X DELETE "http://localhost:9070/knowledge-base/markdown/markdown-canary.md"` returned HTTP 204
-- [x] Deleted `int_metadata_store` rows for all three keys (pierogi, banana, markdown-canary) — DELETE 3
-- [x] Wiped Qdrant points for `documents/pierogi-recipe.docx`, `documents/banana-price-poland.pdf` and `markdown/markdown-canary.md` in collection `ascendai-1536` — acknowledged
-- [x] Truncated `chat_history` rows for `frostyAttachSourcesTest` + deleted Redis key `chat:frostyAttachSourcesTest` — DELETE 2 rows, Redis key deleted
+- [x] Deleted `int_metadata_store` rows for all three keys (pierogi, banana, markdown-canary) - DELETE 3
+- [x] Wiped Qdrant points for `documents/pierogi-recipe.docx`, `documents/banana-price-poland.pdf` and `markdown/markdown-canary.md` in collection `ascendai-1536` - acknowledged
+- [x] Truncated `chat_history` rows for `frostyAttachSourcesTest` + deleted Redis key `chat:frostyAttachSourcesTest` - DELETE 2 rows, Redis key deleted
 - [x] Deleted Redis key `user:frostyAttachSourcesTest:instructions`
 - [x] `POST http://localhost:7020/api/v1/memory/wipe?user_id=frostyAttachSourcesTest` returned `{"status":"success", ...}`
 

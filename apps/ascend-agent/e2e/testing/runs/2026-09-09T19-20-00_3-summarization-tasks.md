@@ -21,14 +21,14 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s) — FAILED: HTTP 422, not 200 (see Result summary)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s) - FAILED: HTTP 422, not 200 (see Result summary)
 
 ### Expected
 
-- [ ] HTTP 200 — observed HTTP 422
-- [ ] Response `content` is a coherent summary that quotes specific facts from the source document — observed `content` was `undefined` (Bruno test: `expected undefined to be a string`)
-- [ ] Response `content` contains at least three of the expected proper nouns listed in the spec's Expected section — not evaluated, `content` was absent
-- [ ] Response `content` is NOT a refusal like "the document context block is empty" or "I don't see a document attached" — not evaluated, `content` was absent
+- [ ] HTTP 200 - observed HTTP 422
+- [ ] Response `content` is a coherent summary that quotes specific facts from the source document - observed `content` was `undefined` (Bruno test: `expected undefined to be a string`)
+- [ ] Response `content` contains at least three of the expected proper nouns listed in the spec's Expected section - not evaluated, `content` was absent
+- [ ] Response `content` is NOT a refusal like "the document context block is empty" or "I don't see a document attached" - not evaluated, `content` was absent
 
 ### Post-run cleanup
 

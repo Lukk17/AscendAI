@@ -92,8 +92,8 @@ different cache entries.
 
 ## Related
 
-- `src/reader/web_reader.py` — `TierName`, `_from_tier`, `_select_strategies`, `_cache_key`.
-- `src/api/rest/rest_endpoints.py` — the `tier` field on `ReadRequest`.
-- `src/api/mcp/mcp_server.py` — the `tier` argument on `web_read`.
+- `src/reader/web_reader.py` - `TierName`, `_from_tier`, `_select_strategies`, `_cache_key`.
+- `src/api/rest/rest_endpoints.py` - the `tier` field on `ReadRequest`.
+- `src/api/mcp/mcp_server.py` - the `tier` argument on `web_read`.
 - [ADR-001](ADR-001-multi-tier-extraction-strategy.md), whose Alternative 3 this reverses in part.
 - [ADR-010](ADR-010-producer-aware-session-replay.md), the routing this override sits above.

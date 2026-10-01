@@ -46,7 +46,7 @@ class DocumentRouterPdfExceptionTest {
     @Test
     @DisplayName("routeAndProcess throws DocumentRoutingException when PDF page processing task fails")
     void routeAndProcess_PageProcessingTaskFails_ThrowsDocumentRoutingException() throws IOException {
-        // given — set text threshold low so text-page routes to Docling
+        // given - set text threshold low so text-page routes to Docling
         ReflectionTestUtils.setField(documentRouter, "pdfMinTextThresholdPerPage", 0);
         ReflectionTestUtils.setField(documentRouter, "pdfParallelPages", 1);
         byte[] pdfBytes = createSinglePagePdf();
@@ -61,7 +61,7 @@ class DocumentRouterPdfExceptionTest {
     @Test
     @DisplayName("routeAndProcess throws DocumentRoutingException when ascend-ocr page task fails")
     void routeAndProcess_AscendOcrPageFails_ThrowsDocumentRoutingException() throws IOException {
-        // given — high threshold so page routes to ascend-ocr
+        // given - high threshold so page routes to ascend-ocr
         ReflectionTestUtils.setField(documentRouter, "pdfMinTextThresholdPerPage", 10_000);
         ReflectionTestUtils.setField(documentRouter, "pdfParallelPages", 1);
         byte[] pdfBytes = createSinglePagePdf();

@@ -108,7 +108,7 @@ class RagRetrievalServiceMetricsTest {
     @Test
     @DisplayName("retrieve registers rag.retrieval.hits counter with above_threshold=false for docs below threshold")
     void retrieve_DocBelowThreshold_RegistersHitCounterFalse() {
-        // given — score 0.3 < threshold 0.5
+        // given - score 0.3 < threshold 0.5
         Document doc = mockDoc("content", 0.3, Map.of("source", "doc.pdf"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
 

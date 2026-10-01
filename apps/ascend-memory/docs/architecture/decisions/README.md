@@ -1,4 +1,4 @@
-# Architecture Decision Records — AscendMemory
+# Architecture Decision Records - AscendMemory
 
 > Index stamped against commit `cdbb447` (branch `feat/agent-deploy-chat-history-caching-rag-attachments`),
 > 2026-06-01.

@@ -253,7 +253,7 @@ class PersistentChatMemoryMessageMappingTest {
         doThrow(new RuntimeException("compaction blew up"))
                 .when(compactionService).maybeCompact(any(), any(), any());
 
-        // then — compaction failures never break the user's turn
+        // then - compaction failures never break the user's turn
         memory.add(CONVO_ID, List.of(new UserMessage("hi")));
     }
 
@@ -282,7 +282,7 @@ class PersistentChatMemoryMessageMappingTest {
         // when
         memory.add(CONVO_ID, List.of(new UserMessage("hello")));
 
-        // then — effective = max(5, 8 + 1) = 9 → trim to 0..8
+        // then - effective = max(5, 8 + 1) = 9 → trim to 0..8
         verify(listOperations).trim(REDIS_KEY, 0, 8);
     }
 

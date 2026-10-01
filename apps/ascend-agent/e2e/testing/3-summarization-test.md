@@ -64,7 +64,7 @@ docker exec redis redis-cli DEL user:frostySummarizationTest:instructions
 
 ## Run
 
-Send the Bruno request and wait for the response before moving to the Expected section. The request may take 30–90 seconds because each PDF page is sent to Docling.
+Send the Bruno request and wait for the response before moving to the Expected section. The request may take 30-90 seconds because each PDF page is sent to Docling.
 
 ```bash
 cd docs/api/request/AscendAI

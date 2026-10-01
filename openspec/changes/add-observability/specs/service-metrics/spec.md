@@ -48,7 +48,7 @@ Every metric emitted by any AscendAI service SHALL carry the tags `service` and 
 - **WHEN** a log line written by ascend-ai-agent is queried in Loki
 - **THEN** the line carries the label `service="ascend-ai-agent"`
 
-### Requirement: Domain custom metrics — semantic memory
+### Requirement: Domain custom metrics - semantic memory
 
 ascend-ai-agent SHALL emit the following metrics related to semantic memory operations.
 
@@ -75,7 +75,7 @@ ascend-ai-agent SHALL emit the following metrics related to semantic memory oper
 - **THEN** `memory_search_duration_seconds_count{outcome="<o>"}` increments by 1
 - **AND** `outcome` is one of `ok`, `error`, `timeout`, `not_found`
 
-### Requirement: Domain custom metrics — RAG retrieval
+### Requirement: Domain custom metrics - RAG retrieval
 
 ascend-ai-agent SHALL emit the following metrics related to RAG retrieval.
 
@@ -97,7 +97,7 @@ ascend-ai-agent SHALL emit the following metrics related to RAG retrieval.
 - **WHEN** `RagRetrievalService` returns N hits with scores `[s1, ..., sN]`
 - **THEN** `rag_top_score_bucket{provider="<p>"}` records N observations, one per hit score
 
-### Requirement: Domain custom metrics — MCP tool calls
+### Requirement: Domain custom metrics - MCP tool calls
 
 ascend-ai-agent SHALL record a timer for every MCP tool invocation.
 
@@ -110,7 +110,7 @@ ascend-ai-agent SHALL record a timer for every MCP tool invocation.
 - **WHEN** ascend-ai-agent invokes any MCP tool (e.g., `web_search`, `transcribe_audio`)
 - **THEN** `mcp_tool_duration_seconds_count{tool="<name>",outcome="<o>"}` increments by exactly 1
 
-### Requirement: Domain custom metrics — prompt cache (powers L3 dashboard)
+### Requirement: Domain custom metrics - prompt cache (powers L3 dashboard)
 
 ascend-ai-agent SHALL emit prompt-cache token counters from each provider strategy's `recordOutcome(...)` so the L3 Cache Hit Rate dashboard can chart cache effectiveness over time.
 
@@ -164,7 +164,7 @@ JVM services SHALL expose only `health`, `info`, and `prometheus` endpoints from
 - **WHEN** `GET http://localhost:9917/actuator/env` is invoked with no override config
 - **THEN** the response status is 404
 
-### Requirement: Domain custom metrics — Python services
+### Requirement: Domain custom metrics - Python services
 
 Each Python service SHALL emit at least the following custom metrics in addition to framework defaults.
 

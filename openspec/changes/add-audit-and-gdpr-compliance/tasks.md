@@ -1,4 +1,4 @@
-## 1. Log redaction (ships first — no dependencies)
+## 1. Log redaction (ships first - no dependencies)
 
 - [ ] 1.1 In `apps/ascend-agent/src/main/java/com/lukk/ascend/ai/agent/controller/PromptController.java` (lines 90-97), replace the `Prompt: {}` argument with `PromptLength: {}` and `PromptSha256: {}` (SHA-256 hex of the prompt body); extract the digest helper to `util/`
 - [ ] 1.2 In `apps/ascend-agent/src/main/resources/application.yaml` `logging.level`, replace the stale `com.lukk.ai.agent: DEBUG` entry with `com.lukk.ascend.ai.agent: DEBUG` (dev posture keeps DEBUG)
@@ -20,7 +20,7 @@
 ## 3. Audit instrumentation of actions
 
 - [ ] 3.1 Emit `CHAT_PROMPT` from the prompt flow with `details` = prompt length + SHA-256 (reuse the 1.1 digest helper), actor from the authenticated principal (`add-auth-and-identity`), source IP from the request
-- [ ] 3.2 Emit `DOCUMENT_UPLOADED` and `INGESTION_RUN` from `controller/IngestionController.java` (both success and rejection outcomes — 415/413 rejections audit with `outcome = DENIED`)
+- [ ] 3.2 Emit `DOCUMENT_UPLOADED` and `INGESTION_RUN` from `controller/IngestionController.java` (both success and rejection outcomes - 415/413 rejections audit with `outcome = DENIED`)
 - [ ] 3.3 Emit `DOCUMENT_PRESIGN_ISSUED` from `service/rag/S3PresignedUrlService.java` with object keys in `details`
 - [ ] 3.4 Emit `MEMORY_WIPED` where `SemanticMemoryClient.wipeUserMemory` is invoked outside an erasure job
 - [ ] 3.5 Emit `AUTH_TOKEN_REJECTED` from the resource-server rejection hook once `add-auth-and-identity` lands (wire an `AuthenticationFailureEvent` / `BearerTokenAuthenticationEntryPoint` listener); until then leave the listener registered but inert behind the dev profile
@@ -50,7 +50,7 @@
 - [ ] 6.3 Test (`ErasureAuthorizationIT`): self allowed, ADMIN allowed, other user 403 with no job row created
 - [ ] 6.4 Add Bruno requests for erasure start + status polling
 
-## 7. Erasure integration test — zero residue
+## 7. Erasure integration test - zero residue
 
 - [ ] 7.1 Build `ErasureZeroResidueIT` (Testcontainers: Postgres, Redis, Qdrant, MinIO; WireMock for AscendMemory): seed a user with chat history, instructions, usage rows, Redis keys, MinIO objects, and Qdrant points in both collections; run the job; assert every store empty for the subject per the `data-erasure` spec scenario
 - [ ] 7.2 Extend it with a schema-drift guard: enumerate user-keyed tables via `information_schema` and fail if a table with a user-id column is not covered by an erasure step; additionally assert the tenant-keyed tables (`documents`, `document_index_state`, `ingestion_runs`, connector tables) are covered by the per-tenant erasure path, since those carry no user-id column and the user-column heuristic alone would miss them (design risk: registry / connector coordination)

@@ -40,11 +40,11 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ## Result summary
 
-All three Expected assertions passed. Step 1 returned HTTP 200 and the response body contained the seeded facts "Rex" (dog name) and "Praga" (rescue location), confirming the model read from the visible history (summary + 8 raw turns + new prompt). After the 5-second async window, the Postgres `chat_history` table for user `frostyCompactionIdempotencyTest` held exactly 11 rows (9 pre-seeded + 1 new user + 1 new assistant), and still exactly 1 `[Conversation summary]` row — proving compaction did not re-fire even though a second prompt was sent into an already-compacted history.
+All three Expected assertions passed. Step 1 returned HTTP 200 and the response body contained the seeded facts "Rex" (dog name) and "Praga" (rescue location), confirming the model read from the visible history (summary + 8 raw turns + new prompt). After the 5-second async window, the Postgres `chat_history` table for user `frostyCompactionIdempotencyTest` held exactly 11 rows (9 pre-seeded + 1 new user + 1 new assistant), and still exactly 1 `[Conversation summary]` row - proving compaction did not re-fire even though a second prompt was sent into an already-compacted history.
 
-Row count after step 3: expected 11 — observed 11
+Row count after step 3: expected 11 - observed 11
 
-Summary row count after step 3: expected 1 — observed 1
+Summary row count after step 3: expected 1 - observed 1
 
 Input tokens:
 

@@ -14,7 +14,7 @@ http:
     data:
       - name: prompt
         type: text
-        value: One more thing — can you also tell me the name of my dog and where he was rescued from?
+        value: One more thing - can you also tell me the name of my dog and where he was rescued from?
       - name: provider
         type: text
         value: anthropic

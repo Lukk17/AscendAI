@@ -46,14 +46,14 @@ class SemanticMemoryExtractorUnbalancedBracketsTest {
         // when
         List<String> result = extractor.extractFactsFromJson(input);
 
-        // then — last balanced array is the outer nested one; does not deserialize as List<String>
+        // then - last balanced array is the outer nested one; does not deserialize as List<String>
         assertThat(result).isEmpty();
     }
 
     @Test
     @DisplayName("extractFactsFromJson ignores bracket characters inside string literals")
     void extractFactsFromJson_WhenBracketsInsideStrings_ThenIgnoresThem() {
-        // given — the "[" inside the string literal must NOT trip the depth counter
+        // given - the "[" inside the string literal must NOT trip the depth counter
         String input = "Reasoning: \"the array starts with [\" -- final: [\"User likes [brackets]\"]";
 
         // then
@@ -63,7 +63,7 @@ class SemanticMemoryExtractorUnbalancedBracketsTest {
     @Test
     @DisplayName("extractFactsFromJson correctly handles escaped quotes inside string values")
     void extractFactsFromJson_WhenEscapedQuotes_ThenStillExtracts() {
-        // given — escaped quote inside a string should keep us in-string and not flip inString flag
+        // given - escaped quote inside a string should keep us in-string and not flip inString flag
         String input = "Some prose [\"User said \\\"hello\\\" loudly\"]";
 
         // then
@@ -73,7 +73,7 @@ class SemanticMemoryExtractorUnbalancedBracketsTest {
     @Test
     @DisplayName("extractFactsFromJson returns empty for balanced brackets that contain non-JSON content")
     void extractFactsFromJson_WhenBalancedButInvalidJsonInside_ThenReturnsEmpty() {
-        // given — balanced brackets but malformed JSON content -> embedded parse fails too
+        // given - balanced brackets but malformed JSON content -> embedded parse fails too
         String input = "Final: [not valid json content]";
 
         // then

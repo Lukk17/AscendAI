@@ -5,7 +5,7 @@
 ### Requirement: Conversation entity and schema
 
 The agent SHALL persist conversations in a `conversations` table created by a new Liquibase changelog with columns:
-`id` (UUID, primary key, generated server-side), `tenant_id` (VARCHAR, nullable — reserved for the tenant-isolation
+`id` (UUID, primary key, generated server-side), `tenant_id` (VARCHAR, nullable - reserved for the tenant-isolation
 change, unused here), `user_id` (VARCHAR, not null, indexed), `title` (VARCHAR(255), not null), `created_at`
 (TIMESTAMP, not null), and `updated_at` (TIMESTAMP, not null). The `chat_history` table SHALL gain an indexed
 `conversation_id` UUID column with a foreign key to `conversations.id`. `updated_at` SHALL be bumped whenever a
@@ -46,7 +46,7 @@ keyed by user id (memories belong to the user, not to a single conversation).
 Both `POST /api/v1/ai/prompt` and `POST /api/v1/ai/prompt/stream` SHALL accept an optional `conversationId` form
 field. When supplied, the conversation MUST exist and belong to the requesting user; otherwise the endpoint SHALL
 respond 404 with an `ApiError` body before any model call. When omitted, the agent SHALL use the requesting user's
-most-recently-updated conversation, auto-creating one if the user has none — preserving the previous single-thread
+most-recently-updated conversation, auto-creating one if the user has none - preserving the previous single-thread
 behavior for callers that never send the field.
 
 #### Scenario: Supplied conversation id routes the turn

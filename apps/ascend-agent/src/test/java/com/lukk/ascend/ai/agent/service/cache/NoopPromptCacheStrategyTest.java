@@ -42,7 +42,7 @@ class NoopPromptCacheStrategyTest {
     @Test
     @DisplayName("recordOutcome emits gen_ai.client.token.usage counter for null response gracefully")
     void recordOutcome_NullResponse_DoesNotThrow() {
-        // then — must not throw; null response is silently skipped
+        // then - must not throw; null response is silently skipped
         new NoopPromptCacheStrategy("x", new SimpleMeterRegistry()).recordOutcome("u", null);
     }
 

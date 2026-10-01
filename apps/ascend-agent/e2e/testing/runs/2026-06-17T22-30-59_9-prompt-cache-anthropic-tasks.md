@@ -27,10 +27,10 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) — warm-cache path: read 3744 tokens instead; spec authorises this
-- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) — warm-cache path: read 3744; spec allows this as the alternative proof
+- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) - warm-cache path: read 3744 tokens instead; spec authorises this
+- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) - warm-cache path: read 3744; spec allows this as the alternative proof
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.cacheReadInputTokens > 0` — observed 3744
+- [x] Step 2: `usage.cacheReadInputTokens > 0` - observed 3744
 
 ### Verdict
 
@@ -38,9 +38,9 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 
 ## Result summary
 
-Both calls returned HTTP 200. On step 1, Anthropic returned `cache_creation_input_tokens=0` and `cache_read_input_tokens=3744`, indicating a warm-cache hit (the spec explicitly allows this: "on a warm-cache cold-test you observe a read instead of a creation — either path proves the cache_control directive was accepted"). On step 2, Anthropic again returned `cache_read_input_tokens=3744 > 0`, satisfying the primary assertion. Both responses were structurally complete with model id `claude-sonnet-4-6`. The `cache_control` directive is confirmed active end-to-end.
+Both calls returned HTTP 200. On step 1, Anthropic returned `cache_creation_input_tokens=0` and `cache_read_input_tokens=3744`, indicating a warm-cache hit (the spec explicitly allows this: "on a warm-cache cold-test you observe a read instead of a creation - either path proves the cache_control directive was accepted"). On step 2, Anthropic again returned `cache_read_input_tokens=3744 > 0`, satisfying the primary assertion. Both responses were structurally complete with model id `claude-sonnet-4-6`. The `cache_control` directive is confirmed active end-to-end.
 
-Cache creation tokens (call 1): 0 (warm-cache path — spec-authorised)
+Cache creation tokens (call 1): 0 (warm-cache path - spec-authorised)
 
 Cache read tokens (call 1): 3744
 

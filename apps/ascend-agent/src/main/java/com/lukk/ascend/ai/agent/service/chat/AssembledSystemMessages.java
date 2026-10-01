@@ -5,7 +5,7 @@ import org.springframework.util.StringUtils;
 /**
  * Static + dynamic split of the assembled system prompt.
  *
- * <p>The {@code staticPrefix} is the {@code app.system-prompt} text only — globally
+ * <p>The {@code staticPrefix} is the {@code app.system-prompt} text only - globally
  * identical across users and turns, eligible for provider prompt caching. The
  * {@code dynamicSuffix} carries per-user content (instructions, semantic memory) that
  * varies per request and must NOT be marked as cacheable.

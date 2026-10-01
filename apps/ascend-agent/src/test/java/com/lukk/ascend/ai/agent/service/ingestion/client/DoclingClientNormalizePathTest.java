@@ -77,7 +77,7 @@ class DoclingClientNormalizePathTest {
     @DisplayName("normalize path keeps slash when single slash")
     @Test
     void normalizePath_WhenSingleSlash_ThenKeepsSlash() {
-        // given — length == 1 -> trimmed.length() > 1 is false -> trailing slash NOT stripped -> "/" returned
+        // given - length == 1 -> trimmed.length() > 1 is false -> trailing slash NOT stripped -> "/" returned
         DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/");
 
         // then
@@ -91,7 +91,7 @@ class DoclingClientNormalizePathTest {
         // given
         DoclingClient client = new DoclingClient(restClient, objectMapper, new DoclingProperties(), "http://docling", "/v1/convert/file");
 
-        // then — package-private invoked via reflection to cover the @PostConstruct line
+        // then - package-private invoked via reflection to cover the @PostConstruct line
         ReflectionTestUtils.invokeMethod(client, "logConfiguredEndpoint");
     }
 }

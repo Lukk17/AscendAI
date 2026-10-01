@@ -35,7 +35,7 @@ Currently registered MCP services:
 
 The agent sets `spring.ai.mcp.client.initialized=false` so Spring AI's `McpClientAutoConfiguration` builds each
 `McpSyncClient` without calling `.initialize()`. The `McpClientStartupInitializer` component listens for
-`ApplicationReadyEvent` and performs the initialisation loop itself — calling `client.initialize()` on each client
+`ApplicationReadyEvent` and performs the initialisation loop itself - calling `client.initialize()` on each client
 with a per-client timeout (default `5s`, configurable via `app.mcp.startup.init-timeout`).
 
 If a client fails to initialise (connection refused, timeout, or any other error), it is recorded as `FAILED` in the

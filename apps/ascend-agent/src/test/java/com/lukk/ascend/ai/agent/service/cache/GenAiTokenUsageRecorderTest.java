@@ -88,7 +88,7 @@ class GenAiTokenUsageRecorderTest {
         // when
         GenAiTokenUsageRecorder.record(registry, response, "lmstudio");
 
-        // then — model tag falls back to "unknown"
+        // then - model tag falls back to "unknown"
         Counter counter = registry.find("gen_ai.client.token.usage")
                 .tag("gen_ai_system", "lmstudio")
                 .tag("gen_ai_request_model", "unknown")
@@ -104,7 +104,7 @@ class GenAiTokenUsageRecorderTest {
         // given
         MeterRegistry registry = new SimpleMeterRegistry();
 
-        // when / then — no exception, no counters registered
+        // when / then - no exception, no counters registered
         GenAiTokenUsageRecorder.record(registry, null, "openai");
         assertThat(registry.find("gen_ai.client.token.usage").counters()).isEmpty();
     }
@@ -112,14 +112,14 @@ class GenAiTokenUsageRecorderTest {
     @Test
     @DisplayName("record does nothing when metadata returns null usage")
     void record_NullUsage_DoesNotThrow() {
-        // given — metadata mock returns null for getUsage()
+        // given - metadata mock returns null for getUsage()
         MeterRegistry registry = new SimpleMeterRegistry();
         ChatResponseMetadata md = mock(ChatResponseMetadata.class);
         when(md.getUsage()).thenReturn(null);
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // when / then — no exception, no counters registered
+        // when / then - no exception, no counters registered
         GenAiTokenUsageRecorder.record(registry, response, "openai");
         assertThat(registry.find("gen_ai.client.token.usage").counters()).isEmpty();
     }

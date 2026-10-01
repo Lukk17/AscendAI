@@ -1,7 +1,7 @@
 """Tests for challenge detection on pages >50 KB (task 6.3).
 
 Before the fix, pages larger than 50 000 bytes were silently returned as
-'clean' — any challenge wall on a large page was missed.  After the fix,
+'clean' - any challenge wall on a large page was missed.  After the fix,
 the detector scans a bounded prefix so challenge markers in the head/title
 section are still detected regardless of total page size.
 """

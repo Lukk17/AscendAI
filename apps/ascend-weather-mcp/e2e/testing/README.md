@@ -22,7 +22,7 @@ Every `<N>-<capability>-test.md` file is the **immutable spec** for one test and
    `"upstream_unavailable"`, `"invalid_input"`), the populated / null fields per status. NOT log substrings.
 6. **Fixtures.** Paths to local files the test reads (none for the current suite).
 
-Each spec has a matching `<N>-<capability>-tasks.template.md` in the [templates/](templates/) subdirectory — the
+Each spec has a matching `<N>-<capability>-tasks.template.md` in the [templates/](templates/) subdirectory - the
 **checkbox template** for a run. The runner never edits the spec or the template directly. Before starting a run, it
 copies the template from `templates/` into [runs/](runs/) with a timestamped filename, ticks boxes as it progresses,
 fills in `Result summary` and `Verdict`, and logs anything done outside the spec under `Additional tasks I did`. See

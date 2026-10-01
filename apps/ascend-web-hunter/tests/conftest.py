@@ -40,7 +40,7 @@ mock_instance = MagicMock()
 
 
 async def mock_asgi_app(_scope, _receive, _send):
-    """Stub ASGI application — discards every call. The FastMCP HTTP mount
+    """Stub ASGI application - discards every call. The FastMCP HTTP mount
     needs *something* with the ASGI signature even though we never invoke it
     in tests."""
 

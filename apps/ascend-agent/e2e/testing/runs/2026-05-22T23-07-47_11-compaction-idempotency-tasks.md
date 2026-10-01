@@ -30,9 +30,9 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ### Expected
 
-- [x] Step 1: HTTP 200, response references seeded facts — observed "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)"
-- [x] Step 3: `chat_history` row count equals exactly 11 (9 pre-seeded + 2 new) — observed 11
-- [x] Step 3: exactly 1 `[Conversation summary]` row exists (NO second summary written) — observed 1
+- [x] Step 1: HTTP 200, response references seeded facts - observed "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)"
+- [x] Step 3: `chat_history` row count equals exactly 11 (9 pre-seeded + 2 new) - observed 11
+- [x] Step 3: exactly 1 `[Conversation summary]` row exists (NO second summary written) - observed 1
 
 ### Verdict
 

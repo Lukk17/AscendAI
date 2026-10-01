@@ -1,4 +1,4 @@
-# ascend-web-hunter — Architecture Decision Records
+# ascend-web-hunter - Architecture Decision Records
 
 | ID | Decision | Status |
 | :--- | :--- | :--- |

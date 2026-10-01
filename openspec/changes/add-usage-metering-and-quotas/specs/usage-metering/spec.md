@@ -1,4 +1,4 @@
-# usage-metering — Delta Specification
+# usage-metering - Delta Specification
 
 ## ADDED Requirements
 

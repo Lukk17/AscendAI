@@ -113,7 +113,7 @@ class StartupLogConfigTest {
                 semanticMemoryProperties, chatHistoryProperties, compactionProperties,
                 qdrantClientProvider, mcpRegistry);
 
-        // Stub env calls used in onReadinessChange — use eq() consistently so Mockito sees uniform matchers
+        // Stub env calls used in onReadinessChange - use eq() consistently so Mockito sees uniform matchers
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("local.server.port"), org.mockito.ArgumentMatchers.anyString())).thenReturn("9917");
         when(env.getProperty(org.mockito.ArgumentMatchers.eq("server.servlet.context-path"), org.mockito.ArgumentMatchers.eq(""))).thenReturn("");
         when(env.getProperty("server.ssl.key-store")).thenReturn(null);
@@ -147,7 +147,7 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // when — must not throw even if DB is unavailable
+        // when - must not throw even if DB is unavailable
         config.onReadinessChange(readinessEvent());
     }
 
@@ -180,7 +180,7 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // when — should not throw
+        // when - should not throw
         config.onReadinessChange(readinessEvent());
     }
 
@@ -305,7 +305,7 @@ class StartupLogConfigTest {
     @Test
     @DisplayName("onReadinessChange logs disabled for AscendMemory when semanticMemory.enabled=false")
     void onReadinessChange_AscendMemoryDisabled_LogsDisabled() throws Exception {
-        // given — semanticMemoryProperties.enabled = false (default in setUp)
+        // given - semanticMemoryProperties.enabled = false (default in setUp)
         stubDatabaseSuccess();
         stubRedisSuccess();
         stubQdrantSuccess();
@@ -318,7 +318,7 @@ class StartupLogConfigTest {
     @Test
     @DisplayName("onReadinessChange logs FAILED for AscendMemory when HTTP probe throws")
     void onReadinessChange_AscendMemoryProbeFails_LogsFailedStatus() throws Exception {
-        // given — enable semantic memory so the HTTP probe actually runs
+        // given - enable semantic memory so the HTTP probe actually runs
         semanticMemoryProperties.setEnabled(true);
         semanticMemoryProperties.setBaseUrl("http://localhost:7020");
 
@@ -327,7 +327,7 @@ class StartupLogConfigTest {
         stubQdrantSuccess();
         stubS3Success();
 
-        // The probe uses an actual RestClient pointing at a non-listening port – it will throw.
+        // The probe uses an actual RestClient pointing at a non-listening port - it will throw.
         // We just verify it doesn't propagate.
         config.onReadinessChange(readinessEvent());
     }
@@ -339,7 +339,7 @@ class StartupLogConfigTest {
         AvailabilityChangeEvent<ReadinessState> event = mock();
         when(event.getState()).thenReturn(ReadinessState.REFUSING_TRAFFIC);
 
-        // when — no interactions expected
+        // when - no interactions expected
         config.onReadinessChange(event);
     }
 

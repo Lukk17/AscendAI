@@ -1,4 +1,4 @@
-# Tasks — add-tenant-administration
+# Tasks - add-tenant-administration
 
 ## 1. Tenant status schema and Keycloak export
 
@@ -13,7 +13,7 @@
 
 ## 3. Tenant lifecycle service and API
 
-- [ ] 3.1 Create `service/admin/TenantAdminService.java`: create (saga — Keycloak group first, then `tenants` row, rollback group on Postgres failure, idempotent by id), list, get, suspend, resume; validate the slug format from `add-tenant-isolation`
+- [ ] 3.1 Create `service/admin/TenantAdminService.java`: create (saga - Keycloak group first, then `tenants` row, rollback group on Postgres failure, idempotent by id), list, get, suspend, resume; validate the slug format from `add-tenant-isolation`
 - [ ] 3.2 Implement delete as ordered erase-then-deprovision (design D5): suspend → per-tenant erasure job (`add-audit-and-gdpr-compliance`) → delete Keycloak group + users → delete `tenants` row; refuse delete with a clear error if the erasure capability is not present
 - [ ] 3.3 Create `controller/admin/TenantAdminController.java` under `/api/v1/admin/tenants`: create (201 + Location), list (paginated), get (404 unknown), suspend/resume (200), delete (202 job or 204); restrict all to `PLATFORM_ADMIN`
 - [ ] 3.4 Emit audit events (`add-audit-and-gdpr-compliance`) for tenant create / suspend / resume / delete

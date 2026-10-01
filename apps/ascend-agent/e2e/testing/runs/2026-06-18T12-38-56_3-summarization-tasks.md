@@ -15,7 +15,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 

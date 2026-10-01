@@ -131,7 +131,7 @@ class S3PresignedUrlServicePresignBranchesTest {
     @Test
     @DisplayName("presignAll includes source when contentLength is null (size check skipped)")
     void presignAll_NullContentLength_SizeCheckSkipped() throws MalformedURLException {
-        // given — contentLength() returns null -> sizeBytes != null && sizeBytes > max is false -> no skip
+        // given - contentLength() returns null -> sizeBytes != null && sizeBytes > max is false -> no skip
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
                 HeadObjectResponse.builder().contentLength(null).contentType("application/pdf").build());
         PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);

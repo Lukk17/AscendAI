@@ -9,7 +9,7 @@ class Fingerprint:
 
     Every browser-based tier (Playwright, Crawlee, NoVNC) must receive the
     same Fingerprint instance so locale, timezone, geolocation, and UA never
-    contradict each other — a mismatch is a bot-detection signal.
+    contradict each other - a mismatch is a bot-detection signal.
     """
 
     user_agent: str

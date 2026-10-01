@@ -8,7 +8,7 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 
 ### Prerequisites
 
-- [x] Bruno CLI present (`bru --version` returns a version) — 3.4.0
+- [x] Bruno CLI present (`bru --version` returns a version) - 3.4.0
 - [x] AscendAgent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [x] WeatherMCP `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 
@@ -19,8 +19,8 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 ### Expected
 
 - [x] HTTP 200
-- [x] Response `content` contains a numeric temperature value for the requested city — 18.1°C
-- [x] Response `content` contains a weather condition word (cloudy / clear / sunny / rain / etc.) — "Partly cloudy"
+- [x] Response `content` contains a numeric temperature value for the requested city - 18.1°C
+- [x] Response `content` contains a weather condition word (cloudy / clear / sunny / rain / etc.) - "Partly cloudy"
 - [x] Response `content` does NOT contain refusal phrases like "I cannot access live data" or "I don't have real-time data"
 
 ### Verdict
@@ -31,9 +31,9 @@ Copy this file to `runs/<UTC-timestamp>_1-weather-mcp-tasks.md` before starting 
 
 HTTP 200. Content: "Here's the current weather in Warsaw: Temperature: 18.1°C, Wind: 2.2 km/h from WSW, Conditions: Partly cloudy (WMO code 3), Is Day: No (nighttime). A cool and calm late-spring night in Warsaw!" MCP tool invoked successfully.
 
-Input tokens: 0 (MiniMax-M2.7 — metadata not returned)
+Input tokens: 0 (MiniMax-M2.7 - metadata not returned)
 
-Output tokens: 0 (MiniMax-M2.7 — metadata not returned)
+Output tokens: 0 (MiniMax-M2.7 - metadata not returned)
 
 Start (UTC): 2026-05-23T23:10:43Z
 

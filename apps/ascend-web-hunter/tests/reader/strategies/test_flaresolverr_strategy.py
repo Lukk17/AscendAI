@@ -58,7 +58,7 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
 @pytest.mark.asyncio
 async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empty():
     """After removing the cf_clearance gate, cookies are saved unconditionally
-    when the set is non-empty — even if no cf_clearance is present."""
+    when the set is non-empty - even if no cf_clearance is present."""
     session = _make_session(
         {
             "status": "ok",

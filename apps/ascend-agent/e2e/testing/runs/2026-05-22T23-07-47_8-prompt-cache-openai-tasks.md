@@ -27,10 +27,10 @@ Copy to `runs/<UTC-timestamp>_8-prompt-cache-openai-tasks.md` before starting.
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.promptTokens >= 1024` — observed promptTokens=1889
-- [x] Step 1: `usage.promptTokensDetails.cachedTokens == 0` (or absent) — call 1 seeded prefix; call 2 shows cache hit confirming call 1 was a miss
+- [x] Step 1: `usage.promptTokens >= 1024` - observed promptTokens=1889
+- [x] Step 1: `usage.promptTokensDetails.cachedTokens == 0` (or absent) - call 1 seeded prefix; call 2 shows cache hit confirming call 1 was a miss
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.promptTokensDetails.cachedTokens > 0` — observed cachedTokens=1792
+- [x] Step 2: `usage.promptTokensDetails.cachedTokens > 0` - observed cachedTokens=1792
 
 ### Verdict
 

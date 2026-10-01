@@ -59,7 +59,7 @@ A strategy result is only accepted by `WebReader` if `ContentValidator.validate`
 `BlocklistLoader` loads the Fanboy Annoyance list from the vendored `src/assets/fanboy-annoyance.txt` and returns
 an `AdblockRules` instance; nothing is downloaded automatically. The result backs the single process-wide
 `url_validator` singleton (`src/validator/url_validator.py`), which `PlaywrightStrategy` and `CrawleeStrategy` use
-as a route filter whose `route_handler` aborts any request matching the blocklist rules — reducing noise in
+as a route filter whose `route_handler` aborts any request matching the blocklist rules - reducing noise in
 extracted content by blocking ads, trackers, and annoyance scripts before they execute in the browser. An operator
 can refresh the list from `BLOCKLIST_URL` via `POST /api/v1/blocklist/refresh`, which only takes effect if the
 download parses to at least one rule. See [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).

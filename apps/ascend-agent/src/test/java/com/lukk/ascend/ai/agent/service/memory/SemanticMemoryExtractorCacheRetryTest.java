@@ -64,7 +64,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("extract triggers cache retry when isCacheConfigError returns true and retry succeeds")
     void extract_CacheConfigError_RetriesWithoutCache() throws InterruptedException {
-        // given — strategy with isCacheConfigError=true
+        // given - strategy with isCacheConfigError=true
         PromptCacheStrategy cacheErrorStrategy = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -94,7 +94,7 @@ class SemanticMemoryExtractorCacheRetryTest {
                 .thenReturn(goodResp);
         when(chatResponseContentResolver.resolveContent(goodResp)).thenReturn("[]");
 
-        // when — extract spawns a virtual thread
+        // when - extract spawns a virtual thread
         extractor.extract(TestConstants.DEFAULT_USER_ID, "I love coding", "openai", "gpt-4o-mini", "openai");
 
         // give virtual thread time to finish
@@ -213,7 +213,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("extract uses null fallback options when extractionModel is blank during cache retry")
     void extract_CacheRetry_WithBlankExtractionModel_UsesFallbackNull() throws InterruptedException {
-        // given — providers map empty + model null -> extractionModel = null -> fallback = null
+        // given - providers map empty + model null -> extractionModel = null -> fallback = null
         PromptCacheStrategy cacheErrorStrategy = new PromptCacheStrategy() {
             @Override
             public String providerName() {
@@ -255,7 +255,7 @@ class SemanticMemoryExtractorCacheRetryTest {
     @Test
     @DisplayName("invokeExtractor skips defaultOptions when options is null and extractionModel is blank")
     void invokeExtractor_NullOptionsAndBlankExtractionModel_NoDefaultOptions() throws InterruptedException {
-        // given — providers map empty + model null -> extractionModel = null
+        // given - providers map empty + model null -> extractionModel = null
         // Noop buildOptions(null) = null -> decoratedOptions = null
         // options==null && hasText(null) = false -> NO defaultOptions set
         PromptCacheStrategy noop = new PromptCacheStrategy() {

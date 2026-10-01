@@ -5,7 +5,7 @@
     { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
   ],
   "annotations": { "list": [] },
-  "description": "L1 Token Cost — estimated USD spend per provider per day. Rates are hardcoded from observability/grafana/dashboards/pricing.yaml; update that file and restart Grafana when provider pricing changes.",
+  "description": "L1 Token Cost - estimated USD spend per provider per day. Rates are hardcoded from observability/grafana/dashboards/pricing.yaml; update that file and restart Grafana when provider pricing changes.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -147,7 +147,7 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "L1 — Token Cost",
+  "title": "L1 - Token Cost",
   "uid": "ascend-token-cost",
   "version": 1
 }

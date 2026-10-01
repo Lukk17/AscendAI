@@ -27,10 +27,10 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) — observed: 823
-- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) — NOTE: warm-cache condition; spec allows either creation or read to prove `cache_control` accepted (see Additional tasks)
+- [x] Step 1: `usage.cacheCreationInputTokens > 0` (write to ephemeral cache) - observed: 823
+- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) - NOTE: warm-cache condition; spec allows either creation or read to prove `cache_control` accepted (see Additional tasks)
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.cacheReadInputTokens > 0` — observed: 3345
+- [x] Step 2: `usage.cacheReadInputTokens > 0` - observed: 3345
 
 ### Verdict
 

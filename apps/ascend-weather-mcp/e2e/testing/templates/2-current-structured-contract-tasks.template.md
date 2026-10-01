@@ -29,9 +29,9 @@ Copy this file to `../runs/<UTC-timestamp>_2-current-structured-contract-tasks.m
 - [ ] `current-warsaw.yml`: `status="ok"`, `message` is null, `requestedQuery` is null
 - [ ] `location.name` contains "Warsaw" (case-insensitive)
 - [ ] `location.countryCode="PL"`
-- [ ] `location.latitude` in 51.5–53.0; `location.longitude` in 20.5–22.0
+- [ ] `location.latitude` in 51.5-53.0; `location.longitude` in 20.5-22.0
 - [ ] `temperature.value` is a finite number; `temperature.unit="celsius"`
-- [ ] `weatherCode` is an integer in 0–99
+- [ ] `weatherCode` is an integer in 0-99
 - [ ] `wind.speed` is a non-null number ≥ 0; `wind.unit="km/h"`
 - [ ] `observedAt` is a non-empty string
 - [ ] `source="open-meteo"`; `fetchedAt` parses as a valid `Instant`

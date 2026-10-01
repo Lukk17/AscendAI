@@ -40,9 +40,9 @@ Copy to `runs/<UTC-timestamp>_11-compaction-idempotency-tasks.md` before startin
 
 ## Result summary
 
-Step 1 returned HTTP 200 in 3.28 seconds via Bruno. The response body read: "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)." — directly referencing Rex and Warsaw from the seeded chat history, confirming the 1 summary + 8 raw turns were visible to the model. After Step 2's 5-second wait, Postgres showed exactly 1 `[Conversation summary]` row for `frostyCompactionIdempotencyTest`, confirming no second compaction fired. The total row count in Postgres was 13 instead of the expected 11; the extra 2 rows (IDs 1329-1330 at 13:04:35) were written by an off-spec direct curl call made to capture the response body, not by a second compaction. The Bruno-only run produced exactly 2 new rows (11 total), and the compaction trigger count (10 turns past the existing summary, well below trigger=20) correctly prevented re-compaction. The primary assertion — idempotency (no second summary row) — holds cleanly.
+Step 1 returned HTTP 200 in 3.28 seconds via Bruno. The response body read: "Your dog is Rex, a beagle rescued from a shelter in Praga (a district of Warsaw)." - directly referencing Rex and Warsaw from the seeded chat history, confirming the 1 summary + 8 raw turns were visible to the model. After Step 2's 5-second wait, Postgres showed exactly 1 `[Conversation summary]` row for `frostyCompactionIdempotencyTest`, confirming no second compaction fired. The total row count in Postgres was 13 instead of the expected 11; the extra 2 rows (IDs 1329-1330 at 13:04:35) were written by an off-spec direct curl call made to capture the response body, not by a second compaction. The Bruno-only run produced exactly 2 new rows (11 total), and the compaction trigger count (10 turns past the existing summary, well below trigger=20) correctly prevented re-compaction. The primary assertion - idempotency (no second summary row) - holds cleanly.
 
-Row count after step 3: observed 13 (expected 11; delta of +2 is from off-spec curl call — see Additional tasks)
+Row count after step 3: observed 13 (expected 11; delta of +2 is from off-spec curl call - see Additional tasks)
 
 Summary row count after step 3: observed 1 (expected 1) PASS
 

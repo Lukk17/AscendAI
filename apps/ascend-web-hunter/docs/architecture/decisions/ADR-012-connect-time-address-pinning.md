@@ -109,10 +109,10 @@ scrapper stack's network in the deployments this repository ships.
 
 ## Related
 
-- `src/validator/url_validator.py` — `PinnedHost`, `pin_safe_host`, `_resolve_public_addresses`,
+- `src/validator/url_validator.py` - `PinnedHost`, `pin_safe_host`, `_resolve_public_addresses`,
   `_is_public_address`, `is_safe_external_url`.
-- `src/reader/strategies/curl_cffi_fetcher.py` — `_pin_session_to`, `fetch_with_curl_cffi`.
-- `tests/reader/strategies/test_curl_cffi_ip_pinning.py` — the rebinding demonstration.
+- `src/reader/strategies/curl_cffi_fetcher.py` - `_pin_session_to`, `fetch_with_curl_cffi`.
+- `tests/reader/strategies/test_curl_cffi_ip_pinning.py` - the rebinding demonstration.
 - [ADR-005](ADR-005-strategy-budget-and-singleton-chromium.md), the singleton Chromium that rules out per-request
   browser pinning.
 - `openspec/changes/archive/2026-09-18-enhance-web-search-scraping/design.md`, decision D6 and its open follow-up.

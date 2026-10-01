@@ -15,7 +15,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 
@@ -30,7 +30,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ## Result summary
 
-The third attempt returned HTTP 200 after two 422 failures caused by the Docling worker OOM crash (confirmed via AscendAgent logs showing `Unexpected end of file from server` at DoclingClient.process). The response `content` field contains a coherent structured summary of the Argent Saga document with specific facts proving the PDF was parsed page-by-page through Docling and the extracted text reached the model. The following proper nouns from the spec's canary list were all present in the response: `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.` — eleven of twelve required markers, well above the three-minimum threshold. The content was not a refusal. All four Expected assertions passed.
+The third attempt returned HTTP 200 after two 422 failures caused by the Docling worker OOM crash (confirmed via AscendAgent logs showing `Unexpected end of file from server` at DoclingClient.process). The response `content` field contains a coherent structured summary of the Argent Saga document with specific facts proving the PDF was parsed page-by-page through Docling and the extracted text reached the model. The following proper nouns from the spec's canary list were all present in the response: `Aenaria Solveh`, `Halen Veyr`, `4317 P.E.`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `Concord of Mireth`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.` - eleven of twelve required markers, well above the three-minimum threshold. The content was not a refusal. All four Expected assertions passed.
 
 Input tokens:
 
@@ -46,7 +46,7 @@ Duration: 00:04:33
 
 ## Additional tasks I did
 
-- Attempt 1 (422, 52s): Docling worker OOM crash — `Unexpected end of file from server` at DoclingClient.process. Retried per caller-granted environmental-flakiness allowance.
+- Attempt 1 (422, 52s): Docling worker OOM crash - `Unexpected end of file from server` at DoclingClient.process. Retried per caller-granted environmental-flakiness allowance.
 - Attempt 2 (422, 19s): Same Docling worker crash. Retried (second and final allowed retry).
 - Attempt 3 (200, 47s): Success. Inspected `content` field via direct curl to confirm proper nouns from the spec's canary list.
 - Checked AscendAgent docker logs to confirm the 422 cause was Docling OOM, not a logic defect in the summarization pipeline.

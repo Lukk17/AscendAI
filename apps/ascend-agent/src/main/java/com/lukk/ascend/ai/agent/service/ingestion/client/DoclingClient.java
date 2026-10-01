@@ -29,7 +29,7 @@ import java.util.Map;
 public class DoclingClient {
 
     private static final String TYPE_DOCLING = "docling";
-    // Docling's /v1/convert/file endpoint binds the multipart field to "files" (plural) —
+    // Docling's /v1/convert/file endpoint binds the multipart field to "files" (plural) -
     // the path segment is "file" (singular), but the form field is "files" because the
     // endpoint supports multi-file batches. Sending "file" returns HTTP 422
     // {"type":"missing","loc":["body","files"],"msg":"Field required"}.

@@ -104,7 +104,7 @@ public class DocumentRouter {
         }
     }
 
-    // PDFBox isn't thread-safe enough to share a PDDocument across threads — slice
+    // PDFBox isn't thread-safe enough to share a PDDocument across threads - slice
     // per-page text and a single-page PDF byte array here (sequentially), then dispatch
     // the slow part (Docling / ascend-ocr network calls) in parallel below.
     private List<PageWork> sliceIntoPageWork(PDDocument pdfDocument, String filename, int totalPages) throws IOException {

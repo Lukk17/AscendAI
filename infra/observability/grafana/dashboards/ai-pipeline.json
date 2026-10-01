@@ -5,7 +5,7 @@
     { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
   ],
   "annotations": { "list": [] },
-  "description": "AI Pipeline — token throughput, provider mix, RAG hit rate, memory parse failures, MCP tool latency.",
+  "description": "AI Pipeline - token throughput, provider mix, RAG hit rate, memory parse failures, MCP tool latency.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -69,7 +69,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Provider mix — share of total input tokens per provider. Metric: gen_ai_client_token_usage_total.",
+      "description": "Provider mix - share of total input tokens per provider. Metric: gen_ai_client_token_usage_total.",
       "fieldConfig": {
         "defaults": { "unit": "percentunit" },
         "overrides": []
@@ -97,7 +97,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "RAG retrieval hit rate — fraction of retrieved chunks that passed the similarity threshold. Metric: rag_retrieval_hits_total{above_threshold}.",
+      "description": "RAG retrieval hit rate - fraction of retrieved chunks that passed the similarity threshold. Metric: rag_retrieval_hits_total{above_threshold}.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },

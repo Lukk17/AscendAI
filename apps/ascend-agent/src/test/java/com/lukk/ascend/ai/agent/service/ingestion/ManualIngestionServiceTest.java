@@ -152,7 +152,7 @@ class ManualIngestionServiceTest {
     @Test
     @DisplayName("run delegates PDF processing to the unstructured service")
     void run_WhenValidPdfObject_ThenDelegatesToUnstructured() {
-        // given — No etag, no lastModified tests unknown fallback
+        // given - No etag, no lastModified tests unknown fallback
         S3Object obj = S3Object.builder().key("documents/report.pdf").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);
@@ -198,7 +198,7 @@ class ManualIngestionServiceTest {
     @Test
     @DisplayName("run rolls back metadata marker on ingestion failure so subsequent runs can retry")
     void run_WhenIngestionFails_ThenRollsBackMetadataMarkerSoRetryIsPossible() {
-        // given — first claim succeeds, then ingestion fails; we expect the marker to be removed
+        // given - first claim succeeds, then ingestion fails; we expect the marker to be removed
         // so a subsequent run for the same ETag is not skipped while Qdrant has no points.
         S3Object obj = S3Object.builder().key("documents/report.pdf").lastModified(Instant.now()).build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
@@ -211,7 +211,7 @@ class ManualIngestionServiceTest {
         // when
         manualIngestionService.run(Optional.empty(), "openai");
 
-        // then — the metadata key that was put-if-absent gets removed so future runs retry
+        // then - the metadata key that was put-if-absent gets removed so future runs retry
         verify(metadataStore).remove(argThat(s -> s != null && s.startsWith("manual-ingestion:documents/report.pdf:")));
     }
 
@@ -242,7 +242,7 @@ class ManualIngestionServiceTest {
     @Test
     @DisplayName("run uses ETag in the metadata key for a DOCX document with a known ETag")
     void run_WhenDocxObjectHasKnownEtag_ThenUsesEtagInMetadataKey() {
-        // given — a DOCX stored under documents/ with a real eTag
+        // given - a DOCX stored under documents/ with a real eTag
         S3Object obj = S3Object.builder().key("documents/contract.docx").eTag("etag-xyz").build();
         ListObjectsV2Response response = ListObjectsV2Response.builder().contents(List.of(obj)).build();
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(response);

@@ -42,9 +42,9 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 
 ## Result summary
 
-All Expected assertions passed. The Bruno request to `compaction-fires-prompt.yml` returned HTTP 200 with a normal chat completion (5758 ms). After the 5-second async wait, Postgres `chat_history` for `frostyCompactionFiresTest` held exactly 9 rows: 1 `system` row whose content begins with `[Conversation summary]` and 8 `user`/`assistant` rows. The compaction service correctly stripped the oldest turns and replaced them with a single summary. The summary text explicitly references Rex (beagle), Warsaw, TechCorp, and Spring Boot — satisfying the manual spot-check.
+All Expected assertions passed. The Bruno request to `compaction-fires-prompt.yml` returned HTTP 200 with a normal chat completion (5758 ms). After the 5-second async wait, Postgres `chat_history` for `frostyCompactionFiresTest` held exactly 9 rows: 1 `system` row whose content begins with `[Conversation summary]` and 8 `user`/`assistant` rows. The compaction service correctly stripped the oldest turns and replaced them with a single summary. The summary text explicitly references Rex (beagle), Warsaw, TechCorp, and Spring Boot - satisfying the manual spot-check.
 
-Pre-compaction row count (after step 1): 23 (21 seed + 2 from the prompt turn — observed indirectly; seed verified at 21 before the run)
+Pre-compaction row count (after step 1): 23 (21 seed + 2 from the prompt turn - observed indirectly; seed verified at 21 before the run)
 
 Post-compaction row count (after step 3): 9 (confirmed)
 
@@ -71,4 +71,4 @@ Duration: 00:03:02
 
 - Confirmed compaction config directly from `application.yaml` since the actuator `/configprops` endpoint returned no output for the `chatHistoryCompaction` key (as the spec anticipated).
 - The `docker exec redis rm /tmp/seed-compaction-fires.redis` command produced a spurious error about a Windows temp path on first attempt (shell quoting artifact on Windows/Git Bash); corrected by using single-quoted path inside the container's `sh -c` invocation. The file was successfully removed on the second attempt.
-- Verified full summary text retrieved from Postgres — all four canary terms (Rex, Warsaw, TechCorp, Spring Boot) present.
+- Verified full summary text retrieved from Postgres - all four canary terms (Rex, Warsaw, TechCorp, Spring Boot) present.

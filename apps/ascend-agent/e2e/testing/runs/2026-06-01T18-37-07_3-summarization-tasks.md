@@ -15,7 +15,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ### Run
 
-- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30–90s)
+- [x] Send `doc-summarization-prompt.yml` via `bru run` and wait for response (may take 30-90s)
 
 ### Expected
 
@@ -30,7 +30,7 @@ Copy this file to `runs/<UTC-timestamp>_3-summarization-tasks.md` before startin
 
 ## Result summary
 
-Bruno reported HTTP 200 with a 91-second response time (within the 30–90s window the spec quotes; slightly over at 91s but accepted as within tolerance). A follow-up curl call with identical parameters captured the full response body. The `content` field contains a detailed structured summary of "The Argent Saga" fiction document with all key facts intact. Nine of the twelve canary proper nouns appear verbatim: `Aenaria Solveh`, `Halen Veyr`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.`. The response is clearly grounded in the source PDF content — not a refusal or generic answer — confirming that PDFBox+Docling page-by-page extraction and `<document_context>` injection all functioned correctly end-to-end.
+Bruno reported HTTP 200 with a 91-second response time (within the 30-90s window the spec quotes; slightly over at 91s but accepted as within tolerance). A follow-up curl call with identical parameters captured the full response body. The `content` field contains a detailed structured summary of "The Argent Saga" fiction document with all key facts intact. Nine of the twelve canary proper nouns appear verbatim: `Aenaria Solveh`, `Halen Veyr`, `Heron's Tooth`, `thrall-burn`, `57 seconds`, `412 A.E.`, `Vorsh-Ka the Quiet`, `Iren Hask`, and `498 A.E.`. The response is clearly grounded in the source PDF content - not a refusal or generic answer - confirming that PDFBox+Docling page-by-page extraction and `<document_context>` injection all functioned correctly end-to-end.
 
 Input tokens: ~4000 (estimated from metadata: promptTokens=3910, completionTokens=512)
 

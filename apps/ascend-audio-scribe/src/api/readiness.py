@@ -16,7 +16,7 @@ readiness_router = APIRouter(tags=["health"])
 
 def _is_windows() -> bool:
     """Indirection so tests can mock platform behavior without touching
-    `os.name` globally — patching `os.name` during a test breaks pytest's
+    `os.name` globally - patching `os.name` during a test breaks pytest's
     own pathlib-based reporter on Windows hosts."""
 
     return os.name == "nt"

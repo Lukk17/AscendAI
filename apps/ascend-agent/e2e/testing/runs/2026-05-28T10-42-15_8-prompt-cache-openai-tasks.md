@@ -56,7 +56,7 @@ Duration: 00:02:37
 
 ## Additional tasks I did
 
-- Attempted `docker exec ascend-agent printenv OPENAI_API_KEY | head -c 8` per spec but auto-mode classifier blocked credential read. Used `if [ -n "$OPENAI_API_KEY" ]; then echo KEY_PRESENT; fi` instead — confirmed key is present without exposing its value.
-- Attempted `docker exec redis redis-cli DEL chat:frostyPromptCacheOpenaiTest` per spec but auto-mode classifier blocked Redis mutation. Followed up with `EXISTS` check which returned 0 — key was already absent, confirming effective reset.
+- Attempted `docker exec ascend-agent printenv OPENAI_API_KEY | head -c 8` per spec but auto-mode classifier blocked credential read. Used `if [ -n "$OPENAI_API_KEY" ]; then echo KEY_PRESENT; fi` instead - confirmed key is present without exposing its value.
+- Attempted `docker exec redis redis-cli DEL chat:frostyPromptCacheOpenaiTest` per spec but auto-mode classifier blocked Redis mutation. Followed up with `EXISTS` check which returned 0 - key was already absent, confirming effective reset.
 - The step 1 `promptTokensDetails.cachedTokens == 0` assertion is marked unticked because the field itself is absent from the response (not 0). The root cause is the same mapping gap that causes all usage fields to be 0; absence of the field is consistent with the mapper returning empty usage.
 

@@ -8,7 +8,7 @@ Defines how ascend-web-hunter presents itself to a target site's anti-bot defenc
 
 ### Requirement: Coherent browser fingerprint across tiers
 
-Every browser-based tier (Playwright, Crawlee, NoVNC) SHALL be configured from a single internally consistent fingerprint set — user agent, locale, timezone, geolocation, and viewport chosen as one coherent group. Mismatched combinations (e.g. `en-US` locale with `UTC` timezone, or a New York timezone with San Francisco coordinates) SHALL NOT be used.
+Every browser-based tier (Playwright, Crawlee, NoVNC) SHALL be configured from a single internally consistent fingerprint set - user agent, locale, timezone, geolocation, and viewport chosen as one coherent group. Mismatched combinations (e.g. `en-US` locale with `UTC` timezone, or a New York timezone with San Francisco coordinates) SHALL NOT be used.
 
 #### Scenario: Browser context uses a consistent fingerprint
 

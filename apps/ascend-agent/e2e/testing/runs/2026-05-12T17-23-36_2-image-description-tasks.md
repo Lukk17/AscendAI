@@ -1,4 +1,4 @@
-# Image description — run tasks template
+# Image description - run tasks template
 
 Spec: [2-image-description-test.md](../2-image-description-test.md)
 
@@ -18,7 +18,7 @@ Spec: [2-image-description-test.md](../2-image-description-test.md)
 
 - [x] HTTP 200
 - [x] Response `content` is a detailed description (more than a few sentences)
-- [x] Response `content` references concrete visual features of `image.png` — specific subjects, colors, objects, or text
+- [x] Response `content` references concrete visual features of `image.png` - specific subjects, colors, objects, or text
 - [x] Response `content` is NOT a refusal like "I don't see an image" or "I'm unable to view images"
 
 ### Verdict

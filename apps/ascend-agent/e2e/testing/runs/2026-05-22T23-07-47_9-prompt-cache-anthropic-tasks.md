@@ -27,10 +27,10 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ### Expected
 
 - [x] Step 1: HTTP 200
-- [x] Step 1: `usage.cacheCreationInputTokens > 0` — observed 2176
-- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) — observed 0
+- [x] Step 1: `usage.cacheCreationInputTokens > 0` - observed 2176
+- [x] Step 1: `usage.cacheReadInputTokens == 0` (or absent) - observed 0
 - [x] Step 2: HTTP 200
-- [x] Step 2: `usage.cacheReadInputTokens > 0` — observed 2176
+- [x] Step 2: `usage.cacheReadInputTokens > 0` - observed 2176
 
 ### Verdict
 
@@ -39,7 +39,7 @@ Copy to `runs/<UTC-timestamp>_9-prompt-cache-anthropic-tasks.md` before starting
 ## Result summary
 
 Call 1: HTTP 200. nativeUsage.cache_creation_input_tokens=2176, cache_read_input_tokens=0.
-Call 2: HTTP 200. nativeUsage.cache_read_input_tokens=2176 (equals creation count — full prefix hit).
+Call 2: HTTP 200. nativeUsage.cache_read_input_tokens=2176 (equals creation count - full prefix hit).
 
 Cache creation tokens (call 1): 2176
 

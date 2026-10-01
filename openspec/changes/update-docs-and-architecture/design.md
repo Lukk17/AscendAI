@@ -1,4 +1,4 @@
-# Design — update-docs-and-architecture
+# Design - update-docs-and-architecture
 
 ## Context
 
@@ -16,24 +16,24 @@ The platform's documentation is spread across `docs/architecture/` (monorepo arc
 **Non-Goals:**
 
 - Application code or behavior changes.
-- Rewriting docs the sibling changes already made correct — this reconciles and fills the system-level gaps, it does not redo per-change docs.
+- Rewriting docs the sibling changes already made correct - this reconciles and fills the system-level gaps, it does not redo per-change docs.
 - Marketing/website content.
 
 ## Decisions
 
-### D1 — Run last, document reality, flag the pending
+### D1 - Run last, document reality, flag the pending
 
 This change is scheduled after the others are implemented and archived. Where a dependency has not shipped, the docs describe what exists and mark the rest pending, never describing unshipped behavior as shipped. This keeps the docs honest even if the initiative is delivered in waves.
 
-### D2 — Diagrams in text, kept in version control
+### D2 - Diagrams in text, kept in version control
 
 C4 and request-path diagrams stay as text (Mermaid) so they diff and review in git, per the documentation standard. Two request-path diagrams are the priority because their shape changed most: an authenticated streamed chat turn with RAG sources via the content endpoint, and a document flowing through ingestion/connector into tenant RAG.
 
-### D3 — Counts in badges, not prose
+### D3 - Counts in badges, not prose
 
-Changing numbers (service counts, endpoint counts, capability counts) live in README badges, not in sentences, so they do not silently go stale — matching the documentation standard.
+Changing numbers (service counts, endpoint counts, capability counts) live in README badges, not in sentences, so they do not silently go stale - matching the documentation standard.
 
-### D4 — The documentation map is the completeness check
+### D4 - The documentation map is the completeness check
 
 The root README's documentation map is the single index; the acceptance bar is that every shipped doc is linked from it and every link resolves. This turns "are the docs complete" into a checkable property.
 

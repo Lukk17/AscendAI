@@ -65,7 +65,7 @@ class ChatContextAssemblerMemoryFilteringTest {
     @Test
     @DisplayName("buildSystemMessages skips null SemanticMemoryItem entries in the memory block")
     void buildSystemMessages_NullMemoryItems_SkipsNulls() {
-        // given — list has one null and one real item
+        // given - list has one null and one real item
         SemanticMemoryItem real = new SemanticMemoryItem("id1", USER_ID, "User likes Java", 0.9, Instant.now(), Map.of());
         when(semanticMemoryClient.search(USER_ID, USER_PROMPT, 5, EMBED_PROVIDER))
                 .thenReturn(Arrays.asList(null, real));
@@ -73,7 +73,7 @@ class ChatContextAssemblerMemoryFilteringTest {
         // when
         String result = assembler.buildSystemMessage(USER_ID, USER_PROMPT, EMBED_PROVIDER);
 
-        // then — null item skipped, real item included
+        // then - null item skipped, real item included
         assertThat(result).contains("User likes Java");
     }
 
@@ -105,14 +105,14 @@ class ChatContextAssemblerMemoryFilteringTest {
         // when
         String result = assembler.buildSystemMessage(USER_ID, USER_PROMPT, EMBED_PROVIDER);
 
-        // then — no memory block since all items filtered
+        // then - no memory block since all items filtered
         assertThat(result).doesNotContain("User memory (may be relevant):");
     }
 
     @Test
     @DisplayName("buildSystemMessages produces no memory block when all items have blank text")
     void buildSystemMessages_AllItemsBlankText_ProducesNoMemoryBlock() {
-        // given — only items with blank texts
+        // given - only items with blank texts
         SemanticMemoryItem b1 = new SemanticMemoryItem("id1", USER_ID, "", 0.9, Instant.now(), Map.of());
         SemanticMemoryItem b2 = new SemanticMemoryItem("id2", USER_ID, "  ", 0.8, Instant.now(), Map.of());
         when(semanticMemoryClient.search(USER_ID, USER_PROMPT, 5, EMBED_PROVIDER))
@@ -165,7 +165,7 @@ class ChatContextAssemblerMemoryFilteringTest {
     @Test
     @DisplayName("buildUserMessage does not append context when RAG context is blank string")
     void buildUserMessage_RagContextBlank_DoesNotAppend() {
-        // given — context is empty string (blank) so !context.isBlank() is false
+        // given - context is empty string (blank) so !context.isBlank() is false
         when(ragRetrievalService.retrieve(USER_PROMPT, EMBED_PROVIDER))
                 .thenReturn(new RagRetrievalResult("", List.of(), true));
 

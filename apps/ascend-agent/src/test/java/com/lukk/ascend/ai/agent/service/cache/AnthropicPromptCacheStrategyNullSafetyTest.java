@@ -20,7 +20,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
     @Test
     @DisplayName("recordOutcome handles null promptTokens (uses 0 as fallback)")
     void recordOutcome_NullPromptTokens_UsesZeroFallback() {
-        // given — AnthropicApi.Usage with both cache fields set, but wrapper Usage.getPromptTokens() returns null
+        // given - AnthropicApi.Usage with both cache fields set, but wrapper Usage.getPromptTokens() returns null
         AnthropicApi.Usage native_ = new AnthropicApi.Usage(null, 100, 0, 50);
         Usage usage = new DefaultUsage(null, 100, null, native_);
         ChatResponseMetadata md = ChatResponseMetadata.builder().usage(usage).build();
@@ -34,7 +34,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
     @Test
     @DisplayName("recordOutcome handles null cacheReadInputTokens (logs 0)")
     void recordOutcome_NullCacheReadTokens_LogsZero() {
-        // given — AnthropicApi.Usage with null cacheRead
+        // given - AnthropicApi.Usage with null cacheRead
         AnthropicApi.Usage native_ = new AnthropicApi.Usage(200, 100, 300, null);
         Usage usage = new DefaultUsage(200, 100, 300, native_);
         ChatResponseMetadata md = ChatResponseMetadata.builder().usage(usage).build();
@@ -48,7 +48,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
     @Test
     @DisplayName("recordOutcome handles null cacheCreationInputTokens (logs 0)")
     void recordOutcome_NullCacheCreationTokens_LogsZero() {
-        // given — AnthropicApi.Usage with null cacheCreate
+        // given - AnthropicApi.Usage with null cacheCreate
         AnthropicApi.Usage native_ = new AnthropicApi.Usage(200, 100, null, 50);
         Usage usage = new DefaultUsage(200, 100, 300, native_);
         ChatResponseMetadata md = ChatResponseMetadata.builder().usage(usage).build();
@@ -102,21 +102,21 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
     @Test
     @DisplayName("recordOutcome logs hit=false when cacheReadInputTokens is non-null but zero")
     void recordOutcome_CacheReadTokensZero_LogsHitFalse() {
-        // given — read = 0 (non-null but zero) -> hit = (read != null && read > 0) = false
+        // given - read = 0 (non-null but zero) -> hit = (read != null && read > 0) = false
         AnthropicApi.Usage native_ = new AnthropicApi.Usage(200, 100, 300, 0);
         Usage usage = new DefaultUsage(200, 100, 300, native_);
         ChatResponseMetadata md = ChatResponseMetadata.builder().usage(usage).build();
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then — logs hit=false (cold-start / no cache read)
+        // then - logs hit=false (cold-start / no cache read)
         strategy.recordOutcome("user", response);
     }
 
     @Test
     @DisplayName("recordOutcome uses 0 for prompt tokens when getPromptTokens() returns null (mocked Usage)")
     void recordOutcome_MockedUsageWithNullPromptTokens_UsesZeroFallback() {
-        // given — DefaultUsage converts null to 0 internally; mocked Usage keeps null from getPromptTokens()
+        // given - DefaultUsage converts null to 0 internally; mocked Usage keeps null from getPromptTokens()
         AnthropicApi.Usage native_ = new AnthropicApi.Usage(null, 100, 50, 25);
         Usage usage = mock(Usage.class);
         when(usage.getNativeUsage()).thenReturn(native_);
@@ -126,7 +126,7 @@ class AnthropicPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then — uses 0 for prompt_tokens (null branch of ternary)
+        // then - uses 0 for prompt_tokens (null branch of ternary)
         strategy.recordOutcome("user", response);
     }
 

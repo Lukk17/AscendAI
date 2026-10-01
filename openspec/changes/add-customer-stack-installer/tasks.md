@@ -1,4 +1,4 @@
-# Tasks — add-customer-stack-installer
+# Tasks - add-customer-stack-installer
 
 ## 1. Terraform infrastructure
 

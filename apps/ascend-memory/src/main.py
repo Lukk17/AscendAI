@@ -67,12 +67,12 @@ async def warmup_client() -> None:
     probe and stays True.
     """
 
-    global is_ready  # noqa: PLW0603 — module-level flag inspected by /health/legacy
+    global is_ready  # noqa: PLW0603 - module-level flag inspected by /health/legacy
     logger.info(
         "Starting background warmup of AscendMemoryClient... "
         "Wait for 'Background warmup complete' before sending requests."
     )
-    for attempt in range(1, WARMUP_MAX_ATTEMPTS + 1):  # pragma: no branch — loop always returns inside
+    for attempt in range(1, WARMUP_MAX_ATTEMPTS + 1):  # pragma: no branch - loop always returns inside
         try:
             client = get_memory_client()
             logger.info(f"Performing active connection check (attempt {attempt}/{WARMUP_MAX_ATTEMPTS})...")

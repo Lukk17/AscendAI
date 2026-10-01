@@ -158,7 +158,7 @@ class PromptControllerValidationTest {
     @Test
     @DisplayName("prompt skips compaction provider check when compactionProvider is blank")
     void prompt_CompactionProviderBlank_SkipsCheckAndReturns200() {
-        // when  — blank string is treated as absent
+        // when  - blank string is treated as absent
         ResponseEntity<?> response = controller.prompt("hello", null, null, null, null, null, null, "  ", null, null);
 
         // then
@@ -232,7 +232,7 @@ class PromptControllerValidationTest {
         // given
         when(aiProviderProperties.getProviders()).thenReturn(java.util.Map.of("openai", mock(AiProviderProperties.ProviderConfig.class)));
 
-        // when — known compaction provider + model
+        // when - known compaction provider + model
         ResponseEntity<?> response = controller.prompt("hello", null, null, "openai", "gpt-4o", null, null, "openai", "gpt-4o-mini", TestConstants.DEFAULT_USER_ID);
 
         // then
@@ -242,7 +242,7 @@ class PromptControllerValidationTest {
     @Test
     @DisplayName("prompt logs non-empty document attachment info")
     void prompt_WithNonEmptyDocument_LogsDocumentAttached() {
-        // given — non-null, non-empty document (hits document != null && !document.isEmpty() = true in log)
+        // given - non-null, non-empty document (hits document != null && !document.isEmpty() = true in log)
         MultipartFile document = mock(MultipartFile.class);
         when(document.isEmpty()).thenReturn(false);
 
@@ -256,7 +256,7 @@ class PromptControllerValidationTest {
     @Test
     @DisplayName("prompt logs empty document attachment info")
     void prompt_WithEmptyDocument_LogsEmptyDoc() {
-        // given — non-null but empty document (hits document != null && document.isEmpty() = true)
+        // given - non-null but empty document (hits document != null && document.isEmpty() = true)
         MultipartFile document = mock(MultipartFile.class);
         when(document.isEmpty()).thenReturn(true);
 

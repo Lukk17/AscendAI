@@ -33,14 +33,14 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
     @Test
     @DisplayName("recordOutcome does not throw when PromptTokensDetails is null inside OpenAiApi.Usage")
     void recordOutcome_NullPromptTokensDetails_DoesNotThrow() {
-        // given — OpenAiApi.Usage with null PromptTokensDetails
+        // given - OpenAiApi.Usage with null PromptTokensDetails
         OpenAiApi.Usage native_ = new OpenAiApi.Usage(100, 1024, 1124, null, null);
         Usage usage = new DefaultUsage(1024, 100, 1124, native_);
         ChatResponseMetadata md = ChatResponseMetadata.builder().usage(usage).build();
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then — returns early without logging (cachedTokens == null -> extractCachedTokens returns null)
+        // then - returns early without logging (cachedTokens == null -> extractCachedTokens returns null)
         strategy.recordOutcome("user", response);
     }
 
@@ -55,7 +55,7 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then — logs hit=false
+        // then - logs hit=false
         strategy.recordOutcome("user", response);
     }
 
@@ -76,7 +76,7 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
     @Test
     @DisplayName("recordOutcome uses 0 for prompt tokens when getPromptTokens() returns null (mocked Usage)")
     void recordOutcome_MockedUsageWithNullPromptTokens_UsesZero() {
-        // given — DefaultUsage converts null to 0 internally; mocked Usage keeps null from getPromptTokens()
+        // given - DefaultUsage converts null to 0 internally; mocked Usage keeps null from getPromptTokens()
         OpenAiApi.Usage.PromptTokensDetails details = new OpenAiApi.Usage.PromptTokensDetails(0, 128);
         OpenAiApi.Usage native_ = new OpenAiApi.Usage(100, 1024, 1124, details, null);
         Usage usage = mock(Usage.class);
@@ -87,7 +87,7 @@ class OpenAiPromptCacheStrategyNullSafetyTest {
         ChatResponse response = mock(ChatResponse.class);
         when(response.getMetadata()).thenReturn(md);
 
-        // then — uses 0 for prompt_tokens (null ternary branch)
+        // then - uses 0 for prompt_tokens (null ternary branch)
         strategy.recordOutcome("user", response);
     }
 }

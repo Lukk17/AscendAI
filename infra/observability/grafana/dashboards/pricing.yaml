@@ -3,7 +3,7 @@
 # provider pricing changes. The token-cost dashboard reads these rates via
 # JSON variable references embedded at dashboard-build time.
 #
-# Rates as of 2026-06 — verify at each provider's pricing page before deploying.
+# Rates as of 2026-06 - verify at each provider's pricing page before deploying.
 
 providers:
 

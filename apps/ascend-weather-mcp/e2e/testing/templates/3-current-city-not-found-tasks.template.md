@@ -25,7 +25,7 @@ Copy this file to `../runs/<UTC-timestamp>_3-current-city-not-found-tasks.md` be
 
 - [ ] HTTP 200
 - [ ] `status="city_not_found"`
-- [ ] `message` equals exactly `"Location not found"` (NOT `"City not found: Zzyxxqq"` — that was pre-audit)
+- [ ] `message` equals exactly `"Location not found"` (NOT `"City not found: Zzyxxqq"` - that was pre-audit)
 - [ ] `requestedQuery="Zzyxxqq"`
 - [ ] `location`, `temperature`, `weatherCode`, `wind`, `observedAt` are all `null`
 - [ ] `source="open-meteo"`

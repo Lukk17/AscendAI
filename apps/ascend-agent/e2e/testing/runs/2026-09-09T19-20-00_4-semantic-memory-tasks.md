@@ -8,7 +8,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ### Prerequisites
 
-- [x] Bruno CLI present (`bru --version` returns a version) — 3.4.0
+- [x] Bruno CLI present (`bru --version` returns a version) - 3.4.0
 - [x] ascend-ai-agent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [x] AscendMemory `/health` returns HTTP 200 with `{"status":"ok"}`
 - [x] Qdrant `/healthz` returns HTTP 200
@@ -56,8 +56,8 @@ Run regardless of Run-step verdict. Every command is idempotent.
 Steps 1-3 all returned HTTP 200 and the recall turn (step 3) fully satisfied its three assertions: the response
 content was `"Your name is Luke, and you're a software engineer."`, containing both `Luke` and `software engineer`
 and no refusal phrase, proven only from semantic memory since chat history was wiped between save and recall. The
-step-1 Qdrant scroll returned 2 points (≥ 1, satisfied) but the spec's stricter assertion — that at least one single
-point's payload contains BOTH `Luke` AND `software engineer` — did not hold: mem0 extracted the two facts as two
+step-1 Qdrant scroll returned 2 points (≥ 1, satisfied) but the spec's stricter assertion - that at least one single
+point's payload contains BOTH `Luke` AND `software engineer` - did not hold: mem0 extracted the two facts as two
 separate atomic points (`"My name is Luke"` and `"I am a software engineer"`), and neither point's `data` field
 contains both terms. Because that Expected assertion is literal and unmet, the run is FAIL despite the end-to-end
 recall capability itself working correctly.

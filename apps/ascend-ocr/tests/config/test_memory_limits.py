@@ -53,7 +53,7 @@ class TestDetectMemoryLimitCgroupV1:
         assert detect_memory_limit_mib() == 512.0
 
     def test_unlimited_sentinel_falls_through(self, tmp_path, monkeypatch):
-        # Given — the classic cgroup v1 "no limit" value, 2^63 rounded to the page size
+        # Given - the classic cgroup v1 "no limit" value, 2^63 rounded to the page size
         monkeypatch.setattr(memory_limits, "_CGROUP_V2_MEMORY_MAX_PATH", tmp_path / "no-v2-file")
         limit_file = tmp_path / "memory.limit_in_bytes"
         limit_file.write_text("9223372036854771712")

@@ -8,7 +8,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ### Prerequisites
 
-- [x] Bruno CLI present (`bru --version` returns a version) — 3.4.0
+- [x] Bruno CLI present (`bru --version` returns a version) - 3.4.0
 - [x] AscendAgent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
 - [x] AscendMemory `/health` returns HTTP 200 with `{"status":"ok"}`
 - [x] Qdrant `/healthz` returns HTTP 200
@@ -17,9 +17,9 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ### Reset state
 
-- [x] Cleared Redis `chat:frostySemanticMemoryTest` key — returned 1 (key deleted)
-- [x] Deleted Postgres `chat_history` rows where `user_id = 'frostySemanticMemoryTest'` — DELETE 4
-- [x] Wiped Qdrant `ascend_memory_*` points where `user_id = 'frostySemanticMemoryTest'` — acknowledged
+- [x] Cleared Redis `chat:frostySemanticMemoryTest` key - returned 1 (key deleted)
+- [x] Deleted Postgres `chat_history` rows where `user_id = 'frostySemanticMemoryTest'` - DELETE 4
+- [x] Wiped Qdrant `ascend_memory_*` points where `user_id = 'frostySemanticMemoryTest'` - acknowledged
 
 ### Run
 
@@ -30,11 +30,11 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 ### Expected
 
 - [x] After step 1: HTTP 200
-- [x] After step 1: Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` returns ≥ 1 point — returned 2 points
-- [x] After step 1: at least one Qdrant point's payload contains both `Luke` and `software engineer` — point 1: "User's name is Luke"; point 2: "User is a software engineer"
+- [x] After step 1: Qdrant scroll filtered by `user_id=frostySemanticMemoryTest` returns ≥ 1 point - returned 2 points
+- [x] After step 1: at least one Qdrant point's payload contains both `Luke` and `software engineer` - point 1: "User's name is Luke"; point 2: "User is a software engineer"
 - [x] After step 3: HTTP 200
-- [x] After step 3: Response `content` contains `Luke` — "Your name is Luke, and you're a software engineer."
-- [x] After step 3: Response `content` contains `software engineer` — confirmed
+- [x] After step 3: Response `content` contains `Luke` - "Your name is Luke, and you're a software engineer."
+- [x] After step 3: Response `content` contains `software engineer` - confirmed
 - [x] After step 3: Response `content` is NOT a refusal like "I don't know your name"
 
 ### Verdict
@@ -43,7 +43,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 ## Result summary
 
-HTTP 200 on both steps. Save turn: 3.1s. Qdrant scroll after 5s: 2 points written — "User's name is Luke" and "User is a software engineer". After full Redis+Postgres wipe, recall response: "Your name is Luke, and you're a software engineer." — both required terms present, sourced from semantic memory only. No refusal.
+HTTP 200 on both steps. Save turn: 3.1s. Qdrant scroll after 5s: 2 points written - "User's name is Luke" and "User is a software engineer". After full Redis+Postgres wipe, recall response: "Your name is Luke, and you're a software engineer." - both required terms present, sourced from semantic memory only. No refusal.
 
 Input tokens: 0 (metadata not returned)
 

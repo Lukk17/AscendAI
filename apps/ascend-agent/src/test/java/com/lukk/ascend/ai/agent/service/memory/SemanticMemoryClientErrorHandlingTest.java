@@ -99,7 +99,7 @@ class SemanticMemoryClientErrorHandlingTest {
         when(bodySpec.retrieve()).thenReturn(respSpec);
         when(respSpec.toBodilessEntity()).thenThrow(new HttpClientErrorException(HttpStatus.NOT_FOUND));
 
-        // then — error is logged at warn and swallowed
+        // then - error is logged at warn and swallowed
         assertThatCode(() -> client.wipeUserMemory(USER, EMB)).doesNotThrowAnyException();
     }
 

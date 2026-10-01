@@ -4,11 +4,11 @@
 
 - `GET /api/v1/web/search` with a blank `query` parameter (`query=   `) returns HTTP 400 and a JSON body whose
   `detail` field describes the empty-query failure.
-- `GET /api/v1/web/search` with a missing `query` parameter (`query` omitted entirely) returns HTTP 422 — FastAPI's
+- `GET /api/v1/web/search` with a missing `query` parameter (`query` omitted entirely) returns HTTP 422 - FastAPI's
   default validation error for a missing required query-string parameter.
 - `GET /api/v1/web/search` with a `query` longer than 500 characters returns HTTP 400 and the `detail` field
   mentions the maximum-length constraint.
-- All three rejections short-circuit inside the FastAPI route before any SearXNG call is made — **no outbound
+- All three rejections short-circuit inside the FastAPI route before any SearXNG call is made - **no outbound
   HTTPS to SearXNG or to the public internet is required** to make this test pass.
 
 ## Prerequisites
@@ -57,11 +57,11 @@ bru run "web-hunter/testing/search-overlong-query.yml" --env ascend-local
 
 The three calls return:
 
-- `search-blank-query.yml` — HTTP 400. The JSON body has a `detail` field equal to `"query must not be empty"`.
-- `search-missing-query.yml` — HTTP 422 (FastAPI default for a missing required query parameter). The JSON body
+- `search-blank-query.yml` - HTTP 400. The JSON body has a `detail` field equal to `"query must not be empty"`.
+- `search-missing-query.yml` - HTTP 422 (FastAPI default for a missing required query parameter). The JSON body
   has a top-level `detail` array; at least one entry has `type` equal to `"missing"` and `loc` containing
   `"query"`.
-- `search-overlong-query.yml` — HTTP 400. The JSON body's `detail` field contains the substring
+- `search-overlong-query.yml` - HTTP 400. The JSON body's `detail` field contains the substring
   `"query exceeds maximum length"`.
 
 Per-call duration measured through Bruno on 2026-09-10 was 325 to 362 ms each, with no upstream contacted. A

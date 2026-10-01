@@ -81,7 +81,7 @@ HTTP 200. The JSON-RPC `result` content matches:
 - `location.countryCode` equals `"PL"`.
 - `forecast` is an array of exactly 3 entries.
 - For each entry: `date` matches `yyyy-MM-dd`; `maxTemp` and `minTemp` are finite numbers with
-  `minTemp <= maxTemp`; `weatherCode` is an integer in 0–99.
+  `minTemp <= maxTemp`; `weatherCode` is an integer in 0-99.
 - The `date` values are strictly increasing.
 - `temperatureUnit` equals `"celsius"`.
 - `source` equals `"open-meteo"`.

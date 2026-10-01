@@ -12,7 +12,7 @@ ascend-ai-agent SHALL NOT write user prompt text or attached document content to
 
 ### Requirement: Docker profile disables content-emitting DEBUG levels
 
-`application-docker.yaml` SHALL contain a `logging.level` block setting `org.springframework.ai` and the application package `com.lukk.ascend.ai.agent` to `INFO` (or stricter), so that Spring AI's DEBUG-level request/response logging cannot ship prompt or completion content to stdout — and therefore to Loki — in the container posture. The stale `com.lukk.ai.agent` logger entry in the base `application.yaml` (which does not match the actual package) SHALL be corrected to the real package name.
+`application-docker.yaml` SHALL contain a `logging.level` block setting `org.springframework.ai` and the application package `com.lukk.ascend.ai.agent` to `INFO` (or stricter), so that Spring AI's DEBUG-level request/response logging cannot ship prompt or completion content to stdout - and therefore to Loki - in the container posture. The stale `com.lukk.ai.agent` logger entry in the base `application.yaml` (which does not match the actual package) SHALL be corrected to the real package name.
 
 #### Scenario: Container posture logs no model payloads
 
@@ -27,7 +27,7 @@ ascend-ai-agent SHALL NOT write user prompt text or attached document content to
 
 ### Requirement: Platform-wide redaction convention covers all six services
 
-A written redaction convention SHALL be documented (in `docs/COMPLIANCE.md`) and applied across ascend-ai-agent, ascend-weather-mcp, ascend-audio-scribe, ascend-web-hunter, AscendMemory, and ascend-ocr: user-supplied content — prompts, documents, transcripts, memory text, scraped page content, OCR output — is never passed as a log argument; logs carry lengths, counts, hashes, and identifiers instead. Each Python service's `[ServiceName]`-prefixed logging SHALL be audited against the convention as part of this change and any content leakage fixed.
+A written redaction convention SHALL be documented (in `docs/COMPLIANCE.md`) and applied across ascend-ai-agent, ascend-weather-mcp, ascend-audio-scribe, ascend-web-hunter, AscendMemory, and ascend-ocr: user-supplied content - prompts, documents, transcripts, memory text, scraped page content, OCR output - is never passed as a log argument; logs carry lengths, counts, hashes, and identifiers instead. Each Python service's `[ServiceName]`-prefixed logging SHALL be audited against the convention as part of this change and any content leakage fixed.
 
 #### Scenario: Python service logs metadata, not content
 

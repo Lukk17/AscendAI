@@ -191,7 +191,7 @@ class SemanticMemoryClientTest {
         when(bodySpecMock.body(anyMap())).thenReturn(bodySpecMock);
         when(bodySpecMock.retrieve()).thenReturn(responseSpecMock);
 
-        // then — no exception
+        // then - no exception
         semanticMemoryClient.insertMemory(DEFAULT_USER_ID, FACT, EMBEDDING_PROVIDER);
     }
 

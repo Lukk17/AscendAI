@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
  * <p>Strategy: attach a Logback {@link ListAppender} to the {@code StartupLogConfig}
  * logger before re-publishing the readiness event. The original event already fired
  * during context start (before the appender attached), so we re-fire it inside the
- * test and capture the second emission. The handler is idempotent — it just logs.
+ * test and capture the second emission. The handler is idempotent - it just logs.
  */
 class StartupBannerIT extends TestcontainersBase {
 
@@ -72,7 +72,7 @@ class StartupBannerIT extends TestcontainersBase {
                 .reduce("", (a, b) -> a + "\n" + b);
 
         // Banner must be emitted with the four backing-service labels and the MCP servers section.
-        // We assert structure, not connectivity — BackingServicesIT covers actual reachability,
+        // We assert structure, not connectivity - BackingServicesIT covers actual reachability,
         // and this IT must not flake when a singleton container's port races the JVM's resolver.
         assertThat(banner).contains("Application '");
         assertThat(banner).contains("Postgres:");
@@ -91,7 +91,7 @@ class StartupBannerIT extends TestcontainersBase {
                 "      Aggregate: 1/2 connected");
         assertThat(banner).doesNotContain("MCP tools");
 
-        // Each backing-service line carries one of the status markers — this guards against
+        // Each backing-service line carries one of the status markers - this guards against
         // an accidental refactor that drops the [Connected]/[FAILED]/[Warning]/[Disabled] tag.
         assertThat(banner).containsPattern("(\\[Connected]|\\[FAILED]|\\[Warning]|\\[Disabled])");
 

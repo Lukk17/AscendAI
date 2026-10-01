@@ -1,4 +1,4 @@
-# Tasks — enhance-web-search-extraction-and-tiers
+# Tasks - enhance-web-search-extraction-and-tiers
 
 ## 1. Tier ladder restructure
 
@@ -24,7 +24,7 @@
 
 ## 4. Schema-guided extraction and self-healing recipes
 
-- [ ] 4.1 Add a schema-extraction read mode (REST + MCP): caller supplies a JSON schema, service returns schema-valid JSON via a configurable OpenAI-compatible endpoint (`EXTRACTION_LLM_BASE_URL` / model — local, ascend-ai-agent proxy, or cloud)
+- [ ] 4.1 Add a schema-extraction read mode (REST + MCP): caller supplies a JSON schema, service returns schema-valid JSON via a configurable OpenAI-compatible endpoint (`EXTRACTION_LLM_BASE_URL` / model - local, ascend-ai-agent proxy, or cloud)
 - [ ] 4.2 On first extraction per domain, persist LLM-emitted CSS/XPath selectors as a recipe (store with TTL); replay selectors on subsequent extractions and skip the model
 - [ ] 4.3 Validate every replay against the caller's schema; on drift (empty/type-mismatched fields) regenerate the recipe
 - [ ] 4.4 Tests: schema extraction returns schema-valid JSON; second call for the same domain is model-free (recipe replay); induced drift regenerates the recipe

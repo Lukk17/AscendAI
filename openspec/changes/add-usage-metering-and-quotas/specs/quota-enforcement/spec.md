@@ -1,4 +1,4 @@
-# quota-enforcement — Delta Specification
+# quota-enforcement - Delta Specification
 
 ## ADDED Requirements
 

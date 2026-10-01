@@ -1,4 +1,4 @@
-# Tasks — Harden Cloud Deployment
+# Tasks - Harden Cloud Deployment
 
 ## 1. Port bindings and compose mechanics
 
@@ -11,7 +11,7 @@
 ## 2. Edge gateway
 
 - [ ] 2.1 Create `gateway/Caddyfile`: site block on `{$ASCEND_DOMAIN:localhost}`, reverse_proxy to `ascend-agent:9917`, forwarded headers on, commented reserved routes for Keycloak (`/auth/*` path form and `auth.` subdomain form, per design D2)
-- [ ] 2.2 Add the `gateway` service to `compose.yaml`: pinned `caddy:2.x` image, ports `"80:80"` and `"443:443"` (all interfaces — the one exception to task 1.1), Caddyfile + cert-storage volume mounts, `ASCEND_DOMAIN` env, healthcheck, restart policy, logging anchor
+- [ ] 2.2 Add the `gateway` service to `compose.yaml`: pinned `caddy:2.x` image, ports `"80:80"` and `"443:443"` (all interfaces - the one exception to task 1.1), Caddyfile + cert-storage volume mounts, `ASCEND_DOMAIN` env, healthcheck, restart policy, logging anchor
 - [ ] 2.3 Add a commented, operator-gated Caddy route for Grafana (disabled by default per design D8)
 - [ ] 2.4 Verify locally: `docker compose up -d gateway` with `ASCEND_DOMAIN` unset serves `https://localhost` from Caddy's internal CA; `curl -k https://localhost/actuator/health` proxies through to ascend-ai-agent and returns 200
 - [ ] 2.5 Coordinate with `add-auth-and-identity`: note in that change's tasks that uncommenting the Keycloak route in `gateway/Caddyfile` is part of its Keycloak wiring
@@ -34,7 +34,7 @@
 - [ ] 4.3 Add `profiles: ["captcha-intervention"]` to `ngrok-ascend-web-hunter`; make `PUBLIC_VNC_URL` handling in `ascend-web-hunter` tolerate the ngrok service being absent
 - [ ] 4.4 Verify: default `docker compose up` creates no ngrok container, `/audio` is an empty named volume, and a `file:///audio/x.mp3` MCP request is rejected; with the owner's `.env` lines set, Desktop-file transcription works again
 
-## 5. Container hardening — ascend-web-hunter
+## 5. Container hardening - ascend-web-hunter
 
 - [ ] 5.1 Add `security/chromium-seccomp.json` (Chromium seccomp profile permitting user-namespace clone/unshare/setns per design D5) to the repo
 - [ ] 5.2 In `compose.ascend-web-hunter.yaml`, remove `cap_add: SYS_ADMIN` from `ascend-web-hunter`; add `security_opt: ["seccomp=./security/chromium-seccomp.json"]` and `init: true`
@@ -62,7 +62,7 @@
 
 ## 9. End-to-end verification
 
-- [ ] 9.1 Fresh-clone rehearsal: clean checkout, copy `.env.example` → `.env`, fill the two required secrets, `docker compose up -d --build` — full stack healthy, all documented `localhost:<port>` endpoints respond, Bruno smoke request to ascend-ai-agent succeeds
+- [ ] 9.1 Fresh-clone rehearsal: clean checkout, copy `.env.example` → `.env`, fill the two required secrets, `docker compose up -d --build` - full stack healthy, all documented `localhost:<port>` endpoints respond, Bruno smoke request to ascend-ai-agent succeeds
 - [ ] 9.2 From a second machine (or the VM's public interface), port-scan the host: only 80/443 open; direct connections to every internal service port fail; `https://<domain-or-localhost>` reaches ascend-ai-agent through the gateway
 - [ ] 9.3 Grafana requires login; Prometheus lifecycle endpoint rejected; repository grep confirms no committed working credential remains (old SearXNG key, `admin`/`password`, `postgres`/`local` as literals)
 - [ ] 9.4 Run the e2e suite (`apps/ascend-agent/e2e/`) against the hardened local stack to confirm no capability regressed

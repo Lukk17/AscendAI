@@ -37,7 +37,7 @@ Creating a tenant SHALL provision a Keycloak group `/tenants/{tenantId}` carryin
 
 ### Requirement: Suspended tenant is refused fail-closed
 
-A tenant's status SHALL be `ACTIVE` or `SUSPENDED`. When the resolved tenant for a request is `SUSPENDED`, every data-plane operation (chat, ingestion, RAG retrieval, memory, source download) SHALL be refused with HTTP 403 at tenant-context resolution — a single enforcement point layered onto the fail-closed resolver from `add-tenant-isolation`. Suspending a tenant SHALL also disable its Keycloak users so new logins fail; resuming SHALL restore both.
+A tenant's status SHALL be `ACTIVE` or `SUSPENDED`. When the resolved tenant for a request is `SUSPENDED`, every data-plane operation (chat, ingestion, RAG retrieval, memory, source download) SHALL be refused with HTTP 403 at tenant-context resolution - a single enforcement point layered onto the fail-closed resolver from `add-tenant-isolation`. Suspending a tenant SHALL also disable its Keycloak users so new logins fail; resuming SHALL restore both.
 
 #### Scenario: Suspended tenant cannot use the data plane
 

@@ -289,7 +289,7 @@ async def test_clear_session_redis_error_falls_back_to_memory_result():
 @pytest.mark.asyncio
 async def test_schemeless_url_resolves_to_same_apex_as_scheme_qualified():
     """Security: `evil.com/path` (no scheme) must produce the same key as
-    `https://evil.com/path` — otherwise an attacker can poison a parallel bucket
+    `https://evil.com/path` - otherwise an attacker can poison a parallel bucket
     with a literal `evil.com/path` key that the legitimate `evil.com` lookup
     will never read back, creating a confused-deputy."""
     manager = _fresh_manager()

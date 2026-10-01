@@ -1,4 +1,4 @@
-## 1. Spec 6 — tiered extraction coverage
+## 1. Spec 6 - tiered extraction coverage
 
 - [x] 1.1 Write `apps/ascend-web-hunter/e2e/testing/6-tiered-scraping-test.md` from the `test-spec` artifact, with the six-section structure (What this verifies / Prerequisites / Reset state / Run / Expected / Fixtures).
 - [x] 1.2 Map each gated row to the tier it forces: row 1 `en.wikipedia.org/wiki/Web_scraping` for curl_cffi, row 2 `www.scrapingcourse.com/cloudflare-challenge` for FlareSolverr, row 3 `quotes.toscrape.com/js/` for a browser tier.
@@ -7,7 +7,7 @@
 - [x] 1.5 Harden row 3's assertion beyond the proposal's wording. The shipped spec asserts the canary phrase AND that the serving `mode` names a browser tier, because the phrase does appear inside an inline `<script>` block in the raw markup, so a raw-HTML absence check alone was not the proof it claimed to be.
 - [x] 1.6 Record the scrapingcourse.com per-address cool-down in the spec, with the verbatim FlareSolverr timeout line, so a row 2 failure caused by rate limiting is not read as a stack defect.
 
-## 2. Spec 7 — authenticated and real-world coverage
+## 2. Spec 7 - authenticated and real-world coverage
 
 - [x] 2.1 Write `apps/ascend-web-hunter/e2e/testing/7-authenticated-realworld-scraping-test.md` covering both parts.
 - [x] 2.2 Part 1: build the difficulty-graded matrix with per-row expected verdicts, gating the stable canaries and leaving live sites best-effort on which branch fires.

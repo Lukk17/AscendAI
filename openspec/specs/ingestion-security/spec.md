@@ -12,7 +12,7 @@ The ingestion controller SHALL sanitize the user-supplied filename before using 
 #### Scenario: Path-traversal attempt is neutralized
 
 - **WHEN** a user uploads a file named `../../etc/passwd.txt`
-- **THEN** the stored S3 key contains `_.._.._etc_passwd.txt` (or equivalent) — no `/` separators or leading dots survive
+- **THEN** the stored S3 key contains `_.._.._etc_passwd.txt` (or equivalent) - no `/` separators or leading dots survive
 - **AND** the upload does NOT write outside its configured prefix
 
 #### Scenario: Unicode and control characters

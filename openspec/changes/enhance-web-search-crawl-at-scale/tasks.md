@@ -1,4 +1,4 @@
-# Tasks — enhance-web-search-crawl-at-scale
+# Tasks - enhance-web-search-crawl-at-scale
 
 ## 1. Crawl job API and result store
 

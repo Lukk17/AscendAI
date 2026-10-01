@@ -122,12 +122,12 @@ SECONDS`) is unchanged by any of this; Read 2 above already proved it answers in
 
 ## Related
 
-- `src/reader/cloudflare/cookie_manager.py` — `PRODUCED_BY_FLARESOLVERR`, `PRODUCED_BY_NOVNC`,
+- `src/reader/cloudflare/cookie_manager.py` - `PRODUCED_BY_FLARESOLVERR`, `PRODUCED_BY_NOVNC`,
   `PRODUCED_BY_LOGIN_SEED`, `PRODUCED_BY_UNKNOWN`, `save_storage_state`, `save_flat_cookies`,
   `get_stored_session_producer`.
-- `src/reader/web_reader.py` — `_select_strategies`, `_browser_tiers`.
-- `src/reader/strategies/flaresolverr_strategy.py` — the stored-cookie injection this ADR's D1 related check
+- `src/reader/web_reader.py` - `_select_strategies`, `_browser_tiers`.
+- `src/reader/strategies/flaresolverr_strategy.py` - the stored-cookie injection this ADR's D1 related check
   confirmed already worked, and the `produced_by` tag it now writes.
-- `src/reader/strategies/novnc_strategy.py` — `_poll_captcha`, `_poll_login`, both now tagging `PRODUCED_BY_NOVNC`.
+- `src/reader/strategies/novnc_strategy.py` - `_poll_captcha`, `_poll_login`, both now tagging `PRODUCED_BY_NOVNC`.
 - [ADR-002](ADR-002-cloudflare-cookie-persistence-redis.md), the session store this ADR extends.
 - [ADR-003](ADR-003-novnc-ngrok-captcha-intervention.md), the NoVNC tier whose captures this ADR tags.

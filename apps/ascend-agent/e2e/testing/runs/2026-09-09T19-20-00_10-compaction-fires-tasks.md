@@ -13,7 +13,7 @@ Copy to `runs/<UTC-timestamp>_10-compaction-fires-tasks.md` before starting.
 - [x] Postgres responds to `SELECT 1`
 - [x] Redis `PING` returns `PONG`
 - [x] Seed scripts `seed-compaction-fires.sql` + `seed-compaction-fires.redis` exist
-- [x] Default compaction config in effect (`enabled=true`, `turn-trigger=20`, `keep-recent-turns=8`) — actuator configprops not exposed, trusting `application.yaml` defaults per spec
+- [x] Default compaction config in effect (`enabled=true`, `turn-trigger=20`, `keep-recent-turns=8`) - actuator configprops not exposed, trusting `application.yaml` defaults per spec
 
 ### Reset state
 
