@@ -54,12 +54,12 @@ class TestOcrTextLine:
         assert line.confidence == pytest.approx(0.0)
 
     def test_confidence_above_one_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             _create_text_line(confidence=1.5)
 
     def test_confidence_below_zero_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             _create_text_line(confidence=-0.1)
 
@@ -95,7 +95,7 @@ class TestOcrPageResult:
         assert len(page.lines) == 0
 
     def test_page_number_must_be_positive(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             OcrPageResult(page_number=0, lines=[])
 
@@ -120,7 +120,7 @@ class TestOcrJsonResponse:
         assert response.processing_time_seconds == pytest.approx(1.5)
 
     def test_invalid_language_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             OcrJsonResponse(
                 filename="x.png",
@@ -200,7 +200,7 @@ class TestReadinessResponse:
         }
         fields[field] = -1
 
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             ReadinessResponse.model_validate(fields)
 
@@ -235,27 +235,27 @@ class TestJobRecord:
 
     @pytest.mark.parametrize("state", ["succeeded", "failed", "cancelled"])
     def test_the_three_finished_states_are_terminal(self, state):
-        # Then
+        # When / Then
         assert _job_record(state=state).is_terminal is True
         assert state in TERMINAL_JOB_STATES
 
     @pytest.mark.parametrize("state", ["waiting", "running"])
     def test_work_still_in_flight_is_not_terminal(self, state):
-        # Then
+        # When / Then
         assert _job_record(state=state).is_terminal is False
 
     def test_a_state_the_service_never_issues_is_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             _job_record(state="paused")
 
     def test_an_identifier_that_is_not_shaped_like_one_is_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             _job_record(job_id="../../etc/passwd")
 
     def test_a_document_with_no_pages_is_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             _job_record(page_count=0)
 
@@ -284,7 +284,7 @@ class TestJobRecord:
         assert restored.quality == "high"
 
     def test_a_quality_mode_the_service_never_offers_is_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             _job_record(quality="ultra")
 
@@ -309,12 +309,12 @@ class TestJobRecord:
         assert restored.straighten is False
 
     def test_a_straighten_value_that_is_not_a_boolean_is_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             _job_record(straighten="sometimes")
 
     def test_only_the_reasons_that_learned_nothing_about_the_document_are_retryable(self):
-        # Then
+        # When / Then
         assert sorted(RETRYABLE_FAILURE_REASONS) == ["RESULT_STORE_UNAVAILABLE", "SERVICE_RESTARTED"]
 
 
@@ -336,7 +336,7 @@ class TestJobResponses:
         assert submitted.status_url.startswith("/v1/ocr/jobs/")
 
     def test_a_hint_of_zero_seconds_is_rejected(self):
-        # Then - a hint must ask the caller to wait, never to ask again immediately
+        # When / Then - a hint must ask the caller to wait, never to ask again immediately
         with pytest.raises(ValueError):
             JobSubmitResponse(
                 job_id=new_job_id(),
@@ -434,7 +434,7 @@ class TestJobResponses:
 
     @pytest.mark.parametrize("state", ["succeeded", "failed", "cancelled"])
     def test_a_finished_state_cannot_appear_in_the_listing(self, state):
-        # Then
+        # When / Then
         with pytest.raises(ValueError):
             JobListEntry(
                 job_id=new_job_id(),

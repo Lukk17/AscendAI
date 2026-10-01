@@ -187,5 +187,5 @@ class TestDecompressionBombGuard:
         assert Image.MAX_IMAGE_PIXELS == 123
 
     def test_it_is_applied_when_the_renderer_is_imported(self):
-        # Then: the worker process imports the renderer and nothing else sets it there
+        # When / Then: the worker process imports the renderer and nothing else sets it there
         assert Image.MAX_IMAGE_PIXELS == settings.OCR_MAX_SOURCE_PIXELS

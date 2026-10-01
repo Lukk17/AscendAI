@@ -28,39 +28,39 @@ from src.observability.metrics import (
 
 class TestMetricRegistration:
     def test_ocr_duration_has_expected_labels(self):
-        # Then
+        # When / Then
         assert OCR_DURATION_SECONDS._labelnames == ("surface", "language")
 
     def test_ocr_requests_has_expected_labels(self):
-        # Then
+        # When / Then
         assert OCR_REQUESTS_TOTAL._labelnames == ("surface", "language")
 
     def test_ocr_errors_has_expected_labels(self):
-        # Then
+        # When / Then
         assert OCR_ERRORS_TOTAL._labelnames == ("error_code", "surface")
 
     def test_engine_cache_evictions_has_expected_labels(self):
-        # Then - the cache is keyed by the model pair, so the label names the engine
+        # When / Then - the cache is keyed by the model pair, so the label names the engine
         assert ENGINE_CACHE_EVICTIONS_TOTAL._labelnames == ("engine",)
 
     def test_engine_warmup_has_expected_labels(self):
-        # Then
+        # When / Then
         assert ENGINE_WARMUP_DURATION_SECONDS._labelnames == ("language",)
 
     def test_mcp_download_has_expected_labels(self):
-        # Then
+        # When / Then
         assert MCP_DOWNLOAD_DURATION_SECONDS._labelnames == ("outcome",)
 
 
 class TestRequestLanguageLabel:
     @pytest.mark.parametrize("language", ["en", "pl", "japan"])
     def test_a_supported_language_is_its_own_label(self, language):
-        # Then
+        # When / Then
         assert request_language_label(language) == language
 
     @pytest.mark.parametrize("language", ["korean", "ru", "xx", "not-a-language-at-all"])
     def test_anything_refused_shares_one_fixed_label(self, language):
-        # Then: a caller cannot mint label values
+        # When / Then: a caller cannot mint label values
         assert request_language_label(language) == UNSUPPORTED_LANGUAGE_LABEL == "unsupported"
 
 
@@ -87,7 +87,7 @@ class TestMetricRecording:
 
 class TestPrometheusMultiprocessMode:
     def test_multiproc_dir_env_var_points_to_existing_directory(self):
-        # Then. src/__init__.py must set this, and create the directory, before
+        # When / Then. src/__init__.py must set this, and create the directory, before
         # prometheus_client is imported anywhere in the process: otherwise counters
         # incremented in the OCR worker process never reach the main process's own
         # /metrics scrape (see src/__init__.py for the full rationale).
@@ -95,14 +95,14 @@ class TestPrometheusMultiprocessMode:
         assert os.path.isdir(multiproc_dir)
 
     def test_value_class_is_multiprocess_backed(self):
-        # Then. Confirms the env var above was set before prometheus_client.values was
+        # When / Then. Confirms the env var above was set before prometheus_client.values was
         # first imported, since ValueClass is chosen once, at that import time.
         assert prometheus_values.ValueClass._multiprocess is True
 
 
 class TestIsEngineWarm:
     def test_false_for_language_never_observed(self):
-        # Then - no worker has ever called warm_up_engine for this language, so its
+        # When / Then - no worker has ever called warm_up_engine for this language, so its
         # count sample doesn't exist in any multiprocess file yet.
         assert is_engine_warm("cold-probe-never-observed") is False
 
@@ -111,21 +111,21 @@ class TestIsEngineWarm:
         # only calls .observe() after _get_engine() returns without raising.
         ENGINE_WARMUP_DURATION_SECONDS.labels(language="warm-probe").observe(1.0)
 
-        # Then
+        # When / Then
         assert is_engine_warm("warm-probe") is True
 
     def test_false_when_only_a_different_language_warmed_up(self):
         # Given
         ENGINE_WARMUP_DURATION_SECONDS.labels(language="warm-probe-pl").observe(1.0)
 
-        # Then - the default language never warmed, so it stays not-ready even though
+        # When / Then - the default language never warmed, so it stays not-ready even though
         # some other language did
         assert is_engine_warm("cold-probe-different-language") is False
 
 
 class TestJobMetrics:
     def test_job_outcomes_are_counted_by_terminal_state(self):
-        # Then
+        # When / Then
         assert JOBS_TOTAL._labelnames == ("outcome",)
 
     @pytest.mark.parametrize("outcome", ["succeeded", "failed", "cancelled"])
@@ -160,7 +160,7 @@ class TestJobMetrics:
         assert JOB_QUEUE_PAGES._value.get() == 0
 
     def test_waiting_work_is_reported_only_by_the_job_queue_gauges(self):
-        # Given
+        # When
         declared = _declared_metric_names()
 
         # Then: nothing counts waiters on the admission gate, whose only client is the job runner
@@ -168,7 +168,7 @@ class TestJobMetrics:
         assert {"ascendocr_job_queue_documents", "ascendocr_job_queue_pages"} <= declared
 
     def test_the_wait_is_measured_only_in_the_job_queue(self):
-        # Given
+        # When
         declared = _declared_metric_names()
 
         # Then: the admission gate's wait is not timed, because the runner never waits on it

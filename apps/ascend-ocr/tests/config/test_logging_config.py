@@ -335,7 +335,7 @@ class TestMcpTransportLoggerRedaction:
 
 class TestColorFormatDefaults:
     def test_both_ids_default_to_a_dash(self):
-        # Then
+        # When / Then
         assert COLOR_FORMAT_DEFAULTS == {"correlation_id": ABSENT_FIELD, "mcp_session_id": ABSENT_FIELD}
 
 

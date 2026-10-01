@@ -273,7 +273,7 @@ class TestSubmitJob:
     async def test_a_lang_query_parameter_is_ignored_in_favour_of_the_default(
         self, client: AsyncClient, store: JobStore
     ) -> None:
-        # Given - `lang` sent as a query parameter rather than a multipart form field.
+        # When - `lang` sent as a query parameter rather than a multipart form field.
         # FastAPI only binds a `Form()`-marked parameter from the request body, so this
         # must be silently dropped and DEFAULT_LANGUAGE used instead.
         response = await client.post(

@@ -74,15 +74,15 @@ async def drain_until_terminal(runner: JobRunner, store: JobStore, job_id: str) 
 
 class TestPollHint:
     def test_the_hint_is_a_tenth_of_the_allowed_time_still_ahead(self):
-        # Then
+        # When / Then
         assert poll_hint_seconds(180.0) == pytest.approx(18.0)
 
     def test_the_hint_never_asks_for_more_than_once_a_second(self):
-        # Then
+        # When / Then
         assert poll_hint_seconds(0.0) == pytest.approx(1.0)
 
     def test_the_hint_never_leaves_a_finished_result_sitting(self):
-        # Then
+        # When / Then
         assert poll_hint_seconds(100_000.0) == pytest.approx(30.0)
 
 
@@ -100,7 +100,7 @@ class TestAdmission:
         for _ in range(2):
             runner.admit(make_record(page_count=1))
 
-        # Then
+        # When / Then
         with pytest.raises(QueueFullError, match="documents are already waiting"):
             runner.reserve(1)
 
@@ -111,7 +111,7 @@ class TestAdmission:
         monkeypatch.setattr(settings, "OCR_JOB_QUEUE_MAX_PAGES", 10)
         runner.admit(make_record(page_count=8))
 
-        # Then
+        # When / Then
         with pytest.raises(QueueFullError, match="queue bound of 10"):
             runner.reserve(3)
 
@@ -138,7 +138,7 @@ class TestAdmission:
         monkeypatch.setattr(settings, "OCR_JOB_QUEUE_MAX_DOCUMENTS", 1)
         runner.reserve(1)
 
-        # Then
+        # When / Then
         with pytest.raises(QueueFullError):
             runner.reserve(1)
 
@@ -164,11 +164,11 @@ class TestAdmission:
         start_running(runner, running)
         write_progress(running.job_id, 3)
 
-        # Then
+        # When / Then
         assert runner.pages_pending() == 7
 
     def test_a_finished_running_document_leaves_no_pages_pending(self, runner: JobRunner) -> None:
-        # Then
+        # When / Then
         assert runner.pages_pending() == 0
 
 
@@ -185,7 +185,7 @@ class TestQueueView:
         runner.admit(first_waiting)
         runner.admit(second_waiting)
 
-        # Then
+        # When / Then
         assert runner.position_of(running.job_id) == 0
         assert runner.position_of(first_waiting.job_id) == 1
         assert runner.position_of(second_waiting.job_id) == 2
@@ -204,7 +204,7 @@ class TestQueueView:
         runner.admit(first_waiting)
         runner.admit(second_waiting)
 
-        # Then
+        # When / Then
         assert runner.pages_ahead_of(running.job_id) == 0
         assert runner.pages_ahead_of(first_waiting.job_id) == 3
         assert runner.pages_ahead_of(second_waiting.job_id) == 5
@@ -224,7 +224,7 @@ class TestQueueView:
         small = settings.page_allowance_seconds(settings.model_pair("en"))
         server = settings.page_allowance_seconds(settings.model_pair(off_family_language))
 
-        # Then
+        # When / Then
         assert runner.seconds_remaining_for(running.job_id) == pytest.approx(3 * small)
         assert runner.seconds_remaining_for(russian.job_id) == pytest.approx(3 * small + 2 * server)
         assert runner.seconds_remaining_for(english.job_id) == pytest.approx(6 * small + 2 * server)
@@ -234,7 +234,7 @@ class TestQueueView:
         # Given
         runner.admit(make_record(page_count=2))
 
-        # Then
+        # When / Then
         assert runner.pages_ahead_of("unknown-identifier--") == 2
         assert runner.seconds_remaining_for("unknown-identifier--") == 0.0
 
@@ -245,7 +245,7 @@ class TestQueueView:
         runner.admit(waiting)
         write_progress(waiting.job_id, 2)
 
-        # Then — a queued document has read nothing, whatever an old progress file says
+        # When / Then — a queued document has read nothing, whatever an old progress file says
         assert runner.pages_done_of(waiting.job_id) == 0
 
     def test_readiness_counters_report_what_is_waiting_and_running(self, runner: JobRunner) -> None:
@@ -253,7 +253,7 @@ class TestQueueView:
         runner.admit(make_record(page_count=1))
         runner.admit(make_record(page_count=1))
 
-        # Then
+        # When / Then
         assert runner.documents_waiting() == 2
         assert runner.documents_running() == 0
         assert runner.pages_waiting() == 2
@@ -273,6 +273,7 @@ class TestReadingADocument:
 
             return await original_upload(job_id, markdown)
 
+        # When
         with (
             patch.object(results, "upload", capture),
             patch(
@@ -299,6 +300,7 @@ class TestReadingADocument:
         record = await queue_job(runner, store, page_count=4, submitted_at=time.time() - 5_000.0, language=language)
         dispatch = AsyncMock(return_value=OcrResponseFactory.with_single_line())
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await drain_until_terminal(runner, store, record.job_id)
 
@@ -314,6 +316,7 @@ class TestReadingADocument:
         runner.admit(record)
         dispatch = AsyncMock(return_value=OcrResponseFactory.with_single_line())
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await drain_until_terminal(runner, store, record.job_id)
 
@@ -329,6 +332,7 @@ class TestReadingADocument:
         runner.admit(record)
         dispatch = AsyncMock(return_value=OcrResponseFactory.with_single_line())
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await drain_until_terminal(runner, store, record.job_id)
 
@@ -345,6 +349,7 @@ class TestReadingADocument:
         runner.admit(record)
         dispatch = AsyncMock(return_value=OcrResponseFactory.with_single_line())
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await drain_until_terminal(runner, store, record.job_id)
 
@@ -372,6 +377,7 @@ class TestReadingADocument:
 
             return OcrResponseFactory.with_single_line()
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await runner.start()
             try:
@@ -389,6 +395,7 @@ class TestReadingADocument:
         # Given
         record = await queue_job(runner, store)
 
+        # When
         with patch(
             "src.service.job_runner.dispatch_ocr_request",
             AsyncMock(return_value=OcrResponseFactory.with_single_line()),
@@ -414,6 +421,7 @@ class TestDispatchOutcomes:
         # Given
         record = await queue_job(runner, store)
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", AsyncMock(side_effect=failure)):
             finished = await drain_until_terminal(runner, store, record.job_id)
 
@@ -430,6 +438,7 @@ class TestDispatchOutcomes:
         # Given
         record = await queue_job(runner, store)
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", AsyncMock(side_effect=RuntimeError("boom"))):
             finished = await drain_until_terminal(runner, store, record.job_id)
 
@@ -445,6 +454,7 @@ class TestDispatchOutcomes:
         results.upload_error = ResultStoreUnavailableError("could not write the result")
         record = await queue_job(runner, store)
 
+        # When
         with patch(
             "src.service.job_runner.dispatch_ocr_request",
             AsyncMock(return_value=OcrResponseFactory.with_single_line()),
@@ -465,6 +475,7 @@ class TestDispatchOutcomes:
         store.delete_input(record.job_id)
         dispatch = AsyncMock()
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             finished = await drain_until_terminal(runner, store, record.job_id)
 
@@ -484,6 +495,7 @@ class TestDispatchOutcomes:
 
             raise OcrProcessingError("OCR worker process failed")
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             finished = await drain_until_terminal(runner, store, record.job_id)
 
@@ -505,6 +517,7 @@ class TestDispatchOutcomes:
 
             return OcrResponseFactory.with_single_line()
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await runner.start()
             try:
@@ -526,6 +539,7 @@ class TestDispatchOutcomes:
         await store.delete(record)
         dispatch = AsyncMock(return_value=OcrResponseFactory.with_single_line())
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await drain_until_terminal(runner, store, second.job_id)
 
@@ -539,6 +553,7 @@ class TestDispatchOutcomes:
         store.cancel(record)
         dispatch = AsyncMock(return_value=OcrResponseFactory.with_single_line())
 
+        # When
         with patch("src.service.job_runner.dispatch_ocr_request", dispatch):
             await drain_until_terminal(runner, store, second.job_id)
 

@@ -68,6 +68,8 @@ class TestRenderMarkdown:
     def test_markdown_control_characters_in_the_text_are_carried_verbatim(self):
         # Given — the document's own text, not something to escape: the agent indexes
         # whatever this returns, so altering the characters alters the document
+
+        # When
         markdown = render_markdown(_response(["# not a heading", "- not a list", "**bold** | pipe"]))
 
         # Then

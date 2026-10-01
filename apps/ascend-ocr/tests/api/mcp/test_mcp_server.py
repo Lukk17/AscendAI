@@ -279,11 +279,15 @@ class TestOcrSubmit:
 class TestOcrSubmitErrorCodes:
     async def test_unsafe_uri_error_code_in_message(self):
         # Given a URI with embedded credentials (triggers UnsafeUriError before any fetch)
+
+        # When / Then
         with pytest.raises(ToolError, match=r"^UNSAFE_URI: "):
             await ocr_submit("http://user:pass@example.com/x.png", lang="en")
 
     async def test_unsupported_scheme_error_code_in_message(self):
         # Given a bare ftp:// URI (not http/https/file - triggers UnsafeUriError for scheme)
+
+        # When / Then
         with pytest.raises(ToolError, match=r"^UNSAFE_URI: "):
             await ocr_submit("ftp://example.com/x.png", lang="en")
 
@@ -291,6 +295,8 @@ class TestOcrSubmitErrorCodes:
     async def test_unsupported_file_type_error_code_in_message(self, _validate_host_mock):
         # Given a URL that returns non-image bytes (plain text), sniff_mime raises
         session = _FakeSession(_FakeResponse(status=200, body=b"plain text data"))
+
+        # When / Then
         with (
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(ToolError, match=r"^UNSUPPORTED_FILE_TYPE: "),
@@ -309,6 +315,8 @@ class TestOcrSubmitErrorCodes:
                 headers={"Content-Length": str(oversize)},
             )
         )
+
+        # When / Then
         with (
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(ToolError, match=r"^FILE_TOO_LARGE: "),
@@ -319,6 +327,8 @@ class TestOcrSubmitErrorCodes:
     async def test_download_failed_error_code_in_message(self, _validate_host_mock):
         # Given a 404 response, DownloadFailedError fires
         session = _FakeSession(_FakeResponse(status=404, body=b""))
+
+        # When / Then
         with (
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(ToolError, match=r"^DOWNLOAD_FAILED: "),
@@ -365,7 +375,7 @@ class TestOcrSubmitErrorCodes:
         image_path.write_bytes(VALID_PNG_BYTES)
         await ocr_submit(image_path.as_uri(), lang="en")
 
-        # Then
+        # When / Then
         with pytest.raises(ToolError, match=r"^QUEUE_FULL: "):
             await ocr_submit(image_path.as_uri(), lang="en")
 
@@ -436,19 +446,19 @@ class TestOcrJobStatus:
         assert status["pages_ahead"] is None
 
     def test_an_unknown_identifier_carries_the_not_found_code(self):
-        # Then
+        # When / Then
         with pytest.raises(ToolError, match=r"^JOB_NOT_FOUND: "):
             ocr_job_status(new_job_id())
 
     def test_an_identifier_that_is_not_shaped_like_one_carries_the_same_code(self):
-        # Then
+        # When / Then
         with pytest.raises(ToolError, match=r"^JOB_NOT_FOUND: "):
             ocr_job_status("../../etc/passwd")
 
 
 class TestOcrListJobs:
     def test_an_idle_service_lists_nothing(self):
-        # Then
+        # When / Then
         assert ocr_list_jobs() == {"jobs": []}
 
     async def test_work_in_flight_is_listed_in_submission_order(
@@ -509,14 +519,14 @@ class TestOcrCancelJob:
         assert store.read(str(submitted["job_id"])).state == "cancelled"
 
     async def test_cancelling_an_unknown_identifier_carries_the_not_found_code(self):
-        # Then
+        # When / Then
         with pytest.raises(ToolError, match=r"^JOB_NOT_FOUND: "):
             await ocr_cancel_job(new_job_id())
 
 
 class TestFetchFileRejections:
     async def test_unsupported_scheme(self):
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError, match="Unsupported URI scheme"):
             await _fetch_file("ftp://example.com/file.png")
 
@@ -524,12 +534,12 @@ class TestFetchFileRejections:
         # Given a bare absolute path; urlparse gives empty scheme
         bare = str(tmp_path / "bare.png")
 
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError):
             await _fetch_file(bare)
 
     async def test_windows_path_is_rejected(self):
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError):
             await _fetch_file("C:\\Users\\foo.png")
 
@@ -539,7 +549,7 @@ class TestReadJailedFile:
         # Given
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", None)
 
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError, match="MCP_FILE_URI_ROOT is unset"):
             await _read_jailed_file("/etc/passwd")
 
@@ -551,7 +561,7 @@ class TestReadJailedFile:
         outside.write_bytes(b"x")
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(jail))
 
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError, match="escapes MCP_FILE_URI_ROOT"):
             await _read_jailed_file("/" + str(outside).replace("\\", "/"))
 
@@ -561,7 +571,7 @@ class TestReadJailedFile:
         ghost = tmp_path / "ghost.png"
         url_path = "/" + str(ghost).replace("\\", "/")
 
-        # Then
+        # When / Then
         with pytest.raises(DownloadFailedError, match="File not found"):
             await _read_jailed_file(url_path)
 
@@ -572,7 +582,7 @@ class TestReadJailedFile:
         big = tmp_path / "big.png"
         big.write_bytes(b"x" * (2 * 1024 * 1024))
 
-        # Then
+        # When / Then
         with pytest.raises(FileSizeExceededError):
             await _read_jailed_file("/" + str(big).replace("\\", "/"))
 
@@ -582,7 +592,7 @@ class TestDownloadHttpRejections:
         # Given
         parsed = urlparse("http://user:pass@host/x.png")
 
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError, match="Credentials in URI"):
             await _download_http("http://user:pass@host/x.png", parsed)
 
@@ -590,7 +600,7 @@ class TestDownloadHttpRejections:
         # Given
         parsed = urlparse("http:///x.png")
 
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError, match="no hostname"):
             await _download_http("http:///x.png", parsed)
 
@@ -599,7 +609,7 @@ class TestDownloadHttpRejections:
         # Given
         parsed = urlparse("http://host.docker.internal/x.png")
 
-        # Then
+        # When / Then
         with patch.object(mcp_server, "_http_session", None), pytest.raises(RuntimeError, match="not initialised"):
             await _download_http("http://host.docker.internal/x.png", parsed)
 
@@ -609,7 +619,7 @@ class TestDownloadHttpRejections:
         session = _FakeSession(_FakeResponse(status=404, body=b""))
         parsed = urlparse("http://host.docker.internal/missing.png")
 
-        # Then
+        # When / Then
         with patch.object(mcp_server, "_http_session", session), pytest.raises(DownloadFailedError, match="HTTP 404"):
             await _download_http("http://host.docker.internal/missing.png", parsed)
 
@@ -626,7 +636,7 @@ class TestDownloadHttpRejections:
         )
         parsed = urlparse("http://host.docker.internal/big.png")
 
-        # Then
+        # When / Then
         with patch.object(mcp_server, "_http_session", session), pytest.raises(FileSizeExceededError):
             await _download_http("http://host.docker.internal/big.png", parsed)
 
@@ -642,7 +652,7 @@ class TestDownloadHttpRejections:
         )
         parsed = urlparse("http://host.docker.internal/big.png")
 
-        # Then
+        # When / Then
         with patch.object(mcp_server, "_http_session", session), pytest.raises(FileSizeExceededError):
             await _download_http("http://host.docker.internal/big.png", parsed)
 
@@ -652,7 +662,7 @@ class TestDownloadHttpRejections:
         session = _FakeSession(aiohttp.ClientError("connection refused"))
         parsed = urlparse("http://host.docker.internal/x.png")
 
-        # Then
+        # When / Then
         with (
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(DownloadFailedError, match="HTTP fetch failed"),
@@ -688,7 +698,7 @@ class TestValidateHost:
         loop = mock_loop.return_value
         loop.getaddrinfo = AsyncMock(return_value=[(0, 0, 0, "", ("10.0.0.5", 0))])
 
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError, match="non-public"):
             await _validate_host("internal.example.com")
 
@@ -707,7 +717,7 @@ class TestValidateHost:
         loop = mock_loop.return_value
         loop.getaddrinfo = AsyncMock(side_effect=socket_mod.gaierror("DNS down"))
 
-        # Then
+        # When / Then
         with pytest.raises(UnsafeUriError, match="Cannot resolve"):
             await _validate_host("does-not-exist.invalid")
 
@@ -727,19 +737,19 @@ class TestPureHelpers:
         ],
     )
     def test_is_blocked_true_for_private_and_special(self, ip_str: str) -> None:
-        # Then
+        # When / Then
         assert _is_blocked(ipaddress.ip_address(ip_str)) is True
 
     def test_is_blocked_false_for_public(self):
-        # Then
+        # When / Then
         assert _is_blocked(ipaddress.ip_address("8.8.8.8")) is False
 
     def test_is_within_true(self, tmp_path: Path) -> None:
-        # Then
+        # When / Then
         assert _is_within(str(tmp_path / "x.png"), str(tmp_path)) is True
 
     def test_is_within_false_when_outside(self, tmp_path: Path) -> None:
-        # Then
+        # When / Then
         assert _is_within(str(tmp_path / "elsewhere"), str(tmp_path / "jail")) is False
 
     def test_is_within_false_on_value_error(self):
@@ -748,7 +758,7 @@ class TestPureHelpers:
         # (e.g. different drives on Windows). Force that outcome directly instead of
         # relying on a platform-specific path shape, so the branch is exercised on Linux too.
         with patch("os.path.commonpath", side_effect=ValueError("paths don't have the same drive")):
-            # Then
+            # When / Then
             assert _is_within("/a", "/b") is False
 
     def test_enforce_size_passes_within_cap(self):
@@ -759,7 +769,7 @@ class TestPureHelpers:
         # Given
         monkeypatch.setattr(settings, "MAX_FILE_SIZE_MB", 1)
 
-        # Then
+        # When / Then
         with pytest.raises(FileSizeExceededError):
             _enforce_size(2 * 1024 * 1024)
 

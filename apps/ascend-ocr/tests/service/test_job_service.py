@@ -202,8 +202,10 @@ class TestSubmit:
         ):
             await service.submit(VALID_PNG_BYTES, "scan.png", "en", "high", "rest")
 
-        # Then — the next submission is not refused for a place nothing is holding
+        # When
         submitted = await service.submit(VALID_PNG_BYTES, "scan.png", "en", "high", "rest")
+
+        # Then — the next submission is not refused for a place nothing is holding
         assert submitted.job_id
 
 
@@ -312,12 +314,12 @@ class TestStatus:
         assert status.poll_after_seconds is not None
 
     def test_an_unknown_identifier_is_not_found(self, service: JobService) -> None:
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             service.status(new_job_id())
 
     def test_an_identifier_that_is_not_shaped_like_one_is_not_found(self, service: JobService) -> None:
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             service.status("../../etc/passwd")
 
@@ -340,7 +342,7 @@ class TestStatus:
 
 class TestListJobs:
     def test_an_idle_service_lists_nothing(self, service: JobService) -> None:
-        # Then
+        # When / Then
         assert service.list_jobs().jobs == []
 
     async def test_everything_in_flight_is_listed_in_submission_order(
@@ -367,7 +369,7 @@ class TestListJobs:
         record = make_record(state="succeeded", finished_at=time.time())
         store.write(record)
 
-        # Then
+        # When / Then
         assert service.list_jobs().jobs == []
         assert service.status(record.job_id).state == "succeeded"
 
@@ -395,7 +397,7 @@ class TestListJobs:
         runner._running = runner._queue.popleft()
         await service.submit(VALID_PNG_BYTES, "one-more.png", "en", "high", "rest")
 
-        # Then
+        # When / Then
         assert len(service.list_jobs().jobs) == settings.OCR_JOB_QUEUE_MAX_DOCUMENTS + 1
 
 
@@ -437,11 +439,11 @@ class TestDelete:
         store.write(record)
         await service.delete(record.job_id)
 
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             await service.delete(record.job_id)
 
     async def test_deleting_an_unknown_identifier_is_not_found(self, service: JobService) -> None:
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             await service.delete(new_job_id())

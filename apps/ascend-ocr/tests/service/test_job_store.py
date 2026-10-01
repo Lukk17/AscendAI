@@ -62,6 +62,8 @@ class TestIdentifier:
     def test_identifier_carries_at_least_128_bits_of_randomness(self):
         # Given — 22 base64url characters encode 16 bytes, and none of them repeats
         # across a batch, so the source is not a counter or a hash of the input
+
+        # When
         identifiers = {new_job_id() for _ in range(500)}
 
         # Then
@@ -69,25 +71,26 @@ class TestIdentifier:
 
     @pytest.mark.parametrize("candidate", TRAVERSAL_CANDIDATES)
     def test_candidate_that_is_not_an_identifier_is_refused(self, candidate):
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             validate_job_id(candidate)
 
     def test_a_refused_identifier_never_reaches_the_filesystem(self):
-        # Given
+        # When
         with (
             patch("src.service.job_store.jobs_dir") as mock_jobs_dir,
             pytest.raises(JobNotFoundError),
         ):
             job_path("../../etc/passwd", RECORD_SUFFIX)
 
+        # Then
         mock_jobs_dir.assert_not_called()
 
     def test_a_valid_identifier_is_returned_unchanged(self):
         # Given
         job_id = new_job_id()
 
-        # Then
+        # When / Then
         assert validate_job_id(job_id) == job_id
 
 
@@ -120,12 +123,12 @@ class TestRecordLifecycle:
         await store.create(record, b"payload")
         store.delete_input(record.job_id)
 
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             await store.read_input(record.job_id)
 
     def test_reading_an_unknown_identifier_raises_not_found(self, store: JobStore) -> None:
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             store.read(new_job_id())
 
@@ -135,7 +138,7 @@ class TestRecordLifecycle:
         jobs_dir.mkdir(parents=True, exist_ok=True)
         (jobs_dir / f"{job_id}{RECORD_SUFFIX}").write_bytes(b"{not json")
 
-        # Then
+        # When / Then
         with pytest.raises(JobNotFoundError):
             store.read(job_id)
 
@@ -246,7 +249,7 @@ class TestProgress:
     def test_progress_starts_at_zero_before_the_first_page(self, jobs_dir: Path) -> None:
         _ = jobs_dir
 
-        # Then
+        # When / Then
         assert read_progress(new_job_id()) == 0
 
     def test_progress_advances_page_by_page(self, jobs_dir: Path) -> None:
@@ -268,7 +271,7 @@ class TestProgress:
         jobs_dir.mkdir(parents=True, exist_ok=True)
         (jobs_dir / f"{job_id}{PROGRESS_SUFFIX}").write_bytes(b"not a number")
 
-        # Then
+        # When / Then
         assert read_progress(job_id) == 0
 
 
@@ -697,7 +700,7 @@ class TestRetainedCount:
         for record in (make_record(state="waiting"), make_record(state="succeeded"), make_record(state="failed")):
             store.write(record)
 
-        # Then
+        # When / Then
         assert store.retained_count() == 2
 
 

@@ -93,11 +93,11 @@ def _default_pair() -> ModelPair:
 
 class TestModelPairResolution:
     def test_language_inside_the_default_family_resolves_to_the_configured_pair(self):
-        # Then
+        # When / Then
         assert _resolve_model_pair("pl") == _default_pair()
 
     def test_language_outside_the_default_family_resolves_to_its_own_pair(self, off_family_language):
-        # Then
+        # When / Then
         assert _resolve_model_pair(off_family_language) == OFF_FAMILY_PAIR
 
     def test_configured_pair_is_the_source_for_every_non_override_language(self, monkeypatch):
@@ -105,7 +105,7 @@ class TestModelPairResolution:
         monkeypatch.setattr(settings, "OCR_TEXT_DETECTION_MODEL", "PP-OCRv6_medium_det")
         monkeypatch.setattr(settings, "OCR_TEXT_RECOGNITION_MODEL", "PP-OCRv6_medium_rec")
 
-        # Then
+        # When / Then
         assert _resolve_model_pair("en") == ModelPair("PP-OCRv6_medium_det", "PP-OCRv6_medium_rec")
 
     def test_configured_pair_does_not_override_a_language_with_its_own_pair(self, monkeypatch, off_family_language):
@@ -113,15 +113,15 @@ class TestModelPairResolution:
         monkeypatch.setattr(settings, "OCR_TEXT_DETECTION_MODEL", "PP-OCRv6_medium_det")
         monkeypatch.setattr(settings, "OCR_TEXT_RECOGNITION_MODEL", "PP-OCRv6_medium_rec")
 
-        # Then
+        # When / Then
         assert _resolve_model_pair(off_family_language) == OFF_FAMILY_PAIR
 
     def test_every_override_language_is_a_supported_language(self):
-        # Then - an override for a language the allowlist rejects would be unreachable
+        # When / Then - an override for a language the allowlist rejects would be unreachable
         assert set(LANGUAGE_MODEL_OVERRIDES) <= set(settings.SUPPORTED_LANGUAGES)
 
     def test_model_pair_renders_as_detection_over_recognition(self):
-        # Then - this string is the eviction metric's label and the eviction log line
+        # When / Then - this string is the eviction metric's label and the eviction log line
         assert str(ModelPair("det-model", "rec-model")) == "det-model/rec-model"
 
 
@@ -230,7 +230,7 @@ class TestOcrServiceEngineCache:
         # Given
         service = OcrService()
 
-        # Then
+        # When / Then
         with pytest.raises(ValueError, match="Unsupported language"):
             service._get_engine("xx-fake")
 
@@ -467,7 +467,7 @@ class TestOcrServicePredictPages:
         engine = _engine_reading(*_create_multi_page_predict_result())
         rendered = MagicMock(wraps=_pages(2))
 
-        # Then
+        # When / Then
         with pytest.raises(OcrDeadlineExceededError, match="after 0"):
             service._predict_pages(engine, rendered, PROFILE, deadline=time.monotonic() - 1)
 
@@ -485,12 +485,14 @@ class TestOcrServicePredictPages:
         # page-timer end, check before page 2 (past deadline).
         monotonic_values = iter([50.0, 50.0, 50.1, 200.0])
 
+        # When
         with (
             patch("src.service.ocr_service.time.monotonic", side_effect=lambda: next(monotonic_values)),
             pytest.raises(OcrDeadlineExceededError, match="after 1"),
         ):
             service._predict_pages(engine, rendered, PROFILE, deadline=deadline)
 
+        # Then
         assert rendered.__next__.call_count == 1
         assert engine.predict_iter.call_count == 1
 
@@ -661,7 +663,7 @@ class TestOcrServiceProcessFile:
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
         service = OcrService()
 
-        # Then: a zero/negative budget must stop the request without inferring
+        # When / Then: a zero/negative budget must stop the request without inferring
         with pytest.raises(OcrDeadlineExceededError):
             service.process_file(b"x", "test.png", "en", "high", budget_seconds=-1.0)
 
@@ -672,6 +674,7 @@ class TestOcrServiceProcessFile:
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
         service = OcrService()
 
+        # When
         with patch("src.service.ocr_service.time.monotonic", return_value=1_000_000.0) as mock_monotonic:
             service.process_file(b"x", "test.png", "en", "high", budget_seconds=30.0)
 
@@ -885,19 +888,19 @@ class TestConvertPolygon:
         assert converted == [[1.0, 2.0], [3.0, 4.0]]
 
     def test_none_returns_empty(self):
-        # Then
+        # When / Then
         assert _convert_polygon(None) == []
 
     def test_empty_returns_empty(self):
-        # Then
+        # When / Then
         assert _convert_polygon([]) == []
 
     def test_index_error_returns_empty(self):
-        # Then - point with no elements triggers IndexError
+        # When / Then - point with no elements triggers IndexError
         assert _convert_polygon([[]]) == []
 
     def test_value_error_returns_empty(self):
-        # Then - non-numeric coordinates trigger ValueError on float()
+        # When / Then - non-numeric coordinates trigger ValueError on float()
         assert _convert_polygon([["x", "y"]]) == []
 
     def test_numpy_array_polygon_does_not_raise_on_truthiness(self):
@@ -1073,7 +1076,7 @@ class TestWorkerPoolLifecycle:
             assert ocr_service_module._process_pool is None
 
     def test_get_process_pool_raises_when_not_started(self):
-        # Then
+        # When / Then
         with (
             patch.object(ocr_service_module, "_process_pool", None),
             pytest.raises(RuntimeError, match="not initialised"),
@@ -1142,7 +1145,7 @@ class TestPoolHealthSignals:
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
 
-        # Then
+        # When / Then
         assert is_pool_usable() is True
 
     def test_is_pool_usable_false_at_cap(self, monkeypatch):
@@ -1150,17 +1153,17 @@ class TestPoolHealthSignals:
         monkeypatch.setattr(settings, "OCR_POOL_REBUILD_MAX_CONSECUTIVE", 3)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 3)
 
-        # Then
+        # When / Then
         assert is_pool_usable() is False
 
     def test_is_rebuild_in_progress_false_by_default(self):
-        # Then
+        # When / Then
         assert is_rebuild_in_progress() is False
 
     async def test_is_rebuild_in_progress_true_while_locked(self):
         # Given
         async with ocr_service_module._rebuild_lock:
-            # Then
+            # When / Then
             assert is_rebuild_in_progress() is True
 
         assert is_rebuild_in_progress() is False
@@ -1169,21 +1172,21 @@ class TestPoolHealthSignals:
         # Given
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {})
 
-        # Then
+        # When / Then
         assert is_job_overrunning() is False
 
     def test_is_job_overrunning_false_within_budget(self, monkeypatch):
         # Given
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {object(): time.monotonic() + 100})
 
-        # Then
+        # When / Then
         assert is_job_overrunning() is False
 
     def test_is_job_overrunning_true_past_budget(self, monkeypatch):
         # Given
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {object(): time.monotonic() - 1})
 
-        # Then
+        # When / Then
         assert is_job_overrunning() is True
 
     def test_is_job_overrunning_true_when_one_of_several_jobs_is_past_budget(self, monkeypatch):
@@ -1196,7 +1199,7 @@ class TestPoolHealthSignals:
             {object(): time.monotonic() + 100, object(): time.monotonic() - 1},
         )
 
-        # Then
+        # When / Then
         assert is_job_overrunning() is True
 
     def test_is_accepting_work_true_when_healthy_and_idle(self, monkeypatch):
@@ -1204,7 +1207,7 @@ class TestPoolHealthSignals:
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {})
 
-        # Then
+        # When / Then
         assert is_accepting_work() is True
 
     def test_is_accepting_work_false_when_pool_exhausted(self, monkeypatch):
@@ -1212,7 +1215,7 @@ class TestPoolHealthSignals:
         monkeypatch.setattr(settings, "OCR_POOL_REBUILD_MAX_CONSECUTIVE", 1)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 1)
 
-        # Then
+        # When / Then
         assert is_accepting_work() is False
 
     def test_is_accepting_work_false_while_job_overrunning(self, monkeypatch):
@@ -1220,7 +1223,7 @@ class TestPoolHealthSignals:
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {object(): time.monotonic() - 1})
 
-        # Then
+        # When / Then
         assert is_accepting_work() is False
 
     async def test_is_accepting_work_false_while_rebuilding(self, monkeypatch):
@@ -1228,7 +1231,7 @@ class TestPoolHealthSignals:
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {})
 
-        # Then
+        # When / Then
         async with ocr_service_module._rebuild_lock:
             assert is_accepting_work() is False
 
@@ -1354,6 +1357,8 @@ class TestRebuildPool:
     async def test_successful_request_resets_failure_counter(self, monkeypatch):
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 2)
+
+        # When
         ocr_service_module._reset_rebuild_failures()
 
         # Then
@@ -1374,7 +1379,7 @@ class TestDispatchOcrRequest:
         monkeypatch.setattr(settings, "OCR_POOL_REBUILD_MAX_CONSECUTIVE", 1)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 1)
 
-        # Then
+        # When / Then
         with pytest.raises(OcrProcessingError, match="unavailable"):
             await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
@@ -1392,6 +1397,7 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When
             result = await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
         # Then
@@ -1461,7 +1467,7 @@ class TestDispatchOcrRequest:
         pool_mock = MagicMock()
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=pool_mock))
 
-        # Then
+        # When / Then
         with pytest.raises(OcrProcessingError, match="waiting for a worker"):
             await dispatch_ocr_request(b"x", "f.png", "en", "high", 0.01, "rest")
 
@@ -1479,7 +1485,7 @@ class TestDispatchOcrRequest:
         async def fake_wait_for(coro, **_kwargs):
             return await coro
 
-        # Then
+        # When / Then
         with (
             patch("src.service.ocr_service.time.monotonic", side_effect=lambda: next(monotonic_values)),
             patch("src.service.ocr_service.asyncio.wait_for", fake_wait_for),
@@ -1503,6 +1509,7 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When / Then
             with (
                 patch.object(ocr_service_module.settings, "OCR_DISPATCH_MARGIN_SECONDS", 0.0),
                 patch.object(ocr_service_module.settings, "OCR_PAGE_ALLOWANCE_HEADROOM", 0.0001),
@@ -1527,6 +1534,7 @@ class TestDispatchOcrRequest:
         async def fake_run_in_executor(_executor, _func, *_args):
             return sentinel
 
+        # When
         with patch("asyncio.get_running_loop") as mock_get_loop:
             mock_loop = MagicMock()
             mock_loop.run_in_executor = fake_run_in_executor
@@ -1552,6 +1560,7 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When / Then
             with pytest.raises(OcrProcessingError, match="worker process failed"):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
@@ -1575,6 +1584,7 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = synchronously_broken_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When / Then
             with pytest.raises(OcrProcessingError, match="worker process failed"):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
@@ -1589,7 +1599,7 @@ class TestDispatchOcrRequest:
             MagicMock(side_effect=RuntimeError("OCR worker pool is not initialised")),
         )
 
-        # Then - a clean, handled OcrProcessingError, not a raw RuntimeError escaping
+        # When / Then - a clean, handled OcrProcessingError, not a raw RuntimeError escaping
         # the dispatch stack.
         with pytest.raises(OcrProcessingError):
             await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
@@ -1653,9 +1663,11 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When
             with pytest.raises(OcrProcessingError, match="budget exhausted during inference"):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
+        # Then
         rebuild_mock.assert_not_called()
 
     async def test_size_and_type_errors_pass_through_unwrapped(self, monkeypatch):
@@ -1671,6 +1683,7 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When / Then
             with pytest.raises(FileSizeExceededError):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
@@ -1686,6 +1699,7 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When / Then
             with pytest.raises(UnsupportedFileTypeError):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
@@ -1701,9 +1715,11 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When
             with pytest.raises(OcrProcessingError) as exc_info:
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
+        # Then
         assert "engine internal trace" not in str(exc_info.value)
 
     async def test_successful_dispatch_resets_rebuild_failure_counter(self, monkeypatch):
@@ -1720,8 +1736,10 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When
             await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
+        # Then
         assert ocr_service_module._consecutive_rebuild_failures == 0
 
     async def test_permit_released_on_worker_failure(self, monkeypatch):
@@ -1736,9 +1754,11 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
+            # When
             with pytest.raises(OcrProcessingError):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
+        # Then
         assert ocr_service_module._admission_semaphore._value == 1
 
     async def test_pool_never_receives_more_concurrent_work_than_worker_count(self, monkeypatch):

@@ -182,5 +182,5 @@ class TestEnforcePageLimit:
 
 class TestTheDecompressionBombGuardIsSetForTheApiProcess:
     def test_importing_the_limits_module_sets_the_image_library_limit_from_the_setting(self):
-        # Then
+        # When / Then
         assert Image.MAX_IMAGE_PIXELS == settings.OCR_MAX_SOURCE_PIXELS
