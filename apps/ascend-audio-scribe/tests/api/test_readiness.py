@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,9 +21,7 @@ def test_resolve_on_path_returns_none_when_absolute_missing(tmp_path: Path) -> N
     assert readiness_module._resolve_on_path(str(tmp_path / "absent")) is None
 
 
-def test_resolve_on_path_walks_path_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_on_path_walks_path_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "ffmpeg"
     target.write_bytes(b"")
     monkeypatch.setenv("PATH", str(tmp_path))
@@ -39,9 +38,7 @@ def test_resolve_on_path_returns_none_when_not_found(
     assert readiness_module._resolve_on_path("nonexistent-binary-xyz") is None
 
 
-def test_resolve_on_path_honours_pathext(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_on_path_honours_pathext(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "ffmpeg.exe"
     target.write_bytes(b"")
     monkeypatch.setenv("PATH", str(tmp_path))
@@ -75,9 +72,7 @@ def test_resolve_on_path_tries_second_pathext_when_first_misses(
     target = tmp_path / "ffmpeg.bat"
     target.write_bytes(b"")
     monkeypatch.setenv("PATH", str(tmp_path))
-    monkeypatch.setattr(
-        readiness_module, "_executable_extensions", lambda: [".EXE", ".BAT"]
-    )
+    monkeypatch.setattr(readiness_module, "_executable_extensions", lambda: [".EXE", ".BAT"])
     resolved = readiness_module._resolve_on_path("ffmpeg")
     assert resolved == target
 
@@ -138,40 +133,42 @@ def test_probe_ffmpeg_ffprobe_missing() -> None:
 
 
 def test_probe_temp_dir_ok(tmp_path: Path) -> None:
-    with patch.object(readiness_module.tempfile, "gettempdir", return_value=str(tmp_path)):
+    with patch.object(tempfile, "gettempdir", return_value=str(tmp_path)):
         assert readiness_module._probe_temp_dir() == {"status": "ok"}
 
 
 def test_probe_temp_dir_missing() -> None:
-    with patch.object(
-        readiness_module.tempfile, "gettempdir", return_value="/nonexistent-ascendaudioscribe-xyz"
-    ):
+    with patch.object(tempfile, "gettempdir", return_value="/nonexistent-ascendaudioscribe-xyz"):
         result = readiness_module._probe_temp_dir()
     assert result["status"] == "error"
 
 
 def test_probe_temp_dir_not_writable(tmp_path: Path) -> None:
-    with patch.object(readiness_module.tempfile, "gettempdir", return_value=str(tmp_path)), \
-         patch("pathlib.Path.write_text", side_effect=OSError("readonly")):
+    with (
+        patch.object(tempfile, "gettempdir", return_value=str(tmp_path)),
+        patch("pathlib.Path.write_text", side_effect=OSError("readonly")),
+    ):
         result = readiness_module._probe_temp_dir()
     assert result["status"] == "error"
 
 
 def test_ready_endpoint_200_when_clean() -> None:
-    with patch.object(readiness_module, "_probe_ffmpeg", return_value={"status": "ok"}), \
-         patch.object(readiness_module, "_probe_temp_dir", return_value={"status": "ok"}), \
-         TestClient(app) as client:
+    with (
+        patch.object(readiness_module, "_probe_ffmpeg", return_value={"status": "ok"}),
+        patch.object(readiness_module, "_probe_temp_dir", return_value={"status": "ok"}),
+        TestClient(app) as client,
+    ):
         response = client.get("/ready")
         assert response.status_code == 200
         assert response.json()["status"] == "ready"
 
 
 def test_ready_endpoint_503_when_degraded() -> None:
-    with patch.object(
-        readiness_module, "_probe_ffmpeg", return_value={"status": "error", "detail": "x"}
-    ), patch.object(
-        readiness_module, "_probe_temp_dir", return_value={"status": "ok"}
-    ), TestClient(app) as client:
+    with (
+        patch.object(readiness_module, "_probe_ffmpeg", return_value={"status": "error", "detail": "x"}),
+        patch.object(readiness_module, "_probe_temp_dir", return_value={"status": "ok"}),
+        TestClient(app) as client,
+    ):
         response = client.get("/ready")
         assert response.status_code == 503
         assert response.json()["status"] == "degraded"

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Per-provider singleton instances keyed by provider name. The lock guards
 # the check-then-set; without it two concurrent first-hit requests for the
 # same provider both instantiate AscendMemoryClient (which opens Qdrant +
-# LLM clients — heavy and wasteful).
+# LLM clients - heavy and wasteful).
 _client_instances: dict[str, "AscendMemoryClient"] = {}
 _client_lock = threading.Lock()
 
@@ -27,7 +27,7 @@ def resolve_provider(provider: str | None) -> str:
     PROVIDER_CONFIGS keys. PROVIDER_CONFIGS is the source of truth.
 
     None or whitespace falls back to settings.MEM0_DEFAULT_PROVIDER.
-    An unknown string raises ValueError listing the allowed set — we never
+    An unknown string raises ValueError listing the allowed set - we never
     silently substitute the default, because doing so would route a caller's
     data to the wrong collection without their consent.
     """
@@ -37,9 +37,7 @@ def resolve_provider(provider: str | None) -> str:
 
     candidate = provider.strip().lower()
     if candidate not in PROVIDER_CONFIGS:
-        raise ValueError(
-            f"Unknown provider '{candidate}'. Allowed: {supported_providers()}"
-        )
+        raise ValueError(f"Unknown provider '{candidate}'. Allowed: {supported_providers()}")
     return candidate
 
 
@@ -83,8 +81,7 @@ def wipe_user_all_collections(user_id: str) -> None:
             wiped_collections.add(collection)
         except Exception:
             logger.exception(
-                f"Error wiping collection={collection} provider={provider} "
-                f"user_hash={_hash_user_id(user_id)}"
+                f"Error wiping collection={collection} provider={provider} user_hash={_hash_user_id(user_id)}"
             )
 
 
@@ -105,7 +102,7 @@ def _hash_user_id(user_id: str) -> str:
 class AscendMemoryClient:
     def __init__(self, provider: str) -> None:
         # Provider is assumed validated by resolve_provider before reaching
-        # here — no silent fallback at this layer.
+        # here - no silent fallback at this layer.
         provider_cfg = PROVIDER_CONFIGS[provider]
 
         collection_name = provider_cfg["collection_name"]
@@ -248,15 +245,13 @@ class AscendMemoryClient:
         mem0 1.x `delete_all` called `vector_store.reset()` after the per-id
         delete loop, which wiped every other user's memories sharing the
         same collection. mem0 2.0.4 removed that reset call, so the safe
-        path is now a single `delete_all` invocation — no manual loop, no
+        path is now a single `delete_all` invocation - no manual loop, no
         custom Qdrant filter delete.
         """
 
         try:
             self.memory.delete_all(user_id=user_id)
-            logger.info(
-                f"Wiped memories for user_hash={_hash_user_id(user_id)} provider={self.provider}"
-            )
+            logger.info(f"Wiped memories for user_hash={_hash_user_id(user_id)} provider={self.provider}")
         except Exception:
             logger.exception(
                 f"Error wiping memory user_hash={_hash_user_id(user_id)} provider={self.provider}"

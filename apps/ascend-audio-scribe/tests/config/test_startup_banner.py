@@ -1,3 +1,7 @@
+import socket
+import urllib.error
+import urllib.request
+from email.message import Message
 from types import TracebackType
 from unittest.mock import patch
 
@@ -30,7 +34,7 @@ def test_resolve_host_returns_string() -> None:
 
 
 def test_resolve_host_falls_back() -> None:
-    with patch.object(startup_banner.socket, "gethostname", side_effect=OSError):
+    with patch.object(socket, "gethostname", side_effect=OSError):
         assert startup_banner._resolve_host() == "localhost"
 
 
@@ -44,27 +48,27 @@ def test_probe_unsupported_scheme() -> None:
 
 
 def test_probe_connected_on_2xx() -> None:
-    with patch.object(startup_banner.urllib.request, "urlopen", return_value=_Resp200()):
+    with patch.object(urllib.request, "urlopen", return_value=_Resp200()):
         assert "[Connected]" in startup_banner._probe_http_sync("http://x.test/")
 
 
 def test_probe_warning_on_3xx() -> None:
-    with patch.object(startup_banner.urllib.request, "urlopen", return_value=_Resp301()):
+    with patch.object(urllib.request, "urlopen", return_value=_Resp301()):
         assert "[Warning" in startup_banner._probe_http_sync("http://x.test/")
 
 
 def test_probe_http_error() -> None:
-    err = startup_banner.urllib.error.HTTPError("http://x/", 404, "NF", {}, None)
-    with patch.object(startup_banner.urllib.request, "urlopen", side_effect=err):
+    err = urllib.error.HTTPError("http://x/", 404, "NF", Message(), None)
+    with patch.object(urllib.request, "urlopen", side_effect=err):
         assert "status=404" in startup_banner._probe_http_sync("http://x.test/")
 
 
 def test_probe_failed_on_oserror() -> None:
-    with patch.object(startup_banner.urllib.request, "urlopen", side_effect=OSError("nope")):
+    with patch.object(urllib.request, "urlopen", side_effect=OSError("nope")):
         assert "[FAILED]" in startup_banner._probe_http_sync("http://x.test/")
 
 
 @pytest.mark.asyncio
 async def test_log_startup_banner_runs() -> None:
-    with patch.object(startup_banner.urllib.request, "urlopen", return_value=_Resp200()):
+    with patch.object(urllib.request, "urlopen", return_value=_Resp200()):
         await startup_banner.log_startup_banner()

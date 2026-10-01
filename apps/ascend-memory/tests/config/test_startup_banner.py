@@ -1,3 +1,6 @@
+import socket
+import urllib.error
+import urllib.request
 from email.message import Message
 from types import TracebackType
 from unittest.mock import patch
@@ -5,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from src.config import startup_banner
+from src.config.config import settings
 
 
 class _FakeUrlOpenResponse:
@@ -44,7 +48,7 @@ def test_resolve_host_returns_string() -> None:
 
 
 def test_resolve_host_falls_back_on_oserror() -> None:
-    with patch.object(startup_banner.socket, "gethostname", side_effect=OSError):
+    with patch.object(socket, "gethostname", side_effect=OSError):
         assert startup_banner._resolve_host() == "localhost"
 
 
@@ -55,28 +59,26 @@ def test_probe_http_sync_rejects_disallowed_scheme() -> None:
 
 
 def test_probe_http_sync_connected_on_2xx() -> None:
-    with patch.object(startup_banner.urllib.request, "urlopen", return_value=_Resp200()):
+    with patch.object(urllib.request, "urlopen", return_value=_Resp200()):
         assert "[Connected]" in startup_banner._probe_http_sync("http://x.test/")
 
 
 def test_probe_http_sync_warning_on_3xx_etc() -> None:
-    with patch.object(startup_banner.urllib.request, "urlopen", return_value=_Resp301()):
+    with patch.object(urllib.request, "urlopen", return_value=_Resp301()):
         assert "[Warning" in startup_banner._probe_http_sync("http://x.test/")
 
 
 def test_probe_http_sync_http_error_returns_warning() -> None:
     # HTTPError.hdrs is typed email.message.Message; pass a real (empty)
     # instance instead of a bare dict to satisfy the typeshed signature.
-    err = startup_banner.urllib.error.HTTPError(
-        "http://x.test/", 404, "Not Found", Message(), None
-    )
-    with patch.object(startup_banner.urllib.request, "urlopen", side_effect=err):
+    err = urllib.error.HTTPError("http://x.test/", 404, "Not Found", Message(), None)
+    with patch.object(urllib.request, "urlopen", side_effect=err):
         assert "status=404" in startup_banner._probe_http_sync("http://x.test/")
 
 
 def test_probe_http_sync_unknown_failure_returns_failed() -> None:
     with patch.object(
-        startup_banner.urllib.request,
+        urllib.request,
         "urlopen",
         side_effect=OSError("connection refused"),
     ):
@@ -86,7 +88,7 @@ def test_probe_http_sync_unknown_failure_returns_failed() -> None:
 def test_describe_default_embedding_handles_known_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(startup_banner.settings, "MEM0_DEFAULT_PROVIDER", "lmstudio")
+    monkeypatch.setattr(settings, "MEM0_DEFAULT_PROVIDER", "lmstudio")
     out = startup_banner._describe_default_embedding()
     assert "lmstudio" in out
 
@@ -94,7 +96,7 @@ def test_describe_default_embedding_handles_known_provider(
 def test_describe_default_embedding_handles_unknown_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(startup_banner.settings, "MEM0_DEFAULT_PROVIDER", "unknown-xyz")
+    monkeypatch.setattr(settings, "MEM0_DEFAULT_PROVIDER", "unknown-xyz")
     out = startup_banner._describe_default_embedding()
     assert "Warning" in out
 
@@ -102,13 +104,13 @@ def test_describe_default_embedding_handles_unknown_provider(
 def test_describe_default_embedding_marks_missing_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(startup_banner.settings, "MEM0_DEFAULT_PROVIDER", "openai")
-    monkeypatch.setattr(startup_banner.settings, "OPENAI_API_KEY", "")
+    monkeypatch.setattr(settings, "MEM0_DEFAULT_PROVIDER", "openai")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
     out = startup_banner._describe_default_embedding()
     assert "Not configured" in out
 
 
 @pytest.mark.asyncio
 async def test_log_startup_banner_runs_without_raising() -> None:
-    with patch.object(startup_banner.urllib.request, "urlopen", return_value=_Resp200()):
+    with patch.object(urllib.request, "urlopen", return_value=_Resp200()):
         await startup_banner.log_startup_banner()

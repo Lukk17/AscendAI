@@ -30,7 +30,7 @@ def _extract_audio_suffix_from_query(query: str) -> str:
 
 def _resolve_to_ips(hostname: str) -> list[str]:
     """Resolve a hostname to every IPv4/IPv6 it points at. Empty list on
-    failure — callers treat that as "do not allow"."""
+    failure - callers treat that as "do not allow"."""
 
     try:
         infos = socket.getaddrinfo(hostname, None)
@@ -118,9 +118,7 @@ async def _fetch_http_streaming(uri: str, dest_path: str, cap: int) -> None:
             raise ValueError(f"Failed to download from {uri}: HTTP {response.status}")
         content_length = response.content_length
         if content_length is not None and content_length > cap:
-            raise FileSizeExceededError(
-                f"Content-Length {content_length} exceeds cap of {cap} bytes"
-            )
+            raise FileSizeExceededError(f"Content-Length {content_length} exceeds cap of {cap} bytes")
 
         written = 0
         buffer_size = settings.UPLOAD_BUFFER_BYTES
@@ -128,9 +126,7 @@ async def _fetch_http_streaming(uri: str, dest_path: str, cap: int) -> None:
             async for chunk in response.content.iter_chunked(buffer_size):
                 written += len(chunk)
                 if written > cap:
-                    raise FileSizeExceededError(
-                        f"Streamed body exceeds cap of {cap} bytes"
-                    )
+                    raise FileSizeExceededError(f"Streamed body exceeds cap of {cap} bytes")
                 await out_file.write(chunk)
 
 

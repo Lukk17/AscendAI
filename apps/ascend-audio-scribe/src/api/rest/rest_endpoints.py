@@ -88,9 +88,7 @@ LanguageForm = Annotated[
 ModelForm = Annotated[str, Form(max_length=128, pattern=settings.MODEL_PATTERN)]
 StreamForm = Annotated[bool, Form(description="True returns an SSE stream; False returns the file")]
 HfProviderForm = Annotated[str, Form(max_length=32, pattern=settings.PROVIDER_PATTERN)]
-ProviderForm = Annotated[
-    str, Form(max_length=16, pattern=r"^(local|openai|huggingface)$")
-]
+ProviderForm = Annotated[str, Form(max_length=16, pattern=r"^(local|openai|huggingface)$")]
 WithTimestampsForm = Annotated[bool, Form(description="Include per-segment timestamps in output")]
 
 
@@ -108,7 +106,7 @@ def _build_transcript_text(segments: list[dict[str, Any]], with_timestamps: bool
 
 
 def _resolve_language(language: str | None) -> str:
-    """Narrow `str | None` to `str` for downstream call sites — explicit
+    """Narrow `str | None` to `str` for downstream call sites - explicit
     `if` so static analysers tighten the type."""
 
     if language is None or language == "":
@@ -133,7 +131,7 @@ def _record(provider: str, outcome: str, duration_s: float) -> None:
 def _coerce_response_text(response_text: Any) -> str:
     """Backend functions return either `str` (text mode) or `list[dict]`
     (with-timestamps mode). For the file-response path we always store a
-    string — JSON-serialise the list when needed."""
+    string - JSON-serialise the list when needed."""
 
     if isinstance(response_text, str):
         return response_text
@@ -167,14 +165,12 @@ async def _drain_progress_queue(
     """Shared SSE polling loop used by every threaded backend (openai, hf,
     audacity). Poll the progress queue while the background task runs, then
     drain any tail events. CancelledError propagates to the caller after
-    cancelling the task — client mid-stream disconnect path."""
+    cancelling the task - client mid-stream disconnect path."""
 
     try:
         while not task.done():
             try:
-                event = await asyncio.wait_for(
-                    progress_queue.get(), timeout=SSE_POLL_TIMEOUT_SECONDS
-                )
+                event = await asyncio.wait_for(progress_queue.get(), timeout=SSE_POLL_TIMEOUT_SECONDS)
                 yield _sse_event(event)
             except TimeoutError:
                 continue
@@ -190,7 +186,7 @@ async def _drain_progress_queue(
 
 @rest_router.get("/download/{file_id}", summary="Download transcript file")
 def download_transcript(file_id: str) -> FileResponse:
-    """Sync `def` — every call inside is sync (registry lookup, FileResponse
+    """Sync `def` - every call inside is sync (registry lookup, FileResponse
     construction); no awaitable work exists."""
 
     cleanup_expired()
@@ -240,9 +236,7 @@ async def transcribe_local_endpoint(
         cleanup_temp_file(temp_file_path)
 
 
-async def _stream_local(
-    file: UploadFile, model: str, lang: str, with_timestamps: bool
-) -> AsyncIterator[str]:
+async def _stream_local(file: UploadFile, model: str, lang: str, with_timestamps: bool) -> AsyncIterator[str]:
     temp_file_path = ""
     started = time.monotonic()
     try:
@@ -256,11 +250,13 @@ async def _stream_local(
         ):
             all_segments.append(segment)
             segment_count += 1
-            yield _sse_event({
-                "type": SSE_PROGRESS,
-                "message": f"Segment {segment_count}: {segment.get('text', '')[:60]}",
-                "data": {"segments": segment_count, "start": segment["start"], "end": segment["end"]},
-            })
+            yield _sse_event(
+                {
+                    "type": SSE_PROGRESS,
+                    "message": f"Segment {segment_count}: {segment.get('text', '')[:60]}",
+                    "data": {"segments": segment_count, "start": segment["start"], "end": segment["end"]},
+                }
+            )
 
         transcript_text = _build_transcript_text(all_segments, with_timestamps)
         file_id, _ = store_transcript(transcript_text, TRANSCRIPT_LOCAL_FILENAME)
@@ -327,9 +323,7 @@ def _spawn_threaded_transcription(
     progress_queue: asyncio.Queue[dict[str, Any]],
     **kwargs: Any,
 ) -> asyncio.Task[Any]:
-    return asyncio.create_task(
-        asyncio.to_thread(fn, progress_callback=progress_queue.put_nowait, **kwargs)
-    )
+    return asyncio.create_task(asyncio.to_thread(fn, progress_callback=progress_queue.put_nowait, **kwargs))
 
 
 async def _stream_openai(file: UploadFile, model: str, lang: str) -> AsyncIterator[str]:
@@ -412,10 +406,12 @@ async def _stream_hf(file: UploadFile, model: str, hf_provider: str) -> AsyncIte
     started = time.monotonic()
     try:
         temp_file_path = await save_upload_to_temp_async(file)
-        yield _sse_event({
-            "type": SSE_PROGRESS,
-            "message": "File uploaded, starting Hugging Face transcription",
-        })
+        yield _sse_event(
+            {
+                "type": SSE_PROGRESS,
+                "message": "File uploaded, starting Hugging Face transcription",
+            }
+        )
 
         progress_queue = _make_progress_queue()
         task = _spawn_threaded_transcription(
@@ -470,9 +466,7 @@ async def transcribe_audacity_endpoint(
     extraction_dir = tempfile.mkdtemp(prefix="audacity_")
     try:
         temp_zip_path = await save_upload_to_temp_async(file)
-        tracks = await asyncio.to_thread(
-            extract_tracks_from_aup, temp_zip_path, extraction_dir
-        )
+        tracks = await asyncio.to_thread(extract_tracks_from_aup, temp_zip_path, extraction_dir)
         if not tracks:
             raise ValueError("No usable audio tracks found in the uploaded Audacity project.")
 
@@ -505,17 +499,21 @@ async def _stream_audacity(
             extract_tracks_from_aup, temp_zip_path, extraction_dir
         )
         if not tracks:
-            yield _sse_event({
-                "type": SSE_ERROR,
-                "message": "No usable audio tracks found in the uploaded Audacity project.",
-            })
+            yield _sse_event(
+                {
+                    "type": SSE_ERROR,
+                    "message": "No usable audio tracks found in the uploaded Audacity project.",
+                }
+            )
             return
 
-        yield _sse_event({
-            "type": SSE_PROGRESS,
-            "message": f"Extracted {len(tracks)} tracks, starting transcription",
-            "data": {"tracks": list(tracks.keys())},
-        })
+        yield _sse_event(
+            {
+                "type": SSE_PROGRESS,
+                "message": f"Extracted {len(tracks)} tracks, starting transcription",
+                "data": {"tracks": list(tracks.keys())},
+            }
+        )
 
         progress_queue = _make_progress_queue(AUDACITY_SSE_QUEUE_MAXSIZE)
         task = asyncio.create_task(

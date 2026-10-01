@@ -37,7 +37,7 @@ def test_configure_otel_activates_when_endpoint_set(monkeypatch: pytest.MonkeyPa
         _configure_otel()
 
 
-def test_liveness_health_always_returns_200(override_dependencies):
+def test_liveness_health_always_returns_200(override_dependencies: MagicMock) -> None:
     with patch("src.main.warmup_client", new_callable=AsyncMock):
         main_module.is_ready = False
         with TestClient(app) as client:
@@ -46,7 +46,7 @@ def test_liveness_health_always_returns_200(override_dependencies):
             assert response.json()["status"] == "ok"
 
 
-def test_legacy_health_reports_503_until_warmup_done(override_dependencies):
+def test_legacy_health_reports_503_until_warmup_done(override_dependencies: MagicMock) -> None:
     with patch("src.main.warmup_client", new_callable=AsyncMock):
         main_module.is_ready = False
         with TestClient(app) as client:
@@ -55,7 +55,7 @@ def test_legacy_health_reports_503_until_warmup_done(override_dependencies):
             assert response.json()["status"] == "starting"
 
 
-def test_legacy_health_returns_200_after_warmup(override_dependencies):
+def test_legacy_health_returns_200_after_warmup(override_dependencies: MagicMock) -> None:
     main_module.is_ready = True
     with TestClient(app) as client:
         response = client.get("/health/legacy")
@@ -63,7 +63,7 @@ def test_legacy_health_returns_200_after_warmup(override_dependencies):
         assert response.json()["status"] == "ok"
 
 
-def test_metrics_endpoint_exposes_prometheus_payload(override_dependencies):
+def test_metrics_endpoint_exposes_prometheus_payload(override_dependencies: MagicMock) -> None:
     with patch("src.main.warmup_client", new_callable=AsyncMock):
         with TestClient(app) as client:
             response = client.get("/metrics")
@@ -74,7 +74,7 @@ def test_metrics_endpoint_exposes_prometheus_payload(override_dependencies):
 
 
 @pytest.mark.asyncio
-async def test_warmup_client_succeeds_on_first_attempt():
+async def test_warmup_client_succeeds_on_first_attempt() -> None:
     main_module.is_ready = False
     with patch("src.main.get_memory_client") as mock_get_client:
         mock_client = MagicMock()
@@ -87,7 +87,7 @@ async def test_warmup_client_succeeds_on_first_attempt():
 
 
 @pytest.mark.asyncio
-async def test_warmup_client_retries_until_max_attempts(monkeypatch):
+async def test_warmup_client_retries_until_max_attempts(monkeypatch: pytest.MonkeyPatch) -> None:
     main_module.is_ready = False
     monkeypatch.setattr(main_module, "WARMUP_MAX_ATTEMPTS", 2)
     monkeypatch.setattr(main_module, "WARMUP_RETRY_DELAY_SECONDS", 0)
@@ -99,7 +99,7 @@ async def test_warmup_client_retries_until_max_attempts(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_warmup_client_logs_warning_on_transient_failure(monkeypatch):
+async def test_warmup_client_logs_warning_on_transient_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     main_module.is_ready = False
     monkeypatch.setattr(main_module, "WARMUP_MAX_ATTEMPTS", 3)
     monkeypatch.setattr(main_module, "WARMUP_RETRY_DELAY_SECONDS", 0)
@@ -107,7 +107,7 @@ async def test_warmup_client_logs_warning_on_transient_failure(monkeypatch):
     mock_client = MagicMock()
     call_count = {"n": 0}
 
-    def get_client_then_succeed(*_args, **_kwargs):
+    def get_client_then_succeed(*_args: object, **_kwargs: object) -> MagicMock:
         call_count["n"] += 1
         if call_count["n"] < 2:
             raise RuntimeError("cold")

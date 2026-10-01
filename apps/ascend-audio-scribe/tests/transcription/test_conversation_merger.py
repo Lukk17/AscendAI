@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -36,10 +37,12 @@ async def test_transcribe_one_track_local(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(
         cm,
         "local_speech_transcription",
-        _AsyncIterOver([
-            {"text": "a", "start": 0.0, "end": 1.0},
-            {"text": "b", "start": 1.0, "end": 2.0},
-        ]),
+        _AsyncIterOver(
+            [
+                {"text": "a", "start": 0.0, "end": 1.0},
+                {"text": "b", "start": 1.0, "end": 2.0},
+            ]
+        ),
     )
     progress: list[dict[str, Any]] = []
     segments = await cm._transcribe_one_track(
@@ -61,7 +64,7 @@ async def test_transcribe_one_track_local(monkeypatch: pytest.MonkeyPatch) -> No
 @pytest.mark.asyncio
 async def test_transcribe_one_track_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        cm.asyncio,
+        asyncio,
         "to_thread",
         AsyncMock(return_value=[{"text": "a", "start": 0.0, "end": 1.0}]),
     )
@@ -82,7 +85,7 @@ async def test_transcribe_one_track_openai(monkeypatch: pytest.MonkeyPatch) -> N
 @pytest.mark.asyncio
 async def test_transcribe_one_track_hf(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        cm.asyncio,
+        asyncio,
         "to_thread",
         AsyncMock(return_value=[{"text": "h", "start": 0.0, "end": 1.0}]),
     )
@@ -118,7 +121,7 @@ async def test_transcribe_one_track_unknown_provider() -> None:
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_hf_handles_str(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cm.asyncio, "to_thread", AsyncMock(return_value="plain"))
+    monkeypatch.setattr(asyncio, "to_thread", AsyncMock(return_value="plain"))
     segments = await cm._transcribe_one_track(
         track_name="t",
         track_wav="x.wav",
@@ -135,7 +138,7 @@ async def test_transcribe_one_track_hf_handles_str(monkeypatch: pytest.MonkeyPat
 
 @pytest.mark.asyncio
 async def test_transcribe_one_track_openai_handles_str(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cm.asyncio, "to_thread", AsyncMock(return_value="plain text result"))
+    monkeypatch.setattr(asyncio, "to_thread", AsyncMock(return_value="plain text result"))
     segments = await cm._transcribe_one_track(
         track_name="t",
         track_wav="x.wav",
@@ -152,14 +155,17 @@ async def test_transcribe_one_track_openai_handles_str(monkeypatch: pytest.Monke
 
 async def _stub_track(**kw: Any) -> list[dict[str, Any]]:
     import asyncio as _aio
+
     await _aio.sleep(0)
     offset = float(kw["track_num"])
-    return [{
-        "text": f"line-{kw['track_name']}",
-        "start": offset,
-        "end": offset + 1,
-        "speaker": kw["track_name"],
-    }]
+    return [
+        {
+            "text": f"line-{kw['track_name']}",
+            "start": offset,
+            "end": offset + 1,
+            "speaker": kw["track_name"],
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -174,6 +180,7 @@ async def test_transcribe_and_merge_tracks_combines(monkeypatch: pytest.MonkeyPa
 
 async def _empty_track(**kw: Any) -> list[dict[str, Any]]:
     import asyncio as _aio
+
     await _aio.sleep(0)
     return [{"text": "", "start": 0.0, "end": 1.0, "speaker": kw["track_name"]}]
 
@@ -181,7 +188,5 @@ async def _empty_track(**kw: Any) -> list[dict[str, Any]]:
 @pytest.mark.asyncio
 async def test_transcribe_and_merge_tracks_strips_blank(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cm, "_transcribe_one_track", _empty_track)
-    out = await cm.transcribe_and_merge_tracks(
-        {"t1": "x.wav"}, provider="local", model="m", language="en"
-    )
+    out = await cm.transcribe_and_merge_tracks({"t1": "x.wav"}, provider="local", model="m", language="en")
     assert out == ""

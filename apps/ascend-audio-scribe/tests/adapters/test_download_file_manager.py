@@ -1,15 +1,18 @@
 import asyncio
+import os
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from src.adapters import download_file_manager as mgr
+from src.config.config import settings
 
 
 @pytest.fixture(autouse=True)
-def _reset_registry():
+def _reset_registry() -> Iterator[None]:
     mgr._file_registry.clear()
     yield
     mgr._file_registry.clear()
@@ -30,8 +33,8 @@ def test_get_transcript_returns_none_for_unknown() -> None:
 def test_get_transcript_returns_none_when_expired(monkeypatch: pytest.MonkeyPatch) -> None:
     file_id, path = mgr.store_transcript("y", "z.md")
     # Force expiry by advancing the clock past TTL.
-    base = time.monotonic() + mgr.settings.DOWNLOAD_FILE_TTL_SECONDS + 1
-    monkeypatch.setattr(mgr.time, "monotonic", lambda: base)
+    base = time.monotonic() + settings.DOWNLOAD_FILE_TTL_SECONDS + 1
+    monkeypatch.setattr(time, "monotonic", lambda: base)
     assert mgr.get_transcript_path(file_id) is None
     assert not Path(path).exists()
 
@@ -55,8 +58,8 @@ def test_remove_transcript_unknown() -> None:
 
 def test_cleanup_expired_removes_old(monkeypatch: pytest.MonkeyPatch) -> None:
     file_id, path = mgr.store_transcript("x", "x.md")
-    base = time.monotonic() + mgr.settings.DOWNLOAD_FILE_TTL_SECONDS + 1
-    monkeypatch.setattr(mgr.time, "monotonic", lambda: base)
+    base = time.monotonic() + settings.DOWNLOAD_FILE_TTL_SECONDS + 1
+    monkeypatch.setattr(time, "monotonic", lambda: base)
     mgr.cleanup_expired()
     assert file_id not in mgr._file_registry
     assert not Path(path).exists()
@@ -80,8 +83,8 @@ def test_cleanup_expired_handles_concurrent_pop(monkeypatch: pytest.MonkeyPatch)
             return super().pop(key, default)
 
     file_id, path = mgr.store_transcript("x", "x.md")
-    base = time.monotonic() + mgr.settings.DOWNLOAD_FILE_TTL_SECONDS + 1
-    monkeypatch.setattr(mgr.time, "monotonic", lambda: base)
+    base = time.monotonic() + settings.DOWNLOAD_FILE_TTL_SECONDS + 1
+    monkeypatch.setattr(time, "monotonic", lambda: base)
 
     racy = _RacyRegistry(mgr._file_registry)
     monkeypatch.setattr(mgr, "_file_registry", racy)
@@ -112,7 +115,7 @@ def test_remove_entry_with_explicit_path(tmp_path: Path) -> None:
 
 
 def test_cleanup_file_swallows_oserror(tmp_path: Path) -> None:
-    with patch.object(mgr.os, "remove", side_effect=OSError("nope")):
+    with patch.object(os, "remove", side_effect=OSError("nope")):
         mgr._cleanup_file(str(tmp_path / "x"))
 
 
@@ -124,7 +127,7 @@ async def test_run_cleanup_loop_runs_then_stops(monkeypatch: pytest.MonkeyPatch)
         calls["n"] += 1
 
     monkeypatch.setattr(mgr, "cleanup_expired", fake_cleanup)
-    monkeypatch.setattr(mgr.settings, "DOWNLOAD_CLEANUP_INTERVAL_SECONDS", 0.01)
+    monkeypatch.setattr(settings, "DOWNLOAD_CLEANUP_INTERVAL_SECONDS", 0.01)
 
     stop = asyncio.Event()
     task = asyncio.create_task(mgr.run_cleanup_loop(stop))
@@ -140,7 +143,7 @@ async def test_run_cleanup_loop_logs_on_failure(monkeypatch: pytest.MonkeyPatch)
         raise RuntimeError("kaboom")
 
     monkeypatch.setattr(mgr, "cleanup_expired", boom)
-    monkeypatch.setattr(mgr.settings, "DOWNLOAD_CLEANUP_INTERVAL_SECONDS", 0.01)
+    monkeypatch.setattr(settings, "DOWNLOAD_CLEANUP_INTERVAL_SECONDS", 0.01)
 
     stop = asyncio.Event()
     task = asyncio.create_task(mgr.run_cleanup_loop(stop))

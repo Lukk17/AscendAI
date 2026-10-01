@@ -6,6 +6,7 @@ import pytest
 from openai import APIError
 
 from src.api.exception_handlers import UpstreamProviderError
+from src.config.config import settings
 from src.transcription import openai_api_speach_to_text as mod
 
 
@@ -44,9 +45,7 @@ def test_get_client_lazy_init(monkeypatch: pytest.MonkeyPatch) -> None:
     assert first is second
 
 
-def test_transcribe_single_chunk_without_timestamps(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_without_timestamps(fake_openai_client: MagicMock, tmp_path: Path) -> None:
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     response = MagicMock()
@@ -57,9 +56,7 @@ def test_transcribe_single_chunk_without_timestamps(
     assert result == "hello"
 
 
-def test_transcribe_single_chunk_no_language(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_no_language(fake_openai_client: MagicMock, tmp_path: Path) -> None:
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     fake_openai_client.audio.transcriptions.create.return_value = MagicMock(text="x")
@@ -68,9 +65,7 @@ def test_transcribe_single_chunk_no_language(
     assert "language" not in kwargs
 
 
-def test_transcribe_single_chunk_with_timestamps(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_with_timestamps(fake_openai_client: MagicMock, tmp_path: Path) -> None:
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     seg = MagicMock(text="hi", start=0.0, end=1.0)
@@ -98,9 +93,7 @@ def test_transcribe_single_chunk_with_timestamps_none_segments(
     assert result == []
 
 
-def test_transcribe_single_chunk_api_error(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_transcribe_single_chunk_api_error(fake_openai_client: MagicMock, tmp_path: Path) -> None:
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     api_err = APIError("boom", request=MagicMock(), body=None)
@@ -121,9 +114,7 @@ def test_openai_transcript_under_limit_uses_direct_call(
     assert result == "direct"
 
 
-def test_openai_transcript_upstream_error_propagates(
-    fake_openai_client: MagicMock, tmp_path: Path
-) -> None:
+def test_openai_transcript_upstream_error_propagates(fake_openai_client: MagicMock, tmp_path: Path) -> None:
     f = tmp_path / "small.wav"
     f.write_bytes(b"x" * 100)
     api_err = APIError("boom", request=MagicMock(), body=None)
@@ -137,7 +128,7 @@ def test_openai_transcript_with_chunking_text(
     fake_openai_client: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     big = tmp_path / "big.wav"
-    big.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    big.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
 
     chunk_a = tmp_path / "a.wav"
     chunk_b = tmp_path / "b.wav"
@@ -150,9 +141,7 @@ def test_openai_transcript_with_chunking_text(
     fake_openai_client.audio.transcriptions.create.side_effect = [response_a, response_b]
 
     progress: list[dict[str, Any]] = []
-    result = mod.openai_transcript(
-        str(big), "whisper-1", "en", progress_callback=progress.append
-    )
+    result = mod.openai_transcript(str(big), "whisper-1", "en", progress_callback=progress.append)
     assert result == "part1 part2"
     assert progress, "progress callback should have been invoked"
 
@@ -161,7 +150,7 @@ def test_openai_transcript_with_chunking_timestamps(
     fake_openai_client: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     big = tmp_path / "big.wav"
-    big.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    big.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
     chunk = tmp_path / "c.wav"
     chunk.write_bytes(b"x")
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(chunk)]))
@@ -180,9 +169,9 @@ def test_openai_transcript_chunk_exceeds_limit(
 ) -> None:
     del fake_openai_client
     big = tmp_path / "big.wav"
-    big.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    big.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
     huge_chunk = tmp_path / "huge.wav"
-    huge_chunk.write_bytes(b"x" * (mod.settings.OPENAI_API_LIMIT_BYTES + 1))
+    huge_chunk.write_bytes(b"x" * (settings.OPENAI_API_LIMIT_BYTES + 1))
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks([str(huge_chunk)]))
 
     with pytest.raises(ValueError, match="exceeded OpenAI size limit"):

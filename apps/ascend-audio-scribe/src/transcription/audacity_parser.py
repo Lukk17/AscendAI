@@ -43,7 +43,7 @@ def _run_subprocess(binary: str, args: list[str]) -> subprocess.CompletedProcess
 
     cmd = [binary, *args]
     try:
-        result = subprocess.run(  # noqa: S603 — binary is a configured path; args sanitised by caller
+        result = subprocess.run(  # noqa: S603 - binary is a configured path; args sanitised by caller
             cmd,
             check=True,
             capture_output=True,
@@ -82,9 +82,12 @@ def _convert_and_normalize(input_path: str, output_path: str, offset_ms: int = 0
 def _generate_silence(output_path: str, duration_seconds: float) -> None:
     args = [
         "-y",
-        "-f", "lavfi",
-        "-i", f"anullsrc=r={TARGET_SAMPLE_RATE}:cl=mono",
-        "-t", f"{duration_seconds:.6f}",
+        "-f",
+        "lavfi",
+        "-i",
+        f"anullsrc=r={TARGET_SAMPLE_RATE}:cl=mono",
+        "-t",
+        f"{duration_seconds:.6f}",
         *_normalize_args(),
         output_path,
     ]
@@ -144,9 +147,7 @@ def _build_track_from_clips(
 
         gap_sec = offset_sec - current_time_sec
         if gap_sec > 0.001:
-            gap_path = os.path.join(
-                extraction_dir, f"gap_{track_idx}_{clip_idx}_{_safe_token()}.wav"
-            )
+            gap_path = os.path.join(extraction_dir, f"gap_{track_idx}_{clip_idx}_{_safe_token()}.wav")
             _generate_silence(gap_path, gap_sec)
             assembled_parts.append(gap_path)
 
@@ -174,9 +175,12 @@ def _build_track_from_clips(
 
 def _get_audio_duration(file_path: str) -> float:
     args = [
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
         file_path,
     ]
     result = _run_subprocess(settings.FFPROBE_PATH, args)
@@ -215,9 +219,7 @@ def _resolve_zip_member_target(name: str, root: Path) -> Path:
     return target
 
 
-def _stream_member_to_disk(
-    zip_ref: zipfile.ZipFile, member: zipfile.ZipInfo, target: Path
-) -> None:
+def _stream_member_to_disk(zip_ref: zipfile.ZipFile, member: zipfile.ZipInfo, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     with zip_ref.open(member) as src, target.open("wb") as dst:
         while True:
@@ -324,16 +326,12 @@ def _process_craig_imports(
             logger.warning(f"Could not find imported file: {filename}")
             continue
 
-        track_wav_path = os.path.join(
-            extraction_dir, f"track_{track_idx}_{_safe_token()}.wav"
-        )
+        track_wav_path = os.path.join(extraction_dir, f"track_{track_idx}_{_safe_token()}.wav")
         offset_ms = int(offset_sec * 1000)
 
         track_start = time.monotonic()
         _convert_and_normalize(found_path, track_wav_path, offset_ms)
-        logger.info(
-            f"Track '{track_name}' extracted in {time.monotonic() - track_start:.2f}s"
-        )
+        logger.info(f"Track '{track_name}' extracted in {time.monotonic() - track_start:.2f}s")
 
         tracks[track_name] = track_wav_path
 
@@ -357,9 +355,7 @@ def _process_standard_wavetracks(
         track_wav = _build_track_from_clips(clips, au_file_map, track_idx, extraction_dir)
 
         if track_wav:
-            logger.info(
-                f"Track '{track_name}' extracted in {time.monotonic() - track_start:.2f}s"
-            )
+            logger.info(f"Track '{track_name}' extracted in {time.monotonic() - track_start:.2f}s")
             tracks[track_name] = track_wav
         else:
             logger.info(f"Track '{track_name}' is empty. Skipping.")

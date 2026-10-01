@@ -17,9 +17,7 @@ request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         incoming = request.headers.get(REQUEST_ID_HEADER)
-        request_id = (
-            incoming if incoming and _REQUEST_ID_PATTERN.fullmatch(incoming) else str(uuid.uuid4())
-        )
+        request_id = incoming if incoming and _REQUEST_ID_PATTERN.fullmatch(incoming) else str(uuid.uuid4())
         token = request_id_ctx.set(request_id)
         try:
             response = await call_next(request)

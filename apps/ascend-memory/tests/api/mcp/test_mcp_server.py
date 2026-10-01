@@ -9,7 +9,7 @@ from src.api.mcp.mcp_server import (
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_insert_returns_success_envelope(mock_get_client):
+def test_memory_insert_returns_success_envelope(mock_get_client: MagicMock) -> None:
     mock_service = MagicMock()
     mock_service.add.return_value = [{"id": "m1"}]
     mock_get_client.return_value = mock_service
@@ -21,7 +21,7 @@ def test_memory_insert_returns_success_envelope(mock_get_client):
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_insert_uses_default_user_id_when_omitted(mock_get_client):
+def test_memory_insert_uses_default_user_id_when_omitted(mock_get_client: MagicMock) -> None:
     mock_service = MagicMock()
     mock_service.add.return_value = []
     mock_get_client.return_value = mock_service
@@ -31,14 +31,14 @@ def test_memory_insert_uses_default_user_id_when_omitted(mock_get_client):
     assert mock_service.add.call_args.kwargs["user_id"] == "default_user"
 
 
-def test_memory_insert_rejects_empty_text():
+def test_memory_insert_rejects_empty_text() -> None:
     result = memory_insert(text="")
     assert result["status"] == "error"
     assert result["code"] == "validation_error"
     assert "empty" in result["message"]
 
 
-def test_memory_insert_rejects_text_above_cap():
+def test_memory_insert_rejects_text_above_cap() -> None:
     from src.config.config import settings
 
     result = memory_insert(text="x" * (settings.MAX_MEMORY_TEXT_LENGTH + 1))
@@ -47,7 +47,7 @@ def test_memory_insert_rejects_text_above_cap():
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_insert_maps_unexpected_failure_to_internal_error(mock_get_client):
+def test_memory_insert_maps_unexpected_failure_to_internal_error(mock_get_client: MagicMock) -> None:
     mock_get_client.side_effect = RuntimeError("upstream burst into flames")
 
     result = memory_insert(text="hi")
@@ -58,7 +58,7 @@ def test_memory_insert_maps_unexpected_failure_to_internal_error(mock_get_client
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_search_returns_success_envelope(mock_get_client):
+def test_memory_search_returns_success_envelope(mock_get_client: MagicMock) -> None:
     mock_service = MagicMock()
     mock_service.search.return_value = [{"id": "m1", "score": 0.8}]
     mock_get_client.return_value = mock_service
@@ -69,29 +69,27 @@ def test_memory_search_returns_success_envelope(mock_get_client):
     mock_service.search.assert_called_once_with(query="find me", user_id="default_user", limit=5)
 
 
-def test_memory_search_rejects_empty_query():
+def test_memory_search_rejects_empty_query() -> None:
     result = memory_search(query="   ")
     assert result["code"] == "validation_error"
 
 
-def test_memory_search_rejects_query_above_cap():
+def test_memory_search_rejects_query_above_cap() -> None:
     from src.config.config import settings
 
     result = memory_search(query="x" * (settings.MAX_QUERY_LENGTH + 1))
     assert result["code"] == "validation_error"
 
 
-def test_memory_search_rejects_limit_out_of_range():
+def test_memory_search_rejects_limit_out_of_range() -> None:
     assert memory_search(query="q", limit=0)["code"] == "validation_error"
     from src.config.config import settings
-    assert (
-        memory_search(query="q", limit=settings.MAX_SEARCH_LIMIT + 1)["code"]
-        == "validation_error"
-    )
+
+    assert memory_search(query="q", limit=settings.MAX_SEARCH_LIMIT + 1)["code"] == "validation_error"
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_delete_returns_success(mock_get_client):
+def test_memory_delete_returns_success(mock_get_client: MagicMock) -> None:
     mock_service = MagicMock()
     mock_get_client.return_value = mock_service
 
@@ -102,12 +100,12 @@ def test_memory_delete_returns_success(mock_get_client):
     mock_service.delete.assert_called_once_with(memory_id="m1")
 
 
-def test_memory_delete_rejects_empty_id():
+def test_memory_delete_rejects_empty_id() -> None:
     assert memory_delete(memory_id="")["code"] == "validation_error"
 
 
 @patch("src.api.mcp.mcp_server.wipe_user_all_collections")
-def test_memory_wipe_without_provider_wipes_all_collections(mock_wipe_all):
+def test_memory_wipe_without_provider_wipes_all_collections(mock_wipe_all: MagicMock) -> None:
     result = memory_wipe(user_id="u1")
 
     assert result["status"] == "success"
@@ -116,14 +114,14 @@ def test_memory_wipe_without_provider_wipes_all_collections(mock_wipe_all):
 
 
 @patch("src.api.mcp.mcp_server.wipe_user_all_collections")
-def test_memory_wipe_uses_default_user_id(mock_wipe_all):
+def test_memory_wipe_uses_default_user_id(mock_wipe_all: MagicMock) -> None:
     memory_wipe()
 
     mock_wipe_all.assert_called_once_with(user_id="default_user")
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_wipe_with_explicit_provider_wipes_that_provider_only(mock_get_client):
+def test_memory_wipe_with_explicit_provider_wipes_that_provider_only(mock_get_client: MagicMock) -> None:
     mock_service = MagicMock()
     mock_get_client.return_value = mock_service
 
@@ -134,7 +132,7 @@ def test_memory_wipe_with_explicit_provider_wipes_that_provider_only(mock_get_cl
 
 
 @patch("src.api.mcp.mcp_server.get_memory_client")
-def test_memory_wipe_unknown_provider_returns_validation_error(mock_get_client):
+def test_memory_wipe_unknown_provider_returns_validation_error(mock_get_client: MagicMock) -> None:
     result = memory_wipe(provider="not-real")
     assert result["code"] == "validation_error"
     mock_get_client.assert_not_called()

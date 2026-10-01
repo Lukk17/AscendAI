@@ -3,9 +3,11 @@ import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import defusedxml.ElementTree as DET
 import pytest
 
 from src.api.exception_handlers import FileSizeExceededError
+from src.config.config import settings
 from src.transcription import audacity_parser as ap
 
 
@@ -25,29 +27,27 @@ def test_normalize_args_shape() -> None:
 
 def test_run_subprocess_records_success(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = MagicMock(returncode=0)
-    monkeypatch.setattr(ap.subprocess, "run", MagicMock(return_value=fake))
+    monkeypatch.setattr(subprocess, "run", MagicMock(return_value=fake))
     result = ap._run_subprocess("ffmpeg", ["-y"])
     assert result is fake
 
 
 def test_run_subprocess_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        ap.subprocess, "run", MagicMock(side_effect=subprocess.TimeoutExpired("ffmpeg", 1))
-    )
+    monkeypatch.setattr(subprocess, "run", MagicMock(side_effect=subprocess.TimeoutExpired("ffmpeg", 1)))
     with pytest.raises(OSError, match="timed out"):
         ap._run_subprocess("ffmpeg", ["-y"])
 
 
 def test_run_subprocess_called_process_error(monkeypatch: pytest.MonkeyPatch) -> None:
     err = subprocess.CalledProcessError(1, "ffmpeg", stderr=b"bad")
-    monkeypatch.setattr(ap.subprocess, "run", MagicMock(side_effect=err))
+    monkeypatch.setattr(subprocess, "run", MagicMock(side_effect=err))
     with pytest.raises(OSError, match="exit code 1"):
         ap._run_subprocess("ffmpeg", ["-y"])
 
 
 def test_run_subprocess_called_process_error_no_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     err = subprocess.CalledProcessError(2, "ffmpeg", stderr=None)
-    monkeypatch.setattr(ap.subprocess, "run", MagicMock(side_effect=err))
+    monkeypatch.setattr(subprocess, "run", MagicMock(side_effect=err))
     with pytest.raises(OSError, match="exit code 2"):
         ap._run_subprocess("ffmpeg", ["-y"])
 
@@ -56,7 +56,7 @@ def test_run_ffmpeg_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
     sub = MagicMock(return_value=MagicMock(returncode=0))
     monkeypatch.setattr(ap, "_run_subprocess", sub)
     ap._run_ffmpeg(["-i", "x"])
-    sub.assert_called_once_with(ap.settings.FFMPEG_PATH, ["-i", "x"])
+    sub.assert_called_once_with(settings.FFMPEG_PATH, ["-i", "x"])
 
 
 def test_convert_and_normalize_with_offset(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -113,13 +113,9 @@ def test_build_track_from_clips_empty(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert ap._build_track_from_clips([], {}, 0, str(tmp_path)) is None
 
 
-def test_build_track_from_clips_single_with_gap(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_build_track_from_clips_single_with_gap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(ap, "_generate_silence", MagicMock())
-    monkeypatch.setattr(
-        ap, "_assemble_clip_blocks", MagicMock(return_value=str(tmp_path / "clip.wav"))
-    )
+    monkeypatch.setattr(ap, "_assemble_clip_blocks", MagicMock(return_value=str(tmp_path / "clip.wav")))
     monkeypatch.setattr(ap, "_get_audio_duration", MagicMock(return_value=1.0))
     monkeypatch.setattr(ap, "_write_concat_list", MagicMock())
     monkeypatch.setattr(ap, "_concat_via_list", MagicMock())
@@ -129,9 +125,7 @@ def test_build_track_from_clips_single_with_gap(
     assert out is not None
 
 
-def test_build_track_from_clips_multi_concat(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_build_track_from_clips_multi_concat(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     paths = [str(tmp_path / f"c{i}.wav") for i in range(3)]
     for p in paths:
         Path(p).write_bytes(b"x")
@@ -149,9 +143,7 @@ def test_build_track_from_clips_multi_concat(
     assert out is not None
 
 
-def test_build_track_from_clips_skips_missing(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_build_track_from_clips_skips_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(ap, "_assemble_clip_blocks", MagicMock(return_value=None))
     clips = [{"offset": 0.0, "au_files": ["x.au"]}]
     out = ap._build_track_from_clips(clips, {}, 0, str(tmp_path))
@@ -168,7 +160,7 @@ def test_get_audio_duration(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_safe_zip_extract_rejects_traversal(tmp_path: Path) -> None:
     zip_path = tmp_path / "bad.zip"
     # Create a zip with a traversal entry. We need to bypass ZipFile's sanitization
-    # by constructing the zip raw bytes — alternative: use a relative path that resolves outside.
+    # by constructing the zip raw bytes - alternative: use a relative path that resolves outside.
     with zipfile.ZipFile(zip_path, "w") as zf:
         info = zipfile.ZipInfo(filename="../escape.txt")
         zf.writestr(info, b"bad")
@@ -189,15 +181,13 @@ def test_safe_zip_extract_rejects_directory_traversal(tmp_path: Path) -> None:
         ap._safe_zip_extract(str(zip_path), str(extract))
 
 
-def test_safe_zip_extract_size_cap(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_safe_zip_extract_size_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     zip_path = tmp_path / "big.zip"
     with zipfile.ZipFile(zip_path, "w") as zf:
         zf.writestr("big.bin", b"x" * 10_000)
     extract = tmp_path / "ok"
     extract.mkdir()
-    monkeypatch.setattr(ap.settings, "MAX_ZIP_UNCOMPRESSED_BYTES", 100)
+    monkeypatch.setattr(settings, "MAX_ZIP_UNCOMPRESSED_BYTES", 100)
     with pytest.raises(FileSizeExceededError):
         ap._safe_zip_extract(str(zip_path), str(extract))
 
@@ -232,7 +222,7 @@ def _build_minimal_aup_zip(zip_path: Path, *, kind: str) -> None:
             '<?xml version="1.0"?>'
             '<project xmlns="http://audacity.sourceforge.net/xml/" rate="44100.0">'
             '  <import filename="speaker_a.wav" offset="0.0"/>'
-            '</project>'
+            "</project>"
         )
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("project.aup", aup_xml)
@@ -245,10 +235,10 @@ def _build_minimal_aup_zip(zip_path: Path, *, kind: str) -> None:
             '    <waveclip offset="0.0">'
             '      <waveblock start="0">'
             '        <simpleblockfile filename="b0.au"/>'
-            '      </waveblock>'
-            '    </waveclip>'
-            '  </wavetrack>'
-            '</project>'
+            "      </waveblock>"
+            "    </waveclip>"
+            "  </wavetrack>"
+            "</project>"
         )
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("project.aup", aup_xml)
@@ -307,9 +297,7 @@ def test_process_craig_imports_skips_no_filename(tmp_path: Path) -> None:
     assert tracks == {}
 
 
-def test_process_craig_imports_skips_missing_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_process_craig_imports_skips_missing_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from xml.etree.ElementTree import Element
 
     el = Element("import")
@@ -350,7 +338,7 @@ def test_parse_clips_skips_empty_simpleblockfile_filename() -> None:
     block = Element("waveblock")
     block.set("start", "0")
     simple = Element("simpleblockfile")
-    # No `filename` attribute set — should be silently skipped.
+    # No `filename` attribute set - should be silently skipped.
     block.append(simple)
     clip.append(block)
     track.append(clip)
@@ -367,7 +355,7 @@ def test_parse_clips_skips_empty_pcmaliasblockfile_aliasfile() -> None:
     block = Element("waveblock")
     block.set("start", "0")
     alias = Element("pcmaliasblockfile")
-    # No `aliasfile` attribute — silently skipped.
+    # No `aliasfile` attribute - silently skipped.
     block.append(alias)
     clip.append(block)
     track.append(clip)
@@ -379,16 +367,14 @@ def test_extract_tracks_returns_empty_when_aup_has_no_tracks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """When the AUP file has neither `<import>` nor `<wavetrack>` elements
-    the returned dict is empty — and the metric inc is skipped (covers the
+    the returned dict is empty - and the metric inc is skipped (covers the
     `if tracks:` False branch in extract_tracks_from_aup)."""
 
     import zipfile as _zip
 
     zip_path = tmp_path / "barren.zip"
     aup_xml = (
-        '<?xml version="1.0"?>'
-        '<project xmlns="http://audacity.sourceforge.net/xml/" rate="44100.0">'
-        '</project>'
+        '<?xml version="1.0"?><project xmlns="http://audacity.sourceforge.net/xml/" rate="44100.0"></project>'
     )
     with _zip.ZipFile(zip_path, "w") as zf:
         zf.writestr("project.aup", aup_xml)
@@ -426,9 +412,7 @@ def test_parse_clips_handles_pcmaliasblockfile() -> None:
     assert clips[0]["au_files"] == ["external.wav"]
 
 
-def test_extract_tracks_handles_missing_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_extract_tracks_handles_missing_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import zipfile
 
     zip_path = tmp_path / "p.zip"
@@ -441,6 +425,6 @@ def test_extract_tracks_handles_missing_root(
         def getroot(self) -> None:
             return None
 
-    monkeypatch.setattr(ap.DET, "parse", lambda _path: _Tree())
+    monkeypatch.setattr(DET, "parse", lambda _path: _Tree())
     with pytest.raises(ValueError, match="no root element"):
         ap.extract_tracks_from_aup(str(zip_path), str(out))

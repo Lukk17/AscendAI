@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 readiness_router = APIRouter(tags=["health"])
 
-# Probe budget — every dependency probe shares the same wall-clock cap so
+# Probe budget - every dependency probe shares the same wall-clock cap so
 # /ready stays responsive when an upstream is slow.
 PROBE_TIMEOUT_SECONDS = 3.0
 
@@ -22,9 +22,7 @@ async def _probe_qdrant() -> dict[str, str]:
 
     try:
         async with httpx.AsyncClient(timeout=PROBE_TIMEOUT_SECONDS) as client:
-            response = await client.get(
-                f"http://{settings.QDRANT_HOST}:{settings.QDRANT_PORT}/healthz"
-            )
+            response = await client.get(f"http://{settings.QDRANT_HOST}:{settings.QDRANT_PORT}/healthz")
             return {"status": "ok"} if response.status_code == 200 else {"status": "error"}
     except Exception as exc:
         logger.warning("/ready: qdrant probe failed: %s", exc)

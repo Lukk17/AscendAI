@@ -1,5 +1,8 @@
 import sys
+from collections.abc import AsyncIterator, Iterator
 from unittest.mock import MagicMock, patch
+
+from starlette.types import Receive, Scope, Send
 
 # Mock mem0ai dependencies
 mock_mem0 = MagicMock()
@@ -23,7 +26,7 @@ from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
-async def _mock_lifespan_context(_app):
+async def _mock_lifespan_context(_app: object) -> AsyncIterator[None]:
     # Intentionally empty: FastAPI's lifespan contract only needs an
     # enter/exit pair, and the mocked MCP app has no startup or teardown to
     # perform during tests.
@@ -37,7 +40,7 @@ _mock_router.lifespan_context = _mock_lifespan_context
 class _MockMcpAsgiApp:
     router = _mock_router
 
-    async def __call__(self, _scope, _receive, _send):
+    async def __call__(self, _scope: Scope, _receive: Receive, _send: Send) -> None:
         # Intentionally a no-op: tests never invoke the MCP ASGI app
         # directly; this stub only satisfies the ASGI callable protocol so
         # the FastAPI mount succeeds during app construction.
@@ -59,7 +62,7 @@ from src.service.memory_client import AscendMemoryClient
 
 
 @pytest.fixture
-def mock_memory_service():
+def mock_memory_service() -> MagicMock:
     """
     Returns the internal mocked Memory instance.
     This allows checking if .add(), .search(), etc. were called on the underlying library.
@@ -68,7 +71,7 @@ def mock_memory_service():
 
 
 @pytest.fixture
-def override_dependencies():
+def override_dependencies() -> Iterator[MagicMock]:
     """
     Patches get_memory_client in rest_endpoints so all endpoint calls return a mock client.
     Returns the mock AscendMemoryClient for assertion.
@@ -79,7 +82,7 @@ def override_dependencies():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def client(override_dependencies) -> AsyncGenerator[AsyncClient, None]:
+async def client(override_dependencies: MagicMock) -> AsyncGenerator[AsyncClient, None]:
     """
     Creates an async test client for the FastAPI app.
     Uses the override_dependencies fixture to ensure no real DB calls happen.
@@ -93,7 +96,7 @@ async def client(override_dependencies) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest.fixture(autouse=True)
-def reset_global_mocks():
+def reset_global_mocks() -> Iterator[None]:
     """Reset global mocks before each test to avoid state pollution."""
     mock_memory_instance.reset_mock()
     mock_memory_instance.side_effect = None

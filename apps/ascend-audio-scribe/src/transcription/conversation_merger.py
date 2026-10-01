@@ -1,7 +1,7 @@
 """Multi-track Audacity conversation merger.
 
 Transcribes every extracted track in parallel (bounded by a semaphore whose
-size depends on the provider — 1 for local-GPU, larger for network-bound
+size depends on the provider - 1 for local-GPU, larger for network-bound
 OpenAI / HF), then merges segments chronologically with speaker tags.
 """
 
@@ -47,11 +47,13 @@ async def _transcribe_one_track(
 
     logger.info(f"Transcribing track '{track_name}' ({track_num}/{total_tracks})...")
     if progress_callback:
-        progress_callback({
-            "type": "progress",
-            "message": f"Transcribing track '{track_name}' ({track_num}/{total_tracks})",
-            "data": {"track": track_num, "total_tracks": total_tracks, "track_name": track_name},
-        })
+        progress_callback(
+            {
+                "type": "progress",
+                "message": f"Transcribing track '{track_name}' ({track_num}/{total_tracks})",
+                "data": {"track": track_num, "total_tracks": total_tracks, "track_name": track_name},
+            }
+        )
 
     segments: list[dict[str, Any]] = []
     if provider == "local":
@@ -87,15 +89,15 @@ async def _transcribe_one_track(
     for segment in segments:
         segment["speaker"] = track_name
 
-    logger.info(
-        f"Track '{track_name}' ({track_num}/{total_tracks}) complete with {len(segments)} segments."
-    )
+    logger.info(f"Track '{track_name}' ({track_num}/{total_tracks}) complete with {len(segments)} segments.")
     if progress_callback:
-        progress_callback({
-            "type": "progress",
-            "message": f"Track '{track_name}' complete ({len(segments)} segments)",
-            "data": {"track": track_num, "total_tracks": total_tracks, "segments": len(segments)},
-        })
+        progress_callback(
+            {
+                "type": "progress",
+                "message": f"Track '{track_name}' complete ({len(segments)} segments)",
+                "data": {"track": track_num, "total_tracks": total_tracks, "segments": len(segments)},
+            }
+        )
 
     return segments
 
@@ -130,10 +132,7 @@ async def transcribe_and_merge_tracks(
             )
 
     track_results = await asyncio.gather(
-        *[
-            _gated(name, path, idx + 1)
-            for idx, (name, path) in enumerate(tracks.items())
-        ]
+        *[_gated(name, path, idx + 1) for idx, (name, path) in enumerate(tracks.items())]
     )
 
     all_segments: list[dict[str, Any]] = [s for segments in track_results for s in segments]

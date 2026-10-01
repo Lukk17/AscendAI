@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -76,7 +77,7 @@ class _FakeChunks:
 async def test_local_speech_transcription_stream_yields_segments(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mod, "chunked_audio", _FakeChunks(["chunk0.wav", "chunk1.wav"]))
     monkeypatch.setattr(
-        mod.asyncio,
+        asyncio,
         "to_thread",
         AsyncMock(return_value=[{"text": "hi", "start": 0.0, "end": 1.0}]),
     )

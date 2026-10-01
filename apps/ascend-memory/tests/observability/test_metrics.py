@@ -3,7 +3,7 @@ from prometheus_client import generate_latest
 from src.observability import metrics
 
 
-def test_counters_registered_with_provider_and_outcome_labels():
+def test_counters_registered_with_provider_and_outcome_labels() -> None:
     for counter in (
         metrics.MEMORY_INSERT_TOTAL,
         metrics.MEMORY_SEARCH_TOTAL,
@@ -22,7 +22,7 @@ def test_counters_registered_with_provider_and_outcome_labels():
         assert name in payload
 
 
-def test_histograms_registered_with_provider_label():
+def test_histograms_registered_with_provider_label() -> None:
     for histogram in (
         metrics.MEMORY_INSERT_DURATION_SECONDS,
         metrics.MEMORY_SEARCH_DURATION_SECONDS,

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -5,6 +6,7 @@ import pytest
 
 from src.adapters import file_service
 from src.api.exception_handlers import FileSizeExceededError
+from src.config.config import settings
 
 
 def test_create_temp_file_returns_path() -> None:
@@ -23,7 +25,7 @@ def test_safe_suffix_empty_filename() -> None:
 
 
 def test_safe_suffix_handles_exception() -> None:
-    """When Path() raises (rare — usually a passing-non-str filename), the
+    """When Path() raises (rare - usually a passing-non-str filename), the
     fallback returns an empty string. Patches the symbol the production
     code calls."""
 
@@ -38,7 +40,7 @@ def test_cleanup_temp_file_handles_none() -> None:
 def test_cleanup_temp_file_swallows_oserror(tmp_path: Path) -> None:
     path = tmp_path / "x.txt"
     path.write_text("y", encoding="utf-8")
-    with patch.object(file_service.os, "remove", side_effect=OSError("nope")):
+    with patch.object(os, "remove", side_effect=OSError("nope")):
         file_service.cleanup_temp_file(str(path))
 
 
@@ -62,8 +64,8 @@ async def test_save_upload_streams_and_succeeds(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_save_upload_enforces_size_cap(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(file_service.settings, "MAX_UPLOAD_BYTES", 100)
-    monkeypatch.setattr(file_service.settings, "UPLOAD_BUFFER_BYTES", 64)
+    monkeypatch.setattr(settings, "MAX_UPLOAD_BYTES", 100)
+    monkeypatch.setattr(settings, "UPLOAD_BUFFER_BYTES", 64)
     upload = MagicMock()
     upload.filename = "big.wav"
     upload.seek = AsyncMock()

@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -7,7 +7,7 @@ from src.observability.metrics import MEMORY_SEARCH_TOTAL
 
 
 @pytest.mark.asyncio
-async def test_insert_memory_success(client: AsyncClient, override_dependencies):
+async def test_insert_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
     mock_service = override_dependencies
     mock_service.add.return_value = [{"id": "m1"}]
 
@@ -22,7 +22,7 @@ async def test_insert_memory_success(client: AsyncClient, override_dependencies)
 
 
 @pytest.mark.asyncio
-async def test_insert_memory_with_provider(client: AsyncClient, override_dependencies):
+async def test_insert_memory_with_provider(client: AsyncClient, override_dependencies: MagicMock) -> None:
     mock_service = override_dependencies
     mock_service.add.return_value = []
 
@@ -37,21 +37,19 @@ async def test_insert_memory_with_provider(client: AsyncClient, override_depende
 
 @pytest.mark.asyncio
 async def test_insert_memory_rejects_missing_user_id(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     response = await client.post("/api/v1/memory/insert", json={"text": "x"})
 
     assert response.status_code == 422
     body = response.json()
-    assert any(
-        "user_id" in str(e.get("loc", [])) for e in body.get("detail", [])
-    )
+    assert any("user_id" in str(e.get("loc", [])) for e in body.get("detail", []))
 
 
 @pytest.mark.asyncio
 async def test_insert_memory_rejects_missing_text_and_messages(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     response = await client.post(
         "/api/v1/memory/insert",
         json={"user_id": "u1"},
@@ -64,11 +62,9 @@ async def test_insert_memory_rejects_missing_text_and_messages(
 
 
 @pytest.mark.asyncio
-async def test_search_memory_success(client: AsyncClient, override_dependencies):
+async def test_search_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
     mock_service = override_dependencies
-    mock_service.search.return_value = [
-        {"id": "m1", "memory": "fact one", "score": 0.8}
-    ]
+    mock_service.search.return_value = [{"id": "m1", "memory": "fact one", "score": 0.8}]
 
     response = await client.get(
         "/api/v1/memory/search",
@@ -82,12 +78,10 @@ async def test_search_memory_success(client: AsyncClient, override_dependencies)
 
 @pytest.mark.asyncio
 async def test_search_memory_response_includes_user_id(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     mock_service = override_dependencies
-    mock_service.search.return_value = [
-        {"id": "m1", "memory": "fact one", "score": 0.9, "user_id": "u1"}
-    ]
+    mock_service.search.return_value = [{"id": "m1", "memory": "fact one", "score": 0.9, "user_id": "u1"}]
 
     response = await client.get(
         "/api/v1/memory/search",
@@ -101,8 +95,8 @@ async def test_search_memory_response_includes_user_id(
 
 @pytest.mark.asyncio
 async def test_search_memory_rejects_too_long_query(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     long_q = "x" * 5000
 
     response = await client.get(
@@ -115,8 +109,8 @@ async def test_search_memory_rejects_too_long_query(
 
 @pytest.mark.asyncio
 async def test_search_memory_rejects_user_id_with_unsafe_chars(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     response = await client.get(
         "/api/v1/memory/search",
         params={"user_id": "../etc/passwd", "query": "q"},
@@ -127,8 +121,8 @@ async def test_search_memory_rejects_user_id_with_unsafe_chars(
 
 @pytest.mark.asyncio
 async def test_search_memory_upstream_failure_maps_to_500_and_records_error_outcome(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     """When the memory client's search call fails (e.g. Qdrant is down or
     the embedder times out), the caller must see a 500 rather than a
     silently empty result, and the search outcome metric must record
@@ -155,7 +149,7 @@ async def test_search_memory_upstream_failure_maps_to_500_and_records_error_outc
 
 
 @pytest.mark.asyncio
-async def test_delete_memory_success(client: AsyncClient, override_dependencies):
+async def test_delete_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
     mock_service = override_dependencies
 
     response = await client.delete("/api/v1/memory", params={"memory_id": "m1"})
@@ -166,7 +160,7 @@ async def test_delete_memory_success(client: AsyncClient, override_dependencies)
 
 
 @pytest.mark.asyncio
-async def test_wipe_memory_success(client: AsyncClient, override_dependencies):
+async def test_wipe_memory_success(client: AsyncClient, override_dependencies: MagicMock) -> None:
     with patch("src.api.rest.rest_endpoints.wipe_user_all_collections") as mock_wipe_all:
         response = await client.post("/api/v1/memory/wipe", params={"user_id": "u1"})
 
@@ -177,8 +171,8 @@ async def test_wipe_memory_success(client: AsyncClient, override_dependencies):
 
 @pytest.mark.asyncio
 async def test_wipe_memory_with_explicit_provider_wipes_only_that_provider(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     """A caller who names a provider (e.g. resetting a single user's
     LM Studio-embedded memories without touching their OpenAI-embedded
     ones) must only wipe that provider's collection, not every provider
@@ -199,9 +193,7 @@ async def test_wipe_memory_with_explicit_provider_wipes_only_that_provider(
 
 
 @pytest.mark.asyncio
-async def test_value_error_maps_to_rfc7807_400(
-    client: AsyncClient, override_dependencies
-):
+async def test_value_error_maps_to_rfc7807_400(client: AsyncClient, override_dependencies: MagicMock) -> None:
     mock_service = override_dependencies
     mock_service.add.side_effect = ValueError("nope")
 
@@ -219,8 +211,8 @@ async def test_value_error_maps_to_rfc7807_400(
 
 @pytest.mark.asyncio
 async def test_unexpected_exception_maps_to_rfc7807_500(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     mock_service = override_dependencies
     sentinel_leak = "UPSTREAM_LEAK_MARKER_99"
     mock_service.add.side_effect = RuntimeError(f"upstream BLEW UP with {sentinel_leak}")
@@ -239,7 +231,7 @@ async def test_unexpected_exception_maps_to_rfc7807_500(
 
 
 @pytest.mark.asyncio
-async def test_request_id_header_echoed_back(client: AsyncClient, override_dependencies):
+async def test_request_id_header_echoed_back(client: AsyncClient, override_dependencies: MagicMock) -> None:
     response = await client.get("/health", headers={"X-Request-ID": "trace-123"})
 
     assert response.headers["X-Request-ID"] == "trace-123"
@@ -247,8 +239,8 @@ async def test_request_id_header_echoed_back(client: AsyncClient, override_depen
 
 @pytest.mark.asyncio
 async def test_request_id_malformed_replaced_with_uuid(
-    client: AsyncClient, override_dependencies
-):
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
     response = await client.get(
         "/health",
         headers={"X-Request-ID": "bad\r\nheader-injection"},

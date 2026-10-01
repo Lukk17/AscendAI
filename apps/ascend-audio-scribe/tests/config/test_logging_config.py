@@ -48,9 +48,7 @@ def test_correlation_filter_injects_request_id() -> None:
 def test_setup_logging_installs_correlation_filter() -> None:
     setup_logging()
     root = logging.getLogger()
-    assert any(
-        isinstance(f, CorrelationFilter) for h in root.handlers for f in h.filters
-    )
+    assert any(isinstance(f, CorrelationFilter) for h in root.handlers for f in h.filters)
 
 
 def test_uvicorn_log_config_shape() -> None:

@@ -83,9 +83,7 @@ def _format_local_transcription(
     segments: list[dict[str, Any]], with_timestamps: bool
 ) -> list[dict[str, Any]] | str:
     if with_timestamps:
-        return [
-            {"text": s["text"], "timestamp": (s["start"], s["end"])} for s in segments
-        ]
+        return [{"text": s["text"], "timestamp": (s["start"], s["end"])} for s in segments]
     return " ".join(s["text"] for s in segments)
 
 

@@ -3,6 +3,7 @@ from types import TracebackType
 from typing import Any, cast
 from unittest.mock import MagicMock
 
+import mem0
 import pytest
 
 import src.service.memory_client as client_module
@@ -123,7 +124,7 @@ def test_init_routes_lmstudio_through_lmstudio_llm_backend(
         captured["config"] = config
         return mock_memory_service
 
-    monkeypatch.setattr(client_module.Memory, "from_config", fake_from_config)
+    monkeypatch.setattr(mem0.Memory, "from_config", fake_from_config)
 
     AscendMemoryClient("lmstudio")
     assert captured["config"]["llm"]["provider"] == "lmstudio"
@@ -139,8 +140,9 @@ def test_init_routes_openai_through_openai_llm_backend(
         captured["config"] = config
         return mock_memory_service
 
-    monkeypatch.setattr(client_module.Memory, "from_config", fake_from_config)
+    monkeypatch.setattr(mem0.Memory, "from_config", fake_from_config)
     from src.config import config as cfg
+
     monkeypatch.setattr(cfg.settings, "OPENAI_API_KEY", "sk-test", raising=False)
 
     AscendMemoryClient("openai")

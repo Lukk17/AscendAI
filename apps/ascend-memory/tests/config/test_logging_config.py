@@ -24,9 +24,7 @@ def _make_record(level: int = logging.INFO, msg: str = "hello") -> logging.LogRe
 
 
 def test_centered_level_formatter_centres_level_token() -> None:
-    fmt = CenteredLevelFormatter(
-        "%(log_color)s - %(levelname)s - %(message)s", log_colors=_LOG_COLORS
-    )
+    fmt = CenteredLevelFormatter("%(log_color)s - %(levelname)s - %(message)s", log_colors=_LOG_COLORS)
     record = _make_record(logging.INFO)
     formatted = fmt.format(record)
     assert "  INFO  " in formatted
@@ -57,11 +55,7 @@ def test_setup_logging_attaches_correlation_filter() -> None:
     setup_logging()
     root = logging.getLogger()
     assert root.handlers
-    assert any(
-        isinstance(f, CorrelationFilter)
-        for handler in root.handlers
-        for f in handler.filters
-    )
+    assert any(isinstance(f, CorrelationFilter) for handler in root.handlers for f in handler.filters)
 
 
 def test_uvicorn_log_config_shape_is_complete() -> None:
