@@ -1,38 +1,33 @@
 import logging
-from typing import Any
+from typing import Any, NoReturn
 
+from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
+from src.api.exception_handlers import error_registry
 from src.config.config import settings
 from src.service.memory_client import get_memory_client, resolve_provider, wipe_user_all_collections
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("AscendMemory")
+mcp = FastMCP("ascend-memory")
 
 
-def _structured_error(operation: str, exc: Exception) -> dict[str, Any]:
-    """Same error envelope every tool returns when something goes wrong.
-    Logs the full exception server-side, surfaces only the message client-
-    side. ValueErrors are user-actionable (unknown provider, bad input);
-    everything else maps to a generic 'internal_error' code."""
+def _raise_mapped_error(operation: str, exc: Exception) -> NoReturn:
+    """Re-raise a failure as a tool error whose text starts with the registry code.
 
-    if isinstance(exc, ValueError):
-        return {
-            "status": "error",
-            "code": "validation_error",
-            "operation": operation,
-            "message": str(exc),
-        }
+    The code and detail come from the service error registry, the same mapping
+    the library McpRefusalMiddleware applies to registered exceptions.
+    """
+
+    entry = error_registry.lookup(exc)
+    if entry is not None:
+        raise ToolError(f"{entry.code.code}: {resolve_detail(entry, exc)}") from exc
 
     logger.exception(f"MCP {operation} failed")
 
-    return {
-        "status": "error",
-        "code": "internal_error",
-        "operation": operation,
-        "message": "An internal error occurred. Check service logs.",
-    }
+    raise ToolError(f"{INTERNAL.code}: {INTERNAL_FIXED_DETAIL}") from exc
 
 
 @mcp.tool()
@@ -66,7 +61,7 @@ def memory_insert(
 
         return {"status": "success", "results": results}
     except Exception as exc:
-        return _structured_error("memory_insert", exc)
+        _raise_mapped_error("memory_insert", exc)
 
 
 @mcp.tool()
@@ -102,7 +97,7 @@ def memory_search(
 
         return {"status": "success", "results": results}
     except Exception as exc:
-        return _structured_error("memory_search", exc)
+        _raise_mapped_error("memory_search", exc)
 
 
 @mcp.tool()
@@ -123,7 +118,7 @@ def memory_delete(memory_id: str, provider: str | None = None) -> dict[str, Any]
 
         return {"status": "success", "message": f"Memory {memory_id} deleted."}
     except Exception as exc:
-        return _structured_error("memory_delete", exc)
+        _raise_mapped_error("memory_delete", exc)
 
 
 @mcp.tool()
@@ -145,4 +140,4 @@ def memory_wipe(user_id: str | None = None, provider: str | None = None) -> dict
 
         return {"status": "success", "message": f"All memories wiped for user {effective_user_id}."}
     except Exception as exc:
-        return _structured_error("memory_wipe", exc)
+        _raise_mapped_error("memory_wipe", exc)

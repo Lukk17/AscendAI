@@ -97,7 +97,7 @@ it, and wipes it. Two tests with disjoint `user_id` lists can run side by side. 
 
 | Constraint | Tests | Why |
 | :--- | :--- | :--- |
-| **No persistence** | 1 | Test 1 hits FastAPI's request validator (422) before mem0 is invoked. No Qdrant writes. Runs in any order. |
+| **No persistence** | 1 | Test 1 hits the request validator (400 `validation` problem body) before mem0 is invoked. No Qdrant writes. Runs in any order. |
 | **Disjoint user IDs** | 2, 3, 5, 6 | Each test owns its own dedicated user IDs (`frostyMemoryInsertSearchTest`, `frostyMemoryWipeAlpha`/`Beta`, `frostyMemoryMcpInsertSearchTest`, `frostyMemoryIsolationUserA`/`B`). No overlap, so they can run in parallel. |
 | **Read-only protocol probe** | 4 | `tools/list` is a pure read against the MCP server. No state writes. |
 
@@ -146,7 +146,7 @@ Numbered by setup cost. Easiest first.
 
 | #  | Spec | What it proves |
 | :- | :--- | :--- |
-| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /api/v1/memory/insert` with a body missing the required `user_id` field is rejected by FastAPI with HTTP 422 before any mem0 / Qdrant call. |
+| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /api/v1/memory/insert` with a body missing the required `user_id` field is rejected with HTTP 400 (`validation` problem body) before any mem0 / Qdrant call. |
 | 2  | [testing/2-insert-and-search-test.md](testing/2-insert-and-search-test.md) | A memory inserted via `POST /api/v1/memory/insert` for a unique `user_id` is retrievable via `GET /api/v1/memory/search` with a semantically related query; the returned `memory` field contains the canary substring `"Reykjavik"`. |
 | 3  | [testing/3-wipe-user-scope-test.md](testing/3-wipe-user-scope-test.md) | `POST /api/v1/memory/wipe?user_id=Alpha` removes Alpha's memories but leaves Beta's intact, proving wipe is scoped to the supplied `user_id` and never bleeds across users. |
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | `tools/list` against `:7020/mcp` (after the `initialize` handshake) advertises memory tools whose names include `insert` and `search`. |

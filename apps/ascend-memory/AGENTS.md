@@ -8,7 +8,7 @@ AscendMemory is a semantic memory service that provides REST API and MCP server 
 
 - **Language**: Python 3.11
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.1.3
+- **Version**: 0.1.4
 - **Docker Base**: `python:3.11-slim`
 
 ## Build & Run Commands
@@ -20,7 +20,8 @@ Every command below runs through this module's own virtual environment at `.venv
 Windows:
 
 ```bash
-# Install dependencies
+# Install the shared library first, then the service
+.venv/Scripts/python.exe -m pip install -e ../../libs/ascend-python-common[dev]
 .venv/Scripts/python.exe -m pip install -e .[dev]
 
 # Run the server (port 7020)
@@ -33,7 +34,8 @@ Windows:
 Linux/macOS (the extra is quoted because zsh treats an unquoted `[dev]` as a glob):
 
 ```bash
-# Install dependencies
+# Install the shared library first, then the service
+.venv/bin/python -m pip install -e "../../libs/ascend-python-common[dev]"
 .venv/bin/python -m pip install -e ".[dev]"
 
 # Run the server (port 7020)
@@ -53,7 +55,18 @@ docker build -t ascend-memory:latest .
 
 **Dual API surface**:
 - REST API: CRUD endpoints for memory operations under `/api/v1/memory/`
-- MCP Server: FastMCP tools exposed via Streamable HTTP
+- MCP Server: FastMCP tools exposed via Streamable HTTP at `/mcp`. The FastMCP server name is `ascend-memory`.
+
+**Platform behavior** (via `ascend-python-common`, wired in `src/main.py` with `create_service_app`):
+- REST errors are RFC 7807 problem bodies (`application/problem+json`) with `code` and `traceId`. Request
+  validation failures answer `400` with code `validation` and an `errors` list sorted by `field`. Unexpected
+  failures answer `500` with code `internal` and a fixed detail. MCP refusals are tool errors whose text starts
+  with `<code>: ` (`validation: `, `internal: `).
+- `/health` answers `200 {"status": "ok", "service": "ascend-memory", "version": ...}` without touching a
+  dependency. `/ready` aggregates the `qdrant`, `embedding_api`, and `mem0_client` probes and answers `200
+  {"status": "ready", ...}` or `503 {"status": "not-ready", ...}`. `/health/legacy` keeps the pre-split contract.
+- Logging comes from the library (`LOG_LEVEL` honoured, `LOG_FORMAT` selects `json` or `color`, lines start with
+  `[ascend-memory]`). There is no service `logging_config.py` and no `log_config` argument on `uvicorn.run`.
 
 **Key Endpoints**:
 - `POST /api/v1/memory/insert` - Store a new memory
@@ -98,6 +111,18 @@ entirely, `resolve_provider()` (`src/service/memory_client.py:25`) falls back to
 - `API_PORT` - Service port (default: 7020)
 - `API_HOST` - Bind address (default: `0.0.0.0`)
 - `LOG_LEVEL` - Logging level (default: `INFO`)
+- `LOG_FORMAT` - Log format, `json` or `color` (default: `json`)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP trace export endpoint, export whenever it is set, unset by default
+- `OTEL_SDK_DISABLED` - OpenTelemetry's standard switch, `true` turns the SDK off
+- `RATE_LIMIT_DEFAULT` - Flood-protection rate limit for REST routes and MCP tools (default: `6000/minute`)
+- `READINESS_PROBE_TIMEOUT_SECONDS` - Budget of each readiness probe (default: `3`)
+- `STARTUP_PROBE_TIMEOUT_SECONDS` - Time each startup banner check may take (default: `2`)
+- `SECURITY_HSTS_MAX_AGE_SECONDS` - `max-age` of the `strict-transport-security` response header (default: `63072000`)
+- `REDIS_URL` - Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-memory` (default: `redis://127.0.0.1:6379/0`)
+
+`API_HOST`, `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
+`ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`. The service reads
+no `MCP_ALLOWED_HOSTS` (it fetches no caller URI) and has no `MCP_PORT`.
 - `QDRANT_HOST` / `QDRANT_PORT` - Qdrant connection
 - `DEFAULT_USER_ID` - Fallback `user_id` when a REST or MCP caller omits it (default: `default_user`)
 - `MAX_USER_ID_LENGTH` - Input cap on `user_id` length (default: `128`)
@@ -123,6 +148,7 @@ something this service reads or writes to.
 - Pydantic models for request/response validation
 - Async/await for I/O-bound operations
 - User-scoped memory operations (all operations require a user_id)
+- When instrumenting new code (metrics, logs, or spans), follow [../../docs/OBSERVABILITY.md](../../docs/OBSERVABILITY.md)
 
 ## Relevant Skills
 

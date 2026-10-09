@@ -1,96 +1,59 @@
 import logging
 
-from src.config.logging_config import (
-    _LOG_COLORS,
-    CenteredLevelFormatter,
-    CorrelationFilter,
-    get_logger,
-    get_uvicorn_log_config,
-    setup_logging,
-)
-from src.observability.request_context import request_id_ctx
+from _pytest.logging import LogCaptureFixture
+from ascend_python_common.log_config import configure_logging
+from ascend_python_common.settings import ServiceSettings
 
 
-def _make_record(level: int = logging.INFO, msg: str = "hello") -> logging.LogRecord:
-    return logging.LogRecord(
-        name="test",
-        level=level,
-        pathname=__file__,
-        lineno=1,
-        msg=msg,
-        args=None,
-        exc_info=None,
+def test_debug_line_visible_at_debug_level(caplog: LogCaptureFixture) -> None:
+    # given
+    configure_logging(
+        "ascend-memory",
+        ServiceSettings(
+            API_PORT=7020, LOG_LEVEL="DEBUG", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="6000/minute"
+        ),
     )
+    logging.getLogger().addHandler(caplog.handler)
+    probe = logging.getLogger("ascend-memory.debug-probe")
+    # when
+    with caplog.at_level(logging.DEBUG, logger="ascend-memory.debug-probe"):
+        probe.debug("debug-marker-2-4")
+    # then
+    assert any(record.message == "debug-marker-2-4" for record in caplog.records)
 
 
-def test_centered_level_formatter_centres_level_token() -> None:
+def test_no_info_or_access_line_at_warning_level(caplog: LogCaptureFixture) -> None:
     # given
-    fmt = CenteredLevelFormatter("%(log_color)s - %(levelname)s - %(message)s", log_colors=_LOG_COLORS)
-    record = _make_record(logging.INFO)
-
+    configure_logging(
+        "ascend-memory",
+        ServiceSettings(
+            API_PORT=7020, LOG_LEVEL="WARNING", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="6000/minute"
+        ),
+    )
+    logging.getLogger().addHandler(caplog.handler)
+    probe = logging.getLogger("ascend-memory.quiet-probe")
+    access = logging.getLogger("uvicorn.access")
     # when
-    formatted = fmt.format(record)
-
+    probe.debug("suppressed-debug-2-4")
+    probe.info("suppressed-info-2-4")
+    access.info("suppressed-access-2-4")
     # then
-    assert "  INFO  " in formatted
+    assert [record for record in caplog.records if record.name == "ascend-memory.quiet-probe"] == []
+    assert [record for record in caplog.records if record.name == "uvicorn.access"] == []
 
 
-def test_centered_level_formatter_passthrough_when_no_match() -> None:
+def test_uvicorn_loggers_route_through_root() -> None:
     # given
-    fmt = CenteredLevelFormatter("%(log_color)s%(message)s", log_colors=_LOG_COLORS)
-    record = _make_record(msg="plain")
-
+    configure_logging(
+        "ascend-memory",
+        ServiceSettings(
+            API_PORT=7020, LOG_LEVEL="WARNING", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="6000/minute"
+        ),
+    )
     # when
-    formatted = fmt.format(record)
-
+    access = logging.getLogger("uvicorn.access")
+    error = logging.getLogger("uvicorn.error")
     # then
-    assert "plain" in formatted
-
-
-def test_correlation_filter_injects_request_id() -> None:
-    # given
-    token = request_id_ctx.set("req-abc")
-    try:
-        record = _make_record()
-
-        # when
-        accepted = CorrelationFilter().filter(record)
-
-        # then
-        assert accepted is True
-        # CorrelationFilter injects request_id as a dynamic LogRecord attribute;
-        # use getattr so static analysers don't complain about the unmodelled
-        # field.
-        assert getattr(record, "request_id", None) == "req-abc"
-    finally:
-        request_id_ctx.reset(token)
-
-
-def test_setup_logging_attaches_correlation_filter() -> None:
-    # when
-    setup_logging()
-
-    # then
-    root = logging.getLogger()
-    assert root.handlers
-    assert any(isinstance(f, CorrelationFilter) for handler in root.handlers for f in handler.filters)
-
-
-def test_uvicorn_log_config_shape_is_complete() -> None:
-    # when
-    cfg = get_uvicorn_log_config()
-
-    # then
-    assert cfg["version"] == 1
-    assert "correlation" in cfg["filters"]
-    assert {"default", "access"} <= set(cfg["formatters"].keys())
-    assert "correlation" in cfg["handlers"]["default"]["filters"]
-
-
-def test_get_logger_returns_logger_instance() -> None:
-    # when
-    log = get_logger("test.module")
-
-    # then
-    assert isinstance(log, logging.Logger)
-    assert log.name == "test.module"
+    assert access.handlers == []
+    assert access.propagate is True
+    assert error.propagate is True

@@ -1,35 +1,19 @@
 [project]
 name = "ascend-memory"
-version = "0.1.3"
+version = "0.1.4"
 description = "AscendAI Memory Service (MCP + REST)"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.136.3",
-    "uvicorn==0.48.0",
+    "ascend-python-common==1.0.0",
     "mem0ai==2.0.4",
-    "fastmcp==3.3.1",
-    "pydantic==2.13.4",
-    "pydantic-settings==2.14.1",
     "httpx==0.28.1",
     "qdrant-client==1.16.2",
-    "colorlog==6.10.1",
-    "prometheus-client==0.24.0",
-    "prometheus-fastapi-instrumentator==8.0.0",
-    "opentelemetry-api==1.44.0",
-    "opentelemetry-sdk==1.44.0",
-    "opentelemetry-instrumentation-fastapi==0.65b0",
-    "opentelemetry-exporter-otlp==1.44.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.0.3",
-    "pytest-asyncio==1.4.0",
-    "pytest-cov==7.1.0",
-    "asgi-lifespan==2.1.0",
+    "ascend-python-common[dev]==1.0.0",
     "httpx2==2.13.1",
-    "ruff==0.15.15",
-    "mypy==2.1.0",
     "pyright==1.1.408"
 ]
 
@@ -67,7 +51,9 @@ pythonpath = [".", "src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
-addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100"
+xfail_strict = true
+filterwarnings = ["error"]
+addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100 --strict-markers --strict-config"
 
 [tool.coverage.run]
 branch = true
@@ -79,51 +65,7 @@ skip_covered = false
 fail_under = 100
 
 [tool.ruff]
-line-length = 110
-target-version = "py311"
-
-[tool.ruff.lint]
-select = [
-    "E", "F", "I", "N", "UP", "S", "B", "A", "RUF", "SIM", "PL",
-    "C4",
-    "RET",
-    "PIE",
-    "TRY",
-    "PERF",
-    "ARG",
-    "LOG",
-    "G",
-    "T20",
-    "ERA",
-    "PT",
-    "PTH",
-    "FA",
-    "TCH",
-    "DTZ",
-    "ICN",
-    "Q",
-    "TID",
-    "INT",
-    "SLF",
-    "ASYNC",
-    "FURB",
-]
-ignore = [
-    "S101",
-    "PLR0913",
-    "N818",
-    "BLE001",
-    "S110",
-    "PLR2004",
-    "S104",
-    "S311",
-    "PLR0911",
-    "PLC0415",
-    "G004",
-    "TRY003",
-    "TRY300",
-    "TRY301",
-]
+extend = "../../libs/ascend-python-common/tooling/ruff.toml"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
@@ -163,8 +105,9 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
+warn_unreachable = true
 ignore_missing_imports = false
-disable_error_code = ["no-untyped-call", "type-arg"]
+mypy_path = "../../libs/ascend-python-common/src"
 
 [[tool.mypy.overrides]]
 module = [

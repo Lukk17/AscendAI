@@ -2,10 +2,10 @@
 
 ## What this verifies
 
-- `POST /api/v1/memory/insert` with a JSON body that omits the required `user_id` field returns HTTP 422 (FastAPI's
-  default request-validation status) before any mem0 / Qdrant call.
-- The response body is a FastAPI validation envelope: a JSON object with a `detail` array whose entries reference the
-  missing field by location and name (`loc` contains `"user_id"`).
+- `POST /api/v1/memory/insert` with a JSON body that omits the required `user_id` field returns HTTP 400
+  (`application/problem+json`, code `validation`) before any mem0 / Qdrant call.
+- The response body is a problem document with an `errors` array sorted by `field` whose entries reference the
+  missing field by name (`field` contains `"user_id"`), plus `traceId` (32 lower case hex characters).
 - **No Qdrant write occurs.** The collection state for any `user_id` is unchanged by this test.
 
 ## Prerequisites
@@ -61,14 +61,15 @@ to remove.
 
 ## Expected
 
-The call returns HTTP 422.
+The call returns HTTP 400 with `Content-Type: application/problem+json`.
 
 The response body matches:
 
-- The body is a JSON object containing a `detail` array.
-- At least one element of `detail` references `"user_id"` in its `loc` array (FastAPI / Pydantic v2 missing-field
-  envelope).
-- The element's `type` is `"missing"` (Pydantic v2 missing-field code).
+- The body is a problem document with `code` equal to `"validation"`.
+- The body contains an `errors` array sorted by `field`.
+- At least one element of `errors` references `"user_id"` in its `field` (missing-field entry with `field` and
+  `message`).
+- `traceId` matches `^[0-9a-f]{32}$`.
 
 No backend call occurred. This is proven two ways, not by wall-clock latency. Container overhead on this stack sits
 around 200-220 ms for any request, including a bodyless `/health` liveness probe. A latency threshold cannot
@@ -76,7 +77,7 @@ distinguish "validator short-circuited" from "reached mem0" and produces false a
 
 - Structurally: `InsertRequest.user_id` in `src/api/rest/rest_endpoints.py` is a required Pydantic field with no
   default. FastAPI validates the request body against this model before the `insert_memory` handler function body
-  ever executes, so a 422 response for a missing `user_id` is only reachable through a code path that never calls
+  ever executes, so a 400 response for a missing `user_id` is only reachable through a code path that never calls
   `get_memory_client` or `client.add`. mem0 and Qdrant cannot have been touched.
 - Observably: `curl -fsS http://localhost:6333/collections/ascend_memory_1536` taken after the run reports the same
   `result.points_count` as the baseline captured in Run Step 1.

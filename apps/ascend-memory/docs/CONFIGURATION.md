@@ -11,8 +11,14 @@ invoked, so a single deployment can serve `provider=lmstudio`, `provider=openai`
 | Variable                 | Default                                                            | Purpose                                                                  |
 | :----------------------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------- |
 | `API_HOST`               | `0.0.0.0`                                                          | Bind address.                                                            |
-| `API_PORT`               | `7020`                                                             | Service port.                                                            |
+| `API_PORT`               | `7020`                                                             | Service port. Compose reads it as `MEMORY_API_PORT`.                     |
 | `LOG_LEVEL`              | `INFO`                                                             | Log level.                                                               |
+| `RATE_LIMIT_DEFAULT`     | `6000/minute`                                                      | Flood-protection rate limit for REST routes and MCP tools. Compose reads it as `MEMORY_RATE_LIMIT_DEFAULT`. Added by `add-ascend-python-common`. |
+| `REDIS_URL`              | `redis://127.0.0.1:6379/0`                                         | Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-memory`. Added by `add-ascend-python-common`. |
+| `READINESS_PROBE_TIMEOUT_SECONDS` | `3`                                                     | Budget of each readiness probe. Added by `add-ascend-python-common`.     |
+| `STARTUP_PROBE_TIMEOUT_SECONDS` | `2`                                                       | Time each startup banner check may take. Added by `add-ascend-python-common`. |
+| `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000`                                                | `max-age` of the `strict-transport-security` response header. Added by `add-ascend-python-common`. |
+| `OTEL_SDK_DISABLED`      | `false`                                                            | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
 
 ---
 

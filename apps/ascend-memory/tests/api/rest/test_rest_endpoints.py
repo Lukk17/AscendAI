@@ -49,9 +49,10 @@ async def test_insert_memory_rejects_missing_user_id(
     response = await client.post("/api/v1/memory/insert", json={"text": "x"})
 
     # then
-    assert response.status_code == 422
+    assert response.status_code == 400
     body = response.json()
-    assert any("user_id" in str(e.get("loc", [])) for e in body.get("detail", []))
+    assert body["code"] == "validation"
+    assert any(entry["field"] == "user_id" for entry in body.get("errors", []))
 
 
 @pytest.mark.asyncio
@@ -123,7 +124,8 @@ async def test_search_memory_rejects_too_long_query(
     )
 
     # then
-    assert response.status_code == 422  # pydantic validation
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation"
 
 
 @pytest.mark.asyncio
@@ -137,7 +139,8 @@ async def test_search_memory_rejects_user_id_with_unsafe_chars(
     )
 
     # then
-    assert response.status_code == 422
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation"
 
 
 @pytest.mark.asyncio

@@ -1,84 +1,41 @@
 import asyncio
 import logging
-import os
-from collections.abc import AsyncIterator
-from contextlib import AsyncExitStack, asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Response, status
-from prometheus_fastapi_instrumentator import Instrumentator
+from ascend_python_common.app import ServiceDefinition, create_service_app
+from ascend_python_common.readiness import ProbeResult
+from fastapi import APIRouter, FastAPI, Response, status
 
-from src.api.exception_handlers import global_exception_handler, value_error_handler
+from src.api import readiness as readiness_module
+from src.api.exception_handlers import error_registry
 from src.api.mcp.mcp_server import mcp
-from src.api.readiness import readiness_router
 from src.api.rest.rest_endpoints import rest_router
 from src.config.config import settings
-from src.config.logging_config import get_uvicorn_log_config, setup_logging
-from src.config.startup_banner import log_startup_banner
-from src.observability.request_context import RequestIdMiddleware
+from src.config.startup_banner import build_service_banner
 from src.service.memory_client import get_memory_client
 
-setup_logging()
 logger = logging.getLogger("uvicorn")
-
-
-def _configure_otel() -> None:
-    """Activate OTel auto-instrumentation when OTEL_EXPORTER_OTLP_ENDPOINT is set.
-
-    A no-op when the env var is absent so local development is unaffected.
-    """
-    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if not endpoint:
-        return
-
-    from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-    service_name = os.getenv("OTEL_SERVICE_NAME", "ascend-memory")
-    resource = Resource.create({"service.name": service_name})
-    provider = TracerProvider(resource=resource)
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
-    trace.set_tracer_provider(provider)
-    FastAPIInstrumentor().instrument()
-    logger.info("[AscendMemory] OTel tracing enabled → %s", endpoint)
-
 
 is_ready = False
 
-# Hold a strong reference to the background warmup task so the asyncio event
-# loop (which only keeps weak references to tasks) cannot GC it before
-# completion.
 _background_tasks: set[asyncio.Task[None]] = set()
 
 WARMUP_RETRY_DELAY_SECONDS = 5
-WARMUP_MAX_ATTEMPTS = 60  # 60 * 5s = 5 minutes of cold-boot tolerance
+WARMUP_MAX_ATTEMPTS = 60
+
+legacy_router = APIRouter(tags=["health"])
 
 
 async def warmup_client() -> None:
-    """Background task to initialize the heavy memory client.
-
-    Retries with a fixed backoff so a transient cold-boot failure (e.g.
-    Qdrant not yet reachable on the docker network) does not leave /health
-    stuck at 503 forever. The flag flips to True on the first successful
-    probe and stays True.
-    """
-
     global is_ready  # noqa: PLW0603 - module-level flag inspected by /health/legacy
     logger.info(
         "Starting background warmup of AscendMemoryClient... "
         "Wait for 'Background warmup complete' before sending requests."
     )
-    for attempt in range(1, WARMUP_MAX_ATTEMPTS + 1):  # pragma: no branch - loop always returns inside
+    for attempt in range(1, WARMUP_MAX_ATTEMPTS + 1):
         try:
             client = get_memory_client()
             logger.info(f"Performing active connection check (attempt {attempt}/{WARMUP_MAX_ATTEMPTS})...")
-            # Note: search now uses mem0 2.x signature (top_k, filters).
-            # Calling through AscendMemoryClient.search keeps that detail
-            # hidden from the warmup logic.
             client.search(query="startup_warmup", user_id="system_warmup")
             is_ready = True
             logger.info("Background warmup complete. AscendMemoryClient is ready.")
@@ -98,68 +55,66 @@ async def warmup_client() -> None:
             await asyncio.sleep(WARMUP_RETRY_DELAY_SECONDS)
 
 
+class _WarmupLifespan:
+    async def __aenter__(self) -> None:
+        warmup_task = asyncio.create_task(warmup_client())
+        _background_tasks.add(warmup_task)
+        warmup_task.add_done_callback(_background_tasks.discard)
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        return None
+
+
+def service_lifespan() -> _WarmupLifespan:
+    return _WarmupLifespan()
+
+
+@legacy_router.get("/health/legacy")
+def legacy_health_check(response: Response) -> dict[str, str]:
+    if not is_ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "starting", "detail": "Memory client initializing"}
+
+    return {"status": "ok"}
+
+
+async def _qdrant_probe() -> ProbeResult:
+    return await readiness_module.probe_qdrant()
+
+
+async def _embedding_probe() -> ProbeResult:
+    return await readiness_module.probe_embedding_api()
+
+
+def _mem0_probe() -> ProbeResult:
+    return readiness_module.probe_mem0_client()
+
+
+def _service_definition() -> ServiceDefinition:
+    return ServiceDefinition(
+        name="ascend-memory",
+        distribution="ascend-memory",
+        settings=settings,
+        mcp=mcp,
+        routers=(rest_router, legacy_router),
+        error_registry=error_registry,
+        probes={
+            "qdrant": _qdrant_probe,
+            "embedding_api": _embedding_probe,
+            "mem0_client": _mem0_probe,
+        },
+        lifespan=service_lifespan(),
+        rate_limit_storage_uri=settings.REDIS_URL,
+        startup_banner=build_service_banner,
+    )
+
+
 def create_app() -> FastAPI:
-    _configure_otel()
-
-    mcp_asgi_app = mcp.http_app()
-
-    @asynccontextmanager
-    async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
-        # setup_logging already ran at module import; the duplicate call in
-        # the old lifespan was redundant. Drop it.
-        async with AsyncExitStack() as stack:
-            await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(fastapi_app))
-            # Start the warmup task AFTER the MCP lifespan has entered so
-            # that any MCP-driven settings hooks are visible.
-            warmup_task = asyncio.create_task(warmup_client())
-            _background_tasks.add(warmup_task)
-            warmup_task.add_done_callback(_background_tasks.discard)
-
-            await log_startup_banner()
-            yield
-
-    app = FastAPI(title="AscendMemory", lifespan=lifespan)
-    app.add_middleware(RequestIdMiddleware)
-
-    app.add_exception_handler(ValueError, value_error_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(Exception, global_exception_handler)
-
-    app.include_router(rest_router)
-    app.include_router(readiness_router)
-
-    Instrumentator(
-        should_group_status_codes=False,
-        excluded_handlers=["/metrics", "/health", "/health/legacy", "/ready"],
-    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-
-    @app.get("/health", tags=["health"])
-    def health_check() -> dict[str, str]:
-        """Liveness probe. Always returns 200 when the process is alive so
-        Kubernetes / Docker do not restart the container during the
-        Qdrant warmup window. Readiness (`is_ready`) is reported on
-        /ready, not here."""
-
-        return {"status": "ok"}
-
-    @app.get("/health/legacy", tags=["health"])
-    def legacy_health_check(response: Response) -> dict[str, str]:
-        """Backwards-compatible combined liveness+readiness response for
-        callers still on the old contract (returns 503 until warmup
-        completes). New callers should switch to /health + /ready."""
-
-        if not is_ready:
-            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-            return {"status": "starting", "detail": "Memory client initializing"}
-
-        return {"status": "ok"}
-
-    # Mount must be last to avoid capturing specific routes
-    app.mount("/", mcp_asgi_app)
-
-    return app
+    return create_service_app(definition)
 
 
-# Global instance for uvicorn
+definition = _service_definition()
+
 app = create_app()
 
 if __name__ == "__main__":  # pragma: no cover
@@ -167,5 +122,4 @@ if __name__ == "__main__":  # pragma: no cover
         "src.main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
-        log_config=get_uvicorn_log_config(),
     )

@@ -18,14 +18,15 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 ### Run
 
 - [ ] Record the baseline `result.points_count` for `ascend_memory_1536` via `curl` against Qdrant
-- [ ] Send `invalid-missing-user.yml` via `bru run` and wait for HTTP 422
+- [ ] Send `invalid-missing-user.yml` via `bru run` and wait for HTTP 400
 
 ### Expected
 
-- [ ] Response status is HTTP 422
-- [ ] Response body is a JSON object with a `detail` array
-- [ ] At least one `detail` entry references `"user_id"` in its `loc` array
-- [ ] That entry's `type` equals `"missing"`
+- [ ] Response status is HTTP 400 with `Content-Type: application/problem+json`
+- [ ] Response body `code` equals `"validation"`
+- [ ] Response body contains an `errors` array sorted by `field`
+- [ ] At least one `errors` entry references `"user_id"` in its `field`
+- [ ] `traceId` matches `^[0-9a-f]{32}$`
 - [ ] Structural proof: `InsertRequest.user_id` has no default, so FastAPI/Pydantic validation rejects the body
       before `insert_memory()`'s handler body runs, meaning mem0/Qdrant cannot be reached
 - [ ] Observable proof: `ascend_memory_1536`'s `result.points_count` after the run equals the baseline recorded above

@@ -1,7 +1,7 @@
 from typing import TypedDict
 
+from ascend_python_common.settings import RateLimit, ServiceSettings
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ProviderConfig(TypedDict):
@@ -50,11 +50,18 @@ PROVIDER_CONFIGS: dict[str, ProviderConfig] = {
 }
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+class Settings(ServiceSettings):
+    API_PORT: int = Field(default=7020, ge=1, le=65535, description="Port for the FastAPI server")
 
-    API_PORT: int = Field(default=7020, description="Port for the FastAPI server")
-    API_HOST: str = Field(default="0.0.0.0", description="Host to bind the server to")
+    RATE_LIMIT_DEFAULT: RateLimit = Field(
+        default="6000/minute",
+        description="Default rate limit for REST routes and MCP tools",
+    )
+
+    REDIS_URL: str = Field(
+        default="redis://127.0.0.1:6379/0",
+        description="Shared storage for the rate limit windows, one budget per caller",
+    )
 
     LMSTUDIO_BASE_URL: str = Field(
         default="http://localhost:1234/v1",
@@ -84,7 +91,7 @@ class Settings(BaseSettings):
     )
 
     QDRANT_HOST: str = Field(default="localhost", description="Qdrant Host")
-    QDRANT_PORT: int = Field(default=6333, description="Qdrant Port")
+    QDRANT_PORT: int = Field(default=6333, ge=1, le=65535, description="Qdrant Port")
 
     MEM0_DEFAULT_PROVIDER: str = Field(
         default="lmstudio",
@@ -105,12 +112,10 @@ class Settings(BaseSettings):
         description="Default user_id when callers (REST or MCP) omit it",
     )
 
-    MAX_USER_ID_LENGTH: int = Field(default=128, description="user_id input cap")
-    MAX_QUERY_LENGTH: int = Field(default=2048, description="search query input cap")
-    MAX_MEMORY_TEXT_LENGTH: int = Field(default=32_768, description="memory text input cap")
-    MAX_SEARCH_LIMIT: int = Field(default=100, description="search limit upper bound")
-
-    LOG_LEVEL: str = Field(default="INFO", description="Logging Level")
+    MAX_USER_ID_LENGTH: int = Field(default=128, ge=1, description="user_id input cap")
+    MAX_QUERY_LENGTH: int = Field(default=2048, ge=1, description="search query input cap")
+    MAX_MEMORY_TEXT_LENGTH: int = Field(default=32_768, ge=1, description="memory text input cap")
+    MAX_SEARCH_LIMIT: int = Field(default=100, ge=1, description="search limit upper bound")
 
 
 settings = Settings()

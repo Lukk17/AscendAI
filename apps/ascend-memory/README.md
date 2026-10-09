@@ -61,6 +61,9 @@ actually invoked.
 The full env-var matrix (service, embedding providers, Qdrant) plus the provider-to-collection mapping table lives in
 [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Read it before deploying or onboarding a new provider key.
 
+`REDIS_URL` (default `redis://127.0.0.1:6379/0`, `redis://host.docker.internal:6379/0` in `compose.yaml`) holds the
+shared rate limit windows, one budget per caller under the key prefix `ascend-memory`.
+
 ---
 
 ### Running the Service
@@ -96,6 +99,11 @@ PowerShell:
 ```
 
 **3. Install dependencies.** The `-e` flag installs in editable mode so source edits show up without reinstall.
+Install the shared library first so pip never asks an index for it, then the service.
+
+```bash
+pip install -e "../../libs/ascend-python-common[dev]"
+```
 
 ```bash
 pip install -e ".[dev]"
@@ -313,7 +321,8 @@ Invoke-RestMethod -Uri "http://localhost:7020/api/v1/memory/wipe?user_id=testUse
 
 ### MCP Server Mode
 
-The service exposes an MCP server at `/mcp` (mounted via HTTP Streamable).
+The service exposes an MCP server at `/mcp` (mounted via HTTP Streamable). The FastMCP server name is
+`ascend-memory`.
 
 #### Tool configuration (e.g. for Claude Desktop)
 
@@ -365,42 +374,46 @@ bru run "memory/testing/insert-reykjavik.yml" --env ascend-local
 
 The service exposes three diagnostic endpoints plus per-operation Prometheus metrics:
 
-- `GET /health` - liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound, regardless of upstream
-  state. Targeted by the Docker `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should
-  hit this.
+- `GET /health` - liveness probe. Always returns `200 {"status": "ok", "service": "ascend-memory", "version":
+  ...}` once uvicorn has bound, regardless of upstream state. Targeted by the Docker `HEALTHCHECK` and the
+  `docker-compose` healthcheck. Kubernetes liveness probes should hit this.
 - `GET /ready` - readiness probe. Probes Qdrant `/healthz`, the default embedding API `/models`, and constructs the
-  mem0 client. Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded",
-  "checks": {...}}`. Per-probe budget is 3 s; worst-case total latency is ~9 s. Kubernetes readiness probes and
-  load-balancer health checks should hit this.
+  mem0 client. Returns `200 {"status": "ready", "service": "ascend-memory", "version": ..., "checks": {...}}` when
+  every probe is ok or skipped, otherwise `503 {"status": "not-ready", ...}` with the same shape. Per-probe budget
+  is 3 s and probes run at once. Kubernetes readiness probes and load-balancer health checks should hit this.
 - `GET /health/legacy` - combined liveness+readiness shape kept for callers still on the pre-split contract. Returns
   503 during warmup, 200 after. Scheduled for removal once all callers migrate.
 - `GET /metrics` - Prometheus payload. Four counters (`memory_{insert,search,delete,wipe}_total`) labelled by
   `provider` and `outcome`, plus four histograms (`memory_*_duration_seconds`) labelled by `provider`.
 
 Every request echoes (or generates) an `X-Request-ID` header. The same value is injected into every log line for that
-request via the `[request_id]` field, so logs can be filtered on a single request in Loki without correlation
-plumbing.
+request, so logs can be filtered on a single request in Loki without extra plumbing. Log lines start with
+`[ascend-memory]` and honour `LOG_LEVEL`; `LOG_FORMAT` selects `json` (containers) or `color` (local runs).
 
 ### Error contract
 
 All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents with `Content-Type:
 application/problem+json`.
 
-- `400` - validation failure (`ValueError` raised in the request lifecycle). Body includes `detail` with the
-  human-readable failure reason (authored by the service, safe to surface).
-- `422` - pydantic input validation failure (query parameters, request body). Body shape is FastAPI's default
-  validation error envelope.
-- `500` - unhandled exception. Body intentionally omits `detail` to prevent leaking upstream stack traces or DSNs.
-  Full diagnostics live in the service logs, correlated by `X-Request-ID`.
+- `400` - validation failure (`ValueError` raised in the request lifecycle, or a request the router cannot
+  validate). Body includes `code: "validation"`, `detail` with the human-readable failure reason (authored by the
+  service, safe to surface), and an `errors` array sorted by `field` (each entry has `field` and `message`).
+- `404` - unknown path (`code: "not_found"`). `405` - wrong method (`code: "method_not_allowed"`, with an `Allow`
+  header).
+- `500` - unhandled exception (`code: "internal"`). Body carries a fixed generic detail to prevent leaking upstream
+  stack traces or DSNs. Full diagnostics live in the service logs, correlated by `X-Request-ID` and `traceId`.
 
-The MCP surface returns a structured envelope instead of HTTP status codes (MCP tool results are JSON):
-`{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+Every body also carries `type`, `title`, `status`, `instance`, and `traceId` (32 lower case hex characters).
+
+MCP refusals are tool errors instead of HTTP status codes (MCP tool results are JSON). The error text starts with
+the registry code: `validation: ...` for refused input, `internal: ...` for unexpected failures.
 
 ### Startup readiness banner
 
-On startup, [src/config/startup_banner.py](src/config/startup_banner.py) emits a single multi-line INFO log entry
-with an ANSI Shadow `ASCEND MEMORY` banner, access URLs, the active embedding provider, a 2 s Qdrant probe, and the
-list of observability and REST endpoints. Shared convention with every other long-running service in the repo. See
+On startup, [src/config/startup_banner.py](src/config/startup_banner.py) passes the art text, content lines, and
+probe results into the `ascend-python-common` banner frame, which emits a single multi-line INFO log entry with an
+ANSI Shadow `ASCEND MEMORY` banner, access URLs, the active embedding provider, a 2 s Qdrant probe, and the list of
+observability and REST endpoints. Shared convention with every other long-running service in the repo. See
 [.agents/skills/coding-standards/SKILL.md](../../.agents/skills/coding-standards/SKILL.md).
 
 ---
@@ -475,8 +488,8 @@ Dependency management lives in [pyproject.toml](pyproject.toml). Add a new depen
 | [src/api/rest/rest_endpoints.py](src/api/rest/rest_endpoints.py)           | REST endpoints under `/api/v1/memory/*`.                            |
 | [src/api/readiness.py](src/api/readiness.py)                               | `/ready` probe - Qdrant, embedding-API, mem0 client construction.   |
 | [src/api/mcp/mcp_server.py](src/api/mcp/mcp_server.py)                     | FastMCP tool definitions.                                           |
-| [src/api/exception_handlers.py](src/api/exception_handlers.py)             | RFC 7807 problem-document handlers for `ValueError` and `Exception`.|
-| [src/observability/request_context.py](src/observability/request_context.py) | `X-Request-ID` middleware and request-id ContextVar.              |
+| [src/api/exception_handlers.py](src/api/exception_handlers.py)             | Service error registry (`ValueError` to `validation`, `internal` for the rest); handlers come from the library.|
+| [src/api/mcp/mcp_server.py](src/api/mcp/mcp_server.py)                     | FastMCP tools; refusals are `ToolError("<code>: <detail>")` via the registry. |
 | [src/observability/metrics.py](src/observability/metrics.py)               | Prometheus counters and histograms exposed at `/metrics`.           |
 | [docs/architecture/decisions/](docs/architecture/decisions/)               | ADRs 1-6 (mem0ai, Qdrant, user_id scope, MCP↔REST, observability, mem0 2.x upgrade). |
 | [docs/api/request/AscendAI/memory/](../../docs/api/request/AscendAI/memory/) and [docs/api/request/AscendAI/mcp/memory/](../../docs/api/request/AscendAI/mcp/memory/) | Example REST + MCP requests in the Bruno collection.         |

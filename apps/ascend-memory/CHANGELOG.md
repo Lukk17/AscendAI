@@ -8,6 +8,30 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.1.4] - <release date>
+
+### Changed
+- The service is built on `ascend-python-common==1.0.0` via `create_service_app`: shared problem bodies, settings
+  base, logging, request correlation, tracing, readiness aggregation, rate limiting, security headers, and the
+  startup banner frame. `Settings` subclasses `ServiceSettings`; the error registry maps `ValueError` to
+  `validation` and everything else to `internal`.
+- REST errors are problem bodies (`application/problem+json`) with `code` and `traceId`. Request validation
+  failures answer `400` with code `validation` and an `errors` array sorted by `field` (was FastAPI's default
+  unprocessable-content envelope). Unknown paths answer a problem `404` and wrong methods a problem `405` with `Allow`. Unexpected
+  failures answer `500` with code `internal` and a fixed generic detail.
+- MCP refusals are tool errors whose text starts with `<code>: ` (`validation: `, `internal: `). The previous
+  `{"status": "error", "code": ...}` result objects are gone. The FastMCP server name is `ascend-memory`.
+- `/health` answers `{"status": "ok", "service": "ascend-memory", "version": ...}`. `/ready` aggregates the
+  `qdrant`, `embedding_api`, and `mem0_client` probes (3 s budget each, run at once) and answers `200`
+  `{"status": "ready", ...}` or `503` `{"status": "not-ready", ...}`. `/health/legacy` is unchanged.
+- Logging comes from the library: `LOG_LEVEL` is honoured, `LOG_FORMAT` selects `json` or `color`, lines start
+  with `[ascend-memory]`. `src/config/logging_config.py`, `src/observability/request_context.py`, and the
+  `log_config` argument of `uvicorn.run` are deleted.
+- `RATE_LIMIT_DEFAULT` defaults to `6000/minute` on REST routes and MCP tools; `/health`, `/ready`, `/metrics`,
+  and `tools/list` are never limited.
+- Docs updated: `AGENTS.md`, `README.md`, arc42 pages 05, 08, 09, ADR-005, and e2e spec 1 with its template now
+  assert the `400` problem body.
+
 ## [0.1.3] - 2026-10-01
 
 ### Changed
