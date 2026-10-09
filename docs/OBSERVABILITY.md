@@ -12,7 +12,9 @@ AscendAI ships a full three-pillar observability stack (metrics, logs, traces) a
 | Logs | Vector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
 | Traces | OTel Collector + Tempo + Grafana | http://localhost:7078 → Explore → Tempo |
 
-All seven observability containers start automatically with `docker compose up`. There is no profile flag required - observability is always-on.
+All seven observability containers start automatically with `docker compose up`. There is no profile flag required - observability is always-on. The stack is always on and is core, never a switchable part of the deployment: no service carries a compose profile for observability and no service switches its metric, log, or trace export off.
+
+Prometheus and Grafana read their operational values from environment variables passed by `compose.yaml`, each in `VAR=${VAR:-default}` form. A change of the committed `infra/observability/prometheus/prometheus.yaml` or of a value needs `docker compose up -d prometheus` (recreate the container for a changed value, restart it for a changed file). Grafana provisioning files expand `${VAR}` with no default form, so the compose line is the only default for the Grafana settings.
 
 ---
 
@@ -84,25 +86,32 @@ To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-
 
 ## Metrics Inventory
 
-Every custom metric emitted by ascend-ai-agent. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
+Every custom metric emitted by the application services. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
 
-| Metric (Spring notation) | Prometheus name | Type | Tags | Dashboards |
-|---|---|---|---|---|
-| `gen_ai.client.token.usage` | `gen_ai_client_token_usage_total` | counter (auto, Spring AI) | `gen_ai_system`, `gen_ai_request_model`, `gen_ai_token_type` | AI Pipeline, L1 Token Cost |
-| `memory.extraction.parse_failed` | `memory_extraction_parse_failed_total` | counter | `provider`, `model` | AI Pipeline |
-| `memory.insert.failed` | `memory_insert_failed_total` | counter | `embedding_provider`, `reason` | - |
-| `memory.search.duration` | `memory_search_duration_seconds_*` | timer | `embedding_provider`, `outcome` | - |
-| `rag.retrieval.hits` | `rag_retrieval_hits_total` | counter | `provider`, `embedding_provider`, `above_threshold` | AI Pipeline, L2 RAG Quality |
-| `rag.retrieval.duration` | `rag_retrieval_duration_seconds_*` | timer | `provider`, `outcome` | - |
-| `rag.last_top_score` | `rag_last_top_score` | gauge | `provider` | L2 RAG Quality |
-| `rag.top_score` | `rag_top_score_bucket` | histogram | `provider` | L2 RAG Quality |
-| `mcp.tool.duration` | `mcp_tool_duration_seconds_*` | timer | `tool`, `outcome` | AI Pipeline |
-| `ingestion.upload.bytes` | `ingestion_upload_bytes_total` | counter | `source_type`, `outcome` | L2 RAG Quality |
-| `prompt_cache.tokens.read` | `prompt_cache_tokens_read_total` | counter | `provider` | L3 Cache Hit Rate |
-| `prompt_cache.tokens.creation` | `prompt_cache_tokens_creation_total` | counter | `provider` (Anthropic only) | L3 Cache Hit Rate |
-| `prompt_cache.tokens.total` | `prompt_cache_tokens_total` | counter | `provider` | L3 Cache Hit Rate |
+| Service | Metric | Prometheus name | Type | Tags | Dashboards |
+|---|---|---|---|---|---|
+| ascend-agent | `gen_ai.client.token.usage` | `gen_ai_client_token_usage_total` | counter (auto, Spring AI) | `gen_ai_system`, `gen_ai_request_model`, `gen_ai_token_type` | AI Pipeline, L1 Token Cost |
+| ascend-agent | `memory.extraction.parse_failed` | `memory_extraction_parse_failed_total` | counter | `provider`, `model` | AI Pipeline |
+| ascend-agent | `memory.insert.failed` | `memory_insert_failed_total` | counter | `embedding_provider`, `reason` | - |
+| ascend-agent | `memory.search.duration` | `memory_search_duration_seconds_*` | timer | `embedding_provider`, `outcome` | - |
+| ascend-agent | `rag.retrieval.hits` | `rag_retrieval_hits_total` | counter | `provider`, `embedding_provider`, `above_threshold` | AI Pipeline, L2 RAG Quality |
+| ascend-agent | `rag.retrieval.duration` | `rag_retrieval_duration_seconds_*` | timer | `provider`, `outcome` | - |
+| ascend-agent | `rag.last_top_score` | `rag_last_top_score` | gauge | `provider` | L2 RAG Quality |
+| ascend-agent | `rag.top_score` | `rag_top_score_bucket` | histogram | `provider` | L2 RAG Quality |
+| ascend-agent, ascend-weather-mcp | `mcp.tool.duration` | `mcp_tool_duration_seconds_*` | timer | `tool`, `outcome` | AI Pipeline |
+| ascend-agent | `ingestion.upload.bytes` | `ingestion_upload_bytes_total` | counter | `source_type`, `outcome` | L2 RAG Quality |
+| ascend-agent | `chat.history.size` | `chat_history_size` | gauge | `user_id` (top-10 slots only, see Cardinality Rules) | - |
+| ascend-agent | `prompt_cache.tokens.read` | `prompt_cache_tokens_read_total` | counter | `provider` | L3 Cache Hit Rate |
+| ascend-agent | `prompt_cache.tokens.creation` | `prompt_cache_tokens_creation_total` | counter | `provider` (Anthropic only) | L3 Cache Hit Rate |
+| ascend-agent | `prompt_cache.tokens.total` | `prompt_cache_tokens_total` | counter | `provider` | L3 Cache Hit Rate |
+| ascend-web-hunter | `strategy_attempts_total` | `strategy_attempts_total` | counter | `strategy`, `outcome`, `domain` | - |
+| ascend-ocr | `ascendocr_jobs_total` | `ascendocr_jobs_total` | counter | `outcome` | - |
+| ascend-ocr | `ascendocr_job_duration_seconds` | `ascendocr_job_duration_seconds` | histogram | none | - |
+| ascend-ocr | `ascendocr_job_queue_wait_seconds` | `ascendocr_job_queue_wait_seconds` | histogram | none | - |
+| ascend-ocr | `ascendocr_job_queue_documents` | `ascendocr_job_queue_documents` | gauge | none | - |
+| ascend-ocr | `ascendocr_job_queue_pages` | `ascendocr_job_queue_pages` | gauge | none | - |
 
-Allowed values for `outcome` tag: `ok`, `error`, `timeout`, `rate_limited`. Never use free-form strings - see Cardinality Rules below.
+Allowed values for `outcome` tag: `ok`, `error`, `timeout`, `rate_limited`, `not_found`. Never use free-form strings - see Cardinality Rules below.
 
 ---
 
@@ -237,8 +246,8 @@ with tracer.start_as_current_span("my-operation") as span:
 
 These rules prevent Prometheus from accumulating millions of time-series (high cardinality) which causes memory exhaustion and slow queries.
 
-1. Never tag metrics with `user_id` directly. If you need to track per-user state, use a rotating slot gauge (contact the platform team first).
-2. Never tag with free-form strings such as URLs, prompt text, error messages, or model responses. Use a closed set: `outcome` must be one of `ok`, `error`, `timeout`, `rate_limited`. If you need richer error context, write a WARN log line (it goes to Loki and is searchable) instead of adding an unbounded tag.
+1. Never tag metrics with `user_id` directly, with the single exception of the `chat.history.size` gauge which may carry `user_id` for the top-10 active sessions only (rotating slots, see Metrics Inventory). If you need any other per-user state, use a rotating slot gauge (contact the platform team first).
+2. Never tag with free-form strings such as URLs, prompt text, error messages, or model responses. Use a closed set: `outcome` must be one of `ok`, `error`, `timeout`, `rate_limited`, `not_found`. If you need richer error context, write a WARN log line (it goes to Loki and is searchable) instead of adding an unbounded tag.
 3. The `model` tag is allowed because the set of models used is small and known (< 20 values).
 4. When in doubt, query the candidate metric in Prometheus with `count(count by (<tag>) (my_metric))` to estimate cardinality before merging.
 

@@ -51,19 +51,29 @@ services:
     build:
       context: ./apps/ascend-ocr
       dockerfile: Dockerfile
+      additional_contexts:
+        ascend-python-common: ./libs/ascend-python-common
     image: ascend-ai-ascend-ocr:latest
     container_name: ascend-ocr
     hostname: ascend-ocr
     restart: unless-stopped
     ports:
-      - "7022:7022"
+      - "${OCR_HOST_PORT:-7022}:${OCR_API_PORT:-7022}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      - API_PORT=7022
-      - API_HOST=0.0.0.0
-      - LOG_LEVEL=INFO
-      - LOG_FORMAT=json
+      - API_HOST=${API_HOST:-0.0.0.0}
+      - API_PORT=${OCR_API_PORT:-7022}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - RATE_LIMIT_DEFAULT=${OCR_RATE_LIMIT_DEFAULT:-600/minute}
+      - RATE_LIMIT_OCR=${RATE_LIMIT_OCR:-60/minute}
+      - READINESS_PROBE_TIMEOUT_SECONDS=${READINESS_PROBE_TIMEOUT_SECONDS:-3}
+      - STARTUP_PROBE_TIMEOUT_SECONDS=${STARTUP_PROBE_TIMEOUT_SECONDS:-2}
+      - SECURITY_HSTS_MAX_AGE_SECONDS=${SECURITY_HSTS_MAX_AGE_SECONDS:-63072000}
+      - MCP_DOWNLOAD_TIMEOUT_SECONDS=${MCP_DOWNLOAD_TIMEOUT_SECONDS:-30}
+      - FETCH_MAX_REDIRECT_HOPS=${OCR_FETCH_MAX_REDIRECT_HOPS:-0}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-false}
       - DEFAULT_LANGUAGE=en
       - MAX_FILE_SIZE_MB=50
       - ENGINE_CACHE_MAX_SIZE=2
@@ -79,22 +89,19 @@ services:
       # SSRF guard: the host-published object store (Floci) is reached via
       # the host-bound localhost address (host.docker.internal:9070) per ADR-001.
       - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
-      - MCP_DOWNLOAD_TIMEOUT_SECONDS=30
       # file:// is disabled by default; mount a writable dir and set
       # MCP_FILE_URI_ROOT to the in-container path to enable.
       # - MCP_FILE_URI_ROOT=/var/lib/apps/ascend-ocr/uploads
-      - RATE_LIMIT_DEFAULT=60/minute
-      - RATE_LIMIT_OCR=20/minute
-      - OTEL_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
       - OTEL_SERVICE_NAME=ascend-ocr
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.3.0
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.3.1
     networks:
       default:
         aliases:
           - ascend-ocr
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7022/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${OCR_API_PORT:-7022}/health"]
       interval: 30s
       timeout: 30s
       start_period: 120s
@@ -153,7 +160,7 @@ services:
         aliases:
           - ascend-agent
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9917/actuator/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9918/actuator/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -173,15 +180,17 @@ services:
     build:
       context: ./apps/ascend-memory
       dockerfile: Dockerfile
+      additional_contexts:
+        ascend-python-common: ./libs/ascend-python-common
     image: ascend-ai-ascend-memory:latest
     container_name: ascend-memory
     hostname: ascend-memory
     restart: unless-stopped
     ports:
-      - "7020:7020"
+      - "${MEMORY_API_PORT:-7020}:${MEMORY_API_PORT:-7020}"
     environment:
-      - API_PORT=7020
-      - API_HOST=0.0.0.0
+      - API_PORT=${MEMORY_API_PORT:-7020}
+      - API_HOST=${API_HOST:-0.0.0.0}
       # Qdrant must be running externally (port 6333)
       - QDRANT_HOST=host.docker.internal
       - QDRANT_PORT=6333
@@ -196,14 +205,22 @@ services:
       # - MEM0_INFER_MEMORY=true
       - MEM0_DEFAULT_PROVIDER=lmstudio
       # - MEM0_DEFAULT_PROVIDER=openai
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
+      - RATE_LIMIT_DEFAULT=${MEMORY_RATE_LIMIT_DEFAULT:-6000/minute}
+      - READINESS_PROBE_TIMEOUT_SECONDS=${READINESS_PROBE_TIMEOUT_SECONDS:-3}
+      - STARTUP_PROBE_TIMEOUT_SECONDS=${STARTUP_PROBE_TIMEOUT_SECONDS:-2}
+      - SECURITY_HSTS_MAX_AGE_SECONDS=${SECURITY_HSTS_MAX_AGE_SECONDS:-63072000}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-false}
+      - OTEL_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-memory
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.3
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.4
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:7020/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:${MEMORY_API_PORT:-7020}/health"]
       interval: 30s
       timeout: 5s
       start_period: 300s
@@ -239,7 +256,8 @@ services:
     ports:
       - "9998:9998"
     environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://otel-collector:4318/v1/traces
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
       - OTEL_SERVICE_NAME=ascend-weather-mcp
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.4
     # Memory sized from measured usage: peak observed at 374 MiB over 24h
@@ -259,12 +277,14 @@ services:
     build:
       context: ./apps/ascend-audio-scribe
       dockerfile: Dockerfile
+      additional_contexts:
+        ascend-python-common: ./libs/ascend-python-common
     image: ascend-ai-ascend-audio-scribe:latest
     container_name: ascend-audio-scribe
     hostname: ascend-audio-scribe
     restart: unless-stopped
     ports:
-      - "7017:7017"
+      - "${AUDIO_SCRIBE_API_PORT:-7017}:${AUDIO_SCRIBE_API_PORT:-7017}"
     environment:
       - HF_HOME=/hf-cache
       - HF_TOKEN=${HF_TOKEN}
@@ -275,14 +295,28 @@ services:
       - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
       # Enables file:// URIs jailed to /audio (the host Desktop mount).
       - MCP_FILE_URI_ROOT=/audio
+      - API_HOST=${API_HOST:-0.0.0.0}
+      - API_PORT=${AUDIO_SCRIBE_API_PORT:-7017}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
+      - RATE_LIMIT_DEFAULT=${AUDIO_SCRIBE_RATE_LIMIT_DEFAULT:-600/minute}
+      - RATE_LIMIT_TRANSCRIBE=${RATE_LIMIT_TRANSCRIBE:-60/minute}
+      - READINESS_PROBE_TIMEOUT_SECONDS=${READINESS_PROBE_TIMEOUT_SECONDS:-3}
+      - STARTUP_PROBE_TIMEOUT_SECONDS=${STARTUP_PROBE_TIMEOUT_SECONDS:-2}
+      - SECURITY_HSTS_MAX_AGE_SECONDS=${SECURITY_HSTS_MAX_AGE_SECONDS:-63072000}
+      - MCP_DOWNLOAD_TIMEOUT_SECONDS=${MCP_DOWNLOAD_TIMEOUT_SECONDS:-30}
+      - FETCH_MAX_REDIRECT_HOPS=${AUDIO_SCRIBE_FETCH_MAX_REDIRECT_HOPS:-10}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-false}
+      - OTEL_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=ascend-audio-scribe
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.9.3
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.9.4
     volumes:
       - D:/Development/AI/hf-cache:/hf-cache
       - C:\Users\Lukk\Desktop:/audio
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:7017/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:${AUDIO_SCRIBE_API_PORT:-7017}/health"]
       interval: 30s
       timeout: 10s
       start_period: 300s
@@ -345,13 +379,21 @@ services:
     hostname: prometheus
     restart: unless-stopped
     ports:
-      - "7077:9090"
+      - "${PROMETHEUS_HOST_PORT:-7077}:9090"
+    environment:
+      - PROMETHEUS_SCRAPE_INTERVAL=${PROMETHEUS_SCRAPE_INTERVAL:-15s}
+      - PROMETHEUS_EVALUATION_INTERVAL=${PROMETHEUS_EVALUATION_INTERVAL:-15s}
+      - OBSERVABILITY_CLUSTER_LABEL=${OBSERVABILITY_CLUSTER_LABEL:-ascend-ai-local}
+      - PROMETHEUS_QDRANT_TARGET=${PROMETHEUS_QDRANT_TARGET:-host.docker.internal:6333}
+    entrypoint: ["/etc/prometheus/price-rules.sh"]
     command:
-      - --config.file=/etc/prometheus/prometheus.yaml
-      - --storage.tsdb.retention.time=72h
+      - --config.file=/prometheus/prometheus.yaml
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-72h}
       - --web.enable-lifecycle
     volumes:
       - ./infra/observability/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./infra/observability/prometheus/price-rules.sh:/etc/prometheus/price-rules.sh:ro
+      - ./infra/observability/grafana/dashboards/pricing.yaml:/etc/prometheus/pricing.yaml:ro
       - prometheus-data:/prometheus
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -366,12 +408,15 @@ services:
     hostname: grafana
     restart: unless-stopped
     ports:
-      - "7078:3000"
+      - "${GRAFANA_HOST_PORT:-7078}:3000"
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Editor
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_AUTH_DISABLE_LOGIN_FORM=false
-      - GF_SERVER_ROOT_URL=http://localhost:7078
+      - GF_SERVER_ROOT_URL=${GF_SERVER_ROOT_URL:-http://localhost:7078}
+      - PROMETHEUS_SCRAPE_INTERVAL=${PROMETHEUS_SCRAPE_INTERVAL:-15s}
+      - GRAFANA_LOKI_MAX_LINES=${GRAFANA_LOKI_MAX_LINES:-1000}
+      - GRAFANA_DASHBOARDS_UPDATE_INTERVAL_SECONDS=${GRAFANA_DASHBOARDS_UPDATE_INTERVAL_SECONDS:-30}
     volumes:
       - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -386,7 +431,11 @@ services:
     container_name: loki
     hostname: loki
     restart: unless-stopped
-    command: -config.file=/etc/loki/loki-config.yaml
+    command:
+      - -config.file=/etc/loki/loki-config.yaml
+      - -config.expand-env=true
+    environment:
+      - LOKI_RETENTION_PERIOD=${LOKI_RETENTION_PERIOD:-2160h}
     volumes:
       - ./infra/observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
@@ -427,7 +476,11 @@ services:
     container_name: tempo
     hostname: tempo
     restart: unless-stopped
-    command: ["-config.file=/etc/tempo/tempo-config.yaml"]
+    command:
+      - -config.file=/etc/tempo/tempo-config.yaml
+      - -config.expand-env=true
+    environment:
+      - TEMPO_BLOCK_RETENTION=${TEMPO_BLOCK_RETENTION:-2160h}
     volumes:
       - ./infra/observability/tempo/tempo-config.yaml:/etc/tempo/tempo-config.yaml:ro
       - tempo-data:/var/tempo
@@ -435,6 +488,36 @@ services:
       default:
         aliases:
           - tempo
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.93.0@sha256:6ca518a72f30f7f576ef92963de1b91d3c3f5fd3aeac949f878bfda183587820
+    container_name: redis-exporter
+    hostname: redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://host.docker.internal:6379
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      default:
+        aliases:
+          - redis-exporter
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+    container_name: postgres-exporter
+    hostname: postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_URI=host.docker.internal:5432/ascend_ai?sslmode=disable
+      - DATA_SOURCE_USER=${DATA_SOURCE_USER}
+      - DATA_SOURCE_PASS=${DATA_SOURCE_PASS}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      default:
+        aliases:
+          - postgres-exporter
 
 volumes:
   prometheus-data:

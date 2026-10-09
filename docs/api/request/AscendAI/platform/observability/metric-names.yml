@@ -1,0 +1,35 @@
+info:
+  name: metric-names
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7077/api/v1/label/__name__/values"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Spring Boot framework metrics are served without any model call", function () {
+            expect(res.getBody().data).to.include("jvm_memory_used_bytes");
+        });
+        test("HTTP server metrics are served without any model call", function () {
+            expect(res.getBody().data).to.include("http_server_requests_seconds_count");
+        });
+        test("Python client metrics are served without any model call", function () {
+            expect(res.getBody().data).to.include("python_info");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

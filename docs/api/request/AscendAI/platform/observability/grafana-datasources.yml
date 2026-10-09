@@ -1,0 +1,38 @@
+info:
+  name: grafana-datasources
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7078/api/frontend/settings"
+  headers:
+    - name: accept
+      value: application/json
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("The three provisioned datasources exist by name", function () {
+            var ds = res.getBody().datasources;
+            expect(ds).to.have.property("Prometheus");
+            expect(ds).to.have.property("Loki");
+            expect(ds).to.have.property("Tempo");
+        });
+        test("Datasource uids match the provisioning file", function () {
+            var ds = res.getBody().datasources;
+            expect(ds.Prometheus.uid).to.equal("prometheus");
+            expect(ds.Loki.uid).to.equal("loki");
+            expect(ds.Tempo.uid).to.equal("tempo");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

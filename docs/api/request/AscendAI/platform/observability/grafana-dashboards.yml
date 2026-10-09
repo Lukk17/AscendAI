@@ -1,0 +1,32 @@
+info:
+  name: grafana-dashboards
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7078/api/search?type=dash-db"
+  headers:
+    - name: accept
+      value: application/json
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("All six dashboards of task 13 are provisioned", function () {
+            var titles = res.getBody().map(function (d) { return d.title; });
+            ["Platform Overview", "AI Pipeline", "Infrastructure", "L1 - Token Cost", "L2 - RAG Quality", "L3 - Cache Hit Rate"].forEach(function (t) {
+                expect(titles, "dashboard " + t).to.include(t);
+            });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

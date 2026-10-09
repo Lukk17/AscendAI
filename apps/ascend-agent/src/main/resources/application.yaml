@@ -2,6 +2,8 @@ server:
   port: 9917
 
 management:
+  server:
+    port: 9918
   endpoints:
     web:
       exposure:

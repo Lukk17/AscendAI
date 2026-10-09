@@ -13,7 +13,7 @@ public class MetricsConfig {
     @Bean
     MeterRegistryCustomizer<MeterRegistry> commonTags() {
         return registry -> registry.config()
-                .commonTags("service", "ascend-ai-agent");
+                .commonTags("service", "ascend-agent");
     }
 
     @Bean

@@ -1,0 +1,51 @@
+info:
+  name: openai-prompt
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:9917/api/v1/ai/prompt"
+  headers:
+    - name: X-User-Id
+      value: frostyAiTrafficTest
+  body:
+    type: multipart-form
+    data:
+      - name: prompt
+        type: text
+        value: |
+          Please write a short, structured technical paragraph (about 200 words)
+          describing the high-level architecture of a typical Spring Boot
+          microservice that uses PostgreSQL for persistence, Redis for caching,
+          and Kafka for asynchronous messaging. Cover the main layers
+          (controller, service, repository), the typical request lifecycle, and
+          a couple of cross-cutting concerns (logging, metrics, tracing). Keep
+          the answer self-contained and consistent run-to-run.
+      - name: provider
+        type: text
+        value: openai
+      - name: model
+        type: text
+        value: gpt-4o
+      - name: embeddingProvider
+        type: text
+        value: openai
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Response carries model content", function () {
+            const body = res.getBody();
+            expect(body.content).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

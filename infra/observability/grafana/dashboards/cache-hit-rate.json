@@ -87,6 +87,7 @@
       },
       "gridPos": { "h": 10, "w": 8, "x": 16, "y": 1 },
       "id": 3,
+      "description": "Current cache hit rate snapshot per provider over the last 10 minutes. Metric: rate(prompt_cache_tokens_read_total[10m]) / rate(prompt_cache_tokens_total[10m]). A gauge below 10% for any cloud provider while that provider is receiving traffic warrants investigation.",
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
       "targets": [
         {

@@ -1,8 +1,11 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: ${PROMETHEUS_SCRAPE_INTERVAL}
+  evaluation_interval: ${PROMETHEUS_EVALUATION_INTERVAL}
   external_labels:
-    cluster: ascend-ai-local
+    cluster: ${OBSERVABILITY_CLUSTER_LABEL}
+
+rule_files:
+  - /prometheus/token-price-rules.yaml
 
 scrape_configs:
 
@@ -12,7 +15,7 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - ascend-agent:9917
+          - ascend-agent:9918
     relabel_configs:
       - target_label: service
         replacement: ascend-agent
@@ -76,7 +79,25 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - host.docker.internal:6333
+          - ${PROMETHEUS_QDRANT_TARGET}
     relabel_configs:
       - target_label: service
         replacement: qdrant
+
+  - job_name: redis
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - redis-exporter:9121
+    relabel_configs:
+      - target_label: service
+        replacement: redis
+
+  - job_name: postgres
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - postgres-exporter:9187
+    relabel_configs:
+      - target_label: service
+        replacement: postgres

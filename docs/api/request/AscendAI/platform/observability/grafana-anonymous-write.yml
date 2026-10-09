@@ -1,0 +1,34 @@
+info:
+  name: grafana-anonymous-write
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7078/api/dashboards/db"
+  headers:
+    - name: accept
+      value: application/json
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: '{"dashboard":{"title":"x"}}'
+  auth: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Anonymous dashboard write never succeeds", function () {
+            expect(res.getStatus()).to.not.equal(200);
+        });
+        test("Answer is 401 or 403", function () {
+            expect([401, 403]).to.include(res.getStatus());
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
