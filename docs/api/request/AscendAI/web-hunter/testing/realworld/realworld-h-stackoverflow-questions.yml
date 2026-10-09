@@ -32,7 +32,7 @@ runtime:
                 const content = b.content || b.text || b.markdown || "";
                 expect(content.length, "success must carry content").to.be.at.least(1);
             } else {
-                expect(b.status).to.equal("human_intervention_required");
+                expect(b.code).to.equal("human_intervention_required");
                 expect(b.vnc_url).to.be.a("string").and.not.empty;
             }
         });

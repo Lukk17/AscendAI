@@ -1,3 +1,4 @@
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,18 +8,22 @@ from src.reader.strategies.novnc_strategy import NoVNCStrategy, _novnc_flow_lock
 
 
 @pytest.fixture(autouse=True)
-def _reset_novnc_flow_lock():
+def _reset_novnc_flow_lock() -> Any:
     """Each get_html() call in this file acquires the shared flow lock but
     (with asyncio.create_task mocked) never runs the monitor that would
     release it, so the lock must be reset around every test to keep them
     independent."""
-    _novnc_flow_lock.release(_novnc_flow_lock._holder_url, _novnc_flow_lock._holder_profile)
+    _novnc_flow_lock.release(
+        cast("str", _novnc_flow_lock._holder_url), cast("str", _novnc_flow_lock._holder_profile)
+    )
     yield
-    _novnc_flow_lock.release(_novnc_flow_lock._holder_url, _novnc_flow_lock._holder_profile)
+    _novnc_flow_lock.release(
+        cast("str", _novnc_flow_lock._holder_url), cast("str", _novnc_flow_lock._holder_profile)
+    )
 
 
 @pytest.mark.asyncio
-async def test_novnc_get_html_forwards_profile_to_monitor_task():
+async def test_novnc_get_html_forwards_profile_to_monitor_task() -> None:
     """The profile passed to the constructor must reach the background monitor
     task, not be silently dropped."""
     # when
@@ -37,7 +42,7 @@ async def test_novnc_get_html_forwards_profile_to_monitor_task():
 
 
 @pytest.mark.asyncio
-async def test_novnc_get_html_raises_login_intervention_on_login_redirect_url():
+async def test_novnc_get_html_raises_login_intervention_on_login_redirect_url() -> None:
     # given
     strategy = NoVNCStrategy()
 
@@ -55,7 +60,7 @@ async def test_novnc_get_html_raises_login_intervention_on_login_redirect_url():
 
 
 @pytest.mark.asyncio
-async def test_novnc_get_html_raises_captcha_intervention_when_no_login_url():
+async def test_novnc_get_html_raises_captcha_intervention_when_no_login_url() -> None:
     # given
     strategy = NoVNCStrategy()
 
@@ -72,7 +77,7 @@ async def test_novnc_get_html_raises_captcha_intervention_when_no_login_url():
 
 
 @pytest.mark.asyncio
-async def test_novnc_extract_calls_get_html_and_returns_empty():
+async def test_novnc_extract_calls_get_html_and_returns_empty() -> None:
     # given
     strategy = NoVNCStrategy()
 
@@ -86,7 +91,7 @@ async def test_novnc_extract_calls_get_html_and_returns_empty():
 
 
 @pytest.mark.asyncio
-async def test_novnc_get_html_raises_busy_when_another_flow_holds_the_lock():
+async def test_novnc_get_html_raises_busy_when_another_flow_holds_the_lock() -> None:
     """A second flow -- whether a manual establish() or an automatic
     escalation -- must be rejected immediately rather than colliding with
     the flow already holding the shared browser/display."""
@@ -109,7 +114,7 @@ async def test_novnc_get_html_raises_busy_when_another_flow_holds_the_lock():
 
 
 @pytest.mark.asyncio
-async def test_novnc_get_html_releases_lock_when_vnc_url_resolution_fails():
+async def test_novnc_get_html_releases_lock_when_vnc_url_resolution_fails() -> None:
     """If the flow never reaches task creation, the lock must not leak."""
     # given
     strategy = NoVNCStrategy()
@@ -132,7 +137,7 @@ async def test_novnc_get_html_releases_lock_when_vnc_url_resolution_fails():
 
 
 @pytest.mark.asyncio
-async def test_novnc_resolve_public_vnc_url_direct():
+async def test_novnc_resolve_public_vnc_url_direct() -> None:
     # given
     strategy = NoVNCStrategy()
 
@@ -144,7 +149,7 @@ async def test_novnc_resolve_public_vnc_url_direct():
 
 
 @pytest.mark.asyncio
-async def test_novnc_fetch_ngrok_url_picks_first_tunnel():
+async def test_novnc_fetch_ngrok_url_picks_first_tunnel() -> None:
     # given
     strategy = NoVNCStrategy()
     response = MagicMock()
@@ -169,7 +174,7 @@ async def test_novnc_fetch_ngrok_url_picks_first_tunnel():
 
 
 @pytest.mark.asyncio
-async def test_novnc_fetch_ngrok_url_falls_back_on_error():
+async def test_novnc_fetch_ngrok_url_falls_back_on_error() -> None:
     # given
     strategy = NoVNCStrategy()
     mock_client = AsyncMock()
@@ -194,7 +199,7 @@ async def test_novnc_fetch_ngrok_url_falls_back_on_error():
     assert url == "http://fallback/vnc.html?autoconnect=true"
 
 
-def test_novnc_extract_url_from_ngrok_empty_tunnels_uses_fallback():
+def test_novnc_extract_url_from_ngrok_empty_tunnels_uses_fallback() -> None:
     # given
     strategy = NoVNCStrategy()
 

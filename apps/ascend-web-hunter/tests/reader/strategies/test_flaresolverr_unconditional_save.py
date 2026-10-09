@@ -5,6 +5,7 @@ discarded all LinkedIn auth cookies.  After the fix, any non-empty cookie set
 is persisted regardless of which names are present.
 """
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,7 +13,7 @@ import pytest
 from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 
 
-def _make_session(json_payload: dict) -> MagicMock:
+def _make_session(json_payload: dict[str, Any]) -> MagicMock:
     response = MagicMock()
     response.json = MagicMock(return_value=json_payload)
     response.raise_for_status = MagicMock()
@@ -24,7 +25,7 @@ def _make_session(json_payload: dict) -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_saves_cookies_without_cf_clearance():
+async def test_flaresolverr_saves_cookies_without_cf_clearance() -> None:
     """Auth cookies like li_at (no cf_clearance) must now be persisted."""
     # given
     session = _make_session(
@@ -55,13 +56,13 @@ async def test_flaresolverr_saves_cookies_without_cf_clearance():
     # then
     mock_save.assert_awaited_once()
     call_args = mock_save.call_args
-    cookies_arg: dict = call_args.args[1]
+    cookies_arg: dict[str, Any] = call_args.args[1]
     assert "li_at" in cookies_arg
     assert "JSESSIONID" in cookies_arg
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_saves_cookies_with_cf_clearance():
+async def test_flaresolverr_saves_cookies_with_cf_clearance() -> None:
     """Cloudflare cookies must still be saved (regression guard)."""
     # given
     session = _make_session(
@@ -91,7 +92,7 @@ async def test_flaresolverr_saves_cookies_with_cf_clearance():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_does_not_save_when_cookies_empty():
+async def test_flaresolverr_does_not_save_when_cookies_empty() -> None:
     """When FlareSolverr returns an empty cookie list, no save should happen."""
     # given
     session = _make_session(
@@ -121,7 +122,7 @@ async def test_flaresolverr_does_not_save_when_cookies_empty():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_injects_stored_cookies_into_payload():
+async def test_flaresolverr_injects_stored_cookies_into_payload() -> None:
     """Stored auth cookies must be injected into the FlareSolverr request payload."""
     # given
     session = _make_session(

@@ -1,5 +1,7 @@
 """Tests for per-domain metric label with cardinality cap (task 7.2)."""
 
+from collections.abc import Iterator
+
 import pytest
 
 import src.observability.domain_label as dl_module
@@ -7,7 +9,7 @@ from src.observability.domain_label import domain_label
 
 
 @pytest.fixture(autouse=True)
-def reset_seen_domains() -> None:
+def reset_seen_domains() -> Iterator[None]:
     """Clear the module-level seen-domains set between tests."""
     dl_module._seen_domains.clear()
     yield

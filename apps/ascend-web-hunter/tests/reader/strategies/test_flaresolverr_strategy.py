@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,7 +8,7 @@ from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR
 from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 
 
-def _make_session(json_payload: dict) -> MagicMock:
+def _make_session(json_payload: dict[str, Any]) -> MagicMock:
     response = MagicMock()
     response.json = MagicMock(return_value=json_payload)
     response.raise_for_status = MagicMock()
@@ -20,7 +21,7 @@ def _make_session(json_payload: dict) -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_skipped_when_url_unset():
+async def test_flaresolverr_skipped_when_url_unset() -> None:
     # given
     strategy = FlareSolverrStrategy()
 
@@ -33,7 +34,7 @@ async def test_flaresolverr_skipped_when_url_unset():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
+async def test_flaresolverr_success_saves_cf_clearance_and_returns_html() -> None:
     # given
     session = _make_session(
         {
@@ -66,7 +67,7 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empty():
+async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empty() -> None:
     """After removing the cf_clearance gate, cookies are saved unconditionally
     when the set is non-empty - even if no cf_clearance is present."""
     # given
@@ -97,7 +98,7 @@ async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empt
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer():
+async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer() -> None:
     """A96/A61: the record saved after a solve must name FlareSolverr as the
     producer, so a later read can replay it through the tier that earned it."""
     # given
@@ -129,7 +130,7 @@ async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_login_wall_raises_challenge():
+async def test_flaresolverr_login_wall_raises_challenge() -> None:
     # given
     session = _make_session(
         {
@@ -158,7 +159,7 @@ async def test_flaresolverr_login_wall_raises_challenge():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation():
+async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation() -> None:
     # given
     session = _make_session(
         {
@@ -191,7 +192,7 @@ async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation()
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_status_not_ok_returns_empty():
+async def test_flaresolverr_status_not_ok_returns_empty() -> None:
     # given
     session = _make_session({"status": "error", "message": "fail"})
 
@@ -204,7 +205,7 @@ async def test_flaresolverr_status_not_ok_returns_empty():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_transport_error_returns_empty():
+async def test_flaresolverr_transport_error_returns_empty() -> None:
     # when
     with patch(
         "src.reader.strategies.flaresolverr_strategy.requests.AsyncSession",
@@ -217,7 +218,7 @@ async def test_flaresolverr_transport_error_returns_empty():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_extract_returns_empty_when_trafilatura_none():
+async def test_flaresolverr_extract_returns_empty_when_trafilatura_none() -> None:
     # given
     session = _make_session(
         {
@@ -242,7 +243,7 @@ async def test_flaresolverr_extract_returns_empty_when_trafilatura_none():
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_extract_empty_when_html_blank():
+async def test_flaresolverr_extract_empty_when_html_blank() -> None:
     # when
     with patch(
         "src.reader.strategies.flaresolverr_strategy.settings.FLARESOLVERR_URL",

@@ -76,7 +76,7 @@ def _html_reader() -> tuple[WebReader, dict[str, int], Any]:
 
 
 @pytest.mark.asyncio
-async def test_a_target_with_no_stored_login_reads_as_before():
+async def test_a_target_with_no_stored_login_reads_as_before() -> None:
     # given
     reader, counter, execute = _succeeding_reader()
 
@@ -89,7 +89,7 @@ async def test_a_target_with_no_stored_login_reads_as_before():
 
 
 @pytest.mark.asyncio
-async def test_a_target_with_no_stored_login_is_never_validated():
+async def test_a_target_with_no_stored_login_is_never_validated() -> None:
     # given
     reader, _, execute = _succeeding_reader()
     validate = AsyncMock(return_value=False)
@@ -110,7 +110,7 @@ async def test_a_target_with_no_stored_login_is_never_validated():
 
 
 @pytest.mark.asyncio
-async def test_a_live_session_runs_the_chain():
+async def test_a_live_session_runs_the_chain() -> None:
     # given
     reader, counter, execute = _succeeding_reader()
 
@@ -123,7 +123,7 @@ async def test_a_live_session_runs_the_chain():
 
 
 @pytest.mark.asyncio
-async def test_an_expired_session_stops_the_read_before_any_tier_runs():
+async def test_an_expired_session_stops_the_read_before_any_tier_runs() -> None:
     # given
     reader, counter, execute = _succeeding_reader()
 
@@ -136,7 +136,7 @@ async def test_an_expired_session_stops_the_read_before_any_tier_runs():
 
 
 @pytest.mark.asyncio
-async def test_the_expired_outcome_carries_its_whole_contract():
+async def test_the_expired_outcome_carries_its_whole_contract() -> None:
     # given
     reader, _, execute = _succeeding_reader()
 
@@ -154,7 +154,7 @@ async def test_the_expired_outcome_carries_its_whole_contract():
 
 
 @pytest.mark.asyncio
-async def test_the_expired_outcome_names_the_default_profile_when_none_was_given():
+async def test_the_expired_outcome_names_the_default_profile_when_none_was_given() -> None:
     # given
     reader, _, execute = _succeeding_reader()
 
@@ -166,7 +166,7 @@ async def test_the_expired_outcome_names_the_default_profile_when_none_was_given
 
 
 @pytest.mark.asyncio
-async def test_the_expired_outcome_is_not_the_generic_failure():
+async def test_the_expired_outcome_is_not_the_generic_failure() -> None:
     # given
     reader, _, execute = _succeeding_reader()
 
@@ -179,7 +179,7 @@ async def test_the_expired_outcome_is_not_the_generic_failure():
 
 
 @pytest.mark.asyncio
-async def test_the_links_path_reports_the_expired_session_too():
+async def test_the_links_path_reports_the_expired_session_too() -> None:
     # given
     reader, counter, execute = _html_reader()
 
@@ -192,7 +192,7 @@ async def test_the_links_path_reports_the_expired_session_too():
 
 
 @pytest.mark.asyncio
-async def test_the_links_path_with_a_live_session_runs_the_chain():
+async def test_the_links_path_with_a_live_session_runs_the_chain() -> None:
     # given
     reader, counter, execute = _html_reader()
 
@@ -205,7 +205,7 @@ async def test_the_links_path_with_a_live_session_runs_the_chain():
 
 
 @pytest.mark.asyncio
-async def test_a_cached_result_does_not_mask_an_expired_session():
+async def test_a_cached_result_does_not_mask_an_expired_session() -> None:
     # given
     reader, _, execute = _succeeding_reader()
     key = _cache_key(_URL, False, False, None, None)

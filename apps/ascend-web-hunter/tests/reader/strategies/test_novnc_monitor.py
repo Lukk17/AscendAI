@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -5,7 +6,9 @@ import pytest
 from src.reader.strategies.novnc_strategy import _monitor_for_cookies
 
 
-def _build_playwright_factory(*, cookies=None, page_url="http://test.com", goto_error=False):
+def _build_playwright_factory(
+    *, cookies: Any = None, page_url: str = "http://test.com", goto_error: Any = False
+) -> Any:
     page = MagicMock()
     page.url = page_url
     page.goto = AsyncMock(side_effect=RuntimeError("nav") if goto_error else AsyncMock())
@@ -27,7 +30,7 @@ def _build_playwright_factory(*, cookies=None, page_url="http://test.com", goto_
 
 
 @pytest.mark.asyncio
-async def test_monitor_breaks_early_when_url_changes():
+async def test_monitor_breaks_early_when_url_changes() -> None:
     # given
     factory, browser, _ctx, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}], page_url="http://test.com/dashboard"
@@ -54,7 +57,7 @@ async def test_monitor_breaks_early_when_url_changes():
 
 
 @pytest.mark.asyncio
-async def test_monitor_handles_goto_failure_and_still_polls():
+async def test_monitor_handles_goto_failure_and_still_polls() -> None:
     # given
     factory, browser, _ctx, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}],
@@ -82,7 +85,7 @@ async def test_monitor_handles_goto_failure_and_still_polls():
 
 
 @pytest.mark.asyncio
-async def test_monitor_swallows_transient_cookie_sync_error():
+async def test_monitor_swallows_transient_cookie_sync_error() -> None:
     """When storage_state() raises transiently the loop swallows the error and keeps going."""
     # given
     factory, browser, context, _page = _build_playwright_factory(
@@ -113,7 +116,7 @@ async def test_monitor_swallows_transient_cookie_sync_error():
 
 
 @pytest.mark.asyncio
-async def test_monitor_handles_outer_exception_and_closes_browser_in_finally():
+async def test_monitor_handles_outer_exception_and_closes_browser_in_finally() -> None:
     # given
     pw = MagicMock()
     pw.chromium.launch = AsyncMock(side_effect=RuntimeError("launch failed"))
@@ -127,7 +130,7 @@ async def test_monitor_handles_outer_exception_and_closes_browser_in_finally():
 
 
 @pytest.mark.asyncio
-async def test_monitor_browser_close_failure_is_tolerated():
+async def test_monitor_browser_close_failure_is_tolerated() -> None:
     # given
     factory, browser, _ctx, _page = _build_playwright_factory(
         cookies=[{"name": "x", "value": "y"}], page_url="http://test.com/done"

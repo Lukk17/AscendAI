@@ -140,7 +140,7 @@ Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -Conte
 
 Starting tier. Names where the escalation chain starts: `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr`,
 `4-playwright_stealth`, `5-crawlee_adaptive` or `6-novnc`, the same strings a read returns in `mode`. Escalation
-continues through the tiers after it. An unknown value is rejected with HTTP 422.
+continues through the tiers after it. An unknown value is rejected with HTTP 400 (`validation` problem body).
 
 Bash:
 
@@ -300,14 +300,19 @@ Wall-clock budget hit before any tier resolved:
 }
 ```
 
-Human intervention required (HTTP 428 on REST, structured result on MCP):
+Human intervention required (HTTP 428 problem body on REST, structured result on MCP):
 
 ```json
 {
-  "status": "human_intervention_required",
+  "type": "https://ascend.ai/errors/human-intervention-required",
+  "title": "Precondition Required",
+  "status": 428,
+  "code": "human_intervention_required",
+  "detail": "Manual Captcha resolution required. Please visit: https://abc123.ngrok.app/vnc.html?autoconnect=true",
+  "instance": "/api/v2/web/read",
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
   "intervention_type": "captcha",
-  "vnc_url": "https://abc123.ngrok.app/vnc.html?autoconnect=true",
-  "message": "Manual Captcha resolution required. Please visit: https://abc123.ngrok.app/vnc.html?autoconnect=true"
+  "vnc_url": "https://abc123.ngrok.app/vnc.html?autoconnect=true"
 }
 ```
 

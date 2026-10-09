@@ -36,7 +36,11 @@ class FlareSolverrStrategy(BaseStrategy):
             return ""
 
         timeout = settings.EXTRACT_TIMEOUT * 2
-        payload: dict = {"cmd": "request.get", "url": url, "maxTimeout": int((timeout - 2) * 1000)}
+        payload: dict[str, object] = {
+            "cmd": "request.get",
+            "url": url,
+            "maxTimeout": int((timeout - 2) * 1000),
+        }
 
         # Inject any stored auth+WAF cookies via FlareSolverr's cookie array.
         saved_flat = await cookie_manager.get_flat_cookies(url, self.profile)

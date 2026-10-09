@@ -11,14 +11,14 @@ from httpx import AsyncClient
 _URL = "http://unit.com/"
 _READ = "src.api.rest.rest_endpoints.web_reader.read"
 _READ_WITH_LINKS = "src.api.rest.rest_endpoints.web_reader.read_with_links"
-_GUARD = "src.api.rest.rest_endpoints.is_safe_external_url"
+_GUARD = "src.api.rest.rest_endpoints.check_fetch_uri"
 
 _STRUCTURED_FIELDS = ["url", "content", "title", "author", "date", "sitename", "status", "mode"]
 _SESSION_EXPIRED_FIELDS = ["url", "content", "status", "profile", "message"]
 
 
 @pytest.mark.asyncio
-async def test_read_forwards_output_format_and_tier(client: AsyncClient):
+async def test_read_forwards_output_format_and_tier(client: AsyncClient) -> None:
     # given
     result = {"content": "X", "status": "success", "mode": "4-playwright_stealth"}
 
@@ -44,7 +44,7 @@ async def test_read_forwards_output_format_and_tier(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_read_defaults_to_text_and_no_tier(client: AsyncClient):
+async def test_read_defaults_to_text_and_no_tier(client: AsyncClient) -> None:
     # given
     result = {"content": "X", "status": "success", "mode": "1-beautifulsoup"}
 
@@ -61,7 +61,7 @@ async def test_read_defaults_to_text_and_no_tier(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_structured_read_returns_the_structured_contract(client: AsyncClient):
+async def test_structured_read_returns_the_structured_contract(client: AsyncClient) -> None:
     # given
     result = {
         "content": "The body",
@@ -88,7 +88,7 @@ async def test_structured_read_returns_the_structured_contract(client: AsyncClie
 
 
 @pytest.mark.asyncio
-async def test_read_forwards_the_tier_on_the_links_path(client: AsyncClient):
+async def test_read_forwards_the_tier_on_the_links_path(client: AsyncClient) -> None:
     # given
     result = {"content": "X", "links": {}, "status": "success", "mode": "3-flaresolverr"}
 
@@ -110,7 +110,7 @@ async def test_read_forwards_the_tier_on_the_links_path(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_structured_with_links_is_rejected(client: AsyncClient):
+async def test_structured_with_links_is_rejected(client: AsyncClient) -> None:
     # when
     with (
         patch(_READ_WITH_LINKS, new_callable=AsyncMock) as mock_read,
@@ -128,27 +128,41 @@ async def test_structured_with_links_is_rejected(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_an_unknown_tier_is_rejected(client: AsyncClient):
+async def test_an_unknown_tier_is_rejected(client: AsyncClient) -> None:
+    # given
+    payload = {"url": _URL, "tier": "7-telepathy"}
+
     # when
     with patch(_GUARD, return_value=True):
-        resp = await client.post("/api/v2/web/read", json={"url": _URL, "tier": "7-telepathy"})
+        resp = await client.post("/api/v2/web/read", json=payload)
 
     # then
-    assert resp.status_code == 422
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["code"] == "validation"
+    assert isinstance(body["errors"], list)
+    assert len(body["errors"]) > 0
 
 
 @pytest.mark.asyncio
-async def test_an_unknown_output_format_is_rejected(client: AsyncClient):
+async def test_an_unknown_output_format_is_rejected(client: AsyncClient) -> None:
+    # given
+    payload = {"url": _URL, "output_format": "yaml"}
+
     # when
     with patch(_GUARD, return_value=True):
-        resp = await client.post("/api/v2/web/read", json={"url": _URL, "output_format": "yaml"})
+        resp = await client.post("/api/v2/web/read", json=payload)
 
     # then
-    assert resp.status_code == 422
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["code"] == "validation"
+    assert isinstance(body["errors"], list)
+    assert len(body["errors"]) > 0
 
 
 @pytest.mark.asyncio
-async def test_session_expired_reaches_the_caller_whole(client: AsyncClient):
+async def test_session_expired_reaches_the_caller_whole(client: AsyncClient) -> None:
     # given
     result = {
         "content": "",

@@ -21,7 +21,7 @@ class _MockResponse:
         self.url = "http://test.com"
         self.headers: dict[str, str] = {}
 
-    def raise_for_status(self):
+    def raise_for_status(self) -> Any:
         return None
 
 
@@ -35,7 +35,7 @@ def _make_curl_session(response: _MockResponse) -> MagicMock:
 
 
 @pytest.fixture
-def patch_cookies_none():
+def patch_cookies_none() -> Any:
     with (
         patch(
             "src.reader.strategies.curl_cffi_fetcher.cookie_manager.get_flat_cookies",
@@ -50,7 +50,7 @@ def patch_cookies_none():
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_returns_html(patch_cookies_none, pinned_public_host):
+async def test_curl_cffi_fetcher_returns_html(patch_cookies_none: Any, pinned_public_host: Any) -> None:
     # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
 
@@ -66,7 +66,7 @@ async def test_curl_cffi_fetcher_returns_html(patch_cookies_none, pinned_public_
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_uses_cached_cookies(pinned_public_host):
+async def test_curl_cffi_fetcher_uses_cached_cookies(pinned_public_host: Any) -> None:
     # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
 
@@ -95,7 +95,9 @@ async def test_curl_cffi_fetcher_uses_cached_cookies(pinned_public_host):
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none, pinned_public_host):
+async def test_curl_cffi_fetcher_raises_on_login_wall(
+    patch_cookies_none: Any, pinned_public_host: Any
+) -> None:
     # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
 
@@ -118,7 +120,9 @@ async def test_curl_cffi_fetcher_raises_on_login_wall(patch_cookies_none, pinned
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_raises_on_waf_block(patch_cookies_none, pinned_public_host):
+async def test_curl_cffi_fetcher_raises_on_waf_block(
+    patch_cookies_none: Any, pinned_public_host: Any
+) -> None:
     # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
 
@@ -145,7 +149,9 @@ async def test_curl_cffi_fetcher_raises_on_waf_block(patch_cookies_none, pinned_
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_returns_empty_on_transport_error(patch_cookies_none):
+async def test_curl_cffi_fetcher_returns_empty_on_transport_error(
+    patch_cookies_none: Any, pinned_public_host: Any
+) -> None:
     # when
     with patch(
         "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
@@ -158,7 +164,7 @@ async def test_curl_cffi_fetcher_returns_empty_on_transport_error(patch_cookies_
 
 
 @pytest.mark.asyncio
-async def test_beautifulsoup_extract_strips_noise(patch_cookies_none, pinned_public_host):
+async def test_beautifulsoup_extract_strips_noise(patch_cookies_none: Any, pinned_public_host: Any) -> None:
     # given
     session = _make_curl_session(_MockResponse(SAMPLE_HTML))
     strategy = BeautifulSoupStrategy(lambda: "ua")
@@ -176,7 +182,7 @@ async def test_beautifulsoup_extract_strips_noise(patch_cookies_none, pinned_pub
 
 
 @pytest.mark.asyncio
-async def test_beautifulsoup_extract_empty_html(patch_cookies_none):
+async def test_beautifulsoup_extract_empty_html(patch_cookies_none: Any) -> None:
     # when
     with patch(
         "src.reader.strategies.beautifulsoup_strategy.fetch_with_curl_cffi",
@@ -190,7 +196,7 @@ async def test_beautifulsoup_extract_empty_html(patch_cookies_none):
 
 
 @pytest.mark.asyncio
-async def test_trafilatura_extract(patch_cookies_none):
+async def test_trafilatura_extract(patch_cookies_none: Any) -> None:
     # given
     long_text = "Extracted content. " * 20  # 380 chars, well above READABILITY_FALLBACK_MIN_CHARS
 
@@ -213,7 +219,7 @@ async def test_trafilatura_extract(patch_cookies_none):
 
 
 @pytest.mark.asyncio
-async def test_trafilatura_extract_empty_html():
+async def test_trafilatura_extract_empty_html() -> None:
     # when
     with patch(
         "src.reader.strategies.trafilatura_strategy.fetch_with_curl_cffi",
@@ -228,8 +234,8 @@ async def test_trafilatura_extract_empty_html():
 
 @pytest.mark.asyncio
 async def test_trafilatura_extract_falls_back_to_readability_when_trafilatura_returns_none(
-    patch_cookies_none,
-):
+    patch_cookies_none: Any,
+) -> None:
     """When trafilatura returns None the readability fallback content is returned instead of empty string."""
     # when
     with (
@@ -276,7 +282,7 @@ def _build_playwright_page_mock(html: str, current_url: str = "http://test.com")
     return page
 
 
-def _wire_browser_pool(monkeypatch, page) -> None:
+def _wire_browser_pool(monkeypatch: Any, page: Any) -> None:
     from src.runtime import browser_pool as bp_module
 
     context = MagicMock()
@@ -291,7 +297,7 @@ def _wire_browser_pool(monkeypatch, page) -> None:
 
 
 @pytest.mark.asyncio
-async def test_playwright_extract_happy_path(monkeypatch):
+async def test_playwright_extract_happy_path(monkeypatch: Any) -> None:
     # given
     page = _build_playwright_page_mock("<html><body>content</body></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)
@@ -320,7 +326,7 @@ async def test_playwright_extract_happy_path(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_playwright_extract_returns_empty_when_trafilatura_none(monkeypatch):
+async def test_playwright_extract_returns_empty_when_trafilatura_none(monkeypatch: Any) -> None:
     # given
     page = _build_playwright_page_mock("<html></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)
@@ -349,7 +355,7 @@ async def test_playwright_extract_returns_empty_when_trafilatura_none(monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_playwright_raises_challenge_on_login_redirect_url(monkeypatch):
+async def test_playwright_raises_challenge_on_login_redirect_url(monkeypatch: Any) -> None:
     # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
@@ -368,7 +374,7 @@ async def test_playwright_raises_challenge_on_login_redirect_url(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_playwright_raises_challenge_on_login_wall_during_poll(monkeypatch):
+async def test_playwright_raises_challenge_on_login_wall_during_poll(monkeypatch: Any) -> None:
     # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
@@ -397,7 +403,7 @@ async def test_playwright_raises_challenge_on_login_wall_during_poll(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch):
+async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch: Any) -> None:
     # given
     page = _build_playwright_page_mock("<html></html>")
     _wire_browser_pool(monkeypatch, page)
@@ -431,7 +437,7 @@ async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkeypatch):
+async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkeypatch: Any) -> None:
     """A Cloudflare JS challenge that auto-clears within the budget must NOT escalate:
     the headful tier keeps polling, the challenge resolves, and content is returned."""
     # given
@@ -470,7 +476,7 @@ async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkey
 
 
 @pytest.mark.asyncio
-async def test_playwright_escalates_when_challenge_never_clears(monkeypatch):
+async def test_playwright_escalates_when_challenge_never_clears(monkeypatch: Any) -> None:
     """A challenge still present after the auto-clear budget escalates to NoVNC."""
     # given
     page = _build_playwright_page_mock("<html></html>")
@@ -510,7 +516,7 @@ async def test_playwright_escalates_when_challenge_never_clears(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_playwright_still_blocked_after_deadline_raises_not_returns_html(monkeypatch):
+async def test_playwright_still_blocked_after_deadline_raises_not_returns_html(monkeypatch: Any) -> None:
     """The post-loop captcha re-check must raise even if the poll loop exited by deadline."""
     # given
     page = _build_playwright_page_mock("<html></html>")
@@ -545,7 +551,7 @@ async def test_playwright_still_blocked_after_deadline_raises_not_returns_html(m
 
 
 @pytest.mark.asyncio
-async def test_playwright_raises_late_login_wall(monkeypatch):
+async def test_playwright_raises_late_login_wall(monkeypatch: Any) -> Any:
     # given
     page = _build_playwright_page_mock("<html></html>")
     page.wait_for_load_state = AsyncMock(return_value=None)
@@ -581,7 +587,7 @@ async def test_playwright_raises_late_login_wall(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_playwright_retries_after_transient_content_read_error(monkeypatch):
+async def test_playwright_retries_after_transient_content_read_error(monkeypatch: Any) -> None:
     """A transient PlaywrightError while reading page.content() during polling must be
     swallowed and retried rather than propagated to the caller."""
     # given
@@ -615,7 +621,7 @@ async def test_playwright_retries_after_transient_content_read_error(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_playwright_retries_after_transient_networkidle_wait_error(monkeypatch):
+async def test_playwright_retries_after_transient_networkidle_wait_error(monkeypatch: Any) -> None:
     """A transient PlaywrightError while waiting for the networkidle load state during
     polling must be swallowed and retried rather than propagated to the caller."""
     # given
@@ -649,7 +655,7 @@ async def test_playwright_retries_after_transient_networkidle_wait_error(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_crawlee_strategy_extract_returns_trafilatura_result():
+async def test_crawlee_strategy_extract_returns_trafilatura_result() -> None:
     # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
@@ -671,7 +677,7 @@ async def test_crawlee_strategy_extract_returns_trafilatura_result():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_strategy_raises_challenge_on_login_wall():
+async def test_crawlee_strategy_raises_challenge_on_login_wall() -> None:
     # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
@@ -694,7 +700,7 @@ async def test_crawlee_strategy_raises_challenge_on_login_wall():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_strategy_raises_challenge_on_waf_block():
+async def test_crawlee_strategy_raises_challenge_on_waf_block() -> None:
     # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
@@ -721,7 +727,7 @@ async def test_crawlee_strategy_raises_challenge_on_waf_block():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_handle_request_playwright_context():
+async def test_crawlee_handle_request_playwright_context() -> None:
     # given
     from crawlee.crawlers import PlaywrightCrawlingContext
 
@@ -739,7 +745,7 @@ async def test_crawlee_handle_request_playwright_context():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_raises():
+async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_raises() -> None:
     """When page.content() raises, _handle_crawlee_request must fall back to get_snapshot()."""
     # given
     from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
@@ -762,19 +768,19 @@ async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_r
 
 
 @pytest.mark.asyncio
-async def test_crawlee_decorated_handlers_executed():
+async def test_crawlee_decorated_handlers_executed() -> Any:
     """The crawlee strategy registers two decorated inner functions
     (request_handler and enable_adblock). Capture them and invoke directly so
     their bodies are covered."""
     # given
     captured: dict[str, Any] = {}
 
-    def capture_default(fn):
+    def capture_default(fn: Any) -> Any:
         captured["default"] = fn
 
         return fn
 
-    def capture_pre_nav(fn):
+    def capture_pre_nav(fn: Any) -> Any:
         captured["pre_nav"] = fn
 
         return fn
@@ -811,7 +817,7 @@ async def test_crawlee_decorated_handlers_executed():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_extract_empty_when_trafilatura_none():
+async def test_crawlee_extract_empty_when_trafilatura_none() -> None:
     # when
     with (
         patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,

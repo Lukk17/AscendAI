@@ -4,31 +4,34 @@
 
 ### Logging
 
-Logging is configured in `src/config/logging_config.py`. The module uses `colorlog` for development-friendly
-coloured output and integrates with the Uvicorn logger. All strategy modules log at `INFO` when a strategy
+Logging comes from `ascend-python-common` (`configure_logging`): `LOG_LEVEL` is honoured, `LOG_FORMAT` selects
+`json` or `color`, and every line starts with `[ascend-web-hunter]`. There is no service `logging_config.py` and
+no `log_config` argument on `uvicorn.run`. All strategy modules log at `INFO` when a strategy
 starts (`--- Strategy N STARTED ---`) and at `WARNING` when a strategy fails or detects a challenge. The startup
-banner (`src/config/startup_banner.py`) emits key config values at startup so operators can verify the runtime
-configuration from container logs without inspecting env vars separately.
+banner frame lives in the library; the service passes its art text, its content lines, and its readiness probe
+results, so operators can verify the runtime configuration from container logs without inspecting env vars separately.
 
 ---
 
 ### SSRF guard
 
-Two distinct SSRF surfaces exist and both are guarded.
-
-`is_safe_external_url` (`src/validator/url_validator.py`) is called by both the REST `POST /api/v2/web/read`
-endpoint and the `web_read` MCP tool before any URL is passed to `WebReader`. It resolves the hostname with
-`socket.getaddrinfo` and rejects loopback, private, link-local, multicast, reserved, and unspecified addresses.
-Non-HTTP/HTTPS schemes are also rejected.
+Two distinct SSRF surfaces exist and both are guarded by the shared `check_fetch_uri`
+(`ascend_python_common.uri_guard`), with a policy of the `ALLOWED_PRIVATE_HOSTS` hosts, no file root, and
+`MAX_REDIRECT_HOPS` (10) hops. The three URL checks of the REST endpoints (`src/api/rest/rest_endpoints.py`) call
+it directly, and the four URL-checking MCP tools share the `_check_url` helper (`src/api/mcp/mcp_server.py`) that
+calls it. A refused URL answers `400` with code `unsafe_uri` on REST and a tool error starting with `unsafe_uri: `
+on MCP. A URI with user info is refused the same way. `URLValidator` and the `url_validator` singleton stay in
+`src/validator/url_validator.py` for the ad blocklist only; the address rule and the pinning left that module.
 
 The boundary check and the fetch are separated by the whole strategy chain, so the fetch path guards itself as
-well. The `curl_cffi` tiers do not follow redirects automatically: each hop is checked before it is followed, up to
-ten hops, so no hop is ever fetched before it has been validated. A relative `Location` is resolved against the URL
+well. The `curl_cffi` tiers do not follow redirects automatically: the redirect loop is the library's
+`follow_guarded_redirects` with a curl_cffi `send_hop` that builds its `CURLOPT_RESOLVE` entries from the checked
+target, so each hop is checked before it is followed, up to ten hops, and no hop is ever fetched before it has
+been validated. A relative `Location` is resolved against the URL
 of the hop that returned it first, as RFC 9110 section 10.2.2 requires, and the resolved absolute URL then faces
 that same check, so an ordinary relative redirect is followed and one that resolves onto an internal address is
 still refused. Those tiers also pin what they
-connect to. `pin_safe_host` resolves the host once, validates every address it gets back, and hands those addresses
-to libcurl through `CURLOPT_RESOLVE`, so the socket opens against an address this process authorised rather than
+connect to: the socket opens against an address the guard authorised rather than
 against a second, possibly different, answer to a second lookup. FlareSolverr and Crawlee fetch out of process, and
 Playwright and NoVNC fetch through a browser the pool launches once, so all four keep pre-dispatch validation only
 and their rebinding window is accepted residual risk. Both halves are recorded in

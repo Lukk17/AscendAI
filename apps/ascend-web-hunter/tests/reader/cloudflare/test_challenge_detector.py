@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -5,7 +6,7 @@ import pytest
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 
 
-def test_is_blocked_no_content():
+def test_is_blocked_no_content() -> None:
     # when / then
     assert ChallengeDetector.is_blocked(403, "") is True
     assert ChallengeDetector.is_blocked(429, "") is True
@@ -13,7 +14,7 @@ def test_is_blocked_no_content():
     assert ChallengeDetector.is_blocked(200, "") is False
 
 
-def test_is_blocked_large_content():
+def test_is_blocked_large_content() -> None:
     # given
     large_html = "a" * 50001
 
@@ -21,7 +22,7 @@ def test_is_blocked_large_content():
     assert ChallengeDetector.is_blocked(403, large_html) is False
 
 
-def test_is_blocked_keywords():
+def test_is_blocked_keywords() -> None:
     # given
     html_with_keyword = "<html><body>Just a moment...</body></html>"
 
@@ -30,7 +31,7 @@ def test_is_blocked_keywords():
     assert ChallengeDetector.is_blocked(403, html_with_keyword) is True
 
 
-def test_is_blocked_ray_id():
+def test_is_blocked_ray_id() -> None:
     # given
     html_with_ray_id = "<html><body>Ray ID: 890123abc</body></html>"
 
@@ -38,7 +39,7 @@ def test_is_blocked_ray_id():
     assert ChallengeDetector.is_blocked(200, html_with_ray_id) is True
 
 
-def test_is_blocked_cf_tokens():
+def test_is_blocked_cf_tokens() -> None:
     # given
     html_turnstile = "<html><body><script src='cf-turnstile'></script></body></html>"
 
@@ -49,7 +50,7 @@ def test_is_blocked_cf_tokens():
     assert ChallengeDetector.is_blocked(200, html_clearance) is True
 
 
-def test_not_blocked():
+def test_not_blocked() -> None:
     # given
     valid_html = "<html><body>Real website content without blocks</body></html>"
 
@@ -57,7 +58,7 @@ def test_not_blocked():
     assert ChallengeDetector.is_blocked(200, valid_html) is False
 
 
-def test_is_login_required():
+def test_is_login_required() -> None:
     # when / then
     assert (
         ChallengeDetector.is_login_required(
@@ -92,7 +93,7 @@ def test_is_login_required():
     )
 
 
-def test_is_login_required_ignores_login_substring_within_words():
+def test_is_login_required_ignores_login_substring_within_words() -> None:
     """Word-boundary match: 'sign in' must not fire on 'design industry'."""
     # when / then
     assert (
@@ -109,7 +110,7 @@ def test_is_login_required_ignores_login_substring_within_words():
     )
 
 
-def test_is_login_required_svg_bypass():
+def test_is_login_required_svg_bypass() -> None:
     # given
     dirty_html = (
         "<html><body>"
@@ -122,7 +123,7 @@ def test_is_login_required_svg_bypass():
     assert ChallengeDetector.is_login_required(dirty_html) is True
 
 
-def test_is_blocked_returns_true_for_waf_script_signature():
+def test_is_blocked_returns_true_for_waf_script_signature() -> None:
     # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
@@ -138,7 +139,7 @@ def test_is_blocked_returns_true_for_waf_script_signature():
         assert ChallengeDetector.is_blocked(200, html) is True
 
 
-def test_is_blocked_returns_true_for_waf_strict_phrase():
+def test_is_blocked_returns_true_for_waf_strict_phrase() -> None:
     # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
@@ -154,7 +155,7 @@ def test_is_blocked_returns_true_for_waf_strict_phrase():
         assert ChallengeDetector.is_blocked(200, html) is True
 
 
-def test_is_blocked_returns_false_on_huge_content():
+def test_is_blocked_returns_false_on_huge_content() -> None:
     # given
     huge = "a" * 50001
 
@@ -162,7 +163,7 @@ def test_is_blocked_returns_false_on_huge_content():
     assert ChallengeDetector.is_blocked(200, huge) is False
 
 
-def test_is_login_required_returns_false_on_huge_content():
+def test_is_login_required_returns_false_on_huge_content() -> None:
     # given
     huge = "a" * 50001
 
@@ -170,18 +171,18 @@ def test_is_login_required_returns_false_on_huge_content():
     assert ChallengeDetector.is_login_required(huge) is False
 
 
-def test_is_login_redirect_url_empty_string_returns_false():
+def test_is_login_redirect_url_empty_string_returns_false() -> None:
     # when / then
     assert ChallengeDetector.is_login_redirect_url("") is False
 
 
 # noinspection PyTypeChecker
-def test_is_login_redirect_url_none_returns_false():
+def test_is_login_redirect_url_none_returns_false() -> None:
     # when / then
     assert ChallengeDetector.is_login_redirect_url(None) is False  # type: ignore[arg-type]
 
 
-def test_has_real_content_true_for_genuine_article():
+def test_has_real_content_true_for_genuine_article() -> None:
     # given
     html = (
         "<html><body><article><p>"
@@ -194,12 +195,12 @@ def test_has_real_content_true_for_genuine_article():
     assert ChallengeDetector.has_real_content(html) is True
 
 
-def test_has_real_content_false_for_empty_string():
+def test_has_real_content_false_for_empty_string() -> None:
     # when / then
     assert ChallengeDetector.has_real_content("") is False
 
 
-def test_has_real_content_false_for_thin_interstitial():
+def test_has_real_content_false_for_thin_interstitial() -> None:
     """A small page whose only text is a short interstitial paragraph (real content
     once boilerplate is stripped is near zero) must fail the positive-evidence check."""
     # given
@@ -209,7 +210,7 @@ def test_has_real_content_false_for_thin_interstitial():
     assert ChallengeDetector.has_real_content(html) is False
 
 
-def test_has_real_content_true_for_large_page_regardless_of_shape():
+def test_has_real_content_true_for_large_page_regardless_of_shape() -> None:
     """Pages at or above CHALLENGE_WALL_MAX_BYTES pass automatically: a genuine
     interstitial is small, so size alone rules it out."""
     # given
@@ -219,7 +220,7 @@ def test_has_real_content_true_for_large_page_regardless_of_shape():
     assert ChallengeDetector.has_real_content(huge) is True
 
 
-def test_is_content_accepted_false_when_blocked_even_with_real_content():
+def test_is_content_accepted_false_when_blocked_even_with_real_content() -> None:
     """A known block signature rejects the page even if it also contains
     enough words to otherwise pass the structural check."""
     # given
@@ -233,7 +234,7 @@ def test_is_content_accepted_false_when_blocked_even_with_real_content():
     assert ChallengeDetector.is_content_accepted(200, html) is False
 
 
-def test_is_content_accepted_false_for_unrecognized_thin_interstitial():
+def test_is_content_accepted_false_for_unrecognized_thin_interstitial() -> None:
     """The Allegro regression: a DataDome block page carrying no literal
     'datadome' string and no cf_clearance/turnstile marker must still be
     rejected via the positive-evidence structural check."""
@@ -248,7 +249,7 @@ def test_is_content_accepted_false_for_unrecognized_thin_interstitial():
     assert ChallengeDetector.is_content_accepted(200, html) is False
 
 
-def test_is_content_accepted_false_for_amazon_style_interstitial():
+def test_is_content_accepted_false_for_amazon_style_interstitial() -> None:
     """Regression guard for a phrase-dictionary hit: an interstitial that renders
     the literal dictionary phrase must still be rejected."""
     # given
@@ -270,7 +271,9 @@ def test_is_content_accepted_false_for_amazon_style_interstitial():
         ("se", "Klicka på knappen nedan för att fortsätta handla", "Fortsätt handla"),
     ],
 )
-def test_is_content_accepted_false_for_real_amazon_captcha_page_any_locale(locale, heading, button):
+def test_is_content_accepted_false_for_real_amazon_captcha_page_any_locale(
+    locale: Any, heading: Any, button: Any
+) -> None:
     """The reported bug: Amazon's own captcha page carries no phrase from the
     dictionary in any locale, and its footer boilerplate (terms/privacy links,
     copyright line) alone is enough real prose to clear has_real_content's word
@@ -300,7 +303,7 @@ def test_is_content_accepted_false_for_real_amazon_captcha_page_any_locale(local
     assert ChallengeDetector.is_content_accepted(200, html) is False
 
 
-def test_is_blocked_returns_true_for_waf_structural_marker():
+def test_is_blocked_returns_true_for_waf_structural_marker() -> None:
     # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
@@ -317,7 +320,7 @@ def test_is_blocked_returns_true_for_waf_structural_marker():
         assert ChallengeDetector.is_blocked(200, html) is True
 
 
-def test_is_content_accepted_true_for_real_datadome_rendered_page():
+def test_is_content_accepted_true_for_real_datadome_rendered_page() -> None:
     """A DataDome-protected page that has actually cleared and serves full content
     must not be rejected merely for referencing DataDome infrastructure."""
     # given
@@ -327,7 +330,7 @@ def test_is_content_accepted_true_for_real_datadome_rendered_page():
     assert ChallengeDetector.is_content_accepted(200, html) is True
 
 
-def test_is_login_redirect_url_matches_known_patterns():
+def test_is_login_redirect_url_matches_known_patterns() -> None:
     # when / then
     assert (
         ChallengeDetector.is_login_redirect_url(

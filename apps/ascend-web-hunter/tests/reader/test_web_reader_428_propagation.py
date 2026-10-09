@@ -9,7 +9,7 @@ from src.reader.web_reader import WebReader
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_propagates_428_when_novnc_raises():
+async def test_read_with_links_propagates_428_when_novnc_raises() -> None:
     """
     When a strategy raises ChallengeDetectedException the orchestrator escalates
     to NoVNC.  If NoVNC raises HumanInterventionRequiredException the 428 must
@@ -53,7 +53,7 @@ async def test_read_with_links_propagates_428_when_novnc_raises():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_direct_428_propagates():
+async def test_read_with_links_direct_428_propagates() -> None:
     """
     When a strategy directly raises HumanInterventionRequiredException
     on the get_html path, it must escape the _execute_html_strategy wrapper.
@@ -71,7 +71,7 @@ async def test_read_with_links_direct_428_propagates():
 
 
 @pytest.mark.asyncio
-async def test_read_propagates_novnc_busy_instead_of_swallowing_it():
+async def test_read_propagates_novnc_busy_instead_of_swallowing_it() -> None:
     """
     A read that escalates all the way to NoVNC while another intervention
     already holds the shared browser/display must surface that conflict to
@@ -115,7 +115,7 @@ async def test_read_propagates_novnc_busy_instead_of_swallowing_it():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_propagates_novnc_busy_instead_of_swallowing_it():
+async def test_read_with_links_propagates_novnc_busy_instead_of_swallowing_it() -> None:
     # given
     exc = NoVNCFlowBusyException("http://other-site.example", "default")
 

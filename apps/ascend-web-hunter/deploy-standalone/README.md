@@ -113,6 +113,15 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | VNC_PASSWORD | Yes | Password for the NoVNC desktop. Turned into an encrypted x11vnc password file at container start. |
 | NGROK_AUTHTOKEN | Yes | Authenticates the ngrok tunnel. |
 | REDIS_URL | No | Where ascend-web-hunter's cookie/session cache lives. Defaults to the bundled Redis (`redis://redis:6379/0`); override to point at an external Redis instead. See [Prerequisites](#prerequisites). |
+| WEB_HUNTER_API_PORT | No | Service port. Code default `7021` applies when unset. |
+| API_HOST | No | Bind address. Code default `0.0.0.0` applies when unset. |
+| LOG_LEVEL | No | Logging level. Code default `INFO` applies when unset. |
+| LOG_FORMAT | No | Log format, `json` or `color`. Code default `json` applies when unset. |
+| WEB_HUNTER_RATE_LIMIT_DEFAULT | No | Flood-protection rate limit for REST routes and MCP tools. Code default `1200/minute` applies when unset. |
+| READINESS_PROBE_TIMEOUT_SECONDS | No | Seconds each readiness probe may take. Code default `3` applies when unset. |
+| STARTUP_PROBE_TIMEOUT_SECONDS | No | Seconds each startup banner check may take. Code default `2` applies when unset. |
+| SECURITY_HSTS_MAX_AGE_SECONDS | No | Max age of the strict-transport-security header. Code default `63072000` applies when unset. |
+| WEB_HUNTER_FETCH_MAX_REDIRECT_HOPS | No | Redirect hops the URI fetch guard follows. Code default `10` applies when unset. |
 
 The full list of tunable settings, timeouts, extraction thresholds, circuit-breaker values and so on, lives in [../docs/configuration.md](../docs/configuration.md). Every one of them can be added to the `environment:` block of the ascend-web-hunter service.
 
@@ -242,6 +251,7 @@ The equivalent file in the repository root is `compose.ascend-web-hunter.yaml`. 
 | ascend-web-hunter `depends_on` redis | Absent. Compose refuses to resolve a `depends_on` that crosses a profile boundary, so a profiled `redis` cannot be a dependency here | Present, `condition: service_healthy`, now that the profile boundary is gone. Costs no measurable startup time, since Redis's health arrives well before searxng's or flaresolverr's |
 | redis service `container_name` | `ascend-scrapper-redis`, to avoid colliding with the development machine's own pre-existing `redis` container | `redis`, matching every other service in this file; no such collision exists on this bundle's target host |
 | redis service volume | None. The profile is meant for occasional local testing of this bundle, and the development machine's own Redis already persists its own data | `redisdata`, since a lost session here means a human re-solving every Cloudflare challenge by hand |
+| ALLOWED_PRIVATE_HOSTS | Passed from `WEB_HUNTER_ALLOWED_PRIVATE_HOSTS`, empty by default and set only by the start command of an end-to-end sweep | Absent. The bundle passes no allow list to the service |
 
 ---
 

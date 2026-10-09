@@ -56,15 +56,15 @@ sequenceDiagram
 sequenceDiagram
     participant Agent as ascend-ai-agent :9917
     participant MCP as web_read tool
-    participant Guard as is_safe_external_url
+    participant Guard as check_fetch_uri
     participant WR as WebReader
     participant BS as BeautifulSoupStrategy
     participant CV as ContentValidator
     participant Redis as Redis :6379
 
     Agent->>MCP: tools/call web_read(url="https://example.com/article")
-    MCP->>Guard: is_safe_external_url("https://example.com/article")
-    Guard-->>MCP: True
+    MCP->>Guard: check_fetch_uri("https://example.com/article")
+    Guard-->>MCP: FetchTarget
     MCP->>WR: read(url)
     WR->>BS: extract(url)
     BS->>Redis: get_session_data("example.com") → None
@@ -124,7 +124,7 @@ sequenceDiagram
     NoVNC->>NoVNC: spawn _monitor_for_cookies task (background)
     NoVNC-->>WR: raises HumanInterventionRequiredException(vnc_url)
     WR-->>Handler: exception propagates
-    Handler-->>Agent: 428 {status:"human_intervention_required", vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
+    Handler-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
 ```
 
 ---

@@ -1,5 +1,7 @@
 """Tests for FlareSolverr circuit breaker integration (task 7.3)."""
 
+from collections.abc import Iterator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -9,14 +11,14 @@ from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 
 
 @pytest.fixture(autouse=True)
-def reset_flaresolverr_breaker() -> None:
+def reset_flaresolverr_breaker() -> Iterator[None]:
     """Reset the module-level breaker singleton before each test."""
     flaresolverr_breaker.record_success()
     yield
     flaresolverr_breaker.record_success()
 
 
-def _make_session(json_payload: dict) -> MagicMock:
+def _make_session(json_payload: dict[str, Any]) -> MagicMock:
     response = MagicMock()
     response.json = MagicMock(return_value=json_payload)
     response.raise_for_status = MagicMock()

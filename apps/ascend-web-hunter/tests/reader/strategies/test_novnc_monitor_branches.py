@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,7 +12,7 @@ def _sample_value(metric_name: str, **labels: str) -> float:
     return REGISTRY.get_sample_value(metric_name, labels) or 0.0
 
 
-def _factory(page_url: str, *, goto_ok: bool = True):
+def _factory(page_url: str, *, goto_ok: bool = True) -> Any:
     page = MagicMock()
     page.url = page_url
     page.goto = AsyncMock() if goto_ok else AsyncMock(side_effect=RuntimeError("nav"))
@@ -32,7 +33,7 @@ def _factory(page_url: str, *, goto_ok: bool = True):
 
 
 @pytest.mark.asyncio
-async def test_monitor_exits_via_timeout_loop_condition():
+async def test_monitor_exits_via_timeout_loop_condition() -> None:
     """With NOVNC_TIMEOUT_SECONDS=0 the while loop body executes zero times - the
     timeout-exit branch (51->75) is the only path to the finally."""
     # given
@@ -50,7 +51,7 @@ async def test_monitor_exits_via_timeout_loop_condition():
 
 
 @pytest.mark.asyncio
-async def test_monitor_records_timeout_outcome_metric_for_login():
+async def test_monitor_records_timeout_outcome_metric_for_login() -> None:
     # given
     factory, browser, _ = _factory("http://novncmetrictimeout.com?login=1")
     before = _sample_value(
@@ -78,7 +79,7 @@ async def test_monitor_records_timeout_outcome_metric_for_login():
 
 
 @pytest.mark.asyncio
-async def test_monitor_records_rejected_outcome_when_timeout_still_blocked():
+async def test_monitor_records_rejected_outcome_when_timeout_still_blocked() -> None:
     """A captcha monitor that times out while the page is still a known block
     page must record 'rejected', not the more ambiguous 'timeout'."""
     # given
@@ -126,14 +127,14 @@ async def test_monitor_records_rejected_outcome_when_timeout_still_blocked():
 
 
 @pytest.mark.asyncio
-async def test_monitor_continues_loop_when_url_did_not_change():
+async def test_monitor_continues_loop_when_url_did_not_change() -> None:
     """Page URL still matches the original URL -> branch 62->71 (continue) runs once,
     then the timeout window closes the loop."""
     # given
     factory, browser, _ = _factory("http://test.com?login=1")
     sleeps = []
 
-    async def fake_sleep(seconds):
+    async def fake_sleep(seconds: Any) -> None:
         sleeps.append(seconds)
         raise RuntimeError("abort loop after one iteration")
 

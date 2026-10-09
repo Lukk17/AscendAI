@@ -25,7 +25,7 @@ def _cookie(name: str) -> dict[str, Any]:
     return {"name": name, "value": "v", "domain": "example.com", "path": "/"}
 
 
-async def test_no_record_means_no_auth_cookies():
+async def test_no_record_means_no_auth_cookies() -> None:
     # given
     manager = _fresh()
 
@@ -33,7 +33,7 @@ async def test_no_record_means_no_auth_cookies():
     assert await manager.has_auth_cookies(_URL) is False
 
 
-async def test_a_captured_login_has_auth_cookies():
+async def test_a_captured_login_has_auth_cookies() -> None:
     # given
     manager = _fresh()
     await manager.save_storage_state(
@@ -44,7 +44,7 @@ async def test_a_captured_login_has_auth_cookies():
     assert await manager.has_auth_cookies(_URL) is True
 
 
-async def test_a_lapsed_login_still_has_auth_cookies():
+async def test_a_lapsed_login_still_has_auth_cookies() -> None:
     """The gate asks whether a login was ever captured, not whether it is still valid."""
     # given
     manager = _fresh()
@@ -56,7 +56,7 @@ async def test_a_lapsed_login_still_has_auth_cookies():
     assert await manager.has_auth_cookies(_URL) is True
 
 
-async def test_a_waf_only_record_has_no_auth_cookies():
+async def test_a_waf_only_record_has_no_auth_cookies() -> None:
     # given
     manager = _fresh()
     await manager.save_flat_cookies(_URL, {"cf_clearance": "x"}, "ua", None, PRODUCED_BY_FLARESOLVERR)
@@ -65,7 +65,7 @@ async def test_a_waf_only_record_has_no_auth_cookies():
     assert await manager.has_auth_cookies(_URL) is False
 
 
-async def test_a_profile_without_a_login_is_independent_of_one_with():
+async def test_a_profile_without_a_login_is_independent_of_one_with() -> None:
     # given
     manager = _fresh()
     await manager.save_storage_state(_URL, {"cookies": [_cookie("li_at")], "origins": []}, "ua", "work")
@@ -75,7 +75,7 @@ async def test_a_profile_without_a_login_is_independent_of_one_with():
     assert await manager.has_auth_cookies(_URL, "personal") is False
 
 
-async def test_nothing_stored_means_no_session_record():
+async def test_nothing_stored_means_no_session_record() -> None:
     # given
     manager = _fresh()
 
@@ -83,7 +83,7 @@ async def test_nothing_stored_means_no_session_record():
     assert await manager.has_session_record(_URL) is False
 
 
-async def test_a_waf_only_record_is_still_a_session_record():
+async def test_a_waf_only_record_is_still_a_session_record() -> None:
     """Wider than has_auth_cookies on purpose: this is what tells an expired
     session apart from one that was never established."""
     # given
@@ -95,7 +95,7 @@ async def test_a_waf_only_record_is_still_a_session_record():
     assert await manager.has_session_record(_URL, "personal") is False
 
 
-async def test_auth_saved_at_reports_the_stored_timestamp():
+async def test_auth_saved_at_reports_the_stored_timestamp() -> None:
     # given
     manager = _fresh()
     await manager.save_storage_state(_URL, {"cookies": [_cookie("li_at")], "origins": []}, "ua")
@@ -106,7 +106,7 @@ async def test_auth_saved_at_reports_the_stored_timestamp():
     assert await manager.get_auth_saved_at(_URL) == 1_000_000.0
 
 
-async def test_auth_saved_at_is_none_when_nothing_is_stored():
+async def test_auth_saved_at_is_none_when_nothing_is_stored() -> None:
     # given
     manager = _fresh()
 
@@ -114,7 +114,7 @@ async def test_auth_saved_at_is_none_when_nothing_is_stored():
     assert await manager.get_auth_saved_at(_URL) is None
 
 
-async def test_auth_saved_at_is_none_for_a_record_carrying_no_auth_entry():
+async def test_auth_saved_at_is_none_for_a_record_carrying_no_auth_entry() -> None:
     # given
     manager = _fresh()
     manager._memory_store["example.com:default"] = {"waf": {"saved_at": 1_000_000.0}}
@@ -123,7 +123,7 @@ async def test_auth_saved_at_is_none_for_a_record_carrying_no_auth_entry():
     assert await manager.get_auth_saved_at(_URL) is None
 
 
-async def test_auth_saved_at_is_none_when_the_stored_value_is_not_a_number():
+async def test_auth_saved_at_is_none_when_the_stored_value_is_not_a_number() -> None:
     """A record written before the field existed, or by something that wrote
     junk into it, reports no timestamp rather than handing one out."""
     # given

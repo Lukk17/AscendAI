@@ -1,85 +1,59 @@
 import logging
-from unittest.mock import patch
 
-from src.config.logging_config import (
-    CenteredLevelFormatter,
-    CorrelationFilter,
-    get_logger,
-    get_uvicorn_log_config,
-    setup_logging,
-)
+from _pytest.logging import LogCaptureFixture
+from ascend_python_common.log_config import configure_logging
+from ascend_python_common.settings import ServiceSettings
 
 
-def test_setup_logging_attaches_filter():
+def test_debug_line_visible_at_debug_level(caplog: LogCaptureFixture) -> None:
     # given
-    with patch("src.config.logging_config.logging.basicConfig") as mock_basic_config:
-        # when
-        setup_logging()
-
-        # then
-        mock_basic_config.assert_called_once()
-        kwargs = mock_basic_config.call_args.kwargs
-        assert kwargs["level"] == logging.INFO
-
-
-def test_get_uvicorn_log_config_returns_expected_keys():
-    # when
-    config = get_uvicorn_log_config()
-
-    # then
-    assert config["version"] == 1
-    assert "filters" in config
-    assert "correlation" in config["filters"]
-    assert "handlers" in config
-
-
-def test_correlation_filter_injects_request_id_default():
-    # given
-    f = CorrelationFilter()
-    record = logging.LogRecord("x", logging.INFO, "x", 1, "msg", None, None)
-
-    # when / then
-    assert f.filter(record) is True
-    assert record.request_id == "-"
-
-
-def test_centered_level_formatter_centers_short_level():
-    # given
-    f = CenteredLevelFormatter(
-        "%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y",
-        log_colors={"INFO": "green"},
+    configure_logging(
+        "ascend-web-hunter",
+        ServiceSettings(
+            API_PORT=7021, LOG_LEVEL="DEBUG", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="1200/minute"
+        ),
     )
-    record = logging.LogRecord("x", logging.INFO, "x", 1, "hello", None, None)
-
+    logging.getLogger().addHandler(caplog.handler)
+    probe = logging.getLogger("ascend-web-hunter.debug-probe")
     # when
-    output = f.format(record)
-
+    with caplog.at_level(logging.DEBUG, logger="ascend-web-hunter.debug-probe"):
+        probe.debug("debug-marker-4-3")
     # then
-    assert "hello" in output
+    assert any(record.message == "debug-marker-4-3" for record in caplog.records)
 
 
-def test_centered_level_formatter_no_match_returns_unchanged():
-    """When the format string does not contain ' - LEVEL - ', the regex misses and
-    the formatted output is returned as-is."""
+def test_no_info_or_access_line_at_warning_level(caplog: LogCaptureFixture) -> None:
     # given
-    f = CenteredLevelFormatter(
-        "%(message)s",  # No level marker
-        datefmt="%Y",
-        log_colors={"INFO": "green"},
+    configure_logging(
+        "ascend-web-hunter",
+        ServiceSettings(
+            API_PORT=7021, LOG_LEVEL="WARNING", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="1200/minute"
+        ),
     )
-    record = logging.LogRecord("x", logging.INFO, "x", 1, "no level marker", None, None)
-
+    logging.getLogger().addHandler(caplog.handler)
+    probe = logging.getLogger("ascend-web-hunter.quiet-probe")
+    access = logging.getLogger("uvicorn.access")
     # when
-    output = f.format(record)
-
+    probe.debug("suppressed-debug-4-3")
+    probe.info("suppressed-info-4-3")
+    access.info("suppressed-access-4-3")
     # then
-    assert "no level marker" in output
+    assert [record for record in caplog.records if record.name == "ascend-web-hunter.quiet-probe"] == []
+    assert [record for record in caplog.records if record.name == "uvicorn.access"] == []
 
 
-def test_get_logger_returns_module_logger():
+def test_uvicorn_loggers_route_through_root() -> None:
+    # given
+    configure_logging(
+        "ascend-web-hunter",
+        ServiceSettings(
+            API_PORT=7021, LOG_LEVEL="WARNING", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="1200/minute"
+        ),
+    )
     # when
-    logger = get_logger("test.module")
-
+    access = logging.getLogger("uvicorn.access")
+    error = logging.getLogger("uvicorn.error")
     # then
-    assert logger.name == "test.module"
+    assert access.handlers == []
+    assert access.propagate is True
+    assert error.propagate is True

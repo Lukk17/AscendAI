@@ -35,11 +35,11 @@ disappears when the clearance is reused, and the whole test runs with nobody at 
 ### Contract (how the service signals each verdict)
 
 - success: HTTP `200`, body `status="success"`, non-empty content, `mode` naming the tier that served it.
-- intervention: HTTP `428 Precondition Required`, body `status="human_intervention_required"` and a non-empty
+- intervention: HTTP `428 Precondition Required`, body `code="human_intervention_required"` and a non-empty
   `vnc_url`. Never a valid verdict on either call of this spec. On Call 2 it is the A61 failure. On Call 1 it means
   FlareSolverr did not solve the challenge, so re-check the FlareSolverr prerequisite and record the body before
   deciding the verdict, since the reuse property was never reached.
-- busy, not a verdict on its own: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After`
+- busy, not a verdict on its own: HTTP `409`, body `code="novnc_busy"` with a `holder_url`, and a `Retry-After`
   header, meaning the read escalated past every automated tier and found the single shared browser held by an
   earlier intervention. For this spec that carries the same meaning as a 428 on the same call, since the read did
   not succeed through an automated tier. Record the `holder_url` in the run record.

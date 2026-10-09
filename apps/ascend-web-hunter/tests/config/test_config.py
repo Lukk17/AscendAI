@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -7,7 +8,7 @@ from pydantic import ValidationError
 from src.config.config import Settings
 
 
-def test_settings_defaults():
+def test_settings_defaults() -> None:
     # when
     settings = Settings()
 
@@ -17,18 +18,18 @@ def test_settings_defaults():
     assert settings.SEARXNG_BASE_URL == "http://localhost:9020"
 
 
-def test_redis_url_default_uses_ipv4_loopback_not_localhost(monkeypatch):
+def test_redis_url_default_uses_ipv4_loopback_not_localhost(monkeypatch: Any) -> None:
     # given
     monkeypatch.delenv("REDIS_URL", raising=False)
 
     # when
-    settings = Settings(_env_file=None)
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     # then
     assert settings.REDIS_URL == "redis://127.0.0.1:6379/0"
 
 
-def test_settings_env_override():
+def test_settings_env_override() -> None:
     # given
     # Mocking environment variables
     with patch.dict(os.environ, {"API_PORT": "9000"}):
@@ -39,7 +40,7 @@ def test_settings_env_override():
         assert settings.API_PORT == 9000
 
 
-def test_blocklist_path_defaults_to_vendored_asset():
+def test_blocklist_path_defaults_to_vendored_asset() -> None:
     # when
     settings = Settings()
 
@@ -47,7 +48,7 @@ def test_blocklist_path_defaults_to_vendored_asset():
     assert settings.BLOCKLIST_PATH == "src/assets/fanboy-annoyance.txt"
 
 
-def test_blocklist_path_env_override(tmp_path):
+def test_blocklist_path_env_override(tmp_path: Any) -> None:
     # given
     # Mocking environment variables
     override = str(tmp_path / "custom-blocklist.txt")
@@ -59,7 +60,7 @@ def test_blocklist_path_env_override(tmp_path):
         assert override == settings.BLOCKLIST_PATH
 
 
-def test_blocklist_refresh_min_interval_default():
+def test_blocklist_refresh_min_interval_default() -> None:
     # given
     settings = Settings()
 
@@ -67,7 +68,7 @@ def test_blocklist_refresh_min_interval_default():
     assert settings.BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS == 60.0
 
 
-def test_content_recall_fallback_ratio_default():
+def test_content_recall_fallback_ratio_default() -> None:
     # given
     settings = Settings()
 
@@ -76,7 +77,7 @@ def test_content_recall_fallback_ratio_default():
 
 
 @pytest.mark.parametrize("value", ["-0.1", "1.1"])
-def test_content_recall_fallback_ratio_rejects_values_outside_the_unit_interval(value):
+def test_content_recall_fallback_ratio_rejects_values_outside_the_unit_interval(value: Any) -> None:
     # given
     with patch.dict(os.environ, {"CONTENT_RECALL_FALLBACK_RATIO": value}):
         # when / then

@@ -3,107 +3,66 @@ import logging
 
 import httpx
 import redis.asyncio as redis
-from fastapi import APIRouter, status
-from fastapi.responses import JSONResponse
+from ascend_python_common.readiness import ProbeResult
 
 from src.circuit_breaker.breaker import BreakerState, flaresolverr_breaker, searxng_breaker
 from src.config.config import settings
 
 logger = logging.getLogger(__name__)
 
-readiness_router = APIRouter(tags=["health"])
 
-# Probe budget: every dependency probe shares the same 3-second wall clock.
-# The /ready endpoint itself should return within a few seconds for k8s
-# probe configurations that expect sub-10s timeouts.
-PROBE_TIMEOUT_SECONDS = 3.0
-
-
-async def _probe_redis() -> dict[str, str]:
+async def probe_redis() -> ProbeResult:
     if not settings.REDIS_URL:
-        return {"status": "skipped"}
-
+        return ProbeResult(status="skipped")
     client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-
     try:
         await client.ping()
-
-        return {"status": "ok"}
+        return ProbeResult(status="ok")
     except Exception as exc:
-        # Log the full exception (includes the DSN, credentials) server-side; never echo
-        # it to an unauthenticated /ready caller. Returning only "error" prevents the
-        # endpoint from being used as a recon primitive.
         logger.warning("/ready: redis probe failed: %s", exc)
-
-        return {"status": "error"}
+        return ProbeResult(status="error")
     finally:
         with contextlib.suppress(Exception):
             await client.aclose()
 
 
-async def _probe_searxng() -> dict[str, str]:
-    """SearXNG's root may return 200 even when search is broken. Hit /search with a
-    cheap query and require 200 to count as ready."""
+async def probe_searxng() -> ProbeResult:
     try:
-        async with httpx.AsyncClient(timeout=PROBE_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=settings.READINESS_PROBE_TIMEOUT_SECONDS) as client:
             response = await client.get(
                 f"{settings.SEARXNG_BASE_URL.rstrip('/')}/search",
                 params={"q": "ping", "format": "html"},
             )
-
-            return {"status": "ok"} if response.status_code == 200 else {"status": "error"}
+            return ProbeResult(status="ok") if response.status_code == 200 else ProbeResult(status="error")
     except Exception as exc:
         logger.warning("/ready: searxng probe failed: %s", exc)
+        return ProbeResult(status="error")
 
-        return {"status": "error"}
 
-
-async def _probe_flaresolverr() -> dict[str, str]:
-    """FlareSolverr only accepts POST. A GET against /v1 returns 405, which the original
-    'status<500' probe treated as ready. Use POST sessions.list for a real signal."""
+async def probe_flaresolverr() -> ProbeResult:
     try:
-        async with httpx.AsyncClient(timeout=PROBE_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=settings.READINESS_PROBE_TIMEOUT_SECONDS) as client:
             response = await client.post(
                 settings.FLARESOLVERR_URL,
                 json={"cmd": "sessions.list"},
             )
-
-            return {"status": "ok"} if response.status_code == 200 else {"status": "error"}
+            return ProbeResult(status="ok") if response.status_code == 200 else ProbeResult(status="error")
     except Exception as exc:
         logger.warning("/ready: flaresolverr probe failed: %s", exc)
+        return ProbeResult(status="error")
 
-        return {"status": "error"}
 
-
-def _breaker_check(breaker_state: BreakerState) -> dict[str, str]:
-    """Translate circuit-breaker state to a readiness check dict."""
+def _breaker_result(breaker_state: BreakerState) -> ProbeResult:
     if breaker_state is BreakerState.OPEN:
-        return {"status": "degraded", "breaker": "open"}
+        return ProbeResult(status="degraded", details={"breaker": "open"})
     if breaker_state is BreakerState.HALF_OPEN:
-        return {"status": "degraded", "breaker": "half_open"}
-    return {"status": "ok", "breaker": "closed"}
+        return ProbeResult(status="degraded", details={"breaker": "half_open"})
+    return ProbeResult(status="ok", details={"breaker": "closed"})
 
 
-@readiness_router.get("/ready")
-async def ready() -> JSONResponse:
-    """Readiness probe. /health is liveness; this is readiness."""
-    searxng_probe = await _probe_searxng()
-    flaresolverr_probe = await _probe_flaresolverr()
+def probe_searxng_breaker() -> ProbeResult:
+    return _breaker_result(searxng_breaker.state)
 
-    searxng_breaker_check = _breaker_check(searxng_breaker.state)
-    flaresolverr_breaker_check = _breaker_check(flaresolverr_breaker.state)
 
-    checks = {
-        "redis": await _probe_redis(),
-        "searxng": searxng_probe,
-        "searxng_breaker": searxng_breaker_check,
-        "flaresolverr": flaresolverr_probe,
-        "flaresolverr_breaker": flaresolverr_breaker_check,
-    }
-    ok = all(c.get("status") in ("ok", "skipped") for c in checks.values())
-    body = {"status": "ready" if ok else "degraded", "checks": checks}
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK if ok else status.HTTP_503_SERVICE_UNAVAILABLE,
-        content=body,
-    )
+def probe_flaresolverr_breaker() -> ProbeResult:
+    return _breaker_result(flaresolverr_breaker.state)

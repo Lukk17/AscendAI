@@ -138,8 +138,9 @@ Tools advertised:
 - `web_search(query, limit)`: search the web through SearXNG
 - `web_read(url, include_links?, link_filter?, heavy_mode?, profile?, output_format?, tier?)`: extract content from a URL
 
-When the response carries `status: "human_intervention_required"`, the agent should display the `vnc_url` to
-the user and re-call `web_read` once they confirm the challenge is solved. The cached Redis session will let
+When the response carries `status: "human_intervention_required"` (MCP tool result), the agent should display the `vnc_url` to
+the user and re-call `web_read` once they confirm the challenge is solved. On REST the same outcome is HTTP 428
+with a problem body carrying `code: "human_intervention_required"` plus `intervention_type` and `vnc_url`. The cached Redis session will let
 the second call succeed without escalating again.
 
 When it carries `status: "session_expired"`, the stored login for that domain and profile has lapsed and no tier

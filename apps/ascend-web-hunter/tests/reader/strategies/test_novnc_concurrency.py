@@ -3,6 +3,7 @@ once do not collide: the second is rejected immediately, and once the first
 finishes and releases the shared lock, a new flow proceeds normally."""
 
 import asyncio
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,7 +17,7 @@ from src.reader.strategies.novnc_strategy import (
 )
 
 
-def _build_playwright_factory():
+def _build_playwright_factory() -> Any:
     """A captcha-branch Playwright double whose page never looks solved, so
     the monitor runs out its (short, patched) NOVNC_TIMEOUT_SECONDS and exits
     through the ordinary timeout path -- exercising the same finally/release
@@ -41,14 +42,18 @@ def _build_playwright_factory():
 
 
 @pytest.fixture(autouse=True)
-def _reset_novnc_flow_lock():
-    _novnc_flow_lock.release(_novnc_flow_lock._holder_url, _novnc_flow_lock._holder_profile)
+def _reset_novnc_flow_lock() -> Any:
+    _novnc_flow_lock.release(
+        cast("str", _novnc_flow_lock._holder_url), cast("str", _novnc_flow_lock._holder_profile)
+    )
     yield
-    _novnc_flow_lock.release(_novnc_flow_lock._holder_url, _novnc_flow_lock._holder_profile)
+    _novnc_flow_lock.release(
+        cast("str", _novnc_flow_lock._holder_url), cast("str", _novnc_flow_lock._holder_profile)
+    )
 
 
 @pytest.mark.asyncio
-async def test_second_concurrent_flow_is_rejected_then_a_new_flow_succeeds_after_release():
+async def test_second_concurrent_flow_is_rejected_then_a_new_flow_succeeds_after_release() -> None:
     # given
     factory = _build_playwright_factory()
 
@@ -84,14 +89,14 @@ async def test_second_concurrent_flow_is_rejected_then_a_new_flow_succeeds_after
 
 
 @pytest.mark.asyncio
-async def test_leaked_lock_self_heals_after_its_lease_expires():
+async def test_leaked_lock_self_heals_after_its_lease_expires() -> None:
     """A flow that wedges and never reaches its finally block (a hung
     browser subprocess, no exception raised) must not make the endpoint
     permanently unavailable: once the lease elapses, a new flow proceeds."""
     # given
     hang_forever = asyncio.Event()
 
-    async def wedged_monitor(url, intervention_type, profile=None):
+    async def wedged_monitor(url: Any, intervention_type: Any, profile: Any = None) -> None:
         await hang_forever.wait()  # never completes; finally/release never runs
 
     with (

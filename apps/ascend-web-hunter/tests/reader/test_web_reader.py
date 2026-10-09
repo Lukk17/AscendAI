@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,7 +22,7 @@ _ARTICLE_HTML = (
 
 
 @pytest.fixture(autouse=True)
-def _default_no_stored_session():
+def _default_no_stored_session() -> Any:
     """Keep read() tests hermetic: no stored session unless a test overrides it."""
     with patch(
         "src.reader.web_reader.cookie_manager.get_storage_state",
@@ -31,7 +32,7 @@ def _default_no_stored_session():
 
 
 @pytest.mark.asyncio
-async def test_read_succeeds_on_first_strategy():
+async def test_read_succeeds_on_first_strategy() -> None:
     # when
     with (
         patch(
@@ -48,7 +49,7 @@ async def test_read_succeeds_on_first_strategy():
 
 
 @pytest.mark.asyncio
-async def test_read_all_strategies_fail_returns_failure_response():
+async def test_read_all_strategies_fail_returns_failure_response() -> None:
     # when
     with patch(
         "src.reader.web_reader.WebReader._execute_strategy",
@@ -62,7 +63,7 @@ async def test_read_all_strategies_fail_returns_failure_response():
 
 
 @pytest.mark.asyncio
-async def test_read_preempts_to_novnc_on_login_redirect_url():
+async def test_read_preempts_to_novnc_on_login_redirect_url() -> None:
     # when
     with (
         patch(
@@ -78,7 +79,7 @@ async def test_read_preempts_to_novnc_on_login_redirect_url():
 
 
 @pytest.mark.asyncio
-async def test_read_heavy_mode_skips_lightweight():
+async def test_read_heavy_mode_skips_lightweight() -> None:
     # when
     with (
         patch(
@@ -94,7 +95,7 @@ async def test_read_heavy_mode_skips_lightweight():
 
 
 @pytest.mark.asyncio
-async def test_read_routes_browser_first_when_stored_session_exists():
+async def test_read_routes_browser_first_when_stored_session_exists() -> None:
     """A stored session (e.g. a captured cf_clearance) forces the browser tier first
     even without heavy_mode, so a curl tier can't trip the challenge and bypass the
     Playwright tier that replays the clearance with its matching user-agent."""
@@ -121,7 +122,7 @@ async def test_read_routes_browser_first_when_stored_session_exists():
 
 
 @pytest.mark.asyncio
-async def test_read_routes_flaresolverr_first_when_producer_is_flaresolverr():
+async def test_read_routes_flaresolverr_first_when_producer_is_flaresolverr() -> None:
     """A61: a clearance FlareSolverr earned must be replayed by FlareSolverr
     first, not skipped straight to the browser tiers."""
     # when
@@ -156,7 +157,9 @@ async def test_read_routes_flaresolverr_first_when_producer_is_flaresolverr():
     ids=["novnc", "login-seed", "unknown-or-legacy-record"],
 )
 @pytest.mark.asyncio
-async def test_read_routes_browser_first_and_skips_flaresolverr_for_non_flaresolverr_producers(producer):
+async def test_read_routes_browser_first_and_skips_flaresolverr_for_non_flaresolverr_producers(
+    producer: Any,
+) -> None:
     """A61: a clearance the browser itself earned (NoVNC, a login seed), or a
     stored session with no recorded producer at all (a pre-fix record, or a
     caller that omitted the field), must not be replayed through
@@ -198,7 +201,7 @@ async def test_read_routes_browser_first_and_skips_flaresolverr_for_non_flaresol
 
 
 @pytest.mark.asyncio
-async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first():
+async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first() -> None:
     """heavy_mode is an explicit caller preference and takes priority over
     producer-based routing, even when a FlareSolverr-produced clearance is
     stored: no FlareSolverr replay, straight to the browser tiers."""
@@ -229,7 +232,7 @@ async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flaresolverr():
+async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flaresolverr() -> None:
     # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
@@ -263,7 +266,7 @@ async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flares
 
 
 @pytest.mark.asyncio
-async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as_a_stored_session():
+async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as_a_stored_session() -> None:
     """establish() legitimately writes a record with zero cookies for a page
     nobody was challenged on (see NoVNCStrategy's monitor). The tier chooser
     must not read that record as grounds to force the browser tier -- it
@@ -295,7 +298,7 @@ async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as
 
 
 @pytest.mark.asyncio
-async def test_read_propagates_human_intervention():
+async def test_read_propagates_human_intervention() -> None:
     # given
     exc = HumanInterventionRequiredException("http://vnc", "captcha")
 
@@ -309,7 +312,7 @@ async def test_read_propagates_human_intervention():
 
 
 @pytest.mark.asyncio
-async def test_read_falls_through_to_novnc_when_challenge_unsolved():
+async def test_read_falls_through_to_novnc_when_challenge_unsolved() -> None:
     """A curl-tier challenge no longer short-circuits to NoVNC; it falls through the
     ladder so the auto-solving tiers get a chance. When none resolve it, NoVNC (the
     last tier) handles it."""
@@ -351,7 +354,7 @@ async def test_read_falls_through_to_novnc_when_challenge_unsolved():
 
 
 @pytest.mark.asyncio
-async def test_read_returns_failure_when_all_tiers_including_novnc_fail():
+async def test_read_returns_failure_when_all_tiers_including_novnc_fail() -> None:
     """Every tier falls through on its challenge (NoVNC included); read ends in a
     failure response rather than looping."""
     # when
@@ -389,7 +392,7 @@ async def test_read_returns_failure_when_all_tiers_including_novnc_fail():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_success():
+async def test_read_with_links_success() -> None:
     # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
@@ -409,7 +412,7 @@ async def test_read_with_links_success():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_filter_keeps_matching_only():
+async def test_read_with_links_filter_keeps_matching_only() -> None:
     # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit. "
@@ -431,7 +434,7 @@ async def test_read_with_links_filter_keeps_matching_only():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_falls_through_when_first_returns_empty():
+async def test_read_with_links_falls_through_when_first_returns_empty() -> None:
     # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
@@ -456,7 +459,7 @@ async def test_read_with_links_falls_through_when_first_returns_empty():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_preempts_to_novnc_on_login_redirect_url():
+async def test_read_with_links_preempts_to_novnc_on_login_redirect_url() -> None:
     # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
@@ -475,7 +478,7 @@ async def test_read_with_links_preempts_to_novnc_on_login_redirect_url():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_propagates_human_intervention():
+async def test_read_with_links_propagates_human_intervention() -> None:
     # given
     exc = HumanInterventionRequiredException("http://vnc", "captcha")
 
@@ -489,7 +492,7 @@ async def test_read_with_links_propagates_human_intervention():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_all_strategies_fail():
+async def test_read_with_links_all_strategies_fail() -> None:
     # when
     with patch(
         "src.reader.web_reader.WebReader._execute_html_strategy",
@@ -503,7 +506,7 @@ async def test_read_with_links_all_strategies_fail():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_falls_through_to_novnc_on_challenge():
+async def test_read_with_links_falls_through_to_novnc_on_challenge() -> None:
     # given
     raw_html = (
         "<html><body>This is filler text to pass the ten word minimum validation limit "
@@ -544,7 +547,7 @@ async def test_read_with_links_falls_through_to_novnc_on_challenge():
 
 
 @pytest.mark.asyncio
-async def test_execute_strategy_returns_none_on_exception():
+async def test_execute_strategy_returns_none_on_exception() -> None:
     # given
     reader = WebReader()
     fail_strategy = MagicMock()
@@ -558,7 +561,7 @@ async def test_execute_strategy_returns_none_on_exception():
 
 
 @pytest.mark.asyncio
-async def test_execute_strategy_returns_none_on_validation_fail():
+async def test_execute_strategy_returns_none_on_validation_fail() -> None:
     # given
     reader = WebReader()
     strategy = MagicMock()
@@ -573,7 +576,7 @@ async def test_execute_strategy_returns_none_on_validation_fail():
 
 
 @pytest.mark.asyncio
-async def test_execute_html_strategy_returns_empty_on_exception():
+async def test_execute_html_strategy_returns_empty_on_exception() -> None:
     # given
     reader = WebReader()
     strategy = MagicMock()
@@ -587,7 +590,7 @@ async def test_execute_html_strategy_returns_empty_on_exception():
 
 
 @pytest.mark.asyncio
-async def test_execute_html_strategy_returns_empty_string_when_html_blank():
+async def test_execute_html_strategy_returns_empty_string_when_html_blank() -> None:
     # given
     reader = WebReader()
     strategy = MagicMock()
@@ -601,7 +604,7 @@ async def test_execute_html_strategy_returns_empty_string_when_html_blank():
 
 
 @pytest.mark.asyncio
-async def test_read_bails_when_budget_exceeded():
+async def test_read_bails_when_budget_exceeded() -> None:
     """READ_TOTAL_BUDGET shortcut path: NoVNC rescue also fails, so reason stays budget_exhausted."""
     # given
     reader = WebReader()
@@ -622,7 +625,7 @@ async def test_read_bails_when_budget_exceeded():
 
 
 @pytest.mark.asyncio
-async def test_read_bails_but_novnc_rescue_succeeds():
+async def test_read_bails_but_novnc_rescue_succeeds() -> None:
     """READ_TOTAL_BUDGET shortcut path: NoVNC is exempt from the budget check
     and, when it returns usable content, its result is the successful read."""
     # given
@@ -645,7 +648,7 @@ async def test_read_bails_but_novnc_rescue_succeeds():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_bails_when_budget_exceeded():
+async def test_read_with_links_bails_when_budget_exceeded() -> None:
     # given
     reader = WebReader()
 
@@ -665,7 +668,7 @@ async def test_read_with_links_bails_when_budget_exceeded():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_bails_but_novnc_rescue_succeeds():
+async def test_read_with_links_bails_but_novnc_rescue_succeeds() -> None:
     """NoVNC is exempt from the budget check on the links path too: when it
     returns usable content, its result is the successful read."""
     # given
@@ -691,7 +694,7 @@ async def test_read_with_links_bails_but_novnc_rescue_succeeds():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_bails_and_novnc_rescue_fails_validation():
+async def test_read_with_links_bails_and_novnc_rescue_fails_validation() -> None:
     """NoVNC's rescue HTML can clear the interstitial gate yet still fail the
     annotated-content validator; that must end in a failure response, not a
     false success."""
@@ -719,7 +722,7 @@ async def test_read_with_links_bails_and_novnc_rescue_fails_validation():
 
 
 @pytest.mark.asyncio
-async def test_failure_response_reports_all_tiers_failed_when_strategies_run_but_all_fail():
+async def test_failure_response_reports_all_tiers_failed_when_strategies_run_but_all_fail() -> None:
     # when
     with patch(
         "src.reader.web_reader.WebReader._execute_strategy",
@@ -732,7 +735,7 @@ async def test_failure_response_reports_all_tiers_failed_when_strategies_run_but
 
 
 @pytest.mark.asyncio
-async def test_read_falls_through_when_validation_fails_then_succeeds():
+async def test_read_falls_through_when_validation_fails_then_succeeds() -> None:
     """Validation-fail on tier 1 should not stop the chain."""
     # when
     with (
@@ -756,7 +759,7 @@ async def test_read_falls_through_when_validation_fails_then_succeeds():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_validation_fail_then_next_tier_succeeds():
+async def test_read_with_links_validation_fail_then_next_tier_succeeds() -> None:
     # given
     short_html = "<html><body>short</body></html>"
     long_html = (
@@ -783,7 +786,7 @@ async def test_read_with_links_validation_fail_then_next_tier_succeeds():
 
 
 @pytest.mark.asyncio
-async def test_read_with_links_falls_through_when_annotated_content_fails_validation():
+async def test_read_with_links_falls_through_when_annotated_content_fails_validation() -> None:
     """Raw HTML that clears the interstitial gate (real, article-shaped content)
     can still fail ContentValidator on the annotated text; that must fall
     through to the next tier rather than stopping the chain."""
@@ -816,7 +819,7 @@ async def test_read_with_links_falls_through_when_annotated_content_fails_valida
 
 
 @pytest.mark.asyncio
-async def test_load_user_agents_falls_back_when_path_missing():
+async def test_load_user_agents_falls_back_when_path_missing() -> None:
     # given
     reader = WebReader()
 
@@ -830,7 +833,7 @@ async def test_load_user_agents_falls_back_when_path_missing():
 
 
 @pytest.mark.asyncio
-async def test_read_json_file_returns_fallback_on_bad_json(tmp_path):
+async def test_read_json_file_returns_fallback_on_bad_json(tmp_path: Any) -> None:
     # given
     reader = WebReader()
     bad = tmp_path / "broken.json"
@@ -843,7 +846,7 @@ async def test_read_json_file_returns_fallback_on_bad_json(tmp_path):
     assert isinstance(agents, list)
 
 
-def test_get_random_user_agent_returns_string():
+def test_get_random_user_agent_returns_string() -> None:
     # when
     reader = WebReader()
 
@@ -852,7 +855,7 @@ def test_get_random_user_agent_returns_string():
 
 
 @pytest.mark.asyncio
-async def test_execute_html_strategy_falls_through_on_challenge():
+async def test_execute_html_strategy_falls_through_on_challenge() -> None:
     """A challenge on the get_html path yields '' so the ladder advances to the next tier."""
     # given
     reader = WebReader()
@@ -867,7 +870,7 @@ async def test_execute_html_strategy_falls_through_on_challenge():
 
 
 @pytest.mark.asyncio
-async def test_execute_strategy_falls_through_on_challenge():
+async def test_execute_strategy_falls_through_on_challenge() -> None:
     """A challenge on the get_html path yields None so the ladder advances to the next tier."""
     # given
     reader = WebReader()
@@ -882,7 +885,7 @@ async def test_execute_strategy_falls_through_on_challenge():
 
 
 @pytest.mark.asyncio
-async def test_execute_strategy_rejects_interstitial_before_validating():
+async def test_execute_strategy_rejects_interstitial_before_validating() -> None:
     """A tier that returns a small page with no article-shaped content (an
     interstitial that clears ContentValidator's shallow checks) must be
     rejected before ever reaching content validation, not reported as success."""
@@ -901,7 +904,7 @@ async def test_execute_strategy_rejects_interstitial_before_validating():
 
 
 @pytest.mark.asyncio
-async def test_execute_html_strategy_rejects_interstitial_before_returning():
+async def test_execute_html_strategy_rejects_interstitial_before_returning() -> None:
     """The links path must reject a tier's raw HTML when the article extractor
     finds nothing, even though annotate_links would otherwise accept it."""
     # given
@@ -918,7 +921,7 @@ async def test_execute_html_strategy_rejects_interstitial_before_returning():
 
 
 @pytest.mark.asyncio
-async def test_read_rejects_amazon_style_interstitial_and_escalates():
+async def test_read_rejects_amazon_style_interstitial_and_escalates() -> None:
     """End-to-end regression test for the reported bug: a 200 response whose
     entire body is Amazon's own captcha interstitial must not be reported as a
     successful scrape. This is a trimmed faithful copy of the real page fetched

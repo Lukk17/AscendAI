@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import trafilatura
 from crawlee.crawlers import (
@@ -19,7 +21,12 @@ from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
-from src.validator.url_validator import URLValidator
+
+if TYPE_CHECKING:
+    from bs4 import BeautifulSoup, Tag
+    from crawlee.crawlers import ParsedHttpCrawlingContext
+
+    from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +90,7 @@ class CrawleeStrategy(BaseStrategy):
         )
 
         @crawler.router.default_handler
-        async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        async def request_handler(context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag]) -> None:
             await self._handle_crawlee_request(context, result_container)
 
         @crawler.pre_navigation_hook
@@ -114,7 +121,10 @@ class CrawleeStrategy(BaseStrategy):
         return str(p)
 
     @staticmethod
-    async def _run_crawler_bounded(crawler: AdaptivePlaywrightCrawler, url: str) -> None:
+    async def _run_crawler_bounded(
+        crawler: AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag],
+        url: str,
+    ) -> None:
         """Run the crawler with a hard wall-clock bound so this tier can never hang forever.
 
         Crawlee's autoscaler blocks all work indefinitely whenever it considers the
@@ -145,7 +155,8 @@ class CrawleeStrategy(BaseStrategy):
 
     @staticmethod
     async def _handle_crawlee_request(
-        context: AdaptivePlaywrightCrawlingContext, result_container: dict[str, str]
+        context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag],
+        result_container: dict[str, str],
     ) -> None:
         try:
             result_container["html"] = await context.page.content()

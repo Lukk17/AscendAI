@@ -10,9 +10,18 @@ against environment variables and `.env`. The source of truth is
 
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
-| `API_PORT` | `7021` | Service port |
+| `API_PORT` | `7021` | Service port. Compose passes `WEB_HUNTER_API_PORT` |
 | `API_HOST` | `0.0.0.0` | Bind address (deliberately broad for the container case) |
 | `LOG_LEVEL` | `INFO` | `DEBUG | INFO | WARNING | ERROR | CRITICAL` |
+| `LOG_FORMAT` | `json` | `json` for log sinks, `color` for a local terminal |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | OTLP trace export endpoint, export whenever it is set |
+| `OTEL_SDK_DISABLED` | `false` | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
+| `RATE_LIMIT_DEFAULT` | `1200/minute` | Flood-protection rate limit for REST routes and MCP tools; `/health`, `/ready`, `/metrics` and `tools/list` are never limited. Compose passes `WEB_HUNTER_RATE_LIMIT_DEFAULT` |
+| `ALLOWED_PRIVATE_HOSTS` | empty | Hosts the URI fetch guard may reach even at a private address. Leave empty, only an e2e sweep sets it. The development compose file fills it from `WEB_HUNTER_ALLOWED_PRIVATE_HOSTS`. |
+| `READINESS_PROBE_TIMEOUT_SECONDS` | `3` | Seconds each readiness probe may take. Added by `add-ascend-python-common`. |
+| `STARTUP_PROBE_TIMEOUT_SECONDS` | `2` | Seconds each startup banner check may take. Added by `add-ascend-python-common`. |
+| `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000` | Max age of the strict-transport-security header. Added by `add-ascend-python-common`. |
+| `FETCH_MAX_REDIRECT_HOPS` | `10` | Redirect hops the URI fetch guard follows. Compose passes `WEB_HUNTER_FETCH_MAX_REDIRECT_HOPS`. Added by `add-ascend-python-common`. |
 
 ---
 
@@ -120,7 +129,7 @@ are mandatory there. `SEARXNG_SECRET` is SearXNG's session-signing key, which is
 
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
-| `REDIS_URL` | `redis://127.0.0.1:6379/0` | Redis for clearance-cookie persistence |
+| `REDIS_URL` | `redis://127.0.0.1:6379/0` | Redis for clearance-cookie persistence. Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-web-hunter` |
 | `USER_AGENTS_PATH` | `src/assets/user_agents.json` | Rotated UA pool for cheap tiers |
 | `FILE_ENCODING` | `utf-8` | Default file encoding |
 

@@ -16,7 +16,7 @@ graph TB
         REST["REST surface<br/>GET /api/v1/web/search<br/>POST /api/v2/web/read"]
         MCP["MCP surface<br/>POST /mcp<br/>(web_search, web_read tools)"]
         WR["WebReader<br/>(strategy orchestrator)"]
-        Guard["SSRF guard<br/>(is_safe_external_url)"]
+        Guard["SSRF guard<br/>(check_fetch_uri, shared library)"]
         Validator["ContentValidator"]
         subgraph "Strategy chain"
             S1["1-beautifulsoup<br/>(curl_cffi + BS4)"]
@@ -85,7 +85,7 @@ sequenceDiagram
 
     participant Agent as ascend-agent :9917
     participant MCP as web_read (mcp_server.py)
-    participant Guard as is_safe_external_url
+    participant Guard as check_fetch_uri
     participant WR as WebReader
     participant S1 as 1-beautifulsoup
     participant S2 as 2-trafilatura
@@ -98,8 +98,8 @@ sequenceDiagram
     participant Ngrok as Ngrok API
 
     Agent->>MCP: tools/call web_read(url="https://target.com/article")
-    MCP->>Guard: is_safe_external_url("https://target.com/article")
-    Guard-->>MCP: True (public IP)
+    MCP->>Guard: check_fetch_uri("https://target.com/article")
+    Guard-->>MCP: FetchTarget (public addresses)
     MCP->>WR: read(url)
 
     note over WR,CV: Happy path - strategy 1 succeeds
@@ -122,7 +122,7 @@ sequenceDiagram
     Ngrok-->>S6: {tunnels:[{public_url:"https://abc.ngrok.io"}]}
     S6->>S6: spawn _monitor_for_cookies task (background)
     S6-->>WR: raises HumanInterventionRequiredException(vnc_url)
-    WR-->>Agent: 428 {status:"human_intervention_required", vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
+    WR-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
 ```
 
 When strategy 1 or 2 return empty string without raising (not a detected block, just no content), the chain

@@ -8,7 +8,7 @@ ascend-web-hunter is an MCP server and REST API for web search and content extra
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.0.6
+- **Version**: 0.0.7
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands
@@ -20,12 +20,16 @@ Every command below runs through this module's own virtual environment at `.venv
 Install dependencies, Windows:
 
 ```powershell
+# Install the shared library first, then the service
+.venv/Scripts/python.exe -m pip install -e ../../libs/ascend-python-common
 .venv/Scripts/python.exe -m pip install -e ".[dev]"
 ```
 
 Linux/macOS:
 
 ```bash
+# Install the shared library first, then the service
+.venv/bin/python -m pip install -e ../../libs/ascend-python-common
 .venv/bin/python -m pip install -e ".[dev]"
 ```
 
@@ -75,7 +79,23 @@ docker build -t ascend-web-hunter:latest .
 
 **Dual API surface**:
 - REST API: Endpoints for web search, page reading, and content extraction
-- MCP Server: FastMCP tools exposed via Streamable HTTP
+- MCP Server: FastMCP tools exposed via Streamable HTTP at `/mcp`.
+
+**Platform behavior** (via `ascend-python-common`, wired in `src/main.py` with `create_service_app`):
+- REST errors are RFC 7807 problem bodies (`application/problem+json`) with `code` and `traceId`. Request
+  validation failures answer `400` with code `validation` and an `errors` list sorted by `field`. A URL the
+  fetch guard refuses answers `400` with code `unsafe_uri`. The NoVNC answers are problem bodies too: `428`
+  with code `human_intervention_required` and extension members `intervention_type` and `vnc_url`, and `409`
+  with code `novnc_busy`, extension members `holder_url` and `holder_profile`, and a `Retry-After` header.
+  Unexpected failures answer `500` with code `internal` and a fixed detail. MCP refusals are tool errors whose
+  text starts with `<code>: ` (`validation: `, `unsafe_uri: `, `internal: `). The MCP status objects
+  (`human_intervention_required`, `novnc_busy`, `session_expired`) are successful tool results, not errors, and
+  keep their `status`-keyed shape.
+- `/health` answers `200 {"status": "ok", "service": "ascend-web-hunter", "version": ...}` without touching a
+  dependency. `/ready` aggregates the `redis`, `searxng`, `flaresolverr`, `searxng_breaker`, and
+  `flaresolverr_breaker` probes and answers `200 {"status": "ready", ...}` or `503 {"status": "not-ready", ...}`.
+- Logging comes from the library (`LOG_LEVEL` honoured, `LOG_FORMAT` selects `json` or `color`, lines start with
+  `[ascend-web-hunter]`). There is no service `logging_config.py` and no `log_config` argument on `uvicorn.run`.
 
 **Multi-tiered extraction strategy** (escalation order):
 1. `curl_cffi` - fast, lightweight HTTP client
@@ -85,7 +105,7 @@ docker build -t ascend-web-hunter:latest .
 
 **Key Features**:
 - SearXNG integration for privacy-respecting meta-search
-- Global HTTP 428 handling for rate limiting
+- HTTP 428 asks for human intervention (NoVNC), HTTP 429 rate-limits flooded callers
 - Session persistence in Redis
 - Ad/annoyance blocklist filtering
 - Content validation (minimum word count)
@@ -102,8 +122,21 @@ docker build -t ascend-web-hunter:latest .
 
 - `SEARXNG_BASE_URL` - SearXNG endpoint (default: `http://searxng:8080`)
 - `API_PORT` - Service port (default: 7021)
+- `LOG_LEVEL` - Logging level (default: `INFO`)
+- `LOG_FORMAT` - Log format, `json` or `color` (default: `json`)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP trace export endpoint, export whenever it is set, unset by default
+- `OTEL_SDK_DISABLED` - OpenTelemetry's standard switch, `true` turns the SDK off
+- `RATE_LIMIT_DEFAULT` - Flood-protection rate limit for REST routes and MCP tools (default: `1200/minute`)
+- `READINESS_PROBE_TIMEOUT_SECONDS` - Seconds each readiness probe may take (default: `3`)
+- `STARTUP_PROBE_TIMEOUT_SECONDS` - Seconds each startup banner check may take (default: `2`)
+- `SECURITY_HSTS_MAX_AGE_SECONDS` - Max age of the strict-transport-security header (default: `63072000`)
+- `FETCH_MAX_REDIRECT_HOPS` - Redirect hops the URI fetch guard follows (default: `10`)
+- `ALLOWED_PRIVATE_HOSTS` - Hosts the URI fetch guard may reach even at a private address (default: empty)
+
+`API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
+`ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`.
 - `FLARESOLVERR_URL` - FlareSolverr endpoint
-- `REDIS_URL` - Redis connection string
+- `REDIS_URL` - Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-web-hunter`, and for clearance-cookie persistence (default: `redis://127.0.0.1:6379/0`)
 - `BLOCKLIST_URL` - Ad blocklist source. Only reached by `POST /api/v1/blocklist/refresh`; never fetched at startup
 - `BLOCKLIST_PATH` - Path to the vendored blocklist file (default `src/assets/fanboy-annoyance.txt`), loaded at
   startup and overwritten in place by a refresh
@@ -170,6 +203,7 @@ commit. The same applies to environment variables: a new variable in the scrappe
 - Pydantic models for data validation
 - Async/await for I/O-bound operations
 - FastMCP for MCP tool definitions
+- When instrumenting new code (metrics, logs, or spans), follow [../../docs/OBSERVABILITY.md](../../docs/OBSERVABILITY.md)
 
 ## Relevant Skills
 

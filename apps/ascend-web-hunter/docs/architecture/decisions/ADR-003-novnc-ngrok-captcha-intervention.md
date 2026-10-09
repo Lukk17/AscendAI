@@ -128,3 +128,15 @@ need revisiting. See `code-reviewer` and `security-auditor` reports from 2026-05
 - `src/config/config.py` - `PUBLIC_VNC_URL`, `SELENIUM_BROWSER_VNC_URL`, `SELENIUM_BROWSER_CDP_URL`,
   `NOVNC_TIMEOUT_SECONDS`.
 - [ADR-002](ADR-002-cloudflare-cookie-persistence-redis.md) - cookie persistence that makes human solves durable.
+
+---
+
+## Amendment 2026-10-03: the 428 and 409 REST answers are problem bodies (add-ascend-python-common, owner answer 60.2)
+
+The `status`-keyed 428 and 409 body shape this record describes is superseded on REST. Both answers are
+`application/problem+json` bodies built by the shared problem builder: the old `status` word moved to `code`
+(`human_intervention_required`, `novnc_busy`), `message` became `detail`, and `status` is the HTTP status number.
+The 428 keeps `intervention_type` and `vnc_url` as extension members; the 409 keeps `holder_url` and
+`holder_profile` as extension members plus its `Retry-After` header. The MCP status objects
+(`human_intervention_required`, `novnc_busy`, `session_expired`) keep their `status`-keyed shape; they are
+successful tool results, not errors. The status line above and the rest of this record are unchanged.

@@ -1,5 +1,6 @@
 """Tests for read-result cache-aside in WebReader (task 7.1)."""
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -16,11 +17,11 @@ async def test_cache_hit_skips_strategy_chain() -> None:
 
     async def _fake_execute(
         name: str,
-        strategy,
+        strategy: Any,
         url: str,
         *,
         output_format: str | None = None,
-    ):
+    ) -> Any:
         nonlocal call_count
         call_count += 1
         return {"content": "some content", "status": "success", "mode": name}
@@ -73,11 +74,11 @@ async def test_cache_entry_expires_after_ttl() -> None:
 
     async def _fake_execute(
         name: str,
-        strategy,
+        strategy: Any,
         url: str,
         *,
         output_format: str | None = None,
-    ):
+    ) -> Any:
         nonlocal call_count
         call_count += 1
         return {"content": "some content", "status": "success", "mode": name}
@@ -110,11 +111,11 @@ async def test_cache_hit_increments_metric() -> None:
 
     async def _fake_execute(
         name: str,
-        strategy,
+        strategy: Any,
         url: str,
         *,
         output_format: str | None = None,
-    ):
+    ) -> Any:
         nonlocal call_count
         call_count += 1
         return {"content": "some content", "status": "success", "mode": name}
@@ -145,7 +146,7 @@ async def test_read_with_links_cache_hit_skips_strategy_chain() -> None:
 
     execute_called = False
 
-    async def _fake_execute(name, strategy, url_, *, output_format=None):
+    async def _fake_execute(name: Any, strategy: Any, url_: Any, *, output_format: Any = None) -> Any:
         nonlocal execute_called
         execute_called = True
         return {"content": "fresh", "status": "success", "mode": name}
@@ -213,22 +214,22 @@ async def test_cache_is_isolated_per_reader_instance() -> None:
 
     async def _fake1(
         name: str,
-        strategy,
+        strategy: Any,
         url: str,
         *,
         output_format: str | None = None,
-    ):
+    ) -> Any:
         nonlocal count1
         count1 += 1
         return {"content": "c1", "status": "success", "mode": name}
 
     async def _fake2(
         name: str,
-        strategy,
+        strategy: Any,
         url: str,
         *,
         output_format: str | None = None,
-    ):
+    ) -> Any:
         nonlocal count2
         count2 += 1
         return {"content": "c2", "status": "success", "mode": name}

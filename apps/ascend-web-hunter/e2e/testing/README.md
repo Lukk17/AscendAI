@@ -93,6 +93,13 @@ presence and value patterns), MCP tool registry contents. Logs are diagnostic, n
 across versions and aren't visible from every runner's shell. If a behaviour assertion fails, a tail of the
 ascend-web-hunter log (or `docker logs ascend-web-hunter`) is the next diagnostic step, but not a pass criterion.
 
+Deterministic first: a behaviour checkable by HTTP status, response body, or persisted state (Redis, the object store,
+Postgres, Qdrant, the fake site request log) is checked by a Bruno request with its assertions inside the request file,
+and no AI model decides the verdict. An AI-run spec is added only where the result needs a real model (schema extraction,
+a chat that must call a tool, a retrieval answer). A new spec takes the next free number at implementation time. When a
+feature changes, its existing spec and template are updated in place under the same number, and a new spec is written only
+when no existing spec can be updated to cover the change (owner answer 67.2 of 2026-10-04).
+
 ## Adding a new test
 
 1. Add a Bruno request under `docs/api/request/AscendAI/web-hunter/testing/<request>.yml`.

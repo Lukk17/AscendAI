@@ -1,13 +1,14 @@
 from typing import Any
 
+from ascend_python_common.uri_guard import FetchPolicy, check_fetch_uri
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
 
+from src.config.config import settings
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
-from src.validator.url_validator import is_safe_external_url
 
 rest_router = APIRouter(prefix="/api/v1/web", tags=["web_v1"])
 rest_router_v2 = APIRouter(prefix="/api/v2/web", tags=["web_v2"])
@@ -16,6 +17,14 @@ MAX_QUERY_LENGTH = 500
 
 search_client = SearxngClient()
 web_reader = WebReader()
+
+
+def _fetch_policy() -> FetchPolicy:
+    return FetchPolicy(
+        allowed_hosts=tuple(settings.ALLOWED_PRIVATE_HOSTS),
+        file_root=None,
+        max_redirect_hops=settings.FETCH_MAX_REDIRECT_HOPS,
+    )
 
 
 class ReadRequest(BaseModel):
@@ -129,11 +138,7 @@ async def read_url_v2(request: ReadRequest) -> dict[str, Any]:
     being hijacked by the HTTP router.
     """
     url_str = str(request.url)
-    if not is_safe_external_url(url_str):
-        raise HTTPException(
-            status_code=400,
-            detail="URL resolves to a private, loopback, link-local, or otherwise non-routable address",
-        )
+    await check_fetch_uri(url_str, _fetch_policy())
     if request.include_links and request.output_format == "structured":
         raise HTTPException(
             status_code=400,
@@ -174,11 +179,7 @@ async def establish_session(request: SessionEstablishRequest) -> dict[str, Any]:
     only one can run at a time.
     """
     url_str = str(request.url)
-    if not is_safe_external_url(url_str):
-        raise HTTPException(
-            status_code=400,
-            detail="URL resolves to a private, loopback, link-local, or otherwise non-routable address",
-        )
+    await check_fetch_uri(url_str, _fetch_policy())
 
     vnc_url = await session_manager.establish(url_str, request.profile)
     return {"status": "login_required", "target": url_str, "vnc_url": vnc_url}
@@ -203,11 +204,7 @@ async def clear_session(request: SessionClearRequest) -> dict[str, Any]:
     Idempotent: always returns 200, whether or not a session existed.
     """
     url_str = str(request.url)
-    if not is_safe_external_url(url_str):
-        raise HTTPException(
-            status_code=400,
-            detail="URL resolves to a private, loopback, link-local, or otherwise non-routable address",
-        )
+    await check_fetch_uri(url_str, _fetch_policy())
 
     existed = await session_manager.clear(url_str, request.profile)
     domain = cookie_manager.registrable_domain(url_str)

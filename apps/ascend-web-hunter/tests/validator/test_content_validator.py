@@ -3,7 +3,7 @@ from unittest.mock import patch
 from src.validator.content_validator import ContentValidator
 
 
-def test_validate_passes_for_quality_long_content():
+def test_validate_passes_for_quality_long_content() -> None:
     # given
     words = [f"word{i}" for i in range(210)]
     content = " ".join(words)
@@ -12,22 +12,22 @@ def test_validate_passes_for_quality_long_content():
     assert ContentValidator().validate(content) is True
 
 
-def test_validate_fails_for_empty_string():
+def test_validate_fails_for_empty_string() -> None:
     # when / then
     assert ContentValidator().validate("") is False
 
 
-def test_validate_fails_for_whitespace_only():
+def test_validate_fails_for_whitespace_only() -> None:
     # when / then
     assert ContentValidator().validate("   \t\n") is False
 
 
-def test_validate_fails_for_short_text():
+def test_validate_fails_for_short_text() -> None:
     # when / then
     assert ContentValidator().validate("only one") is False
 
 
-def test_validate_fails_on_error_keyword():
+def test_validate_fails_on_error_keyword() -> None:
     # given
     text = " ".join(["filler"] * 30) + " Access Denied " + " ".join(["more"] * 30)
 
@@ -35,7 +35,7 @@ def test_validate_fails_on_error_keyword():
     assert ContentValidator().validate(text) is False
 
 
-def test_validate_fails_closed_when_textstat_raises():
+def test_validate_fails_closed_when_textstat_raises() -> None:
     """ContentValidator must fail closed (return False) when textstat errors, so the
     orchestrator escalates to the next tier rather than accepting junk content."""
     # given
@@ -49,7 +49,7 @@ def test_validate_fails_closed_when_textstat_raises():
         assert ContentValidator().validate(content) is False
 
 
-def test_validate_fails_when_low_lexicon_and_low_flesch():
+def test_validate_fails_when_low_lexicon_and_low_flesch() -> None:
     # given
     # 11 unique words to pass the length gate, lexicon_count < min and flesch < threshold
     content = "one two three four five six seven eight nine ten eleven"
@@ -61,7 +61,7 @@ def test_validate_fails_when_low_lexicon_and_low_flesch():
         assert ContentValidator().validate(content) is False
 
 
-def test_validate_fails_on_repetition():
+def test_validate_fails_on_repetition() -> None:
     # given
     # 51 identical words -> TTR < 0.1 -> repetitive
     content = " ".join(["foo"] * 51)

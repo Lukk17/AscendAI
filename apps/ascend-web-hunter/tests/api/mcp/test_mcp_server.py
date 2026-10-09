@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from ascend_python_common.uri_guard import UnsafeUriError
 
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.api.mcp.mcp_server import session_clear, session_establish, session_status, web_read, web_search
@@ -8,7 +9,7 @@ from src.session.session_manager import SessionInfo, SessionManager
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_search_returns_results():
+async def test_mcp_web_search_returns_results() -> None:
     # given
     mock_results = [{"title": "MCP", "url": "url"}]
 
@@ -25,42 +26,69 @@ async def test_mcp_web_search_returns_results():
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_search_empty_query_raises():
-    # when / then
-    with pytest.raises(ValueError, match="empty"):
-        await web_search("")
+async def test_mcp_web_search_empty_query_raises() -> None:
+    # given
+    bad_query = ""
+
+    # when
+    with pytest.raises(Exception, match=r"^validation: .*empty") as exc_info:
+        await web_search(bad_query)
+
+    # then
+    assert str(exc_info.value).startswith("validation: ")
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_search_whitespace_only_raises():
-    # when / then
-    with pytest.raises(ValueError, match="empty"):
-        await web_search("   ")
+async def test_mcp_web_search_whitespace_only_raises() -> None:
+    # given
+    bad_query = "   "
+
+    # when
+    with pytest.raises(Exception, match=r"^validation: .*empty") as exc_info:
+        await web_search(bad_query)
+
+    # then
+    assert str(exc_info.value).startswith("validation: ")
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_search_too_long_raises():
-    # when / then
-    with pytest.raises(ValueError, match="maximum length"):
-        await web_search("x" * 501)
+async def test_mcp_web_search_too_long_raises() -> None:
+    # given
+    bad_query = "x" * 501
+
+    # when
+    with pytest.raises(Exception, match=r"^validation: .*maximum length") as exc_info:
+        await web_search(bad_query)
+
+    # then
+    assert str(exc_info.value).startswith("validation: ")
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_read_unsafe_url_raises():
-    # when / then
-    with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
-        with pytest.raises(ValueError, match="non-routable"):
-            await web_read("http://127.0.0.1")
+async def test_mcp_web_read_unsafe_url_raises() -> None:
+    # given
+    bad_url = "http://127.0.0.1"
+
+    # when
+    with patch(
+        "src.api.mcp.mcp_server.check_fetch_uri",
+        side_effect=UnsafeUriError("URI resolves to a non-public address"),
+    ):
+        with pytest.raises(Exception, match=r"^unsafe_uri: ") as exc_info:
+            await web_read(bad_url)
+
+    # then
+    assert str(exc_info.value).startswith("unsafe_uri: ")
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_read_calls_read_when_include_links_false():
+async def test_mcp_web_read_calls_read_when_include_links_false() -> None:
     # given
     mock_content = {"content": "MCP Content", "status": "success", "mode": "1-beautifulsoup"}
 
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch(
             "src.api.mcp.mcp_server.web_reader.read",
             new_callable=AsyncMock,
@@ -77,7 +105,7 @@ async def test_mcp_web_read_calls_read_when_include_links_false():
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_read_calls_read_with_links_when_include_links_true():
+async def test_mcp_web_read_calls_read_with_links_when_include_links_true() -> None:
     # given
     mock_result = {
         "content": "Job title [1]",
@@ -87,7 +115,7 @@ async def test_mcp_web_read_calls_read_with_links_when_include_links_true():
 
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch(
             "src.api.mcp.mcp_server.web_reader.read_with_links",
             new_callable=AsyncMock,
@@ -104,13 +132,13 @@ async def test_mcp_web_read_calls_read_with_links_when_include_links_true():
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_read_catches_human_intervention_and_returns_structured_payload():
+async def test_mcp_web_read_catches_human_intervention_and_returns_structured_payload() -> None:
     # given
     exc = HumanInterventionRequiredException(vnc_url="http://vnc/x", intervention_type="captcha")
 
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch(
             "src.api.mcp.mcp_server.web_reader.read",
             new_callable=AsyncMock,
@@ -127,13 +155,13 @@ async def test_mcp_web_read_catches_human_intervention_and_returns_structured_pa
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_read_human_intervention_on_links_branch():
+async def test_mcp_web_read_human_intervention_on_links_branch() -> None:
     # given
     exc = HumanInterventionRequiredException(vnc_url="http://vnc/y", intervention_type="login")
 
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch(
             "src.api.mcp.mcp_server.web_reader.read_with_links",
             new_callable=AsyncMock,
@@ -147,13 +175,13 @@ async def test_mcp_web_read_human_intervention_on_links_branch():
 
 
 @pytest.mark.asyncio
-async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload():
+async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload() -> None:
     # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
 
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch(
             "src.api.mcp.mcp_server.web_reader.read",
             new_callable=AsyncMock,
@@ -174,10 +202,10 @@ async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload():
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_establish_returns_human_intervention_payload():
+async def test_mcp_session_establish_returns_human_intervention_payload() -> None:
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch.object(
             SessionManager,
             "establish",
@@ -194,21 +222,30 @@ async def test_mcp_session_establish_returns_human_intervention_payload():
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_establish_unsafe_url_raises():
-    # when / then
-    with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
-        with pytest.raises(ValueError, match="non-routable"):
-            await session_establish("http://10.0.0.1")
+async def test_mcp_session_establish_unsafe_url_raises() -> None:
+    # given
+    bad_url = "http://10.0.0.1"
+
+    # when
+    with patch(
+        "src.api.mcp.mcp_server.check_fetch_uri",
+        side_effect=UnsafeUriError("URI resolves to a non-public address"),
+    ):
+        with pytest.raises(Exception, match=r"^unsafe_uri: ") as exc_info:
+            await session_establish(bad_url)
+
+    # then
+    assert str(exc_info.value).startswith("unsafe_uri: ")
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_establish_returns_novnc_busy_payload():
+async def test_mcp_session_establish_returns_novnc_busy_payload() -> None:
     # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
 
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch.object(SessionManager, "establish", new=AsyncMock(side_effect=exc)),
     ):
         result = await session_establish("http://example.com")
@@ -225,7 +262,7 @@ async def test_mcp_session_establish_returns_novnc_busy_payload():
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_status_returns_info():
+async def test_mcp_session_status_returns_info() -> None:
     # given
     info = SessionInfo(
         status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default"
@@ -233,7 +270,7 @@ async def test_mcp_session_status_returns_info():
 
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch.object(SessionManager, "status", new=AsyncMock(return_value=info)),
     ):
         result = await session_status("http://example.com")
@@ -245,11 +282,20 @@ async def test_mcp_session_status_returns_info():
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_status_unsafe_url_raises():
-    # when / then
-    with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
-        with pytest.raises(ValueError, match="non-routable"):
-            await session_status("http://10.0.0.1")
+async def test_mcp_session_status_unsafe_url_raises() -> None:
+    # given
+    bad_url = "http://10.0.0.1"
+
+    # when
+    with patch(
+        "src.api.mcp.mcp_server.check_fetch_uri",
+        side_effect=UnsafeUriError("URI resolves to a non-public address"),
+    ):
+        with pytest.raises(Exception, match=r"^unsafe_uri: ") as exc_info:
+            await session_status(bad_url)
+
+    # then
+    assert str(exc_info.value).startswith("unsafe_uri: ")
 
 
 # ---------------------------------------------------------------------------
@@ -258,10 +304,10 @@ async def test_mcp_session_status_unsafe_url_raises():
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_clear_returns_cleared_status():
+async def test_mcp_session_clear_returns_cleared_status() -> None:
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch.object(SessionManager, "clear", new=AsyncMock(return_value=True)),
         patch("src.api.mcp.mcp_server.web_reader.clear_cache_for_domain", return_value=1),
     ):
@@ -274,10 +320,10 @@ async def test_mcp_session_clear_returns_cleared_status():
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_clear_is_idempotent_when_nothing_stored():
+async def test_mcp_session_clear_is_idempotent_when_nothing_stored() -> None:
     # when
     with (
-        patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
         patch.object(SessionManager, "clear", new=AsyncMock(return_value=False)),
         patch("src.api.mcp.mcp_server.web_reader.clear_cache_for_domain", return_value=0),
     ):
@@ -288,8 +334,105 @@ async def test_mcp_session_clear_is_idempotent_when_nothing_stored():
 
 
 @pytest.mark.asyncio
-async def test_mcp_session_clear_unsafe_url_raises():
-    # when / then
-    with patch("src.api.mcp.mcp_server.is_safe_external_url", return_value=False):
-        with pytest.raises(ValueError, match="non-routable"):
-            await session_clear("http://10.0.0.1")
+async def test_mcp_session_clear_unsafe_url_raises() -> None:
+    # given
+    bad_url = "http://10.0.0.1"
+
+    # when
+    with patch(
+        "src.api.mcp.mcp_server.check_fetch_uri",
+        side_effect=UnsafeUriError("URI resolves to a non-public address"),
+    ):
+        with pytest.raises(Exception, match=r"^unsafe_uri: ") as exc_info:
+            await session_clear(bad_url)
+
+    # then
+    assert str(exc_info.value).startswith("unsafe_uri: ")
+
+
+@pytest.mark.asyncio
+async def test_mcp_web_search_unexpected_failure_maps_to_internal() -> None:
+    # given
+    failure = RuntimeError("upstream blew up")
+
+    # when
+    with patch(
+        "src.api.mcp.mcp_server.search_client.search",
+        new=AsyncMock(side_effect=failure),
+    ):
+        with pytest.raises(Exception, match=r"^internal: ") as exc_info:
+            await web_search("query")
+
+    # then
+    assert str(exc_info.value).startswith("internal: ")
+
+
+@pytest.mark.asyncio
+async def test_mcp_web_read_unexpected_failure_maps_to_internal() -> None:
+    # given
+    failure = RuntimeError("reader blew up")
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", new_callable=AsyncMock),
+        patch(
+            "src.api.mcp.mcp_server.web_reader.read",
+            new=AsyncMock(side_effect=failure),
+        ),
+    ):
+        with pytest.raises(Exception, match=r"^internal: ") as exc_info:
+            await web_read("http://mcp.com")
+
+    # then
+    assert str(exc_info.value).startswith("internal: ")
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_establish_unexpected_failure_maps_to_internal() -> None:
+    # given
+    failure = RuntimeError("session blew up")
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", new_callable=AsyncMock),
+        patch.object(SessionManager, "establish", new=AsyncMock(side_effect=failure)),
+    ):
+        with pytest.raises(Exception, match=r"^internal: ") as exc_info:
+            await session_establish("http://example.com")
+
+    # then
+    assert str(exc_info.value).startswith("internal: ")
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_status_unexpected_failure_maps_to_internal() -> None:
+    # given
+    failure = RuntimeError("status blew up")
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", new_callable=AsyncMock),
+        patch.object(SessionManager, "status", new=AsyncMock(side_effect=failure)),
+    ):
+        with pytest.raises(Exception, match=r"^internal: ") as exc_info:
+            await session_status("http://example.com")
+
+    # then
+    assert str(exc_info.value).startswith("internal: ")
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_clear_unexpected_failure_maps_to_internal() -> None:
+    # given
+    failure = RuntimeError("clear blew up")
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", new_callable=AsyncMock),
+        patch.object(SessionManager, "clear", new=AsyncMock(side_effect=failure)),
+    ):
+        with pytest.raises(Exception, match=r"^internal: ") as exc_info:
+            await session_clear("http://example.com")
+
+    # then
+    assert str(exc_info.value).startswith("internal: ")

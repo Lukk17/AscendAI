@@ -9,7 +9,7 @@ from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC
 
 
 @pytest.mark.asyncio
-async def test_novnc_monitor_saves_storage_state_not_cookies():
+async def test_novnc_monitor_saves_storage_state_not_cookies() -> None:
     """
     The background monitor must call save_storage_state (not save_session_data/cookies).
     We verify by checking that save_storage_state is awaited and that context.storage_state()
@@ -65,7 +65,7 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
+async def test_novnc_captcha_monitor_saves_once_when_clearance_appears() -> None:
     """The captcha monitor must persist the session only after a cf_clearance cookie
     appears, then stop - never overwrite a good clearance on later polls."""
     # given
@@ -112,13 +112,15 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
     # then
     # Saved exactly once - on the poll where cf_clearance appeared - then broke out.
     mock_save.assert_awaited_once()
-    saved_state = mock_save.await_args.args[1]
+    await_args = mock_save.await_args
+    assert await_args is not None
+    saved_state = await_args.args[1]
     assert any(c["name"] == "cf_clearance" for c in saved_state["cookies"])
-    assert mock_save.await_args.args[-1] == PRODUCED_BY_NOVNC
+    assert await_args.args[-1] == PRODUCED_BY_NOVNC
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_session():
+async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_session() -> None:
     """The reported bug: an Allegro-style DataDome block page (no cf_clearance,
     no literal 'datadome' string) must never be declared cleared, and no
     session may be written for it."""
@@ -165,7 +167,7 @@ async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_se
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page():
+async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page() -> None:
     """establish() is the proactive counterpart to passive capture: a call
     against an ordinary page that already shows real content on the very
     first poll, with no block ever observed, must still persist a session
@@ -210,7 +212,7 @@ async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page():
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance():
+async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance() -> None:
     """For non-Cloudflare captchas (e.g. DataDome) there is no cf_clearance cookie; the
     monitor must capture once the challenge wall is gone."""
     # given
@@ -257,5 +259,7 @@ async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance
 
     # then
     mock_save.assert_awaited_once()
-    saved_state = mock_save.await_args.args[1]
+    await_args = mock_save.await_args
+    assert await_args is not None
+    saved_state = await_args.args[1]
     assert any(c["name"] == "datadome" for c in saved_state["cookies"])

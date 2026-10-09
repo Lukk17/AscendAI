@@ -1,5 +1,6 @@
 """Tests for ProxyProvider seam (task 4.3)."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -32,7 +33,7 @@ def test_proxy_enabled_when_url_set() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_host: Any) -> None:
     """When proxy_provider.for_curl_cffi() returns a dict, it is passed to the HTTP session."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -79,7 +80,7 @@ async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_hos
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_host: Any) -> None:
     """When a redirect occurs, the proxy dict is forwarded to the hop request too."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -139,7 +140,7 @@ async def test_flaresolverr_strategy_injects_proxy_into_payload() -> None:
     from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 
     fs_proxy = {"url": "http://proxy:8080"}
-    payload_sent: dict = {}
+    payload_sent: dict[str, Any] = {}
 
     response = MagicMock()
     response.json = MagicMock(
@@ -153,7 +154,7 @@ async def test_flaresolverr_strategy_injects_proxy_into_payload() -> None:
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=False)
 
-    async def capture_post(url, *, json, **_kwargs):
+    async def capture_post(url: Any, *, json: Any, **_kwargs: Any) -> Any:
         payload_sent.update(json)
         return response
 
@@ -202,9 +203,9 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
     rules.should_block.return_value = False
     url_validator = URLValidator(rules)
 
-    captured_ctx_options: dict = {}
+    captured_ctx_options: dict[str, Any] = {}
 
-    def fake_with_beautifulsoup(*args, **kwargs):
+    def fake_with_beautifulsoup(*args: Any, **kwargs: Any) -> Any:
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
         captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()
@@ -234,7 +235,7 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_host: Any) -> None:
     """When there is no proxy and a redirect occurs, the hop request is made without proxies."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -284,7 +285,7 @@ async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_ho
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location(pinned_public_host: Any) -> None:
     """When a redirect response has no Location header, the loop breaks immediately."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -339,9 +340,9 @@ async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
     rules.should_block.return_value = False
     url_validator = URLValidator(rules)
 
-    captured_ctx_options: dict = {}
+    captured_ctx_options: dict[str, Any] = {}
 
-    def fake_with_beautifulsoup(*args, **kwargs):
+    def fake_with_beautifulsoup(*args: Any, **kwargs: Any) -> Any:
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
         captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()

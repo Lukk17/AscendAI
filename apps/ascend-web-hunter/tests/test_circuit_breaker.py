@@ -30,7 +30,8 @@ def test_opens_after_threshold_failures() -> None:
     # then
     assert b.state is BreakerState.CLOSED
     b.record_failure()
-    assert b.state is BreakerState.OPEN
+    reopened: BreakerState = b.state
+    assert reopened is BreakerState.OPEN
     assert b.is_open
 
 
@@ -60,7 +61,8 @@ def test_transitions_to_half_open_after_recovery_timeout() -> None:
     assert b.state is BreakerState.OPEN
 
     with patch("src.circuit_breaker.breaker.time.monotonic", return_value=time.monotonic() + 2.0):
-        assert b.state is BreakerState.HALF_OPEN
+        recovered: BreakerState = b.state
+        assert recovered is BreakerState.HALF_OPEN
 
 
 def test_as_status_dict_contains_state() -> None:

@@ -135,6 +135,8 @@ and `.env`. The most-used variables:
 | `PLAYWRIGHT_HEADLESS`| `false`                            | Headless Chromium; flip to `true` in CI / no X       |
 | `PUBLIC_VNC_URL`     | `http://localhost:7900`            | NoVNC URL (or `http://ngrok:4040/api/tunnels`)       |
 | `NOVNC_TIMEOUT_SECONDS` | `600`                           | NoVNC monitor task lifetime                          |
+| `RATE_LIMIT_DEFAULT` | `1200/minute`                    | Flood-protection rate limit for REST routes and MCP tools |
+| `ALLOWED_PRIVATE_HOSTS` | empty                         | Hosts the URI fetch guard may reach even at a private address; leave empty, only an e2e sweep sets it |
 
 Full settings reference in [docs/configuration.md](docs/configuration.md).
 

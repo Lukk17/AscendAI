@@ -28,7 +28,7 @@ def _fresh() -> CookieManager:
     return m
 
 
-def _state(cookies: list[dict[str, Any]], origins: list[dict] | None = None) -> dict[str, Any]:
+def _state(cookies: list[dict[str, Any]], origins: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {"cookies": cookies, "origins": origins or []}
 
 
@@ -50,7 +50,7 @@ _WAF_COOKIE_VALUE = "xyz"
 # ---------------------------------------------------------------------------
 
 
-def test_split_separates_waf_from_auth():
+def test_split_separates_waf_from_auth() -> None:
     # given
     state = _state([_cookie("li_at"), _cookie("cf_clearance"), _cookie("JSESSIONID")])
 
@@ -64,7 +64,7 @@ def test_split_separates_waf_from_auth():
     assert waf_names == {"cf_clearance"}
 
 
-def test_split_preserves_origins_in_auth_only():
+def test_split_preserves_origins_in_auth_only() -> None:
     # given
     state = _state([_cookie("cf_clearance")], origins=[{"origin": "https://example.com", "localStorage": []}])
 
@@ -82,7 +82,7 @@ def test_split_preserves_origins_in_auth_only():
 
 
 @pytest.mark.asyncio
-async def test_save_and_get_storage_state_roundtrip():
+async def test_save_and_get_storage_state_roundtrip() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
@@ -99,7 +99,7 @@ async def test_save_and_get_storage_state_roundtrip():
 
 
 @pytest.mark.asyncio
-async def test_get_storage_state_returns_none_when_empty():
+async def test_get_storage_state_returns_none_when_empty() -> None:
     # given
     m = _fresh()
 
@@ -111,7 +111,7 @@ async def test_get_storage_state_returns_none_when_empty():
 
 
 @pytest.mark.asyncio
-async def test_auth_ttl_expiry_hides_auth_cookies_but_waf_remains():
+async def test_auth_ttl_expiry_hides_auth_cookies_but_waf_remains() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
@@ -135,7 +135,7 @@ async def test_auth_ttl_expiry_hides_auth_cookies_but_waf_remains():
 
 
 @pytest.mark.asyncio
-async def test_waf_ttl_expiry_hides_cf_clearance_but_auth_remains():
+async def test_waf_ttl_expiry_hides_cf_clearance_but_auth_remains() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
@@ -162,7 +162,7 @@ async def test_waf_ttl_expiry_hides_cf_clearance_but_auth_remains():
 
 
 @pytest.mark.asyncio
-async def test_profiles_are_isolated():
+async def test_profiles_are_isolated() -> None:
     # given
     m = _fresh()
     state_a = _state([_cookie("li_at", "account-a")])
@@ -185,7 +185,7 @@ async def test_profiles_are_isolated():
 
 
 @pytest.mark.asyncio
-async def test_default_profile_key_matches_settings():
+async def test_default_profile_key_matches_settings() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("token", "x")])
@@ -206,7 +206,7 @@ async def test_default_profile_key_matches_settings():
 
 
 @pytest.mark.asyncio
-async def test_slide_auth_ttl_updates_saved_at():
+async def test_slide_auth_ttl_updates_saved_at() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("token")])
@@ -227,7 +227,7 @@ async def test_slide_auth_ttl_updates_saved_at():
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_returns_positive_when_fresh():
+async def test_get_auth_ttl_remaining_returns_positive_when_fresh() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("token")])
@@ -241,7 +241,7 @@ async def test_get_auth_ttl_remaining_returns_positive_when_fresh():
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_returns_zero_when_absent():
+async def test_get_auth_ttl_remaining_returns_zero_when_absent() -> None:
     # given
     m = _fresh()
 
@@ -258,7 +258,7 @@ async def test_get_auth_ttl_remaining_returns_zero_when_absent():
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_reports_zero_once_the_only_hard_cookie_expired():
+async def test_get_auth_ttl_remaining_reports_zero_once_the_only_hard_cookie_expired() -> None:
     """A cookie that hard-expired minutes after being saved must report as
     expired immediately, not ride the 14-day sliding ceiling to "active"."""
     # given
@@ -279,7 +279,7 @@ async def test_get_auth_ttl_remaining_reports_zero_once_the_only_hard_cookie_exp
 
 
 @pytest.mark.asyncio
-async def test_get_storage_state_hides_auth_once_the_only_hard_cookie_expired():
+async def test_get_storage_state_hides_auth_once_the_only_hard_cookie_expired() -> None:
     # given
     m = _fresh()
     saved_at = time.time() - 3600
@@ -298,7 +298,7 @@ async def test_get_storage_state_hides_auth_once_the_only_hard_cookie_expired():
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_uses_earliest_hard_cookie_expiry():
+async def test_get_auth_ttl_remaining_uses_earliest_hard_cookie_expiry() -> None:
     """Governed by the shortest-lived hard-expiring cookie, not the longest."""
     # given
     m = _fresh()
@@ -319,7 +319,7 @@ async def test_get_auth_ttl_remaining_uses_earliest_hard_cookie_expiry():
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_caps_at_configured_ceiling_despite_long_cookie():
+async def test_get_auth_ttl_remaining_caps_at_configured_ceiling_despite_long_cookie() -> None:
     """A cookie the site marked good for a year is still capped by
     SESSION_AUTH_TTL_SECONDS: the ceiling still earns its place as an
     independent trust boundary, not just a fallback for session cookies."""
@@ -339,7 +339,7 @@ async def test_get_auth_ttl_remaining_caps_at_configured_ceiling_despite_long_co
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_falls_back_to_ceiling_for_session_only_cookies():
+async def test_get_auth_ttl_remaining_falls_back_to_ceiling_for_session_only_cookies() -> None:
     """Cookies with no hard expiry (Playwright's expires=-1 or absent) carry
     no expiry signal of their own, so the configured ceiling alone governs."""
     # given
@@ -355,7 +355,7 @@ async def test_get_auth_ttl_remaining_falls_back_to_ceiling_for_session_only_coo
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_reports_positive_for_a_genuinely_live_session():
+async def test_get_auth_ttl_remaining_reports_positive_for_a_genuinely_live_session() -> None:
     """A session with time left on both the cookie and the ceiling reports
     the smaller of the two, never zero."""
     # given
@@ -372,7 +372,7 @@ async def test_get_auth_ttl_remaining_reports_positive_for_a_genuinely_live_sess
 
 
 @pytest.mark.asyncio
-async def test_get_auth_ttl_remaining_reports_zero_for_a_freshly_saved_empty_cookie_jar():
+async def test_get_auth_ttl_remaining_reports_zero_for_a_freshly_saved_empty_cookie_jar() -> None:
     """A record saved with zero cookies (establish() on a page nobody was
     challenged on) must not ride the sliding SESSION_AUTH_TTL_SECONDS
     ceiling to a fourteen-day "active" reading: an empty jar authenticates
@@ -390,7 +390,7 @@ async def test_get_auth_ttl_remaining_reports_zero_for_a_freshly_saved_empty_coo
 
 
 @pytest.mark.asyncio
-async def test_get_storage_state_returns_none_for_a_freshly_saved_empty_cookie_jar():
+async def test_get_storage_state_returns_none_for_a_freshly_saved_empty_cookie_jar() -> None:
     """Mirrors the TTL check above at the storage_state boundary: an empty
     jar must not be presented as usable state to callers deciding whether a
     stored session justifies preferring the browser tier."""
@@ -412,7 +412,7 @@ async def test_get_storage_state_returns_none_for_a_freshly_saved_empty_cookie_j
 
 
 @pytest.mark.asyncio
-async def test_save_flat_cookies_and_get_session_data_compat():
+async def test_save_flat_cookies_and_get_session_data_compat() -> None:
     # given
     m = _fresh()
     await m.save_flat_cookies(
@@ -436,7 +436,7 @@ async def test_save_flat_cookies_and_get_session_data_compat():
 
 
 @pytest.mark.asyncio
-async def test_redis_save_and_load_roundtrip():
+async def test_redis_save_and_load_roundtrip() -> Any:
     # given
     m = _fresh()
     mock_redis = AsyncMock()
@@ -616,7 +616,7 @@ async def test_get_session_data_returns_none_when_no_stored_state() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_redis_configured_but_unreachable_logs_fallback(caplog: pytest.LogCaptureFixture):
+def test_redis_configured_but_unreachable_logs_fallback(caplog: pytest.LogCaptureFixture) -> None:
     # given
     CookieManager._instance = None
 
@@ -642,7 +642,7 @@ def test_redis_configured_but_unreachable_logs_fallback(caplog: pytest.LogCaptur
 
 
 @pytest.mark.asyncio
-async def test_save_storage_state_writes_produced_by_on_auth_and_waf_entries():
+async def test_save_storage_state_writes_produced_by_on_auth_and_waf_entries() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])
@@ -658,7 +658,7 @@ async def test_save_storage_state_writes_produced_by_on_auth_and_waf_entries():
 
 
 @pytest.mark.asyncio
-async def test_save_flat_cookies_passes_produced_by_through():
+async def test_save_flat_cookies_passes_produced_by_through() -> None:
     # given
     m = _fresh()
     await m.save_flat_cookies(
@@ -673,7 +673,7 @@ async def test_save_flat_cookies_passes_produced_by_through():
 
 
 @pytest.mark.asyncio
-async def test_get_stored_session_producer_prefers_waf_entry_when_valid():
+async def test_get_stored_session_producer_prefers_waf_entry_when_valid() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("li_at")])
@@ -689,7 +689,7 @@ async def test_get_stored_session_producer_prefers_waf_entry_when_valid():
 
 
 @pytest.mark.asyncio
-async def test_get_stored_session_producer_falls_back_to_auth_when_no_waf_entry():
+async def test_get_stored_session_producer_falls_back_to_auth_when_no_waf_entry() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("li_at")])
@@ -703,7 +703,7 @@ async def test_get_stored_session_producer_falls_back_to_auth_when_no_waf_entry(
 
 
 @pytest.mark.asyncio
-async def test_get_stored_session_producer_falls_back_to_auth_when_waf_expired():
+async def test_get_stored_session_producer_falls_back_to_auth_when_waf_expired() -> None:
     """save_storage_state always replaces the whole auth sub-entry with the
     current call's split, so the auth entry that must survive here has to be
     written *after* the waf entry, with a state that carries no WAF cookie of
@@ -731,7 +731,7 @@ async def test_get_stored_session_producer_falls_back_to_auth_when_waf_expired()
 
 
 @pytest.mark.asyncio
-async def test_get_stored_session_producer_reports_unknown_for_a_record_missing_the_field():
+async def test_get_stored_session_producer_reports_unknown_for_a_record_missing_the_field() -> None:
     """A record saved before this field existed (or by a caller that omitted it)
     still reports a producer, distinct from None, so routing can tell "stored
     session, unknown origin" apart from "no stored session at all"."""
@@ -748,7 +748,7 @@ async def test_get_stored_session_producer_reports_unknown_for_a_record_missing_
 
 
 @pytest.mark.asyncio
-async def test_get_stored_session_producer_returns_none_when_no_stored_session():
+async def test_get_stored_session_producer_returns_none_when_no_stored_session() -> None:
     # given
     m = _fresh()
 
@@ -760,7 +760,7 @@ async def test_get_stored_session_producer_returns_none_when_no_stored_session()
 
 
 @pytest.mark.asyncio
-async def test_get_stored_session_producer_returns_none_when_both_entries_expired():
+async def test_get_stored_session_producer_returns_none_when_both_entries_expired() -> None:
     # given
     m = _fresh()
     state = _state([_cookie("li_at"), _cookie("cf_clearance")])

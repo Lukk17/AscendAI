@@ -34,7 +34,7 @@ graph TB
 
 | Quality | Scenario | Expected behaviour |
 | :--- | :--- | :--- |
-| Security | REST caller sends `url: "http://169.254.169.254/latest/meta-data/"` | `is_safe_external_url` resolves to link-local address, returns False; handler returns 400 with SSRF detail message. |
+| Security | REST caller sends `url: "http://169.254.169.254/latest/meta-data/"` | The shared guard resolves to a link-local address and refuses; handler returns a 400 problem body with code `unsafe_uri`. |
 | Security | MCP `web_read` receives `url: "http://localhost:6379"` | Same SSRF guard; 400 returned to the agent. |
 | Availability | Target page is Cloudflare-protected, strategies 1 and 2 return empty | Strategy 3 (FlareSolverr) is invoked; if it succeeds, response carries `mode="3-flaresolverr"`. |
 | Availability | Target page requires CAPTCHA; strategies 1-5 fail | Strategy 6 (NoVNC) raises 428 with `vnc_url`. ascend-ai-agent displays the URL to the user. |

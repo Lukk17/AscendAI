@@ -4,6 +4,17 @@
 
 Accepted, 2026-09-18
 
+## Amendment, 2026-10-04 (owner answer 63.2)
+
+The rule is unchanged and now lives in the library: `check_fetch_uri`,
+`follow_guarded_redirects` and the `CURLOPT_RESOLVE` send hop of
+`ascend-python-common` (`openspec/changes/add-ascend-python-common/design.md`
+D21). `is_safe_external_url`, `pin_safe_host` and their helpers left
+`src/validator/url_validator.py`, keeping `URLValidator` and the
+`url_validator` singleton, which apply the ad blocklist. A host on
+`ALLOWED_PRIVATE_HOSTS` skips the address check, a setting no production
+file sets (owner answer 67.3). The rest of this record is unchanged.
+
 ## Context
 
 `is_safe_external_url` resolves a hostname with `socket.getaddrinfo`, checks every address it gets back against the

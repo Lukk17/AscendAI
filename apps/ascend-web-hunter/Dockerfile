@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM mcr.microsoft.com/playwright/python:v1.60.0-noble
 
 WORKDIR /app
@@ -30,7 +32,9 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install python dependencies strictly within the venv
 COPY pyproject.toml .
+COPY --from=ascend-python-common . /opt/ascend-python-common
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install /opt/ascend-python-common && \
     pip install .
 
 # Environment variables

@@ -38,7 +38,7 @@ _CRAWLER_FACTORY_PATH = (
 
 
 @pytest.mark.asyncio
-async def test_crawlee_uses_playwright_headless_setting():
+async def test_crawlee_uses_playwright_headless_setting() -> Any:
     """headless kwarg passed to AdaptivePlaywrightCrawler must equal settings.PLAYWRIGHT_HEADLESS."""
     # given
     captured: dict[str, Any] = {}
@@ -77,7 +77,7 @@ async def test_crawlee_uses_playwright_headless_setting():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_headless_false_when_setting_false():
+async def test_crawlee_headless_false_when_setting_false() -> Any:
     """headless=False must be passed when PLAYWRIGHT_HEADLESS=False."""
     # given
     captured: dict[str, Any] = {}
@@ -116,7 +116,9 @@ async def test_crawlee_headless_false_when_setting_false():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(monkeypatch: pytest.MonkeyPatch):
+async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """A crawler.run() that never returns (e.g. Crawlee's autoscaler permanently reports the
     system as memory-overloaded, so no request is ever dequeued) must not hang this tier
     forever: get_html() must raise TimeoutError within the configured budget instead."""
@@ -149,7 +151,7 @@ async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatch: pytest.MonkeyPatch):
+async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatch: pytest.MonkeyPatch) -> Any:
     """Crawlee's BasicCrawler.run() catches CancelledError internally and can return
     normally after being cancelled (see asyncio.wait_for docs: a task that suppresses
     the cancellation and returns a value has that value returned, not TimeoutError).
@@ -188,7 +190,7 @@ async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatc
 @pytest.mark.asyncio
 async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
     monkeypatch: pytest.MonkeyPatch,
-):
+) -> None:
     """CRAWLEE_MEMORY_MBYTES, when configured, must be propagated to the environment
     variable Crawlee itself reads before the crawler is constructed: Crawlee's service
     locator lazily builds and caches its Configuration singleton the first time any
@@ -229,7 +231,7 @@ async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
 @pytest.mark.asyncio
 async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch
-):
+) -> None:
     """CRAWLEE_STORAGE_DIR must be propagated to the environment variable Crawlee itself
     reads before the crawler is constructed, for the same reason as CRAWLEE_MEMORY_MBYTES
     above: Crawlee's service locator caches its Configuration singleton on first crawler

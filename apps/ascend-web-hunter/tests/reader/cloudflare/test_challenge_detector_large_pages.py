@@ -29,7 +29,7 @@ def large_waf_page() -> str:
     return header + padding + "</body></html>"
 
 
-def test_is_login_required_detects_marker_in_large_page(large_cf_page: str):
+def test_is_login_required_detects_marker_in_large_page(large_cf_page: str) -> None:
     # given
     with patch(
         "src.reader.cloudflare.challenge_detector._BOT_DICT",
@@ -39,12 +39,12 @@ def test_is_login_required_detects_marker_in_large_page(large_cf_page: str):
         assert ChallengeDetector.is_login_required(large_cf_page) is True
 
 
-def test_is_blocked_detects_ray_id_in_large_page(large_waf_page: str):
+def test_is_blocked_detects_ray_id_in_large_page(large_waf_page: str) -> None:
     # when / then
     assert ChallengeDetector.is_blocked(200, large_waf_page) is True
 
 
-def test_is_login_required_clean_large_page_returns_false():
+def test_is_login_required_clean_large_page_returns_false() -> None:
     """A genuinely clean large page must not be misidentified as a login wall."""
     # given
     big_clean = (
@@ -58,7 +58,7 @@ def test_is_login_required_clean_large_page_returns_false():
         assert ChallengeDetector.is_login_required(big_clean) is False
 
 
-def test_challenge_detection_max_bytes_setting_respected():
+def test_challenge_detection_max_bytes_setting_respected() -> None:
     """
     When CHALLENGE_DETECTION_MAX_BYTES is small, a marker placed after the prefix
     must NOT be detected (detector correctly limits its scan).
@@ -77,7 +77,7 @@ def test_challenge_detection_max_bytes_setting_respected():
     assert result is False
 
 
-def test_challenge_detection_fires_when_marker_within_max_bytes():
+def test_challenge_detection_fires_when_marker_within_max_bytes() -> None:
     """When a strong marker falls inside the prefix window, detection must fire
     regardless of total page size."""
     # given
@@ -91,7 +91,7 @@ def test_challenge_detection_fires_when_marker_within_max_bytes():
     assert result is True
 
 
-def test_large_page_embedding_turnstile_widget_is_not_blocked():
+def test_large_page_embedding_turnstile_widget_is_not_blocked() -> None:
     """A real page that merely embeds a Turnstile widget (e.g. nowsecure.nl) must not
     be flagged as a challenge wall just because it contains cf-turnstile."""
     # when
@@ -102,7 +102,7 @@ def test_large_page_embedding_turnstile_widget_is_not_blocked():
     assert ChallengeDetector.is_blocked(200, html) is False
 
 
-def test_small_interstitial_with_turnstile_is_blocked():
+def test_small_interstitial_with_turnstile_is_blocked() -> None:
     """A small interstitial page dominated by the Turnstile widget is still a block."""
     # given
     html = "<html><body><div class='cf-turnstile'></div></body></html>"
@@ -111,7 +111,7 @@ def test_small_interstitial_with_turnstile_is_blocked():
     assert ChallengeDetector.is_blocked(200, html) is True
 
 
-def test_large_page_loading_datadome_tag_is_not_blocked():
+def test_large_page_loading_datadome_tag_is_not_blocked() -> None:
     """A real DataDome-protected page loads the datadome tag while serving full content;
     it must not be flagged as a challenge wall on the basis of that tag alone."""
     # when
@@ -126,7 +126,7 @@ def test_large_page_loading_datadome_tag_is_not_blocked():
     assert ChallengeDetector.is_blocked(200, html) is False
 
 
-def test_small_datadome_interstitial_is_blocked():
+def test_small_datadome_interstitial_is_blocked() -> None:
     """A small DataDome challenge interstitial is still a block."""
     # given
     html = "<html><body><script src='https://js.datadome.co/tags.js'></script>captcha</body></html>"

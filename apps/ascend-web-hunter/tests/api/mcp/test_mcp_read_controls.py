@@ -12,14 +12,14 @@ from src.api.mcp.mcp_server import web_read
 _URL = "http://mcp.com"
 _READ = "src.api.mcp.mcp_server.web_reader.read"
 _READ_WITH_LINKS = "src.api.mcp.mcp_server.web_reader.read_with_links"
-_GUARD = "src.api.mcp.mcp_server.is_safe_external_url"
+_GUARD = "src.api.mcp.mcp_server.check_fetch_uri"
 
 _STRUCTURED_FIELDS = ["content", "title", "author", "date", "sitename", "status", "mode"]
 _SESSION_EXPIRED_FIELDS = ["content", "status", "profile", "message"]
 
 
 @pytest.mark.asyncio
-async def test_web_read_forwards_output_format_and_tier():
+async def test_web_read_forwards_output_format_and_tier() -> None:
     # given
     result = {"content": "X", "status": "success", "mode": "3-flaresolverr"}
 
@@ -37,7 +37,7 @@ async def test_web_read_forwards_output_format_and_tier():
 
 
 @pytest.mark.asyncio
-async def test_web_read_returns_the_structured_contract():
+async def test_web_read_returns_the_structured_contract() -> None:
     # given
     result = {
         "content": "The body",
@@ -63,7 +63,7 @@ async def test_web_read_returns_the_structured_contract():
 
 
 @pytest.mark.asyncio
-async def test_web_read_forwards_the_tier_on_the_links_path():
+async def test_web_read_forwards_the_tier_on_the_links_path() -> None:
     # given
     result = {"content": "X", "links": {}, "status": "success", "mode": "5-crawlee_adaptive"}
 
@@ -81,21 +81,23 @@ async def test_web_read_forwards_the_tier_on_the_links_path():
 
 
 @pytest.mark.asyncio
-async def test_structured_with_links_is_rejected():
+async def test_structured_with_links_is_rejected() -> None:
+    # given
+    guard = patch(_GUARD, return_value=True)
+    unread = patch(_READ_WITH_LINKS, new_callable=AsyncMock)
+
     # when
-    with (
-        patch(_GUARD, return_value=True),
-        patch(_READ_WITH_LINKS, new_callable=AsyncMock) as mock_read,
-    ):
-        with pytest.raises(ValueError, match="include_links"):
+    with guard, unread as mock_read:
+        with pytest.raises(Exception, match=r"^validation: .*include_links") as exc_info:
             await web_read(_URL, include_links=True, output_format="structured")
 
     # then
+    assert str(exc_info.value).startswith("validation: ")
     mock_read.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_session_expired_reaches_the_agent_whole():
+async def test_session_expired_reaches_the_agent_whole() -> None:
     # given
     result = {
         "content": "",

@@ -102,6 +102,6 @@ graph TB
 | `CookieManager` | `src/reader/cloudflare/cookie_manager.py` | Singleton. Redis-backed session store with in-process fallback. Apex domain normalisation. |
 | `SearxngClient` | `src/search/search_client.py` | Async `httpx` client for SearXNG HTML search. BeautifulSoup `article.result` parser. |
 | `ContentValidator` | `src/validator/content_validator.py` | Word count, error-keyword check, Flesch reading ease, type-token ratio. |
-| `URLValidator` | `src/validator/url_validator.py` | Wraps adblock `AdblockRules` for route filtering; `is_safe_external_url` standalone SSRF guard. The module-level `url_validator` singleton is shared by every `WebReader`; a refresh reassigns its `.rules` in place. |
+| `URLValidator` | `src/validator/url_validator.py` | Wraps adblock `AdblockRules` for route filtering. The module-level `url_validator` singleton is shared by every `WebReader`; a refresh reassigns its `.rules` in place. |
 | `BlocklistLoader` | `src/config/blocklist_loader.py` | Loads the vendored blocklist from `BLOCKLIST_PATH`; `refresh()` downloads, validates, and atomically swaps the on-disk file and in-memory rules. |
 | `Settings` | `src/config/config.py` | Pydantic-settings class. Single `settings` singleton. Reads `.env` file or environment. |

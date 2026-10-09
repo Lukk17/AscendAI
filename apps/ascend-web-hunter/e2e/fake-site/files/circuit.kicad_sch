@@ -1,0 +1,3 @@
+(kicad_sch (version 20231130) (paper "A4")
+  ; KICAD-CANARY net CLASS_47 assigns 0.35 mm track width to the Mirell bus.
+)

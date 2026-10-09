@@ -1,16 +1,9 @@
+from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    API_PORT: int = Field(default=7021, description="Port for the FastAPI/MCP server")
-    API_HOST: str = Field(default="0.0.0.0", description="Host to bind the server to")
+class Settings(ServiceSettings):
+    API_PORT: int = Field(default=7021, ge=1, le=65535, description="Port for the FastAPI/MCP server")
 
     # Default to localhost:9020 for local development (accessing host machine port).
     # Docker Compose overrides this to http://searxng:8080 (internal container communication).
@@ -56,9 +49,22 @@ class Settings(BaseSettings):
         description="Minimum word count for valid content",
     )
 
-    LOG_LEVEL: str = Field(
-        default="INFO",
-        description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    RATE_LIMIT_DEFAULT: RateLimit = Field(
+        default="1200/minute",
+        description="Default rate limit for REST routes and MCP tools",
+    )
+
+    ALLOWED_PRIVATE_HOSTS: CsvTuple = Field(
+        default=(),
+        description=(
+            "Hosts the URI fetch guard may reach even at a private address. "
+            "Leave empty, only an e2e sweep sets it."
+        ),
+    )
+    FETCH_MAX_REDIRECT_HOPS: int = Field(
+        default=10,
+        ge=0,
+        description="Redirect hops the URI fetch guard follows.",
     )
 
     USER_AGENTS_PATH: str = Field(

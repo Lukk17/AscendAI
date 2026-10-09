@@ -19,10 +19,10 @@ solve leaves behind. This spec has no human step and runs fully automated.
 ### Contract (how the service signals each verdict)
 
 - **success** - HTTP `200`, body `status="success"`, non-empty content.
-- **intervention** - HTTP `428 Precondition Required`, body `status="human_intervention_required"` + a non-empty
+- **intervention** - HTTP `428 Precondition Required`, body `code="human_intervention_required"` + a non-empty
   `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
 - **hard-fail** - a non-2xx the SSRF / host guard fail-closes with (e.g. HTTP `400` for an unresolvable host).
-- busy, not a verdict: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
+- busy, not a verdict: HTTP `409`, body `code="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
   meaning another row's NoVNC intervention still holds the single shared browser. The runner reads the
   `Retry-After` header and the `holder_url` from the folder run's JSON output file (see Run), waits that many
   seconds, and re-runs only that row's own request file, up to 3 attempts in total, recording each attempt and
@@ -234,7 +234,7 @@ Unix:
 bru run "web-hunter/testing/realworld" --env ascend-local -o "/tmp/realworld-run.json" -f json
 ```
 
-Part 1, retry of a busy row. For each entry in that JSON whose response is HTTP `409` with `status="novnc_busy"`,
+Part 1, retry of a busy row. For each entry in that JSON whose response is HTTP `409` with `code="novnc_busy"`,
 read the `Retry-After` header and the body's `holder_url` from the entry, wait the `Retry-After` seconds, then
 re-run only that row's own request file (`web-hunter/testing/realworld/realworld-<row>-<site>.yml`, for example
 `realworld-u-allegro-product.yml`) with the same `-o <file> -f json` flags into its own file, up to 3 attempts in
@@ -246,7 +246,7 @@ third 409.
 - **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly - a-e are `200`/`success` (+ canary where
   noted), q is the `400` hard-fail. Best-effort rows each return a valid terminal verdict (`200`/`success`/content
   **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed. A `409` with
-  `status="novnc_busy"` is not a verdict: the runner reads its `Retry-After` header and `holder_url` from the
+  `code="novnc_busy"` is not a verdict: the runner reads its `Retry-After` header and `holder_url` from the
   folder run's JSON output file, waits the `Retry-After` seconds, and re-runs only that row's own request file,
   up to 3 attempts in total, records each attempt and each 409 body's `holder_url` in the run record, and fails
   the row only on the third 409.

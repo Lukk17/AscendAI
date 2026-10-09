@@ -1,20 +1,52 @@
-from typing import Any
+import logging
+from typing import Any, NoReturn
 
+from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
+from ascend_python_common.uri_guard import FetchPolicy, check_fetch_uri
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
+from src.api.exception_handlers import error_registry
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.config.config import settings
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
-from src.validator.url_validator import is_safe_external_url
 
 mcp = FastMCP("ascend-web-hunter")
 search_client = SearxngClient()
 web_reader = WebReader()
 
+logger = logging.getLogger(__name__)
+
 MAX_QUERY_LENGTH = 500
+
+
+def _fetch_policy() -> FetchPolicy:
+    return FetchPolicy(
+        allowed_hosts=tuple(settings.ALLOWED_PRIVATE_HOSTS),
+        file_root=None,
+        max_redirect_hops=settings.FETCH_MAX_REDIRECT_HOPS,
+    )
+
+
+async def _check_url(operation: str, url: str) -> None:
+    try:
+        await check_fetch_uri(url, _fetch_policy())
+    except Exception as exc:
+        _raise_mapped_error(operation, exc)
+
+
+def _raise_mapped_error(operation: str, exc: Exception) -> NoReturn:
+    entry = error_registry.lookup(exc)
+    if entry is not None:
+        raise ToolError(f"{entry.code.code}: {resolve_detail(entry, exc)}") from exc
+
+    logger.exception(f"MCP {operation} failed")
+
+    raise ToolError(f"{INTERNAL.code}: {INTERNAL_FIXED_DETAIL}") from exc
 
 
 @mcp.tool()
@@ -26,11 +58,16 @@ async def web_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
         limit: Max results (default 5).
     """
     if not query or not query.strip():
-        raise ValueError("query must not be empty")
+        _raise_mapped_error("web_search", ValueError("query must not be empty"))
     if len(query) > MAX_QUERY_LENGTH:
-        raise ValueError(f"query exceeds maximum length of {MAX_QUERY_LENGTH} characters")
+        _raise_mapped_error(
+            "web_search", ValueError(f"query exceeds maximum length of {MAX_QUERY_LENGTH} characters")
+        )
 
-    return await search_client.search(query=query, limit=limit)
+    try:
+        return await search_client.search(query=query, limit=limit)
+    except Exception as exc:
+        _raise_mapped_error("web_search", exc)
 
 
 @mcp.tool()
@@ -63,13 +100,15 @@ async def web_read(
               '3-flaresolverr', '4-playwright_stealth', '5-crawlee_adaptive', '6-novnc') instead of
               where heavy_mode and the stored session would start it. Escalation continues after it.
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("web_read", url)
 
     if include_links and output_format == "structured":
-        raise ValueError(
-            "output_format=structured is not available with include_links: the annotated-links "
-            "response carries the flat content shape plus a link map"
+        _raise_mapped_error(
+            "web_read",
+            ValueError(
+                "output_format=structured is not available with include_links: the annotated-links "
+                "response carries the flat content shape plus a link map"
+            ),
         )
 
     try:
@@ -104,6 +143,8 @@ async def web_read(
             "holder_url": exc.holder_url,
             "holder_profile": exc.holder_profile,
         }
+    except Exception as exc:
+        _raise_mapped_error("web_read", exc)
 
 
 @mcp.tool()
@@ -116,8 +157,7 @@ async def session_establish(url: str, profile: str | None = None) -> dict[str, A
         url: The site URL to establish a session for.
         profile: Optional profile label to use (e.g. 'work', 'personal').
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("session_establish", url)
 
     try:
         vnc_url = await session_manager.establish(url, profile)
@@ -130,6 +170,8 @@ async def session_establish(url: str, profile: str | None = None) -> dict[str, A
             "holder_url": exc.holder_url,
             "holder_profile": exc.holder_profile,
         }
+    except Exception as exc:
+        _raise_mapped_error("session_establish", exc)
 
     HUMAN_INTERVENTION_TOTAL.labels(intervention_type="login").inc()
     return {
@@ -150,10 +192,12 @@ async def session_status(url: str, profile: str | None = None) -> dict[str, Any]
     Returns status ('active', 'expired', 'none'), remaining auth TTL in seconds,
     and the timestamp of the last validated session.
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("session_status", url)
 
-    info = await session_manager.status(url, profile)
+    try:
+        info = await session_manager.status(url, profile)
+    except Exception as exc:
+        _raise_mapped_error("session_status", exc)
     return {"url": url, **info.to_dict()}
 
 
@@ -167,10 +211,12 @@ async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
         url: The site URL whose session should be cleared.
         profile: Optional profile label (e.g. 'work', 'personal').
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("session_clear", url)
 
-    existed = await session_manager.clear(url, profile)
+    try:
+        existed = await session_manager.clear(url, profile)
+    except Exception as exc:
+        _raise_mapped_error("session_clear", exc)
     domain = cookie_manager.registrable_domain(url)
     cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
 

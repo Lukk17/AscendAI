@@ -22,7 +22,7 @@ def _build_html_with_articles(count: int = 1) -> str:
 
 
 @pytest.mark.asyncio
-async def test_search_returns_results_for_async_client():
+async def test_search_returns_results_for_async_client() -> None:
     # given
     html = _build_html_with_articles(1)
 
@@ -47,7 +47,7 @@ async def test_search_returns_results_for_async_client():
 
 
 @pytest.mark.asyncio
-async def test_search_limits_results():
+async def test_search_limits_results() -> None:
     # given
     html = _build_html_with_articles(5)
 
@@ -68,7 +68,7 @@ async def test_search_limits_results():
 
 
 @pytest.mark.asyncio
-async def test_search_skips_article_without_title():
+async def test_search_skips_article_without_title() -> None:
     # given
     html = """
     <html><body>
@@ -100,7 +100,7 @@ async def test_search_skips_article_without_title():
 
 
 @pytest.mark.asyncio
-async def test_search_with_categories_forwards_param():
+async def test_search_with_categories_forwards_param() -> None:
     # given
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -120,7 +120,7 @@ async def test_search_with_categories_forwards_param():
 
 
 @pytest.mark.asyncio
-async def test_search_raises_on_http_status_error():
+async def test_search_raises_on_http_status_error() -> None:
     # given
     request = httpx.Request("GET", "http://searxng/search")
     response = httpx.Response(500, request=request)
@@ -136,7 +136,7 @@ async def test_search_raises_on_http_status_error():
 
 
 @pytest.mark.asyncio
-async def test_search_raises_on_timeout():
+async def test_search_raises_on_timeout() -> None:
     # given
     mock_get = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
 
@@ -150,7 +150,7 @@ async def test_search_raises_on_timeout():
 
 
 @pytest.mark.asyncio
-async def test_search_raises_on_transport_error():
+async def test_search_raises_on_transport_error() -> None:
     # given
     mock_get = AsyncMock(side_effect=httpx.ConnectError("nope"))
 

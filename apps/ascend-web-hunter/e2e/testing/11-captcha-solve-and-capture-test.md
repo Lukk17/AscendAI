@@ -5,7 +5,7 @@
 Two things, both against the real democaptcha hCaptcha demo form (no mocks), with a human in the loop between them:
 
 1. Human intervention contract. A read of `https://democaptcha.com/demo-form-eng/hcaptcha.html` with no stored
-   session answers HTTP 428, `status="human_intervention_required"` and a non-empty `vnc_url`. The page's
+   session answers HTTP 428, `code="human_intervention_required"` and a non-empty `vnc_url`. The page's
    `hcaptcha.com/1/api.js` script is one of the block signatures in `src/reader/cloudflare/challenge_dictionary.json`,
    so every automated tier reports a challenge (measured on 2026-09-10: 26 seconds from the request to the NoVNC
    monitor starting) and the scraper escalates to NoVNC for a human to act.
@@ -29,16 +29,16 @@ it proved nothing about a human.
 ### Contract (how the service signals each verdict)
 
 - success: HTTP `200`, body `status="success"`, non-empty content.
-- intervention: HTTP `428 Precondition Required`, body `status="human_intervention_required"` and a non-empty
+- intervention: HTTP `428 Precondition Required`, body `code="human_intervention_required"` and a non-empty
   `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
-- busy, not a verdict: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
+- busy, not a verdict: HTTP `409`, body `code="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
   meaning another intervention still holds the single shared browser. This spec runs alone, so a 409 on Call 1 means
   a monitor from an earlier run is still open. Wait the `Retry-After` seconds and re-run Call 1, up to 3 attempts in
   total, recording each attempt and the `holder_url` in the run record.
 
 ### Human-intervention forwarding (mandatory)
 
-Any call in this test that returns `status="human_intervention_required"` returns a `vnc_url` that a human must
+Any call in this test that returns `code="human_intervention_required"` returns a `vnc_url` that a human must
 open. The agent driving the test must print that `vnc_url` verbatim into the chat the moment it is received, then
 wait for the human to confirm they solved it before the capture check.
 
@@ -136,7 +136,7 @@ Expect a JSON value whose `auth` entry contains an `hmt_id` cookie.
 
 ## Expected
 
-- Call 1: HTTP `428`, `status="human_intervention_required"`, `vnc_url` is a non-empty string. The main agent
+- Call 1: HTTP `428`, `code="human_intervention_required"`, `vnc_url` is a non-empty string. The main agent
   printed the `vnc_url` verbatim in the chat.
 - Capture check: `session:democaptcha.com:default` exists and its `auth` entry carries a cookie named `hmt_id`. On
   the 2026-09-10 solve the `auth` entry also carried `evod95wg4` (democaptcha.com) and `__cflb` (api.hcaptcha.com),

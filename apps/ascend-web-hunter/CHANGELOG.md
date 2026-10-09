@@ -9,6 +9,46 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
+## [0.0.7]
+
+### Changed
+- The service is built on `ascend-python-common==1.0.0` via `create_service_app`: shared problem bodies, settings
+  base, logging, request correlation, tracing, readiness aggregation, rate limiting, security headers, and the
+  startup banner frame. `Settings` subclasses `ServiceSettings`; the error registry maps `ValueError` to
+  `validation`, `UnsafeUriError` to `unsafe_uri`, and everything unexpected to `internal`.
+- REST errors are problem bodies (`application/problem+json`) with `code` and `traceId`. Request validation
+  failures answer `400` with code `validation` and an `errors` array sorted by `field`. A refused URL answers
+  `400` with code `unsafe_uri`, including URIs with user info. The 428 and 409 answers are problem bodies too:
+  code `human_intervention_required` with `intervention_type` and `vnc_url`, and code `novnc_busy` with
+  `holder_url`, `holder_profile` and the `Retry-After` header. Unknown paths answer a problem `404` and wrong
+  methods a problem `405` with `Allow`. Unexpected failures answer `500` with code `internal` and a fixed generic
+  detail.
+- MCP refusals are tool errors whose text starts with `<code>: ` (`validation: `, `unsafe_uri: `, `internal: `).
+  The MCP status objects (`human_intervention_required`, `novnc_busy`, `session_expired`) are successful tool
+  results, not errors, and keep their `status`-keyed shape.
+- `/health` answers `{"status": "ok", "service": "ascend-web-hunter", "version": ...}`. `/ready` aggregates the
+  `redis`, `searxng`, `flaresolverr`, `searxng_breaker` and `flaresolverr_breaker` probes and answers `200`
+  `{"status": "ready", ...}` or `503` `{"status": "not-ready", ...}`.
+- Logging comes from the library: `LOG_LEVEL` is honoured, `LOG_FORMAT` selects `json` or `color`, lines start
+  with `[ascend-web-hunter]`. `src/config/logging_config.py` and `src/observability/request_context.py` are
+  deleted.
+- `RATE_LIMIT_DEFAULT` defaults to `1200/minute` on REST routes and MCP tools, with no stricter limit;
+  `/health`, `/ready`, `/metrics` and `tools/list` are never limited.
+- OpenTelemetry comes from the library (1.45.0 and 0.66b0); the service's own 1.42.1 and 0.63b1 pins are gone.
+- The URL guard lives in the library: the REST endpoints and MCP tools call `check_fetch_uri` with the
+  `ALLOWED_PRIVATE_HOSTS` policy (empty by default, only an e2e sweep sets it), and the curl_cffi tier follows
+  redirects through `follow_guarded_redirects` with address pinning. `is_safe_external_url`, `pin_safe_host`
+  and their helpers left `src/validator/url_validator.py`, which keeps `URLValidator` and the `url_validator`
+  singleton for the ad blocklist.
+- `Dockerfile` installs the library from the `ascend-python-common` named build context before the service; the
+   compose service declares `additional_contexts` and sets `LOG_FORMAT=json` and `OTEL_EXPORTER_OTLP_ENDPOINT` with no rate
+   limit line, so the code default applies.
+- Docs updated: `AGENTS.md`, `README.md`, `docs/configuration.md`, `docs/api-examples.md`, `docs/running.md`,
+  arc42 pages 04, 05, 06, 08, 10 and 12, the container diagram, the ADR-003 amendment (428 and 409 body shape
+  superseded), and e2e specs 7, 11 and 12 with their Bruno requests and the spec 11 template now asserting `code`.
+- The shared library is cut at `1.0.0` now that all four services are migrated. The service pin moves to
+  `ascend-python-common==1.0.0`; this entry stays the one version of this change.
+
 ## [0.0.6] - 2026-10-01
 
 ### Fixed

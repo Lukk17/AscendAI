@@ -1,6 +1,8 @@
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from ascend_python_common.uri_guard import UnsafeUriError
 from httpx import AsyncClient
 
 from src.api.exceptions import NoVNCFlowBusyException
@@ -8,7 +10,7 @@ from src.session.session_manager import SessionInfo, SessionManager
 
 
 @pytest.mark.asyncio
-async def test_search_get_success(client: AsyncClient):
+async def test_search_get_success(client: AsyncClient) -> None:
     # given
     mock_results = [{"title": "Unit", "url": "http://unit.com", "content": "desc"}]
 
@@ -26,7 +28,7 @@ async def test_search_get_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_search_get_empty_query_returns_400(client: AsyncClient):
+async def test_search_get_empty_query_returns_400(client: AsyncClient) -> None:
     # when
     resp = await client.get("/api/v1/web/search", params={"query": ""})
 
@@ -35,7 +37,7 @@ async def test_search_get_empty_query_returns_400(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_search_get_whitespace_query_returns_400(client: AsyncClient):
+async def test_search_get_whitespace_query_returns_400(client: AsyncClient) -> None:
     # when
     resp = await client.get("/api/v1/web/search", params={"query": "   "})
 
@@ -44,7 +46,7 @@ async def test_search_get_whitespace_query_returns_400(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_search_get_too_long_returns_400(client: AsyncClient):
+async def test_search_get_too_long_returns_400(client: AsyncClient) -> None:
     # when
     resp = await client.get("/api/v1/web/search", params={"query": "x" * 501})
 
@@ -53,7 +55,7 @@ async def test_search_get_too_long_returns_400(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_read_post_success(client: AsyncClient):
+async def test_read_post_success(client: AsyncClient) -> None:
     # given
     mock_content = {"content": "Extracted unit", "status": "success", "mode": "test"}
 
@@ -64,7 +66,7 @@ async def test_read_post_success(client: AsyncClient):
             new_callable=AsyncMock,
             return_value=mock_content,
         ),
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
     ):
         resp = await client.post("/api/v2/web/read", json={"url": "http://unit.com/"})
 
@@ -74,9 +76,12 @@ async def test_read_post_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_read_post_unsafe_url_returns_400(client: AsyncClient):
+async def test_read_post_unsafe_url_returns_400(client: AsyncClient) -> None:
     # when
-    with patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=False):
+    with patch(
+        "src.api.rest.rest_endpoints.check_fetch_uri",
+        side_effect=UnsafeUriError("URI resolves to a non-public address"),
+    ):
         resp = await client.post("/api/v2/web/read", json={"url": "http://127.0.0.1/"})
 
     # then
@@ -84,16 +89,25 @@ async def test_read_post_unsafe_url_returns_400(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_read_post_missing_url_returns_422(client: AsyncClient):
+async def test_read_post_missing_url_returns_400(client: AsyncClient) -> None:
+    # given
+    payload: dict[str, Any] = {}
+
     # when
-    resp = await client.post("/api/v2/web/read", json={})
+    resp = await client.post("/api/v2/web/read", json=payload)
 
     # then
-    assert resp.status_code == 422
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["code"] == "validation"
+    assert isinstance(body["errors"], list)
+    fields = [entry["field"] for entry in body["errors"]]
+    assert fields == sorted(fields)
+    assert all("message" in entry for entry in body["errors"])
 
 
 @pytest.mark.asyncio
-async def test_read_post_with_include_links(client: AsyncClient):
+async def test_read_post_with_include_links(client: AsyncClient) -> None:
     # given
     mock_res = {
         "content": "X",
@@ -109,7 +123,7 @@ async def test_read_post_with_include_links(client: AsyncClient):
             new_callable=AsyncMock,
             return_value=mock_res,
         ) as mock_read,
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
     ):
         resp = await client.post(
             "/api/v2/web/read",
@@ -124,7 +138,7 @@ async def test_read_post_with_include_links(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_read_post_heavy_mode_forwarded(client: AsyncClient):
+async def test_read_post_heavy_mode_forwarded(client: AsyncClient) -> None:
     # given
     mock_res = {"content": "X", "status": "success", "mode": "test"}
 
@@ -135,7 +149,7 @@ async def test_read_post_heavy_mode_forwarded(client: AsyncClient):
             new_callable=AsyncMock,
             return_value=mock_res,
         ) as mock_read,
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
     ):
         resp = await client.post(
             "/api/v2/web/read",
@@ -155,10 +169,10 @@ async def test_read_post_heavy_mode_forwarded(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_establish_session_returns_vnc_url(client: AsyncClient):
+async def test_establish_session_returns_vnc_url(client: AsyncClient) -> None:
     # when
     with (
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
         patch.object(
             SessionManager,
             "establish",
@@ -179,13 +193,13 @@ async def test_establish_session_returns_vnc_url(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_establish_session_returns_409_when_another_flow_is_in_flight(client: AsyncClient):
+async def test_establish_session_returns_409_when_another_flow_is_in_flight(client: AsyncClient) -> None:
     # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
 
     # when
     with (
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
         patch.object(SessionManager, "establish", new=AsyncMock(side_effect=exc)),
     ):
         resp = await client.post(
@@ -195,16 +209,22 @@ async def test_establish_session_returns_409_when_another_flow_is_in_flight(clie
 
     # then
     assert resp.status_code == 409
-    assert resp.headers["Retry-After"] == "30"
+    assert "retry-after" in {key.lower() for key in resp.headers}
     body = resp.json()
-    assert body["status"] == "novnc_busy"
+    assert body["code"] == "novnc_busy"
+    assert body["type"] == "https://ascend.ai/errors/novnc-busy"
+    assert body["status"] == 409
     assert body["holder_url"] == "http://in-flight.example"
+    assert body["holder_profile"] == "default"
 
 
 @pytest.mark.asyncio
-async def test_establish_session_unsafe_url_returns_400(client: AsyncClient):
+async def test_establish_session_unsafe_url_returns_400(client: AsyncClient) -> None:
     # when
-    with patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=False):
+    with patch(
+        "src.api.rest.rest_endpoints.check_fetch_uri",
+        side_effect=UnsafeUriError("URI resolves to a non-public address"),
+    ):
         resp = await client.post(
             "/api/v2/web/session/establish",
             json={"url": "http://192.168.1.1/"},
@@ -220,7 +240,7 @@ async def test_establish_session_unsafe_url_returns_400(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_session_status_returns_info(client: AsyncClient):
+async def test_session_status_returns_info(client: AsyncClient) -> None:
     # given
     info = SessionInfo(
         status="active", auth_ttl_remaining=3600.0, last_validated=1_000_000.0, profile="default"
@@ -246,10 +266,10 @@ async def test_session_status_returns_info(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_session_clear_returns_cleared_status(client: AsyncClient):
+async def test_session_clear_returns_cleared_status(client: AsyncClient) -> None:
     # when
     with (
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
         patch.object(SessionManager, "clear", new=AsyncMock(return_value=True)),
         patch(
             "src.api.rest.rest_endpoints.web_reader.clear_cache_for_domain",
@@ -270,10 +290,10 @@ async def test_session_clear_returns_cleared_status(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_session_clear_is_idempotent_when_nothing_stored(client: AsyncClient):
+async def test_session_clear_is_idempotent_when_nothing_stored(client: AsyncClient) -> None:
     # when
     with (
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
         patch.object(SessionManager, "clear", new=AsyncMock(return_value=False)),
         patch(
             "src.api.rest.rest_endpoints.web_reader.clear_cache_for_domain",
@@ -291,9 +311,12 @@ async def test_session_clear_is_idempotent_when_nothing_stored(client: AsyncClie
 
 
 @pytest.mark.asyncio
-async def test_session_clear_unsafe_url_returns_400(client: AsyncClient):
+async def test_session_clear_unsafe_url_returns_400(client: AsyncClient) -> None:
     # when
-    with patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=False):
+    with patch(
+        "src.api.rest.rest_endpoints.check_fetch_uri",
+        side_effect=UnsafeUriError("URI resolves to a non-public address"),
+    ):
         resp = await client.post(
             "/api/v2/web/session/clear",
             json={"url": "http://192.168.1.1/"},

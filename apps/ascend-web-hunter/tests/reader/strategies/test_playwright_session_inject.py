@@ -35,7 +35,7 @@ def _make_browser_and_context(html: str = "<html><body>content</body></html>") -
 
 
 @pytest.mark.asyncio
-async def test_playwright_injects_storage_state_when_present():
+async def test_playwright_injects_storage_state_when_present() -> None:
     """When a session is stored, new_context must be called with storage_state."""
     # given
     stored_state: dict[str, Any] = {
@@ -80,7 +80,7 @@ async def test_playwright_injects_storage_state_when_present():
 
 
 @pytest.mark.asyncio
-async def test_playwright_omits_storage_state_when_absent():
+async def test_playwright_omits_storage_state_when_absent() -> None:
     """When no session is stored, new_context must NOT receive storage_state."""
     # given
     browser, context = _make_browser_and_context()
