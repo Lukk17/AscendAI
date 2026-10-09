@@ -1,16 +1,12 @@
-import ipaddress
 import logging
-import socket as socket_mod
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
-from urllib.parse import urlparse
 
 import aiohttp
 import pytest
 from fastmcp.exceptions import ToolError
-from pydantic import ValidationError
 
 from src.api.exception_handlers import (
     DownloadFailedError,
@@ -19,13 +15,8 @@ from src.api.exception_handlers import (
 )
 from src.api.mcp import mcp_server
 from src.api.mcp.mcp_server import (
-    _download_http,
     _enforce_size,
     _fetch_file,
-    _is_blocked,
-    _is_within,
-    _read_jailed_file,
-    _validate_host,
     mcp,
     mcp_lifespan,
     ocr_cancel_job,
@@ -39,9 +30,18 @@ from src.observability.metrics import OCR_REQUESTS_TOTAL
 from src.service.job_runner import JobRunner
 from src.service.job_service import JobService
 from src.service.job_store import JobStore, new_job_id
-from tests.conftest import PNG_MAGIC_BYTES, VALID_PNG_BYTES, FakeResultStore, make_record, write_finished_record
+from tests.conftest import (
+    PNG_MAGIC_BYTES,
+    VALID_PNG_BYTES,
+    FakeResultStore,
+    make_record,
+    write_finished_record,
+)
 
-SHIPPED_LANGUAGE_REFUSAL = "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan"
+SHIPPED_LANGUAGE_REFUSAL = (
+    "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan"
+)
+REFUSALS_LOGGER = "ascend_python_common.errors.refusals"
 
 
 @pytest.fixture
@@ -73,11 +73,8 @@ class _FakeResponse:
         self.headers = headers or {}
         self.content = _FakeContent(body)
 
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_args):
-        return False
+    def release(self) -> None:
+        return None
 
 
 class _FakeContent:
@@ -95,7 +92,7 @@ class _FakeSession:
         self.last_url: str | None = None
         self.last_kwargs: dict[str, object] | None = None
 
-    def get(self, url: str, **kwargs: object) -> _FakeResponse:
+    async def get(self, url: str, **kwargs: object) -> _FakeResponse:
         self.last_url = url
         self.last_kwargs = kwargs
         if isinstance(self._response, Exception):
@@ -104,8 +101,14 @@ class _FakeSession:
         return self._response
 
 
+@pytest.fixture
+def allowlisted_fetch_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stub hosts answer no DNS here, so the guard lets them through without a lookup."""
+    monkeypatch.setattr(settings, "ALLOWED_PRIVATE_HOSTS", ("host.docker.internal", "example.com"))
+
+
 class TestToolCatalogue:
-    async def test_the_four_job_tools_are_advertised_and_the_removed_one_is_not(self):
+    async def test_the_four_job_tools_are_advertised_and_the_removed_one_is_not(self) -> None:
         # When
         advertised = {tool.name for tool in await mcp.list_tools()}
 
@@ -163,7 +166,7 @@ class TestOcrSubmit:
         # Then
         assert store.read(str(result["job_id"])).quality == "high"
 
-    async def test_the_tool_advertises_exactly_the_two_modes_with_high_as_default(self):
+    async def test_the_tool_advertises_exactly_the_two_modes_with_high_as_default(self) -> None:
         # When
         tool = next(tool for tool in await mcp.list_tools() if tool.name == "ocr_submit")
 
@@ -183,7 +186,7 @@ class TestOcrSubmit:
         # When / Then
         with (
             patch("src.api.mcp.mcp_server._fetch_file", new_callable=AsyncMock) as fetch,
-            pytest.raises(ValidationError, match="Input should be 'normal' or 'high'"),
+            pytest.raises(ToolError, match=r"^INTERNAL_ERROR: "),
         ):
             await mcp.call_tool("ocr_submit", {"file_uri": image_path.as_uri(), "quality": "ultra"})
 
@@ -217,7 +220,7 @@ class TestOcrSubmit:
         # Then
         assert store.read(str(result["job_id"])).straighten is False
 
-    async def test_the_tool_advertises_straighten_as_an_optional_boolean_that_is_off(self):
+    async def test_the_tool_advertises_straighten_as_an_optional_boolean_that_is_off(self) -> None:
         # When
         tool = next(tool for tool in await mcp.list_tools() if tool.name == "ocr_submit")
 
@@ -238,17 +241,17 @@ class TestOcrSubmit:
         # When / Then
         with (
             patch("src.api.mcp.mcp_server._fetch_file", new_callable=AsyncMock) as fetch,
-            pytest.raises(ValidationError, match="valid boolean"),
+            pytest.raises(ToolError, match=r"^INTERNAL_ERROR: "),
         ):
             await mcp.call_tool("ocr_submit", {"file_uri": image_path.as_uri(), "straighten": "sometimes"})
 
         fetch.assert_not_awaited()
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
     async def test_an_http_uri_is_fetched_through_the_module_session(
-        self, _validate_host_mock: AsyncMock, store: JobStore
+        self, allowlisted_fetch_hosts: None, store: JobStore
     ) -> None:
         # Given
+        _ = allowlisted_fetch_hosts
         session = _FakeSession(_FakeResponse(status=200, body=VALID_PNG_BYTES))
 
         # When
@@ -260,8 +263,9 @@ class TestOcrSubmit:
         assert session.last_kwargs == {"allow_redirects": False}
         assert store.read(str(result["job_id"])).filename == "remote.png"
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_an_http_url_basename_is_decoded(self, _validate_host_mock: AsyncMock, store: JobStore) -> None:
+    async def test_an_http_url_basename_is_decoded(
+        self, allowlisted_fetch_hosts: None, store: JobStore
+    ) -> None:
         # Given
         session = _FakeSession(_FakeResponse(status=200, body=VALID_PNG_BYTES))
 
@@ -277,22 +281,23 @@ class TestOcrSubmit:
 
 
 class TestOcrSubmitErrorCodes:
-    async def test_unsafe_uri_error_code_in_message(self):
+    async def test_unsafe_uri_error_code_in_message(self) -> None:
         # Given a URI with embedded credentials (triggers UnsafeUriError before any fetch)
 
         # When / Then
         with pytest.raises(ToolError, match=r"^UNSAFE_URI: "):
-            await ocr_submit("http://user:pass@example.com/x.png", lang="en")
+            await mcp.call_tool(
+                "ocr_submit", {"file_uri": "http://user:pass@example.com/x.png", "lang": "en"}
+            )
 
-    async def test_unsupported_scheme_error_code_in_message(self):
+    async def test_unsupported_scheme_error_code_in_message(self) -> None:
         # Given a bare ftp:// URI (not http/https/file - triggers UnsafeUriError for scheme)
 
         # When / Then
         with pytest.raises(ToolError, match=r"^UNSAFE_URI: "):
-            await ocr_submit("ftp://example.com/x.png", lang="en")
+            await mcp.call_tool("ocr_submit", {"file_uri": "ftp://example.com/x.png", "lang": "en"})
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_unsupported_file_type_error_code_in_message(self, _validate_host_mock):
+    async def test_unsupported_file_type_error_code_in_message(self, allowlisted_fetch_hosts: None) -> None:
         # Given a URL that returns non-image bytes (plain text), sniff_mime raises
         session = _FakeSession(_FakeResponse(status=200, body=b"plain text data"))
 
@@ -301,10 +306,11 @@ class TestOcrSubmitErrorCodes:
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(ToolError, match=r"^UNSUPPORTED_FILE_TYPE: "),
         ):
-            await ocr_submit("http://example.com/x.txt", lang="en")
+            await mcp.call_tool("ocr_submit", {"file_uri": "http://example.com/x.txt", "lang": "en"})
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_file_too_large_error_code_in_message(self, _validate_host_mock, monkeypatch):
+    async def test_file_too_large_error_code_in_message(
+        self, allowlisted_fetch_hosts: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given an oversized Content-Length header, FileSizeExceededError fires during download
         monkeypatch.setattr(settings, "MAX_FILE_SIZE_MB", 1)
         oversize = 2 * 1024 * 1024
@@ -321,10 +327,9 @@ class TestOcrSubmitErrorCodes:
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(ToolError, match=r"^FILE_TOO_LARGE: "),
         ):
-            await ocr_submit("http://example.com/big.png", lang="en")
+            await mcp.call_tool("ocr_submit", {"file_uri": "http://example.com/big.png", "lang": "en"})
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_download_failed_error_code_in_message(self, _validate_host_mock):
+    async def test_download_failed_error_code_in_message(self, allowlisted_fetch_hosts: None) -> None:
         # Given a 404 response, DownloadFailedError fires
         session = _FakeSession(_FakeResponse(status=404, body=b""))
 
@@ -333,7 +338,7 @@ class TestOcrSubmitErrorCodes:
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(ToolError, match=r"^DOWNLOAD_FAILED: "),
         ):
-            await ocr_submit("http://example.com/missing.png", lang="en")
+            await mcp.call_tool("ocr_submit", {"file_uri": "http://example.com/missing.png", "lang": "en"})
 
     @pytest.mark.parametrize("language", ["korean", "ru"])
     async def test_an_unsupported_language_is_refused_before_anything_is_fetched_or_queued(
@@ -347,27 +352,31 @@ class TestOcrSubmitErrorCodes:
             patch.object(mcp_server, "_fetch_file", fetch),
             pytest.raises(ToolError) as exc_info,
         ):
-            await ocr_submit("http://example.com/scan.png", lang=language)
+            await mcp.call_tool("ocr_submit", {"file_uri": "http://example.com/scan.png", "lang": language})
 
         # Then
         assert str(exc_info.value) == f"UNSUPPORTED_LANGUAGE: {SHIPPED_LANGUAGE_REFUSAL}"
         fetch.assert_not_awaited()
         assert runner.documents_waiting() == 0
 
-    async def test_a_refused_language_is_counted_under_one_fixed_label(self):
+    async def test_a_refused_language_is_counted_under_one_fixed_label(self) -> None:
         # Given
         before = OCR_REQUESTS_TOTAL.labels(surface="mcp", language="unsupported")._value.get()
 
         # When
         with pytest.raises(ToolError):
-            await ocr_submit("http://example.com/scan.png", lang="qqzzxy")
+            await mcp.call_tool("ocr_submit", {"file_uri": "http://example.com/scan.png", "lang": "qqzzxy"})
 
         # Then
         assert OCR_REQUESTS_TOTAL.labels(surface="mcp", language="unsupported")._value.get() == before + 1
-        labels = {sample.labels["language"] for metric in OCR_REQUESTS_TOTAL.collect() for sample in metric.samples}
+        labels = {
+            sample.labels["language"] for metric in OCR_REQUESTS_TOTAL.collect() for sample in metric.samples
+        }
         assert "qqzzxy" not in labels
 
-    async def test_queue_full_error_code_in_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_queue_full_error_code_in_message(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
         monkeypatch.setattr(settings, "OCR_JOB_QUEUE_MAX_DOCUMENTS", 1)
@@ -377,11 +386,13 @@ class TestOcrSubmitErrorCodes:
 
         # When / Then
         with pytest.raises(ToolError, match=r"^QUEUE_FULL: "):
-            await ocr_submit(image_path.as_uri(), lang="en")
+            await mcp.call_tool("ocr_submit", {"file_uri": image_path.as_uri(), "lang": "en"})
 
 
 class TestOcrJobStatus:
-    async def test_the_state_of_waiting_work_is_readable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_the_state_of_waiting_work_is_readable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
         image_path = tmp_path / "scan.png"
@@ -445,19 +456,19 @@ class TestOcrJobStatus:
         assert status["queue_position"] is None
         assert status["pages_ahead"] is None
 
-    def test_an_unknown_identifier_carries_the_not_found_code(self):
+    async def test_an_unknown_identifier_carries_the_not_found_code(self) -> None:
         # When / Then
         with pytest.raises(ToolError, match=r"^JOB_NOT_FOUND: "):
-            ocr_job_status(new_job_id())
+            await mcp.call_tool("ocr_job_status", {"job_id": new_job_id()})
 
-    def test_an_identifier_that_is_not_shaped_like_one_carries_the_same_code(self):
+    async def test_an_identifier_that_is_not_shaped_like_one_carries_the_same_code(self) -> None:
         # When / Then
         with pytest.raises(ToolError, match=r"^JOB_NOT_FOUND: "):
-            ocr_job_status("../../etc/passwd")
+            await mcp.call_tool("ocr_job_status", {"job_id": "../../etc/passwd"})
 
 
 class TestOcrListJobs:
-    def test_an_idle_service_lists_nothing(self):
+    def test_an_idle_service_lists_nothing(self) -> None:
         # When / Then
         assert ocr_list_jobs() == {"jobs": []}
 
@@ -518,16 +529,16 @@ class TestOcrCancelJob:
         assert cancelled == {"job_id": submitted["job_id"], "cancelled": True}
         assert store.read(str(submitted["job_id"])).state == "cancelled"
 
-    async def test_cancelling_an_unknown_identifier_carries_the_not_found_code(self):
+    async def test_cancelling_an_unknown_identifier_carries_the_not_found_code(self) -> None:
         # When / Then
         with pytest.raises(ToolError, match=r"^JOB_NOT_FOUND: "):
-            await ocr_cancel_job(new_job_id())
+            await mcp.call_tool("ocr_cancel_job", {"job_id": new_job_id()})
 
 
 class TestFetchFileRejections:
-    async def test_unsupported_scheme(self):
+    async def test_unsupported_scheme(self) -> None:
         # When / Then
-        with pytest.raises(UnsafeUriError, match="Unsupported URI scheme"):
+        with pytest.raises(UnsafeUriError, match="unsupported URI scheme"):
             await _fetch_file("ftp://example.com/file.png")
 
     async def test_bare_path_is_rejected(self, tmp_path: Path) -> None:
@@ -538,44 +549,44 @@ class TestFetchFileRejections:
         with pytest.raises(UnsafeUriError):
             await _fetch_file(bare)
 
-    async def test_windows_path_is_rejected(self):
+    async def test_windows_path_is_rejected(self) -> None:
         # When / Then
         with pytest.raises(UnsafeUriError):
             await _fetch_file("C:\\Users\\foo.png")
 
 
 class TestReadJailedFile:
-    async def test_file_uri_disabled_when_root_unset(self, monkeypatch):
+    async def test_file_uri_disabled_when_root_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", None)
 
         # When / Then
-        with pytest.raises(UnsafeUriError, match="MCP_FILE_URI_ROOT is unset"):
-            await _read_jailed_file("/etc/passwd")
+        with pytest.raises(UnsafeUriError, match="file URI fetching is disabled"):
+            await _fetch_file("file:///tmp/scan.png")
 
-    async def test_traversal_outside_root_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_traversal_outside_root_is_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         jail = tmp_path / "jail"
         jail.mkdir()
-        outside = tmp_path / "outside.png"
-        outside.write_bytes(b"x")
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(jail))
 
         # When / Then
-        with pytest.raises(UnsafeUriError, match="escapes MCP_FILE_URI_ROOT"):
-            await _read_jailed_file("/" + str(outside).replace("\\", "/"))
+        with pytest.raises(UnsafeUriError, match="escapes its root"):
+            await _fetch_file((tmp_path / "outside.png").as_uri())
 
     async def test_missing_file_inside_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given a path inside the jail that does not exist on disk
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
-        ghost = tmp_path / "ghost.png"
-        url_path = "/" + str(ghost).replace("\\", "/")
 
         # When / Then
         with pytest.raises(DownloadFailedError, match="File not found"):
-            await _read_jailed_file(url_path)
+            await _fetch_file((tmp_path / "ghost.png").as_uri())
 
-    async def test_size_cap_enforced_after_read(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_size_cap_enforced_after_read(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", str(tmp_path))
         monkeypatch.setattr(settings, "MAX_FILE_SIZE_MB", 1)
@@ -584,48 +595,46 @@ class TestReadJailedFile:
 
         # When / Then
         with pytest.raises(FileSizeExceededError):
-            await _read_jailed_file("/" + str(big).replace("\\", "/"))
+            await _fetch_file(big.as_uri())
 
 
 class TestDownloadHttpRejections:
-    async def test_credentials_in_uri_rejected(self):
-        # Given
-        parsed = urlparse("http://user:pass@host/x.png")
+    async def test_credentials_in_uri_rejected(self) -> None:
+        # When / Then
+        with pytest.raises(UnsafeUriError, match="user info"):
+            await _fetch_file("http://user:pass@host/x.png")
+
+    async def test_missing_hostname_rejected(self) -> None:
+        # When / Then
+        with pytest.raises(UnsafeUriError, match="no host"):
+            await _fetch_file("http:///x.png")
+
+    async def test_session_uninitialised(self, allowlisted_fetch_hosts: None) -> None:
+        # Given the guard lets the host through but no session was opened
+        _ = allowlisted_fetch_hosts
 
         # When / Then
-        with pytest.raises(UnsafeUriError, match="Credentials in URI"):
-            await _download_http("http://user:pass@host/x.png", parsed)
+        with (
+            patch.object(mcp_server, "_http_session", None),
+            pytest.raises(RuntimeError, match="not initialised"),
+        ):
+            await _fetch_file("http://host.docker.internal/x.png")
 
-    async def test_missing_hostname_rejected(self):
+    async def test_non_200_raises_download_failed(self, allowlisted_fetch_hosts: None) -> None:
         # Given
-        parsed = urlparse("http:///x.png")
-
-        # When / Then
-        with pytest.raises(UnsafeUriError, match="no hostname"):
-            await _download_http("http:///x.png", parsed)
-
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_session_uninitialised(self, _validate_host_mock):
-        # Given
-        parsed = urlparse("http://host.docker.internal/x.png")
-
-        # When / Then
-        with patch.object(mcp_server, "_http_session", None), pytest.raises(RuntimeError, match="not initialised"):
-            await _download_http("http://host.docker.internal/x.png", parsed)
-
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_non_200_raises_download_failed(self, _validate_host_mock):
-        # Given
+        _ = allowlisted_fetch_hosts
         session = _FakeSession(_FakeResponse(status=404, body=b""))
-        parsed = urlparse("http://host.docker.internal/missing.png")
 
         # When / Then
-        with patch.object(mcp_server, "_http_session", session), pytest.raises(DownloadFailedError, match="HTTP 404"):
-            await _download_http("http://host.docker.internal/missing.png", parsed)
+        with (
+            patch.object(mcp_server, "_http_session", session),
+            pytest.raises(DownloadFailedError, match="HTTP 404"),
+        ):
+            await _fetch_file("http://host.docker.internal/missing.png")
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_content_length_over_cap(self, _validate_host_mock):
+    async def test_content_length_over_cap(self, allowlisted_fetch_hosts: None) -> None:
         # Given
+        _ = allowlisted_fetch_hosts
         oversize_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024 + 1
         session = _FakeSession(
             _FakeResponse(
@@ -634,15 +643,16 @@ class TestDownloadHttpRejections:
                 headers={"Content-Length": str(oversize_bytes)},
             )
         )
-        parsed = urlparse("http://host.docker.internal/big.png")
 
         # When / Then
         with patch.object(mcp_server, "_http_session", session), pytest.raises(FileSizeExceededError):
-            await _download_http("http://host.docker.internal/big.png", parsed)
+            await _fetch_file("http://host.docker.internal/big.png")
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_streamed_body_over_cap(self, _validate_host_mock, monkeypatch):
+    async def test_streamed_body_over_cap(
+        self, allowlisted_fetch_hosts: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
+        _ = allowlisted_fetch_hosts
         monkeypatch.setattr(settings, "MAX_FILE_SIZE_MB", 1)
         session = _FakeSession(
             _FakeResponse(
@@ -650,122 +660,43 @@ class TestDownloadHttpRejections:
                 body=b"x" * (2 * 1024 * 1024),
             )
         )
-        parsed = urlparse("http://host.docker.internal/big.png")
 
         # When / Then
         with patch.object(mcp_server, "_http_session", session), pytest.raises(FileSizeExceededError):
-            await _download_http("http://host.docker.internal/big.png", parsed)
+            await _fetch_file("http://host.docker.internal/big.png")
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_client_error_raises_download_failed(self, _validate_host_mock):
+    async def test_client_error_raises_download_failed(self, allowlisted_fetch_hosts: None) -> None:
         # Given
+        _ = allowlisted_fetch_hosts
         session = _FakeSession(aiohttp.ClientError("connection refused"))
-        parsed = urlparse("http://host.docker.internal/x.png")
 
         # When / Then
         with (
             patch.object(mcp_server, "_http_session", session),
             pytest.raises(DownloadFailedError, match="HTTP fetch failed"),
         ):
-            await _download_http("http://host.docker.internal/x.png", parsed)
+            await _fetch_file("http://host.docker.internal/x.png")
 
-    @patch("src.api.mcp.mcp_server._validate_host", new_callable=AsyncMock)
-    async def test_http_path_without_basename_falls_back(self, _validate_host_mock):
+    async def test_http_path_without_basename_falls_back(self, allowlisted_fetch_hosts: None) -> None:
         # Given
+        _ = allowlisted_fetch_hosts
         session = _FakeSession(_FakeResponse(status=200, body=PNG_MAGIC_BYTES))
-        parsed = urlparse("http://host.docker.internal/")
 
         # When
         with patch.object(mcp_server, "_http_session", session):
-            content, filename = await _download_http("http://host.docker.internal/", parsed)
+            content, filename = await _fetch_file("http://host.docker.internal/")
 
         # Then
         assert content == PNG_MAGIC_BYTES
         assert filename == "remote-file"
 
 
-class TestValidateHost:
-    async def test_allowlisted_host_skipped(self, monkeypatch):
-        # Given
-        monkeypatch.setattr(settings, "MCP_ALLOWED_HOSTS", ("host.docker.internal",))
-
-        # When / Then - no raise
-        await _validate_host("host.docker.internal")
-
-    @patch("src.api.mcp.mcp_server.asyncio.get_running_loop")
-    async def test_private_ip_rejected(self, mock_loop):
-        # Given
-        loop = mock_loop.return_value
-        loop.getaddrinfo = AsyncMock(return_value=[(0, 0, 0, "", ("10.0.0.5", 0))])
-
-        # When / Then
-        with pytest.raises(UnsafeUriError, match="non-public"):
-            await _validate_host("internal.example.com")
-
-    @patch("src.api.mcp.mcp_server.asyncio.get_running_loop")
-    async def test_public_ip_allowed(self, mock_loop):
-        # Given
-        loop = mock_loop.return_value
-        loop.getaddrinfo = AsyncMock(return_value=[(0, 0, 0, "", ("93.184.216.34", 0))])
-
-        # When / Then - no raise
-        await _validate_host("example.com")
-
-    @patch("src.api.mcp.mcp_server.asyncio.get_running_loop")
-    async def test_dns_failure_rejected(self, mock_loop):
-        # Given
-        loop = mock_loop.return_value
-        loop.getaddrinfo = AsyncMock(side_effect=socket_mod.gaierror("DNS down"))
-
-        # When / Then
-        with pytest.raises(UnsafeUriError, match="Cannot resolve"):
-            await _validate_host("does-not-exist.invalid")
-
-
-class TestPureHelpers:
-    @pytest.mark.parametrize(
-        "ip_str",
-        [
-            "127.0.0.1",
-            "10.0.0.1",
-            "192.168.1.1",
-            "169.254.169.254",
-            "0.0.0.0",  # noqa: S104
-            "224.0.0.1",
-            "::1",
-            "240.0.0.1",
-        ],
-    )
-    def test_is_blocked_true_for_private_and_special(self, ip_str: str) -> None:
-        # When / Then
-        assert _is_blocked(ipaddress.ip_address(ip_str)) is True
-
-    def test_is_blocked_false_for_public(self):
-        # When / Then
-        assert _is_blocked(ipaddress.ip_address("8.8.8.8")) is False
-
-    def test_is_within_true(self, tmp_path: Path) -> None:
-        # When / Then
-        assert _is_within(str(tmp_path / "x.png"), str(tmp_path)) is True
-
-    def test_is_within_false_when_outside(self, tmp_path: Path) -> None:
-        # When / Then
-        assert _is_within(str(tmp_path / "elsewhere"), str(tmp_path / "jail")) is False
-
-    def test_is_within_false_on_value_error(self):
-        # Given
-        # os.path.commonpath raises ValueError when the paths cannot be compared at all
-        # (e.g. different drives on Windows). Force that outcome directly instead of
-        # relying on a platform-specific path shape, so the branch is exercised on Linux too.
-        with patch("os.path.commonpath", side_effect=ValueError("paths don't have the same drive")):
-            # When / Then
-            assert _is_within("/a", "/b") is False
-
-    def test_enforce_size_passes_within_cap(self):
+class TestEnforceSize:
+    def test_enforce_size_passes_within_cap(self) -> None:
         # When / Then
         _enforce_size(1)
 
-    def test_enforce_size_raises_over_cap(self, monkeypatch):
+    def test_enforce_size_raises_over_cap(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "MAX_FILE_SIZE_MB", 1)
 
@@ -775,7 +706,7 @@ class TestPureHelpers:
 
 
 class TestMcpLifespan:
-    async def test_lifespan_opens_and_closes_session(self):
+    async def test_lifespan_opens_and_closes_session(self) -> None:
         # Given
         with patch.object(mcp_server, "_http_session", None):
             # When
@@ -798,23 +729,25 @@ class TestRefusalLogging:
         ],
     )
     async def test_a_refused_uri_is_one_warning_naming_its_code_with_no_traceback(
-        self, emitted_logs, monkeypatch, file_uri
-    ):
+        self, emitted_logs: list[logging.LogRecord], monkeypatch: pytest.MonkeyPatch, file_uri: str
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "MCP_FILE_URI_ROOT", None)
-        monkeypatch.setattr(settings, "MCP_ALLOWED_HOSTS", [])
+        monkeypatch.setattr(settings, "ALLOWED_PRIVATE_HOSTS", ())
 
         # When
         with pytest.raises(ToolError, match=r"^UNSAFE_URI: "):
             await mcp.call_tool("ocr_submit", {"file_uri": file_uri, "lang": "en"})
 
         # Then
-        visible = [record for record in emitted_logs if record.levelno >= logging.WARNING]
-        assert [(record.levelno, "UNSAFE_URI" in record.getMessage(), record.exc_info) for record in visible] == [
-            (logging.WARNING, True, None)
-        ]
+        refusals = [record for record in emitted_logs if record.name == REFUSALS_LOGGER]
+        assert [
+            (record.levelno, "UNSAFE_URI" in record.getMessage(), record.exc_info) for record in refusals
+        ] == [(logging.WARNING, True, None)]
 
-    async def test_the_credentials_of_a_refused_uri_are_never_logged(self, emitted_logs):
+    async def test_the_credentials_of_a_refused_uri_are_never_logged(
+        self, emitted_logs: list[logging.LogRecord]
+    ) -> None:
         # When
         with pytest.raises(ToolError):
             await mcp.call_tool("ocr_submit", {"file_uri": "http://someone:secret-pass@example.com/x.png"})
@@ -822,42 +755,57 @@ class TestRefusalLogging:
         # Then
         assert not any("secret-pass" in record.getMessage() for record in emitted_logs)
 
-    async def test_an_unsupported_language_is_one_warning_naming_its_code(self, emitted_logs):
+    async def test_an_unsupported_language_is_one_warning_naming_its_code(
+        self, emitted_logs: list[logging.LogRecord]
+    ) -> None:
         # When
         with pytest.raises(ToolError, match=r"^UNSUPPORTED_LANGUAGE: "):
             await mcp.call_tool("ocr_submit", {"file_uri": "http://example.com/x.png", "lang": "qqzzxy"})
 
         # Then
-        visible = [record for record in emitted_logs if record.levelno >= logging.WARNING]
-        assert [(record.levelno, "UNSUPPORTED_LANGUAGE" in record.getMessage()) for record in visible] == [
+        refusals = [record for record in emitted_logs if record.name == REFUSALS_LOGGER]
+        assert [(record.levelno, "UNSUPPORTED_LANGUAGE" in record.getMessage()) for record in refusals] == [
             (logging.WARNING, True)
         ]
 
-    async def test_an_unknown_job_is_one_warning_naming_its_code(self, emitted_logs):
+    async def test_an_unknown_job_is_one_warning_naming_its_code(
+        self, emitted_logs: list[logging.LogRecord]
+    ) -> None:
         # When
         with pytest.raises(ToolError, match=r"^JOB_NOT_FOUND: "):
             await mcp.call_tool("ocr_job_status", {"job_id": new_job_id()})
 
         # Then
-        visible = [record for record in emitted_logs if record.levelno >= logging.WARNING]
-        assert [(record.levelno, "JOB_NOT_FOUND" in record.getMessage()) for record in visible] == [
+        refusals = [record for record in emitted_logs if record.name == REFUSALS_LOGGER]
+        assert [(record.levelno, "JOB_NOT_FOUND" in record.getMessage()) for record in refusals] == [
             (logging.WARNING, True)
         ]
 
-    async def test_a_refusal_keeps_the_service_error_as_its_cause(self):
+    async def test_a_refusal_keeps_the_service_error_as_its_cause(self) -> None:
         # When
         with pytest.raises(ToolError) as exc_info:
-            await ocr_submit("ftp://example.com/x.png", lang="en")
+            await mcp.call_tool("ocr_submit", {"file_uri": "ftp://example.com/x.png", "lang": "en"})
 
         # Then
-        assert isinstance(exc_info.value.__cause__, UnsafeUriError)
+        chain: list[BaseException] = []
+        current: BaseException | None = exc_info.value
+        while current is not None:
+            chain.append(current)
+            cause = current.__cause__
+            current = cause if cause is not None else current.__context__
+        assert any(isinstance(link, UnsafeUriError) for link in chain)
 
-    async def test_an_unexpected_failure_is_still_an_error_with_its_traceback(self, emitted_logs, service):
+    async def test_an_unexpected_failure_is_still_an_error_with_its_traceback(
+        self, emitted_logs: list[logging.LogRecord], service: JobService
+    ) -> None:
         # When
-        with patch.object(service, "status", side_effect=RuntimeError("boom")), pytest.raises(ToolError):
+        with (
+            patch.object(service, "status", side_effect=RuntimeError("boom")),
+            pytest.raises(ToolError, match=r"^INTERNAL_ERROR: "),
+        ):
             await mcp.call_tool("ocr_job_status", {"job_id": new_job_id()})
 
         # Then
-        visible = [record for record in emitted_logs if record.levelno >= logging.WARNING]
-        assert [record.levelno for record in visible] == [logging.ERROR]
-        assert visible[0].exc_info is not None
+        refusals = [record for record in emitted_logs if record.name == REFUSALS_LOGGER]
+        assert [record.levelno for record in refusals] == [logging.ERROR]
+        assert refusals[0].exc_info is not None

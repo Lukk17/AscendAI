@@ -342,7 +342,7 @@ class AscendOcrClientTest {
         server.expect(times(3), requestTo(JOBS_URL))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                         .header(HttpHeaders.RETRY_AFTER, "100")
                         .body(queueFullBody()));
 
@@ -365,7 +365,7 @@ class AscendOcrClientTest {
         server.expect(requestTo(JOBS_URL))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                         .header(HttpHeaders.RETRY_AFTER, "0")
                         .body(queueFullBody()));
         expectSubmit(server);

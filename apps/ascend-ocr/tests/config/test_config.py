@@ -8,6 +8,7 @@ from src.config.config import (
     MAX_DETECTOR_DOWNSCALE_RATIO,
     MEASURED_WORST_PAGE_SECONDS,
     ModelPair,
+    QualityMode,
     QualityProfile,
     Settings,
 )
@@ -15,122 +16,143 @@ from tests.conftest import OFF_FAMILY_PAIR
 
 
 class TestSettingsDefaults:
-    def test_default_api_host(self):
+    def test_default_api_host(self) -> None:
         # When / Then
-        assert Settings().API_HOST == "0.0.0.0"  # noqa: S104
+        assert Settings().API_HOST == "0.0.0.0"
 
-    def test_default_api_port(self):
+    def test_default_api_port(self) -> None:
         # When / Then
         assert Settings().API_PORT == 7022
 
-    def test_default_log_level(self):
+    def test_default_log_level(self) -> None:
         # When / Then
         assert Settings().LOG_LEVEL == "INFO"
 
-    def test_default_language(self):
+    def test_default_language(self) -> None:
         # When / Then
         assert Settings().DEFAULT_LANGUAGE == "en"
 
-    def test_default_max_file_size(self):
+    def test_default_max_file_size(self) -> None:
         # When / Then
         assert Settings().MAX_FILE_SIZE_MB == 50
 
-    def test_default_engine_cache_max_size(self):
+    def test_default_engine_cache_max_size(self) -> None:
         # When / Then: counts cached engines, the pre-cached default pair plus one slot that
         # stays empty until a language is opted back in with a pair of its own
         assert Settings().ENGINE_CACHE_MAX_SIZE == 2
 
-    def test_default_model_pair_is_the_small_member_of_the_current_family(self):
+    def test_default_model_pair_is_the_small_member_of_the_current_family(self) -> None:
         # When / Then - explicit, because the library's own default for these languages is the
         # medium member (see ADR-007)
         assert Settings().OCR_TEXT_DETECTION_MODEL == "PP-OCRv6_small_det"
         assert Settings().OCR_TEXT_RECOGNITION_MODEL == "PP-OCRv6_small_rec"
 
-    def test_no_language_carries_a_model_pair_of_its_own(self):
+    def test_no_language_carries_a_model_pair_of_its_own(self) -> None:
         # When / Then: ru and korean were the only two, and both are switched off until the
         # small detector is measured with their recognisers
         assert LANGUAGE_MODEL_OVERRIDES == {}
 
-    def test_default_supported_languages_are_the_ones_the_default_pair_reads(self):
+    def test_default_supported_languages_are_the_ones_the_default_pair_reads(self) -> None:
         # When / Then. "japan" is PaddleOCR's own code for Japanese, not the ISO "ja".
-        assert Settings().SUPPORTED_LANGUAGES == ("en", "pl", "de", "fr", "es", "it", "pt", "nl", "ch", "japan")
+        assert Settings().SUPPORTED_LANGUAGES == (
+            "en",
+            "pl",
+            "de",
+            "fr",
+            "es",
+            "it",
+            "pt",
+            "nl",
+            "ch",
+            "japan",
+        )
 
     @pytest.mark.parametrize("language", ["ru", "korean"])
-    def test_russian_and_korean_are_switched_off(self, language):
+    def test_russian_and_korean_are_switched_off(self, language: str) -> None:
         # When / Then: their PP-OCRv5 server detector peaked above the container limit
         assert language not in Settings().SUPPORTED_LANGUAGES
 
-    def test_default_mcp_file_uri_root_unset(self):
+    def test_default_mcp_file_uri_root_unset(self) -> None:
         # When / Then
         assert Settings().MCP_FILE_URI_ROOT is None
 
-    def test_default_mcp_allowed_hosts_empty(self):
+    def test_default_mcp_allowed_hosts_empty(self) -> None:
         # When / Then
         assert Settings().MCP_ALLOWED_HOSTS == ()
 
-    def test_default_mcp_download_timeout(self):
+    def test_default_mcp_download_timeout(self) -> None:
         # When / Then
         assert pytest.approx(30.0) == Settings().MCP_DOWNLOAD_TIMEOUT_SECONDS
 
+    def test_default_fetch_max_redirect_hops_is_zero(self) -> None:
+        # given
+        fresh = Settings()
+        # when
+        hops = fresh.FETCH_MAX_REDIRECT_HOPS
+        # then
+        assert hops == 0
+
 
 class TestSettingsEnvOverride:
-    def test_override_api_port(self, monkeypatch):
+    def test_override_api_port(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("API_PORT", "9999")
 
         # When / Then
         assert Settings().API_PORT == 9999
 
-    def test_override_default_language(self, monkeypatch):
+    def test_override_default_language(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("DEFAULT_LANGUAGE", "pl")
 
         # When / Then
         assert Settings().DEFAULT_LANGUAGE == "pl"
 
-    def test_override_max_file_size(self, monkeypatch):
+    def test_override_max_file_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("MAX_FILE_SIZE_MB", "100")
 
         # When / Then
         assert Settings().MAX_FILE_SIZE_MB == 100
 
-    def test_override_log_level(self, monkeypatch):
+    def test_override_log_level(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("LOG_LEVEL", "DEBUG")
 
         # When / Then
         assert Settings().LOG_LEVEL == "DEBUG"
 
-    def test_override_mcp_file_uri_root(self, monkeypatch):
+    def test_override_mcp_file_uri_root(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         # Given
-        monkeypatch.setenv("MCP_FILE_URI_ROOT", "/var/lib/ascend-ocr/uploads")
+        monkeypatch.setenv("MCP_FILE_URI_ROOT", str(tmp_path))
 
         # When / Then
-        assert Settings().MCP_FILE_URI_ROOT == "/var/lib/ascend-ocr/uploads"
+        assert str(tmp_path) == Settings().MCP_FILE_URI_ROOT
 
-    def test_override_mcp_allowed_hosts_csv(self, monkeypatch):
+    def test_override_allowed_private_hosts_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
-        monkeypatch.setenv("MCP_ALLOWED_HOSTS", "host.docker.internal,localhost,127.0.0.1")
+        monkeypatch.setenv("ALLOWED_PRIVATE_HOSTS", "host.docker.internal,localhost,127.0.0.1")
 
         # When / Then
-        assert Settings().MCP_ALLOWED_HOSTS == ("host.docker.internal", "localhost", "127.0.0.1")
+        assert Settings().ALLOWED_PRIVATE_HOSTS == ("host.docker.internal", "localhost", "127.0.0.1")
 
-    def test_override_mcp_allowed_hosts_csv_strips_whitespace(self, monkeypatch):
+    def test_override_allowed_private_hosts_csv_strips_whitespace(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
-        monkeypatch.setenv("MCP_ALLOWED_HOSTS", "  host.docker.internal , localhost  , ,127.0.0.1 ")
+        monkeypatch.setenv("ALLOWED_PRIVATE_HOSTS", "  host.docker.internal , localhost  , ,127.0.0.1 ")
 
         # When / Then. Empty entries dropped, whitespace stripped from each.
-        assert Settings().MCP_ALLOWED_HOSTS == ("host.docker.internal", "localhost", "127.0.0.1")
+        assert Settings().ALLOWED_PRIVATE_HOSTS == ("host.docker.internal", "localhost", "127.0.0.1")
 
-    def test_override_supported_languages_csv(self, monkeypatch):
+    def test_override_supported_languages_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("SUPPORTED_LANGUAGES", "en,pl,fr")
 
         # When / Then
         assert Settings().SUPPORTED_LANGUAGES == ("en", "pl", "fr")
 
-    def test_override_model_pair(self, monkeypatch):
+    def test_override_model_pair(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given - switching family member is two environment variables, no code change
         monkeypatch.setenv("OCR_TEXT_DETECTION_MODEL", "PP-OCRv6_medium_det")
         monkeypatch.setenv("OCR_TEXT_RECOGNITION_MODEL", "PP-OCRv6_medium_rec")
@@ -144,39 +166,39 @@ class TestSettingsEnvOverride:
 
 
 class TestSettingsValidation:
-    def test_invalid_log_level_rejected(self, monkeypatch):
+    def test_invalid_log_level_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("LOG_LEVEL", "TRACE")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="LOG_LEVEL"):
             Settings()
 
-    def test_invalid_language_pattern_rejected(self, monkeypatch):
+    def test_invalid_language_pattern_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("DEFAULT_LANGUAGE", "../etc")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="DEFAULT_LANGUAGE"):
             Settings()
 
-    def test_model_name_with_path_traversal_rejected(self, monkeypatch):
+    def test_model_name_with_path_traversal_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given - the model name reaches a library that resolves it against a cache directory
         monkeypatch.setenv("OCR_TEXT_DETECTION_MODEL", "../../etc/passwd")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_TEXT_DETECTION_MODEL"):
             Settings()
 
-    def test_empty_model_name_rejected(self, monkeypatch):
+    def test_empty_model_name_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_TEXT_RECOGNITION_MODEL", "")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_TEXT_RECOGNITION_MODEL"):
             Settings()
 
-    def test_six_letter_default_language_accepted(self, monkeypatch):
+    def test_six_letter_default_language_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given. "korean" is the longest PaddleOCR-native code, so the pattern still
         # admits it and a request in it reaches the unsupported-language refusal.
         monkeypatch.setenv("DEFAULT_LANGUAGE", "korean")
@@ -184,23 +206,25 @@ class TestSettingsValidation:
         # When / Then
         assert Settings().DEFAULT_LANGUAGE == "korean"
 
-    def test_seven_letter_default_language_rejected(self, monkeypatch):
+    def test_seven_letter_default_language_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("DEFAULT_LANGUAGE", "abcdefg")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="DEFAULT_LANGUAGE"):
             Settings()
 
-    def test_zero_max_file_size_rejected(self, monkeypatch):
+    def test_zero_max_file_size_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("MAX_FILE_SIZE_MB", "0")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="MAX_FILE_SIZE_MB"):
             Settings()
 
-    def test_a_leftover_request_timeout_in_the_environment_is_ignored(self, monkeypatch):
+    def test_a_leftover_request_timeout_in_the_environment_is_ignored(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - a deployment that has not yet dropped the deleted setting
         monkeypatch.setenv("OCR_REQUEST_TIMEOUT", "300")
 
@@ -213,46 +237,46 @@ class TestSettingsValidation:
 
 
 class TestNewLimitsSettingsDefaults:
-    def test_default_worker_count(self):
+    def test_default_worker_count(self) -> None:
         # When / Then
         assert Settings().OCR_WORKER_COUNT == 1
 
-    def test_default_page_allowance_headroom_is_the_rule_the_allowance_was_derived_with(self):
+    def test_default_page_allowance_headroom_is_the_rule_the_allowance_was_derived_with(self) -> None:
         # When / Then
         assert pytest.approx(4.5) == Settings().OCR_PAGE_ALLOWANCE_HEADROOM
 
-    def test_default_dispatch_margin(self):
+    def test_default_dispatch_margin(self) -> None:
         # When / Then
         assert pytest.approx(5.0) == Settings().OCR_DISPATCH_MARGIN_SECONDS
 
-    def test_default_pool_rebuild_max_consecutive(self):
+    def test_default_pool_rebuild_max_consecutive(self) -> None:
         # When / Then
         assert Settings().OCR_POOL_REBUILD_MAX_CONSECUTIVE == 3
 
 
 class TestNewLimitsSettingsOverrides:
-    def test_override_worker_count(self, monkeypatch):
+    def test_override_worker_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_WORKER_COUNT", "2")
 
         # When / Then
         assert Settings().OCR_WORKER_COUNT == 2
 
-    def test_override_page_allowance_headroom(self, monkeypatch):
+    def test_override_page_allowance_headroom(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_PAGE_ALLOWANCE_HEADROOM", "6")
 
         # When / Then
         assert pytest.approx(6.0) == Settings().OCR_PAGE_ALLOWANCE_HEADROOM
 
-    def test_override_dispatch_margin(self, monkeypatch):
+    def test_override_dispatch_margin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_DISPATCH_MARGIN_SECONDS", "10")
 
         # When / Then
         assert pytest.approx(10.0) == Settings().OCR_DISPATCH_MARGIN_SECONDS
 
-    def test_override_pool_rebuild_max_consecutive(self, monkeypatch):
+    def test_override_pool_rebuild_max_consecutive(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_POOL_REBUILD_MAX_CONSECUTIVE", "5")
 
@@ -261,36 +285,36 @@ class TestNewLimitsSettingsOverrides:
 
 
 class TestNewLimitsSettingsValidation:
-    def test_zero_worker_count_rejected(self, monkeypatch):
+    def test_zero_worker_count_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_WORKER_COUNT", "0")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_WORKER_COUNT"):
             Settings()
 
-    def test_zero_page_allowance_headroom_rejected(self, monkeypatch):
+    def test_zero_page_allowance_headroom_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_PAGE_ALLOWANCE_HEADROOM", "0")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_PAGE_ALLOWANCE_HEADROOM"):
             Settings()
 
-    def test_zero_dispatch_margin_rejected(self, monkeypatch):
+    def test_zero_dispatch_margin_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_DISPATCH_MARGIN_SECONDS", "0")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_DISPATCH_MARGIN_SECONDS"):
             Settings()
 
-    def test_zero_pool_rebuild_max_consecutive_rejected(self, monkeypatch):
+    def test_zero_pool_rebuild_max_consecutive_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_POOL_REBUILD_MAX_CONSECUTIVE", "0")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_POOL_REBUILD_MAX_CONSECUTIVE"):
             Settings()
 
 
@@ -299,58 +323,66 @@ SERVER_PAIR = OFF_FAMILY_PAIR
 
 
 @pytest.fixture
-def default_family_only(monkeypatch):
+def default_family_only(monkeypatch: pytest.MonkeyPatch) -> None:
     """A deployment whose every language reads with the default pair, so the worst engine is the small one."""
     monkeypatch.setenv("SUPPORTED_LANGUAGES", "en,pl")
     monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
 
 
 class TestPageAllowance:
-    def test_the_measured_worst_pages_are_the_in_container_high_mode_runs(self):
+    def test_the_measured_worst_pages_are_the_in_container_high_mode_runs(self) -> None:
         # When / Then: the small detector's worst is a dense Polish A4 prose page, the server
         # detector's a plain 4200 x 4200 page, both bounded to 1536, fastest of three runs
         assert dict(MEASURED_WORST_PAGE_SECONDS) == {"PP-OCRv6_small_det": 25.1, "PP-OCRv5_server_det": 96.0}
 
     @pytest.mark.parametrize(("pair", "expected"), [(SMALL_PAIR, 25.1 * 4.5), (SERVER_PAIR, 96.0 * 4.5)])
-    def test_a_page_is_allowed_the_headroom_times_its_own_engines_worst_measured_page(self, pair, expected):
+    def test_a_page_is_allowed_the_headroom_times_its_own_engines_worst_measured_page(
+        self, pair: ModelPair, expected: float
+    ) -> None:
         # When / Then
         assert pytest.approx(expected) == Settings().page_allowance_seconds(pair)
 
-    def test_the_shipped_page_allowance_is_112_95_seconds(self):
+    def test_the_shipped_page_allowance_is_112_95_seconds(self) -> None:
         # When / Then: 4.5 x 25.1 s
         assert pytest.approx(112.95) == Settings().page_allowance_seconds(SMALL_PAIR)
 
-    def test_a_detector_nobody_measured_is_allowed_the_slowest_measured_page(self):
+    def test_a_detector_nobody_measured_is_allowed_the_slowest_measured_page(self) -> None:
         # When / Then
         assert pytest.approx(96.0 * 4.5) == Settings().page_allowance_seconds(
             ModelPair("PP-OCRv6_medium_det", "PP-OCRv6_medium_rec")
         )
 
-    def test_the_allowance_follows_the_headroom(self, monkeypatch):
+    def test_the_allowance_follows_the_headroom(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_PAGE_ALLOWANCE_HEADROOM", "2")
 
         # When / Then
         assert pytest.approx(50.2) == Settings().page_allowance_seconds(SMALL_PAIR)
 
-    def test_the_worst_allowance_is_the_small_engines_while_every_supported_language_reads_with_it(self):
+    def test_the_worst_allowance_is_the_small_engines_while_every_supported_language_reads_with_it(
+        self,
+    ) -> None:
         # When / Then
         assert pytest.approx(25.1 * 4.5) == Settings().OCR_WORST_PAGE_ALLOWANCE_SECONDS
 
-    def test_the_worst_allowance_counts_only_engines_a_language_can_reach(self, default_family_only):
+    def test_the_worst_allowance_counts_only_engines_a_language_can_reach(
+        self, default_family_only: None
+    ) -> None:
         # When / Then
         assert pytest.approx(25.1 * 4.5) == Settings().OCR_WORST_PAGE_ALLOWANCE_SECONDS
 
     def test_a_language_opted_back_in_on_a_slower_detector_raises_the_worst_allowance(
-        self, monkeypatch, off_family_language
-    ):
+        self, monkeypatch: pytest.MonkeyPatch, off_family_language: str
+    ) -> None:
         # Given
         monkeypatch.setenv("SUPPORTED_LANGUAGES", f"en,pl,{off_family_language}")
 
         # When / Then
         assert pytest.approx(96.0 * 4.5) == Settings().OCR_WORST_PAGE_ALLOWANCE_SECONDS
 
-    def test_the_default_language_is_reachable_even_when_the_list_is_empty(self, monkeypatch, off_family_language):
+    def test_the_default_language_is_reachable_even_when_the_list_is_empty(
+        self, monkeypatch: pytest.MonkeyPatch, off_family_language: str
+    ) -> None:
         # Given
         monkeypatch.setenv("SUPPORTED_LANGUAGES", "")
         monkeypatch.setenv("DEFAULT_LANGUAGE", off_family_language)
@@ -358,7 +390,9 @@ class TestPageAllowance:
         # When / Then
         assert pytest.approx(96.0 * 4.5) == Settings().OCR_WORST_PAGE_ALLOWANCE_SECONDS
 
-    def test_a_language_resolves_to_its_override_or_the_configured_pair(self, off_family_language):
+    def test_a_language_resolves_to_its_override_or_the_configured_pair(
+        self, off_family_language: str
+    ) -> None:
         # When
         loaded = Settings()
 
@@ -366,12 +400,14 @@ class TestPageAllowance:
         assert loaded.model_pair(off_family_language) == SERVER_PAIR
         assert loaded.model_pair("pl") == SMALL_PAIR
 
-    def test_the_shipped_languages_reach_only_the_small_pair(self):
+    def test_the_shipped_languages_reach_only_the_small_pair(self) -> None:
         # When / Then: no supported language loads the PP-OCRv5 server detector, so the image
         # preloads nothing else
         assert Settings().reachable_model_pairs() == frozenset({SMALL_PAIR})
 
-    def test_every_engine_a_supported_language_can_load_is_reachable_once(self, monkeypatch, off_family_language):
+    def test_every_engine_a_supported_language_can_load_is_reachable_once(
+        self, monkeypatch: pytest.MonkeyPatch, off_family_language: str
+    ) -> None:
         # Given
         monkeypatch.setenv("SUPPORTED_LANGUAGES", f"en,pl,{off_family_language}")
 
@@ -379,8 +415,8 @@ class TestPageAllowance:
         assert Settings().reachable_model_pairs() == frozenset({SMALL_PAIR, SERVER_PAIR})
 
     def test_the_default_languages_engine_is_reachable_even_when_the_list_is_empty(
-        self, monkeypatch, off_family_language
-    ):
+        self, monkeypatch: pytest.MonkeyPatch, off_family_language: str
+    ) -> None:
         # Given
         monkeypatch.setenv("SUPPORTED_LANGUAGES", "")
         monkeypatch.setenv("DEFAULT_LANGUAGE", off_family_language)
@@ -388,7 +424,9 @@ class TestPageAllowance:
         # When / Then
         assert Settings().reachable_model_pairs() == frozenset({SERVER_PAIR})
 
-    def test_the_allowance_is_not_settable_from_the_environment(self, monkeypatch):
+    def test_the_allowance_is_not_settable_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given: the removed single allowance, left behind in an environment
         monkeypatch.setenv("OCR_PAGE_TIMEOUT_SECONDS", "45")
 
@@ -401,7 +439,9 @@ class TestPageAllowance:
 
 
 class TestDerivedProperties:
-    def test_reclamation_grace_is_the_engines_own_allowance_plus_the_margin(self, monkeypatch):
+    def test_reclamation_grace_is_the_engines_own_allowance_plus_the_margin(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_PAGE_ALLOWANCE_HEADROOM", "2")
         monkeypatch.setenv("OCR_DISPATCH_MARGIN_SECONDS", "5")
@@ -413,7 +453,7 @@ class TestDerivedProperties:
         assert pytest.approx(50.2 + 5.0) == loaded.reclamation_grace_seconds(SMALL_PAIR)
         assert pytest.approx(192.0 + 5.0) == loaded.reclamation_grace_seconds(SERVER_PAIR)
 
-    def test_reclamation_grace_follows_the_margin(self, monkeypatch):
+    def test_reclamation_grace_follows_the_margin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_PAGE_ALLOWANCE_HEADROOM", "2")
         monkeypatch.setenv("OCR_DISPATCH_MARGIN_SECONDS", "10")
@@ -423,7 +463,7 @@ class TestDerivedProperties:
 
 
 class TestJobSettings:
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         # When
         settings = Settings()
 
@@ -445,14 +485,18 @@ class TestJobSettings:
             ("OCR_JOB_QUEUE_MAX_DOCUMENTS", "4", 4),
         ],
     )
-    def test_each_setting_can_be_overridden(self, monkeypatch, name, value, expected):
+    def test_each_setting_can_be_overridden(
+        self, monkeypatch: pytest.MonkeyPatch, name: str, value: str, expected: int | float
+    ) -> None:
         # Given
         monkeypatch.setenv(name, value)
 
         # When / Then
         assert getattr(Settings(), name) == expected
 
-    def test_the_jobs_directory_can_be_overridden(self, monkeypatch, tmp_path):
+    def test_the_jobs_directory_can_be_overridden(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOBS_DIR", str(tmp_path))
 
@@ -469,15 +513,19 @@ class TestJobSettings:
             ("OCR_JOB_QUEUE_MAX_DOCUMENTS", "0"),
         ],
     )
-    def test_each_setting_rejects_a_value_out_of_range(self, monkeypatch, name, value):
+    def test_each_setting_rejects_a_value_out_of_range(
+        self, monkeypatch: pytest.MonkeyPatch, name: str, value: str
+    ) -> None:
         # Given
         monkeypatch.setenv(name, value)
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=name):
             Settings()
 
-    def test_a_queue_that_could_not_hold_one_maximal_document_is_rejected(self, monkeypatch):
+    def test_a_queue_that_could_not_hold_one_maximal_document_is_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOB_MAX_PAGES", "100")
         monkeypatch.setenv("OCR_JOB_QUEUE_MAX_PAGES", "99")
@@ -486,7 +534,9 @@ class TestJobSettings:
         with pytest.raises(ValueError, match=r"OCR_JOB_QUEUE_MAX_PAGES.*OCR_JOB_MAX_PAGES"):
             Settings()
 
-    def test_a_queue_bound_equal_to_the_page_ceiling_is_accepted(self, monkeypatch):
+    def test_a_queue_bound_equal_to_the_page_ceiling_is_accepted(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - exactly one maximal document may wait
         monkeypatch.setenv("OCR_JOB_MAX_PAGES", "100")
         monkeypatch.setenv("OCR_JOB_QUEUE_MAX_PAGES", "100")
@@ -496,7 +546,7 @@ class TestJobSettings:
 
 
 class TestResultStoreSettings:
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         # When
         settings = Settings()
 
@@ -506,7 +556,9 @@ class TestResultStoreSettings:
         assert settings.OCR_RESULT_S3_ACCESS_KEY == ""
         assert settings.OCR_RESULT_S3_SECRET_KEY == ""
 
-    def test_the_public_endpoint_follows_the_endpoint_when_it_is_not_set(self, monkeypatch):
+    def test_the_public_endpoint_follows_the_endpoint_when_it_is_not_set(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_RESULT_S3_ENDPOINT", "http://host.docker.internal:9070")
 
@@ -516,7 +568,9 @@ class TestResultStoreSettings:
         # Then
         assert settings.OCR_RESULT_S3_PUBLIC_ENDPOINT == "http://host.docker.internal:9070"
 
-    def test_the_public_endpoint_does_not_follow_the_endpoint_when_it_is_set(self, monkeypatch):
+    def test_the_public_endpoint_does_not_follow_the_endpoint_when_it_is_set(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - the address this service reaches is not the one a caller reaches
         monkeypatch.setenv("OCR_RESULT_S3_ENDPOINT", "http://host.docker.internal:9070")
         monkeypatch.setenv("OCR_RESULT_S3_PUBLIC_ENDPOINT", "http://localhost:9070")
@@ -524,7 +578,7 @@ class TestResultStoreSettings:
         # When / Then
         assert Settings().OCR_RESULT_S3_PUBLIC_ENDPOINT == "http://localhost:9070"
 
-    def test_the_credentials_can_be_set(self, monkeypatch):
+    def test_the_credentials_can_be_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_RESULT_S3_ACCESS_KEY", "admin")
         monkeypatch.setenv("OCR_RESULT_S3_SECRET_KEY", "password")
@@ -537,34 +591,42 @@ class TestResultStoreSettings:
         assert settings.OCR_RESULT_S3_SECRET_KEY == "password"
 
     @pytest.mark.parametrize("endpoint", ["localhost:9070", "ftp://store/", "/not-a-url", "http://a b"])
-    def test_an_endpoint_that_is_not_an_absolute_http_url_is_rejected(self, monkeypatch, endpoint):
+    def test_an_endpoint_that_is_not_an_absolute_http_url_is_rejected(
+        self, monkeypatch: pytest.MonkeyPatch, endpoint: str
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_RESULT_S3_ENDPOINT", endpoint)
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_RESULT_S3_ENDPOINT"):
             Settings()
 
-    def test_a_public_endpoint_that_is_not_an_absolute_http_url_is_rejected(self, monkeypatch):
+    def test_a_public_endpoint_that_is_not_an_absolute_http_url_is_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_RESULT_S3_PUBLIC_ENDPOINT", "not-a-url")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_RESULT_S3_PUBLIC_ENDPOINT"):
             Settings()
 
     @pytest.mark.parametrize("bucket", ["Ocr-Results", "ab", "results_bucket", "-results", "x" * 64])
-    def test_a_name_no_object_store_would_accept_is_rejected(self, monkeypatch, bucket):
+    def test_a_name_no_object_store_would_accept_is_rejected(
+        self, monkeypatch: pytest.MonkeyPatch, bucket: str
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_RESULT_S3_BUCKET", bucket)
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_RESULT_S3_BUCKET"):
             Settings()
 
 
 class TestJobDerivedProperties:
-    def test_the_reading_ceiling_is_the_page_ceiling_times_the_worst_allowance(self, monkeypatch):
+    def test_the_reading_ceiling_is_the_page_ceiling_times_the_worst_allowance(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOB_MAX_PAGES", "100")
 
@@ -576,8 +638,13 @@ class TestJobDerivedProperties:
         [("OCR_JOB_MAX_PAGES", "50", 50 * 50.2), ("OCR_PAGE_ALLOWANCE_HEADROOM", "3", 100 * 75.3)],
     )
     def test_the_reading_ceiling_follows_every_one_of_its_inputs(
-        self, monkeypatch, default_family_only, name, value, expected
-    ):
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        default_family_only: None,
+        name: str,
+        value: str,
+        expected: float,
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOB_MAX_PAGES", "100")
         monkeypatch.setenv("OCR_PAGE_ALLOWANCE_HEADROOM", "2")
@@ -586,7 +653,9 @@ class TestJobDerivedProperties:
         # When / Then
         assert pytest.approx(expected) == Settings().OCR_JOB_READING_CEILING_SECONDS
 
-    def test_the_reading_ceiling_is_not_settable_from_the_environment(self, monkeypatch, default_family_only):
+    def test_the_reading_ceiling_is_not_settable_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch, default_family_only: None
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOB_READING_CEILING_SECONDS", "999")
         monkeypatch.setenv("OCR_JOB_MAX_PAGES", "10")
@@ -595,7 +664,9 @@ class TestJobDerivedProperties:
         # When / Then: an unknown variable is ignored, so it stays derived
         assert pytest.approx(502.0) == Settings().OCR_JOB_READING_CEILING_SECONDS
 
-    def test_the_maximum_lifetime_is_the_whole_queue_plus_one_maximal_document(self, monkeypatch):
+    def test_the_maximum_lifetime_is_the_whole_queue_plus_one_maximal_document(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOB_QUEUE_MAX_PAGES", "200")
         monkeypatch.setenv("OCR_JOB_MAX_PAGES", "100")
@@ -612,8 +683,13 @@ class TestJobDerivedProperties:
         ],
     )
     def test_the_maximum_lifetime_follows_every_one_of_its_inputs(
-        self, monkeypatch, default_family_only, name, value, expected
-    ):
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        default_family_only: None,
+        name: str,
+        value: str,
+        expected: float,
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOB_QUEUE_MAX_PAGES", "200")
         monkeypatch.setenv("OCR_JOB_MAX_PAGES", "100")
@@ -623,7 +699,9 @@ class TestJobDerivedProperties:
         # When / Then
         assert pytest.approx(expected) == Settings().OCR_JOB_MAX_LIFETIME_SECONDS
 
-    def test_the_maximum_lifetime_is_not_settable_from_the_environment(self, monkeypatch, default_family_only):
+    def test_the_maximum_lifetime_is_not_settable_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch, default_family_only: None
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_JOB_MAX_LIFETIME_SECONDS", "1")
         monkeypatch.setenv("OCR_JOB_QUEUE_MAX_PAGES", "200")
@@ -635,7 +713,7 @@ class TestJobDerivedProperties:
 
 
 class TestDeletedSettingsHaveNoConsumers:
-    def test_no_module_reads_the_deleted_request_timeout_or_derived_page_limit(self):
+    def test_no_module_reads_the_deleted_request_timeout_or_derived_page_limit(self) -> None:
         # Given - both were deleted with this change, and a consumer left behind would
         # raise AttributeError only on the path that happens to reach it
         source_root = Path(__file__).resolve().parents[2] / "src"
@@ -663,7 +741,7 @@ DELETED_PAGE_SETTINGS = [
 
 class TestDeletedPageSettingsHaveNoConsumers:
     @pytest.mark.parametrize("name", DELETED_PAGE_SETTINGS)
-    def test_no_module_reads_a_setting_this_change_replaced(self, name):
+    def test_no_module_reads_a_setting_this_change_replaced(self, name: str) -> None:
         # Given: a consumer left behind would raise AttributeError only on the path
         # that happens to reach it
         source_root = Path(__file__).resolve().parents[2] / "src"
@@ -679,7 +757,9 @@ class TestDeletedPageSettingsHaveNoConsumers:
         assert offenders == []
 
     @pytest.mark.parametrize("name", DELETED_PAGE_SETTINGS)
-    def test_a_leftover_value_in_the_environment_is_ignored(self, monkeypatch, name):
+    def test_a_leftover_value_in_the_environment_is_ignored(
+        self, monkeypatch: pytest.MonkeyPatch, name: str
+    ) -> None:
         # Given
         monkeypatch.setenv(name, "1")
 
@@ -691,20 +771,20 @@ class TestDeletedPageSettingsHaveNoConsumers:
 
 
 class TestQualityProfile:
-    def test_the_render_scale_is_the_resolution_over_the_points_per_inch_of_a_pdf(self):
+    def test_the_render_scale_is_the_resolution_over_the_points_per_inch_of_a_pdf(self) -> None:
         # When / Then
         assert pytest.approx(300 / 72) == QualityProfile(render_dpi=300, detector_max_side=1536).render_scale
 
-    def test_the_largest_supported_long_side_is_us_legal_at_the_resolution(self):
+    def test_the_largest_supported_long_side_is_us_legal_at_the_resolution(self) -> None:
         # When / Then: 14 inches, the longest standard page the service targets
         assert QualityProfile(render_dpi=300, detector_max_side=1536).max_long_side_pixels == 4200
         assert QualityProfile(render_dpi=150, detector_max_side=1024).max_long_side_pixels == 2100
 
-    def test_the_largest_inference_is_a_square_at_the_largest_long_side(self):
+    def test_the_largest_inference_is_a_square_at_the_largest_long_side(self) -> None:
         # When / Then
         assert QualityProfile(render_dpi=150, detector_max_side=1024).max_inference_pixels == 2100 * 2100
 
-    def test_a_pair_at_the_measured_ratio_ceiling_is_accepted(self):
+    def test_a_pair_at_the_measured_ratio_ceiling_is_accepted(self) -> None:
         # Given: 14 in x 72 dpi is 1008 px, and 1008 / 3.3 is 305.45
 
         # When
@@ -713,28 +793,28 @@ class TestQualityProfile:
         # Then
         assert profile.worst_downscale_ratio <= MAX_DETECTOR_DOWNSCALE_RATIO
 
-    def test_a_pair_beyond_the_measured_ratio_ceiling_is_refused(self):
+    def test_a_pair_beyond_the_measured_ratio_ceiling_is_refused(self) -> None:
         # When / Then: 4200 / 1024 is 4.1x, between the clean 3.3x and the garbage 6.85x
         with pytest.raises(ValueError, match=r"300:1024 .*4\.10x"):
             QualityProfile(render_dpi=300, detector_max_side=1024)
 
     @pytest.mark.parametrize(("dpi", "side"), [(0, 1536), (300, 0), (-1, 1536)])
-    def test_a_pair_with_a_non_positive_number_is_refused(self, dpi, side):
+    def test_a_pair_with_a_non_positive_number_is_refused(self, dpi: int, side: int) -> None:
         # When / Then
         with pytest.raises(ValueError, match="positive"):
             QualityProfile(render_dpi=dpi, detector_max_side=side)
 
-    def test_the_pair_is_written_the_way_the_setting_reads_it(self):
+    def test_the_pair_is_written_the_way_the_setting_reads_it(self) -> None:
         # When / Then
         assert str(QualityProfile(render_dpi=150, detector_max_side=1024)) == "150:1024"
 
 
 class TestQualitySettings:
-    def test_the_default_mode_is_high(self):
+    def test_the_default_mode_is_high(self) -> None:
         # When / Then
         assert DEFAULT_QUALITY == "high"
 
-    def test_the_shipped_pairs(self):
+    def test_the_shipped_pairs(self) -> None:
         # When
         loaded = Settings()
 
@@ -749,11 +829,11 @@ class TestQualitySettings:
             ("high", QualityProfile(render_dpi=300, detector_max_side=1536)),
         ],
     )
-    def test_each_mode_resolves_to_its_own_pair(self, mode, expected):
+    def test_each_mode_resolves_to_its_own_pair(self, mode: QualityMode, expected: QualityProfile) -> None:
         # When / Then
         assert Settings().quality_profile(mode) == expected
 
-    def test_a_pair_is_read_from_the_environment_as_one_value(self, monkeypatch):
+    def test_a_pair_is_read_from_the_environment_as_one_value(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_QUALITY_HIGH", " 200 : 1280 ")
 
@@ -761,7 +841,9 @@ class TestQualitySettings:
         assert Settings().quality_profile("high") == QualityProfile(render_dpi=200, detector_max_side=1280)
 
     @pytest.mark.parametrize("value", ["300", "300:", ":1536", "300:1536:1", "300dpi:1536", "high", ""])
-    def test_a_malformed_pair_stops_the_service_from_starting(self, monkeypatch, value):
+    def test_a_malformed_pair_stops_the_service_from_starting(
+        self, monkeypatch: pytest.MonkeyPatch, value: str
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_QUALITY_NORMAL", value)
 
@@ -769,7 +851,9 @@ class TestQualitySettings:
         with pytest.raises(ValueError, match="OCR_QUALITY_NORMAL"):
             Settings()
 
-    def test_a_pair_beyond_the_ratio_ceiling_stops_the_service_from_starting(self, monkeypatch):
+    def test_a_pair_beyond_the_ratio_ceiling_stops_the_service_from_starting(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setenv("OCR_QUALITY_HIGH", "300:1024")
 
@@ -779,21 +863,21 @@ class TestQualitySettings:
 
 
 class TestSourcePixelCeiling:
-    def test_the_default_is_pillows_own_decompression_bomb_threshold(self):
+    def test_the_default_is_pillows_own_decompression_bomb_threshold(self) -> None:
         # When / Then
         assert Settings().OCR_MAX_SOURCE_PIXELS == 89_478_485
 
-    def test_it_can_be_overridden(self, monkeypatch):
+    def test_it_can_be_overridden(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_MAX_SOURCE_PIXELS", "100000000")
 
         # When / Then
         assert Settings().OCR_MAX_SOURCE_PIXELS == 100_000_000
 
-    def test_zero_is_refused(self, monkeypatch):
+    def test_zero_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setenv("OCR_MAX_SOURCE_PIXELS", "0")
 
         # When / Then
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="OCR_MAX_SOURCE_PIXELS"):
             Settings()

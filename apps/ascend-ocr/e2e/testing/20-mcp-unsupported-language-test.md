@@ -34,7 +34,7 @@ Check nothing is in flight, because step 3 asserts an empty listing.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"jobs_queued":0` and `"jobs_running":0`. Anything else means an earlier run left work behind: wait for it to
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`. Anything else means an earlier run left work behind: wait for it to
 finish or reset per [`../README.md`](../README.md) "Resetting between runs" before starting.
 
 ## Reset state

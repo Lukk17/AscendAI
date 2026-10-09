@@ -25,7 +25,9 @@ from tests.conftest import (
     make_record,
 )
 
-SHIPPED_LANGUAGE_REFUSAL = "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan"
+SHIPPED_LANGUAGE_REFUSAL = (
+    "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan"
+)
 
 
 def _holds_any_file(directory: Path) -> bool:
@@ -100,7 +102,7 @@ class TestSubmit:
         assert runner.documents_waiting() == 0
         assert not await asyncio.to_thread(_holds_any_file, jobs_dir)
 
-    def test_the_refusal_names_every_supported_language_and_not_the_one_asked_for(self):
+    def test_the_refusal_names_every_supported_language_and_not_the_one_asked_for(self) -> None:
         # When
         with pytest.raises(UnsupportedLanguageError) as exc_info:
             ensure_language_supported("korean")
@@ -108,7 +110,7 @@ class TestSubmit:
         # Then
         assert str(exc_info.value) == SHIPPED_LANGUAGE_REFUSAL
 
-    def test_the_refusal_follows_the_configured_allowlist(self, monkeypatch):
+    def test_the_refusal_follows_the_configured_allowlist(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "SUPPORTED_LANGUAGES", ("en", "ru"))
 
@@ -133,7 +135,9 @@ class TestSubmit:
         # Then
         assert store.read(submitted.job_id).straighten is True
 
-    async def test_an_omitted_straighten_choice_is_recorded_as_off(self, service: JobService, store: JobStore) -> None:
+    async def test_an_omitted_straighten_choice_is_recorded_as_off(
+        self, service: JobService, store: JobStore
+    ) -> None:
         # When
         submitted = await service.submit(VALID_PNG_BYTES, "scan.png", "en", "high", "rest")
 
@@ -174,7 +178,9 @@ class TestSubmit:
 
         assert runner.documents_waiting() == 0
 
-    async def test_a_file_the_service_cannot_read_is_refused(self, service: JobService, runner: JobRunner) -> None:
+    async def test_a_file_the_service_cannot_read_is_refused(
+        self, service: JobService, runner: JobRunner
+    ) -> None:
         # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             await service.submit(b"plain text, not a document", "notes.txt", "en", "high", "rest")
@@ -194,7 +200,9 @@ class TestSubmit:
 
         assert len(store.records()) == 1
 
-    async def test_a_failed_write_releases_the_place_it_reserved(self, service: JobService, runner: JobRunner) -> None:
+    async def test_a_failed_write_releases_the_place_it_reserved(
+        self, service: JobService, runner: JobRunner
+    ) -> None:
         # Given
         with (
             patch.object(type(service._store), "create", AsyncMock(side_effect=OSError("disk full"))),
@@ -250,7 +258,9 @@ class TestStatus:
         assert status.result.url.startswith("http")
         assert results.signed[-1][0] == f"{record.job_id}.md"
 
-    async def test_a_straightened_result_says_it_was_straightened(self, service: JobService, store: JobStore) -> None:
+    async def test_a_straightened_result_says_it_was_straightened(
+        self, service: JobService, store: JobStore
+    ) -> None:
         # Given
         record = make_record(state="running", straighten=True, started_at=time.time())
         store.write(record)
@@ -323,10 +333,14 @@ class TestStatus:
         with pytest.raises(JobNotFoundError):
             service.status("../../etc/passwd")
 
-    async def test_the_answer_does_not_grow_with_the_document(self, service: JobService, store: JobStore) -> None:
+    async def test_the_answer_does_not_grow_with_the_document(
+        self, service: JobService, store: JobStore
+    ) -> None:
         # Given — one page against the page ceiling, both finished
         short = make_record(state="running", page_count=1, started_at=time.time())
-        long_document = make_record(state="running", page_count=settings.OCR_JOB_MAX_PAGES, started_at=time.time())
+        long_document = make_record(
+            state="running", page_count=settings.OCR_JOB_MAX_PAGES, started_at=time.time()
+        )
         for record in (short, long_document):
             store.write(record)
             store.succeed(record, JobResultLocation(bucket="ocr-results", key=f"{record.job_id}.md"), 1.0)

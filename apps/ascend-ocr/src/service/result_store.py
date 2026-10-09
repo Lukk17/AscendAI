@@ -3,11 +3,11 @@ import math
 from typing import TYPE_CHECKING, Final
 
 import boto3
+from ascend_python_common.log_config import get_logger
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from src.config.config import settings
-from src.config.logging_config import get_logger
 from src.model.ocr_models import JobResultLocation, OcrJsonResponse
 from src.observability.metrics import RESULT_UPLOAD_ATTEMPTS_TOTAL, RESULT_UPLOAD_FAILURES_TOTAL
 
@@ -61,7 +61,10 @@ def render_markdown(result: OcrJsonResponse) -> str:
     by the ingestion pipeline downstream, so anything that is not the document's own
     text would be indexed as if it were.
     """
-    pages = ["\n".join([f"## Page {page.page_number}", *(line.text for line in page.lines)]) for page in result.pages]
+    pages = [
+        "\n".join([f"## Page {page.page_number}", *(line.text for line in page.lines)])
+        for page in result.pages
+    ]
 
     return "\n\n".join(pages) + "\n"
 

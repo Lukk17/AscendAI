@@ -20,14 +20,14 @@ def _make_tiff(*frame_sizes: tuple[int, int]) -> bytes:
 
 
 class TestInspectInputDispatch:
-    def test_pdf_mime_routes_to_pdf_inspection(self):
+    def test_pdf_mime_routes_to_pdf_inspection(self) -> None:
         # When
         shape = inspect_input(VALID_PDF_BYTES, "application/pdf")
 
         # Then
         assert shape.page_count == 1
 
-    def test_image_mime_routes_to_image_inspection(self):
+    def test_image_mime_routes_to_image_inspection(self) -> None:
         # When
         shape = inspect_input(VALID_PNG_BYTES, "image/png")
 
@@ -36,7 +36,7 @@ class TestInspectInputDispatch:
 
 
 class TestInspectImage:
-    def test_an_image_at_the_source_pixel_ceiling_is_accepted(self, monkeypatch):
+    def test_an_image_at_the_source_pixel_ceiling_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_MAX_SOURCE_PIXELS", 200)
 
@@ -46,15 +46,19 @@ class TestInspectImage:
         # Then
         assert shape.page_count == 1
 
-    def test_an_image_above_the_source_pixel_ceiling_is_refused_naming_both_numbers(self, monkeypatch):
+    def test_an_image_above_the_source_pixel_ceiling_is_refused_naming_both_numbers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_MAX_SOURCE_PIXELS", 199)
 
         # When / Then
-        with pytest.raises(FileSizeExceededError, match="200 pixels, exceeding the source pixel ceiling of 199"):
+        with pytest.raises(
+            FileSizeExceededError, match="200 pixels, exceeding the source pixel ceiling of 199"
+        ):
             inspect_input(_make_png(width=20, height=10), "image/png")
 
-    def test_a_300_dpi_a4_scan_is_accepted_rather_than_refused(self):
+    def test_a_300_dpi_a4_scan_is_accepted_rather_than_refused(self) -> None:
         # Given: the input the old 2.5 megapixel inference ceiling refused
         scan = _make_png(width=2480, height=3508)
 
@@ -64,14 +68,16 @@ class TestInspectImage:
         # Then
         assert shape.page_count == 1
 
-    def test_a_tiff_reports_one_page_per_frame(self):
+    def test_a_tiff_reports_one_page_per_frame(self) -> None:
         # When
         shape = inspect_input(_make_tiff((10, 10), (20, 5), (5, 5)), "image/tiff")
 
         # Then
         assert shape.page_count == 3
 
-    def test_a_tiff_is_refused_when_a_later_frame_is_above_the_ceiling(self, monkeypatch):
+    def test_a_tiff_is_refused_when_a_later_frame_is_above_the_ceiling(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_MAX_SOURCE_PIXELS", 150)
 
@@ -79,12 +85,14 @@ class TestInspectImage:
         with pytest.raises(FileSizeExceededError, match="400 pixels"):
             inspect_input(_make_tiff((10, 10), (20, 20)), "image/tiff")
 
-    def test_corrupt_header_raises_unsupported_file_type(self):
+    def test_corrupt_header_raises_unsupported_file_type(self) -> None:
         # When / Then
         with pytest.raises(UnsupportedFileTypeError, match="Cannot read image header"):
             inspect_input(b"not a real image", "image/png")
 
-    def test_pillows_own_guard_above_twice_its_limit_is_the_same_refusal(self, monkeypatch):
+    def test_pillows_own_guard_above_twice_its_limit_is_the_same_refusal(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given: Pillow raises by itself inside Image.open above twice MAX_IMAGE_PIXELS
         monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
 
@@ -92,7 +100,7 @@ class TestInspectImage:
         with pytest.raises(FileSizeExceededError, match="source pixel ceiling"):
             inspect_input(_make_png(width=10, height=10), "image/png")
 
-    def test_reads_only_the_header_not_the_full_pixel_buffer(self):
+    def test_reads_only_the_header_not_the_full_pixel_buffer(self) -> None:
         # Given: Image.open() only parses the header, and neither .size nor seek() on a
         # TIFF forces Image.load(), which is what decodes and allocates the pixels
         data = _make_tiff((50, 50), (60, 60))
@@ -105,14 +113,16 @@ class TestInspectImage:
 
 
 class TestInspectPdf:
-    def test_reports_page_count(self):
+    def test_reports_page_count(self) -> None:
         # When
         shape = inspect_input(VALID_MULTI_PAGE_PDF_BYTES, "application/pdf")
 
         # Then
         assert shape.page_count == 2
 
-    def test_a_physically_enormous_page_is_never_refused_for_its_pixels(self, monkeypatch):
+    def test_a_physically_enormous_page_is_never_refused_for_its_pixels(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given: the service decides how many pixels a page is rendered at
         monkeypatch.setattr(settings, "OCR_MAX_SOURCE_PIXELS", 1)
 
@@ -122,12 +132,12 @@ class TestInspectPdf:
         # Then
         assert shape.page_count == 1
 
-    def test_corrupt_header_raises_unsupported_file_type(self):
+    def test_corrupt_header_raises_unsupported_file_type(self) -> None:
         # When / Then
         with pytest.raises(UnsupportedFileTypeError, match="Cannot read PDF header"):
             inspect_input(b"not a real pdf", "application/pdf")
 
-    def test_zero_page_document_raises_unsupported_file_type(self):
+    def test_zero_page_document_raises_unsupported_file_type(self) -> None:
         # Given
         empty_pdf = MagicMock()
         empty_pdf.__len__.return_value = 0
@@ -141,7 +151,7 @@ class TestInspectPdf:
 
         empty_pdf.close.assert_called_once()
 
-    def test_document_is_closed_even_when_counting_pages_fails(self):
+    def test_document_is_closed_even_when_counting_pages_fails(self) -> None:
         # Given
         broken_pdf = MagicMock()
         broken_pdf.__len__.side_effect = RuntimeError("corrupt page tree")
@@ -157,21 +167,21 @@ class TestInspectPdf:
 
 
 class TestEnforcePageLimit:
-    def test_below_the_ceiling_is_accepted(self, monkeypatch):
+    def test_below_the_ceiling_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_JOB_MAX_PAGES", 2)
 
         # When / Then: no raise
         enforce_page_limit(InputShape(page_count=1))
 
-    def test_at_the_ceiling_is_accepted(self, monkeypatch):
+    def test_at_the_ceiling_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_JOB_MAX_PAGES", 2)
 
         # When / Then: no raise
         enforce_page_limit(InputShape(page_count=2))
 
-    def test_above_the_ceiling_is_refused_naming_both_numbers(self, monkeypatch):
+    def test_above_the_ceiling_is_refused_naming_both_numbers(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given: the only page ceiling left is the configured one
         monkeypatch.setattr(settings, "OCR_JOB_MAX_PAGES", 2)
 
@@ -181,6 +191,6 @@ class TestEnforcePageLimit:
 
 
 class TestTheDecompressionBombGuardIsSetForTheApiProcess:
-    def test_importing_the_limits_module_sets_the_image_library_limit_from_the_setting(self):
+    def test_importing_the_limits_module_sets_the_image_library_limit_from_the_setting(self) -> None:
         # When / Then
         assert Image.MAX_IMAGE_PIXELS == settings.OCR_MAX_SOURCE_PIXELS

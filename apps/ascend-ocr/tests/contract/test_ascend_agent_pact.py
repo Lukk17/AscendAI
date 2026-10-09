@@ -10,7 +10,7 @@ import pytest
 import uvicorn
 from pact import Verifier
 
-from src.api.middleware.rate_limit import limiter
+from src.api.rest.rest_endpoints import limiter
 from src.config.config import settings
 from src.main import create_app
 from src.model.ocr_models import JobRecord, JobResultLocation
@@ -66,12 +66,16 @@ class ProviderStates:
 
     def reset(self) -> JobPath:
         self._generation += 1
-        self._monkeypatch.setattr(settings, "OCR_JOBS_DIR", str(self._jobs_root / f"state-{self._generation}"))
+        self._monkeypatch.setattr(
+            settings, "OCR_JOBS_DIR", str(self._jobs_root / f"state-{self._generation}")
+        )
 
         results = FakeResultStore()
         store = JobStore(results)
         runner = JobRunner(store, results)
-        self._monkeypatch.setattr("src.api.rest.rest_endpoints.job_service", JobService(store, results, runner))
+        self._monkeypatch.setattr(
+            "src.api.rest.rest_endpoints.job_service", JobService(store, results, runner)
+        )
         limiter.reset()
 
         return JobPath(store, runner)
@@ -106,7 +110,7 @@ class ProviderStates:
 def _parameter(parameters: StateParameters, name: str) -> str:
     value = (parameters or {}).get(name)
     if not isinstance(value, str):
-        raise ValueError(f"Provider state parameter {name!r} is missing or not a string: {value!r}")
+        raise TypeError(f"Provider state parameter {name!r} is missing or not a string: {value!r}")
 
     return value
 
@@ -191,9 +195,13 @@ def provider_url(provider_states: ProviderStates) -> Iterator[str]:
     listener.bind((LOOPBACK, 0))
     port = listener.getsockname()[1]
 
-    config = uvicorn.Config(create_app(), host=LOOPBACK, port=port, lifespan="off", ws="none", log_config=None)
+    config = uvicorn.Config(
+        create_app(), host=LOOPBACK, port=port, lifespan="off", ws="none", log_config=None
+    )
     server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, name="pact-provider", daemon=True)
+    thread = threading.Thread(
+        target=server.run, kwargs={"sockets": [listener]}, name="pact-provider", daemon=True
+    )
     thread.start()
 
     try:

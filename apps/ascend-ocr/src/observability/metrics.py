@@ -23,15 +23,9 @@ UNSUPPORTED_LANGUAGE_LABEL: str = "unsupported"
 
 
 def request_language_label(language: str) -> str:
-    """The language a request is counted under: itself when supported, one fixed value when it will be refused."""
+    """The language a request is counted under: itself when supported, one fixed value otherwise."""
     return language if language in settings.SUPPORTED_LANGUAGES else UNSUPPORTED_LANGUAGE_LABEL
 
-
-OCR_ERRORS_TOTAL: Counter = Counter(
-    "ascendocr_ocr_errors_total",
-    "OCR errors by code and surface.",
-    labelnames=("error_code", "surface"),
-)
 
 ENGINE_CACHE_EVICTIONS_TOTAL: Counter = Counter(
     "ascendocr_engine_cache_evictions_total",
@@ -132,7 +126,7 @@ def is_engine_warm(language: str) -> bool:
     failed or still-pending warm-up leaves the count at zero.
     """
     registry = CollectorRegistry()
-    MultiProcessCollector(registry)
+    MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
 
     for metric_family in registry.collect():
         if metric_family.name != _ENGINE_WARMUP_METRIC_NAME:

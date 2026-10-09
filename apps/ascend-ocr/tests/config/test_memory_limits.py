@@ -1,9 +1,13 @@
+from pathlib import Path
+
+import pytest
+
 from src.config import memory_limits
 from src.config.memory_limits import detect_memory_limit_mib
 
 
 class TestDetectMemoryLimitCgroupV2:
-    def test_reads_limit_in_bytes(self, tmp_path, monkeypatch):
+    def test_reads_limit_in_bytes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         cgroup_file = tmp_path / "memory.max"
         cgroup_file.write_text("12884901888")  # 12 GiB
@@ -12,7 +16,7 @@ class TestDetectMemoryLimitCgroupV2:
         # When / Then
         assert detect_memory_limit_mib() == 12288.0
 
-    def test_unlimited_falls_through(self, tmp_path, monkeypatch):
+    def test_unlimited_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         cgroup_file = tmp_path / "memory.max"
         cgroup_file.write_text("max")
@@ -22,7 +26,7 @@ class TestDetectMemoryLimitCgroupV2:
         # When / Then
         assert detect_memory_limit_mib() is None
 
-    def test_missing_file_falls_through(self, tmp_path, monkeypatch):
+    def test_missing_file_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(memory_limits, "_CGROUP_V2_MEMORY_MAX_PATH", tmp_path / "does-not-exist")
         monkeypatch.setattr(memory_limits, "_CGROUP_V1_MEMORY_LIMIT_PATH", tmp_path / "missing-v1")
@@ -30,7 +34,7 @@ class TestDetectMemoryLimitCgroupV2:
         # When / Then
         assert detect_memory_limit_mib() is None
 
-    def test_malformed_content_falls_through(self, tmp_path, monkeypatch):
+    def test_malformed_content_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         cgroup_file = tmp_path / "memory.max"
         cgroup_file.write_text("not-a-number")
@@ -42,7 +46,7 @@ class TestDetectMemoryLimitCgroupV2:
 
 
 class TestDetectMemoryLimitCgroupV1:
-    def test_reads_limit_in_bytes(self, tmp_path, monkeypatch):
+    def test_reads_limit_in_bytes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(memory_limits, "_CGROUP_V2_MEMORY_MAX_PATH", tmp_path / "no-v2-file")
         limit_file = tmp_path / "memory.limit_in_bytes"
@@ -52,7 +56,7 @@ class TestDetectMemoryLimitCgroupV1:
         # When / Then
         assert detect_memory_limit_mib() == 512.0
 
-    def test_unlimited_sentinel_falls_through(self, tmp_path, monkeypatch):
+    def test_unlimited_sentinel_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given - the classic cgroup v1 "no limit" value, 2^63 rounded to the page size
         monkeypatch.setattr(memory_limits, "_CGROUP_V2_MEMORY_MAX_PATH", tmp_path / "no-v2-file")
         limit_file = tmp_path / "memory.limit_in_bytes"
@@ -62,7 +66,7 @@ class TestDetectMemoryLimitCgroupV1:
         # When / Then
         assert detect_memory_limit_mib() is None
 
-    def test_malformed_content_falls_through(self, tmp_path, monkeypatch):
+    def test_malformed_content_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(memory_limits, "_CGROUP_V2_MEMORY_MAX_PATH", tmp_path / "no-v2-file")
         limit_file = tmp_path / "memory.limit_in_bytes"
@@ -74,7 +78,9 @@ class TestDetectMemoryLimitCgroupV1:
 
 
 class TestDetectMemoryLimitNoCgroup:
-    def test_returns_none_when_no_cgroup_files_exist(self, tmp_path, monkeypatch):
+    def test_returns_none_when_no_cgroup_files_exist(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(memory_limits, "_CGROUP_V2_MEMORY_MAX_PATH", tmp_path / "no-v2-file")
         monkeypatch.setattr(memory_limits, "_CGROUP_V1_MEMORY_LIMIT_PATH", tmp_path / "no-v1-file")

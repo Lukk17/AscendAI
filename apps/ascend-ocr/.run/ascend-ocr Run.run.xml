@@ -46,14 +46,6 @@
               <option name="name" value="MCP_DOWNLOAD_TIMEOUT_SECONDS" />
               <option name="value" value="30" />
             </DockerEnvVarImpl>
-            <DockerEnvVarImpl>
-              <option name="name" value="RATE_LIMIT_DEFAULT" />
-              <option name="value" value="60/minute" />
-            </DockerEnvVarImpl>
-            <DockerEnvVarImpl>
-              <option name="name" value="RATE_LIMIT_OCR" />
-              <option name="value" value="20/minute" />
-            </DockerEnvVarImpl>
           </list>
         </option>
         <option name="portBindings">

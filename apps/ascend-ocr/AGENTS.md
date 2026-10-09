@@ -8,7 +8,7 @@ ascend-ocr is an OCR (Optical Character Recognition) service that wraps the Padd
 
 - **Language**: Python 3.11
 - **Framework**: FastAPI + Uvicorn, FastMCP 3.3.1
-- **Version**: 0.3.0
+- **Version**: 0.3.1
 - **Key Libraries**: PaddlePaddle 3.3.1, PaddleOCR 3.7.0, Pillow 12.2.0, aiohttp 3.13.5
 - **Docker Base**: `python:3.11-slim` (multi-stage build with pre-cached models)
 
@@ -157,11 +157,18 @@ engine. The image's download step (`preload_models()` in `src/service/ocr_servic
 
 **File transport contract** (MCP):
 
-- `http(s)://` is the primary path. ascend-ocr fetches via aiohttp, subject to an SSRF guard (block private/loopback IPs unless the hostname is on `MCP_ALLOWED_HOSTS`).
+- `http(s)://` is the primary path. ascend-ocr fetches via aiohttp through the shared library guard
+  (`check_fetch_uri` with `PinnedResolver`, redirects refused at a hop count of 0, so a 3xx answer stays
+  `DOWNLOAD_FAILED`), which blocks private/loopback IPs unless the hostname is on `ALLOWED_PRIVATE_HOSTS`.
 - `file://` is disabled unless `MCP_FILE_URI_ROOT` is set. When set, the URI is jailed to that directory via `realpath`; traversal outside is rejected. No upload endpoint - operator drops bytes into the root out-of-band.
 - All other schemes (bare paths, `ftp://`, `data:`, Windows `C:\...`) are rejected with `UNSAFE_URI`.
 
-**Error model** (REST + MCP, see ADR-002):
+**Error model** (REST + MCP, see ADR-002). REST refusals are RFC 7807 problem bodies
+(`application/problem+json`) carrying `type`, `title`, `status`, `detail`, `instance`, `code` and `traceId`.
+A request that fails validation answers 400 with code `validation` and an `errors` list sorted by `field`.
+An unknown path answers 404 with code `not_found`, a wrong method 405 with code `method_not_allowed` and an
+`Allow` header. On MCP a refusal is FastMCP's `ToolError` reading `CODE: detail`. The codes and statuses are
+unchanged:
 
 | Code                    | REST status | When raised                                                                      |
 | ----------------------- | ----------- | --------------------------------------------------------------------------------- |
@@ -185,63 +192,36 @@ and never a URI's userinfo, on both surfaces. On MCP it is raised as FastMCP's `
 FastMCP adds no ERROR line of its own. An unexpected exception is still logged at ERROR with its traceback. See the
 third 2026-09-25 amendment to ADR-002.
 
-Every log line carries `correlation_id`, the `x-request-id` of the HTTP request being served. An inbound
-`x-request-id` is kept only when it is 1 to 128 characters of letters, digits, `.`, `_`, `:` and `-`
-(`ACCEPTED_CORRELATION_ID_PATTERN` in `src/api/middleware/correlation_id.py`). Any other value, including one with a
-byte outside ASCII or a control character, is replaced by a fresh id, which is then logged and echoed. Every MCP
-request (tool calls, `tools/list`, resources, prompts) is logged under the id of the HTTP request that carried it,
-never the one that opened the session, and each line written while that request is bound also carries
-`mcp_session_id`, the first 16 hex characters of the SHA-256 digest of the session's `mcp-session-id`, so one
-session's requests can be grouped without writing the live session handle into the log. Two places bind it, both
-through `digest_of_mcp_session_id`. `McpRequestLogContextMiddleware` in `src/api/mcp/request_log_context.py` binds it
-inside the MCP SDK's session task, where the MCP request runs. `CorrelationIdMiddleware` binds it in the HTTP
-request's own task, for the whole request, only for a request to the MCP endpoint (path exactly `MCP_ENDPOINT_PATH`,
-`/mcp`, in `src/config/config.py`, the one constant `src/main.py` passes to both `mcp.http_app` and the middleware)
-that carries an `mcp-session-id` header the SDK accepts (visible ASCII, the SDK's `SESSION_ID_PATTERN`), so uvicorn's
-access line and every other line written in that task carry it too. It is the digest of the value the caller sent,
-not proof that a session exists: on the 404 the SDK answers for an unknown or expired session it names no live
-session. A request to any other path never carries it, whatever headers it sends. An `initialize` request carries no
-such header, because its response creates the session, so `CorrelationIdMiddleware` binds the digest of the
-response's `mcp-session-id` header only while the response start is sent, which is when uvicorn writes the access
-line. That access line is the one line that ties the opening request's `correlation_id` to the session in the field
-itself. The caller chooses `correlation_id` whenever it sends an acceptable `x-request-id`, so the id is a debugging
-aid and must never be used to decide who did something.
+Logging, correlation and tracing come from `ascend-python-common` (`configure_logging`, the request-context
+middleware, the tracer provider builder), wired in `src/main.py` with `create_service_app`. There is no service
+`logging_config.py` and no `log_config` argument on `uvicorn.run`: `LOG_LEVEL` is honoured, `LOG_FORMAT` selects
+`json` or `color`, and every line starts with `[ascend-ocr]`. What stays ascend-ocr specific:
 
-`CorrelationIdMiddleware` is the outermost layer of the app: `build_middleware_stack` of the FastAPI subclass in
-`src/main.py` wraps Starlette's whole stack in it, `ServerErrorMiddleware` included, and nothing else registers it.
-When an unhandled exception ends a request, the `INTERNAL_ERROR` line `_global_exception_handler` writes and the
-500's access line are therefore written while the request's ids are bound, and the 500 carries `x-request-id` like
-every other response. Uvicorn writes its own `Exception in ASGI application` line after the app has raised, outside
-every ASGI layer, so the middleware attaches the request's ids to the exception on its way out, and
-`CorrelationIdLogFilter` uses them for a record whose exception carries them when no request is bound. That line
-carries the same `correlation_id`, and the session digest for a request to the MCP endpoint.
+- `correlation_id` is the caller's `x-request-id` when it is 1 to 128 characters of letters, digits, `.`, `_`,
+  `:` and `-`, else a fresh id that is logged and echoed. It is `-` on a line written outside any request, such
+  as a job state transition the job runner writes while it reads a document. It is a debugging aid and must
+  never be used to decide who did something.
+- `mcp_session_id` is the first 16 hex characters of the SHA-256 digest of the session's `mcp-session-id`, so
+  one session's requests can be grouped without writing the live session handle into the log. The raw session id
+  never leaves the process: the redaction filter replaces every 32-hex-character token in the MCP transport
+  lines and their traceback text with its digest. With tracing on, the library drops `mcp.session.id` from
+  every span, so no exported span carries the session id, raw or as a digest.
+- Worker process tracing and the trace-context carry helpers (`configure_worker_tracing`, `inject_trace_context`,
+  `extract_trace_context`) stay in `src/observability/tracing.py` and build their tracer provider through the
+  library's builder, so the export rule exists once.
+- An expected refusal is logged as one WARNING line naming its code, with no traceback and never a URI's
+  userinfo, on both surfaces. An unexpected exception is still logged at ERROR with its traceback.
 
-In the JSON format every line names both fields: `correlation_id` is `-` outside any request (a job state transition
-the job runner writes while it reads a document), and `mcp_session_id` is `null` on every line of a request to any
-path other than the MCP endpoint (every REST line, `/health`, `/ready` and `/metrics` included, even when the request
-sends an `mcp-session-id` header), on a line of an MCP endpoint request that carries no acceptable `mcp-session-id`
-header (every line of an `initialize` request except its access line), on lines outside any request, and on the MCP
-SDK's transport lines written outside a request that carries the header: `Created new transport` during
-`initialize`, and the idle timeout, crash and clean-up lines the session's own task writes. `Terminating session` on
-DELETE is written in the DELETE request's own task and carries the digest. The color format prints `[<correlation_id> <mcp_session_id>]`, with `-`
-for either one when it is missing. The one line that cannot carry the id of its own request is the MCP SDK's INFO line
-`Processing request of type ...`, written before any FastMCP middleware runs, which carries the id of the
-`initialize` request that opened the session and no `mcp_session_id`.
+**Readiness** (`src/api/readiness.py`, served by the shared aggregator): `/health` answers 200 without touching
+a dependency. `/ready` runs the `engine`, `worker_pool` and `jobs` probes at once and answers 200 `ready` or 503
+`not-ready`, with a `checks` object naming each probe. A worker replacement, a pool rebuild, or a cancel that kills
+the worker reports `not-ready` for the duration, never `/health`.
 
-The raw session id never leaves the process. The MCP SDK writes it into its own transport lines (new session, idle
-timeout, crash with traceback, clean-up, `Terminating session` on DELETE), and `McpSessionIdRedactionFilter`
-replaces every 32-hex-character token in those lines and their traceback text with its digest. It runs as a logger
-filter on `mcp.server.streamable_http_manager` and `mcp.server.streamable_http`, before any handler, so a handler added
-later cannot bypass it, and again as a handler filter on the root handler in both formats. It rewrites every 32-hex run
-in those two loggers' lines, not only session ids. `setup_logging` removes the handlers of `fastmcp`, `uvicorn`,
-`uvicorn.error` and `uvicorn.access`, sets them to `NOTSET` and turns propagation on. It runs when `src.main` is
-imported, after uvicorn has applied its own logging config (the commands above pass no `--log-config`), so FastMCP's
-lines, uvicorn's access lines and the startup banner all go through the root handler's format and filters under
-`LOG_LEVEL` (`FASTMCP_LOG_LEVEL`, uvicorn's `--log-level` and `--no-access-log` have no effect). With tracing on,
-`McpSessionDigestSpanExporter` in `src/observability/tracing.py` replaces the raw id with the digest in the span
-attributes `mcp.session.id`, `http.request.header.mcp_session_id` and `http.response.header.mcp_session_id` before any
-span is exported, and keeps the span's events, links, status, resource, scope and dropped counts. All three use `digest_of_mcp_session_id` in
-`src/api/middleware/correlation_id.py`. See the fourth 2026-09-25 amendment to ADR-002.
+**Metrics**: refusals and unexpected failures are counted by the library as
+`ascend_service_errors_total{code,surface,operation}` (the route template on REST, the tool name on MCP,
+`unmatched` for an unknown path). The queue and job domain counters keep their `ascendocr_*` names
+(`ascendocr_job_queue_documents`, `ascendocr_job_queue_pages`, `ascendocr_job_queue_wait_seconds`,
+`ascendocr_jobs_total`, and the rest in `src/observability/metrics.py`).
 
 Architecture decisions live under [`docs/architecture/decisions/`](docs/architecture/decisions/README.md).
 
@@ -335,23 +315,29 @@ logs a `WARNING`, never a refusal, when that service peak meets or exceeds it. S
 
 ## Environment Variables
 
-- `API_PORT` - service port (default `7022`).
+- `API_PORT` - service port (default `7022`). Compose reads it as `OCR_API_PORT`.
+- `OCR_HOST_PORT` - host port of the service (default `7022`).
 - `API_HOST` - bind address (default `0.0.0.0`).
 - `LOG_LEVEL` - `DEBUG | INFO | WARNING | ERROR | CRITICAL` (default `INFO`).
 - `LOG_FORMAT` - `json` for production log sinks, `color` for a local terminal (default `json`).
+- `READINESS_PROBE_TIMEOUT_SECONDS` - budget of each readiness probe (default `3`).
+- `STARTUP_PROBE_TIMEOUT_SECONDS` - time each startup banner check may take (default `2`).
+- `SECURITY_HSTS_MAX_AGE_SECONDS` - `max-age` of the `strict-transport-security` response header (default `63072000`).
 - `SUPPORTED_LANGUAGES` - the allowlist both surfaces enforce at submission with `UNSUPPORTED_LANGUAGE`, and `OcrService._get_engine` again before any model name is resolved (default `en,pl,de,fr,es,it,pt,nl,ch,japan`). `ru` and `korean` are switched off until the small detector is measured with their recognisers.
-- `RATE_LIMIT_DEFAULT` - slowapi's default limit, applied to every operation but submission (default `60/minute`).
-- `RATE_LIMIT_OCR` - the stricter limit on `POST /v1/ocr/jobs` and `ocr_submit` (default `20/minute`).
-- `OTEL_ENABLED` - when true, FastAPI and aiohttp auto-instrumentation plus the manual spans are wired up (default `false`).
-- `OTEL_EXPORTER_OTLP_ENDPOINT` - gRPC OTLP collector address (default `http://otel-collector:4317`).
+- `RATE_LIMIT_DEFAULT` - flood-protection limit on every operation but submission (default `600/minute`).
+- `RATE_LIMIT_OCR` - flood-protection limit on `POST /v1/ocr/jobs` and `ocr_submit`, which share one budget across surfaces and containers (default `60/minute`).
+- `REDIS_URL` - shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-ocr` (default `redis://127.0.0.1:6379/0`).
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - gRPC OTLP collector address. Export happens whenever it is set, unset by default.
+- `OTEL_SDK_DISABLED` - OpenTelemetry's standard switch, `true` turns the SDK off (default `false`).
 - `DEFAULT_LANGUAGE`: default OCR language, which must match `^[a-z]{2,6}$` (default `en`).
 - `MAX_FILE_SIZE_MB` - max source size, enforced on both REST upload and MCP download (default `50`).
 - `ENGINE_CACHE_MAX_SIZE` - max number of engines kept resident; LRU eviction beyond this (default `2`). It counts engines, not languages: the cache is keyed by the model pair a language resolves to, so every supported language shares one entry. The second slot stays empty until a language is opted back in with a pair of its own, and then keeps it from evicting the pair almost every request uses. An empty slot costs nothing, and the banner prices only engines a supported language can reach. See [ADR-007](docs/architecture/decisions/ADR-007-explicit-ocr-model-selection.md).
 - `OCR_TEXT_DETECTION_MODEL` - detection model for every language the default pair covers (default `PP-OCRv6_small_det`).
 - `OCR_TEXT_RECOGNITION_MODEL` - recognition model for the same languages (default `PP-OCRv6_small_rec`). Together with the line above this is the whole model choice, named rather than resolved from the language, and switching family member (`PP-OCRv6_medium_det` / `PP-OCRv6_medium_rec`) is these two variables and a rebuild. A language outside the family would name its own pair in `LANGUAGE_MODEL_OVERRIDES` in `src/config/config.py`, which is empty while `ru` and `korean` are switched off. See [ADR-007](docs/architecture/decisions/ADR-007-explicit-ocr-model-selection.md).
 - `MCP_FILE_URI_ROOT` - when set, enables `file://` URI scheme jailed to this absolute path. Unset by default ⇒ `file://` rejected.
-- `MCP_ALLOWED_HOSTS` - comma-separated hostnames that bypass the SSRF private-IP check. `host.docker.internal` reaches the object store on host ports 9070/9071 from inside the container. Default empty ⇒ strict block.
+- `ALLOWED_PRIVATE_HOSTS` - comma-separated hostnames that bypass the SSRF private-IP check. `host.docker.internal` reaches the object store on host ports 9070/9071 from inside the container. Default empty ⇒ strict block.
 - `MCP_DOWNLOAD_TIMEOUT_SECONDS` - total timeout for MCP HTTP fetch (default `30`).
+- `FETCH_MAX_REDIRECT_HOPS` - redirect hops the URI fetch guard follows (default `0`). Compose reads it as `OCR_FETCH_MAX_REDIRECT_HOPS`.
 - `OCR_WORKER_COUNT` - number of inference worker processes and admission-gate permits, both read from this one setting so they cannot disagree. A memory constraint, not a throughput knob (default `1`).
 - `OCR_PAGE_ALLOWANCE_HEADROOM`: the service's only configured time input. A page is allowed this multiple of the worst page measured on the engine that reads it (`MEASURED_WORST_PAGE_SECONDS` in `src/config/config.py`), the worker checks the resulting budget between pages, and every other duration the service enforces derives from it (default `4.5`, the headroom the allowance was first derived with).
 - `OCR_DISPATCH_MARGIN_SECONDS` - headroom the worker's own budget subtracts so it gives up slightly before the parent does (default `5`).
@@ -403,6 +389,7 @@ the bottom of `job_service.py`.
 - Pydantic models for data validation; `Field(...)` constraints on every user-influenced field.
 - Constructor injection in `OcrService`; module-level singletons for `ocr_service` and the FastMCP HTTP session.
 - Linting: ruff (E/F/W/I/B/UP/SIM/RUF/S/PL); type-checking: mypy with `paddleocr.*` / `fastmcp.*` / `slowapi.*` / `prometheus_fastapi_instrumentator.*` / `pypdfium2.*` ignored.
+- When instrumenting new code (metrics, logs, or spans), follow [../../docs/OBSERVABILITY.md](../../docs/OBSERVABILITY.md)
 
 ## Relevant Skills
 

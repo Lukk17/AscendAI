@@ -10,9 +10,13 @@
 | Variable                          | Default                                       | Purpose                                                                                  |
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
 | API_HOST                          | `0.0.0.0`                                     | Uvicorn bind address.                                                                    |
-| API_PORT                          | `7022`                                        | Uvicorn port.                                                                            |
+| API_PORT                          | `7022`                                        | Uvicorn port. Compose reads it as `OCR_API_PORT`.                                        |
+| OCR_HOST_PORT                     | `7022`                                        | Host port of the service. Added by `add-ascend-python-common`.                           |
 | LOG_LEVEL                         | `INFO`                                        | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.                                         |
 | LOG_FORMAT                        | `json`                                        | `json` for production log sinks, `color` for local terminal output.                      |
+| READINESS_PROBE_TIMEOUT_SECONDS   | `3`                                           | Budget of each readiness probe. Added by `add-ascend-python-common`.                     |
+| STARTUP_PROBE_TIMEOUT_SECONDS     | `2`                                           | Time each startup banner check may take. Added by `add-ascend-python-common`.            |
+| SECURITY_HSTS_MAX_AGE_SECONDS     | `63072000`                                    | `max-age` of the `strict-transport-security` response header. Added by `add-ascend-python-common`. |
 
 ---
 
@@ -114,8 +118,9 @@ ascend-ai-agent already uses for the same store.
 | Variable                          | Default                                       | Purpose                                                                                  |
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
 | MCP_FILE_URI_ROOT                 | unset                                         | When set, `file://` is enabled and jailed to this directory via `realpath`. See [ADR-001](architecture/decisions/ADR-001-mcp-file-transport-uri-only.md). |
-| MCP_ALLOWED_HOSTS                 | empty                                         | Hostnames that bypass the SSRF private-IP guard. The docker-compose default is `host.docker.internal,localhost,127.0.0.1`. |
+| ALLOWED_PRIVATE_HOSTS             | empty                                         | Hostnames that bypass the SSRF private-IP guard. The docker-compose default is `host.docker.internal,localhost,127.0.0.1`. |
 | MCP_DOWNLOAD_TIMEOUT_SECONDS      | `30.0`                                        | Total aiohttp timeout for the URI fetch.                                                 |
+| FETCH_MAX_REDIRECT_HOPS           | `0`                                           | Redirect hops the URI fetch guard follows. Compose reads it as `OCR_FETCH_MAX_REDIRECT_HOPS`. Added by `add-ascend-python-common`. |
 
 ---
 
@@ -123,8 +128,9 @@ ascend-ai-agent already uses for the same store.
 
 | Variable                          | Default                                       | Purpose                                                                                  |
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| RATE_LIMIT_DEFAULT                | `60/minute`                                   | slowapi default applied to every endpoint.                                               |
-| RATE_LIMIT_OCR                    | `20/minute`                                   | Stricter cap on `POST /v1/ocr/jobs`. Reading a state, listing work in flight and deleting a job are throttled at the default limit instead, because they are file reads rather than inference. |
+| RATE_LIMIT_DEFAULT                | `600/minute`                                  | Flood-protection limit on every operation but submission, shared across surfaces and containers under the key prefix `ascend-ocr`. Compose reads it as `OCR_RATE_LIMIT_DEFAULT`. |
+| RATE_LIMIT_OCR                    | `60/minute`                                   | Flood-protection limit on `POST /v1/ocr/jobs` and `ocr_submit`, sharing one budget. Reading a state, listing work in flight and deleting a job are throttled at the default limit instead, because they are file reads rather than inference. |
+| REDIS_URL                         | `redis://127.0.0.1:6379/0`                    | Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-ocr`. Added by `add-ascend-python-common`. |
 
 ---
 
@@ -132,8 +138,8 @@ ascend-ai-agent already uses for the same store.
 
 | Variable                          | Default                                       | Purpose                                                                                  |
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| OTEL_ENABLED                      | `false`                                       | When `true`, FastAPI + aiohttp auto-instrumentation plus three manual spans are wired up. |
-| OTEL_EXPORTER_OTLP_ENDPOINT       | `http://otel-collector:4317`                  | gRPC OTLP collector address.                                                             |
+| OTEL_EXPORTER_OTLP_ENDPOINT       | unset                                         | gRPC OTLP collector address. Trace export happens whenever it is set.                    |
+| OTEL_SDK_DISABLED                 | `false`                                       | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
 
 ---
 
@@ -146,7 +152,7 @@ The `Settings` class reads a `.env` file in the project root if present. Example
 LOG_FORMAT=color
 LOG_LEVEL=DEBUG
 MCP_FILE_URI_ROOT=/tmp/ascend-ocr-uploads
-MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
+ALLOWED_PRIVATE_HOSTS=host.docker.internal,localhost,127.0.0.1
 ```
 
 The repo's [.gitignore](../../../.gitignore) excludes `.env`. Commit a sanitised `.env.example` if a profile needs sharing.

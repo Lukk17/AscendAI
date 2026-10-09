@@ -2,9 +2,9 @@ import logging
 from collections.abc import Iterator
 
 import pytest
+from ascend_python_common.request_context import mcp_request_log_context
 
 from src.api.middleware.audit_log import emit_mcp_audit
-from src.api.middleware.correlation_id import mcp_request_log_context
 
 AUDITED_CORRELATION_ID = "corr-1"
 

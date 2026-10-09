@@ -7,7 +7,7 @@ from tests.conftest import JPEG_MAGIC_BYTES, PDF_MAGIC_BYTES, PNG_MAGIC_BYTES
 
 class TestSniffMime:
     @pytest.mark.parametrize(
-        "data,expected",
+        ("data", "expected"),
         [
             (PNG_MAGIC_BYTES, "image/png"),
             (JPEG_MAGIC_BYTES, "image/jpeg"),
@@ -24,17 +24,17 @@ class TestSniffMime:
         # When / Then
         assert sniff_mime(data) == expected
 
-    def test_unknown_signature_raises(self):
+    def test_unknown_signature_raises(self) -> None:
         # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(b"plain text content with no known magic prefix")
 
-    def test_empty_bytes_raises(self):
+    def test_empty_bytes_raises(self) -> None:
         # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(b"")
 
-    def test_riff_without_webp_tag_is_rejected(self):
+    def test_riff_without_webp_tag_is_rejected(self) -> None:
         # Given a RIFF container that is not WEBP
         data = b"RIFF\x00\x00\x00\x00WAVE" + b"\x00" * 10
 
@@ -42,7 +42,7 @@ class TestSniffMime:
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(data)
 
-    def test_short_riff_payload_is_rejected(self):
+    def test_short_riff_payload_is_rejected(self) -> None:
         # When / Then
         with pytest.raises(UnsupportedFileTypeError):
             sniff_mime(b"RIFF")

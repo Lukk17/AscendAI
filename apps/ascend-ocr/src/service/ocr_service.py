@@ -8,13 +8,13 @@ from concurrent.futures.process import BrokenProcessPool
 from typing import Any, Final, cast
 
 import numpy as np
+from ascend_python_common.log_config import configure_logging, get_logger
 from paddleocr import PaddleOCR
 from PIL import Image, ImageDraw, ImageFont
 
 from src.api.exception_handlers import FileSizeExceededError, OcrProcessingError, UnsupportedFileTypeError
 from src.config.config import DEFAULT_QUALITY, ModelPair, QualityMode, QualityProfile, settings
 from src.config.cpu_limits import apply_cpu_thread_limit, detect_cpu_limit
-from src.config.logging_config import get_logger, setup_logging
 from src.model.ocr_models import OcrJsonResponse, OcrPageResult, OcrTextLine
 from src.observability.metrics import (
     ENGINE_CACHE_EVICTIONS_TOTAL,
@@ -38,8 +38,8 @@ WARM_UP_PAGE_SIZE: Final[tuple[int, int]] = (320, 64)
 WARM_UP_TEXT_ORIGIN: Final[tuple[int, int]] = (16, 16)
 WARM_UP_FONT_SIZE: Final[int] = 24
 # Runs once per process (main process and each spawned worker re-import this module
-# fresh). setup_logging() must run first, because a spawned worker is a fresh
-# interpreter that never executes create_app()'s own setup_logging() call. Without this,
+# fresh). configure_logging() must run first, because a spawned worker is a fresh
+# interpreter that never executes create_app()'s own configure_logging() call. Without this,
 # its root logger has no handler, so every log call the worker makes is silently
 # dropped instead of reaching the container's log stream, including
 # apply_cpu_thread_limit()'s own line, since that call happens right here at import
@@ -47,7 +47,7 @@ WARM_UP_FONT_SIZE: Final[int] = 24
 # apply_cpu_thread_limit() must then run before _get_engine() ever constructs a
 # PaddleOCR instance, so the cap is in place before any thread pool it configures gets
 # created.
-setup_logging()
+configure_logging("ascend-ocr", settings)
 apply_cpu_thread_limit()
 
 
@@ -116,7 +116,9 @@ class OcrService:
 
         while True:
             if deadline is not None and time.monotonic() >= deadline:
-                raise OcrDeadlineExceededError(f"Budget exhausted after {page_number} of the document's pages")
+                raise OcrDeadlineExceededError(
+                    f"Budget exhausted after {page_number} of the document's pages"
+                )
 
             page_start = time.monotonic()
             remaining_budget = deadline - page_start if deadline is not None else None
@@ -130,13 +132,17 @@ class OcrService:
                 "ascend-ocr.engine.predict.page",
                 attributes={
                     "page_index": page_number,
-                    "remaining_budget_seconds": round(remaining_budget, 3) if remaining_budget is not None else -1.0,
+                    "remaining_budget_seconds": round(remaining_budget, 3)
+                    if remaining_budget is not None
+                    else -1.0,
                 },
             ):
                 page_data = _predict_page(engine, page_image, profile, straighten)
                 OCR_PAGE_DURATION_SECONDS.observe(time.monotonic() - page_start)
                 if isinstance(page_data, dict):
-                    pages.append(OcrPageResult(page_number=page_number, lines=self._extract_text_lines(page_data)))
+                    pages.append(
+                        OcrPageResult(page_number=page_number, lines=self._extract_text_lines(page_data))
+                    )
 
             # The same seam the deadline uses, so progress is written exactly where the
             # worker is already free to be interrupted, and a poll arriving mid-document
@@ -155,7 +161,9 @@ class OcrService:
             attributes={"language": language},
         ):
             engine = self._get_engine(language)
-            _predict_page(engine, _warm_up_page(), settings.quality_profile(DEFAULT_QUALITY), straighten=False)
+            _predict_page(
+                engine, _warm_up_page(), settings.quality_profile(DEFAULT_QUALITY), straighten=False
+            )
 
         ENGINE_WARMUP_DURATION_SECONDS.labels(language=language).observe(time.monotonic() - start)
 
@@ -183,9 +191,9 @@ class OcrService:
             logger.info("Evicted engine %s (cache full)", evicted_models)
 
     def _extract_text_lines(self, page_data: dict[str, object]) -> list[OcrTextLine]:
-        rec_texts = cast(Iterable[Any], page_data.get("rec_texts", []))
-        rec_scores = cast(Iterable[Any], page_data.get("rec_scores", []))
-        dt_polys = cast(Iterable[Any], page_data.get("dt_polys", []))
+        rec_texts = cast("Iterable[Any]", page_data.get("rec_texts", []))
+        rec_scores = cast("Iterable[Any]", page_data.get("rec_scores", []))
+        dt_polys = cast("Iterable[Any]", page_data.get("dt_polys", []))
 
         return [
             OcrTextLine(
@@ -229,7 +237,9 @@ def preload_models() -> None:
         build_engine(models)
 
 
-def _predict_page(engine: PaddleOCR, page_image: PageImage, profile: QualityProfile, straighten: bool) -> object:
+def _predict_page(
+    engine: PaddleOCR, page_image: PageImage, profile: QualityProfile, straighten: bool
+) -> object:
     """Read one rendered page, bounding what detection sees by the request's quality mode.
 
     The pipeline's own detection limit only ever scales an image up, so without "max" every
@@ -371,7 +381,7 @@ def _terminate_pool_processes(pool: ProcessPoolExecutor) -> None:
     cooperative signal the worker polls, is a second stopping mechanism beside the
     deadline the worker already checks (see ADR-008).
     """
-    for process in list(pool._processes.values()):
+    for process in list(pool._processes.values()):  # noqa: SLF001
         process.kill()
 
 
@@ -437,7 +447,7 @@ def _forget_replacement(task: asyncio.Task[None]) -> None:
 
 
 async def wait_for_worker_replacements() -> None:
-    """Wait until every replacement a cancel started has finished, without cancelling one if the waiter is cancelled."""
+    """Wait for every replacement a cancel started without cancelling one if the waiter is cancelled."""
     if not _pending_replacements:
         return
 
@@ -465,13 +475,16 @@ async def _rebuild_pool(observed_generation: int, reason: str, terminate: bool =
 
         if not is_pool_usable():
             logger.error(
-                "OCR worker pool rebuild abandoned after %d consecutive failures", _consecutive_rebuild_failures
+                "OCR worker pool rebuild abandoned after %d consecutive failures",
+                _consecutive_rebuild_failures,
             )
 
             return
 
         logger.warning(
-            "Rebuilding OCR worker pool (reason=%s, consecutive_failures=%d)", reason, _consecutive_rebuild_failures
+            "Rebuilding OCR worker pool (reason=%s, consecutive_failures=%d)",
+            reason,
+            _consecutive_rebuild_failures,
         )
         loop = asyncio.get_running_loop()
         # Offloaded like start_worker_pool() below, not called directly: shutdown(wait=True)

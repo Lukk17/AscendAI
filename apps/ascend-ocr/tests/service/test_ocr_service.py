@@ -3,15 +3,17 @@ import contextlib
 import itertools
 import logging
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures.process import BrokenProcessPool
+from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pytest
 
 from src.api.exception_handlers import FileSizeExceededError, OcrProcessingError, UnsupportedFileTypeError
-from src.config.config import LANGUAGE_MODEL_OVERRIDES, ModelPair, QualityProfile, settings
+from src.config.config import LANGUAGE_MODEL_OVERRIDES, ModelPair, QualityMode, QualityProfile, settings
 from src.model.ocr_models import OcrJsonResponse
 from src.observability.metrics import ENGINE_CACHE_EVICTIONS_TOTAL, POOL_REBUILDS_TOTAL
 from src.service import ocr_service as ocr_service_module
@@ -92,15 +94,19 @@ def _default_pair() -> ModelPair:
 
 
 class TestModelPairResolution:
-    def test_language_inside_the_default_family_resolves_to_the_configured_pair(self):
+    def test_language_inside_the_default_family_resolves_to_the_configured_pair(self) -> None:
         # When / Then
         assert _resolve_model_pair("pl") == _default_pair()
 
-    def test_language_outside_the_default_family_resolves_to_its_own_pair(self, off_family_language):
+    def test_language_outside_the_default_family_resolves_to_its_own_pair(
+        self, off_family_language: str
+    ) -> None:
         # When / Then
         assert _resolve_model_pair(off_family_language) == OFF_FAMILY_PAIR
 
-    def test_configured_pair_is_the_source_for_every_non_override_language(self, monkeypatch):
+    def test_configured_pair_is_the_source_for_every_non_override_language(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_TEXT_DETECTION_MODEL", "PP-OCRv6_medium_det")
         monkeypatch.setattr(settings, "OCR_TEXT_RECOGNITION_MODEL", "PP-OCRv6_medium_rec")
@@ -108,7 +114,9 @@ class TestModelPairResolution:
         # When / Then
         assert _resolve_model_pair("en") == ModelPair("PP-OCRv6_medium_det", "PP-OCRv6_medium_rec")
 
-    def test_configured_pair_does_not_override_a_language_with_its_own_pair(self, monkeypatch, off_family_language):
+    def test_configured_pair_does_not_override_a_language_with_its_own_pair(
+        self, monkeypatch: pytest.MonkeyPatch, off_family_language: str
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_TEXT_DETECTION_MODEL", "PP-OCRv6_medium_det")
         monkeypatch.setattr(settings, "OCR_TEXT_RECOGNITION_MODEL", "PP-OCRv6_medium_rec")
@@ -116,18 +124,18 @@ class TestModelPairResolution:
         # When / Then
         assert _resolve_model_pair(off_family_language) == OFF_FAMILY_PAIR
 
-    def test_every_override_language_is_a_supported_language(self):
+    def test_every_override_language_is_a_supported_language(self) -> None:
         # When / Then - an override for a language the allowlist rejects would be unreachable
         assert set(LANGUAGE_MODEL_OVERRIDES) <= set(settings.SUPPORTED_LANGUAGES)
 
-    def test_model_pair_renders_as_detection_over_recognition(self):
+    def test_model_pair_renders_as_detection_over_recognition(self) -> None:
         # When / Then - this string is the eviction metric's label and the eviction log line
         assert str(ModelPair("det-model", "rec-model")) == "det-model/rec-model"
 
 
 class TestOcrServiceEngineCache:
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_repeated_language_constructs_one_engine(self, mock_paddle_class):
+    def test_repeated_language_constructs_one_engine(self, mock_paddle_class: MagicMock) -> None:
         # Given
         service = OcrService()
         mock_paddle_class.return_value = MagicMock()
@@ -140,7 +148,7 @@ class TestOcrServiceEngineCache:
         assert mock_paddle_class.call_count == 1
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_languages_sharing_a_model_pair_share_one_engine(self, mock_paddle_class):
+    def test_languages_sharing_a_model_pair_share_one_engine(self, mock_paddle_class: MagicMock) -> None:
         # Given - "en" and "pl" both resolve to the configured default pair
         service = OcrService()
         mock_paddle_class.return_value = MagicMock()
@@ -154,7 +162,9 @@ class TestOcrServiceEngineCache:
         assert list(service._engines) == [_default_pair()]
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_languages_with_different_model_pairs_get_their_own_engine(self, mock_paddle_class, off_family_language):
+    def test_languages_with_different_model_pairs_get_their_own_engine(
+        self, mock_paddle_class: MagicMock, off_family_language: str
+    ) -> None:
         # Given
         service = OcrService()
         mock_paddle_class.return_value = MagicMock()
@@ -168,7 +178,7 @@ class TestOcrServiceEngineCache:
         assert list(service._engines) == [_default_pair(), OFF_FAMILY_PAIR]
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_configured_models_are_named_on_the_constructor(self, mock_paddle_class):
+    def test_configured_models_are_named_on_the_constructor(self, mock_paddle_class: MagicMock) -> None:
         # Given
         service = OcrService()
         mock_paddle_class.return_value = MagicMock()
@@ -183,7 +193,9 @@ class TestOcrServiceEngineCache:
         assert "lang" not in kwargs
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_operator_configured_pair_reaches_the_constructor(self, mock_paddle_class, monkeypatch):
+    def test_operator_configured_pair_reaches_the_constructor(
+        self, mock_paddle_class: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_TEXT_DETECTION_MODEL", "PP-OCRv6_medium_det")
         monkeypatch.setattr(settings, "OCR_TEXT_RECOGNITION_MODEL", "PP-OCRv6_medium_rec")
@@ -199,7 +211,9 @@ class TestOcrServiceEngineCache:
         assert kwargs["text_recognition_model_name"] == "PP-OCRv6_medium_rec"
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_override_language_is_constructed_from_its_own_pair(self, mock_paddle_class, off_family_language):
+    def test_override_language_is_constructed_from_its_own_pair(
+        self, mock_paddle_class: MagicMock, off_family_language: str
+    ) -> None:
         # Given
         service = OcrService()
         mock_paddle_class.return_value = MagicMock()
@@ -214,7 +228,9 @@ class TestOcrServiceEngineCache:
 
     @pytest.mark.parametrize("language", ["ru", "korean"])
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_russian_and_korean_are_refused_before_any_engine_is_built(self, mock_paddle_class, language):
+    def test_russian_and_korean_are_refused_before_any_engine_is_built(
+        self, mock_paddle_class: MagicMock, language: str
+    ) -> None:
         # Given: the shipped allowlist, with both switched off
         service = OcrService()
 
@@ -226,7 +242,7 @@ class TestOcrServiceEngineCache:
         mock_paddle_class.assert_not_called()
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_unsupported_language_raises(self, mock_paddle_class):
+    def test_unsupported_language_raises(self, mock_paddle_class: MagicMock) -> None:
         # Given
         service = OcrService()
 
@@ -235,7 +251,9 @@ class TestOcrServiceEngineCache:
             service._get_engine("xx-fake")
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_unsupported_language_is_refused_before_any_engine_is_built(self, mock_paddle_class):
+    def test_unsupported_language_is_refused_before_any_engine_is_built(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given
         service = OcrService()
 
@@ -248,7 +266,9 @@ class TestOcrServiceEngineCache:
         assert not service._engines
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_lru_eviction(self, mock_paddle_class, monkeypatch, off_family_language):
+    def test_lru_eviction(
+        self, mock_paddle_class: MagicMock, monkeypatch: pytest.MonkeyPatch, off_family_language: str
+    ) -> None:
         # Given: a second language opted back in with a third pair
         third_pair = ModelPair("PP-OCRv5_server_det", "korean_PP-OCRv5_mobile_rec")
         monkeypatch.setitem(LANGUAGE_MODEL_OVERRIDES, "korean", third_pair)
@@ -269,8 +289,8 @@ class TestOcrServiceEngineCache:
 
     @patch("src.service.ocr_service.PaddleOCR")
     def test_eviction_is_counted_against_the_evicted_model_pair(
-        self, mock_paddle_class, monkeypatch, off_family_language
-    ):
+        self, mock_paddle_class: MagicMock, monkeypatch: pytest.MonkeyPatch, off_family_language: str
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "ENGINE_CACHE_MAX_SIZE", 1)
         mock_paddle_class.return_value = MagicMock()
@@ -286,7 +306,7 @@ class TestOcrServiceEngineCache:
         assert ENGINE_CACHE_EVICTIONS_TOTAL.labels(engine=label)._value.get() == before + 1
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_engine_is_constructed_without_a_detector_bound(self, mock_paddle_class):
+    def test_the_engine_is_constructed_without_a_detector_bound(self, mock_paddle_class: MagicMock) -> None:
         # Given: the bound belongs to the request's quality mode, not to the engine
         mock_paddle_class.return_value = MagicMock()
         service = OcrService()
@@ -301,8 +321,8 @@ class TestOcrServiceEngineCache:
 
     @patch("src.service.ocr_service.PaddleOCR")
     def test_the_engine_names_every_preprocessing_model_rather_than_inheriting_library_defaults(
-        self, mock_paddle_class
-    ):
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given: unwarping is loaded once and switched per call, so straightening needs no second engine
         mock_paddle_class.return_value = MagicMock()
         service = OcrService()
@@ -318,7 +338,9 @@ class TestOcrServiceEngineCache:
         assert kwargs["enable_mkldnn"] is False
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_line_orientation_classifier_decides_each_line_on_its_own(self, mock_paddle_class):
+    def test_the_line_orientation_classifier_decides_each_line_on_its_own(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given: the library's batch of 6 turns upright lines upside down in blocks of 6 on a mixed page
         mock_paddle_class.return_value = MagicMock()
         service = OcrService()
@@ -331,7 +353,7 @@ class TestOcrServiceEngineCache:
         assert kwargs["textline_orientation_batch_size"] == 1
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_recogniser_reads_each_line_unpadded(self, mock_paddle_class):
+    def test_the_recogniser_reads_each_line_unpadded(self, mock_paddle_class: MagicMock) -> None:
         # Given: the library's batch of 6 pads every line to the widest in its batch, slower and dropping spaces
         mock_paddle_class.return_value = MagicMock()
         service = OcrService()
@@ -343,31 +365,31 @@ class TestOcrServiceEngineCache:
         _, kwargs = mock_paddle_class.call_args
         assert kwargs["text_recognition_batch_size"] == 1
 
-    @patch("src.service.ocr_service.render_pages", side_effect=lambda _data, _profile: _pages(1))
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_straightened_and_plain_requests_share_one_engine(self, mock_paddle_class, _mock_render):
+    def test_straightened_and_plain_requests_share_one_engine(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading({}, {})
         service = OcrService()
 
         # When
-        service.process_file(b"x", "a.jpg", "en", "high", straighten=True)
-        service.process_file(b"x", "b.jpg", "en", "high", straighten=False)
+        with patch("src.service.ocr_service.render_pages", side_effect=lambda _data, _profile: _pages(1)):
+            service.process_file(b"x", "a.jpg", "en", "high", straighten=True)
+            service.process_file(b"x", "b.jpg", "en", "high", straighten=False)
 
         # Then
         assert mock_paddle_class.call_count == 1
         assert list(service._engines) == [_default_pair()]
 
-    @patch("src.service.ocr_service.render_pages", side_effect=lambda _data, _profile: _pages(1))
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_both_quality_modes_share_one_engine(self, mock_paddle_class, _mock_render):
+    def test_both_quality_modes_share_one_engine(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading({}, {})
         service = OcrService()
 
         # When
-        service.process_file(b"x", "a.png", "en", "normal")
-        service.process_file(b"x", "b.png", "en", "high")
+        with patch("src.service.ocr_service.render_pages", side_effect=lambda _data, _profile: _pages(1)):
+            service.process_file(b"x", "a.png", "en", "normal")
+            service.process_file(b"x", "b.png", "en", "high")
 
         # Then
         assert mock_paddle_class.call_count == 1
@@ -375,7 +397,7 @@ class TestOcrServiceEngineCache:
 
 
 class TestOcrServicePredictPages:
-    def test_predict_pages_assigns_page_numbers_in_order(self):
+    def test_predict_pages_assigns_page_numbers_in_order(self) -> None:
         # Given
         service = OcrService()
         engine = _engine_reading(*_create_multi_page_predict_result())
@@ -388,7 +410,7 @@ class TestOcrServicePredictPages:
         assert pages[0].lines[0].text == "Page one"
         assert pages[1].lines[0].text == "Page two"
 
-    def test_each_page_is_read_as_its_own_image_with_the_modes_detector_bound(self):
+    def test_each_page_is_read_as_its_own_image_with_the_modes_detector_bound(self) -> None:
         # Given
         service = OcrService()
         first, second = np.zeros((2, 2, 3), dtype=np.uint8), np.ones((3, 3, 3), dtype=np.uint8)
@@ -399,7 +421,10 @@ class TestOcrServicePredictPages:
 
         # Then
         calls = engine.predict_iter.call_args_list
-        assert [call.args[0] is image for call, image in zip(calls, [first, second], strict=True)] == [True, True]
+        assert [call.args[0] is image for call, image in zip(calls, [first, second], strict=True)] == [
+            True,
+            True,
+        ]
         assert all(
             call.kwargs
             == {
@@ -412,7 +437,7 @@ class TestOcrServicePredictPages:
             for call in calls
         )
 
-    def test_a_straightened_page_is_unwarped_and_still_orientation_corrected(self):
+    def test_a_straightened_page_is_unwarped_and_still_orientation_corrected(self) -> None:
         # Given
         service = OcrService()
         engine = _engine_reading({})
@@ -426,7 +451,7 @@ class TestOcrServicePredictPages:
         assert kwargs["use_doc_orientation_classify"] is True
         assert kwargs["use_textline_orientation"] is True
 
-    def test_predict_pages_empty_document_returns_empty(self):
+    def test_predict_pages_empty_document_returns_empty(self) -> None:
         # Given
         service = OcrService()
         engine = _engine_reading()
@@ -438,7 +463,7 @@ class TestOcrServicePredictPages:
         assert pages == []
         engine.predict_iter.assert_not_called()
 
-    def test_predict_pages_skips_non_dict_entries(self):
+    def test_predict_pages_skips_non_dict_entries(self) -> None:
         # Given
         service = OcrService()
         engine = _engine_reading("not-a-dict", _create_mock_predict_result()[0])
@@ -449,7 +474,7 @@ class TestOcrServicePredictPages:
         # Then
         assert len(pages) == 1
 
-    def test_a_page_the_engine_returns_nothing_for_is_skipped(self):
+    def test_a_page_the_engine_returns_nothing_for_is_skipped(self) -> None:
         # Given
         service = OcrService()
         engine = MagicMock()
@@ -461,7 +486,7 @@ class TestOcrServicePredictPages:
         # Then
         assert pages == []
 
-    def test_deadline_stops_before_first_page_when_already_expired(self):
+    def test_deadline_stops_before_first_page_when_already_expired(self) -> None:
         # Given: deadline in the past: no page should ever be rendered or read
         service = OcrService()
         engine = _engine_reading(*_create_multi_page_predict_result())
@@ -474,7 +499,7 @@ class TestOcrServicePredictPages:
         rendered.__next__.assert_not_called()
         engine.predict_iter.assert_not_called()
 
-    def test_deadline_stops_mid_document_before_next_page_is_rendered(self):
+    def test_deadline_stops_mid_document_before_next_page_is_rendered(self) -> None:
         # Given: the deadline expires after the first page, so the second page must be
         # neither rendered nor read.
         service = OcrService()
@@ -496,7 +521,7 @@ class TestOcrServicePredictPages:
         assert rendered.__next__.call_count == 1
         assert engine.predict_iter.call_count == 1
 
-    def test_no_deadline_consumes_every_page(self):
+    def test_no_deadline_consumes_every_page(self) -> None:
         # Given
         service = OcrService()
         engine = _engine_reading(*_create_multi_page_predict_result())
@@ -507,7 +532,7 @@ class TestOcrServicePredictPages:
         # Then
         assert len(pages) == 2
 
-    def test_one_span_per_page_carrying_index_and_remaining_budget(self):
+    def test_one_span_per_page_carrying_index_and_remaining_budget(self) -> None:
         # Given
         service = OcrService()
         engine = _engine_reading(*_create_multi_page_predict_result())
@@ -520,14 +545,16 @@ class TestOcrServicePredictPages:
         # Then: one span per page, each nested under whatever span is current when
         # _predict_pages runs, since start_as_current_span attaches to the ambient context
         page_span_calls = [
-            call for call in mock_tracer.start_as_current_span.call_args_list if call.args[0].endswith(".page")
+            call
+            for call in mock_tracer.start_as_current_span.call_args_list
+            if call.args[0].endswith(".page")
         ]
         assert len(page_span_calls) == 2
         assert page_span_calls[0].kwargs["attributes"]["page_index"] == 1
         assert page_span_calls[1].kwargs["attributes"]["page_index"] == 2
         assert page_span_calls[0].kwargs["attributes"]["remaining_budget_seconds"] > 0
 
-    def test_span_remaining_budget_is_negative_one_when_no_deadline(self):
+    def test_span_remaining_budget_is_negative_one_when_no_deadline(self) -> None:
         # Given
         service = OcrService()
         engine = _engine_reading(*_create_mock_predict_result())
@@ -543,7 +570,7 @@ class TestOcrServicePredictPages:
 
 class TestOcrServiceProcessFile:
     @pytest.fixture(autouse=True)
-    def _render_one_page_per_result(self):
+    def _render_one_page_per_result(self) -> Iterator[None]:
         self.page_count = 1
         with patch("src.service.ocr_service.render_pages") as mock_render:
             mock_render.side_effect = lambda _data, _profile: _pages(self.page_count)
@@ -551,7 +578,7 @@ class TestOcrServiceProcessFile:
             yield
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_process_file_json_output(self, mock_paddle_class):
+    def test_process_file_json_output(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
         service = OcrService()
@@ -574,7 +601,7 @@ class TestOcrServiceProcessFile:
         ]
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_process_file_multi_page(self, mock_paddle_class):
+    def test_process_file_multi_page(self, mock_paddle_class: MagicMock) -> None:
         # Given
         self.page_count = 2
         mock_paddle_class.return_value = _engine_reading(*_create_multi_page_predict_result())
@@ -589,7 +616,7 @@ class TestOcrServiceProcessFile:
         assert result.pages[1].page_number == 2
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_process_file_empty_result(self, mock_paddle_class):
+    def test_process_file_empty_result(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading({})
         service = OcrService()
@@ -603,7 +630,9 @@ class TestOcrServiceProcessFile:
 
     @pytest.mark.parametrize("quality", ["normal", "high"])
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_submitted_bytes_are_rendered_with_the_requested_modes_pair(self, mock_paddle_class, quality):
+    def test_the_submitted_bytes_are_rendered_with_the_requested_modes_pair(
+        self, mock_paddle_class: MagicMock, quality: QualityMode
+    ) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading({})
         service = OcrService()
@@ -618,7 +647,9 @@ class TestOcrServiceProcessFile:
 
     @pytest.mark.parametrize("straighten", [True, False])
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_requests_straighten_choice_reaches_the_engine_on_that_call(self, mock_paddle_class, straighten):
+    def test_the_requests_straighten_choice_reaches_the_engine_on_that_call(
+        self, mock_paddle_class: MagicMock, straighten: bool
+    ) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading({})
         service = OcrService()
@@ -631,7 +662,9 @@ class TestOcrServiceProcessFile:
         assert kwargs["use_doc_unwarping"] is straighten
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_an_omitted_straighten_choice_leaves_the_page_unwarped(self, mock_paddle_class):
+    def test_an_omitted_straighten_choice_leaves_the_page_unwarped(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading({})
         service = OcrService()
@@ -643,7 +676,9 @@ class TestOcrServiceProcessFile:
         assert mock_paddle_class.return_value.predict_iter.call_args.kwargs["use_doc_unwarping"] is False
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_nothing_is_written_to_disk(self, mock_paddle_class, tmp_path, monkeypatch):
+    def test_nothing_is_written_to_disk(
+        self, mock_paddle_class: MagicMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given: the engine reads rendered arrays, so no scratch copy of the upload exists
         monkeypatch.chdir(tmp_path)
         mock_paddle_class.return_value = _engine_reading({})
@@ -658,7 +693,9 @@ class TestOcrServiceProcessFile:
         assert list(tmp_path.iterdir()) == []
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_process_file_raises_when_budget_exhausted_before_first_page(self, mock_paddle_class):
+    def test_process_file_raises_when_budget_exhausted_before_first_page(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
         service = OcrService()
@@ -668,7 +705,9 @@ class TestOcrServiceProcessFile:
             service.process_file(b"x", "test.png", "en", "high", budget_seconds=-1.0)
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_process_file_deadline_computed_from_duration_not_absolute_time(self, mock_paddle_class):
+    def test_process_file_deadline_computed_from_duration_not_absolute_time(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given - no absolute timestamp may cross the process boundary: the worker
         # must derive its deadline from its own time.monotonic() plus the duration.
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
@@ -682,7 +721,7 @@ class TestOcrServiceProcessFile:
         mock_monotonic.assert_called()
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_process_file_no_budget_means_no_deadline(self, mock_paddle_class):
+    def test_process_file_no_budget_means_no_deadline(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
         service = OcrService()
@@ -694,9 +733,13 @@ class TestOcrServiceProcessFile:
 
 class TestOcrServiceReadsRealDocuments:
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_a_pdf_page_reaches_the_engine_rendered_at_the_modes_resolution(self, mock_paddle_class, monkeypatch):
+    def test_a_pdf_page_reaches_the_engine_rendered_at_the_modes_resolution(
+        self, mock_paddle_class: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given: a 100 x 50 pt page, and a 144 dpi mode, which is a scale of exactly 2
-        monkeypatch.setattr(settings, "OCR_QUALITY_NORMAL", QualityProfile(render_dpi=144, detector_max_side=1024))
+        monkeypatch.setattr(
+            settings, "OCR_QUALITY_NORMAL", QualityProfile(render_dpi=144, detector_max_side=1024)
+        )
         engine = _engine_reading({})
         mock_paddle_class.return_value = engine
         service = OcrService()
@@ -709,7 +752,7 @@ class TestOcrServiceReadsRealDocuments:
         assert page_image.shape == (100, 200, 3)
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_an_image_reaches_the_engine_as_its_own_pixels(self, mock_paddle_class):
+    def test_an_image_reaches_the_engine_as_its_own_pixels(self, mock_paddle_class: MagicMock) -> None:
         # Given
         engine = _engine_reading({})
         mock_paddle_class.return_value = engine
@@ -725,12 +768,12 @@ class TestOcrServiceReadsRealDocuments:
 
 class TestOcrServiceProcessFileTraceContext:
     @pytest.fixture(autouse=True)
-    def _render_one_page(self):
+    def _render_one_page(self) -> Iterator[None]:
         with patch("src.service.ocr_service.render_pages", side_effect=lambda _data, _profile: _pages(1)):
             yield
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_no_trace_carrier_starts_span_with_no_parent(self, mock_paddle_class):
+    def test_no_trace_carrier_starts_span_with_no_parent(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
         service = OcrService()
@@ -746,7 +789,9 @@ class TestOcrServiceProcessFileTraceContext:
 
     @patch("src.service.ocr_service.extract_trace_context")
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_trace_carrier_is_extracted_into_parent_context(self, mock_paddle_class, mock_extract):
+    def test_trace_carrier_is_extracted_into_parent_context(
+        self, mock_paddle_class: MagicMock, mock_extract: MagicMock
+    ) -> None:
         # Given - trace_carrier simulates a context injected by the process that
         # submitted this call, since process_file runs inside a separate OCR worker
         mock_paddle_class.return_value = _engine_reading(*_create_mock_predict_result())
@@ -765,7 +810,7 @@ class TestOcrServiceProcessFileTraceContext:
         assert kwargs["context"] is sentinel_context
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_predict_span_names_the_quality_mode(self, mock_paddle_class):
+    def test_the_predict_span_names_the_quality_mode(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = _engine_reading({})
         service = OcrService()
@@ -781,7 +826,7 @@ class TestOcrServiceProcessFileTraceContext:
 
 class TestOcrServiceWarmUp:
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_warm_up_creates_engine(self, mock_paddle_class):
+    def test_warm_up_creates_engine(self, mock_paddle_class: MagicMock) -> None:
         # Given
         mock_paddle_class.return_value = MagicMock()
         service = OcrService()
@@ -793,7 +838,9 @@ class TestOcrServiceWarmUp:
         assert _default_pair() in service._engines
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_warm_up_reads_one_generated_page_so_the_first_job_pays_no_first_inference(self, mock_paddle_class):
+    def test_warm_up_reads_one_generated_page_so_the_first_job_pays_no_first_inference(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given
         engine = _engine_reading({})
         mock_paddle_class.return_value = engine
@@ -811,7 +858,7 @@ class TestOcrServiceWarmUp:
         assert engine.predict_iter.call_args.kwargs["use_doc_unwarping"] is False
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_a_failed_warm_up_read_fails_the_warm_up(self, mock_paddle_class):
+    def test_a_failed_warm_up_read_fails_the_warm_up(self, mock_paddle_class: MagicMock) -> None:
         # Given: the build already fails the pool's initializer, so the first read must not be quieter
         engine = MagicMock()
         engine.predict_iter.side_effect = RuntimeError("inference failed")
@@ -825,7 +872,9 @@ class TestOcrServiceWarmUp:
 
 class TestEngineConstruction:
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_every_engine_a_supported_language_can_load_is_built_once(self, mock_paddle_class):
+    def test_every_engine_a_supported_language_can_load_is_built_once(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # When
         preload_models()
 
@@ -837,7 +886,7 @@ class TestEngineConstruction:
         assert sorted(built, key=str) == sorted(settings.reachable_model_pairs(), key=str)
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_shipped_languages_preload_only_the_small_pair(self, mock_paddle_class):
+    def test_the_shipped_languages_preload_only_the_small_pair(self, mock_paddle_class: MagicMock) -> None:
         # When
         preload_models()
 
@@ -849,7 +898,9 @@ class TestEngineConstruction:
         assert built == [ModelPair("PP-OCRv6_small_det", "PP-OCRv6_small_rec")]
 
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_the_preload_builds_engines_exactly_as_the_service_does(self, mock_paddle_class):
+    def test_the_preload_builds_engines_exactly_as_the_service_does(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # Given
         OcrService()._get_engine("en")
         service_kwargs = mock_paddle_class.call_args.kwargs
@@ -866,18 +917,20 @@ class TestEngineConstruction:
         )
         assert default_call.kwargs == service_kwargs
 
-    @patch("src.service.ocr_service.detect_cpu_limit", return_value=3)
     @patch("src.service.ocr_service.PaddleOCR")
-    def test_an_engine_runs_as_many_cpu_threads_as_the_container_may_use(self, mock_paddle_class, _limit):
+    def test_an_engine_runs_as_many_cpu_threads_as_the_container_may_use(
+        self, mock_paddle_class: MagicMock
+    ) -> None:
         # When
-        build_engine(_default_pair())
+        with patch("src.service.ocr_service.detect_cpu_limit", return_value=3):
+            build_engine(_default_pair())
 
         # Then: passed explicitly, because PaddleOCR otherwise passes its own 10 and the env var never applies
         assert mock_paddle_class.call_args.kwargs["cpu_threads"] == 3
 
 
 class TestConvertPolygon:
-    def test_valid_polygon(self):
+    def test_valid_polygon(self) -> None:
         # Given
         polygon = [(1, 2), (3, 4)]
 
@@ -887,23 +940,23 @@ class TestConvertPolygon:
         # Then
         assert converted == [[1.0, 2.0], [3.0, 4.0]]
 
-    def test_none_returns_empty(self):
+    def test_none_returns_empty(self) -> None:
         # When / Then
         assert _convert_polygon(None) == []
 
-    def test_empty_returns_empty(self):
+    def test_empty_returns_empty(self) -> None:
         # When / Then
         assert _convert_polygon([]) == []
 
-    def test_index_error_returns_empty(self):
+    def test_index_error_returns_empty(self) -> None:
         # When / Then - point with no elements triggers IndexError
         assert _convert_polygon([[]]) == []
 
-    def test_value_error_returns_empty(self):
+    def test_value_error_returns_empty(self) -> None:
         # When / Then - non-numeric coordinates trigger ValueError on float()
         assert _convert_polygon([["x", "y"]]) == []
 
-    def test_numpy_array_polygon_does_not_raise_on_truthiness(self):
+    def test_numpy_array_polygon_does_not_raise_on_truthiness(self) -> None:
         # Given. PaddleOCR returns dt_polys as numpy arrays in production. An older
         # `if not polygon` check raised `ValueError: The truth value of an array with
         # more than one element is ambiguous` and surfaced as OCR_FAILED on every
@@ -919,7 +972,7 @@ class TestConvertPolygon:
             def __len__(self) -> int:
                 return len(self._points)
 
-            def __iter__(self):
+            def __iter__(self) -> Iterator[tuple[float, float]]:
                 return iter(self._points)
 
         polygon = _FakeArray([(1.0, 2.0), (3.0, 4.0), (5.0, 6.0), (7.0, 8.0)])
@@ -934,7 +987,9 @@ class TestConvertPolygon:
 class TestWorkerPoolLifecycle:
     @patch("src.service.ocr_service.multiprocessing")
     @patch("src.service.ocr_service.ProcessPoolExecutor")
-    def test_start_worker_pool_creates_and_warms_pool(self, mock_executor_class, mock_multiprocessing):
+    def test_start_worker_pool_creates_and_warms_pool(
+        self, mock_executor_class: MagicMock, mock_multiprocessing: MagicMock
+    ) -> None:
         # Given
         mock_pool = MagicMock()
         mock_executor_class.return_value = mock_pool
@@ -960,7 +1015,9 @@ class TestWorkerPoolLifecycle:
 
     @patch("src.service.ocr_service.multiprocessing")
     @patch("src.service.ocr_service.ProcessPoolExecutor")
-    def test_start_worker_pool_increments_generation(self, mock_executor_class, mock_multiprocessing):
+    def test_start_worker_pool_increments_generation(
+        self, mock_executor_class: MagicMock, mock_multiprocessing: MagicMock
+    ) -> None:
         # Given
         mock_executor_class.return_value = MagicMock()
         mock_multiprocessing.get_context.return_value = MagicMock()
@@ -974,7 +1031,9 @@ class TestWorkerPoolLifecycle:
 
     @patch("src.service.ocr_service.multiprocessing")
     @patch("src.service.ocr_service.ProcessPoolExecutor")
-    def test_start_worker_pool_resets_gate(self, mock_executor_class, mock_multiprocessing):
+    def test_start_worker_pool_resets_gate(
+        self, mock_executor_class: MagicMock, mock_multiprocessing: MagicMock
+    ) -> None:
         # Given
         mock_executor_class.return_value = MagicMock()
         mock_multiprocessing.get_context.return_value = MagicMock()
@@ -988,7 +1047,9 @@ class TestWorkerPoolLifecycle:
 
     @patch("src.service.ocr_service.multiprocessing")
     @patch("src.service.ocr_service.ProcessPoolExecutor")
-    def test_start_worker_pool_survives_broken_initializer(self, mock_executor_class, mock_multiprocessing):
+    def test_start_worker_pool_survives_broken_initializer(
+        self, mock_executor_class: MagicMock, mock_multiprocessing: MagicMock
+    ) -> None:
         # Given. A warm-up failure inside _warm_worker_engine (the pool initializer)
         # surfaces here as BrokenProcessPool when the blocking .result() call is
         # awaited, not as the original exception.
@@ -1008,7 +1069,9 @@ class TestWorkerPoolLifecycle:
 
     @patch("src.service.ocr_service.multiprocessing")
     @patch("src.service.ocr_service.ProcessPoolExecutor")
-    def test_start_worker_pool_warms_every_configured_worker(self, mock_executor_class, mock_multiprocessing):
+    def test_start_worker_pool_warms_every_configured_worker(
+        self, mock_executor_class: MagicMock, mock_multiprocessing: MagicMock
+    ) -> None:
         # Given - ProcessPoolExecutor only spawns one worker per submit() call when no
         # worker is idle yet, so warming all OCR_WORKER_COUNT workers at startup
         # requires one submission per worker, not one submission total.
@@ -1032,8 +1095,8 @@ class TestWorkerPoolLifecycle:
     @patch("src.service.ocr_service.multiprocessing")
     @patch("src.service.ocr_service.ProcessPoolExecutor")
     def test_start_worker_pool_one_broken_worker_among_several_fails_the_whole_pool(
-        self, mock_executor_class, mock_multiprocessing
-    ):
+        self, mock_executor_class: MagicMock, mock_multiprocessing: MagicMock
+    ) -> None:
         # Given - three workers requested, the second one's own warm-up is broken.
         # ProcessPoolExecutor has no per-worker recovery: any worker's initializer
         # failure marks the whole pool broken, so start_worker_pool must report False
@@ -1057,7 +1120,7 @@ class TestWorkerPoolLifecycle:
         assert warmed is False
         assert mock_pool.submit.call_count == 3
 
-    def test_stop_worker_pool_shuts_down_existing_pool(self):
+    def test_stop_worker_pool_shuts_down_existing_pool(self) -> None:
         # Given
         mock_pool = MagicMock()
 
@@ -1069,13 +1132,13 @@ class TestWorkerPoolLifecycle:
             mock_pool.shutdown.assert_called_once_with(wait=True)
             assert ocr_service_module._process_pool is None
 
-    def test_stop_worker_pool_no_op_when_not_started(self):
+    def test_stop_worker_pool_no_op_when_not_started(self) -> None:
         # When / Then - no raise, nothing to shut down
         with patch.object(ocr_service_module, "_process_pool", None):
             stop_worker_pool()
             assert ocr_service_module._process_pool is None
 
-    def test_get_process_pool_raises_when_not_started(self):
+    def test_get_process_pool_raises_when_not_started(self) -> None:
         # When / Then
         with (
             patch.object(ocr_service_module, "_process_pool", None),
@@ -1083,7 +1146,7 @@ class TestWorkerPoolLifecycle:
         ):
             get_process_pool()
 
-    def test_get_process_pool_returns_started_pool(self):
+    def test_get_process_pool_returns_started_pool(self) -> None:
         # Given
         mock_pool = MagicMock()
 
@@ -1092,9 +1155,10 @@ class TestWorkerPoolLifecycle:
             assert get_process_pool() is mock_pool
 
     @patch("src.service.ocr_service.ocr_service")
-    def test_run_ocr_in_worker_delegates_to_singleton(self, mock_service):
+    def test_run_ocr_in_worker_delegates_to_singleton(self, mock_service: MagicMock) -> None:
         # Given
-        mock_service.process_file.return_value = "sentinel-response"
+        sentinel = OcrJsonResponse(filename="scan.png", language="en", pages=[], processing_time_seconds=0.1)
+        mock_service.process_file.return_value = sentinel
         carrier = {"traceparent": "00-fake-01"}
 
         # When
@@ -1104,10 +1168,10 @@ class TestWorkerPoolLifecycle:
         mock_service.process_file.assert_called_once_with(
             b"bytes", "scan.png", "en", "normal", carrier, 30.0, None, False
         )
-        assert result == "sentinel-response"
+        assert result == sentinel
 
     @patch("src.service.ocr_service.ocr_service")
-    def test_run_ocr_in_worker_carries_the_straighten_choice(self, mock_service):
+    def test_run_ocr_in_worker_carries_the_straighten_choice(self, mock_service: MagicMock) -> None:
         # When
         run_ocr_in_worker(b"bytes", "photo.jpg", "en", "high", None, 30.0, "job", True)
 
@@ -1115,7 +1179,7 @@ class TestWorkerPoolLifecycle:
         assert mock_service.process_file.call_args.args[-1] is True
 
     @patch("src.service.ocr_service.ocr_service")
-    def test_run_ocr_in_worker_defaults_to_none(self, mock_service):
+    def test_run_ocr_in_worker_defaults_to_none(self, mock_service: MagicMock) -> None:
         # Given
         mock_service.process_file.return_value = "sentinel-response"
 
@@ -1123,11 +1187,15 @@ class TestWorkerPoolLifecycle:
         run_ocr_in_worker(b"bytes", "scan.png", "en", "high")
 
         # Then
-        mock_service.process_file.assert_called_once_with(b"bytes", "scan.png", "en", "high", None, None, None, False)
+        mock_service.process_file.assert_called_once_with(
+            b"bytes", "scan.png", "en", "high", None, None, None, False
+        )
 
     @patch("src.service.ocr_service.configure_worker_tracing")
     @patch("src.service.ocr_service.ocr_service")
-    def test_warm_worker_engine_configures_tracing_before_warmup(self, mock_service, mock_configure_tracing):
+    def test_warm_worker_engine_configures_tracing_before_warmup(
+        self, mock_service: MagicMock, mock_configure_tracing: MagicMock
+    ) -> None:
         # When
         _warm_worker_engine("en")
 
@@ -1135,20 +1203,20 @@ class TestWorkerPoolLifecycle:
         mock_configure_tracing.assert_called_once()
         mock_service.warm_up_engine.assert_called_once_with("en")
 
-    def test_noop_task_completes_without_raising(self):
+    def test_noop_task_completes_without_raising(self) -> None:
         # When / Then
         _noop_task()
 
 
 class TestPoolHealthSignals:
-    def test_is_pool_usable_true_under_cap(self, monkeypatch):
+    def test_is_pool_usable_true_under_cap(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
 
         # When / Then
         assert is_pool_usable() is True
 
-    def test_is_pool_usable_false_at_cap(self, monkeypatch):
+    def test_is_pool_usable_false_at_cap(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_POOL_REBUILD_MAX_CONSECUTIVE", 3)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 3)
@@ -1156,11 +1224,11 @@ class TestPoolHealthSignals:
         # When / Then
         assert is_pool_usable() is False
 
-    def test_is_rebuild_in_progress_false_by_default(self):
+    def test_is_rebuild_in_progress_false_by_default(self) -> None:
         # When / Then
         assert is_rebuild_in_progress() is False
 
-    async def test_is_rebuild_in_progress_true_while_locked(self):
+    async def test_is_rebuild_in_progress_true_while_locked(self) -> None:
         # Given
         async with ocr_service_module._rebuild_lock:
             # When / Then
@@ -1168,28 +1236,30 @@ class TestPoolHealthSignals:
 
         assert is_rebuild_in_progress() is False
 
-    def test_is_job_overrunning_false_when_idle(self, monkeypatch):
+    def test_is_job_overrunning_false_when_idle(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {})
 
         # When / Then
         assert is_job_overrunning() is False
 
-    def test_is_job_overrunning_false_within_budget(self, monkeypatch):
+    def test_is_job_overrunning_false_within_budget(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {object(): time.monotonic() + 100})
 
         # When / Then
         assert is_job_overrunning() is False
 
-    def test_is_job_overrunning_true_past_budget(self, monkeypatch):
+    def test_is_job_overrunning_true_past_budget(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {object(): time.monotonic() - 1})
 
         # When / Then
         assert is_job_overrunning() is True
 
-    def test_is_job_overrunning_true_when_one_of_several_jobs_is_past_budget(self, monkeypatch):
+    def test_is_job_overrunning_true_when_one_of_several_jobs_is_past_budget(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - two workers, one healthy and well within budget, one genuinely stuck.
         # A single shared deadline variable could only ever record the more recent of
         # the two, so this is the regression case for that bug.
@@ -1202,7 +1272,7 @@ class TestPoolHealthSignals:
         # When / Then
         assert is_job_overrunning() is True
 
-    def test_is_accepting_work_true_when_healthy_and_idle(self, monkeypatch):
+    def test_is_accepting_work_true_when_healthy_and_idle(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {})
@@ -1210,7 +1280,7 @@ class TestPoolHealthSignals:
         # When / Then
         assert is_accepting_work() is True
 
-    def test_is_accepting_work_false_when_pool_exhausted(self, monkeypatch):
+    def test_is_accepting_work_false_when_pool_exhausted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_POOL_REBUILD_MAX_CONSECUTIVE", 1)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 1)
@@ -1218,7 +1288,7 @@ class TestPoolHealthSignals:
         # When / Then
         assert is_accepting_work() is False
 
-    def test_is_accepting_work_false_while_job_overrunning(self, monkeypatch):
+    def test_is_accepting_work_false_while_job_overrunning(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {object(): time.monotonic() - 1})
@@ -1226,7 +1296,7 @@ class TestPoolHealthSignals:
         # When / Then
         assert is_accepting_work() is False
 
-    async def test_is_accepting_work_false_while_rebuilding(self, monkeypatch):
+    async def test_is_accepting_work_false_while_rebuilding(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {})
@@ -1237,7 +1307,7 @@ class TestPoolHealthSignals:
 
 
 class TestRebuildPool:
-    async def test_generation_mismatch_skips_rebuild(self, monkeypatch):
+    async def test_generation_mismatch_skips_rebuild(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given - another caller already rebuilt past the generation this caller saw
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 5)
         stop_mock = MagicMock()
@@ -1249,7 +1319,7 @@ class TestRebuildPool:
         # Then
         stop_mock.assert_not_called()
 
-    async def test_cap_already_reached_skips_rebuild(self, monkeypatch):
+    async def test_cap_already_reached_skips_rebuild(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 1)
         monkeypatch.setattr(settings, "OCR_POOL_REBUILD_MAX_CONSECUTIVE", 1)
@@ -1263,7 +1333,7 @@ class TestRebuildPool:
         # Then
         stop_mock.assert_not_called()
 
-    async def test_successful_rebuild_increments_ok_metric(self, monkeypatch):
+    async def test_successful_rebuild_increments_ok_metric(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 1)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
@@ -1276,7 +1346,7 @@ class TestRebuildPool:
         # Then
         assert ocr_service_module._consecutive_rebuild_failures == 0
 
-    async def test_failed_rebuild_increments_failure_counter(self, monkeypatch):
+    async def test_failed_rebuild_increments_failure_counter(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 1)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
@@ -1289,7 +1359,9 @@ class TestRebuildPool:
         # Then
         assert ocr_service_module._consecutive_rebuild_failures == 1
 
-    async def test_stop_worker_pool_does_not_block_the_event_loop(self, monkeypatch):
+    async def test_stop_worker_pool_does_not_block_the_event_loop(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - stop_worker_pool blocks its own thread for a while, mirroring
         # ProcessPoolExecutor.shutdown(wait=True) waiting on another worker's own
         # legitimate, unrelated in-flight job to finish (proven against the real
@@ -1325,7 +1397,7 @@ class TestRebuildPool:
         gaps = [b - a for a, b in itertools.pairwise(ticks)]
         assert max(gaps) < 0.2
 
-    async def test_concurrent_triggers_produce_one_rebuild(self, monkeypatch):
+    async def test_concurrent_triggers_produce_one_rebuild(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 1)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
@@ -1339,7 +1411,7 @@ class TestRebuildPool:
 
         start_mock = MagicMock(side_effect=fake_start)
 
-        async def fake_run_in_executor(_executor, func):
+        async def fake_run_in_executor(_executor: object, func: Callable[[], bool]) -> bool:
             return func()
 
         monkeypatch.setattr(ocr_service_module, "stop_worker_pool", MagicMock())
@@ -1354,7 +1426,7 @@ class TestRebuildPool:
         # Then - only the first actually rebuilds; the second sees the bumped generation
         assert start_mock.call_count == 1
 
-    async def test_successful_request_resets_failure_counter(self, monkeypatch):
+    async def test_successful_request_resets_failure_counter(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 2)
 
@@ -1367,14 +1439,14 @@ class TestRebuildPool:
 
 class TestDispatchOcrRequest:
     @pytest.fixture(autouse=True)
-    def _reset_state(self, monkeypatch):
+    def _reset_state(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(ocr_service_module, "_active_deadlines", {})
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         monkeypatch.setattr(ocr_service_module, "_admission_semaphore", asyncio.Semaphore(1))
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 1)
-        yield
+        return
 
-    async def test_pool_unusable_refuses_immediately(self, monkeypatch):
+    async def test_pool_unusable_refuses_immediately(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_POOL_REBUILD_MAX_CONSECUTIVE", 1)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 1)
@@ -1383,13 +1455,13 @@ class TestDispatchOcrRequest:
         with pytest.raises(OcrProcessingError, match="unavailable"):
             await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
-    async def test_successful_dispatch_returns_result(self, monkeypatch):
+    async def test_successful_dispatch_returns_result(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         sentinel = OcrJsonResponse(filename="f.png", language="en", pages=[], processing_time_seconds=0.1)
         mock_pool = MagicMock()
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=mock_pool))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> OcrJsonResponse:
             return sentinel
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1408,8 +1480,8 @@ class TestDispatchOcrRequest:
     @patch("src.service.ocr_service.multiprocessing")
     @patch("src.service.ocr_service.ProcessPoolExecutor")
     async def test_a_dispatch_across_a_pool_rebuild_releases_the_gate_it_acquired(
-        self, mock_executor_class, mock_multiprocessing, monkeypatch
-    ):
+        self, mock_executor_class: MagicMock, mock_multiprocessing: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given: the pool is rebuilt while this document is being read, which replaces the gate
         mock_executor_class.return_value = MagicMock()
         mock_multiprocessing.get_context.return_value = MagicMock()
@@ -1418,7 +1490,9 @@ class TestDispatchOcrRequest:
         acquired_gate = ocr_service_module._admission_semaphore
         sentinel = OcrJsonResponse(filename="f.png", language="en", pages=[], processing_time_seconds=0.1)
 
-        async def rebuilding_run_in_executor(_executor, _func, *_args):
+        async def rebuilding_run_in_executor(
+            _executor: object, _func: object, *_args: object
+        ) -> OcrJsonResponse:
             start_worker_pool()
 
             return sentinel
@@ -1438,13 +1512,15 @@ class TestDispatchOcrRequest:
         assert rebuilt_gate._value == settings.OCR_WORKER_COUNT
 
     @pytest.mark.parametrize("straighten", [True, False])
-    async def test_the_straighten_choice_reaches_the_worker(self, monkeypatch, straighten):
+    async def test_the_straighten_choice_reaches_the_worker(
+        self, monkeypatch: pytest.MonkeyPatch, straighten: bool
+    ) -> None:
         # Given
         sentinel = OcrJsonResponse(filename="f.jpg", language="en", pages=[], processing_time_seconds=0.1)
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
         worker_args: list[tuple[object, ...]] = []
 
-        async def fake_run_in_executor(_executor, _func, *args):
+        async def fake_run_in_executor(_executor: object, _func: object, *args: object) -> OcrJsonResponse:
             worker_args.append(args)
 
             return sentinel
@@ -1460,7 +1536,9 @@ class TestDispatchOcrRequest:
         # Then
         assert worker_args[0][-1] is straighten
 
-    async def test_budget_expired_while_waiting_never_dispatches(self, monkeypatch):
+    async def test_budget_expired_while_waiting_never_dispatches(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - permit already held by someone else, and the budget is effectively zero
         held_semaphore = asyncio.Semaphore(0)
         monkeypatch.setattr(ocr_service_module, "_admission_semaphore", held_semaphore)
@@ -1473,7 +1551,9 @@ class TestDispatchOcrRequest:
 
         pool_mock.submit.assert_not_called()
 
-    async def test_budget_expired_between_acquire_and_dispatch_never_dispatches(self, monkeypatch):
+    async def test_budget_expired_between_acquire_and_dispatch_never_dispatches(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - the gate grants the permit right away, but by the time dispatch
         # re-checks the budget afterward, the clock has moved past it. wait_for is
         # replaced with a direct await so only dispatch_ocr_request's own three explicit
@@ -1482,7 +1562,7 @@ class TestDispatchOcrRequest:
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=pool_mock))
         monotonic_values = iter([0.0, 0.0, 1.0])
 
-        async def fake_wait_for(coro, **_kwargs):
+        async def fake_wait_for(coro: Any, **_kwargs: Any) -> Any:
             return await coro
 
         # When / Then
@@ -1495,13 +1575,15 @@ class TestDispatchOcrRequest:
 
         pool_mock.submit.assert_not_called()
 
-    async def test_worker_timeout_triggers_rebuild_and_fails_request(self, monkeypatch):
+    async def test_worker_timeout_triggers_rebuild_and_fails_request(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given. The reclamation grace is derived (the reading engine's page allowance
         # plus the dispatch margin), so it is driven through its real settings.
         monkeypatch.setattr(ocr_service_module, "_rebuild_pool", lambda *a, **k: _async_none())
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             await asyncio.sleep(10)
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1511,27 +1593,29 @@ class TestDispatchOcrRequest:
 
             # When / Then
             with (
-                patch.object(ocr_service_module.settings, "OCR_DISPATCH_MARGIN_SECONDS", 0.0),
-                patch.object(ocr_service_module.settings, "OCR_PAGE_ALLOWANCE_HEADROOM", 0.0001),
+                patch.object(settings, "OCR_DISPATCH_MARGIN_SECONDS", 0.0),
+                patch.object(settings, "OCR_PAGE_ALLOWANCE_HEADROOM", 0.0001),
                 pytest.raises(OcrProcessingError, match="reclamation grace"),
             ):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 0.05, "rest")
 
     @pytest.mark.usefixtures("off_family_language")
     @pytest.mark.parametrize("language", ["en", "ru"])
-    async def test_the_reclamation_grace_is_the_reading_engine_s_own(self, monkeypatch, language):
+    async def test_the_reclamation_grace_is_the_reading_engine_s_own(
+        self, monkeypatch: pytest.MonkeyPatch, language: str
+    ) -> None:
         # Given: the server detector an opted-in ru loads is allowed far longer per page than the small one
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
         sentinel = OcrJsonResponse(filename="f.png", language=language, pages=[], processing_time_seconds=0.1)
         timeouts: list[float] = []
         real_wait_for = asyncio.wait_for
 
-        async def recording_wait_for(awaitable, **kwargs):
+        async def recording_wait_for(awaitable: Any, **kwargs: Any) -> Any:
             timeouts.append(kwargs["timeout"])
 
             return await real_wait_for(awaitable, **kwargs)
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> OcrJsonResponse:
             return sentinel
 
         # When
@@ -1540,19 +1624,21 @@ class TestDispatchOcrRequest:
             mock_loop.run_in_executor = fake_run_in_executor
             mock_get_loop.return_value = mock_loop
 
-            with patch.object(ocr_service_module.asyncio, "wait_for", recording_wait_for):
+            with patch.object(asyncio, "wait_for", recording_wait_for):
                 await dispatch_ocr_request(b"x", "f.png", language, "high", 30.0, "rest")
 
         # Then
         grace = settings.reclamation_grace_seconds(settings.model_pair(language))
         assert timeouts[-1] == pytest.approx(30.0 + grace, abs=0.5)
 
-    async def test_broken_pool_triggers_rebuild_and_fails_request(self, monkeypatch):
+    async def test_broken_pool_triggers_rebuild_and_fails_request(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_rebuild_pool", lambda *a, **k: _async_none())
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             raise BrokenProcessPool("dead worker")
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1564,7 +1650,9 @@ class TestDispatchOcrRequest:
             with pytest.raises(OcrProcessingError, match="worker process failed"):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
-    async def test_pool_already_broken_at_submission_triggers_rebuild_and_fails_request(self, monkeypatch):
+    async def test_pool_already_broken_at_submission_triggers_rebuild_and_fails_request(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - a worker killed between requests (e.g. by the OS, out-of-band) leaves
         # the pool broken before this request ever calls run_in_executor. concurrent.
         # futures' own executor.submit() raises BrokenProcessPool synchronously in that
@@ -1576,7 +1664,7 @@ class TestDispatchOcrRequest:
         monkeypatch.setattr(ocr_service_module, "_rebuild_pool", lambda *a, **k: _async_none())
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        def synchronously_broken_run_in_executor(_executor, _func, *_args):
+        def synchronously_broken_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             raise BrokenProcessPool("pool already broken")
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1588,7 +1676,7 @@ class TestDispatchOcrRequest:
             with pytest.raises(OcrProcessingError, match="worker process failed"):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
-    async def test_pool_torn_down_mid_rebuild_fails_cleanly(self, monkeypatch):
+    async def test_pool_torn_down_mid_rebuild_fails_cleanly(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given - a request that clears admission while a concurrent background
         # rebuild (now offloaded off the event loop, see TestRebuildPool) has already
         # torn the old pool down but not yet stood the replacement up.
@@ -1607,7 +1695,9 @@ class TestDispatchOcrRequest:
         # And the permit is still released for the next request.
         assert ocr_service_module._admission_semaphore._value == 1
 
-    async def test_concurrent_jobs_track_independent_overrun_deadlines(self, monkeypatch):
+    async def test_concurrent_jobs_track_independent_overrun_deadlines(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - two permits, two concurrent jobs with different budgets. The first
         # to finish must not erase the still-running second job's own deadline
         # tracking (the regression case for the single shared _active_deadline bug).
@@ -1615,11 +1705,12 @@ class TestDispatchOcrRequest:
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
         release_slow = asyncio.Event()
 
-        async def fake_run_in_executor(_executor, _func, *args):
+        async def fake_run_in_executor(_executor: object, _func: object, *args: object) -> OcrJsonResponse:
             # run_ocr_in_worker's positional args carry the budget third from last, with
             # the job identifier and the straighten choice after it. Use the budget to
             # tell the fast call from the slow one.
             budget = args[-3]
+            assert isinstance(budget, float)
             if budget < 1:
                 return OcrJsonResponse(filename="fast", language="en", pages=[], processing_time_seconds=0.01)
 
@@ -1633,7 +1724,9 @@ class TestDispatchOcrRequest:
             mock_get_loop.return_value = mock_loop
 
             fast_task = asyncio.create_task(dispatch_ocr_request(b"x", "fast.png", "en", "high", 0.5, "rest"))
-            slow_task = asyncio.create_task(dispatch_ocr_request(b"x", "slow.png", "en", "high", 60.0, "rest"))
+            slow_task = asyncio.create_task(
+                dispatch_ocr_request(b"x", "slow.png", "en", "high", 60.0, "rest")
+            )
             await asyncio.sleep(0.05)
 
             # When - the fast job finishes and its own finally clears its own entry
@@ -1648,14 +1741,16 @@ class TestDispatchOcrRequest:
         assert slow_result.filename == "slow"
         assert ocr_service_module._active_deadlines == {}
 
-    async def test_worker_own_deadline_stop_fails_cleanly_without_rebuild(self, monkeypatch):
+    async def test_worker_own_deadline_stop_fails_cleanly_without_rebuild(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - the worker observed its own deadline between pages and returned on
         # its own (Decision 3's expected path), which must not trigger a replacement.
         rebuild_mock = AsyncMock()
         monkeypatch.setattr(ocr_service_module, "_rebuild_pool", rebuild_mock)
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             raise OcrDeadlineExceededError("Budget exhausted after 1 of the document's pages")
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1670,12 +1765,12 @@ class TestDispatchOcrRequest:
         # Then
         rebuild_mock.assert_not_called()
 
-    async def test_size_and_type_errors_pass_through_unwrapped(self, monkeypatch):
+    async def test_size_and_type_errors_pass_through_unwrapped(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given - the worker can in principle still raise these directly; they must
         # not be masked as a generic OCR failure.
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             raise FileSizeExceededError("too big")
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1687,11 +1782,13 @@ class TestDispatchOcrRequest:
             with pytest.raises(FileSizeExceededError):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
-    async def test_unsupported_type_error_passes_through_unwrapped(self, monkeypatch):
+    async def test_unsupported_type_error_passes_through_unwrapped(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             raise UnsupportedFileTypeError("bad type")
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1703,11 +1800,13 @@ class TestDispatchOcrRequest:
             with pytest.raises(UnsupportedFileTypeError):
                 await dispatch_ocr_request(b"x", "f.png", "en", "high", 30.0, "rest")
 
-    async def test_generic_engine_failure_wrapped_as_ocr_processing_error(self, monkeypatch):
+    async def test_generic_engine_failure_wrapped_as_ocr_processing_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             raise RuntimeError("engine internal trace")
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1722,13 +1821,15 @@ class TestDispatchOcrRequest:
         # Then
         assert "engine internal trace" not in str(exc_info.value)
 
-    async def test_successful_dispatch_resets_rebuild_failure_counter(self, monkeypatch):
+    async def test_successful_dispatch_resets_rebuild_failure_counter(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 2)
         sentinel = OcrJsonResponse(filename="f.png", language="en", pages=[], processing_time_seconds=0.1)
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> OcrJsonResponse:
             return sentinel
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1742,11 +1843,11 @@ class TestDispatchOcrRequest:
         # Then
         assert ocr_service_module._consecutive_rebuild_failures == 0
 
-    async def test_permit_released_on_worker_failure(self, monkeypatch):
+    async def test_permit_released_on_worker_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "get_process_pool", MagicMock(return_value=MagicMock()))
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> None:
             raise RuntimeError("boom")
 
         with patch("asyncio.get_running_loop") as mock_get_loop:
@@ -1761,7 +1862,9 @@ class TestDispatchOcrRequest:
         # Then
         assert ocr_service_module._admission_semaphore._value == 1
 
-    async def test_pool_never_receives_more_concurrent_work_than_worker_count(self, monkeypatch):
+    async def test_pool_never_receives_more_concurrent_work_than_worker_count(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - the pool's own queue can only ever be empty if the admission gate
         # never lets more than OCR_WORKER_COUNT dispatches reach it at once.
         monkeypatch.setattr(ocr_service_module, "_admission_semaphore", asyncio.Semaphore(2))
@@ -1770,7 +1873,7 @@ class TestDispatchOcrRequest:
         max_active = 0
         lock = asyncio.Lock()
 
-        async def fake_run_in_executor(_executor, _func, *_args):
+        async def fake_run_in_executor(_executor: object, _func: object, *_args: object) -> OcrJsonResponse:
             nonlocal active, max_active
             async with lock:
                 active += 1
@@ -1787,7 +1890,9 @@ class TestDispatchOcrRequest:
             mock_get_loop.return_value = mock_loop
 
             # When - five requests arrive at once against a pool of two workers
-            await asyncio.gather(*[dispatch_ocr_request(b"x", "f.png", "en", "high", 5.0, "rest") for _ in range(5)])
+            await asyncio.gather(
+                *[dispatch_ocr_request(b"x", "f.png", "en", "high", 5.0, "rest") for _ in range(5)]
+            )
 
         # Then
         assert max_active <= 2
@@ -1798,7 +1903,9 @@ async def _async_none() -> None:
 
 
 class TestWorkerProgress:
-    def test_the_worker_records_each_page_as_it_finishes_it(self, jobs_dir, monkeypatch):
+    def test_the_worker_records_each_page_as_it_finishes_it(
+        self, jobs_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - a three page document being read for a known job
         _ = jobs_dir
         service = OcrService()
@@ -1817,7 +1924,7 @@ class TestWorkerProgress:
         assert seen == [1, 2, 3]
         assert len(pages) == 3
 
-    def test_progress_is_readable_between_pages(self, jobs_dir):
+    def test_progress_is_readable_between_pages(self, jobs_dir: Path) -> None:
         # Given
         _ = jobs_dir
         service = OcrService()
@@ -1830,7 +1937,9 @@ class TestWorkerProgress:
         # Then
         assert read_progress(job_id) == 2
 
-    def test_a_call_with_no_job_records_no_progress(self, jobs_dir, monkeypatch):
+    def test_a_call_with_no_job_records_no_progress(
+        self, jobs_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - the warm-up path and any direct call, which belong to no job
         _ = jobs_dir
         service = OcrService()
@@ -1849,7 +1958,9 @@ class TestWorkerProgress:
 
 
 class TestCancellationReplacesTheWorker:
-    async def test_a_requested_replacement_is_reported_as_in_progress_before_it_first_runs(self, monkeypatch):
+    async def test_a_requested_replacement_is_reported_as_in_progress_before_it_first_runs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         replacement_may_finish = asyncio.Event()
 
@@ -1868,7 +1979,9 @@ class TestCancellationReplacesTheWorker:
         await wait_for_worker_replacements()
         assert is_rebuild_in_progress() is False
 
-    async def test_requesting_a_replacement_does_not_wait_for_it(self, monkeypatch):
+    async def test_requesting_a_replacement_does_not_wait_for_it(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         started: list[bool] = []
 
@@ -1885,7 +1998,9 @@ class TestCancellationReplacesTheWorker:
         await wait_for_worker_replacements()
         assert started == [True]
 
-    async def test_a_replacement_that_fails_is_logged_and_no_longer_in_progress(self, monkeypatch, emitted_logs):
+    async def test_a_replacement_that_fails_is_logged_and_no_longer_in_progress(
+        self, monkeypatch: pytest.MonkeyPatch, emitted_logs: list[logging.LogRecord]
+    ) -> None:
         # Given
         async def failing_replacement() -> None:
             raise RuntimeError("pool would not start")
@@ -1901,7 +2016,9 @@ class TestCancellationReplacesTheWorker:
         assert [record.exc_info is not None for record in failures] == [True]
         assert is_rebuild_in_progress() is False
 
-    async def test_a_replacement_cancelled_by_shutdown_is_forgotten_without_an_error(self, monkeypatch, emitted_logs):
+    async def test_a_replacement_cancelled_by_shutdown_is_forgotten_without_an_error(
+        self, monkeypatch: pytest.MonkeyPatch, emitted_logs: list[logging.LogRecord]
+    ) -> None:
         # Given
         async def endless_replacement() -> None:
             await asyncio.Event().wait()
@@ -1918,7 +2035,9 @@ class TestCancellationReplacesTheWorker:
         assert is_rebuild_in_progress() is False
         assert [record for record in emitted_logs if record.levelno >= logging.ERROR] == []
 
-    async def test_a_waiter_that_is_cancelled_leaves_the_replacement_running(self, monkeypatch):
+    async def test_a_waiter_that_is_cancelled_leaves_the_replacement_running(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given: the job runner waits on a replacement, and shutdown cancels the runner mid-wait
         replacement_may_finish = asyncio.Event()
 
@@ -1943,20 +2062,24 @@ class TestCancellationReplacesTheWorker:
         assert replacement.done() is True
         assert replacement.cancelled() is False
 
-    async def test_waiting_for_replacements_with_none_in_flight_returns_at_once(self):
+    async def test_waiting_for_replacements_with_none_in_flight_returns_at_once(self) -> None:
         # When
         await asyncio.wait_for(wait_for_worker_replacements(), timeout=1.0)
 
         # Then
         assert is_rebuild_in_progress() is False
 
-    async def test_a_cancel_kills_the_worker_rather_than_draining_it(self, monkeypatch):
+    async def test_a_cancel_kills_the_worker_rather_than_draining_it(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given - a pool whose worker is mid-document, which shutdown(wait=True) alone
         # would wait for
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 7)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
         stopped: list[bool] = []
-        monkeypatch.setattr(ocr_service_module, "stop_worker_pool", lambda terminate=False: stopped.append(terminate))
+        monkeypatch.setattr(
+            ocr_service_module, "stop_worker_pool", lambda terminate=False: stopped.append(terminate)
+        )
         monkeypatch.setattr(ocr_service_module, "start_worker_pool", MagicMock(return_value=True))
         before = POOL_REBUILDS_TOTAL.labels(reason="cancel", outcome="ok")._value.get()
 
@@ -1967,7 +2090,9 @@ class TestCancellationReplacesTheWorker:
         assert stopped == [True]
         assert POOL_REBUILDS_TOTAL.labels(reason="cancel", outcome="ok")._value.get() == before + 1
 
-    async def test_a_cancel_does_not_count_towards_the_consecutive_failure_cap(self, monkeypatch):
+    async def test_a_cancel_does_not_count_towards_the_consecutive_failure_cap(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(ocr_service_module, "_pool_generation", 7)
         monkeypatch.setattr(ocr_service_module, "_consecutive_rebuild_failures", 0)
@@ -1981,7 +2106,7 @@ class TestCancellationReplacesTheWorker:
         assert ocr_service_module._consecutive_rebuild_failures == 0
         assert is_pool_usable() is True
 
-    def test_terminating_the_pool_kills_every_worker_process(self):
+    def test_terminating_the_pool_kills_every_worker_process(self) -> None:
         # Given
         first = MagicMock()
         second = MagicMock()
@@ -1995,7 +2120,9 @@ class TestCancellationReplacesTheWorker:
         first.kill.assert_called_once()
         second.kill.assert_called_once()
 
-    def test_stopping_without_terminating_leaves_the_workers_to_finish(self, monkeypatch):
+    def test_stopping_without_terminating_leaves_the_workers_to_finish(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         pool = MagicMock()
         pool._processes = {1: MagicMock()}
@@ -2008,7 +2135,9 @@ class TestCancellationReplacesTheWorker:
         pool._processes[1].kill.assert_not_called()
         pool.shutdown.assert_called_once_with(wait=True)
 
-    def test_stopping_with_terminate_kills_first_and_then_shuts_down(self, monkeypatch):
+    def test_stopping_with_terminate_kills_first_and_then_shuts_down(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         process = MagicMock()
         pool = MagicMock()

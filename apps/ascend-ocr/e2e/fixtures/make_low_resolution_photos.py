@@ -1,12 +1,13 @@
 """Generate the three low-resolution copies of the flat straightening photo.
 
-Each copy is `straightening-photo-flat.jpg` shrunk with LANCZOS to a long side of 1600, 1000 or 640 pixels with its
-aspect ratio kept, saved as JPEG at quality 85, 80 or 75, and stripped of every APP0 to APP15 segment and every
-comment, so it carries no EXIF, ICC, XMP or JFIF data.
+Each copy is `straightening-photo-flat.jpg` shrunk with LANCZOS to a long side of 1600, 1000 or 640
+pixels with its aspect ratio kept, saved as JPEG at quality 85, 80 or 75, and stripped of every APP0 to
+APP15 segment and every comment, so it carries no EXIF, ICC, XMP or JFIF data.
 """
 
 import io
 import struct
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -64,4 +65,4 @@ with Image.open(SOURCE) as source:
     for long_side, quality in VARIANTS:
         output = OUTPUT_DIR / f"straightening-photo-flat-{long_side}px.jpg"
         output.write_bytes(downscale(source, long_side, quality))
-        print(output, output.stat().st_size, "bytes")
+        sys.stdout.write(f"{output} {output.stat().st_size} bytes\n")

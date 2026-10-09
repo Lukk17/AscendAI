@@ -44,24 +44,57 @@
       "response": {
         "body": {
           "content": {
-            "code": "UNSUPPORTED_FILE_TYPE"
+            "code": "UNSUPPORTED_FILE_TYPE",
+            "detail": "Unsupported file type",
+            "instance": "/v1/ocr/jobs",
+            "status": 400,
+            "title": "Bad Request",
+            "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+            "type": "https://ascend.ai/errors/unsupported-file-type"
           },
-          "contentType": "application/json; charset=UTF-8",
+          "contentType": "application/problem+json",
           "encoded": false
         },
         "headers": {
           "Content-Type": [
-            "application/json; charset=UTF-8"
+            "application/problem+json"
           ]
         },
         "matchingRules": {
+          "body": {
+            "$.detail": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.instance": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.traceId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{32}"
+                }
+              ]
+            }
+          },
           "header": {
             "Content-Type": {
               "combine": "AND",
               "matchers": [
                 {
                   "match": "regex",
-                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                  "regex": "application/problem\\+json.*"
                 }
               ]
             }
@@ -675,24 +708,57 @@
       "response": {
         "body": {
           "content": {
-            "code": "JOB_NOT_FOUND"
+            "code": "JOB_NOT_FOUND",
+            "detail": "Job identifier is unknown or expired",
+            "instance": "/v1/ocr/jobs/tQ3v9ZkLx2Wm8aPbR5cN0g",
+            "status": 404,
+            "title": "Not Found",
+            "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+            "type": "https://ascend.ai/errors/job-not-found"
           },
-          "contentType": "application/json; charset=UTF-8",
+          "contentType": "application/problem+json",
           "encoded": false
         },
         "headers": {
           "Content-Type": [
-            "application/json; charset=UTF-8"
+            "application/problem+json"
           ]
         },
         "matchingRules": {
+          "body": {
+            "$.detail": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.instance": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.traceId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{32}"
+                }
+              ]
+            }
+          },
           "header": {
             "Content-Type": {
               "combine": "AND",
               "matchers": [
                 {
                   "match": "regex",
-                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                  "regex": "application/problem\\+json.*"
                 }
               ]
             }
@@ -847,24 +913,57 @@
       "response": {
         "body": {
           "content": {
-            "code": "UNSUPPORTED_LANGUAGE"
+            "code": "UNSUPPORTED_LANGUAGE",
+            "detail": "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan",
+            "instance": "/v1/ocr/jobs",
+            "status": 400,
+            "title": "Bad Request",
+            "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+            "type": "https://ascend.ai/errors/unsupported-language"
           },
-          "contentType": "application/json; charset=UTF-8",
+          "contentType": "application/problem+json",
           "encoded": false
         },
         "headers": {
           "Content-Type": [
-            "application/json; charset=UTF-8"
+            "application/problem+json"
           ]
         },
         "matchingRules": {
+          "body": {
+            "$.detail": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.instance": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.traceId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{32}"
+                }
+              ]
+            }
+          },
           "header": {
             "Content-Type": {
               "combine": "AND",
               "matchers": [
                 {
                   "match": "regex",
-                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                  "regex": "application/problem\\+json.*"
                 }
               ]
             }
@@ -1020,14 +1119,19 @@
         "body": {
           "content": {
             "code": "QUEUE_FULL",
-            "detail": "Queue is full, retry later"
+            "detail": "Queue is full, retry later",
+            "instance": "/v1/ocr/jobs",
+            "status": 503,
+            "title": "Service Unavailable",
+            "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+            "type": "https://ascend.ai/errors/queue-full"
           },
-          "contentType": "application/json; charset=UTF-8",
+          "contentType": "application/problem+json",
           "encoded": false
         },
         "headers": {
           "Content-Type": [
-            "application/json; charset=UTF-8"
+            "application/problem+json"
           ],
           "Retry-After": [
             "1"
@@ -1042,6 +1146,23 @@
                   "match": "type"
                 }
               ]
+            },
+            "$.instance": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.traceId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{32}"
+                }
+              ]
             }
           },
           "header": {
@@ -1050,7 +1171,7 @@
               "matchers": [
                 {
                   "match": "regex",
-                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                  "regex": "application/problem\\+json.*"
                 }
               ]
             },

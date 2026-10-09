@@ -5,6 +5,8 @@ from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from ascend_python_common.log_config import get_logger
+
 from src.api.exception_handlers import (
     ERROR_CODE_INTERNAL,
     ERROR_CODE_OCR_FAILED,
@@ -13,7 +15,6 @@ from src.api.exception_handlers import (
     QueueFullError,
 )
 from src.config.config import settings
-from src.config.logging_config import get_logger
 from src.model.ocr_models import FAILURE_RESULT_STORE_UNAVAILABLE, JobRecord
 from src.observability.metrics import (
     JOB_QUEUE_DOCUMENTS,

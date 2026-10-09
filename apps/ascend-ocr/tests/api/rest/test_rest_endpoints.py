@@ -1,6 +1,8 @@
 import asyncio
 import io
+import re
 import time
+from collections.abc import AsyncIterator
 from importlib.metadata import version as get_package_version
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,7 +12,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 
 from src.api.exception_handlers import OcrProcessingError
-from src.api.middleware.rate_limit import limiter
+from src.api.rest.rest_endpoints import limiter
 from src.config.config import settings
 from src.main import create_app
 from src.model.ocr_models import JobResultLocation, JobState
@@ -33,7 +35,7 @@ JOBS_PATH = "/v1/ocr/jobs"
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limiter():
+def reset_rate_limiter() -> None:
     """Every test starts with a full budget, so one module's traffic cannot throttle another's."""
     limiter.reset()
 
@@ -67,7 +69,7 @@ def app(service: JobService, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
 
 
 @pytest.fixture
-async def client(app):
+async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
@@ -82,7 +84,7 @@ async def submit_png(client: AsyncClient, filename: str = "test.png", lang: str 
 
 
 class TestHealthEndpoint:
-    async def test_health_returns_ok(self, client):
+    async def test_health_returns_ok(self, client: AsyncClient) -> None:
         # When
         response = await client.get("/health")
 
@@ -94,7 +96,7 @@ class TestHealthEndpoint:
 
 
 class TestOpenApiDocument:
-    async def test_openapi_reports_the_same_version_as_health(self, client):
+    async def test_openapi_reports_the_same_version_as_health(self, client: AsyncClient) -> None:
         # When
         health = await client.get("/health")
         openapi = await client.get("/openapi.json")
@@ -105,94 +107,102 @@ class TestOpenApiDocument:
 
 
 class TestReadyEndpoint:
-    @patch("src.main.is_accepting_work", return_value=True)
-    @patch("src.main.is_engine_warm", return_value=False)
-    async def test_ready_returns_not_ready_when_engine_cold(self, mock_is_warm, _mock_accepting, client):
+    @patch("src.api.readiness.is_engine_warm", return_value=False)
+    async def test_ready_returns_not_ready_when_engine_cold(
+        self, mock_is_warm: MagicMock, client: AsyncClient
+    ) -> None:
+        # When
+        with patch("src.api.readiness.is_accepting_work", return_value=True):
+            response = await client.get("/ready")
+
+        # Then
+        assert response.status_code == 503
+        assert response.json()["status"] == "not-ready"
+        assert response.json()["checks"]["engine"]["warm"] == "false"
+        mock_is_warm.assert_called_once_with(settings.DEFAULT_LANGUAGE)
+
+    @patch("src.api.readiness.is_accepting_work", return_value=True)
+    @patch("src.api.readiness.is_engine_warm", return_value=True)
+    async def test_ready_returns_ready_when_engine_warm_and_accepting_work(
+        self, mock_is_warm: MagicMock, mock_accepting: MagicMock, client: AsyncClient
+    ) -> None:
         # When
         response = await client.get("/ready")
 
         # Then
         assert response.status_code == 200
-        assert response.json()["status"] == "not-ready"
-        assert response.json()["engine_warm"] is False
-        mock_is_warm.assert_called_once_with(settings.DEFAULT_LANGUAGE)
-
-    @patch("src.main.is_accepting_work", return_value=True)
-    @patch("src.main.is_engine_warm", return_value=True)
-    async def test_ready_returns_ready_when_engine_warm_and_accepting_work(self, mock_is_warm, mock_accepting, client):
-        # When
-        response = await client.get("/ready")
-
-        # Then
         assert response.json()["status"] == "ready"
-        assert response.json()["engine_warm"] is True
-        assert response.json()["accepting_work"] is True
+        assert response.json()["checks"]["engine"]["warm"] == "true"
+        assert response.json()["checks"]["worker_pool"]["accepting_work"] == "true"
         mock_is_warm.assert_called_once_with(settings.DEFAULT_LANGUAGE)
         mock_accepting.assert_called_once()
 
-    @patch("src.main.is_accepting_work", return_value=False)
-    @patch("src.main.is_engine_warm", return_value=True)
     async def test_ready_returns_not_ready_when_engine_warm_but_not_accepting_work(
-        self, _mock_is_warm, _mock_accepting, client
-    ):
+        self, client: AsyncClient
+    ) -> None:
         # Given - engine warm but the worker is being replaced, the pool is broken, or
         # the in-flight job is past its budget: still not-ready, per ADR-004.
         # When
-        response = await client.get("/ready")
+        with (
+            patch("src.api.readiness.is_accepting_work", return_value=False),
+            patch("src.api.readiness.is_engine_warm", return_value=True),
+        ):
+            response = await client.get("/ready")
 
         # Then
+        assert response.status_code == 503
         assert response.json()["status"] == "not-ready"
-        assert response.json()["accepting_work"] is False
+        assert response.json()["checks"]["worker_pool"]["accepting_work"] == "false"
 
-    async def test_ready_reports_the_queue_only_through_the_job_counters(self, client):
+    async def test_ready_reports_the_queue_only_through_the_job_counters(self, client: AsyncClient) -> None:
         # When
         response = await client.get("/ready")
 
         # Then
         assert set(response.json()) == {
             "status",
+            "service",
             "version",
-            "engine_warm",
-            "accepting_work",
-            "jobs_queued",
-            "jobs_running",
+            "checks",
         }
 
-    @patch("src.main.is_accepting_work", return_value=True)
-    @patch("src.main.is_engine_warm", return_value=True)
     async def test_ready_reports_work_waiting_and_running_and_stays_ready(
-        self, _mock_is_warm: MagicMock, _mock_accepting: MagicMock, client: AsyncClient, runner: JobRunner
+        self, client: AsyncClient, runner: JobRunner
     ) -> None:
         # Given - one document being read and two waiting
         for _ in range(3):
             runner.admit(make_record(page_count=1))
 
         runner._running = runner._queue.popleft()
-        with patch("src.main.job_runner", runner):
+        with (
+            patch("src.api.readiness.is_accepting_work", return_value=True),
+            patch("src.api.readiness.is_engine_warm", return_value=True),
+            patch("src.api.readiness.job_runner", runner),
+        ):
             # When
             response = await client.get("/ready")
 
         # Then - busy is still ready, because the waiting work will be served
         payload = response.json()
-        assert payload["jobs_running"] == 1
-        assert payload["jobs_queued"] == 2
+        assert payload["checks"]["jobs"]["running"] == "1"
+        assert payload["checks"]["jobs"]["queued"] == "2"
         assert payload["status"] == "ready"
 
     async def test_ready_reports_nothing_in_flight_on_an_idle_service(
         self, client: AsyncClient, runner: JobRunner
     ) -> None:
         # Given
-        with patch("src.main.job_runner", runner):
+        with patch("src.api.readiness.job_runner", runner):
             # When
             response = await client.get("/ready")
 
         # Then
-        assert response.json()["jobs_queued"] == 0
-        assert response.json()["jobs_running"] == 0
+        assert response.json()["checks"]["jobs"]["queued"] == "0"
+        assert response.json()["checks"]["jobs"]["running"] == "0"
 
 
 class TestMetricsEndpoint:
-    async def test_metrics_endpoint_serves_prometheus_text(self, client):
+    async def test_metrics_endpoint_serves_prometheus_text(self, client: AsyncClient) -> None:
         # When
         response = await client.get("/metrics")
 
@@ -208,7 +218,7 @@ class TestMetricsEndpoint:
 
 
 class TestSecurityHeaders:
-    async def test_hsts_header_on_health(self, client):
+    async def test_hsts_header_on_health(self, client: AsyncClient) -> None:
         # When
         response = await client.get("/health")
 
@@ -217,7 +227,7 @@ class TestSecurityHeaders:
 
 
 class TestCorrelationIdHeader:
-    async def test_response_carries_correlation_id(self, client):
+    async def test_response_carries_correlation_id(self, client: AsyncClient) -> None:
         # When
         response = await client.get("/health")
 
@@ -226,7 +236,9 @@ class TestCorrelationIdHeader:
 
 
 class TestRemovedSynchronousPath:
-    async def test_the_old_synchronous_path_answers_not_found_like_any_unknown_path(self, client):
+    async def test_the_old_synchronous_path_answers_not_found_like_any_unknown_path(
+        self, client: AsyncClient
+    ) -> None:
         # When
         response = await client.post(
             "/v1/ocr",
@@ -238,7 +250,9 @@ class TestRemovedSynchronousPath:
 
 
 class TestSubmitJob:
-    async def test_submission_is_accepted_with_an_identifier_and_a_relative_location(self, client):
+    async def test_submission_is_accepted_with_an_identifier_and_a_relative_location(
+        self, client: AsyncClient
+    ) -> None:
         # When
         response = await submit_png(client)
 
@@ -251,7 +265,7 @@ class TestSubmitJob:
         assert payload["status_url"] == f"{JOBS_PATH}/{payload['job_id']}"
         assert payload["poll_after_seconds"] >= 1.0
 
-    async def test_the_submission_answer_carries_no_page_content(self, client):
+    async def test_the_submission_answer_carries_no_page_content(self, client: AsyncClient) -> None:
         # When
         response = await submit_png(client)
 
@@ -317,7 +331,8 @@ class TestSubmitJob:
         )
 
         # Then
-        assert response.status_code == 422
+        assert response.status_code == 400
+        assert response.json()["code"] == "validation"
         assert runner.documents_waiting() == 0
 
     async def test_a_straighten_request_is_recorded(self, client: AsyncClient, store: JobStore) -> None:
@@ -355,10 +370,11 @@ class TestSubmitJob:
         )
 
         # Then
-        assert response.status_code == 422
+        assert response.status_code == 400
+        assert response.json()["code"] == "validation"
         assert runner.documents_waiting() == 0
 
-    async def test_a_pdf_is_accepted(self, client):
+    async def test_a_pdf_is_accepted(self, client: AsyncClient) -> None:
         # When
         response = await client.post(
             JOBS_PATH,
@@ -368,12 +384,16 @@ class TestSubmitJob:
         # Then
         assert response.status_code == 202
 
-    async def test_a_submission_with_no_file_is_rejected(self, client):
+    async def test_a_submission_with_no_file_is_rejected(self, client: AsyncClient) -> None:
         # When
         response = await client.post(JOBS_PATH)
 
         # Then
-        assert response.status_code == 422
+        assert response.status_code == 400
+        payload = response.json()
+        assert payload["code"] == "validation"
+        assert isinstance(payload["errors"], list)
+        assert len(payload["errors"]) > 0
 
     @pytest.mark.parametrize("language", ["korean", "ru"])
     async def test_a_language_the_service_does_not_read_is_refused_with_no_identifier(
@@ -384,14 +404,22 @@ class TestSubmitJob:
 
         # Then
         assert response.status_code == 400
-        assert response.json() == {
-            "code": "UNSUPPORTED_LANGUAGE",
-            "detail": "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan",
-        }
+        assert "application/problem+json" in response.headers["content-type"]
+        payload = response.json()
+        assert payload["type"] == "https://ascend.ai/errors/unsupported-language"
+        assert payload["title"] == "Bad Request"
+        assert payload["status"] == 400
+        assert payload["code"] == "UNSUPPORTED_LANGUAGE"
+        assert payload["detail"] == (
+            "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan"
+        )
+        assert payload["instance"] == JOBS_PATH
+        assert re.fullmatch(r"[0-9a-f]{32}", payload["traceId"]) is not None
+        assert "job_id" not in payload
         assert "location" not in response.headers
         assert runner.documents_waiting() == 0
 
-    async def test_a_refused_language_is_counted_under_one_fixed_label(self, client):
+    async def test_a_refused_language_is_counted_under_one_fixed_label(self, client: AsyncClient) -> None:
         # Given
         before = OCR_REQUESTS_TOTAL.labels(surface="rest", language="unsupported")._value.get()
 
@@ -400,10 +428,12 @@ class TestSubmitJob:
 
         # Then
         assert OCR_REQUESTS_TOTAL.labels(surface="rest", language="unsupported")._value.get() == before + 1
-        labels = {sample.labels["language"] for metric in OCR_REQUESTS_TOTAL.collect() for sample in metric.samples}
+        labels = {
+            sample.labels["language"] for metric in OCR_REQUESTS_TOTAL.collect() for sample in metric.samples
+        }
         assert "zzqrst" not in labels
 
-    async def test_a_file_the_service_cannot_read_is_refused(self, client):
+    async def test_a_file_the_service_cannot_read_is_refused(self, client: AsyncClient) -> None:
         # When
         response = await client.post(
             JOBS_PATH,
@@ -414,7 +444,9 @@ class TestSubmitJob:
         assert response.status_code == 400
         assert response.json()["code"] == "UNSUPPORTED_FILE_TYPE"
 
-    async def test_an_oversized_file_is_refused(self, client, monkeypatch):
+    async def test_an_oversized_file_is_refused(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "MAX_FILE_SIZE_MB", 0)
 
@@ -445,7 +477,9 @@ class TestSubmitJob:
         assert response.json()["code"] == "FILE_TOO_LARGE"
         assert runner.documents_waiting() == 0
 
-    async def test_a_full_queue_answers_service_unavailable_with_a_retry_hint(self, client, monkeypatch):
+    async def test_a_full_queue_answers_service_unavailable_with_a_retry_hint(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_JOB_QUEUE_MAX_DOCUMENTS", 1)
         await submit_png(client, filename="first.png")
@@ -458,7 +492,7 @@ class TestSubmitJob:
         assert response.json()["code"] == "QUEUE_FULL"
         assert int(response.headers["retry-after"]) >= 1
 
-    async def test_an_unexpected_failure_surfaces_as_a_handled_internal_error(self, app):
+    async def test_an_unexpected_failure_surfaces_as_a_handled_internal_error(self, app: FastAPI) -> None:
         # Given - every expected failure is mapped by the service layer; anything else
         # must still reach the global handler rather than taking the app down.
         transport = ASGITransport(app=app, raise_app_exceptions=False)
@@ -476,7 +510,7 @@ class TestSubmitJob:
 
 
 class TestReadJob:
-    async def test_reading_waiting_work_reports_its_place_and_its_hint(self, client):
+    async def test_reading_waiting_work_reports_its_place_and_its_hint(self, client: AsyncClient) -> None:
         # Given
         job_id = (await submit_png(client)).json()["job_id"]
 
@@ -563,7 +597,7 @@ class TestReadJob:
         assert payload["queue_position"] is None
         assert payload["pages_ahead"] is None
 
-    async def test_reading_an_unknown_identifier_is_not_found(self, client):
+    async def test_reading_an_unknown_identifier_is_not_found(self, client: AsyncClient) -> None:
         # When
         response = await client.get(f"{JOBS_PATH}/{new_job_id()}")
 
@@ -577,7 +611,9 @@ class TestReadJob:
     # segment, so it reaches the identifier validator rather than being rewritten by the
     # client into a different URL.
     @pytest.mark.parametrize("candidate", ["not-an-identifier", "%2e%2e", "x" * 200, "job..id"])
-    async def test_an_identifier_that_is_not_shaped_like_one_is_not_found(self, client, candidate):
+    async def test_an_identifier_that_is_not_shaped_like_one_is_not_found(
+        self, client: AsyncClient, candidate: str
+    ) -> None:
         # When
         response = await client.get(f"{JOBS_PATH}/{candidate}")
 
@@ -587,7 +623,7 @@ class TestReadJob:
 
 
 class TestListJobs:
-    async def test_an_idle_service_lists_nothing(self, client):
+    async def test_an_idle_service_lists_nothing(self, client: AsyncClient) -> None:
         # When
         response = await client.get(JOBS_PATH)
 
@@ -656,7 +692,7 @@ class TestDeleteJob:
         assert results.deleted == [f"{record.job_id}.md"]
         assert (await client.get(f"{JOBS_PATH}/{record.job_id}")).status_code == 404
 
-    async def test_deleting_an_unknown_identifier_is_not_found(self, client):
+    async def test_deleting_an_unknown_identifier_is_not_found(self, client: AsyncClient) -> None:
         # When
         response = await client.delete(f"{JOBS_PATH}/{new_job_id()}")
 
@@ -715,25 +751,31 @@ class TestDeleteJob:
         # Then: cancelled at once, not-ready while the worker is replaced, accepting again after
         assert response.status_code == 204
         assert status_during == "cancelled"
-        assert during["accepting_work"] is False
-        assert after["accepting_work"] is True
+        assert during["status"] == "not-ready"
+        assert during["checks"]["worker_pool"]["accepting_work"] == "false"
+        assert after["status"] == "ready"
+        assert after["checks"]["worker_pool"]["accepting_work"] == "true"
 
 
 class TestRateLimits:
-    async def test_submission_is_throttled_at_the_ocr_limit(self, client, monkeypatch):
+    async def test_submission_is_throttled_at_the_ocr_limit(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_JOB_QUEUE_MAX_DOCUMENTS", 1000)
         allowed = int(settings.RATE_LIMIT_OCR.split("/")[0])
 
         # When
-        statuses = [(await submit_png(client, filename=f"scan-{index}.png")).status_code for index in range(allowed)]
+        statuses = [
+            (await submit_png(client, filename=f"scan-{index}.png")).status_code for index in range(allowed)
+        ]
         over_the_limit = await submit_png(client, filename="one-too-many.png")
 
         # Then
         assert set(statuses) == {202}
         assert over_the_limit.status_code == 429
 
-    async def test_reading_and_listing_are_throttled_at_the_default_limit(self, client):
+    async def test_reading_and_listing_are_throttled_at_the_default_limit(self, client: AsyncClient) -> None:
         # Given - more reads than the OCR limit allows, which must not throttle them
         job_id = (await submit_png(client)).json()["job_id"]
         ocr_limit = int(settings.RATE_LIMIT_OCR.split("/")[0])

@@ -1,9 +1,10 @@
 import logging
-import socket
 from dataclasses import dataclass
 from typing import get_args
 
-from src.config.config import MCP_ENDPOINT_PATH, ModelPair, QualityMode, QualityProfile, settings
+from ascend_python_common.startup_banner import BannerLine, BannerSection, build_banner
+
+from src.config.config import ModelPair, QualityMode, QualityProfile, settings
 from src.config.memory_limits import detect_memory_limit_mib
 from src.service.result_store import result_store
 
@@ -18,7 +19,6 @@ BANNER = (
     "╚═╝     ╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚══════╝     ╚═════╝  ╚═════╝╚═╝  ╚═╝"
 )
 
-DIVIDER = "-" * 80
 APP_NAME = "ascend-ocr"
 
 _PIXELS_PER_MEGAPIXEL: float = 1_000_000
@@ -130,11 +130,15 @@ def _fitted_call_peak_mib(profile: QualityProfile) -> float:
 def _measured_call_peak_mib(pair: ModelPair, profile: QualityProfile) -> float | None:
     """Price the mode's worst input from this engine's measurements, or None when none covers it.
 
-    A measurement of that exact input is used as is. Otherwise the smallest measurement whose input and detection
-    input are both at least as large is used, because peak memory was measured not to grow steadily with pixels.
+    A measurement of that exact input is used as is. Otherwise the smallest measurement whose input
+    and detection input are both at least as large is used, because peak memory was measured not to
+    grow steadily with pixels.
     """
     measurements = [
-        measurement for engine in _MEASURED_ENGINES if engine.pair == pair for measurement in engine.measurements
+        measurement
+        for engine in _MEASURED_ENGINES
+        if engine.pair == pair
+        for measurement in engine.measurements
     ]
     input_pixels = profile.max_inference_pixels
     detector_pixels = min(input_pixels, profile.detector_max_side * profile.detector_max_side)
@@ -157,7 +161,7 @@ def _measured_call_peak_mib(pair: ModelPair, profile: QualityProfile) -> float |
 
 
 def _call_peak(pair: ModelPair, profile: QualityProfile, straighten: bool = False) -> _CallPeak:
-    """Predict one call's peak on one engine in one mode, falling back to the fitted model where nothing covers it."""
+    """Predict one call's peak on one engine in one mode, falling back to the fitted model."""
     overhead_mib = _STRAIGHTEN_OVERHEAD_MIB if straighten else 0.0
     measured_peak_mib = _measured_call_peak_mib(pair, profile)
     if measured_peak_mib is None:
@@ -172,11 +176,13 @@ def _quality_profiles() -> list[QualityProfile]:
 
 def _worst_call_peak(pair: ModelPair, straighten: bool) -> _CallPeak:
     """The costlier of the engine's quality modes, since a caller may ask for either."""
-    return max((_call_peak(pair, profile, straighten) for profile in _quality_profiles()), key=lambda peak: peak.mib)
+    return max(
+        (_call_peak(pair, profile, straighten) for profile in _quality_profiles()), key=lambda peak: peak.mib
+    )
 
 
 def _reachable_model_pairs() -> list[ModelPair]:
-    """Every engine the service can load, the same set the image preloads, in a stable order for the banner."""
+    """Every engine the service can load, the same set the image preloads, in a stable order."""
     return sorted(settings.reachable_model_pairs(), key=str)
 
 
@@ -185,7 +191,7 @@ def _resident_engine_count(reachable_pairs: list[ModelPair]) -> int:
 
 
 def _estimate_call_peak_mib() -> float:
-    """Predict one straightened call's peak on the worst engine that can be resident, beside the idle ones cached."""
+    """Predict one straightened call's peak on the worst engine that can be resident."""
     reachable_pairs = _reachable_model_pairs()
     idle_engines = _resident_engine_count(reachable_pairs) - 1
     worst_call_mib = max(_worst_call_peak(pair, straighten=True).mib for pair in reachable_pairs)
@@ -193,132 +199,115 @@ def _estimate_call_peak_mib() -> float:
     return worst_call_mib + _IDLE_ENGINE_MIB * idle_engines
 
 
-def _engine_lines() -> list[str]:
-    reachable_pairs = _reachable_model_pairs()
-    worst_peaks = {pair: _worst_call_peak(pair, straighten=False) for pair in reachable_pairs}
-    lines = [
-        f"      {pair}: ~{peak.mib:.0f} MiB, ~{peak.mib + _STRAIGHTEN_OVERHEAD_MIB:.0f} MiB straightened "
-        f"({'measured' if peak.is_measured else 'fitted'})"
-        for pair, peak in worst_peaks.items()
-    ]
-    lines.append(
-        f"      Resident engines: up to {_resident_engine_count(reachable_pairs)} of {len(reachable_pairs)} reachable, "
-        f"~{_IDLE_ENGINE_MIB:.0f} MiB per idle engine (measured)"
-    )
-    lines.append(f"      API process at rest: ~{_API_PROCESS_AT_REST_MIB:.0f} MiB (measured)")
-    if any(peak.is_measured for peak in worst_peaks.values()):
-        lines.append(f"      {MEASUREMENT_PROVENANCE}")
-
-    return lines
-
-
-def _page_allowance_lines() -> list[str]:
-    return [
-        f"      Page allowance, {pair}: {settings.page_allowance_seconds(pair):.1f}s"
-        for pair in _reachable_model_pairs()
-    ]
-
-
-def _quality_lines() -> list[str]:
-    return [
-        f"      Quality {mode}: {profile.render_dpi} dpi, detector max side {profile.detector_max_side}, "
-        f"up to {profile.max_inference_pixels} pixels per inference"
-        for mode in get_args(QualityMode)
-        for profile in (settings.quality_profile(mode),)
-    ]
-
-
-def _result_store_lines() -> list[str]:
+def _result_store_entries() -> list[BannerLine]:
     """Describe the one external service this module has, and never its credentials."""
     reachable = result_store.bucket_reachable
-    status = "unknown (not checked yet)" if reachable is None else ("answered" if reachable else "did NOT answer")
-    lines = [
-        f"      Result store: {settings.OCR_RESULT_S3_ENDPOINT} [{status}]",
-        f"      Result bucket: {settings.OCR_RESULT_S3_BUCKET}",
+    status = (
+        "unknown (not checked yet)" if reachable is None else ("answered" if reachable else "did NOT answer")
+    )
+    entries = [
+        BannerLine("Result store", f"{settings.OCR_RESULT_S3_ENDPOINT} [{status}]"),
+        BannerLine("Result bucket", settings.OCR_RESULT_S3_BUCKET),
     ]
 
     if settings.OCR_RESULT_S3_PUBLIC_ENDPOINT != settings.OCR_RESULT_S3_ENDPOINT:
-        lines.append(f"      Result store (public): {settings.OCR_RESULT_S3_PUBLIC_ENDPOINT}")
+        entries.append(BannerLine("Result store (public)", settings.OCR_RESULT_S3_PUBLIC_ENDPOINT))
 
-    return lines
-
-
-def _resolve_host() -> str:
-    try:
-        return socket.gethostname()
-    except OSError:
-        return "localhost"
+    return entries
 
 
-def log_startup_banner() -> None:
-    host = _resolve_host()
-    port = settings.API_PORT
-    local_url = f"http://localhost:{port}"
-    hostname_url = f"http://{host}:{port}"
+def _runtime_entries() -> list[BannerLine]:
+    return [
+        BannerLine("Language", settings.DEFAULT_LANGUAGE),
+        BannerLine("Max upload", f"{settings.MAX_FILE_SIZE_MB} MB"),
+        *(
+            BannerLine(f"Page allowance, {pair}", f"{settings.page_allowance_seconds(pair):.1f}s")
+            for pair in _reachable_model_pairs()
+        ),
+        BannerLine("Page ceiling", f"{settings.OCR_JOB_MAX_PAGES} page(s) per document"),
+        BannerLine("Reading ceiling", f"{settings.OCR_JOB_READING_CEILING_SECONDS}s per document"),
+        BannerLine(
+            "Queue bounds",
+            f"{settings.OCR_JOB_QUEUE_MAX_DOCUMENTS} document(s), {settings.OCR_JOB_QUEUE_MAX_PAGES} page(s)",
+        ),
+        BannerLine(
+            "Result retention",
+            f"{settings.OCR_JOB_RETENTION_SECONDS}s, {settings.OCR_JOB_MAX_RETAINED} record(s) max",
+        ),
+        BannerLine("Jobs directory", settings.OCR_JOBS_DIR),
+        *(
+            BannerLine(
+                f"Quality {mode}",
+                f"{profile.render_dpi} dpi, detector max side {profile.detector_max_side}, "
+                f"up to {profile.max_inference_pixels} pixels per inference",
+            )
+            for mode in get_args(QualityMode)
+            for profile in (settings.quality_profile(mode),)
+        ),
+        BannerLine("Engine cache cap", f"{settings.ENGINE_CACHE_MAX_SIZE} engines"),
+        BannerLine("Worker count", str(settings.OCR_WORKER_COUNT)),
+    ]
 
-    file_uri_root = settings.MCP_FILE_URI_ROOT or "disabled"
-    allowed_hosts = ", ".join(settings.MCP_ALLOWED_HOSTS) or "(none - public hosts only)"
+
+def _memory_entries() -> list[BannerLine]:
+    reachable_pairs = _reachable_model_pairs()
+    worst_peaks = {pair: _worst_call_peak(pair, straighten=False) for pair in reachable_pairs}
+    entries = [
+        BannerLine(
+            str(pair),
+            f"~{peak.mib:.0f} MiB, ~{peak.mib + _STRAIGHTEN_OVERHEAD_MIB:.0f} MiB straightened "
+            f"({'measured' if peak.is_measured else 'fitted'})",
+        )
+        for pair, peak in worst_peaks.items()
+    ]
+    entries.append(
+        BannerLine(
+            "Resident engines",
+            f"up to {_resident_engine_count(reachable_pairs)} of {len(reachable_pairs)} reachable, "
+            f"~{_IDLE_ENGINE_MIB:.0f} MiB per idle engine (measured)",
+        )
+    )
+    entries.append(BannerLine("API process at rest", f"~{_API_PROCESS_AT_REST_MIB:.0f} MiB (measured)"))
+    if any(peak.is_measured for peak in worst_peaks.values()):
+        entries.append(BannerLine("Provenance", MEASUREMENT_PROVENANCE))
     call_peak_mib = _estimate_call_peak_mib()
     service_peak_mib = _API_PROCESS_AT_REST_MIB + call_peak_mib * settings.OCR_WORKER_COUNT
-
-    block = "\n".join(
-        [
-            "",
-            BANNER,
-            DIVIDER,
-            f"    Application '{APP_NAME}' is running!",
-            "",
-            "    Access URLs:",
-            f"      Local:     {local_url}",
-            f"      Hostname:  {hostname_url}",
-            "",
-            f"    Profile(s): default (log level: {settings.LOG_LEVEL})",
-            "",
-            "    External services:",
-            *_result_store_lines(),
-            "",
-            "    Actuator:",
-            f"      Health:    {local_url}/health",
-            f"      Ready:     {local_url}/ready",
-            "",
-            "    API documentation:",
-            f"      OpenAPI:   {local_url}/openapi.json",
-            f"      Swagger:   {local_url}/docs",
-            f"      Redoc:     {local_url}/redoc",
-            "",
-            "    Observability:",
-            f"      Logging:   {settings.LOG_FORMAT} on the root handler (src.config.logging_config)",
-            "",
-            "    MCP endpoint:",
-            f"      HTTP:      POST {local_url}{MCP_ENDPOINT_PATH}",
-            f"      file:// root:    {file_uri_root}",
-            f"      Allowed hosts:   {allowed_hosts}",
-            f"      Download timeout: {settings.MCP_DOWNLOAD_TIMEOUT_SECONDS}s",
-            "",
-            "    Runtime config:",
-            f"      Language:  {settings.DEFAULT_LANGUAGE}",
-            f"      Max upload: {settings.MAX_FILE_SIZE_MB} MB",
-            *_page_allowance_lines(),
-            f"      Page ceiling: {settings.OCR_JOB_MAX_PAGES} page(s) per document",
-            f"      Reading ceiling: {settings.OCR_JOB_READING_CEILING_SECONDS}s per document",
-            f"      Queue bounds: {settings.OCR_JOB_QUEUE_MAX_DOCUMENTS} document(s), "
-            f"{settings.OCR_JOB_QUEUE_MAX_PAGES} page(s)",
-            f"      Result retention: {settings.OCR_JOB_RETENTION_SECONDS}s, "
-            f"{settings.OCR_JOB_MAX_RETAINED} record(s) max",
-            f"      Jobs directory: {settings.OCR_JOBS_DIR}",
-            *_quality_lines(),
-            f"      Engine cache cap: {settings.ENGINE_CACHE_MAX_SIZE} engines",
-            f"      Worker count: {settings.OCR_WORKER_COUNT}",
-            "    Memory ceiling (this configuration):",
-            *_engine_lines(),
-            f"      One call, straightened: ~{call_peak_mib:.0f} MiB, x{settings.OCR_WORKER_COUNT} worker(s) "
+    entries.append(
+        BannerLine(
+            "One call, straightened",
+            f"~{call_peak_mib:.0f} MiB, x{settings.OCR_WORKER_COUNT} worker(s) "
             f"+ ~{_API_PROCESS_AT_REST_MIB:.0f} MiB API process = ~{service_peak_mib:.0f} MiB service peak",
-            DIVIDER,
-        ]
+        )
     )
-    logger.info("\n%s", block)
+
+    return entries
+
+
+def service_banner_sections() -> list[BannerSection]:
+    return [
+        BannerSection("External services", _result_store_entries()),
+        BannerSection("Runtime config", _runtime_entries()),
+        BannerSection("Memory ceiling (this configuration)", _memory_entries()),
+    ]
+
+
+def build_service_banner() -> list[str]:
+    return build_banner(
+        service_name=APP_NAME,
+        api_port=settings.API_PORT,
+        log_level=settings.LOG_LEVEL,
+        art=BANNER,
+        sections=service_banner_sections(),
+    )
+
+
+def _service_peak_mib() -> float:
+    return _API_PROCESS_AT_REST_MIB + _estimate_call_peak_mib() * settings.OCR_WORKER_COUNT
+
+
+def log_startup_warnings() -> None:
     _warn_if_result_store_unreachable()
-    _warn_if_service_peak_exceeds_container_limit(service_peak_mib)
+    _warn_if_service_peak_exceeds_container_limit(_service_peak_mib())
 
 
 def _warn_if_result_store_unreachable() -> None:
@@ -333,8 +322,8 @@ def _warn_if_result_store_unreachable() -> None:
         return
 
     logger.warning(
-        "Result store %s did not answer for bucket '%s'. The service will accept and read documents, and every "
-        "job will finish with the RESULT_STORE_UNAVAILABLE reason until the store is reachable.",
+        "Result store %s did not answer for bucket '%s'. The service will accept and read documents, "
+        "and every job will finish with the RESULT_STORE_UNAVAILABLE reason until the store is reachable.",
         settings.OCR_RESULT_S3_ENDPOINT,
         settings.OCR_RESULT_S3_BUCKET,
     )

@@ -22,16 +22,21 @@ runtime:
     - type: tests
       code: |-
         test("A submission with no file is rejected before any work is queued", function () {
-            expect(res.getStatus()).to.equal(422);
+            expect(res.getStatus()).to.equal(400);
         });
-        test("The body carries the validation detail naming the missing file, not a job record", function () {
+        test("The body is the problem body with the validation code", function () {
             const body = res.getBody();
-            expect(body.detail).to.be.an("array").that.is.not.empty;
-            const fileError = body.detail.find(function (entry) {
-                return Array.isArray(entry.loc) && entry.loc[entry.loc.length - 1] === "file";
+            expect(body.code).to.equal("validation");
+            expect(body.detail).to.be.a("string").and.not.empty;
+        });
+        test("The errors array names the missing file field", function () {
+            const body = res.getBody();
+            expect(body.errors).to.be.an("array").that.is.not.empty;
+            const fields = body.errors.map(function (entry) { return entry.field; });
+            expect(fields).to.include("file");
+            body.errors.forEach(function (entry) {
+                expect(entry.message).to.be.a("string").and.not.empty;
             });
-            expect(fileError, JSON.stringify(body.detail)).to.be.ok;
-            expect(fileError.type).to.equal("missing");
             expect(body).to.not.have.property("state");
         });
         test("No identifier is issued", function () {

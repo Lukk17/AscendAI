@@ -86,7 +86,7 @@ which is what makes the header read `30`. Any headroom of at least 1.5 keeps it 
 docker exec ascend-ocr printenv RATE_LIMIT_OCR
 ```
 
-Expect `20/minute`, which `compose.yaml` sets. The spec makes ten submissions, and they must all land within one
+Expect `60/minute`, which is the code default of `RATE_LIMIT_OCR`. The spec makes ten submissions, and they must all land within one
 minute of each other without meeting that limit. A limit below 10 per minute answers 429 before the queue is full,
 which is a failure of the setup, not of this spec.
 
@@ -120,7 +120,7 @@ Confirm the service is idle before starting.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"status":"ready"`, `"jobs_queued":0` and `"jobs_running":0`.
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`.
 
 ## Run
 
@@ -215,7 +215,7 @@ Step 4:
 
 - The listing has nine entries: the long document first with `state` `running`, then the eight single page images in
   submission order with `state` `waiting`.
-- `/ready` reads `status` `ready`, `jobs_running` 1 and `jobs_queued` 8. A full queue is busy, and busy stays ready.
+- `/ready` reads `status` `ready`, with `checks.jobs` reporting `running` 1 and `queued` 8. A full queue is busy, and busy stays ready.
 
 Step 5:
 
@@ -228,7 +228,7 @@ Step 5:
 Step 6:
 
 - The listing is the same nine entries as in step 4, in the same order, with no tenth entry.
-- `/ready` still reads `jobs_running` 1 and `jobs_queued` 8.
+- `/ready` still reads `checks.jobs` with `running` 1 and `queued` 8.
 
 Step 7:
 

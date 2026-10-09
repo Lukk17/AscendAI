@@ -12,8 +12,13 @@ from src.api.exception_handlers import (
     OcrProcessingError,
     QueueFullError,
 )
-from src.config.config import settings
-from src.model.ocr_models import FAILURE_RESULT_STORE_UNAVAILABLE, JobRecord, JobResultLocation
+from src.config.config import QualityMode, settings
+from src.model.ocr_models import (
+    FAILURE_RESULT_STORE_UNAVAILABLE,
+    JobRecord,
+    JobResultLocation,
+    OcrJsonResponse,
+)
 from src.observability.metrics import OCR_DURATION_SECONDS
 from src.service import ocr_service as ocr_service_module
 from src.service.job_runner import JobRunner, poll_hint_seconds
@@ -33,7 +38,11 @@ def runner(store: JobStore, results: FakeResultStore) -> JobRunner:
 
 
 async def queue_job(
-    runner: JobRunner, store: JobStore, page_count: int = 1, submitted_at: float | None = None, language: str = "en"
+    runner: JobRunner,
+    store: JobStore,
+    page_count: int = 1,
+    submitted_at: float | None = None,
+    language: str = "en",
 ) -> JobRecord:
     record = make_record(page_count=page_count, submitted_at=submitted_at, language=language)
     await store.create(record, b"payload")
@@ -73,15 +82,15 @@ async def drain_until_terminal(runner: JobRunner, store: JobStore, job_id: str) 
 
 
 class TestPollHint:
-    def test_the_hint_is_a_tenth_of_the_allowed_time_still_ahead(self):
+    def test_the_hint_is_a_tenth_of_the_allowed_time_still_ahead(self) -> None:
         # When / Then
         assert poll_hint_seconds(180.0) == pytest.approx(18.0)
 
-    def test_the_hint_never_asks_for_more_than_once_a_second(self):
+    def test_the_hint_never_asks_for_more_than_once_a_second(self) -> None:
         # When / Then
         assert poll_hint_seconds(0.0) == pytest.approx(1.0)
 
-    def test_the_hint_never_leaves_a_finished_result_sitting(self):
+    def test_the_hint_never_leaves_a_finished_result_sitting(self) -> None:
         # When / Then
         assert poll_hint_seconds(100_000.0) == pytest.approx(30.0)
 
@@ -230,7 +239,9 @@ class TestQueueView:
         assert runner.seconds_remaining_for(english.job_id) == pytest.approx(6 * small + 2 * server)
         assert runner.seconds_pending() == pytest.approx(6 * small + 2 * server)
 
-    def test_pages_ahead_of_work_the_runner_does_not_hold_is_everything_in_flight(self, runner: JobRunner) -> None:
+    def test_pages_ahead_of_work_the_runner_does_not_hold_is_everything_in_flight(
+        self, runner: JobRunner
+    ) -> None:
         # Given
         runner.admit(make_record(page_count=2))
 
@@ -238,7 +249,9 @@ class TestQueueView:
         assert runner.pages_ahead_of("unknown-identifier--") == 2
         assert runner.seconds_remaining_for("unknown-identifier--") == 0.0
 
-    def test_progress_is_only_reported_for_the_document_being_read(self, runner: JobRunner, jobs_dir: Path) -> None:
+    def test_progress_is_only_reported_for_the_document_being_read(
+        self, runner: JobRunner, jobs_dir: Path
+    ) -> None:
         # Given
         _ = jobs_dir
         waiting = make_record(page_count=3)
@@ -292,12 +305,19 @@ class TestReadingADocument:
     @pytest.mark.usefixtures("off_family_language")
     @pytest.mark.parametrize(("language", "measured"), [("en", 25.1), ("ru", 96.0)])
     async def test_the_reading_budget_is_the_page_count_times_its_own_engine_s_allowance(
-        self, runner: JobRunner, store: JobStore, monkeypatch: pytest.MonkeyPatch, language: str, measured: float
+        self,
+        runner: JobRunner,
+        store: JobStore,
+        monkeypatch: pytest.MonkeyPatch,
+        language: str,
+        measured: float,
     ) -> None:
         # Given — a document that waited far longer than its own reading ceiling, and
         # still inside the maximum lifetime, so nothing else touches it. ru is opted back in.
         monkeypatch.setattr(settings, "OCR_PAGE_ALLOWANCE_HEADROOM", 2.0)
-        record = await queue_job(runner, store, page_count=4, submitted_at=time.time() - 5_000.0, language=language)
+        record = await queue_job(
+            runner, store, page_count=4, submitted_at=time.time() - 5_000.0, language=language
+        )
         dispatch = AsyncMock(return_value=OcrResponseFactory.with_single_line())
 
         # When
@@ -325,7 +345,9 @@ class TestReadingADocument:
         assert dispatch.call_args.args[6] == {"traceparent": "00-fake-01"}
         assert dispatch.call_args.args[7] == record.job_id
 
-    async def test_the_submitted_quality_mode_reaches_the_worker(self, runner: JobRunner, store: JobStore) -> None:
+    async def test_the_submitted_quality_mode_reaches_the_worker(
+        self, runner: JobRunner, store: JobStore
+    ) -> None:
         # Given
         record = make_record(quality="normal")
         await store.create(record, b"payload")
@@ -367,8 +389,19 @@ class TestReadingADocument:
         in_flight = 0
         peak = 0
 
-        async def dispatch(_payload, _filename, _language, _quality, _budget, _surface, _carrier, job_id, straighten):
+        async def dispatch(
+            _payload: bytes,
+            _filename: str,
+            _language: str,
+            _quality: QualityMode,
+            _budget: float,
+            _surface: str,
+            _carrier: dict[str, str] | None,
+            job_id: str | None,
+            straighten: bool,
+        ) -> OcrJsonResponse:
             nonlocal in_flight, peak
+            assert job_id is not None
             in_flight += 1
             peak = max(peak, in_flight)
             order.append(job_id)
@@ -439,7 +472,9 @@ class TestDispatchOutcomes:
         record = await queue_job(runner, store)
 
         # When
-        with patch("src.service.job_runner.dispatch_ocr_request", AsyncMock(side_effect=RuntimeError("boom"))):
+        with patch(
+            "src.service.job_runner.dispatch_ocr_request", AsyncMock(side_effect=RuntimeError("boom"))
+        ):
             finished = await drain_until_terminal(runner, store, record.job_id)
 
         # Then
@@ -489,7 +524,7 @@ class TestDispatchOutcomes:
         # Given — the record turns cancelled while the dispatch is in flight
         record = await queue_job(runner, store)
 
-        async def dispatch(*_args):
+        async def dispatch(*_args: object) -> None:
             current = store.read(record.job_id)
             store.cancel(current)
 
@@ -511,7 +546,7 @@ class TestDispatchOutcomes:
         record = await queue_job(runner, store)
         dispatched = asyncio.Event()
 
-        async def dispatch(*_args):
+        async def dispatch(*_args: object) -> OcrJsonResponse:
             await store.delete(store.read(record.job_id))
             dispatched.set()
 
@@ -532,7 +567,9 @@ class TestDispatchOutcomes:
         assert results.deleted == [f"{record.job_id}.md"]
         assert results.objects == {}
 
-    async def test_a_queued_job_whose_record_vanished_is_skipped(self, runner: JobRunner, store: JobStore) -> None:
+    async def test_a_queued_job_whose_record_vanished_is_skipped(
+        self, runner: JobRunner, store: JobStore
+    ) -> None:
         # Given
         record = await queue_job(runner, store)
         second = await queue_job(runner, store)
@@ -546,7 +583,9 @@ class TestDispatchOutcomes:
         # Then
         assert dispatch.await_count == 1
 
-    async def test_a_queued_job_already_cancelled_is_never_dispatched(self, runner: JobRunner, store: JobStore) -> None:
+    async def test_a_queued_job_already_cancelled_is_never_dispatched(
+        self, runner: JobRunner, store: JobStore
+    ) -> None:
         # Given
         record = await queue_job(runner, store)
         second = await queue_job(runner, store)
@@ -562,7 +601,9 @@ class TestDispatchOutcomes:
 
 
 class TestCancellation:
-    async def test_cancelling_waiting_work_removes_it_from_the_queue(self, runner: JobRunner, store: JobStore) -> None:
+    async def test_cancelling_waiting_work_removes_it_from_the_queue(
+        self, runner: JobRunner, store: JobStore
+    ) -> None:
         # Given
         first = await queue_job(runner, store)
         second = await queue_job(runner, store)
@@ -656,7 +697,18 @@ class TestCancellation:
                 runner_is_waiting.set()
             await real_wait()
 
-        async def dispatch(_payload, _filename, _language, _quality, _budget, _surface, _carrier, job_id, _straighten):
+        async def dispatch(
+            _payload: bytes,
+            _filename: str,
+            _language: str,
+            _quality: QualityMode,
+            _budget: float,
+            _surface: str,
+            _carrier: dict[str, str] | None,
+            job_id: str | None,
+            _straighten: bool,
+        ) -> OcrJsonResponse:
+            assert job_id is not None
             if job_id == cancelled.job_id:
                 runner.cancel(store.read(job_id))
             else:
@@ -686,7 +738,11 @@ class TestCancellation:
 
     @pytest.mark.parametrize("bytes_read_before_the_cancel", [True, False])
     async def test_a_cancel_while_the_submitted_bytes_are_read_is_kept(
-        self, runner: JobRunner, store: JobStore, monkeypatch: pytest.MonkeyPatch, bytes_read_before_the_cancel: bool
+        self,
+        runner: JobRunner,
+        store: JobStore,
+        monkeypatch: pytest.MonkeyPatch,
+        bytes_read_before_the_cancel: bool,
     ) -> None:
         # Given: the runner has taken the document and is awaiting its bytes when the cancel arrives
         record = await queue_job(runner, store)
@@ -711,7 +767,9 @@ class TestCancellation:
         ):
             await runner.start()
             try:
-                assert await poll_until(lambda: runner.documents_waiting() == 0 and runner.documents_running() == 0)
+                assert await poll_until(
+                    lambda: runner.documents_waiting() == 0 and runner.documents_running() == 0
+                )
             finally:
                 await runner.stop()
 
@@ -755,9 +813,13 @@ class TestIdleTick:
         # Then
         assert store.exists(record.job_id) is False
 
-    async def test_the_idle_tick_fails_work_past_its_maximum_lifetime(self, runner: JobRunner, store: JobStore) -> None:
+    async def test_the_idle_tick_fails_work_past_its_maximum_lifetime(
+        self, runner: JobRunner, store: JobStore
+    ) -> None:
         # Given
-        record = make_record(state="running", submitted_at=time.time() - settings.OCR_JOB_MAX_LIFETIME_SECONDS - 1.0)
+        record = make_record(
+            state="running", submitted_at=time.time() - settings.OCR_JOB_MAX_LIFETIME_SECONDS - 1.0
+        )
         store.write(record)
 
         # When
@@ -840,7 +902,7 @@ class TestCooperativeShutdown:
         record = await queue_job(runner, store)
         reading = asyncio.Event()
 
-        async def never_returns(*_args):
+        async def never_returns(*_args: object) -> None:
             reading.set()
             await asyncio.Event().wait()
 
@@ -899,7 +961,7 @@ def _duration_count(surface: str, language: str) -> float:
 
 
 class TestSinglePathToTheWorker:
-    def test_only_the_runner_dispatches_to_the_worker(self):
+    def test_only_the_runner_dispatches_to_the_worker(self) -> None:
         # Given — every promise the queue makes about what runs at once is only true
         # while one component decides it
         source_root = Path(__file__).resolve().parents[2] / "src"
@@ -915,7 +977,7 @@ class TestSinglePathToTheWorker:
         # Then
         assert callers == allowed
 
-    def test_the_runner_is_the_only_holder_of_the_admission_gate(self):
+    def test_the_runner_is_the_only_holder_of_the_admission_gate(self) -> None:
         # Given — the gate is what enforces OCR_WORKER_COUNT, and it is acquired on the
         # runner's behalf inside the dispatch it is the only caller of
         source_root = Path(__file__).resolve().parents[2] / "src"
@@ -1013,7 +1075,7 @@ class TestRunnerResilience:
         calls: list[int] = []
         original_sweep = store.sweep
 
-        async def sweep_badly_once_inside_the_loop():
+        async def sweep_badly_once_inside_the_loop() -> None:
             calls.append(1)
             if len(calls) == 2:
                 raise OSError("the jobs directory went away")

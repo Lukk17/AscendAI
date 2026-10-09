@@ -6,8 +6,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Annotated, Final, Literal
 
+from ascend_python_common.settings import McpFetchSettings, RateLimit, ServiceSettings
 from pydantic import BeforeValidator, Field, model_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import NoDecode, SettingsConfigDict
 
 
 def _csv_to_tuple(value: object) -> object:
@@ -98,7 +99,8 @@ class QualityProfile:
 
         if self.worst_downscale_ratio > MAX_DETECTOR_DOWNSCALE_RATIO:
             raise ValueError(
-                f"Quality pair {self} downscales the largest page {self.worst_downscale_ratio:.2f}x for detection, "
+                f"Quality pair {self} downscales the largest page "
+                f"{self.worst_downscale_ratio:.2f}x for detection, "
                 f"beyond the {MAX_DETECTOR_DOWNSCALE_RATIO}x measured to read every line correctly"
             )
 
@@ -138,14 +140,14 @@ def _parse_quality_pair(value: object) -> object:
 QualityPair = Annotated[QualityProfile, NoDecode, BeforeValidator(_parse_quality_pair)]
 
 
-class Settings(BaseSettings):
+class Settings(ServiceSettings, McpFetchSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    API_HOST: str = Field(default="0.0.0.0")  # noqa: S104  intentional all-interface bind for containerised service
+    API_HOST: str = Field(default="0.0.0.0")
     API_PORT: int = Field(default=7022)
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
     LOG_FORMAT: Literal["json", "color"] = Field(default="json")
@@ -171,16 +173,19 @@ class Settings(BaseSettings):
     # engine's model resolution table (see comment on DEFAULT_LANGUAGE above) returns no
     # model for "ja" and raises immediately. "ru" and "korean" are switched off, because
     # the PP-OCRv5 server detector they loaded peaked above the container limit (ADR-011).
-    SUPPORTED_LANGUAGES: CsvTuple = Field(default=("en", "pl", "de", "fr", "es", "it", "pt", "nl", "ch", "japan"))
+    SUPPORTED_LANGUAGES: CsvTuple = Field(
+        default=("en", "pl", "de", "fr", "es", "it", "pt", "nl", "ch", "japan")
+    )
 
-    MCP_FILE_URI_ROOT: str | None = Field(default=None)
     MCP_ALLOWED_HOSTS: CsvTuple = Field(default=())
     MCP_DOWNLOAD_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
+    FETCH_MAX_REDIRECT_HOPS: int = Field(default=0, ge=0)
 
-    RATE_LIMIT_DEFAULT: str = Field(default="60/minute")
-    RATE_LIMIT_OCR: str = Field(default="20/minute")
+    RATE_LIMIT_DEFAULT: RateLimit = Field(default="600/minute")
+    RATE_LIMIT_OCR: RateLimit = Field(default="60/minute")
 
-    OTEL_ENABLED: bool = Field(default=False)
+    REDIS_URL: str = Field(default="redis://127.0.0.1:6379/0")
+
     OTEL_EXPORTER_OTLP_ENDPOINT: str = Field(default="http://otel-collector:4317")
 
     # One document is read at a time, and every promise the queue makes about how long
@@ -268,7 +273,9 @@ class Settings(BaseSettings):
 
     def reachable_model_pairs(self) -> frozenset[ModelPair]:
         """Return every engine an accepted language can load, the default language included."""
-        return frozenset(self.model_pair(language) for language in {*self.SUPPORTED_LANGUAGES, self.DEFAULT_LANGUAGE})
+        return frozenset(
+            self.model_pair(language) for language in {*self.SUPPORTED_LANGUAGES, self.DEFAULT_LANGUAGE}
+        )
 
     def page_allowance_seconds(self, pair: ModelPair) -> float:
         """How long one page may take on this engine, in either quality mode.
@@ -284,17 +291,17 @@ class Settings(BaseSettings):
         return self.page_allowance_seconds(pair) + self.OCR_DISPATCH_MARGIN_SECONDS
 
     @property
-    def OCR_WORST_PAGE_ALLOWANCE_SECONDS(self) -> float:  # matches settings convention above
+    def OCR_WORST_PAGE_ALLOWANCE_SECONDS(self) -> float:  # noqa: N802
         """The allowance of the slowest engine any accepted language can load."""
         return max(self.page_allowance_seconds(pair) for pair in self.reachable_model_pairs())
 
     @property
-    def OCR_JOB_READING_CEILING_SECONDS(self) -> float:  # matches settings convention above
+    def OCR_JOB_READING_CEILING_SECONDS(self) -> float:  # noqa: N802
         """The longest one document may be read for."""
         return self.OCR_JOB_MAX_PAGES * self.OCR_WORST_PAGE_ALLOWANCE_SECONDS
 
     @property
-    def OCR_JOB_MAX_LIFETIME_SECONDS(self) -> float:  # matches settings convention above
+    def OCR_JOB_MAX_LIFETIME_SECONDS(self) -> float:  # noqa: N802
         """The longest wait the queue admits plus the longest read, past which a record is wedged."""
         return (self.OCR_JOB_QUEUE_MAX_PAGES + self.OCR_JOB_MAX_PAGES) * self.OCR_WORST_PAGE_ALLOWANCE_SECONDS
 

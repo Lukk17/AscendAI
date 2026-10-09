@@ -1,273 +1,121 @@
-import hashlib
-import uuid
-from unittest.mock import MagicMock, patch
+from collections.abc import Iterator
+from unittest.mock import patch
 
 import pytest
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import SpanLimits, TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import Link, SpanContext, Status, StatusCode
-from opentelemetry.util.types import AttributeValue
+from ascend_python_common.tracing import build_tracer_provider
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
 
 from src.config.config import settings
 from src.observability.tracing import (
-    MCP_SESSION_ID_REQUEST_HEADER_ATTRIBUTE,
-    MCP_SESSION_ID_RESPONSE_HEADER_ATTRIBUTE,
-    MCP_SESSION_ID_SPAN_ATTRIBUTE,
-    McpSessionDigestSpanExporter,
-    configure_tracing,
     configure_worker_tracing,
     extract_trace_context,
     get_tracer,
     inject_trace_context,
 )
 
-SESSION_DIGEST_LENGTH = 16
-FLUSH_TIMEOUT_MILLIS = 1234
-SPAN_NAME = "tools/call ocr_job_status"
-SCOPE_NAME = "probe-scope"
-SCOPE_VERSION = "1.2.3"
-KEPT_EVENT_NAME = "second event"
-STATUS_DESCRIPTION = "tool failed"
-LINKED_TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
-LINKED_SPAN_IDS = (0x1111111111111111, 0x2222222222222222)
 
+@pytest.fixture
+def _isolated_global_provider() -> Iterator[None]:
+    from opentelemetry.util._once import Once
 
-def _digest_of(session_id: str) -> str:
-    return hashlib.sha256(session_id.encode()).hexdigest()[:SESSION_DIGEST_LENGTH]
-
-
-def _exported_through_the_digest_exporter(attributes: dict[str, AttributeValue]) -> InMemorySpanExporter:
-    exported = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(McpSessionDigestSpanExporter(exported)))
-    with provider.get_tracer("test").start_as_current_span("tools/call ocr_job_status", attributes=attributes):
-        pass
-
-    return exported
-
-
-class TestConfigureTracing:
-    def test_disabled_when_otel_off(self, monkeypatch):
-        # Given
-        monkeypatch.setattr(settings, "OTEL_ENABLED", False)
-        app = MagicMock()
-
-        # When
-        configure_tracing(app)
-
-        # Then - no FastAPI instrumentation calls
-        app.add_middleware.assert_not_called()
-
-    @patch("src.observability.tracing.AioHttpClientInstrumentor")
-    @patch("src.observability.tracing.FastAPIInstrumentor")
-    @patch("src.observability.tracing.BatchSpanProcessor")
-    @patch("src.observability.tracing.OTLPSpanExporter")
-    @patch("src.observability.tracing.TracerProvider")
-    def test_enabled_wires_otel_stack(
-        self,
-        mock_provider,
-        mock_exporter,
-        mock_processor,
-        mock_fastapi_inst,
-        mock_aiohttp_inst,
-        monkeypatch,
-    ):
-        # Given
-        monkeypatch.setattr(settings, "OTEL_ENABLED", True)
-        app = MagicMock()
-
-        # When
-        configure_tracing(app)
-
-        # Then
-        mock_provider.assert_called_once()
-        mock_exporter.assert_called_once()
-        mock_fastapi_inst.instrument_app.assert_called_once_with(app)
-        mock_aiohttp_inst.return_value.instrument.assert_called_once()
-        [wrapped_exporter] = mock_processor.call_args.args
-        assert isinstance(wrapped_exporter, McpSessionDigestSpanExporter)
+    saved_provider = trace._TRACER_PROVIDER
+    trace._TRACER_PROVIDER = None
+    trace._TRACER_PROVIDER_SET_ONCE = Once()
+    yield
+    trace._TRACER_PROVIDER = saved_provider
+    trace._TRACER_PROVIDER_SET_ONCE = Once()
 
 
 class TestConfigureWorkerTracing:
-    def test_disabled_when_otel_off(self, monkeypatch):
-        # Given
-        monkeypatch.setattr(settings, "OTEL_ENABLED", False)
+    def test_worker_tracing_builds_through_the_library_builder(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # given
+        monkeypatch.setattr(settings, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://probe-collector:4317")
+        # when
+        with patch("src.observability.tracing.build_tracer_provider") as mock_build:
+            with patch("src.observability.tracing.trace.set_tracer_provider") as mock_set:
+                configure_worker_tracing()
+        # then
+        mock_build.assert_called_once_with("ascend-ocr", otel_endpoint="http://probe-collector:4317")
+        mock_set.assert_called_once_with(mock_build.return_value)
 
-        # When
-        with patch("src.observability.tracing.TracerProvider") as mock_provider:
-            configure_worker_tracing()
-
-        # Then - no provider is built when tracing is off
-        mock_provider.assert_not_called()
-
-    @patch("src.observability.tracing.AioHttpClientInstrumentor")
-    @patch("src.observability.tracing.FastAPIInstrumentor")
-    @patch("src.observability.tracing.BatchSpanProcessor")
-    @patch("src.observability.tracing.OTLPSpanExporter")
-    @patch("src.observability.tracing.TracerProvider")
-    def test_enabled_configures_provider_without_app_instrumentation(
-        self,
-        mock_provider,
-        mock_exporter,
-        mock_processor,
-        mock_fastapi_inst,
-        mock_aiohttp_inst,
-        monkeypatch,
-    ):
-        # Given - a worker process has no FastAPI app and no aiohttp client of its own
-        monkeypatch.setattr(settings, "OTEL_ENABLED", True)
-
-        # When
+    @pytest.mark.usefixtures("_isolated_global_provider")
+    def test_endpoint_set_installs_a_sampled_provider_for_ascend_ocr(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # given
+        monkeypatch.setattr(settings, "OTEL_EXPORTER_OTLP_ENDPOINT", "http://probe-collector:4317")
+        # when
         configure_worker_tracing()
+        provider = trace.get_tracer_provider()
+        # then
+        assert isinstance(provider, TracerProvider)
+        assert provider.resource.attributes["service.name"] == "ascend-ocr"
 
-        # Then
-        mock_provider.assert_called_once()
-        mock_exporter.assert_called_once()
-        mock_fastapi_inst.instrument_app.assert_not_called()
-        mock_aiohttp_inst.return_value.instrument.assert_not_called()
-
-
-class TestMcpSessionDigestSpanExporter:
-    def test_a_span_leaves_with_the_session_digest_in_place_of_the_session_id(self):
-        # Given
-        session_id = uuid.uuid4().hex
-
-        # When
-        exported = _exported_through_the_digest_exporter({MCP_SESSION_ID_SPAN_ATTRIBUTE: session_id, "other": "kept"})
-
-        # Then
-        [span] = exported.get_finished_spans()
-        assert span.attributes is not None
-        expected_digest = hashlib.sha256(session_id.encode()).hexdigest()[:SESSION_DIGEST_LENGTH]
-        assert span.attributes[MCP_SESSION_ID_SPAN_ATTRIBUTE] == expected_digest
-        assert session_id not in span.attributes.values()
-        assert span.attributes["other"] == "kept"
-        assert span.name == "tools/call ocr_job_status"
-
-    def test_a_rewritten_span_keeps_everything_but_the_session_id(self):
-        # Given
-        session_id = uuid.uuid4().hex
-        exported = InMemorySpanExporter()
-        provider = TracerProvider(
-            resource=Resource.create({"service.name": "probe-service"}),
-            span_limits=SpanLimits(max_attributes=2, max_events=1, max_links=1),
-        )
-        provider.add_span_processor(SimpleSpanProcessor(McpSessionDigestSpanExporter(exported)))
-        tracer = provider.get_tracer(SCOPE_NAME, SCOPE_VERSION)
-        linked = [Link(SpanContext(LINKED_TRACE_ID, span_id, is_remote=True)) for span_id in LINKED_SPAN_IDS]
-        attributes = {"evicted": "first", "kept": "second", MCP_SESSION_ID_SPAN_ATTRIBUTE: session_id}
-
-        # When
-        with tracer.start_as_current_span(SPAN_NAME, attributes=attributes, links=linked) as span:
-            span.add_event("first event")
-            span.add_event(KEPT_EVENT_NAME)
-            span.set_status(Status(StatusCode.ERROR, STATUS_DESCRIPTION))
-
-        # Then
-        [exported_span] = exported.get_finished_spans()
-        assert (exported_span.dropped_attributes, exported_span.dropped_events, exported_span.dropped_links) == (
-            1,
-            1,
-            1,
-        )
-        assert [event.name for event in exported_span.events] == [KEPT_EVENT_NAME]
-        assert [link.context.span_id for link in exported_span.links] == [LINKED_SPAN_IDS[-1]]
-        assert (exported_span.status.status_code, exported_span.status.description) == (
-            StatusCode.ERROR,
-            STATUS_DESCRIPTION,
-        )
-        assert exported_span.resource.attributes["service.name"] == "probe-service"
-        assert exported_span.instrumentation_scope is not None
-        assert (exported_span.instrumentation_scope.name, exported_span.instrumentation_scope.version) == (
-            SCOPE_NAME,
-            SCOPE_VERSION,
-        )
-        assert dict(exported_span.attributes or {}) == {
-            "kept": "second",
-            MCP_SESSION_ID_SPAN_ATTRIBUTE: _digest_of(session_id),
-        }
-
-    @pytest.mark.parametrize(
-        "header_attribute", [MCP_SESSION_ID_REQUEST_HEADER_ATTRIBUTE, MCP_SESSION_ID_RESPONSE_HEADER_ATTRIBUTE]
-    )
-    def test_a_captured_session_header_leaves_as_the_digest(self, header_attribute):
-        # Given
-        session_id = uuid.uuid4().hex
-
-        # When
-        exported = _exported_through_the_digest_exporter({header_attribute: [session_id]})
-
-        # Then
-        [span] = exported.get_finished_spans()
-        assert dict(span.attributes or {}) == {header_attribute: (_digest_of(session_id),)}
-
-    def test_a_span_without_a_session_id_leaves_unchanged(self):
-        # When
-        exported = _exported_through_the_digest_exporter({"other": "kept"})
-
-        # Then
-        [span] = exported.get_finished_spans()
-        assert dict(span.attributes or {}) == {"other": "kept"}
-
-    def test_shutdown_and_flush_reach_the_wrapped_exporter(self):
-        # Given
-        delegate = MagicMock()
-        exporter = McpSessionDigestSpanExporter(delegate)
-
-        # When
-        flushed = exporter.force_flush(FLUSH_TIMEOUT_MILLIS)
-        exporter.shutdown()
-
-        # Then
-        assert flushed is delegate.force_flush.return_value
-        delegate.force_flush.assert_called_once_with(FLUSH_TIMEOUT_MILLIS)
-        delegate.shutdown.assert_called_once_with()
+    @pytest.mark.usefixtures("_isolated_global_provider")
+    def test_endpoint_unset_installs_an_unsampled_provider(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # given
+        monkeypatch.setattr(settings, "OTEL_EXPORTER_OTLP_ENDPOINT", None)
+        # when
+        configure_worker_tracing()
+        # then
+        assert isinstance(trace.get_tracer_provider(), TracerProvider)
+        with get_tracer().start_as_current_span("probe") as span:
+            sampled = span.get_span_context().trace_flags.sampled
+        assert sampled is False
 
 
 class TestGetTracer:
-    def test_returns_tracer_instance(self):
-        # When
+    def test_returns_a_tracer_that_starts_a_span(self) -> None:
+        # given
         tracer = get_tracer()
-
-        # Then
-        assert tracer is not None
-        with tracer.start_as_current_span("test") as span:
-            assert span is not None
+        # when
+        with tracer.start_as_current_span("probe") as span:
+            span_context = span.get_span_context()
+        # then
+        assert span_context.trace_id != 0
 
 
 class TestTraceContextPropagation:
-    def test_inject_returns_empty_carrier_without_active_span(self):
-        # When - no span is current at module scope, so nothing is injected
+    def test_inject_returns_empty_carrier_without_active_span(self) -> None:
+        # when - no span is current at module scope, so nothing is injected
         carrier = inject_trace_context()
-
-        # Then
+        # then
         assert carrier == {}
 
-    def test_inject_delegates_to_propagator(self):
-        # Given
+    def test_inject_delegates_to_the_propagator(self) -> None:
+        # given
         def fake_inject(carrier: dict[str, str]) -> None:
             carrier["traceparent"] = "00-fake-01"
 
-        # When
-        with patch("src.observability.tracing.propagate") as mock_propagate:
-            mock_propagate.inject.side_effect = fake_inject
+        # when
+        with patch("src.observability.tracing.propagate.inject", side_effect=fake_inject):
             carrier = inject_trace_context()
-
-        # Then
+        # then
         assert carrier == {"traceparent": "00-fake-01"}
 
-    def test_extract_delegates_to_propagator(self):
-        # Given
+    def test_extract_delegates_to_the_propagator(self) -> None:
+        # given
         sentinel_context = object()
         carrier = {"traceparent": "00-fake-01"}
-
-        # When
-        with patch("src.observability.tracing.propagate") as mock_propagate:
-            mock_propagate.extract.return_value = sentinel_context
+        # when
+        with patch(
+            "src.observability.tracing.propagate.extract", return_value=sentinel_context
+        ) as mock_extract:
             result = extract_trace_context(carrier)
-
-        # Then
+        # then
         assert result is sentinel_context
-        mock_propagate.extract.assert_called_once_with(carrier)
+        mock_extract.assert_called_once_with(carrier)
+
+    def test_injected_context_carried_into_the_worker_stays_on_one_trace(self) -> None:
+        # given - a provider of our own, so the global one is left alone
+        provider = build_tracer_provider("probe", otel_endpoint=None)
+        tracer = provider.get_tracer("probe")
+        # when
+        with tracer.start_as_current_span("parent"):
+            carrier = inject_trace_context()
+        child_context = extract_trace_context(carrier)
+        with tracer.start_as_current_span("child", context=child_context) as child:
+            child_trace_id = format(child.get_span_context().trace_id, "032x")
+        # then
+        assert carrier["traceparent"].split("-")[1] == child_trace_id

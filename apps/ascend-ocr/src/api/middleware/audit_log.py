@@ -1,5 +1,5 @@
-from src.api.middleware.correlation_id import get_correlation_id
-from src.config.logging_config import get_logger
+from ascend_python_common.log_config import get_logger
+from ascend_python_common.request_context import get_correlation_id
 
 logger = get_logger("ascend-ocr.audit")
 
