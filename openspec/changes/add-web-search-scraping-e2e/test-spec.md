@@ -9,18 +9,19 @@ rotate WAFs and go down, so refine it as real targets are discovered.
 | Row | Tier / strategy | URL | Canary assertion | In automated gate |
 | :-- | :-------------- | :-- | :--------------- | :---------------- |
 | 1 | `curl_cffi` - static article | `https://en.wikipedia.org/wiki/Web_scraping` | content (lowercased) contains `"web scraping"` | yes |
-| 2 | FlareSolverr - Cloudflare WAF | `https://www.scrapingcourse.com/cloudflare-challenge` | `status="success"`, content contains `"cloudflare challenge"` (FlareSolverr bypassed the challenge) | yes |
-| 3 | Playwright - JS-rendered | `https://quotes.toscrape.com/js/` | content contains `"The world as we have created it"`, which is absent from the raw (non-JS) HTML | yes |
-| 4 | NoVNC - hard CAPTCHA | *TBD* | human solves CAPTCHA, content returned | no - manual / best-effort |
-| 5-8 | real-world categories | *TBD* (job board, news article, product page, docs page) | per-site, defined when added | no - added later |
+| 2 | FlareSolverr - Cloudflare WAF (moved to the browser tiers by task 6.4 of `enhance-web-search-tier-ladder`, owner decision 65.12 of 2026-10-04) | `https://www.scrapingcourse.com/cloudflare-challenge` | `status="success"`, content contains `"cloudflare challenge"` (FlareSolverr bypassed the challenge) | yes |
+| 3 | Playwright - JS-rendered | `https://quotes.toscrape.com/js/` | content contains `"The world as we have created it"`, and the serving `mode` is a browser tier (design D3) | yes |
+| 4 | NoVNC - hard CAPTCHA | covered by spec 11, `11-captcha-solve-and-capture-test.md` (owner decision 65.26 of 2026-10-04) | human solves CAPTCHA, content returned | no - manual, run in spec 11 |
+| 5-8 | real-world categories | covered by spec 7 Part 1, `7-authenticated-realworld-scraping-test.md` (owner decision 65.26 of 2026-10-04) | per-site, as spec 7 defines | no - run in spec 7 |
 
 - `POST /api/v2/web/read` returns HTTP 200 with `status="success"` and a non-empty content field
   (`content` / `text` / `markdown`) for each gated row (1, 2, 3).
 - Row 1 (static): the content field, lowercased, contains `"web scraping"`.
 - Row 2 (Cloudflare): `status="success"` and a content field of length ≥ 50 - proves the Cloudflare challenge
   was solved rather than the bot-block interstitial being returned.
-- Row 3 (JavaScript): the content field contains `"The world as we have created it"`; a direct host-side
-  `curl` of the same URL does not contain that phrase - proving JS execution rendered the DOM.
+- Row 3 (JavaScript): the content field contains `"The world as we have created it"` and the response's `mode`
+  names a browser tier. The phrase is also in the raw markup inside an inline `<script>` block, so its presence alone
+  proves nothing, and the browser tier `mode` is the proof that the page was rendered (design D3).
 - The response shape is identical across all three rows; the caller never learns which tier served the request.
 - Row 4 (CAPTCHA): documented here but excluded from the pass/fail verdict; it requires human interaction via
   the NoVNC/Ngrok path and cannot be asserted unattended.

@@ -9,9 +9,12 @@ out in full. It is not started and must not start until the tier-ladder change h
 
 - The `3-flaresolverr` tier, its strategy, its settings, its container, its readiness probe, its banner line, its
   circuit breaker, its proxy branch, its cookie producer constant and its tests are deleted.
-- `3-flaresolverr` stays a reserved public value from ADR-011: a caller that passes it gets HTTP 400 naming a removed
-  tier, never a silent start at another tier. The value is never reused.
-- A stored session with `produced_by` `3-flaresolverr` is replayed by the browser tiers.
+- `3-flaresolverr` is removed from the accepted tier values: a caller that passes it gets the normal HTTP 400
+  validation refusal for a value outside the allowed set, never a silent start at another tier (owner answer 93 of
+  2026-10-08). The value is never reused.
+- Session records that the FlareSolverr tier stored before this change get no special handling and no migration.
+  The owner decided on 2026-10-02 (confirmed by owner answer 73.1 of 2026-10-06) that there is no existing data to keep. This holds only until the first real
+  customer deployment.
 
 ## Capabilities
 
@@ -21,15 +24,27 @@ None.
 
 ### Modified Capabilities
 
-- `web-search-authenticated-sessions`: the FlareSolverr persistence requirement is removed, and the capture
-  requirement no longer names a FlareSolverr tier. The replay requirements modified by
-  `enhance-web-search-tier-ladder` are rewritten without FlareSolverr in task 1.1, after that change is archived, so
-  this change's deltas apply to the archived text.
+- `web-search-authenticated-sessions`: the FlareSolverr persistence requirement is removed, the capture
+  requirement no longer names a FlareSolverr tier, "Stored session is replayed into every fetch tier" is modified
+  without FlareSolverr from the text `enhance-web-search-tier-ladder` gives it, and "A stored session is replayed by
+  the tier that earned it" is removed and replaced by "A stored session is replayed by the browser family that earned
+  it", which keeps only its browser rule. A MODIFIED block cannot drop the FlareSolverr scenarios of that requirement,
+  so it is removed and added under the new name (review fix of 2026-10-08).
+- `web-search-antibot-evasion`: the proxy requirement no longer lists FlareSolverr among the tiers that route
+  through the proxy, because its proxy branch is deleted.
+- `web-search-tier-ladder`: the requirement "FlareSolverr is disabled by default for one release" is removed, the
+  requirement "Ladder order with two patched-browser tiers" no longer lists `3-flaresolverr`, and a new requirement
+  says the removed value `3-flaresolverr` is refused on both surfaces as a value outside the allowed set and that no
+  FlareSolverr component remains.
 
 ## Dependencies and Build Order
 
-Depends on `enhance-web-search-tier-ladder` being archived and released for one release. Independent of
-`enhance-web-search-extraction-and-tiers` and `enhance-web-search-crawl-at-scale`.
+Build order (owner build order of 2026-10-04, which supersedes the earlier orders): build group 2 (web-hunter),
+position 7. It needs `enhance-web-search-tier-ladder` (position 5), which lands before it, archived and released for
+one release with `FLARESOLVERR_ENABLED=false`, and the e2e files that task 6.4 of that change updated. It does not need
+`enhance-web-search-extraction-and-tiers` (position 6), which lands between the two, and
+`enhance-web-search-crawl-at-scale` (position 9) and `add-file-download` (position 10) land after it on a service with
+no FlareSolverr tier.
 
 ## Impact
 
@@ -52,8 +67,13 @@ Code, compose and docs that name FlareSolverr today, measured on 2026-10-01 with
 - Docs: root `AGENTS.md` (the scrapper service table and the four fixed container names, which become three),
   `apps/ascend-web-hunter/AGENTS.md`, `README.md`, `CHANGELOG.md`, `docs/configuration.md`, `docs/running.md`,
   `docs/api-examples.md`, `docs/README.md`, the arc42 sections 01 to 12 that name it, the container diagram, and
-  ADR-001, ADR-002, ADR-005, ADR-006, ADR-010, ADR-011 and ADR-012, each amended rather than rewritten.
+  ADR-001, ADR-002, ADR-005, ADR-006, ADR-010, ADR-011 and ADR-012, each amended rather than rewritten, and the new
+  ADR-018 that records the removal. The version moves from 0.0.12 to 0.0.13, and
+  `docs/architecture/arc42/02-constraints.md` names it.
 - Root `.env.example` and `deploy-standalone/.env.example` if either names `FLARESOLVERR_URL`.
+- e2e: the tier-ladder spec needs no update, because it no longer holds a FlareSolverr step (owner answer 91.3 of 2026-10-08), FlareSolverr removed from every e2e
+  file outside past run records, from the Bruno collection and from `docs/E2E_RUN_SCENARIOS.md` (three fixed
+  container names instead of four).
 
 ## Relevant Skills
 

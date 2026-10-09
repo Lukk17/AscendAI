@@ -1,37 +1,37 @@
 ## Purpose
 
 Defines what the catalogue of vendor markers and phrases contains, where each entry's provenance is recorded, how the
-runtime file is produced from the maintained source, which languages the phrase supplement covers, and what evidence
+provenance sits in the one catalogue file the service loads, which languages the phrase supplement covers, and what evidence
 a marker needs before it is admitted, so that the catalogue can be trusted, extended and corrected by reading it.
 
 ## ADDED Requirements
 
-### Requirement: The runtime catalogue is generated from a maintained source
+### Requirement: The runtime catalogue is one maintained file
 
-The catalogue the service loads SHALL be generated from a maintained source file by a generator that is part of the
-repository. The generated file SHALL be committed and SHALL be byte-identical to what the generator produces from the
-committed source. The test suite SHALL fail when the two differ.
+The catalogue the service loads SHALL be one maintained file in the repository that holds the vendor markers, the
+phrases and their provenance together. The service SHALL load that file directly, with no generated copy and no
+generator beside it, and SHALL fail at startup with a message naming the file when the file is missing or malformed.
 
-#### Scenario: A hand edit to the generated file
+#### Scenario: The file the service loads is the file that is maintained
 
-- **WHEN** the generated catalogue is edited directly and the generator is run in check mode
-- **THEN** the check fails and names the file
+- **WHEN** a marker or a translation is added to the catalogue file
+- **THEN** the service loads it at its next start with no other file changed
 
-#### Scenario: Regeneration is deterministic
+#### Scenario: A missing catalogue
 
-- **WHEN** the generator is run twice on the same source
-- **THEN** the two outputs are byte-identical
+- **WHEN** the catalogue file is missing or is not valid JSON
+- **THEN** the service refuses to start and the message names the file
 
 ### Requirement: Every vendor marker carries a source and a verification date
 
-Each vendor marker in the source SHALL record the signal it feeds, the URL of the source it was verified against and
+Each vendor marker in the catalogue file SHALL record the signal it feeds, the URL of the source it was verified against and
 the date of that verification. A marker without a source SHALL be rejected by the test suite. Markers that could not
 be verified against a vendor page or a maintained detector SHALL NOT be in the catalogue and SHALL be listed in the
 design as excluded.
 
 #### Scenario: A marker without a source
 
-- **WHEN** a marker is added to the source file with no source URL
+- **WHEN** a marker is added to the catalogue file with no source URL
 - **THEN** the test suite fails and names the marker
 
 #### Scenario: The excluded list is honoured
@@ -63,7 +63,7 @@ the corpus. Every vendor SHALL have at least one wall fixture. A marker with no 
 
 #### Scenario: A marker with no fixture
 
-- **WHEN** a marker is added to the source and no fixture fires it
+- **WHEN** a marker is added to the catalogue file and no fixture fires it
 - **THEN** the corpus test fails and names the marker
 
 #### Scenario: A fixture removed from under a marker
@@ -81,12 +81,12 @@ Maltese, plus Ukrainian, Russian, Turkish, Japanese, Korean, Simplified Chinese,
 
 #### Scenario: A translation without provenance
 
-- **WHEN** a translation is added to the source with no capture record
+- **WHEN** a translation is added to the catalogue file with no capture record
 - **THEN** the test suite fails and names the phrase and the language
 
 #### Scenario: Coverage is visible
 
-- **WHEN** the generator is run in coverage mode
+- **WHEN** the catalogue test runs
 - **THEN** it prints a table with one column per language code and one row per phrase id, marking each captured
   translation
 
@@ -97,9 +97,9 @@ Maltese, plus Ukrainian, Russian, Turkish, Japanese, Korean, Simplified Chinese,
 
 ### Requirement: Phrases are normalised once, by one function
 
-Phrases SHALL be normalised at generation and at match time by the same function: Unicode compatibility
-normalisation, case folding, punctuation removal and whitespace collapsing. The generator SHALL import that function
-from the matcher rather than defining its own.
+Phrases SHALL be normalised when the catalogue is loaded and at match time by the same function: Unicode
+compatibility normalisation, case folding, punctuation removal and whitespace collapsing. The loader SHALL call that
+function from the matcher rather than defining its own.
 
 #### Scenario: Ellipsis variants match
 
@@ -108,7 +108,7 @@ from the matcher rather than defining its own.
 
 #### Scenario: One implementation
 
-- **WHEN** the generator module is inspected
+- **WHEN** the catalogue loader is inspected
 - **THEN** it defines no normalisation function of its own
 
 ### Requirement: The corpus holds real captures, marked synthetic only when no public page exists

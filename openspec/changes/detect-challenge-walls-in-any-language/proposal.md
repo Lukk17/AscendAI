@@ -41,8 +41,8 @@ words as the first line of evidence and puts it on the things a wall cannot tran
 and header signatures, the HTTP status the wall is served with, the shape of the page (a form with a captcha input,
 an image or canvas named captcha, a page whose visible text is one form, a meta refresh or a script-only body), and
 the ratio of extracted words to bytes, links and article structure that separates a wall from an article. Phrases
-stay, as a supplement generated from a maintained source file for a broad set of languages, and never as the thing
-the verdict depends on.
+stay, as a supplement kept in one maintained file with its provenance for a broad set of languages, and never as the
+thing the verdict depends on.
 
 The other side of the same coin is a false positive that already exists today. `recaptcha/api.js` fires `is_blocked`
 regardless of page size, so a blog post with a reCAPTCHA under its comment form is escalated tier by tier to a 428 and
@@ -58,7 +58,8 @@ One verdict, with a score, instead of four booleans:
   type. `is_blocked`, `has_real_content` and `is_content_accepted` keep their names and become thin readers of
   that verdict, so the nine call sites that use them today keep working while each is moved to pass the response
   headers it already has.
-- A page is a wall when its score reaches `CHALLENGE_SCORE_THRESHOLD`, or when a definitive signal fires. A
+- A page is a wall when its score reaches the threshold setting `CHALLENGE_SCORE_THRESHOLD` (default 100), or when a definitive
+  signal fires. A
   definitive signal is one the vendor only ever emits while serving a challenge, such as Cloudflare's
   `cf-mitigated: challenge` response header, and it carries a weight of twice the threshold so no guard can cancel
   it.
@@ -81,14 +82,14 @@ Signals in four families, the language-independent three first:
   of extracted article text is pulled back below the threshold unless a definitive signal says otherwise. That is
   the guard that keeps a blog post with a captcha under its comment form from becoming a human escalation.
 
-Phrases as a generated supplement:
+Phrases as a supplement with provenance:
 
-- `challenge_dictionary.json` stops being hand-edited. It becomes the generated output of
-  `scripts/generate_challenge_dictionary.py` from `challenge_dictionary.source.json`, which holds the vendor
-  catalogue with a source per marker and a phrase table with a provenance per translation. A test asserts the
-  committed output is byte-identical to what the generator produces, so a hand edit fails the suite.
+- `challenge_dictionary.json` stays the one catalogue file. It holds the vendor catalogue with a source per marker
+  and a phrase table with a provenance per translation, and the detector loads it directly and normalises the phrases
+  at load time. No source file, no generator and no generated copy sit beside it (owner answer 93 of 2026-10-08).
+  A test fails when a marker has no source or a translation has no provenance.
 - The phrase set is sixteen canonical phrases, listed in [design.md](design.md), and the language set is thirty
-  BCP 47 codes, also listed there. A translation enters the source file only when captured from the vendor's own
+  BCP 47 codes, also listed there. A translation enters the catalogue file only when captured from the vendor's own
   localised page or from a measured interstitial, with the capture recorded beside it. No translation is typed from
   memory, including by the author of this change.
 - Phrases are normalised before matching, so `Just a moment...` and `Just a moment…` are one phrase, and a phrase
@@ -125,21 +126,24 @@ The e2e suite gains rows that cannot pass by luck:
   with the three existing readers kept as wrappers.
 - `apps/ascend-web-hunter/src/reader/cloudflare/challenge_signals.py`: new, the signal families, their weights and
   the pure functions that compute each one from a status, a header map, a prefix and an extraction.
-- `apps/ascend-web-hunter/src/reader/cloudflare/challenge_dictionary.source.json`: new, the maintained source.
-- `apps/ascend-web-hunter/src/reader/cloudflare/challenge_dictionary.json`: becomes generated output.
-- `apps/ascend-web-hunter/scripts/generate_challenge_dictionary.py`: new, the generator, with a `--check` mode the
-  test suite runs.
+- `apps/ascend-web-hunter/src/reader/cloudflare/challenge_dictionary.json`: rewritten into the one maintained
+  catalogue file with its provenance fields.
 - `apps/ascend-web-hunter/src/api/exceptions.py`: `ChallengeDetectedException` gains the verdict.
 - `apps/ascend-web-hunter/src/reader/strategies/curl_cffi_fetcher.py`, `playwright_strategy.py`,
   `flaresolverr_strategy.py`, `crawlee_strategy.py`, `novnc_strategy.py` and `src/reader/web_reader.py`: the nine
   call sites (crawlee 101, curl_cffi 123, flaresolverr 82, novnc 122 and 123, playwright 79 and 107, web_reader 407
   and 468), each passing the headers it has.
-- `apps/ascend-web-hunter/src/config/config.py`: seven settings, listed with derivations in [design.md](design.md).
+- `apps/ascend-web-hunter/src/config/config.py`: the seven tuning values and one weight per signal become settings
+  with the values of [design.md](design.md) as defaults (owner rule 98 of 2026-10-08), passed by both compose files
+  as `${VAR:-default}` and added to both `.env.example` files and the bundle README by the sync rule.
 - `apps/ascend-web-hunter/src/observability/metrics.py`: two counters and one histogram.
-- `apps/ascend-web-hunter/tests/`: the fixture corpus, its manifest, the signal tests, the corpus test, the generator
+- `apps/ascend-web-hunter/tests/`: the fixture corpus, its manifest, the signal tests, the corpus test, the catalogue
   test, and the migration test, to the module's `--cov-fail-under=100` with `--cov-branch`.
 - `apps/ascend-web-hunter/e2e/testing/7-authenticated-realworld-scraping-test.md`, its sidecar template, the
   Bruno rows under `docs/api/request/AscendAI/web-hunter/testing/realworld/`, and `e2e/README.md`.
+- A new automated e2e spec, `<N>-challenge-verdicts` (next free number at implementation time), that reads walls and
+  content pages in several languages from the shared e2e fake site, with its Bruno folder
+  `docs/api/request/AscendAI/web-hunter/testing/challenge-verdicts/`, and its place in `docs/E2E_RUN_SCENARIOS.md`.
 - Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, a new ADR-014, an amendment to ADR-001, and a new row in
   `docs/DEFECT_REGISTER.md`.
 
@@ -183,9 +187,9 @@ The e2e suite gains rows that cannot pass by luck:
 - The Amazon marker discrepancy. If `/errors_page/validateCaptcha` never matched, rows v, w, x and y have been
   passing on product pages and failing on interstitials since they were written, which is what the spec's own
   paragraph says. Task 3.5 measures the live form action before the catalogue commits to either path.
-- Rollback. `CHALLENGE_SCORE_THRESHOLD` raised well above the sum of the non-definitive weights disables the score
-  and leaves only the definitive signals and the word floor, which is a stricter version of today's behaviour. There
-  is no setting that restores the phrase-first behaviour, and none is wanted.
+- Rollback. A rollback is the image of the change before this one, ascend-web-hunter 0.0.9. The threshold and the
+  weights are settings (owner rule 98 of 2026-10-08), but no value of them restores the phrase-first behaviour, and
+  none is wanted.
 
 ## Capabilities
 
@@ -195,7 +199,7 @@ The e2e suite gains rows that cannot pass by luck:
   how it is scored, where the threshold sits, which signals are definitive, how a page with a real article is kept
   from being a wall, and what each tier does with the verdict.
 - `web-search-challenge-signature-catalogue`: what the catalogue of vendor markers and phrases contains, where each
-  entry's provenance lives, how the runtime file is generated from the source, which languages the phrase supplement
+  entry's provenance lives in the one catalogue file the service loads, which languages the phrase supplement
   covers, and what the fixture corpus must hold for a marker to be admitted.
 - `web-search-challenge-detection-observability`: what the service reports about each verdict, over the metrics
   surface and the logs, so an operator can tell a wall the detector caught from one it nearly missed.
@@ -218,7 +222,8 @@ which shape: a wall from a vendor the dictionary did not know returns 428 where 
 that hosts a captcha widget returns 200 where it returned 428.
 
 Operational: one parse and one extraction per page per tier, bounded by two byte limits. Three new metric series,
-one of them a histogram. Seven settings with defaults that need no operator action.
+one of them a histogram. New settings: the seven tuning values and one weight per signal, each with the value of
+`design.md` as its default (owner rule 98 of 2026-10-08).
 
 Tests: `apps/ascend-web-hunter` runs `--cov=src --cov-branch --cov-fail-under=100`, so every signal and every branch
 in the verdict needs a test before the suite goes green. The fixture corpus adds roughly forty HTML files under
@@ -233,13 +238,17 @@ already describes. ADR-009 to ADR-012 already exist and ADR-013 belongs to the s
 
 ## Dependencies and Build Order
 
-The owner fixed the build order on 2026-10-01: `open-several-novnc-windows-at-once` first, then this change, then
-`enhance-web-search-tier-ladder`, then `enhance-web-search-extraction-and-tiers` (structured extraction), then
-`enhance-web-search-crawl-at-scale`. This change depends on `open-several-novnc-windows-at-once`: the five Amazon
-rows `aa` to `ae` in spec 7 each open a NoVNC window nobody solves, so they need `NOVNC_MAX_CONCURRENT_FLOWS` of at
-least 5, which only exists after that change. Both changes ship together as ascend-web-hunter 0.0.7 with one
-CHANGELOG entry, and the version bump itself belongs to the sibling change. `enhance-web-search-tier-ladder` depends
-on this change, because its new browser tiers pass their response to the same verdict.
+Build order (owner build order of 2026-10-04, which supersedes the earlier orders, among them the owner order of
+2026-10-01): build group 2 (web-hunter), position 4. It needs `open-several-novnc-windows-at-once` (position 3), which
+lands before it: the five Amazon rows `aa` to `ae` in spec 7 each open a NoVNC window nobody solves, so they need
+`NOVNC_MAX_CONCURRENT_FLOWS` of at least 5, which only exists after that change. It also needs `add-ascend-python-common`
+(position 1) and `add-python-runtime-upgrades` (position 2), so the MCP tools and tests of this change are written
+against FastMCP 4 and every test that uses `fastmcp.Client` names its protocol era (`add-python-runtime-upgrades` D9).
+Its e2e rows use the shared fake site of `add-web-search-scraping-e2e` (build group 1). This change ships as
+ascend-web-hunter 0.0.10 with its own CHANGELOG entry, one patch step after 0.0.9 of
+`open-several-novnc-windows-at-once` (owner decision of 2026-10-08, one named version per change, in build order).
+`enhance-web-search-tier-ladder` (position 5) builds on this change, because its new browser tiers pass their
+response to the same verdict.
 
 ## Relevant Skills
 

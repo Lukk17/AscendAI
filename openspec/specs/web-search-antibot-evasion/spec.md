@@ -35,11 +35,21 @@ The service SHALL support routing fetches through a configurable proxy for all t
 - **WHEN** a proxy is configured
 - **THEN** each tier routes its outbound fetch through that proxy
 
-### Requirement: No service-side request rate limiting
+### Requirement: No outbound self-throttling, and inbound limits only per caller
 
-The service SHALL NOT impose per-domain or per-caller request rate limiting or self-throttling. Throughput control is delegated to the deployment stack.
+The service SHALL NOT impose per-domain rate limiting or self-throttling on its outbound fetches. Throughput control of outbound fetches is delegated to the deployment stack. The only request limit the service applies SHALL be the inbound per-caller limit of `python-service-platform`, read from settings.
 
-#### Scenario: Rapid successive reads
+#### Scenario: Rapid successive reads within the caller's limit
 
-- **WHEN** many read requests are issued in quick succession
+- **WHEN** many read requests are issued in quick succession and stay within the caller's configured limit
 - **THEN** the service does not delay, queue, or reject them for rate-limiting reasons
+
+#### Scenario: Reads of one domain are not throttled
+
+- **WHEN** many reads of pages on the same domain arrive within the callers' limits
+- **THEN** the service fetches each of them without waiting for an earlier fetch of that domain
+
+#### Scenario: A caller over its limit
+
+- **WHEN** one caller sends more read requests than its configured limit allows in the window
+- **THEN** the next request answers HTTP 429 with code `rate_limited`

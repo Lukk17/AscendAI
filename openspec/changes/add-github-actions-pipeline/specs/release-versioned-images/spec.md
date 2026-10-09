@@ -91,6 +91,12 @@ Each selected app's image SHALL be built once and pushed to `lukk17/ascend-ai-<s
 - **WHEN** `ascend-ocr` is not selected in a release
 - **THEN** `lukk17/ascend-ai-ascend-ocr:latest` and `ghcr.io/lukk17/ascend-ai-ascend-ocr:latest` are unchanged by the run
 
+#### Scenario: A released image starts and reports its version
+
+- **WHEN** the `v<version>` image of a released app is pulled from either registry and started for `linux/amd64` and for `linux/arm64` with the environment its compose service gives it
+- **THEN** its health endpoint answers healthy on both platforms
+- **AND** a service that reports its version in its health answer reports the version of the top entry of its `CHANGELOG.md`
+
 ### Requirement: Registry authentication and least privilege
 
 The workflow SHALL log in to Docker Hub using `docker/login-action@v3` with the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets, and to GHCR using `docker/login-action@v3` with the automatic `GITHUB_TOKEN`, before any push. The workflow SHALL declare `permissions: { contents: write }` at workflow level, and the `build-and-push` job SHALL narrow it to `contents: read` and `packages: write`. Credentials SHALL NOT appear in plaintext in logs.
@@ -106,7 +112,7 @@ When `create_github_release` is ticked and every selected app pushed successfull
 
 #### Scenario: Release notes list all app versions
 
-- **WHEN** a release of `ascend-agent` (0.1.3) and `ascend-audio-scribe` (0.9.4) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 0.0.4, ascend-web-hunter 0.0.6, ascend-memory 0.1.3, ascend-ocr 0.3.0
+- **WHEN** a release of `ascend-agent` (0.1.3) and `ascend-audio-scribe` (99.0.0) is dispatched as `stack_version=1.1.1`, with the other apps currently at ascend-weather-mcp 0.0.4, ascend-web-hunter 0.0.6, ascend-memory 0.1.3, ascend-ocr 0.3.0
 - **THEN** a GitHub Release tagged `ascend-ai_1.1.1` is created
 - **AND** its body lists all six apps with their current versions, marking `ascend-agent` and `ascend-audio-scribe` as released
 - **AND** the release is not a draft

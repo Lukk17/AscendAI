@@ -25,7 +25,7 @@ ascend-web-hunter SHALL run trafilatura and readability-lxml on the same HTML fo
 
 ### Requirement: Schema-guided extraction through a configurable endpoint
 
-With `output_format` `schema` and an `extraction_schema`, ascend-web-hunter SHALL return a JSON object validated against that schema, produced by the OpenAI-compatible endpoint in `EXTRACTION_LLM_BASE_URL`. An answer that does not validate SHALL be refused with HTTP 502 and code `EXTRACTION_FAILED`. When no endpoint is configured the request SHALL be refused with HTTP 400.
+With `output_format` `schema` and an `extraction_schema`, ascend-web-hunter SHALL return a JSON object validated against that schema, produced by the OpenAI-compatible endpoint in `EXTRACTION_LLM_BASE_URL`. An answer that does not validate SHALL be refused with HTTP 502 and code `extraction_failed`. When no endpoint is configured the request SHALL be refused with HTTP 400 and code `extraction_not_configured`.
 
 #### Scenario: Valid schema extraction
 
@@ -35,7 +35,22 @@ With `output_format` `schema` and an `extraction_schema`, ascend-web-hunter SHAL
 #### Scenario: Endpoint not configured
 
 - **WHEN** `EXTRACTION_LLM_BASE_URL` is empty and a caller asks for `schema`
-- **THEN** the request is refused with HTTP 400 naming the missing setting
+- **THEN** the request is refused with HTTP 400, `code` `extraction_not_configured` and a `detail` naming the missing setting
+
+### Requirement: Extraction errors are problem bodies with a trace id
+
+Every REST error of the read path that this capability adds SHALL be an RFC 7807 problem body with media type `application/problem+json`, `type` `https://ascend.ai/errors/` followed by the code with every `_` replaced by `-`, `title`, `status`, `detail`, `instance`, the extension field `code` and the extension field `traceId`, built by the shared problem builder of the `ascend-python-common` library, which every other error handler of the service SHALL also use. `traceId` SHALL be the 32 character lower case hex trace id of the current OpenTelemetry span when one is valid, and SHALL be left out otherwise, never empty and never invented.
+
+#### Scenario: Failed schema extraction names its trace
+
+- **WHEN** tracing is on and the model answers with JSON that does not validate against the caller's schema
+- **THEN** the answer is HTTP 502 with `Content-Type: application/problem+json`, `code` `extraction_failed`, `type` `https://ascend.ai/errors/extraction-failed` and a `traceId` equal to the trace id of that request
+
+#### Scenario: Links asked for with a structured format is a problem body
+
+- **WHEN** a REST read asks for `output_format` `structured` and `include_links` true
+- **THEN** the answer is HTTP 400 with `Content-Type: application/problem+json`, `code` `bad_request` and a `traceId` of 32 lower case hex characters
+- **AND** the page is not fetched
 
 ### Requirement: Page content sent to a model is untrusted data
 
@@ -63,12 +78,18 @@ On a schema extraction the model SHALL also return one CSS selector per field, s
 
 ### Requirement: Non-HTML content routed to the platform services
 
-A PDF SHALL be converted by docling-serve, an image SHALL be read through the ascend-ocr job API (`POST /v1/ocr/jobs`, then `GET /v1/ocr/jobs/{job_id}`), and audio SHALL be transcribed by ascend-audio-scribe. Every routed document SHALL be fetched through the SSRF-guarded client and capped at `DOCUMENT_MAX_BYTES`. A routing failure SHALL return the HTML extraction with a `routing_error` field rather than fail the read.
+A PDF SHALL be converted by docling-serve, an image SHALL be read through the ascend-ocr job API (`POST /v1/ocr/jobs`, then `GET /v1/ocr/jobs/{job_id}`), and audio SHALL be transcribed by ascend-audio-scribe. Every routed document SHALL be fetched by the shared `stream_to_file` of `src/fetch/byte_fetch.py`, built on the one redirect loop of `src/fetch/pinned_fetch.py` that checks and pins every hop, and capped at `DOCUMENT_MAX_BYTES`. No route SHALL open an HTTP client of its own. A routing failure SHALL return the HTML extraction with a `routing_error` field rather than fail the read.
 
 #### Scenario: PDF converted by docling-serve
 
 - **WHEN** a read targets a URL whose response is `application/pdf`
 - **THEN** the returned content is the Markdown docling-serve produced
+
+#### Scenario: Oversized PDF not sent
+
+- **WHEN** a read targets a PDF whose `Content-Length` is above `DOCUMENT_MAX_BYTES`
+- **THEN** the body is not read and nothing is posted to docling-serve
+- **AND** the read returns the HTML extraction with a `routing_error` field
 
 #### Scenario: Image read through the OCR job API
 
@@ -77,9 +98,15 @@ A PDF SHALL be converted by docling-serve, an image SHALL be read through the as
 
 ### Requirement: Tables and screenshot output formats
 
-`output_format` `tables` SHALL return each HTML table as a list of rows. `output_format` `screenshot` SHALL return a base64 full-page PNG taken by the browser tier that served the read, and SHALL be refused with HTTP 400 when no browser tier is enabled.
+`output_format` `tables` SHALL return each HTML table as a list of rows. `output_format` `screenshot` SHALL return a base64 full-page PNG taken by the browser tier that served the read, and SHALL be refused with HTTP 400 and code `screenshot_unavailable` when no browser tier is enabled.
 
 #### Scenario: Table page
 
 - **WHEN** a page with one HTML table is read with `output_format` `tables`
 - **THEN** the response holds that table as rows
+
+#### Scenario: Screenshot is a PNG and is not cached
+
+- **WHEN** a page is read twice with `output_format` `screenshot`
+- **THEN** each answer holds a base64 value that decodes to bytes starting with the PNG signature
+- **AND** the page is fetched once per read

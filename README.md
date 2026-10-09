@@ -218,6 +218,7 @@ Two architecture entry points, depending on what you're after.
 | **[AscendMemory](apps/ascend-memory/AGENTS.md)**             | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                     |
 | **[ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md)** | Java / Spring Boot     | 9998 | Weather data MCP server                             |
 | **[ascend-ocr](apps/ascend-ocr/AGENTS.md)**                 | Python / FastMCP       | 7022 | OCR service                                         |
+| **[ascend-python-common](libs/ascend-python-common/README.md)** | Python shared library (no service, no image) | - | Shared platform code (errors, settings, logging, tracing, rate limiting) for the four Python services |
 
 #### Request flow
 

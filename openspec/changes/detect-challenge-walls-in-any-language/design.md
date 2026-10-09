@@ -88,9 +88,15 @@ catalogue plus a score can be read, tested and corrected by hand.
 
 ### Decision 2: Five signal families, with the language-independent ones first
 
-The weights are module constants in `challenge_signals.py`, not settings. They are relative to each other and to
-`CHALLENGE_SCORE_THRESHOLD`, and changing one without re-running the corpus is guessing. The corpus test in task 9.1
-is the place a weight changes.
+The weights are settings, one per signal, named `CHALLENGE_WEIGHT_<SIGNAL ID IN UPPER CASE>` with the weight of the
+tables below as the default (owner rule 98 of 2026-10-08). They are relative to each other and to the setting
+`CHALLENGE_SCORE_THRESHOLD`, and changing one without re-running the corpus is guessing, so the documentation says so
+and a validator refuses a set of weights that breaks the rules of this decision (configuration section). The seven
+tuning values the families compare with (the threshold, `CHALLENGE_RICH_CONTENT_WORDS`,
+`CHALLENGE_FORM_DOMINANCE_RATIO`, `CHALLENGE_MIN_WORDS_PER_KB`, `CHALLENGE_THIN_LINK_COUNT`,
+`CHALLENGE_RICH_LINK_COUNT` and `CHALLENGE_SHAPE_MAX_BYTES`) are settings too, with the values of the configuration
+table as defaults. `challenge_signals.py` reads all of them from the settings. The corpus test in task 9.1 is the
+place a default weight changes.
 
 Family A, vendor signatures. All language-independent.
 
@@ -174,7 +180,11 @@ Rejected: a threshold at 60 with a single vendor script sufficient. That is toda
 
 Rejected: requiring a phrase for any verdict. That is today's false negative in every language but two.
 
-Rejected: weights as settings. Eleven more environment variables whose only safe values are the ones in the table.
+Weights and tuning values as settings were rejected by owner answer 93 and are adopted by owner rule 98 of
+2026-10-08: every value with a default is a setting, and an operator may need to move a weight or the threshold on a
+host whose traffic the corpus does not cover. The defaults stay the values of the tables, and the validator of task
+1.2 keeps the rules of this decision true for any values: no signal other than `definitive_header` and
+`status_empty_body` reaches the threshold alone, the two guards never add to a score, and no other signal subtracts.
 
 ### Decision 3: The catalogue carries a source per marker, and unverified markers stay out
 
@@ -224,20 +234,22 @@ Left out because no vendor page or maintained detector confirmed them on 2026-09
 enters the catalogue with a source and a fixture or not at all.
 
 One consequence of the sources: Cloudflare's supported-languages reference says the challenge page's displayed
-language follows the browser's `navigator.language`, read client-side, not the request's `Accept-Language`. That was a
-fetched summary rather than a quoted sentence, so confidence is medium, and task 5.2 confirms it by capture. If it
+language follows the browser's `navigator.language`, read client-side, not the request's `Accept-Language`. The
+reference says it in one sentence, quoted under Open Question 3 (owner decision 65.27 of 2026-10-04), and task 5.2
+captures the translated phrases through a browser. If it
 holds, the curl tier only ever sees the page's default text, and the browser tiers see it in the fingerprint's
 locale, so the phrase supplement must be captured through a browser per language and the default text captured
 through curl.
 
-### Decision 4: Phrases are generated from a maintained source, and none is typed from memory
+### Decision 4: Phrases live in one maintained file with their provenance, and none is typed from memory
 
-`challenge_dictionary.source.json` is the maintained file. `challenge_dictionary.json` is generated from it by
-`scripts/generate_challenge_dictionary.py` and committed, and `tests/reader/cloudflare/test_challenge_dictionary.py`
-runs the generator in `--check` mode and fails when the committed output differs. A hand edit to the generated file
-therefore fails the suite.
+`challenge_dictionary.json` is the one maintained file. It carries the provenance of every entry itself, and the
+detector loads it directly through one loader in `challenge_signals.py`. There is no source file beside it, no
+generator script and no generated copy (owner answer 93 of 2026-10-08, review item B8): one piece of knowledge has one
+file. `tests/reader/cloudflare/test_challenge_dictionary.py` checks the rules a generator would have enforced: every
+marker has a source and a date, every translation has a provenance, and every phrase id appears once.
 
-The source file has three sections. `vendors` holds the marker table from Decision 3, each marker with its `signal`,
+The file has three sections. `vendors` holds the marker table from Decision 3, each marker with its `signal`,
 its `source` URL and its `verified_on` date. `phrases` holds the table below, each translation with a `provenance`
 object recording the URL it was captured from, the tier or the browser locale it was captured through, and the date.
 `login_title_patterns` is carried over verbatim and untouched.
@@ -275,11 +287,11 @@ challenge in a Playwright context with `locale` set to each code and records the
 Amazon phrases, task 5.3 fetches each marketplace's captcha page and records its text, which extends the four locales
 spec 7 already measured. For the generic and vendor phrases that exist today, the English is kept with provenance
 `legacy-dictionary`, and a translation is added only when a wall carrying it is captured into the corpus. A language
-with no captured translation for a phrase simply has no entry, and `scripts/generate_challenge_dictionary.py
---coverage` prints the phrase by language table so the gap is visible rather than guessed at.
+with no captured translation for a phrase simply has no entry, and `test_challenge_dictionary.py` prints the phrase by
+language table so the gap is visible rather than guessed at.
 
-Normalisation is applied at generation and at match time by the same function, so the generated file holds the
-normalised forms and the matcher never has to agree with a second implementation.
+The file holds each phrase as it was captured. The loader normalises every phrase when it reads the file, with the same
+function the matcher applies to the page, so the matcher never has to agree with a second implementation.
 
 Rejected: translating the phrases with a machine translation service and committing the output. It produces a
 plausible sentence that is not the sentence the vendor renders, and a phrase that almost matches is a phrase that
@@ -335,7 +347,7 @@ Corpus rules, each enforced by a test:
 - Every vendor in the catalogue has at least one `wall` fixture. Every `vendor_script`, `interstitial_structure` and
   `definitive_header` marker is fired by at least one fixture.
 - Cloudflare and Amazon, the two vendors that localise their wall, have one fixture per captured language, and each
-  phrase translation in the source file is fired by at least one of them.
+  phrase translation in the catalogue file is fired by at least one of them.
 - The counterexample set contains at least: a blog post with a reCAPTCHA comment form, a page hosting a Turnstile
   widget beside its own text, a vendor's own page that hosts its widget beside real content, a login page with a
   captcha (expected wall, type `login`), an article in each of `en`, `pl`, `de`, `ja` and `ar`, a 404 page, a 403
@@ -363,7 +375,16 @@ largest fixture and on the largest real page in spec 7's matrix.
 
 ## Configuration
 
-| Setting | Default | Derivation |
+Every row is a setting (owner rule 98 of 2026-10-08). The first seven are new and replace the module constants of
+owner answer 93 (review item C14), with the same values as defaults. The last three are the settings that exist
+today, kept. The weight settings `CHALLENGE_WEIGHT_*` of Decision 2 are new settings too, one per signal of its
+tables, with the weight printed there as the default. `config.py` carries each default, the `ascend-web-hunter`
+service of both compose files passes each new setting and the two existing `CHALLENGE_*` byte limits as
+`${VAR:-default}` with the same value, and the sync rule puts each new name into both `.env.example` files and the
+bundle README (task 1.4). The rows of `docs/configuration.md` end with "Added by
+`detect-challenge-walls-in-any-language`." (task 10.1).
+
+| Name | Default | Derivation |
 | :-- | :-- | :-- |
 | `CHALLENGE_SCORE_THRESHOLD` | `100` | Above every non-definitive weight, so a wall needs two independent signals. Below the sum of any two strong ones, so a vendor script beside a captcha input is a wall on a thin page. |
 | `CHALLENGE_RICH_CONTENT_WORDS` | `150` | Every wall in the catalogue explains itself in under 150 extracted words. Every article the service is asked to read is well over it. The guard sits between. |
@@ -376,8 +397,11 @@ largest fixture and on the largest real page in spec 7's matrix.
 | `CHALLENGE_WALL_MAX_BYTES` | `50_000` | Kept. The size under which a 403, 429 or 503 body is small, and under which the word floor is computed. |
 | `VALIDATION_MIN_WORDS` | `10` | Kept. The word floor, unchanged. |
 
-Two validators run at settings construction: the threshold must be positive, and `CHALLENGE_SHAPE_MAX_BYTES` must be
-at least `CHALLENGE_WALL_MAX_BYTES`, so the word floor is never computed on a page the shape family refused.
+One validator runs at settings construction (task 1.2): `CHALLENGE_WALL_MAX_BYTES` must not exceed
+`CHALLENGE_SHAPE_MAX_BYTES`, so the word floor is never computed on a page the shape family refused, every weight
+other than those of `definitive_header` and `status_empty_body` must stay below `CHALLENGE_SCORE_THRESHOLD`, the
+weights of `rich_content` and `many_links` must not be positive and every other weight must not be negative, and
+`CHALLENGE_THIN_LINK_COUNT` must not exceed `CHALLENGE_RICH_LINK_COUNT`.
 
 ## Observability
 
@@ -385,7 +409,7 @@ at least `CHALLENGE_WALL_MAX_BYTES`, so the word floor is never computed on a pa
 | :-- | :-- | :-- | :-- |
 | `challenge_signals_fired_total` | Counter | `signal`, `vendor` | One increment per signal per verdict. `vendor` is a catalogue name, `none` for vendor-free signals. Cardinality is bounded by the catalogue. |
 | `challenge_verdicts_total` | Counter | `verdict`, `tier` | `wall`, `content` or `no_content`, per tier name plus `novnc-monitor` and `reader`. |
-| `challenge_score` | Histogram | none | Buckets `0, 20, 40, 60, 80, 100, 120, 160, 200, 300`, one at each weight sum that matters, so the near misses on both sides of 100 are visible. |
+| `challenge_score` | Histogram | none | Buckets `0, 20, 40, 60, 80, 100, 120, 160, 200, 300`, one at each weight sum that matters at the default weights, plus `CHALLENGE_SCORE_THRESHOLD` when an override moves it off the list, so the near misses on both sides of the threshold are visible. The bucket list is part of the metric's definition and stays a constant. |
 | `strategy_attempts_total` | Counter | `strategy`, `outcome`, `domain` | Kept. `challenge_detected` keeps its meaning. |
 
 One log line per verdict at INFO when the score is at or above half the threshold or the verdict is a wall, at DEBUG
@@ -398,11 +422,12 @@ and the score in the same line rather than a second line.
 
 ## Migration from the current dictionary
 
-1. `challenge_dictionary.json` keeps its filename and its four top-level keys become sections of the generated file,
-   with `login_title_patterns` copied verbatim. The four `waf_script_signatures` become `vendor_script` markers under
+1. `challenge_dictionary.json` keeps its filename and its four top-level keys become sections of the rewritten
+   file, with `login_title_patterns` copied verbatim. The four `waf_script_signatures` become `vendor_script` markers under
    their vendors. The eleven `waf_strict_phrases` become the phrase entries marked `legacy-dictionary` in Decision 4.
    The one `waf_structural_markers` entry becomes an Amazon `interstitial_structure` marker, beside the
-   `/errors/validateCaptcha` form the sources name, until task 3.5 measures which is real and drops the other.
+   `/errors/validateCaptcha` form the sources name. The marker matches both paths and neither is dropped (owner
+   decision 65.27 of 2026-10-04).
 2. The three size-gated substrings, `cf-turnstile`, `cf_clearance` and `datadome`, become a `captcha_element`, a
    `vendor_presence` and a `vendor_presence` marker with no size gate. The `Ray ID:` regex becomes a Cloudflare
    `interstitial_structure` marker.
@@ -415,20 +440,103 @@ and the score in the same line rather than a second line.
    test.
 5. `ERROR_KEYWORDS` in `ContentValidator` is untouched and its English-only defect is recorded in the register by
    task 10.4 as its own entry.
-6. Rollback is `CHALLENGE_SCORE_THRESHOLD=1000`, which no sum of non-definitive weights reaches, leaving the two
-   definitive headers, the empty-body status rule and the word floor. That is stricter than today, never looser.
+6. Rollback is the image of the change before this one, ascend-web-hunter 0.0.9. The threshold and the weights are
+   settings (owner rule 98 of 2026-10-08), but no value of them restores the phrase-first behaviour, because a
+   definitive signal still forces a wall, so they tune the score and are not a rollback.
 
 ## Open Questions
 
-1. Whether 150 words is the right guard. The worked example of a short page hosting a Turnstile widget lands at 160
-   and is a wall. The corpus margin table from task 9.1 is what either confirms the number or moves it, before the
-   change is called done, and `nowsecure.nl` is captured as a fixture so the decision is made on the real page.
-2. Which of `/errors/validateCaptcha` and `/errors_page/validateCaptcha` Amazon serves. The dictionary and one test
-   say the second, spec 7 and every external source say the first. Task 3.5 measures it on five marketplaces.
-3. Whether Cloudflare renders the challenge language client-side from `navigator.language`. If it does, the curl
-   tier never sees a translated phrase and the phrase supplement is effectively a browser-tier signal for Cloudflare.
-   Task 5.2 settles it by capturing the same challenge through curl and through a browser with a non-English locale.
-4. Which vendors have no public wall to capture. Akamai, Imperva, Kasada, PerimeterX, DDoS-Guard and AWS WAF are
-   expected to need a synthetic fixture on the first pass. Each synthetic fixture is listed in the manifest with
-   `synthetic: true`, and task 8.6 records any real capture that a later spec 7 run produces so the synthetic one is
-   replaced.
+All four were closed by owner decision 65.27 of 2026-10-04. They are kept with their answers so the numbers other
+text cites stay valid.
+
+1. Closed: the 150-word guard stays as a measured task. Task 9.1's corpus margin table, with `nowsecure.nl` captured
+   as a fixture, confirms the number or moves it before the change is called done.
+2. Closed: the Amazon marker matches both `/errors/validateCaptcha` and `/errors_page/validateCaptcha`, so neither
+   path is dropped. Task 3.5 still records which path each marketplace serves, as evidence for the fixtures.
+3. Closed: Cloudflare's challenge language follows the browser's `navigator.language`. Source, quoted on
+   2026-10-04: "Cloudflare Challenges can detect multiple languages and display the localized challenge experience,
+   which is determined by `navigator.language` value."
+   (https://developers.cloudflare.com/cloudflare-challenges/reference/supported-languages/). The curl tier therefore
+   sees only the page's default text, and the translated phrases are a browser-tier signal. Task 5.2 captures them
+   through a browser per language.
+4. Closed: the synthetic fixtures for Akamai, Imperva, Kasada, PerimeterX, DDoS-Guard and AWS WAF stay, listed with
+   `synthetic: true`, and task 8.6 replaces each one with a real capture when a spec 7 run records one.
+
+## Owner decisions of 2026-10-08
+
+The owner approved on 2026-10-08 the fixes of the review of the group 1 and group 2 changes of 2026-10-07.
+
+- Item 6: the fake site pages of the verdict spec of task 11.8 are named by path, and task 11.12 adds the missing ones
+  (`/wall-vendor-thin`, `/wall-oversized`), rebuilds `/wall-ko` so it scores above the 428 threshold, rebuilds
+  `/captcha-wall` into a blog post with a catalogued widget, and moves every page into one file each under
+  `apps/ascend-web-hunter/e2e/fake-site/pages/`, which a unit test judges with `assess`. The pages are not corpus
+  fixtures and the corpus rules of Decision 7 do not apply to them. The same unit test keeps `/turnstile-wall` of
+  `open-several-novnc-windows-at-once` a wall.
+- Item 8: task 8.4 no longer names a spec 7 Part 3, which does not exist. The hCaptcha demo form of spec 11 is the
+  fixture that pins the human spec's contract.
+- Item 19: task 9.3 runs mypy over `src scripts tests`, the same gate as `add-ascend-python-common` D14.
+  (Changed by answer 93 below: with the generator gone there is no `scripts` folder, so task 9.3 runs mypy over
+  `src tests`.)
+- Item 20: spec 7 carries one cap rule. Task 11.5 replaces the "at least 4" line of
+  `open-several-novnc-windows-at-once` task 11.1 in place with "at least 5".
+- Owner decision of 2026-10-08, "one named version per change, in build order": this change ships as
+  ascend-web-hunter 0.0.10 with its own CHANGELOG entry, one patch step after 0.0.9 of
+  `open-several-novnc-windows-at-once` (build group 2, position 3). It no longer adds its lines to that change's entry
+  (task 10.5).
+
+Answer 87: confirmed, nothing to change. The verdict holds no state between requests. The catalogue is a file of the
+image, the same in every ascend-web-hunter container, loaded once per process, and the metrics are per container like
+every other metric of the service. No lock, cache, counter or queue of this change needs to be shared between
+containers, so several containers run it safely as it is.
+
+Answer 93: review item C14 is applied. The seven tuning values (`CHALLENGE_SCORE_THRESHOLD`,
+`CHALLENGE_RICH_CONTENT_WORDS`, `CHALLENGE_FORM_DOMINANCE_RATIO`, `CHALLENGE_MIN_WORDS_PER_KB`,
+`CHALLENGE_THIN_LINK_COUNT`, `CHALLENGE_RICH_LINK_COUNT` and `CHALLENGE_SHAPE_MAX_BYTES`) are module constants in
+`challenge_signals.py` beside the weights, not settings (configuration table, tasks 1.1, 1.2 and 10.1). The rollback by
+setting the threshold to 1000 goes with them, and a rollback is the image of the change before this one. (Changed by
+answer 98 below: the seven tuning values and the weights are settings again, with the same values as defaults. The
+rollback stays the image.) Review item
+B8 is applied: `challenge_dictionary.json` is the one maintained file with its provenance, loaded directly and
+normalised at load time, with no source file, no generator script and no generated copy (Decision 4, tasks 2.1 to 2.4,
+5.1, 5.5 and 10.2, task 2.2 removed). The phrase by language table that the generator's coverage mode printed is
+printed by the catalogue test instead, so the gap stays visible. Without a `scripts` folder, task 9.3 runs mypy over
+`src tests`.
+
+Answer 92: not applied, because each would cut what the owner asked for. Review item C15 (keep one live Amazon locale
+in spec 7 instead of five) is skipped: the five rows are live checks against real sites, which answer 91.3 keeps, and
+they are the only proof that the wall is caught in those languages on the real pages. Review item B15 (drop the
+thirty-language phrase capture) is skipped by the owner's own list of things not to apply.
+
+Answer 91.3: no spec of this change is dropped. The verdict spec of task 11.8 is the one deterministic spec of this
+capability, and it proves what the unit test of task 11.12 cannot: that each real tier hands the status, the headers
+and the cookie names of a real response to the verdict, and that a wall reaches the 428 through the stack. The spec 7
+rows read real sites and stay.
+
+Answer 85.1: no task of this change exports a key or a secret in a shell.
+
+Answer 98: every value of this change that has a default is a setting (owner rule 98 of 2026-10-08), which also
+decides the tuning constants of answer 93 (CANON 31.13): an operator may need to move the threshold, a weight or a
+limit on traffic the corpus does not cover, without a new image. Settings, each read by `config.py` with its default,
+passed by both compose files as `${VAR:-default}` with the same value, put into both `.env.example` files and the
+bundle README by the sync rule (task 1.4) and listed in `docs/configuration.md` with "Added by
+`detect-challenge-walls-in-any-language`." (task 10.1): `CHALLENGE_SCORE_THRESHOLD` 100, `CHALLENGE_RICH_CONTENT_WORDS`
+150, `CHALLENGE_FORM_DOMINANCE_RATIO` 0.6, `CHALLENGE_MIN_WORDS_PER_KB` 2.0, `CHALLENGE_THIN_LINK_COUNT` 5,
+`CHALLENGE_RICH_LINK_COUNT` 20, `CHALLENGE_SHAPE_MAX_BYTES` 500000, and the eighteen weights
+`CHALLENGE_WEIGHT_DEFINITIVE_HEADER` 200, `CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE` 80,
+`CHALLENGE_WEIGHT_VENDOR_SCRIPT` 60, `CHALLENGE_WEIGHT_VENDOR_PRESENCE` 30, `CHALLENGE_WEIGHT_STATUS_EMPTY_BODY` 200,
+`CHALLENGE_WEIGHT_STATUS_SMALL_BODY` 50, `CHALLENGE_WEIGHT_STATUS_LARGE_BODY` 20, `CHALLENGE_WEIGHT_CAPTCHA_INPUT` 50,
+`CHALLENGE_WEIGHT_CAPTCHA_ELEMENT` 40, `CHALLENGE_WEIGHT_FORM_DOMINANCE` 40, `CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY` 40,
+`CHALLENGE_WEIGHT_THIN_TEXT` 20, `CHALLENGE_WEIGHT_FEW_LINKS` 20, `CHALLENGE_WEIGHT_NO_ARTICLE` 20,
+`CHALLENGE_WEIGHT_RICH_CONTENT` -60, `CHALLENGE_WEIGHT_MANY_LINKS` -20, `CHALLENGE_WEIGHT_PHRASE_TITLE` 60 and
+`CHALLENGE_WEIGHT_PHRASE_BODY` 30. The existing `CHALLENGE_DETECTION_MAX_BYTES` (50000) and `CHALLENGE_WALL_MAX_BYTES`
+(50000) keep their defaults and gain their compose lines in the same task. A validator keeps the rules of Decision 2
+true for any values (task 1.2), and the score histogram always has a boundary at the configured threshold (task 7.1,
+the observability requirement). Kept as constants, because they are not operational: the zero weight of the
+`parse_failed` pseudo-signal (it records a fact and never scores), the signal ids, family names and vendor names, the
+histogram bucket list (part of the metric's definition), the metric names and labels, and the test-only values of the
+corpus (the twenty point near-threshold band of task 9.1, the 200 kilobyte fixture bound of task 8.8 and the 50
+millisecond measurement bound of task 9.4). The spec texts that said "fixed" for the threshold, the word count, the
+link count and the form share now say "configured". Tasks changed: 1.1, 1.2, 4.7, 7.1, 9.4 and 10.1, new task 1.4. No
+task of this change is ticked, so nothing is marked for rework. The proposal sentences that still called the tuning values constants
+(What Changes, Impact, Risks and the operational note) now name them settings. No test or measurement of this change
+uses LM Studio, and no text of this change names the old `e2e` profile or plans several copies elsewhere.

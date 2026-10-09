@@ -41,7 +41,7 @@ The job also exposes per-service `*_changed` outputs for `verify-changelog`, an 
 Each matrix entry declares `service`, `language`, `path` and `python_version`. `strategy.fail-fast: false` so every selected service reports.
 
 - Java: `actions/setup-java@v4` (Temurin 21) and `gradle/actions/setup-gradle@v3`, then `./gradlew --no-daemon build test`. For `ascend-agent` only, `./gradlew --no-daemon jacocoTestCoverageVerification` follows, which fails below 80 percent instruction coverage. `ascend-weather-mcp` has no coverage floor.
-- Python: `actions/setup-python@v5` (3.11, or 3.12 for `ascend-web-hunter`) with `cache: pip` and a `cache-dependency-path` of the service's own `pyproject.toml` and any `*requirements*.txt` beside it, so each cache key comes from that service. Then `pip install -e .[dev]`, `ruff check .`, Mypy, and the tests. Mypy runs `mypy src` for every Python service except `ascend-ocr`, which runs `mypy src tests` because its own type-check gate covers the tests too. `ascend-audio-scribe` runs plain `pytest`, whose options already set `--cov-fail-under=100` with branch coverage. `ascend-ocr` runs `pytest -m "not contract"` with the same configured coverage gate, because the contract test needs the committed pact and is run by the `contract-provider` job (D13). `ascend-web-hunter` and `ascend-memory` run `pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100`, which repeats the same gate their options set.
+- Python: `actions/setup-python@v5` (3.11, or 3.12 for `ascend-web-hunter`) with `cache: pip` and a `cache-dependency-path` of the service's own `pyproject.toml` and any `*requirements*.txt` beside it, so each cache key comes from that service. Then `pip install -e .[dev]`, `ruff check .`, Mypy, and the tests. Mypy runs `mypy src` for every Python service except `ascend-ocr`, which runs `mypy src tests` because its own type-check gate covers the tests too. `ascend-audio-scribe` runs plain `pytest`, whose options already set `--cov-fail-under=100` with branch coverage. `ascend-ocr` runs `pytest -m "not contract"` with the same configured coverage gate, because the contract test needs the committed pact and is run by the `contract-provider` job (D13). `ascend-web-hunter` and `ascend-memory` run plain `pytest` too, because their options set the same gate (owner answer 93 of 2026-10-08, task 2.13: the first build repeated the flags on the command line).
 - Test reports upload as `test-results-<service>` on every run, including failures.
 
 ### D4: CI, changelog version bump gate
@@ -160,3 +160,24 @@ Alternatives considered (rejected): a Pact Broker, because it adds a hosted serv
 ## Migration Plan
 
 Purely additive: two workflow files and an operator README. Rollback is `git revert`. After merge the maintainer: (1) adds the two Docker Hub secrets, (2) ensures each app's `CHANGELOG.md` has a top `## [x.y.z]` entry, (3) cuts the first release via Actions → `Release` → `Run workflow`, entering `stack_version` and ticking the apps to ship, and (4) makes each new GHCR package public once. The guard needs no first-release special case, because an image that was never published is found on neither registry.
+
+## Owner decisions of 2026-10-08
+
+The owner approved on 2026-10-08 the fixes of the review of the group 1 and group 2 changes of 2026-10-07.
+
+- Item 16: task 7.2 reads the health of ascend-weather-mcp on its server port `9998`, because it has no separate management port. Only ascend-agent serves `/actuator/health` on the internal management port `9918`.
+- Item 23: the task counts in `openspec/BUILD_ORDER.md` are recounted from this file.
+- Item 9 of the same review is handled by another agent and is not part of this edit.
+
+Answers of the planning round of 2026-10-08 (answers 87 to 93):
+
+- Answer 93: C3, the coverage flags are written once, in each service's pytest options, and `ci.yaml` runs plain `pytest` for every Python service but `ascend-ocr` (`pytest -m "not contract"`). Done task 2.10 keeps its tick, task 2.13 changes the workflow, and the pass line of task 5.3 names plain `pytest`. C4, the "candidate, not run by any workflow" table of task 7.3 is removed until a workflow runs those specs. Its rows in `add-ascend-python-common` and `add-python-runtime-upgrades` are removed by their own worker, and the rows of `upgrade-spring-boot-4` tasks 14.13 and 14.14 were sent to that change through `inbox93`. C5 (start the released image for `linux/amd64` only and read the arm64 manifest instead of starting it under QEMU) is not applied: it would drop the one real start of the arm64 image that the release publishes, so it cuts a check of a published feature (rule R3). Task 7.2 stays as it is.
+- Answer 87 (rule R1): checked. The workflows run on GitHub runners and hold no runtime state of the services, so several agent or ascend-web-hunter containers change nothing here. The release builds one image per service, which runs as many containers as the deployment starts.
+
+Answer 98: checked. This change adds no service setting and changes none. Its two workflows run on GitHub runners, and the values they hold (the JaCoCo floor of 80 percent, the Python coverage floor of 100 percent that each service sets in its own pytest options, the Java and Python versions, the cache scopes, the matrix and the registry names) are build and release gates reviewed as code, not values a running service reads. Task 7.2 starts a released image with the environment its compose service gives it, so it uses the settings of the other changes as they are. No configuration reference row comes from this change, and no test of it uses LM Studio as a default (task 7.2 reads only health endpoints and calls no model).
+
+Answer 98.6 and 99.1: checked. No text of this change says that running several copies is planned elsewhere or later, and no host port range is planned.
+
+## Owner decisions of 2026-10-09
+
+Owner-approved fix of 2026-10-09: every throwaway changelog entry that a test task writes on a `ci-verify` branch is `## [99.0.0]` (tasks 5.2, 5.3, 5.9, 5.10, 6.11 and 6.12), because the numbers used before (`0.1.3`, `0.1.4`, `0.3.1`) are real planned versions (agent 0.1.3, memory 0.1.4, OCR 0.3.1) and no real release will reach 99.0.0. The scenario "Release notes list all app versions" of the `release-versioned-images` spec uses `99.0.0` for ascend-audio-scribe instead of `0.9.4` for the same reason. None of these tasks was ticked, so no rework task is needed.

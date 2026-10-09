@@ -40,12 +40,17 @@ that requested it, including the human-intervention monitor and the orchestrator
 
 The service SHALL record every verdict's score in a histogram whose buckets fall on the weight sums that matter, so
 that verdicts just under and just over the threshold are distinguishable from one another and from verdicts far from
-it.
+it. The buckets SHALL always include a boundary at the configured threshold.
 
 #### Scenario: A near miss is visible
 
 - **WHEN** a page scores just under the threshold
 - **THEN** its observation lands in the bucket immediately below the threshold and not in the one above
+
+#### Scenario: An overridden threshold keeps its boundary
+
+- **WHEN** the operator sets the threshold to a value that is not one of the default bucket boundaries
+- **THEN** the histogram has a bucket boundary at that value
 
 ### Requirement: The verdict is logged with its evidence and without the page
 

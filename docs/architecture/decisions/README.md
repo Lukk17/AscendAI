@@ -16,6 +16,7 @@
 | [ADR-M008](ADR-M008-email-join-with-provider-identifiers.md)            | Join provider identities on email, keep both provider identifiers                               | Accepted |
 | [ADR-M009](ADR-M009-enforcement-in-the-agent.md)                        | Enforcement lives in the agent's retrieval path, not behind a network hop                       | Accepted |
 | [ADR-M010](ADR-M010-consumer-driven-contract-in-repo.md)                | Agent to OCR contract as a Pact file committed in the repository, no Pact Broker                | Accepted |
+| [ADR-M012](ADR-M012-shared-python-library.md)                           | Shared Python platform library installed from the monorepo folder                               | Accepted |
 
 ADR-M004 through ADR-M009 are the decision set behind [permission-aware retrieval](../permission-aware-retrieval.md), which is the design document they belong to.
 

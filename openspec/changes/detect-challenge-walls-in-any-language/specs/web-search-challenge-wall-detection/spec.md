@@ -125,6 +125,12 @@ page's language.
 - **WHEN** a page is judged a wall and no dominant form carries a password input
 - **THEN** the intervention type is `captcha`
 
+#### Scenario: The read API reports the classified type
+
+- **WHEN** a caller reads a Turkish login wall and a Korean captcha wall through `POST /api/v2/web/read`
+- **THEN** each answer is HTTP 428 with `code` `human_intervention_required` and a non-empty `vnc_url`
+- **AND** the first carries `intervention_type` `login` and the second `intervention_type` `captcha`
+
 ### Requirement: A markup parse failure does not accept the page
 
 When the page cannot be parsed for structure signals, the structure family SHALL contribute nothing, the failure

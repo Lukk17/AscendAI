@@ -51,13 +51,17 @@ One flow, one of everything it needs:
 
 A cap that is a number rather than an accident:
 
-- `NOVNC_MAX_CONCURRENT_FLOWS` replaces the global lock, defaulting to 4. A request that arrives when every slot is
-  taken still gets HTTP 409 with `status: novnc_busy` and `Retry-After`, and that is the only case that produces a
-  409. The response now says how many flows are live, what the maximum is, and what each live flow is working on.
+- `NOVNC_MAX_CONCURRENT_FLOWS` replaces the global lock, defaulting to 4 per container. A request that arrives when
+  every slot of its container is taken still gets HTTP 409 with `status: novnc_busy` and `Retry-After`, and that is
+  the only case that produces a 409. The response now says how many flows are live, what the maximum is, and what each live flow is working on.
 - A second request for a site and profile that already has a live window joins that window instead of opening a
   second one or being refused. It receives the same `vnc_url` and the same flow identifier, and the capture the human
   produces satisfies both callers, because both were waiting on the same session record. This is why a duplicate is
   never a 409: refusing it would spend a 409 on a case the service can serve.
+- Several ascend-web-hunter containers can run at once (owner answer 87 of 2026-10-08). Each live flow has a record in
+  Redis that expires with its lease, so a request that reaches any container joins the live flow for its site and
+  profile, and two containers never open two windows for one site and profile. Slots, browsers and windows stay on the
+  container whose display shows them.
 
 Failure that stays inside one flow:
 
@@ -66,23 +70,28 @@ Failure that stays inside one flow:
   overwrite a sibling's session record.
 - A capture already written stays written. A flow's teardown never clears the session store.
 - The lease-based self-healing is kept and made stronger. Each flow carries its own lease of
-  `NOVNC_TIMEOUT_SECONDS + NOVNC_FLOW_LEASE_GRACE_SECONDS` from its own start. An expired lease now cancels that
+  `NOVNC_TIMEOUT_SECONDS` plus the grace `NOVNC_FLOW_LEASE_GRACE_SECONDS` (default 30 seconds) from its own start. An expired lease now cancels that
   flow's monitor, which closes its browser and removes its window from the display, rather than only marking the slot
   free and leaving a wedged window behind for the human to look at.
-- A periodic sweep runs the lease check on a timer rather than only when the next caller arrives, so a dead window
-  leaves the display within one sweep interval even when no further request is ever made.
+- A periodic sweep runs the lease check on a timer, in each container for its own flows, so a dead window leaves the
+  display within one sweep interval even when no further request is ever made.
 - Shutdown cancels every live monitor and waits, bounded, for each to close its browser. Today they are abandoned.
 
 A contract that lets a caller and a human tell the windows apart:
 
-- The 428 body gains `flow_id`, `joined` and `window` (slot index and pixel rectangle), alongside the existing
-  `status`, `intervention_type`, `vnc_url` and `message`. Every existing field keeps its name, its type and its
-  meaning, so ADR-003's field-shape contract and every agent that reads it are untouched.
-- The 409 body keeps `status`, `message`, `holder_url` and `holder_profile`, and gains `active_flows`,
-  `max_concurrent_flows` and a `flows` array. `holder_url` and `holder_profile` now describe the oldest live flow,
-  which is the one whose slot frees next, so the fields stay truthful for a caller that already reads them.
+- The 428 answer gains `flow_id`, `joined` and `window` (slot index and pixel rectangle). On REST it is the RFC 7807
+  problem body that `add-ascend-python-common` makes of it before this change lands (owner answer 60.2 of
+  2026-10-03: code `human_intervention_required`, `detail`, and `intervention_type` and `vnc_url` as extension
+  members), and the three new fields are further extension members. On MCP the status object keeps `status`,
+  `intervention_type`, `vnc_url` and `message` and gains the same three fields. Every existing field keeps its name,
+  its type and its meaning, so every agent that reads them is untouched.
+- The 409 answer (REST problem body with code `novnc_busy`, MCP status object) keeps `holder_url` and
+  `holder_profile`, and gains `active_flows`, `max_concurrent_flows` and a `flows` array. `holder_url` and
+  `holder_profile` now describe the oldest live flow, which is the one whose slot frees next, so the fields stay
+  truthful for a caller that already reads them.
 - A new read-only listing, `GET /api/v2/session/interventions` on REST and `session_interventions` on MCP, returns
-  the live flows with their windows and remaining lease. This is what turns "clear them in any order" from a hope
+  the live flows of every container with their windows and remaining lease, in the same flow shape and under the same
+  field names as the 409 answer. This is what turns "clear them in any order" from a hope
   into something a human or an agent can actually do, and it is what lets the e2e suite assert the window count
   deterministically instead of inferring it.
 
@@ -90,7 +99,8 @@ Observability that names the flow:
 
 - Every NoVNC log line carries the flow identifier, the slot and the originating request identifier, so a 428 a
   caller saw, the window the human worked in, and the capture that landed can be tied together after the fact.
-- A gauge for live flows, counters for flows started, joined, refused at the cap, and reclaimed by reason.
+- A gauge for live flows, a `joined` label on the existing `human_intervention_total` that tells flows started from
+  requests that joined one, and counters for requests refused at the cap and flows reclaimed by reason.
   `novnc_flow_busy_total` keeps its name and now counts exactly one thing: a request refused because the cap was
   reached.
 
@@ -104,19 +114,30 @@ Observability that names the flow:
   method `CookieManager.registrable_domain(url)`, so it keys on the same value the session store keys on.
 - `apps/ascend-web-hunter/src/api/`: the two exception bodies, the new listing endpoint on both surfaces, and the
   exception's own fields.
-- `apps/ascend-web-hunter/src/config/config.py`: ten settings, listed with their derivations in
-  [design.md](design.md).
+- `apps/ascend-web-hunter/src/config/config.py`: the cap `NOVNC_MAX_CONCURRENT_FLOWS`, the display size
+  `NOVNC_DISPLAY_SIZE`, the window size and cascade offset, the lease grace, the sweep interval, the cancel grace, the
+  busy `Retry-After` and `NOVNC_PUBLIC_URL`, every one a setting with its default (owner rule 98 of 2026-10-08), listed
+  with their derivations in [design.md](design.md).
+- `compose.ascend-web-hunter.yaml`, `deploy-standalone/compose.yaml`, both `.env.example` files and the bundle
+  README: each setting passed as `${VAR:-default}` and listed under the sync rule.
+- `apps/ascend-web-hunter/Dockerfile` and `supervisord.conf`: the display size read by the Xvfb command line from
+  `NOVNC_DISPLAY_SIZE`, which the Dockerfile also sets for a container started without compose.
 - `apps/ascend-web-hunter/src/main.py`: the sweeper task and the shutdown hook in the existing lifespan.
-- `apps/ascend-web-hunter/src/observability/metrics.py`: one gauge and three counters.
+- `apps/ascend-web-hunter/src/observability/metrics.py`: one gauge, one counter, and the label `joined` on the
+  existing `human_intervention_total`.
 - `apps/ascend-web-hunter/tests/`: the rewritten concurrency tests and the new registry and layout tests, to the
   module's configured `--cov-fail-under=100` with `--cov-branch`.
 - `apps/ascend-web-hunter/e2e/testing/7-authenticated-realworld-scraping-test.md` and its sidecar template: the four
-  rows that answered 409 get a stated expectation, and a new gated Part 4 exercises several windows at once.
+  rows that answered 409 get a stated expectation. A new automated spec, `<N>-concurrent-interventions` (next free
+  number at implementation time), proves several windows at once against the shared e2e fake site, with the 428 and
+  409 problem bodies, the join, the listing on both surfaces and the metrics. The human spec 11 gains a Part 2 that
+  solves two windows out of order. `docs/E2E_RUN_SCENARIOS.md` lists both.
 - Docs: `AGENTS.md`, `README.md`, `docs/configuration.md`, a new ADR-013, an amendment to ADR-003, and one evidence
   line on F22.
-- `apps/ascend-web-hunter/pyproject.toml` and `CHANGELOG.md`: the version moves from 0.0.6 to 0.0.7 with one
-  `## [0.0.7]` entry. That one bump and that one entry also cover `detect-challenge-walls-in-any-language`, which
-  ships in the same release and adds its lines to the same entry.
+- `apps/ascend-web-hunter/pyproject.toml`, `CHANGELOG.md`, the `AGENTS.md` version line and
+  `docs/architecture/arc42/02-constraints.md`: the version moves from 0.0.8 (set by `add-python-runtime-upgrades`) to
+  0.0.9 with one `## [0.0.9]` entry. `detect-challenge-walls-in-any-language` takes 0.0.10 after it, by the owner
+  decision of 2026-10-08 of one named version per change, in build order.
 
 ## Out of Scope
 
@@ -155,7 +176,7 @@ Observability that names the flow:
   precisely because both callers were already waiting on the same session record. A caller that needs its own window
   can ask for a different profile.
 - Reclamation cannot force-kill a Chromium that ignores its close. The cancel path is bounded by
-  `NOVNC_FLOW_CANCEL_GRACE_SECONDS`, after which the slot is freed and an orphan is logged and counted rather than
+  a fixed cancellation grace of 10 seconds, after which the slot is freed and an orphan is logged and counted rather than
   the registry blocking on it forever. The orphan window may remain on the display. This is the same residual risk
   the lock had, now named, bounded and measured.
 - Regression risk against F22 itself. The defect this change reverses the shape of is real and was expensive. Task
@@ -189,8 +210,9 @@ store, its keys and its TTLs and is left untouched.
 
 ## Impact
 
-API: additive on both surfaces. Three fields are added to the 428 body and three to the 409 body, no existing field
-changes name, type or meaning, and one read-only endpoint is added. A caller that ignores every new field behaves
+API: additive on both surfaces. Three fields are added to the 428 answer and three to the 409 answer, as extension
+members of the problem body on REST and as fields of the status object on MCP, no existing field changes name, type
+or meaning, and one read-only endpoint is added. A caller that ignores every new field behaves
 exactly as it does today. The behaviour a caller sees does change in one way worth naming: with the shipped default
 of 4, three requests that would each have received a 409 now each receive a 428 with a window of their own.
 
@@ -209,11 +231,15 @@ that its collision cannot recur under the new model. F22 is not reopened.
 
 ## Dependencies and Build Order
 
-The owner fixed the build order on 2026-10-01: this change first, then `detect-challenge-walls-in-any-language`, then
-`enhance-web-search-tier-ladder`, then `enhance-web-search-extraction-and-tiers` (structured extraction), then
-`enhance-web-search-crawl-at-scale`. This change depends on nothing unbuilt. `detect-challenge-walls-in-any-language`
-depends on it, because its spec 7 Amazon rows need a cap of at least 5. Both changes ship together as
-ascend-web-hunter 0.0.7.
+Build order (owner build order of 2026-10-04, which supersedes the earlier orders): build group 2 (web-hunter),
+position 3. It needs `add-ascend-python-common` (position 1) and `add-python-runtime-upgrades` (position 2): the 428
+problem body it extends is built by the library of the first, and its MCP status objects and tests are written against
+FastMCP 4 of the second, with every test that uses `fastmcp.Client` naming its protocol era. Its e2e spec uses the
+shared fake site of `add-web-search-scraping-e2e` (build group 1). `detect-challenge-walls-in-any-language`
+(position 4) builds on it, because its spec 7 Amazon rows need a cap of at least 5. This change ships as
+ascend-web-hunter 0.0.9 and that change as 0.0.10. The owner order of 2026-10-01 (this change first in the web-search chain) is superseded by the
+owner build order of 2026-10-04, which keeps this change first among the web-search changes after the two Python
+platform changes.
 
 ## Relevant Skills
 

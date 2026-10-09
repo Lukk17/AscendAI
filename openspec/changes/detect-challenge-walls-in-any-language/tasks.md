@@ -10,39 +10,65 @@ and it gates calling the change done.
 
 ## 1. Configuration
 
-- [ ] 1.1 Add `CHALLENGE_SCORE_THRESHOLD`, `CHALLENGE_RICH_CONTENT_WORDS`, `CHALLENGE_FORM_DOMINANCE_RATIO`,
-      `CHALLENGE_MIN_WORDS_PER_KB`, `CHALLENGE_THIN_LINK_COUNT`, `CHALLENGE_RICH_LINK_COUNT` and
-      `CHALLENGE_SHAPE_MAX_BYTES` to `src/config/config.py`, each with a `Field` carrying its default, its constraint
-      and a description. Defaults are the table in `design.md`. Verify with a case per setting in
-      `tests/config/test_config.py` covering the default, a valid override and a rejected out-of-range value.
-- [ ] 1.2 Add a model validator rejecting `CHALLENGE_SHAPE_MAX_BYTES` below `CHALLENGE_WALL_MAX_BYTES` and a
-      constraint rejecting a threshold below 1. Verify with tests asserting construction fails and that the message
-      names both fields.
+- [ ] 1.1 Add to `src/config/config.py`, each with a `Field` carrying its default, its constraint and a description, the
+      seven tuning settings `CHALLENGE_SCORE_THRESHOLD` (100), `CHALLENGE_RICH_CONTENT_WORDS` (150),
+      `CHALLENGE_FORM_DOMINANCE_RATIO` (0.6, above 0 and at most 1), `CHALLENGE_MIN_WORDS_PER_KB` (2.0),
+      `CHALLENGE_THIN_LINK_COUNT` (5), `CHALLENGE_RICH_LINK_COUNT` (20) and `CHALLENGE_SHAPE_MAX_BYTES` (500000), and
+      one weight setting per signal of `design.md` Decision 2, named `CHALLENGE_WEIGHT_<SIGNAL ID IN UPPER CASE>` with
+      the weight of that table as its default: `CHALLENGE_WEIGHT_DEFINITIVE_HEADER` (200),
+      `CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE` (80), `CHALLENGE_WEIGHT_VENDOR_SCRIPT` (60),
+      `CHALLENGE_WEIGHT_VENDOR_PRESENCE` (30), `CHALLENGE_WEIGHT_STATUS_EMPTY_BODY` (200),
+      `CHALLENGE_WEIGHT_STATUS_SMALL_BODY` (50), `CHALLENGE_WEIGHT_STATUS_LARGE_BODY` (20),
+      `CHALLENGE_WEIGHT_CAPTCHA_INPUT` (50), `CHALLENGE_WEIGHT_CAPTCHA_ELEMENT` (40),
+      `CHALLENGE_WEIGHT_FORM_DOMINANCE` (40), `CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY` (40), `CHALLENGE_WEIGHT_THIN_TEXT`
+      (20), `CHALLENGE_WEIGHT_FEW_LINKS` (20), `CHALLENGE_WEIGHT_NO_ARTICLE` (20), `CHALLENGE_WEIGHT_RICH_CONTENT`
+      (-60), `CHALLENGE_WEIGHT_MANY_LINKS` (-20), `CHALLENGE_WEIGHT_PHRASE_TITLE` (60) and
+      `CHALLENGE_WEIGHT_PHRASE_BODY` (30). `challenge_signals.py` reads them from the settings and holds no weight or
+      tuning value of its own. The zero weight of the `parse_failed` pseudo-signal stays a constant, because it only
+      records a fact (owner rule 98 of 2026-10-08, which replaces the module constants of owner answer 93 for these
+      values). Verify with cases in `tests/config/test_config.py` for each default, a valid override and a rejected
+      value outside its constraint, and by the tests of sections 4 and 9 asserting the boundaries at the defaults and
+      one boundary moved by an override.
+- [ ] 1.2 Add a model validator rejecting a `CHALLENGE_WALL_MAX_BYTES` above `CHALLENGE_SHAPE_MAX_BYTES`, a weight of
+      a signal other than `definitive_header` and `status_empty_body` at or above `CHALLENGE_SCORE_THRESHOLD` (no
+      single such signal may decide a wall, `design.md` Decision 2), a positive weight for `rich_content` or
+      `many_links`, a negative weight for any other signal, and a `CHALLENGE_THIN_LINK_COUNT` above
+      `CHALLENGE_RICH_LINK_COUNT`. Verify with one test per rule asserting construction fails and that the message
+      names the settings involved.
 - [ ] 1.3 Reword the descriptions of `CHALLENGE_DETECTION_MAX_BYTES` and `CHALLENGE_WALL_MAX_BYTES` to the meanings
       in `design.md`'s configuration table, without changing their defaults. Verify by asserting both defaults are
       unchanged in `tests/config/test_config.py`.
+- [ ] 1.4 Pass every setting of task 1.1 and the two existing settings of task 1.3 through the `ascend-web-hunter`
+      service of `compose.ascend-web-hunter.yaml` and of `deploy-standalone/compose.yaml` as
+      `- <NAME>=${<NAME>:-<default>}` with the default of the settings, for example
+      `- CHALLENGE_SCORE_THRESHOLD=${CHALLENGE_SCORE_THRESHOLD:-100}` and
+      `- CHALLENGE_WEIGHT_RICH_CONTENT=${CHALLENGE_WEIGHT_RICH_CONTENT:--60}` (owner rule 98 of 2026-10-08). Under the
+      sync rule, in the same commit as task 1.1, add each new setting as a commented line with its default and a
+      one-line comment, in the form of `# RATE_LIMIT_DEFAULT=1200/minute`, to the root `.env.example` and
+      `deploy-standalone/.env.example`, and a row (Required `No`, the default named) to the configuration table of
+      `deploy-standalone/README.md`. Verify with `docker compose config` (read only) from the repository root and in
+      `deploy-standalone/` showing each variable with its default on the service (the negative weights included), the
+      same command with `CHALLENGE_SCORE_THRESHOLD=120` set in the shell of that one command showing the override, and
+      a search of both `.env.example` files and the bundle README finding each new name once.
 
-## 2. The catalogue source and the generator
+## 2. The catalogue file
 
-- [ ] 2.1 Create `src/reader/cloudflare/challenge_dictionary.source.json` with the three sections from `design.md`
-      Decision 4: `vendors` holding the marker table from Decision 3 with `signal`, `source` and `verified_on` per
-      marker, `phrases` holding the sixteen ids with their canonical English and a `provenance` per translation, and
-      `login_title_patterns` copied verbatim from the current dictionary. Verify with a test that loads the source,
-      asserts every marker has a non-empty `source` URL and a `verified_on` date, and asserts every phrase id in
-      Decision 4's table is present exactly once.
-- [ ] 2.2 Create `scripts/generate_challenge_dictionary.py` that reads the source, normalises every phrase with the
-      same function the matcher uses, and writes `challenge_dictionary.json` deterministically with sorted keys and
-      a fixed indent. Give it `--check`, which exits non-zero when the committed file differs, and `--coverage`,
-      which prints the phrase by language table. Verify with `tests/reader/cloudflare/test_challenge_dictionary.py`
-      asserting that running the generator twice produces byte-identical output, that `--check` fails on a
-      hand-edited copy, and that `--coverage` lists every one of the thirty language codes as a column.
-- [ ] 2.3 Regenerate `challenge_dictionary.json` from the source and commit the output. Verify that
-      `.venv/Scripts/python.exe scripts/generate_challenge_dictionary.py --check` exits zero and that every string
-      the old dictionary carried appears in the new file under its new section.
-- [ ] 2.4 Make the detector load the generated file through one loader in `challenge_signals.py` that fails loudly
-      on a missing or malformed file instead of the current silent fallback to empty lists. Verify with a test that
-      a missing file raises at import with a message naming the path, matching the packaging-defect rule ADR-008
-      applies to the blocklist.
+- [ ] 2.1 Rewrite `src/reader/cloudflare/challenge_dictionary.json` into the one maintained catalogue file with the
+      three sections from `design.md` Decision 4: `vendors` holding the marker table from Decision 3 with `signal`,
+      `source` and `verified_on` per marker, `phrases` holding the sixteen ids with their canonical English and a
+      `provenance` per translation, and `login_title_patterns` copied verbatim from the current dictionary. No source
+      file, generator or generated copy is added (owner answer 93 of 2026-10-08, review item B8). Verify with
+      `tests/reader/cloudflare/test_challenge_dictionary.py`, which loads the file, asserts every marker has a
+      non-empty `source` URL and a `verified_on` date, asserts every translation has a `provenance`, and asserts every
+      phrase id in Decision 4's table is present exactly once.
+- [ ] 2.3 Carry every string the old dictionary held into the rewritten file under its new section. Verify with a test
+      that lists the old dictionary's strings and finds each one in the loaded catalogue.
+- [ ] 2.4 Make the detector load the catalogue file directly through one loader in `challenge_signals.py`, which
+      normalises every phrase at load time and fails loudly on a missing or malformed file instead of the current
+      silent fallback to empty lists. Verify with a test that a missing file raises at import with a message naming
+      the path, matching the packaging-defect rule ADR-008 applies to the blocklist.
+
+Task 2.2 removed by owner decision 93 of 2026-10-08.
 
 ## 3. Vendor signatures
 
@@ -62,8 +88,9 @@ and it gates calling the change done.
 - [ ] 3.5 Measure Amazon's live captcha page form action on the five capture locales `amazon.de`, `amazon.fr`,
       `amazon.it`, `amazon.es` and `amazon.co.jp`, and on the four spec 7 already measured (`amazon.com`,
       `amazon.pl`, `amazon.co.uk` and `amazon.se`), with a direct `curl -sS` of `/errors/validateCaptcha` and record the `action` attribute of the
-      form in each response in the source file's `notes` for the Amazon vendor. Keep whichever path or paths the
-      responses carry and drop the other. Verify by the recorded responses being the fixtures captured in task 8.3
+      form in each response in the catalogue file's `notes` for the Amazon vendor. Keep both paths in the marker
+      whatever the responses carry (owner decision 65.27 of 2026-10-04), and record which path each marketplace
+      served. Verify by the recorded responses being the fixtures captured in task 8.3
       and by the corpus test firing `interstitial_structure` on each.
 
 ## 4. The verdict and the structure and shape signals
@@ -90,7 +117,7 @@ and it gates calling the change done.
 - [ ] 4.7 Implement `assess` as the sum of fired weights compared with the threshold, with a definitive signal
       forcing `wall` regardless of the sum. Verify with a test that a definitive header beside `rich_content` and
       `many_links` is still a wall, and that the twelve worked examples in `design.md` Decision 2 produce the scores
-      and verdicts printed there, one parametrised case per row.
+      and verdicts printed there at the default settings, one parametrised case per row.
 - [ ] 4.8 Reimplement `is_blocked`, `has_real_content` and `is_content_accepted` as readers of `assess`, keeping
       their two-argument forms working. Verify by the existing `tests/reader/cloudflare/test_challenge_detector.py`
       passing with only the changes named in `design.md` migration step 4, each rewritten test stating its new
@@ -99,12 +126,12 @@ and it gates calling the change done.
 ## 5. The phrase supplement
 
 - [ ] 5.1 Implement the normalisation function (NFKC, casefold, punctuation stripped, whitespace collapsed) in
-      `challenge_signals.py` and use it from both the generator and the matcher. Verify with a test that
-      `Just a moment...`, `Just a moment…` and `JUST A MOMENT` normalise to one string, and that the generator imports
-      the same function rather than defining its own.
+      `challenge_signals.py` and use it from both the catalogue loader and the matcher. Verify with a test that
+      `Just a moment...`, `Just a moment…` and `JUST A MOMENT` normalise to one string, and that the loader calls the
+      same function rather than defining its own.
 - [ ] 5.2 Capture the Cloudflare phrases: open a page that serves a Cloudflare managed challenge in a Playwright
       context with `locale` set to each of the thirty codes, record the rendered `title` and heading, and record the
-      same page through `curl_cffi`. Add each captured translation to the source file with its provenance. Verify by
+      same page through `curl_cffi`. Add each captured translation to the catalogue file with its provenance. Verify by
       the corpus fixtures from task 8.2 firing `phrase_title` or `phrase_body` for every captured language, and by
       writing the answer to Open Question 3 into `design.md` with the two captures as evidence.
 - [ ] 5.3 Capture the Amazon phrases from the captcha page of the five capture locales in task 3.5, extending the
@@ -113,8 +140,8 @@ and it gates calling the change done.
       prefix. Verify with a test that a phrase in the title fires `phrase_title` and not `phrase_body`, that the
       Polish translation the dictionary already carries fires on a Polish fixture, and that an article quoting
       `Just a moment...` in its body with `rich_content` fired is not a wall.
-- [ ] 5.5 Run `--coverage` and commit its table into `docs/challenge-detection.md` under a heading that names the
-      capture date. Verify the table's language columns match the thirty codes and its phrase rows match the sixteen
+- [ ] 5.5 Make `test_challenge_dictionary.py` print the phrase by language table, and commit that table into
+      `docs/challenge-detection.md` under a heading that names the capture date. Verify the table's language columns match the thirty codes and its phrase rows match the sixteen
       ids.
 
 ## 6. Wiring the call sites
@@ -145,8 +172,10 @@ and it gates calling the change done.
 ## 7. Observability
 
 - [ ] 7.1 Add `CHALLENGE_SIGNALS_FIRED_TOTAL`, `CHALLENGE_VERDICTS_TOTAL` and `CHALLENGE_SCORE` to
-      `src/observability/metrics.py` with the labels and buckets in `design.md`. Verify with cases in
-      `tests/observability/test_metrics.py` asserting each name, type, label set and the bucket boundaries.
+      `src/observability/metrics.py` with the labels and buckets in `design.md`, the histogram's boundaries being the
+      bucket list of the Observability section plus `CHALLENGE_SCORE_THRESHOLD` when the list does not already hold it.
+      Verify with cases in `tests/observability/test_metrics.py` asserting each name, type, label set and the bucket
+      boundaries at the default threshold and at an overridden one.
 - [ ] 7.2 Increment them from `assess` and from the tier that calls it, with the tier name passed in. Verify with a
       test that one wall verdict with four signals produces four signal increments, one verdict increment under
       `wall` and the tier, and one histogram observation at the score.
@@ -167,10 +196,12 @@ and it gates calling the change done.
       asserting `definitive_header` on the curl capture and `interstitial_structure` on each rendered capture.
 - [ ] 8.3 Capture the Amazon captcha page from the five capture locales in task 3.5 (`amazon.de`, `amazon.fr`,
       `amazon.it`, `amazon.es`, `amazon.co.jp`) plus the four spec 7 already measured. Verify by the corpus test asserting `interstitial_structure` and `captcha_input` on each.
-- [ ] 8.4 Capture one real wall for each vendor with a public one: the Google reCAPTCHA demo spec 7 Part 3 uses, the
-      hCaptcha demo, and a GeeTest, MTCaptcha, Friendly Captcha and Arkose page where a public one serves the widget
-      as the page's whole purpose. Verify by the corpus test asserting each vendor's `vendor_script` and the wall
-      verdict, and by the reCAPTCHA demo fixture asserting a wall so Part 3's contract is pinned by a unit test.
+- [ ] 8.4 Capture one real wall for each vendor with a public one: the Google reCAPTCHA demo page, the hCaptcha demo
+      form `https://democaptcha.com/demo-form-eng/hcaptcha.html` that spec 11 uses, and a GeeTest, MTCaptcha,
+      Friendly Captcha and Arkose page where a public one serves the widget as the page's whole purpose. Verify by the
+      corpus test asserting each vendor's `vendor_script` and the wall verdict, and by the hCaptcha demo fixture
+      asserting a wall so the contract of spec 11 is pinned by a unit test. Spec 7 has no Part 3: its human part
+      moved to spec 11.
 - [ ] 8.5 Build synthetic fixtures, marked `synthetic: true`, for Akamai, Imperva, Kasada, PerimeterX, DDoS-Guard
       and AWS WAF from the cited markers alone. Verify by the corpus test asserting the wall verdict and by a test
       that every synthetic entry is listed in `design.md` Open Question 4.
@@ -199,23 +230,30 @@ and it gates calling the change done.
       on Windows, or the same through `.venv/bin/python` on Linux and macOS. Verify it
       passes at 100 percent branch coverage with no `# pragma: no cover` and no `# noqa` added anywhere in this
       change.
-- [ ] 9.3 Run `.venv/Scripts/python.exe -m ruff check .` and `.venv/Scripts/python.exe -m mypy src scripts`
+- [ ] 9.3 Run `.venv/Scripts/python.exe -m ruff check .` and `.venv/Scripts/python.exe -m mypy src tests`
       (`.venv/bin/python` on Linux and macOS). Verify both are clean, with
       no suppression added.
 - [ ] 9.4 Measure the cost of `assess` on the largest fixture in the corpus and on the largest page in spec 7's
       matrix, with `time.perf_counter` around one hundred calls each, and record both figures in `design.md`
       Decision 8. Verify the per-call figure on the largest fixture is under 50 milliseconds, and if it is not, bound
-      it by lowering `CHALLENGE_SHAPE_MAX_BYTES` in the same edit and say so in the table.
+      it by lowering the default of the setting `CHALLENGE_SHAPE_MAX_BYTES` in `config.py`, in the two compose lines and
+      the two `.env.example` lines of task 1.4, in the bundle README row and in the `docs/configuration.md` row in the
+      same edit, and say so in the table.
 
 ## 10. Documentation and decisions
 
-- [ ] 10.1 Add the seven settings, and the two existing `CHALLENGE_*` settings `docs/configuration.md` does not
-      list, to the tables in `apps/ascend-web-hunter/AGENTS.md`, `README.md` and `docs/configuration.md`, and add
-      `docs/challenge-detection.md` describing the families, the weights, the threshold and the capture rules, linked
-      from `docs/README.md`. Verify each of the nine names appears in all three tables and that the new page is
-      reachable from the documentation map.
+- [ ] 10.1 Add the two existing `CHALLENGE_*` settings `docs/configuration.md` does not list and every setting of task
+      1.1 to the tables in `apps/ascend-web-hunter/AGENTS.md`, `README.md` and `docs/configuration.md`, the rows of
+      `docs/configuration.md` in the same commit as the settings, each new row with its default and its description
+      ending with "Added by `detect-challenge-walls-in-any-language`." (owner rule 98 of 2026-10-08, the per-service
+      configuration reference), and add `docs/challenge-detection.md` describing the families, the weights, the
+      threshold, the seven tuning settings, the weight settings with the validator rules of task 1.2 and the warning
+      that a changed weight needs the corpus test of task 9.1 run again, and the capture rules, linked from
+      `docs/README.md`. Verify each of the two existing names and every name of task 1.1 appears in all three tables,
+      that every row this change adds to `docs/configuration.md` ends with "Added by
+      `detect-challenge-walls-in-any-language`.", and that the new page is reachable from the documentation map.
 - [ ] 10.2 Write `docs/architecture/decisions/ADR-014-scored-challenge-detection.md` in the existing ADR format:
-      the scoring model, the family order, the definitive signals, the guard, the generated catalogue and its
+      the scoring model, the family order, the definitive signals, the guard, the one catalogue file and its
       provenance rule, and the corpus as the admission rule, with the rejected alternatives from `design.md`
       Decisions 1, 2 and 4. Verify the file follows the structure of ADR-003 and ADR-008 and is added to the
       decisions `README.md` index, and that ADR-013 is the sibling change's record and is not touched.
@@ -227,12 +265,15 @@ and it gates calling the change done.
       paragraph describes, moved to Fixed with this change's commit once it lands, and one Found and not fixed row
       for `ERROR_KEYWORDS` failing validation on an article that mentions a captcha, with the measurement that shows
       it. Verify both rows follow the register's column layout and that no other row is touched.
-- [ ] 10.5 Add this change's lines to the `## [0.0.7]` entry in `apps/ascend-web-hunter/CHANGELOG.md` that
-      `open-several-novnc-windows-at-once` task 10.5 created, and do not bump the version again: `pyproject.toml`
-      already reads `0.0.7`, per the register's F44 rule that the two move together. Verify `pyproject.toml` reads
-      `0.0.7` and the CHANGELOG holds exactly one `## [0.0.7]` heading that names both changes.
+- [ ] 10.5 Bump `version` in `apps/ascend-web-hunter/pyproject.toml`, the version line in
+      `apps/ascend-web-hunter/AGENTS.md` and the version in `apps/ascend-web-hunter/docs/architecture/arc42/02-constraints.md`
+      from `0.0.9` (set by `open-several-novnc-windows-at-once`) to `0.0.10`, and add one `## [0.0.10]` entry at the top
+      of `apps/ascend-web-hunter/CHANGELOG.md` describing the scored challenge verdict (owner decision of 2026-10-08, one
+      named version per change, in build order). The version moves in all four files together, per the register's F44
+      rule. Verify `pyproject.toml`, `AGENTS.md` and the arc42 page read `0.0.10` and the CHANGELOG holds exactly one
+      `## [0.0.10]` heading, the topmost version heading.
 
-## 11. End-to-end spec 7
+## 11. End-to-end coverage
 
 - [ ] 11.1 Measure three candidate pages for the "Widgets that are not walls" group with a direct fetch and a word
       count of the trafilatura extraction, from the candidates `friendlycaptcha.com`, `mtcaptcha.com`,
@@ -253,24 +294,87 @@ and it gates calling the change done.
       and the retail section and confirming nothing in them still describes a 200 carrying an interstitial as the
       deployed behaviour.
 - [ ] 11.4 Add the Bruno requests `realworld-aa-amazon-de-captcha.yml` through `realworld-ae-amazon-jp-captcha.yml`
-      asserting HTTP 428, `status="human_intervention_required"` and a non-empty `vnc_url`, and
+      asserting HTTP 428, `code="human_intervention_required"` (the problem body of `add-ascend-python-common`,
+      owner answer 60.2 of 2026-10-03) and a non-empty `vnc_url`, and
       `realworld-af-...` through `realworld-ah-...` asserting HTTP 200, `status="success"` and the page's own canary
       phrase. Verify each runs with `bru run "<file>" --env ascend-local` against a live stack.
 - [ ] 11.5 Add a note to the spec's intervention handling section that rows `aa` to `ae` each spawn a NoVNC monitor
       that no human is expected to solve. State as a prerequisite that the matrix runs with
       `NOVNC_MAX_CONCURRENT_FLOWS` of at least 5, which the sibling change `open-several-novnc-windows-at-once`
-      provides and which is built before this change. Verify against the Concurrency section, which must say the
-      five rows mutate the session keys for five Amazon marketplaces.
+      provides and which is built before this change. Write it by replacing in place the "at least 4" prerequisite
+      that `open-several-novnc-windows-at-once` task 11.1 wrote, so spec 7 states one cap rule. Verify against the
+      Concurrency section, which must say the five rows mutate the session keys for five Amazon marketplaces, and
+      that spec 7 and its template name the cap once, as at least 5.
 - [ ] 11.6 Update `e2e/testing/templates/7-authenticated-realworld-scraping-tasks.template.md` with rows `aa` to
       `ah` and the changed paragraph. Verify the template's row set matches the spec's row set exactly, item for item.
 - [ ] 11.7 Update `e2e/README.md`'s capability table row for spec 7 to name the two new groups. Verify the row still
       describes every group the spec carries.
+- [ ] 11.8 Owner request of 2026-10-04: prove the verdict end to end without depending on what a live site serves that
+      day. Write the new automated spec `apps/ascend-web-hunter/e2e/testing/<N>-challenge-verdicts-test.md` (`<N>` the
+      next free number at implementation time) and its template, reading pages of the shared e2e fake site under its
+      allowed name `e2e-fake-site` (design D11 and D12 of `add-web-search-scraping-e2e`, owner answer 67.3 of 2026-10-04)
+      through
+      `POST /api/v2/web/read`. The fake site pages are the ones task 11.12 adds or rebuilds, and the unit test of task
+      11.12 runs `assess` over the same page files, so the end-to-end rows and the unit tests judge the same markup.
+      Rows, their fake site paths and their gated verdicts:
+      - `/wall-ko`, a site's own captcha page in Korean with no vendor marker: HTTP 428 with `intervention_type`
+        `captcha`
+      - `/wall-tr`, a Turkish login form with a password input and a captcha input: HTTP 428 with `intervention_type`
+        `login`
+      - `/wall-vendor-thin`, a catalogued vendor script on a thin page: HTTP 428
+      - `/wall-header`, a 403 carrying the definitive `cf-mitigated` challenge header beside a rich body: HTTP 428
+      - `/wall-oversized`, a wall page larger than `CHALLENGE_DETECTION_MAX_BYTES`: HTTP 428
+      - `/captcha-wall`, a blog post of at least 150 words with a catalogued widget under its comment form: HTTP 200
+        `status` `success` with its canary sentence
+      - `/article-ja` and `/article-ar`, a Japanese article and an Arabic article with no vendor marker: HTTP 200
+        `success` with their canary sentences
+      - `/prose-captcha`, a page with the word `captcha` only in its prose: HTTP 200 `success`
+      - `/rich-403`, a 403 with a rich body and no other signal: any answer but HTTP 428
+      Every 428 passes the problem body check of design D13 of
+      `add-web-search-scraping-e2e` with a non-empty `vnc_url`. After the rows, `/metrics` shows
+      `challenge_verdicts_total{verdict="wall"}` grown by the number of wall rows and `{verdict="content"}` grown by at
+      least the number of content rows, and every `vendor` label value of `challenge_signals_fired_total` is a
+      catalogue vendor name or the fixed label of the observability spec. Cleanup waits until
+      `GET /api/v2/session/interventions` reports `active_flows` 0. Concurrency: each wall row opens a NoVNC flow, so the
+      spec does not run beside the concurrent intervention spec of `open-several-novnc-windows-at-once` or any spec
+      that can answer a 428. Verify every assertion is an HTTP status, a response body or `/metrics`, never a log line.
+- [ ] 11.9 Add the Bruno requests of task 11.8 in the folder
+      `docs/api/request/AscendAI/web-hunter/testing/challenge-verdicts/`, one request per row
+      (`wall-own-captcha-korean.yml`, `wall-login-turkish.yml`, `wall-vendor-script-thin.yml`,
+      `wall-definitive-header.yml`, `wall-oversized.yml`, `content-widget-under-article.yml`,
+      `content-article-japanese.yml`, `content-article-arabic.yml`, `content-captcha-word-in-prose.yml`,
+      `content-403-rich-body.yml`) plus `metrics-challenge.yml`, each with its assertions in the request file. Verify
+      each runs with `bru run "<file>" --env ascend-local` against a live stack.
+- [ ] 11.10 Move the live check of task 12.4 into spec 7 as gated rows `ai` (a Japanese Wikipedia article) and `aj` (an
+      Arabic Wikipedia article), each expected `success` with a canary phrase measured from the article on the day the
+      rows are written, with their Bruno requests `realworld-ai-wikipedia-ja.yml` and `realworld-aj-wikipedia-ar.yml`
+      and the matching template rows. Verify the template row set matches the spec row set item for item.
+- [ ] 11.11 Add the new spec of task 11.8 to the spec lists, counts and run order of scenarios 1 to 6 and of the
+      ascend-web-hunter service suite in `docs/E2E_RUN_SCENARIOS.md`, as a spec that runs alone after the concurrent
+      intervention spec, and add it to `e2e/README.md`'s capability table and `e2e/testing/README.md`'s ordered list.
+      Verify every count in the document still adds up.
+- [ ] 11.12 Make the shared fake site serve the pages of task 11.8 from one place and judge them with a unit test, before
+      task 11.8 is written. Move the HTML of `/wall-ko`, `/wall-tr`, `/wall-header`, `/captcha-wall`, `/article-ja`,
+      `/article-ar`, `/prose-captcha`, `/rich-403` and `/turnstile-wall` (the page of
+      `open-several-novnc-windows-at-once` task 11.9) out of `apps/ascend-web-hunter/e2e/fake-site/app.py` into one
+      file each under `apps/ascend-web-hunter/e2e/fake-site/pages/`, served unchanged by `app.py` with the status and
+      headers each serves today. Add `/wall-vendor-thin` (a thin page whose only marker is one catalogued
+      `vendor_script` of a vendor in the catalogue file of task 2.1, named in the fixtures README) and `/wall-oversized` (a
+      wall whose marker sits inside the first `CHALLENGE_DETECTION_MAX_BYTES` and whose body is longer than that).
+      Rebuild `/wall-ko`, which today holds one Korean sentence and scores below the 428 threshold, into a page with a
+      captcha image, a text input for the answer and the Korean phrase of the catalogue file, still with no vendor
+      marker. Rebuild `/captcha-wall` into a blog post of at least 150 words whose comment form carries a catalogued
+      widget, keeping its canary sentence. Write `tests/reader/cloudflare/test_fake_site_verdicts.py`, which runs
+      `assess` over every file of that folder with its served status and headers and asserts the verdict of task 11.8,
+      and `wall` true for `/turnstile-wall`. List every page and its canary in
+      `apps/ascend-web-hunter/e2e/fixtures/README.md`. Verify the unit test passes and fails when one page is turned
+      into the other verdict, the image builds, and each page answers its documented status and `Content-Type`.
 
 ## 12. Live verification
 
 - [ ] 12.1 Rebuild and restart the scrapper stack from the repository root against the main compose file, then
       confirm the container is running the new image. Verify with `docker compose ps ascend-web-hunter` and by
-      reading the startup banner for the seven new settings.
+      reading the startup banner.
 - [ ] 12.2 Read each Amazon locale captcha page through `POST /api/v2/web/read` and confirm HTTP 428 with a
       `vnc_url`, then read `/metrics` and confirm `challenge_signals_fired_total` carries `interstitial_structure`
       with `vendor="amazon"` and `challenge_verdicts_total` carries `verdict="wall"`. Verify against the metrics
@@ -280,7 +384,8 @@ and it gates calling the change done.
       the response bodies and the metrics output.
 - [ ] 12.4 Read a Wikipedia article in Japanese and one in Arabic and confirm both are `success` with the article
       text, so the guard is proven on non-Latin pages live. Verify against the response bodies.
-- [ ] 12.5 Re-run e2e spec 7 in full, with Part 3 on the main session and Part 1 fanned out per the spec's
-      concurrency rules, and confirm rows `aa` to `ah` return their gated verdicts and rows v, w, x and y return a
-      terminal verdict with no interstitial marker on any success. Verify by the run record written under
-      `e2e/testing/runs/`, and attach it to this change.
+- [ ] 12.5 Ask the owner which run scenario of `docs/E2E_RUN_SCENARIOS.md` to use, then re-run e2e spec 7 in full,
+      Part 1 fanned out per the spec's concurrency rules (spec 7 has no Part 3 since its human part moved to spec 11),
+      and confirm rows `aa` to `aj` return their gated verdicts and rows v, w, x and y return a terminal verdict with no
+      interstitial marker on any success. Then run the new spec of task 11.8 alone. Verify by the run records written
+      under `e2e/testing/runs/`, and attach them to this change.

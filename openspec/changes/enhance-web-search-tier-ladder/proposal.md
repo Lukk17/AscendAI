@@ -22,12 +22,17 @@ structured-extraction work.
   to the `TierName` Literal in `src/reader/web_reader.py` and accepted by the REST `tier` field and the MCP `web_read`
   `tier` argument.
 - FlareSolverr stays for one release behind `FLARESOLVERR_ENABLED`, default `false`. When it is false the
-  `3-flaresolverr` tier is skipped by the ladder, a caller that names it gets HTTP 400, readiness does not probe it,
+  `3-flaresolverr` tier is skipped by the ladder, a caller that names it gets HTTP 409 `tier_disabled` (owner answers
+  94.6 and 95.3 of 2026-10-08), readiness does not probe it,
   and a session it produced earlier is replayed by the browser tiers. Removing FlareSolverr and every reference to it
   is the follow-up change `remove-flaresolverr-tier`, written out in full and not started.
 - Per-domain tier memory: the tier that last succeeded for a registrable domain is kept in Redis and the next read
   starts there, decaying back to the start of the ladder after `TIER_MEMORY_TTL_SECONDS`. A caller-selected `tier`
   (ADR-011) always wins over the memory.
+- Every browser tier checks every page load, redirect hop and subresource request against the shared URI guard of
+  `add-ascend-python-common` before the browser connects, through Playwright request interception, and blocks a
+  request that fails (owner decision 66 of 2026-10-04, design D6). FlareSolverr needs nothing, because it is off here
+  and removed by `remove-flaresolverr-tier`.
 - No CAPTCHA solver is added. The owner dropped the local solver on 2026-10-01. A CAPTCHA still goes to the human at
   `6-novnc`.
 
@@ -48,12 +53,15 @@ structured-extraction work.
 
 ## Dependencies and Build Order
 
-Build order fixed by the owner on 2026-10-01: `open-several-novnc-windows-at-once`, then
-`detect-challenge-walls-in-any-language`, then this change, then the structured-extraction change in
-`enhance-web-search-extraction-and-tiers`, then `enhance-web-search-crawl-at-scale`. This change depends on
-`detect-challenge-walls-in-any-language` because the two new tiers pass their response to `ChallengeDetector.assess`
-and raise on its verdict, exactly like the existing tiers after that change. `remove-flaresolverr-tier` depends on this
-change having shipped for one release.
+Build order (owner build order of 2026-10-04, which supersedes the earlier orders, among them the owner order of
+2026-10-01): build group 2 (web-hunter), position 5. It needs `detect-challenge-walls-in-any-language` (position 4),
+because the two new tiers pass their response to `ChallengeDetector.assess` and raise on its verdict, exactly like the
+existing tiers after that change. It also needs `add-ascend-python-common` (position 1, the URI guard and its
+`ALLOWED_PRIVATE_HOSTS` setting) and `add-python-runtime-upgrades` (position 2), so the MCP tools and tests of this
+change are written against FastMCP 4 and every test that uses `fastmcp.Client` names its protocol era
+(`add-python-runtime-upgrades` D9). Its e2e spec uses the shared fake site of `add-web-search-scraping-e2e` (build
+group 1). `enhance-web-search-extraction-and-tiers` (position 6) follows it, and `remove-flaresolverr-tier`
+(position 7) builds on this change having shipped for one release.
 
 ## Impact
 
@@ -63,13 +71,21 @@ change having shipped for one release.
 - `apps/ascend-web-hunter/src/reader/strategies/patchright_strategy.py` and `camoufox_strategy.py`: new.
 - `apps/ascend-web-hunter/src/reader/web_reader.py`: `TierName`, the ladder list, tier memory lookup and update.
 - `apps/ascend-web-hunter/src/reader/tier_memory.py`: new, the Redis store.
+- `apps/ascend-web-hunter/src/reader/browser_guard.py`: new, the guarded route handler of every browser tier, and
+  `playwright_strategy.py`, `crawlee_strategy.py` and `novnc_strategy.py` install it.
 - `apps/ascend-web-hunter/src/config/config.py`: `FLARESOLVERR_ENABLED`, `TIER_MEMORY_TTL_SECONDS`,
-  `CAMOUFOX_ENABLED`.
+  `CAMOUFOX_ENABLED`, and `NETWORKIDLE_POLL_MS` and `SCROLL_PAUSE_MS` (the two waits `playwright_strategy.py` holds as
+  code today, owner answer 100.3 of 2026-10-09), each passed by both compose files as `${VAR:-default}` with the same default and added to both
+  `.env.example` files and the bundle README by the sync rule (owner rule 98 of 2026-10-08).
 - `apps/ascend-web-hunter/src/api/readiness.py` and `src/config/startup_banner.py`: FlareSolverr only when enabled.
 - `apps/ascend-web-hunter/src/api/rest/rest_endpoints.py` and `src/api/mcp/mcp_server.py`: the new tier values and the
-  400 for a disabled tier.
+  409 `tier_disabled` for a disabled tier.
+- e2e: a new automated spec, `<N>-tier-ladder-and-guard` (next free number at implementation time), that proves the
+  URL guard in every tier against the shared e2e fake site, the two new tiers and the tier memory (the disabled
+  FlareSolverr tier is proven by unit tests, owner answer 91.3 of 2026-10-08), its Bruno folder `docs/api/request/AscendAI/web-hunter/testing/tier-ladder/`, a best-effort spec 7 row
+  for `nowsecure.nl`, and its place in `docs/E2E_RUN_SCENARIOS.md`.
 - Docs: `apps/ascend-web-hunter/AGENTS.md`, `README.md`, `docs/configuration.md`, ADR-015 for the ladder, an
-  amendment to ADR-011 listing the two new public values, and a CHANGELOG entry with a version bump to 0.0.8.
+  amendment to ADR-011 listing the two new public values, and a CHANGELOG entry with a version bump from 0.0.10 to 0.0.11.
 
 ## Relevant Skills
 
