@@ -24,7 +24,7 @@ Every group in this version is a Keycloak realm group and SHALL mint into `local
 
 ### Requirement: Group membership is resolved from the Keycloak group claim
 
-ascend-ai-agent SHALL resolve the caller's group identifiers from the configured group claim on the validated token, and from no other source. It SHALL NOT call any external directory, and SHALL NOT read group membership from any store of its own. Each group name in the claim SHALL be minted into one principal through the typed factory. A token carrying no group claim, or an empty one, SHALL resolve to no group principals, which SHALL be understood as a true statement that an administrator has placed the caller in no groups.
+ascend-ai-agent SHALL resolve the caller's group identifiers from the configured group claim on the validated token, and, for an identity resolved without a token through `add-keycloak-login`, from the user's Keycloak realm groups read through Keycloak's admin API with the `ascend-agent-directory` client, and from no other source. It SHALL NOT call any external directory, and SHALL NOT read group membership from any store of its own. Each group name in the claim SHALL be minted into one principal through the typed factory. A token carrying no group claim, or an empty one, SHALL resolve to no group principals, which SHALL be understood as a true statement that an administrator has placed the caller in no groups.
 
 #### Scenario: Group names in the claim become principals
 
@@ -41,7 +41,7 @@ ascend-ai-agent SHALL resolve the caller's group identifiers from the configured
 #### Scenario: A group name that cannot be minted fails loudly
 
 - **WHEN** a token carries a group name containing a character outside the permitted principal character set
-- **THEN** the factory throws and the request fails with an error naming the constraint
+- **THEN** the factory throws and the request fails with HTTP 403 as `application/problem+json` with a `detail` naming the constraint
 - **AND** no partially-populated principal set reaches any filter
 
 ### Requirement: A directory group identifier matches no principal in this version
@@ -62,7 +62,7 @@ ascend-ai-agent SHALL NOT mint or match a principal naming a group in an externa
 
 ### Requirement: Membership is only as fresh as the token that carries it
 
-A change to a caller's group membership SHALL become visible to ascend-ai-agent when that caller next obtains an access token, bounded by the realm's access token lifetime and, for continued use without signing in again, by the realm's SSO session lifetime. Both lifetimes SHALL be set explicitly in the realm export and documented in `docs/SECURITY.md` as a product disclosure. ascend-ai-agent SHALL NOT introduce a second staleness window of its own by caching a resolved principal set.
+A change to a caller's group membership SHALL become visible to ascend-ai-agent when that caller next obtains an access token, bounded by the realm's access token lifetime and, for continued use without signing in again, by the realm's SSO session lifetime. Both lifetimes SHALL be set explicitly in the realm export and documented in `docs/SECURITY.md` as a product disclosure. ascend-ai-agent SHALL NOT introduce a second staleness window of its own by caching a principal set resolved from a token. A principal set resolved without a token, for a linked chat platform account or a scheduled firing, SHALL be cached for at most the realm access token lifetime, so it is never staler than a token would be.
 
 #### Scenario: A group removal takes effect at the next token
 
@@ -98,7 +98,7 @@ ascend-ai-agent SHALL assemble the caller's principal set during authentication,
 
 ### Requirement: The principal set is capped and never truncated
 
-The resolved principal set SHALL be subject to a configurable cap defaulting to 256 principals. A caller whose resolved set exceeds the cap SHALL receive HTTP 403 with an `application/problem+json` body naming the cap and the resolved size, and no vector search SHALL be executed for that request. The set SHALL NEVER be truncated to fit the cap.
+The resolved principal set SHALL be subject to a configurable cap defaulting to 256 principals, the setting `app.identity.max-principals` (environment variable `APP_IDENTITY_MAXPRINCIPALS`). A caller whose resolved set exceeds the cap SHALL receive HTTP 403 with an `application/problem+json` body naming the cap and the resolved size, and no vector search SHALL be executed for that request. The set SHALL NEVER be truncated to fit the cap.
 
 #### Scenario: An over-cap caller is refused rather than trimmed
 
@@ -108,7 +108,7 @@ The resolved principal set SHALL be subject to a configurable cap defaulting to 
 
 ### Requirement: The dev profile synthesises a usable principal set
 
-When the Spring profile `dev` is active, the synthesized identity SHALL carry a principal set containing `tenant:everyone:default` and `local:group:dev-all`, so that a locally-ingested corpus carrying either principal is retrievable without an identity provider. The dev profile SHALL NOT synthesize an empty principal set.
+When the Spring profile `dev` is active, the synthesized identity of `add-keycloak-login` SHALL carry, through the identity contributor of this change and with no edit of the dev chain, a principal set containing `tenant:everyone:default` and `local:group:dev-all`, so that a locally-ingested corpus carrying either principal is retrievable without an identity provider. The dev profile SHALL NOT synthesize an empty principal set.
 
 #### Scenario: A developer retrieves seeded documents
 

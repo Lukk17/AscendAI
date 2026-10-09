@@ -10,15 +10,17 @@ Proposed, 2026-09-04. Becomes Accepted when the OpenSpec change `add-tenant-isol
 
 Retrieval is filtered by one expression carrying both isolation axes, `tenant_id == '<currentTenant>' AND acl IN <principalSet>`, composed where the `SearchRequest` is built. That guarantee holds only while there is exactly one place a `SearchRequest` is built. A second retrieval path that assembles its own request is not a partial application of the filter, it is no filter at all on that path, and it looks like an ordinary new feature in a diff.
 
-Today `RagRetrievalService.performSimilaritySearch` is the only production caller of `VectorStore.similaritySearch(...)`. That is a fact about the current code, not a property of it, and nothing prevents the next feature from adding a second one. The failure would be quiet: a developer building a new surface writes a search, tests it against a fixture holding one tenant's documents, sees correct results, and ships a path with neither conjunct on it.
+Before this change two production methods call `VectorStore.similaritySearch(...)`: `RagRetrievalService.performSimilaritySearch` for the knowledge base, and `CapabilityIndex.search` of `add-agent-skills` for the capability index of skills, subagents and tools. Nothing prevents the next feature from adding a third. The failure would be quiet: a developer building a new surface writes a search, tests it against a fixture holding one tenant's documents, sees correct results, and ships a path with neither conjunct on it.
 
 ADR-M009 accepts that permission enforcement living in application code can be bypassed by an application bug, and states that the mitigation is tests rather than architecture. This record is that mitigation, made specific.
 
 ## Decision
 
-Exactly one method in production code calls `VectorStore.similaritySearch(...)`, and it is the method that composes the filter expression. An ArchUnit rule, added as a test-scope dependency, asserts that no other production class calls it, and names the offending class when it fails.
+Exactly one method in production code calls `VectorStore.similaritySearch(...)`: `TenantFilteredVectorSearch.search` in `com.lukk.ascend.ai.agent.service.search`, which composes the mandatory filter. An ArchUnit rule, added as a test-scope dependency, asserts that no other production class calls it, and names the offending class when it fails.
 
-A new retrieval surface therefore routes through `RagRetrievalService` and inherits the composed filter, or it changes this rule deliberately and explains why in a new record.
+The method takes a search target and picks the vector store from it, so the target fixes both the store and the filter. Target `KNOWLEDGE` (the RAG collections, used by `RagRetrievalService.performSimilaritySearch`) composes `tenant_id == '<currentTenant>' AND acl IN <principalSet>`. Target `CAPABILITIES` (the capability index, used by `CapabilityIndex.search`) composes `scope == 'global' OR tenant == '<currentTenant>'`, because a capability entry carries no access list. Both fail closed without a resolved tenant, and `KNOWLEDGE` also without a resolved principal set.
+
+A new retrieval surface therefore routes through `TenantFilteredVectorSearch.search` and inherits a mandatory filter, adding a target with its own tenant conjunct when it searches a new index, or it changes this rule deliberately and explains why in a new record.
 
 ## Consequences
 
@@ -39,6 +41,6 @@ Grep the source tree from a plain unit test. Same assertion, written worse, with
 ## Related
 
 - OpenSpec change `add-tenant-isolation`, design decision 10, and the `rag-retrieval` requirement "Exactly one method issues the similarity search"
-- `RagRetrievalService.performSimilaritySearch`
+- `TenantFilteredVectorSearch.search`, and its two callers `RagRetrievalService.performSimilaritySearch` and `CapabilityIndex.search` of `add-agent-skills`
 - ADR-NNN-fail-closed-on-missing-tenant-or-principals, the fail-closed rule that covers the case where the one call site runs without resolved context
 - `docs/architecture/decisions/ADR-M005-pre-filter-in-vector-search.md` and `ADR-M009-enforcement-in-the-agent.md`

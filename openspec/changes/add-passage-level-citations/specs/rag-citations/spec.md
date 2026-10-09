@@ -37,7 +37,7 @@ The label SHALL be short enough that repeating it inline costs the model a small
 
 ### Requirement: Label assignment is deterministic
 
-Labels SHALL be assigned by descending similarity score over the passages that are injected, ties broken first by the ascending source object key, then by the ascending chunk ordinal within the document, and finally, for a chunk carrying no ordinal, by its stable vector-store identifier. Numbering SHALL start at 1 and SHALL be contiguous. The same retrieval result SHALL therefore always produce the same label-to-passage mapping, and labels SHALL be scoped to a single response: a label from one response carries no meaning in another.
+Labels SHALL be assigned by descending similarity score over the passages that are injected, ties broken first by the ascending source object key, then by the ascending chunk ordinal within the document. Numbering SHALL start at 1 and SHALL be contiguous. The same retrieval result SHALL therefore always produce the same label-to-passage mapping, and labels SHALL be scoped to a single response: a label from one response carries no meaning in another.
 
 #### Scenario: Same retrieval result yields the same labels
 
@@ -57,7 +57,7 @@ Labels SHALL be assigned by descending similarity score over the passages that a
 
 ### Requirement: The response carries a citations array that resolves every label
 
-When retrieval injects at least one labeled passage, the prompt response SHALL contain a `citations` array with exactly one entry per label issued, in label order. Each entry SHALL always carry `label` (the bare label without brackets, for example `S1`) and `name` (the document's display name), so that every citation is at minimum readable as a document-level attribution. Each entry SHALL additionally carry, when and only when that fact is known for the passage: `documentId` (the registry id of the source document), `page` (a one-based page number), `chunkIndex` (the zero-based ordinal of the passage within its document) and `chunkCount` (the number of chunks that document was split into). An unknown field SHALL be omitted from the JSON rather than serialized as `null` or as a sentinel number.
+When retrieval injects at least one labeled passage, the prompt response SHALL contain a `citations` array with exactly one entry per label issued, in label order. Each entry SHALL always carry `label` (the bare label without brackets, for example `S1`), `name` (the document's display name), `chunkIndex` (the zero-based ordinal of the passage within its document) and `chunkCount` (the number of chunks that document was split into). Each entry SHALL additionally carry, when and only when that fact is known for the passage: `documentId` (the registry id of the source document) and `page` (a one-based page number). An unknown field SHALL be omitted from the JSON rather than serialized as `null` or as a sentinel number.
 
 The array SHALL cover exactly the passages injected into the prompt: no entry without a corresponding labeled block, and no labeled block without an entry. When retrieval injects nothing, the `citations` key SHALL be omitted from the JSON rather than serialized as `null` or as an empty array.
 
@@ -66,7 +66,7 @@ The array SHALL cover exactly the passages injected into the prompt: no entry wi
 - **WHEN** the injected context contains labeled blocks `S1`, `S2` and `S3`
 - **THEN** `response.citations` has exactly three entries with `label` values `S1`, `S2` and `S3` in that order
 - **AND** every entry has a non-blank `name`
-- **AND** every entry whose passage was indexed with ordinal metadata has an integer `chunkIndex` and an integer `chunkCount`
+- **AND** every entry has an integer `chunkIndex` and an integer `chunkCount`
 
 #### Scenario: Citation resolves back to a real document and location
 
@@ -86,7 +86,7 @@ The array SHALL cover exactly the passages injected into the prompt: no entry wi
 
 ### Requirement: Locator degrades when a passage has no page
 
-A source without pages, for example a Markdown file or a scraped web page, SHALL still produce a usable citation. When the passage carries no page number, the citation entry SHALL omit the `page` field and SHALL still carry `chunkIndex` and `chunkCount`, and the passage's labeled block in the prompt SHALL state the ordinal locator instead of a page. When the passage carries neither page nor ordinal metadata, the citation SHALL degrade one step further to a document-level attribution carrying `label` and `name` alone. Absence of provenance at any level SHALL NOT cause the request to fail, SHALL NOT suppress the label, and SHALL NOT suppress the citation entry.
+A source without pages, for example a Markdown file or a scraped web page, SHALL still produce a usable citation. When the passage carries no page number, the citation entry SHALL omit the `page` field and SHALL still carry `chunkIndex` and `chunkCount`, and the passage's labeled block in the prompt SHALL state the ordinal locator instead of a page. Absence of a page SHALL NOT cause the request to fail, SHALL NOT suppress the label, and SHALL NOT suppress the citation entry.
 
 #### Scenario: Markdown source cites without a page
 
@@ -95,38 +95,21 @@ A source without pages, for example a Markdown file or a scraped web page, SHALL
 - **AND** it carries `chunkIndex` and `chunkCount`
 - **AND** the labeled block identifies the passage by its ordinal position within the document
 
-#### Scenario: Document indexed before page provenance existed
-
-- **WHEN** a passage is retrieved from a document indexed before this change shipped, whose stored chunk carries neither page nor ordinal metadata
-- **THEN** the passage is still labeled and still appears in `citations`
-- **AND** its entry omits `page`, `chunkIndex` and `chunkCount`
-- **AND** its entry still carries `label` and a non-blank `name`
-- **AND** its labeled block in the prompt names the document without claiming a location inside it
-
 #### Scenario: Mixed corpus in one answer
 
 - **WHEN** one answer draws on a PDF passage with a page and a Markdown passage without one
 - **THEN** both passages are labeled
 - **AND** the PDF citation carries `page` while the Markdown citation does not
 
-### Requirement: Citations are independent of the source-attachment opt-in and have a kill switch
+### Requirement: Citations are independent of the source-attachment opt-in
 
-Inline labels and the `citations` array SHALL be governed by a single server-side setting, `app.rag.citations.enabled`, shipped enabled. They SHALL NOT be gated on the `attachSources` request flag, because an inline label in the answer text is unusable without the array that resolves it, and gating the array on a download-link flag would leave unresolvable labels in the default response.
-
-When `app.rag.citations.enabled` is `false`, the injected context SHALL contain no labels, the response SHALL contain no `citations` key, and the response shape SHALL be identical to the shape produced before this change.
+Inline labels and the `citations` array SHALL always be on, with no setting that turns them off. They SHALL NOT be gated on the `attachSources` request flag, because an inline label in the answer text is unusable without the array that resolves it, and gating the array on a download-link flag would leave unresolvable labels in the default response. Going back to the response shape produced before this change SHALL be done by reverting the change.
 
 #### Scenario: Citations returned without requesting sources
 
 - **WHEN** a prompt is sent with no `attachSources` field and retrieval injects two passages
 - **THEN** the response contains a `citations` array with two entries
 - **AND** the response contains no `sources` key
-
-#### Scenario: Kill switch restores the previous response shape
-
-- **WHEN** `app.rag.citations.enabled: false` is configured and a prompt is answered from retrieved context
-- **THEN** the response JSON contains no `citations` key
-- **AND** the injected context contains no labels
-- **AND** the answer text contains no label markers
 
 ### Requirement: The system prompt names the label format that is actually supplied
 
@@ -162,7 +145,7 @@ A retrieved passage whose source object has no document-registry row SHALL still
 
 ### Requirement: The streaming endpoint emits a citations event
 
-When `POST /api/v1/ai/prompt/stream` serves a turn whose retrieval injected at least one labeled passage and citations are enabled, the stream SHALL contain exactly one `citations` event whose payload is `{"citations": [CitationRef, ...]}` with the same entries the synchronous response would carry for the same retrieval. The event SHALL be emitted after the last `delta` event and before the `sources` event and the terminal `done` event. When no passage was injected or citations are disabled, the stream SHALL contain no `citations` event.
+When `POST /api/v1/ai/prompt/stream` serves a turn whose retrieval injected at least one labeled passage, the stream SHALL contain exactly one `citations` event whose payload is `{"citations": [CitationRef, ...]}` with the same entries the synchronous response would carry for the same retrieval. The event SHALL be emitted after the last `delta` event and before the `sources` event and the terminal `done` event. When no passage was injected, the stream SHALL contain no `citations` event.
 
 #### Scenario: Citations event precedes sources and done
 
@@ -174,3 +157,44 @@ When `POST /api/v1/ai/prompt/stream` serves a turn whose retrieval injected at l
 
 - **WHEN** a streaming prompt retrieves no passage above the threshold
 - **THEN** the stream contains no `citations` event
+
+### Requirement: Citations are verified end to end against a live stack
+
+Every user-visible citation behaviour SHALL be covered by an end-to-end spec in the ascend-agent suite under `apps/ascend-agent/e2e/testing/`, numbered with the next free number when it is written. A spec whose result the seeded canary documents fix SHALL judge only the `citations` and `sources` arrays and the stored Qdrant payloads, and SHALL NOT judge the wording of the answer. The layout of the labeled blocks in the injected context SHALL be checked by a deterministic spec from the request log (Mockoon request log `GET /mockoon-admin/logs`) of the scripted model of the shared e2e harness of `close-agent-test-gaps` (its design D5 and task group 4), which starts only for deterministic specs and never for an AI-run spec. Every spec that sends a prompt but does not judge the answer's wording SHALL send it to the provider `scripted` of that harness. Only a spec that checks whether the answer text cites the right label SHALL depend on a real chat model, and it SHALL be marked as an AI-run spec. No spec SHALL pass or fail on a log line. A behaviour that a unit or integration test already proves, such as the place of the `citations` event in the stream or the equal provenance of an uploaded and a bucket-scanned file, SHALL NOT be repeated by an end-to-end spec.
+
+#### Scenario: Markdown citation degrades to an ordinal
+
+- **WHEN** the Markdown ordinal spec asks about an indexed Markdown canary with no `attachSources` field
+- **THEN** the response has a `citations` array with contiguous labels from `S1`, the canary's entry carries its registry `documentId`, `chunkIndex` and `chunkCount` and no `page`
+- **AND** the response has no `sources` key
+
+#### Scenario: Citation prompt layout read from the scripted model's request log
+
+- **WHEN** the Markdown ordinal spec sends its prompt to the scripted model and reads the scripted model's request log
+- **THEN** the user message of that request holds one labeled block per `citations` entry, each label exactly once, with the canary's display name and its ordinal locator
+- **AND** it holds no label that the `citations` array does not have
+- **AND** the system message names the bracketed label form `[S<n>]`
+
+#### Scenario: PDF citation names the page
+
+- **WHEN** the PDF page spec indexes a three-page canary by upload, then asks about the fact on page 2
+- **THEN** every stored point has its object key as `source`, a `page` from 1 to 3 and ordinals that run across the whole file
+- **AND** a citation entry for the document carries `page` 2
+
+#### Scenario: OCR and Unstructured pages keep their numbers
+
+- **WHEN** the other parsers spec indexes a scanned two-page canary PDF and a canary the router sends to Unstructured
+- **THEN** every stored point carries the right `page`, and no stored text holds a `## Page` heading
+
+#### Scenario: Citations join the sources and survive an unregistered source
+
+- **WHEN** the citations with sources spec asks about an indexed canary with `attachSources=true`
+- **THEN** every citation with a `documentId` matches exactly one source entry, and each source entry carries `ingestedAt` equal to the document's `lastIndexedAt`
+- **AND** after the canary's registry row is removed the passage is still cited with no `documentId`, is absent from `sources`, and the request answers 200
+- **AND** a prompt no canary answers has no `citations` key
+
+#### Scenario: A real model cites the passage it used
+
+- **WHEN** the AI-run spec asks a hosted chat model about the fact on page 2 of the indexed canary PDF
+- **THEN** the answer text holds a label, every label in it has an entry in `citations`, and the label next to that fact resolves to `page` 2
+- **AND** an answer to a question no canary covers holds no label

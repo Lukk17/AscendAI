@@ -4,7 +4,7 @@ Draft. The number is assigned at implementation time: it takes the next free num
 
 ## Status
 
-Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 12.8 installs into `apps/ascend-agent/docs/architecture/decisions/`, taking the next free number at that time.
+Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 7.6 installs into `apps/ascend-agent/docs/architecture/decisions/`, taking the next free number at that time.
 
 ## Amendment, 2026-09-04
 
@@ -49,7 +49,7 @@ Every path that cannot produce a caller's true principal set either fails loudly
 ### Trade-offs
 
 - Directory availability becomes product availability on the cache-miss path. This is the real cost and it is accepted rather than argued away. The Redis cache from ADR-M007 absorbs a short outage for anybody recently active, so the blast radius is cold callers during the outage window, not everybody.
-- The design document's open question about synchronous membership resolution against a large directory stays open, and this decision makes the consequence of a slow or failing directory more visible rather than less. That is intentional: the measurement does not exist yet, and hiding the failure would remove the pressure to take it.
+- The open question about synchronous membership resolution against a large directory (question 5 under "Open questions" in `docs/architecture/permission-aware-retrieval.md`) belongs to the deferred directory work, the section "Deferred: resolving membership from a customer's own directory" of that document and the entries Deferred D9a and Deferred D14a in the Deferred section of the `add-auth-and-identity` design. It stays open with that work, and this decision makes the consequence of a slow or failing directory more visible rather than less. That is intentional: the measurement does not exist yet, and hiding the failure would remove the pressure to take it.
 - A person legitimately in more than 256 groups cannot use the product until an administrator changes the cap. Accepted, because the alternative is that person quietly losing access to some of their documents with no indication which ones.
 - The dev principal set is one more thing that has to stay in step with what the dev-profile ingestion path writes. If they drift, local retrieval goes quiet, which is the exact symptom this record exists to prevent, arriving through the back door. Mitigated by stating both values in `docs/SECURITY.md` and asserting them in a slice test.
 

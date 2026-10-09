@@ -20,8 +20,9 @@ Logical isolation. Shared collections, bucket, Redis instance, and tables, with 
 
 - Qdrant: a `tenant_id` payload field on every chunk, and a `tenant_id` equality conjunct in the search filter, with a keyword payload index behind it.
 - the object store (Floci): a `tenant/{tenantId}/` key prefix, built from the resolved tenant context and never from user input, checked again before a download is presigned.
-- Redis: `chat:{tenantId}:{conversationId}` and `user:{tenantId}:{userId}:instructions`.
-- Postgres: `tenant_id VARCHAR(64) NOT NULL` on the tenant-scoped tables, in the primary key for `user_instructions` and in the composite index for `chat_history`.
+- Redis: `chat:{tenantId}:{conversationId}`. User instructions have no key any more, because `add-agent-soul` removes them.
+- Postgres: `tenant_id VARCHAR(64) NOT NULL` with a foreign key to `tenants(id)` on the tenant-scoped tables, and in the composite index for `chat_history`.
+- The agent home `app.agent-home`: one folder `tenants/<tenantId>/` per tenant for its skills, subagent definitions, personality and user facts.
 - AscendMemory: the composite `user_id` value `{tenantId}:{userId}`, namespacing the partition key that service already uses.
 
 The access axis follows the same shape for the same reason: an `acl` payload field and a set-intersection conjunct, not a collection per group.
@@ -29,14 +30,14 @@ The access axis follows the same shape for the same reason: an `acl` payload fie
 ## Consequences
 
 - One mechanism covers five stores, so there is one thing to reason about and one class of bug to test for, rather than five provisioning flows that fail differently.
-- Adding a tenant is a row in `tenants` and nothing else. No collection to create, no bucket to provision, no schema to migrate, no per-tenant Liquibase run.
+- Adding a tenant is a row in `tenants` and nothing else. No collection to create, no bucket to provision, no schema to migrate, no per-tenant Flyway run.
 - The blast radius of an application bug is wider than under physical separation. A missing discriminator on one path is a cross-tenant read, where separate infrastructure would have made it an error. This is the real cost of the decision and it is paid down with the fail-closed rule in ADR-NNN-fail-closed-on-missing-tenant-or-principals, the single search call site in ADR-NNN-single-similarity-search-call-site, and integration tests that assert cross-tenant reads return zero results.
 - Noisy-neighbour effects stay possible: one tenant's large ingest shares index structures and connection pools with everyone else. Acceptable at the scale this platform targets, and revisitable per tenant later without changing the code, since a dedicated deployment is still a deployment of the same image.
 - Deleting a tenant becomes a filtered delete across five stores rather than dropping a collection, which matters to `add-audit-and-gdpr-compliance` when it specifies erasure.
 
 ### Alternatives considered
 
-Collection, bucket, and schema per tenant. Stronger blast-radius isolation, and a mis-scoped query fails rather than leaking. Rejected because Qdrant collection count would grow with tenants times embedding dimensions, per-request provider routing in `VectorStoreResolver` would need a second dimension, Liquibase would run per schema, and object-store bucket limits bite early. The fail-closed filter gives the same observable guarantee at the scale in question. ADR-M009 rejects the same shape one level down for groups, where the multiplication is worse.
+Collection, bucket, and schema per tenant. Stronger blast-radius isolation, and a mis-scoped query fails rather than leaking. Rejected because Qdrant collection count would grow with tenants times embedding dimensions, per-request provider routing in `VectorStoreResolver` would need a second dimension, Flyway would run per schema, and object-store bucket limits bite early. The fail-closed filter gives the same observable guarantee at the scale in question. ADR-M009 rejects the same shape one level down for groups, where the multiplication is worse.
 
 A single tenant per deployment, kept forever. This is today's posture and it is what the change exists to move away from: it blocks consolidating the per-company deployments that already exist, and it prices out any customer smaller than a dedicated stack.
 

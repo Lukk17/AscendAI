@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-09-05. Accepted when the OpenSpec change `add-document-connectors` lands. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive, taking the next free number at that time.
+Proposed, 2026-09-05. Moved on 2026-10-04 from `add-document-connectors` to `add-connector-framework` with the freshness check, when that change was split (owner rule of 2026-10-04: the personal assistant comes first). Accepted when the OpenSpec change `add-connector-framework` lands. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive, taking the next free number at that time.
 
 ## Context
 
@@ -16,11 +16,11 @@ But the failure shape the `access-list-staleness-sweep` record identified has no
 
 ## Decision
 
-A scheduled freshness check compares each enabled connector's last successful sync against its configured maximum sync age and marks the connector stale when it has exceeded it. The flag is returned by the connector read and list endpoints, and the time since each connector's last successful sync is exposed as a gauge alongside a count of stale connectors. A successful sync clears the flag. A run with trigger type `FRESHNESS_CHECK` is recorded only when a connector's stale state changes.
+A scheduled freshness check, the system task `connector-freshness-check` on the shared scheduler of `add-shared-scheduler`, compares each enabled connector's last successful sync against its configured maximum sync age and marks the connector stale when it has exceeded it. The flag is returned by the connector read and list endpoints, and the time since each connector's last successful sync is exposed as a gauge alongside a count of stale connectors. A successful sync clears the flag. A run with trigger type `FRESHNESS_CHECK` is recorded only when a connector's stale state changes.
 
-The check writes nothing to MinIO, writes nothing to the vector store, and does not call the source.
+The check writes nothing to the object store, writes nothing to the vector store, and does not call the source.
 
-A connector's maximum sync age must be greater than the interval its cron schedule fires on. The framework rejects a configuration where it is not, at write time.
+A connector's maximum sync age must be greater than the interval its cron schedule fires on, measured as `CronRule`'s shortest gap between firings. The framework rejects a configuration where it is not, at write time.
 
 ## Consequences
 
@@ -41,7 +41,7 @@ Neither half of that applies here. Nothing is serving an authorization decision,
 - A stale connector's documents stay retrievable and stay stale. Somebody can get an answer from a policy that was superseded three weeks ago, and nothing in the response says so. That is the accepted cost, and it is the reason the flag is on the API rather than only in a metric.
 - The check depends on an operator or a dashboard looking. It is a signal, and a signal nobody reads is worth nothing. Mitigated by exposing it on the same read an administrator already performs to see their connectors, rather than only as a metric behind a dashboard nobody has built yet.
 - Basing the check on last successful sync rather than on document age means a connector whose runs all end `PARTIAL` looks fresh while making almost no progress. Accepted for this iteration: a `PARTIAL` run did complete a window, and the run history shows the pattern. A per-item content age would be a second table for a second failure that this scope does not need.
-- One more scheduled job and one more claimed row lock. Cheap, and it reuses the claim the scheduled sync already needs.
+- One more system task on the shared scheduler of `add-shared-scheduler`, which runs each firing on exactly one agent instance. Cheap, and it uses the same scheduler the connector syncs already run on.
 
 ### Alternatives considered
 
@@ -53,7 +53,7 @@ Neither half of that applies here. Nothing is serving an authorization decision,
 
 ## Related
 
-- the `access-list-staleness-sweep` record, whose instinct this record keeps and whose enforcement it drops, deferred rather than withdrawn
+- the `access-list-staleness-sweep` record of `add-document-connectors`, whose instinct this record keeps and whose enforcement it drops, deferred rather than withdrawn
 - ADR-M006 (`docs/architecture/decisions/ADR-M006-deny-by-default-on-missing-acl.md`) for why an emptied list means invisible, which is the mechanism this record declines to use
-- Design decision D19, and D18 for the company-wide grant that makes enforcement unnecessary here
-- `add-auth-and-identity`, whose named limitation states the same scope cut from the identity side
+- Design decision D19 of `add-connector-framework`, and D18 of `add-document-connectors` for the company-wide grant that makes enforcement unnecessary for a connector-landed document
+- `add-auth-and-identity` (company), whose named limitation states the same scope cut from the identity side

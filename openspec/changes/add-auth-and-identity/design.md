@@ -1,186 +1,72 @@
 ## Context
 
-ascend-ai-agent's security surface today is a placeholder. `SecurityConfig.java` is a two-branch filter chain: with `app.security.enabled=false` (the default) every request is permitAll; with it enabled, a single in-memory HTTP Basic user (`admin`/`admin` defaults from `SecurityProperties.java`) guards everything except `/actuator/health` and the Swagger paths. CSRF is disabled, sessions are stateless. User identity, the partitioning key for Redis chat history, Postgres persistence, Qdrant memory, and RAG scoping, comes from an `X-User-Id` request header (`PromptController.java:86-88`) that any client can set to any value, falling back to `app.user.default-id=user1`.
+`add-keycloak-login` gives the personal assistant real login (owner answer 70.2 of 2026-10-04): one Keycloak realm `ascend-ai` as the only issuer, password sign-in on Keycloak's own login page, the agent as an OAuth2 resource server on Spring Security 7.1.1, the roles `USER` and `ADMIN` with one authorization matrix that every later change extends, the app client `ascend-flutter`, the confidential clients `ascend-openclaw-host` and `ascend-agent-directory`, the service token for our own services, the identity resolved without a token, the production guard, and one tenant `default`. Until 2026-10-04 all of that was part of this change. It was split out to follow the owner rule of 2026-10-04: the personal assistant comes first, nothing personal, web-hunter or base may depend on company work, and company work comes last and only plugs in through extension points with safe defaults.
 
-The five downstream services have zero inbound auth. Their only middleware is request-id propagation and security response headers (for example `apps/ascend-memory/src/observability/request_context.py`). AscendMemory's `POST /api/v1/memory/wipe` and `DELETE /api/v1/memory` are destructive and reachable by anyone on the docker network or exposed port. ascend-ai-agent talks to them via a `RestClient` in `SemanticMemoryClient`, via ingestion REST clients (ascend-ocr), and via Spring AI's MCP client (`spring.ai.mcp.client.streamable-http.connections` in `application.yaml` lines 391-398: ascend-audio-scribe, weather, ascend-web-hunter).
-
-Useful groundwork already exists: `spring-boot-starter-security` and `spring-boot-starter-oauth2-client` are on the classpath (`build.gradle.kts` lines 75 and 45, aliases declared in `gradle/libs.versions.toml`), and the `SecurityConfig` Javadoc explicitly earmarks the OAuth2/Keycloak swap as a separate change. This is that change.
+This change is the company half. It adds what a deployment serving several customers needs: the tenant claim, groups, group principals for retrieval access lists, corporate single sign-on through brokering with Keycloak Organizations and SAML, and the test tenants of the company specs. It edits no class of `add-keycloak-login`. It plugs in through that change's two ports (`add-keycloak-login` D22): `TenantResolver`, whose default answers `default`, and `IdentityContributor`, which adds typed values to the resolved identity. It is build group 5, position 1 of the owner build order of 2026-10-04, after every web-hunter, base and personal change, and it needs only `add-keycloak-login` (build group 3, position 3) among them.
 
 `docs/architecture/permission-aware-retrieval.md` describes how AscendAI decides which chunks a person may read, and its ownership table assigns six elements of that mechanism here. This version delivers two: the principal identifier format with its typed factory, and group membership resolution. The other four belong to the directory work and are deferred with their analysis intact, in the Deferred section below. The supporting monorepo records are `ADR-M004` through `ADR-M009` under `docs/architecture/decisions/`.
 
-The platform decision is settled and the scope of this change has been cut to match it. Keycloak, self-hosted, is the identity layer in production, not a local convenience with a real provider assumed behind it later. The normal shape of the product is a Keycloak account with a password: the person signs in on Keycloak's own login page and the application receives an authorization code. Groups are Keycloak realm groups, created by an administrator, assigned by an administrator, and emitted into the token by a protocol mapper. Nothing is read from a customer's Microsoft or Google directory in this version, and nothing carrying authorization meaning is imported across the broker.
-
-Identity brokering survives as optional configuration for a customer who wants corporate single sign-on. It decides where a person authenticates. It does not decide what they may read, because that comes from the Keycloak groups an administrator put them in. Nothing on the password path depends on a brokered provider existing, and the password path is built and proven first.
+Groups are Keycloak realm groups, created by an administrator, assigned by an administrator, and emitted into the token by a protocol mapper. Nothing is read from a customer's Microsoft or Google directory in this version, and nothing carrying authorization meaning is imported across the broker. Identity brokering is optional configuration for a customer who wants corporate single sign-on. It decides where a person authenticates. It does not decide what they may read.
 
 Constraints:
 
-- Sibling changes depend on this one's contract: `add-tenant-isolation` consumes the `tenant` claim defined here, and `add-usage-metering-and-quotas` and `add-audit-and-gdpr-compliance` key on the authenticated principal. The claim names must be stable before those changes land.
-- The e2e suite and Bruno collection (`docs/api/request/AscendAI/`) currently send `X-User-Id` and no credentials. Local single-user workflows must keep working without a Keycloak round-trip.
-- `harden-cloud-deployment` owns network and TLS. This change is app-level auth only, and tokens travel over plain HTTP inside the compose network, which is accepted here.
+- Sibling changes depend on this one's contract: `add-tenant-isolation` consumes the `tenant` claim and the principal set defined here, and `add-usage-metering-and-quotas`, `add-audit-and-gdpr-compliance`, `add-tenant-administration` and `add-tenant-policy` key on the tenant of the resolved identity. The claim names must be stable before those changes land.
 - `add-tenant-isolation` composes the access-list predicate into the same `SearchRequest` filter that carries the tenant predicate, and it can only do that if a principal set already exists on the request. `add-document-connectors` writes access lists that name principals, and those lists mean nothing until the principal format is fixed. Both are blocked on the identity work here, so the principal contract has to be frozen before either of them starts.
 - The principal namespaces this version can actually mint are `local` and `tenant`. A directory group identifier matches nothing, which is a real limitation with a real consequence for connector-synced documents, and it has its own section below rather than a footnote.
-- Keycloak is now a service the platform operates. If it is down, nobody signs in. It needs a database, certificates, backups, and a standing upgrade habit, and the upstream release cadence does not make that habit optional. This is a cost of the decision rather than a footnote to it, and it is priced in the risk list.
+- No personal change may depend on anything here. Personal code reads the five named fields of the resolved identity and never an extension value (`add-keycloak-login` D22), so a deployment without this change loses no personal behaviour.
 
 ## Goals / Non-Goals
 
 Goals:
 
-- Verified user identity: every request to a protected ascend-ai-agent endpoint carries a JWT validated against a configurable OIDC issuer, and identity fields are read from claims, never from client-controlled headers.
-- Role-based authorization: `USER` (chat, upload) and `ADMIN` (ingestion run, future admin surface) mapped from realm roles.
-- Closed downstream perimeter: no unauthenticated call reaches any Python service or ascend-weather-mcp, on either the REST or the MCP surface.
-- Keycloak as the product's identity layer: one self-hosted realm is the issuer in development and in production, provisioned from a checked-in export, with `docker compose up` yielding the same realm shape an operator deploys. The export is provisioning, not a test fixture.
-- Password sign-in that works on its own: an administrator creates an account, sets a password policy, creates groups, and puts people in them, and that is a complete, usable product with no identity provider of the customer's involved anywhere.
-- Optional corporate single sign-on: a customer's own identity provider can be brokered inside that realm as a configured entry, and adding one is an administrative procedure rather than a code change or a release.
-- Issuer portability kept as an escape hatch rather than sold as the plan: the resource server still validates against a configurable `issuer-uri`, so a deployment that validates a provider's tokens directly is possible.
+- A trustworthy tenant on every identity, read from the `tenant` claim that Keycloak stamps, through the replaced `TenantResolver`.
 - Group principals on every request: the resolved identity carries the caller's Keycloak groups converted into `namespace:type:id` principals, assembled once into an immutable set that `add-tenant-isolation` composes into the search filter.
+- Optional corporate single sign-on: a customer's own identity provider can be brokered inside the realm as a configured entry, routed by email domain through Keycloak Organizations, and adding one is an administrative procedure rather than a code change or a release.
+- Company specs against test tenants that never share state with the personal specs.
 
 Non-Goals:
 
-- Tenant enforcement (row filtering, collection scoping), which is `add-tenant-isolation`. This change only defines and propagates the claim.
-- TLS, network segmentation, secret-manager integration, which are `harden-cloud-deployment`.
-- Login UI. The Flutter app does the authorization-code and PKCE dance itself against Keycloak's own login page, and we provision its client and nothing more.
-- Per-user rate limits or quotas, which are `add-usage-metering-and-quotas`.
-- Audit logging of auth events, which is `add-audit-and-gdpr-compliance`.
-- Enforcement of the access-list predicate inside the vector search, the `acl` payload keys, and the `tenant:everyone:{tenantId}` pseudo-group. Those belong to `add-tenant-isolation`, which composes the predicate that this change's principal set feeds.
+- Everything `add-keycloak-login` holds: the realm itself, password sign-in, the resource server, the roles and the matrix, the service token, the confidential clients, the identity resolved without a token and the production guard.
+- Tenant enforcement (row filtering, collection scoping), which is `add-tenant-isolation`. This change defines and propagates the claim.
+- Enforcement of the access-list predicate inside the vector search, the `acl` payload keys, and the `tenant:everyone:{tenantId}` stamp on chunks. Those belong to `add-tenant-isolation`.
 - Capturing access lists from SharePoint or Google Drive item permissions at sync. That belongs to `add-document-connectors`, and the Named limitation section below says what this version can and cannot match.
 - Reading group membership from a customer's directory, importing group identifiers across the broker, the cross-provider identity link, and the administrator API that corrects one. All deferred, with their analysis preserved below.
-- Roles beyond `USER` and `ADMIN`. The role model stays at two on purpose, and that is not a statement about document permissions. Roles gate endpoints, principals gate documents. Per-document permission is expressed entirely through group principals, and an `ADMIN` token widens the endpoint matrix while widening retrieval by exactly nothing (ADR-M006).
+- Roles beyond `USER` and `ADMIN`. Roles gate endpoints, principals gate documents. Per-document permission is expressed entirely through group principals, and an `ADMIN` token widens the endpoint matrix while widening retrieval by exactly nothing (ADR-M006).
 
 ## Decisions
 
-Decision numbers are stable. A decision that has been deferred keeps its number and moves to the Deferred section, so a cross-reference from a sibling change or a decision record still lands on the right text.
+Decision numbers are stable. D1 to D7 and D20 moved to `add-keycloak-login` on 2026-10-04 with their numbers, so a cross-reference to them now lands there. A decision that has been deferred keeps its number and moves to the Deferred section, so a cross-reference from a sibling change or a decision record still lands on the right text.
 
-### D1 - OAuth2 resource server with issuer-uri, not oauth2-client or a Keycloak adapter
+### D2b - What this change adds to the realm export of add-keycloak-login
 
-ascend-ai-agent validates tokens and never initiates a login. So the correct Spring artifact is `spring-boot-starter-oauth2-resource-server` (Nimbus JWT decoder plus `issuer-uri` discovery), replacing the currently unused `spring-boot-starter-oauth2-client` dependency in `build.gradle.kts`. Configuration is the standard `spring.security.oauth2.resourceserver.jwt.issuer-uri`. The decoder pulls JWKS from the issuer's discovery document. Under D2 that issuer is our own Keycloak realm and it stays the same across every customer, so the property is not a customer-onboarding lever. It remains the escape hatch for a deployment that validates a provider's tokens directly. The deprecated Keycloak Spring adapter is not an option (end of life), and rolling our own JWT filter would re-implement what Nimbus already does.
+The production realm export of `add-keycloak-login` gains, in this change's tasks:
 
-Alternatives considered: keep HTTP Basic and harden it, which has no identity claims, no roles, and no mobile-app story; session-based `oauth2Login` in the agent, which is the wrong topology, because the Flutter app is the OAuth client and the agent is a pure API.
-
-### D2 - Keycloak is the identity layer, one realm, one issuer, and the realm export provisions it
-
-Keycloak is the product's identity provider in production as well as locally. It is not a stand-in for a real provider that arrives later.
-
-One realm, `ascend-ai`, serves every customer, and it is the only token issuer ascend-ai-agent validates against. Customers are not realms. A customer is a `tenant` value, optionally plus a brokered identity provider (D15) if they want corporate sign-on. Tenant separation is enforced by the tenant claim and the search filter that `add-tenant-isolation` composes, not by a realm boundary.
-
-That is the whole answer to the question this change previously left open about whether a multi-customer deployment needs an issuer registry. It does not. One issuer is strictly simpler than a per-customer issuer with per-customer JWKS, per-customer discovery, and a resolution step in front of token validation. The resource-server configuration in D1 stays a single `issuer-uri`, and every sibling change that assumed one issuer keeps that assumption intact.
-
-Realm-per-customer was the alternative and it was rejected. It buys blast-radius isolation on realm configuration and per-customer session lifetimes, and it costs an issuer registry, a per-request issuer resolution before validation, N JWKS caches, and a migration for every sibling change that currently treats the issuer as fixed. The isolation it buys is isolation we already get from the tenant claim, so it is paid twice.
-
-The compose service is `quay.io/keycloak/keycloak` with the export at `keycloak/realm-ascend-ai.json` mounted into `/opt/keycloak/data/import/`, backed by the external PostgreSQL on a dedicated `keycloak` database. Keycloak is a separate service on its own host address and port. It is not routed under a path such as `/auth/` behind the agent's gateway. The host port is 8180, mapped to the container's 8080, chosen because no service in `compose.yaml` or `compose.ascend-web-hunter.yaml` publishes it. Development runs `start-dev --import-realm`. A production deployment runs `start --import-realm` with `KC_HOSTNAME` set to the public Keycloak address (for example `https://auth.<customer-domain>`), `KC_HTTP_ENABLED=true` and `KC_PROXY_HEADERS=xforwarded` behind the TLS proxy that `harden-cloud-deployment` supplies, and the difference between the two is a command and an environment block, not a different realm.
-
-Login and token rate limits belong to this change, not to `harden-cloud-deployment`. The reverse proxy that `harden-cloud-deployment` puts in front of each public host gets one rule set on the Keycloak host: a per-client-address limit on `/realms/ascend-ai/login-actions/authenticate` and on `/realms/ascend-ai/protocol/openid-connect/token`, answering 429 over the limit. Keycloak's own brute-force detection (task 1.2) locks an account after repeated failures, and the proxy limit slows a guessing run across many accounts before it reaches Keycloak at all. The limit values are configuration in the proxy file, not code.
-
-The export is the provisioning of a real system, so what it must contain is a contract rather than a convenience:
-
-| Element | Why it is in the export |
+| Element | Why it is added here |
 | :--- | :--- |
-| Realm `ascend-ai`, realm roles `USER` and `ADMIN`, with `USER` as the realm default role | The role model D4 maps from, and the reason a new account has a role at all on its first sign-in |
-| Public client `ascend-flutter`, authorization code with PKCE `S256`, no secret, no direct access grants | The application client. Direct access grants stay off, because a password grant is prohibited by the security standard this repo follows, and it is not what password sign-in means (D2a) |
-| A realm password policy: minimum length, and brute-force detection enabled | Password sign-in is the default path, so the policy that protects it is part of the provisioning rather than something an operator remembers |
+| A protocol mapper emitting the `tenant` user attribute as the `tenant` claim | The multi-tenant claim D3b reads. A realm user with no `tenant` attribute carries no claim and resolves `default` |
 | Realm groups, and the group protocol mapper emitting them into the access token as an array of group names | The only source of group principals in this version (D9) |
-| Protocol mappers emitting `tenant` and `email` into the access token | The rest of the claims contract every ascend-ai-agent deployment reads. A mapper missing here is an empty field there |
-| Realm SSO session and access token lifetimes | The staleness bound for a group change (D18). They are a product disclosure, so they are checked in rather than left at whatever the default happens to be |
-| A brokered-provider template entry, disabled, carrying the tenant stamp mapper from D15 and nothing that imports an upstream authorization claim | Onboarding a customer who wants corporate sign-on becomes copying a shape that has been reviewed |
-| Nothing else | No seeded human user, no direct access grants, no stored provider tokens |
+| A disabled brokered-provider template entry, carrying the tenant stamp mapper from D15 and nothing that imports an upstream authorization claim, with token storage off | Onboarding a customer who wants corporate sign-on becomes copying a shape that has been reviewed |
+| An organization template for Keycloak Organizations, one organization per customer with its email domain and its linked provider | The domain routing of D15 (owner decision 65.15 of 2026-10-04) |
 
-The seeded test user, the `dev-all` realm group, and the direct-access-grant client that the Bruno collection and the e2e suite need are a development overlay, imported only in the development compose posture. They are not in the production export, because a seeded account with both roles is a backdoor and a password grant is one the standard forbids outright.
+The development overlay gains the `dev-all` realm group with the seeded development user in it, the test tenants of task 8.1, and the stand-in customer realm `e2e-customer` of task 8.5. None of it reaches the production export.
 
-Why an export rather than Terraform or keycloak-config-cli: one file, no extra tooling, and the same provisioning shape this repo already uses for Grafana dashboards. The export is the source of truth. A console edit that is not reflected back into it is lost at the next clean deploy, and the runbook in `docs/SECURITY.md` says so.
+Of the six decision records drafted in `decisions/`, the two accepted ones are installed into `apps/ascend-agent/docs/architecture/decisions/` (task 7.6). The four deferred drafts stay in this change's `decisions/` folder, which the archive keeps, next to the Deferred section below (owner answer 93 of 2026-10-08).
 
-Beyond role mapping (D4) and the group mapper (D9), nothing in the agent depends on a Keycloak-specific token shape.
+### D3b - The tenant claim replaces the default tenant
 
-### D2a - Password sign-in is the default, and it is not the direct access grant
+A claim-reading `TenantResolver` bean replaces the default bean of `add-keycloak-login` (its D22). For a token it reads the `tenant` claim, and for the Keycloak user representation of a resolution without a token it reads the `tenant` user attribute. Both default to `default` when absent, which is the normal case for a realm user who arrived through no brokered provider. For a person who arrived through a brokered provider it is the value that provider's hardcoded-attribute mapper stamped (D15). The claim name and the default value are a stable contract. Nothing in this change enforces the tenant. `add-tenant-isolation` owns enforcement.
 
-The default and primary way a person signs in is with a Keycloak account and a password. The application redirects to Keycloak's own login page, the person types their password there, Keycloak returns an authorization code, and the application exchanges that code for tokens using PKCE. The application never sees, holds, or forwards the password. This is the authorization code flow, and it is what the `ascend-flutter` client is provisioned for.
+### D3c - Groups and principals travel as identity extensions
 
-The direct access grant, commonly called the resource owner password credentials grant or just the password grant, is a different mechanism. There the application itself collects the password and posts it to Keycloak's token endpoint. It looks like the same feature because both involve a password, and it is not: it puts the customer's credential inside our application, it defeats any interactive step Keycloak might add later such as a second factor or a forced password reset, and OAuth 2.1 removes it outright. The repo's security standard prohibits it.
+An `IdentityContributor` bean (`add-keycloak-login` D22) adds one typed value to the resolved identity's `extensions`: `PrincipalSet`, the immutable set of D10 built by the D8 factory from the Keycloak group names the caller holds. The raw group names are not stored next to it, because nothing reads them (owner answer 93 of 2026-10-08, review item B9). On the token path the group names come from the configured group claim (D9). On the path without a token they come from Keycloak's admin API through the `ascend-agent-directory` client of `add-keycloak-login`, which already holds `view-users` and so may read a user's groups. Both paths pass through the same factory and the same cap, so a user resolves an equal principal set whether they arrive with a token or through a link.
 
-So the two statements below are both true at once, and neither weakens the other:
+`PrincipalContext.currentPrincipals()` in the package `com.lukk.ascend.ai.agent.security` (owner decision 65.23 of 2026-10-04) returns `Optional<PrincipalSet>`, read from the extensions of the current request's identity. An empty `Optional` means nothing resolved the set, and a present empty set means a resolved set with no group, so the two stay different at the type level (`add-tenant-isolation` decision 2). It fails closed like `TenantContext` of `add-keycloak-login`: a call outside a request with a resolved identity throws.
 
-- Password sign-in is the default path and must work end to end without any brokered provider.
-- Direct access grants are disabled on `ascend-flutter` and on every client a customer touches.
+Which claim carries the group names is configuration under `app.identity.claims`, next to the email claim name of `add-keycloak-login`: the property `app.identity.claims.groups`, environment variable `APP_IDENTITY_CLAIMS_GROUPS`, default `groups` (owner rule 98 of 2026-10-08).
 
-The one place a password grant survives is the development overlay's own client, so the e2e suite and the Bruno collection can obtain a token without driving a browser. That client is not in the production export (D2), and importing the production export alone yields no client that accepts a password grant. The realm-export verification asserts exactly that.
+### D5b - The dev identity carries a usable principal set
 
-This is written out at length because the two mechanisms are one word apart. A future reader asked to "turn on password login" could reasonably reach for `directAccessGrantsEnabled`, which would undo a defect already caught and fixed in this change.
-
-### D3 - Identity claims
-
-The user identifier used for Redis, Postgres, and Qdrant partitioning is the token's `sub` claim: stable, unique inside one application, never reassigned, which is everything a partition key needs. `preferred_username` is carried for logging and display only, because it can change and storage must never be keyed on it. A custom `tenant` claim is defined here and exposed on the resolved identity, but nothing in this change enforces it. Its value is `default` for a realm user who arrived through no brokered provider, which is the normal case, and for a person who arrived through a brokered provider it is the value that provider's hardcoded-attribute mapper stamped (D15). `add-tenant-isolation` owns enforcement, and defining the claim here means that sibling needs no token-format migration.
-
-The resolved identity carries:
-
-| Field | Source | Job |
-| :--- | :--- | :--- |
-| `userId` | `sub` | Storage partition key for chat history, semantic memory, RAG scoping, and log attribution |
-| `username` | `preferred_username` | Display and logging only |
-| `email` | `email` | Display and logging only in this version |
-| `tenant` | `tenant`, defaulting to `default` | Propagated here, enforced by `add-tenant-isolation` |
-| `roles` | role claim through the D4 converter | Endpoint authorization only, never retrieval breadth |
-| `groupIds` | the configured group claim (D9) | The raw Keycloak group names the caller holds |
-| `principals` | typed factory over `groupIds` (D8) | The immutable set the search filter is composed from (D10) |
-
-Which claim carries the group names and which carries the email are configuration under `app.identity.claims`, not a branch in code. The value object is a Java record, resolved once per request by a dedicated resolver component and injected into controllers in place of the `userIdHeader` parameter in `PromptController` and its equivalent in `IngestionController`.
-
-The second subject this document previously carried, a directory object id used for Microsoft Graph lookups, is deferred with the directory work. The analysis behind it is preserved in the Deferred section, because the Entra ID pairwise-subject trap it exists to avoid is real and will be needed the moment directory lookups return.
-
-Existing `user1`-keyed local data belongs to the dev-profile identity (D5), so there is no data migration. Pre-auth data was single-user by construction.
-
-Trade-off acknowledged and unchanged: switching identity providers later changes `sub` values and orphans per-user data. Accepted, because user data migration tooling is out of scope and `sub` is still the only claim with a stability guarantee inside one issuer. Under D2 that risk shrinks, because `sub` is Keycloak's own subject and survives a customer changing what they broker.
-
-### D4 - Role mapping via a converter, tolerant of both Keycloak and generic shapes
-
-Keycloak puts realm roles at `realm_access.roles`, Entra ID uses `roles`, and others use `scope`. A single `JwtAuthenticationConverter` with a custom granted-authorities converter reads `realm_access.roles` when present, else a top-level `roles` claim, and maps entries to `ROLE_USER` and `ROLE_ADMIN`. That keeps role mapping issuer-agnostic and already handles the common shapes.
-
-The converter's job stops at roles. Group claims are not its input: the group claim is read by the membership resolver (D9) directly from the `Jwt`, under a configured claim name. Keeping the two apart is load-bearing. The converter deliberately drops role values it does not recognise, and a converter that also owned groups would drop those the same way, which is how a design ends up with a correct role model and an empty principal set.
-
-Two roles is the entire role model and it stays that way. Roles decide which endpoints a caller may call, principals decide which chunks a caller may retrieve. `ADMIN` appears nowhere in a retrieval filter, so an administrator retrieves exactly what their group principals allow and not one chunk more.
-
-`USER` is the realm's default role in the export, granted to every new account including every brokered one, so a person who has just signed in for the first time can use the product. `ADMIN` is assigned deliberately and never by a mapper reading a customer's claim. A customer's own directory must not be able to mint an administrator of our platform by naming a group, which is what a role mapper on a brokered provider would allow.
-
-Authorization matrix (enforced in the filter chain, not method security, to keep one visible source of truth in `SecurityConfig`):
-
-| Path | Rule |
-|---|---|
-| `/actuator/health`, `/actuator/prometheus` | permitAll (infra scrapes, no token) |
-| `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | permitAll (docs readable, "Try it out" still needs a token) |
-| `POST /api/v1/ai/prompt` | `USER` or `ADMIN` |
-| `POST /api/v1/ingestion/upload` | `USER` or `ADMIN` |
-| `POST /api/v1/ingestion/run` | `ADMIN` only |
-| everything else | authenticated |
-
-All other actuator endpoints stay behind authentication (the observability change already keeps them 404 or localhost-only, and this change does not widen them). CSRF remains disabled, which is correct for a stateless bearer-token API with no cookies.
-
-### D5 - Dev profile keeps permitAll; docker defaults to secured
-
-Spring profile `dev`: permitAll chain plus a synthetic `AuthenticatedUser(app.user.default-id, "dev", "default", [USER, ADMIN])` so every service layer downstream sees a fully-populated identity and there is exactly one identity code path. The Bruno collection and quick local runs use this. The default (no profile) and `docker` profiles require JWTs. The boolean `app.security.enabled` toggle and the `app.security.user` block are deleted, so posture is a profile decision rather than a flag, which prevents the "flag accidentally false in production" failure mode. A startup WARN fires when the `dev` chain is active.
-
-The dev identity also carries a principal set, and it has to be a usable one. Under the deny-by-default rule from ADR-M006 a chunk matches nobody unless one of its principals appears in the caller's set, so a dev profile that synthesises an empty set hands a developer a knowledge base that answers nothing, with no way to tell that apart from a broken search. The dev identity therefore holds `tenant:everyone:default` and `local:group:dev-all`. `docs/SECURITY.md` records that a locally-ingested corpus has to carry at least one of those two principals to be retrievable under the dev profile, which is a consequence of deny-by-default rather than an exception to it.
-
-### D6 - Service-to-service auth: static bearer token now, client-credentials as upgrade path
-
-Baseline: one shared secret, `SERVICE_AUTH_TOKEN`, injected via env into all five downstream services and into ascend-ai-agent. Downstream enforcement:
-
-- Python services: a FastAPI dependency (HTTPBearer plus constant-time compare) applied to every REST router, and the same check on the FastMCP surface via its middleware or auth hook, so `/mcp` is not a bypass. `/health` (and `/ready`, `/metrics` where present) stay open for compose healthchecks and Prometheus. The same pattern in all four services, implemented per service (they share no code package, so the spec pins identical behaviour instead).
-- ascend-weather-mcp: a `OncePerRequestFilter` doing the same compare ahead of the MCP endpoints, health excluded.
-- An unset or blank `SERVICE_AUTH_TOKEN` in a service means fail-fast at startup in the docker posture (refuse to boot open). A dev or local run without the env var logs a WARN and stays open, to preserve today's uvicorn and bootRun workflow.
-
-ascend-ai-agent attaches `Authorization: Bearer ${SERVICE_AUTH_TOKEN}` on the `SemanticMemoryClient` RestClient (default header on the builder), the ascend-ocr and ingestion clients, and the MCP client connections. Spring AI's MCP client properties support per-connection custom headers, and where a connection type lacks header support, a customizer bean on the underlying WebClient supplies it.
-
-Why not client-credentials from day one: it doubles the moving parts (every Python service becomes a resource server needing a JWKS fetch and clock sync against Keycloak, and the agent needs a token-refresh loop) for a perimeter that is compose-internal. The upgrade path is real and cheap later: Keycloak already runs, so add a confidential client per service, switch the FastAPI dependency from string compare to JWT validation against the same issuer, and swap the static header for `client_credentials` acquisition in the agent. The spec requirements are written against "a valid bearer token" so the upgrade does not change observable contracts. Known trade-offs of the baseline: one shared secret means no per-service identity or revocation granularity, and rotation is a coordinated env change plus restart, accepted for the current single-operator deployment and revisited by `harden-cloud-deployment`.
-
-### D7 - Test strategy
-
-- ascend-ai-agent: `spring-security-test` with `SecurityMockMvcRequestPostProcessors.jwt()`, so no Keycloak is needed in unit or slice tests. Cases: 401 without a token, 403 for `USER` on `/ingestion/run`, 200 with proper roles, identity resolved from `sub` and not from any header, `X-User-Id` ignored when sent.
-- Python services: pytest against the FastAPI dependency, covering 401 on a missing or wrong token, 200 with the token, and `/health` open, plus one MCP-surface test proving `/mcp` rejects tokenless calls.
-- Outbound: assert the bearer header on `SemanticMemoryClient` requests (MockRestServiceServer-style) and on MCP connection config.
-- Realm export: the production export imports into a clean Keycloak and yields no human user and no client accepting a password grant, and the `ascend-flutter` client is public, PKCE `S256`, with direct access grants disabled. This is the assertion that keeps D2a from being undone.
-- Password sign-in end to end: an authorization code obtained against Keycloak's own login page for a seeded account, exchanged with PKCE, produces a token the agent accepts on a protected endpoint. No brokered provider exists in this test.
-- e2e: the Bruno collection gains a token request against the seeded test user, issued through the development overlay's client rather than the application client, because the application client has direct access grants disabled (D2, D2a). Specs run secured. The dev-profile path remains for ad-hoc manual runs.
-- Membership: a token carrying two realm groups resolves two `local:group:*` principals plus the tenant pseudo-group, a token carrying no group claim resolves the tenant pseudo-group alone, and an administrator removing a person from a group results in that principal being absent from the next token they obtain.
-- Principal set: assembled once and immutable, so an attempt to add to it after resolution fails; a resolved set over the cap returns 403 with the cap named and no search executed.
-- Roles contribute nothing: two callers with identical group membership, one `USER` and one `ADMIN`, resolve equal principal sets.
-- Brokering, which is optional and therefore tested as a separate section rather than as a precondition of anything above: a second Keycloak realm stands in for a customer's identity provider, a person signing in through the broker reaches a token stamped with the brokered provider's tenant, an upstream token claiming a different tenant does not override it, an upstream group named `ADMIN` yields no `ROLE_ADMIN`, and a brokered person's principals are exactly the Keycloak groups an administrator assigned.
+The dev identity of `add-keycloak-login` D5 runs the contributors like any other identity, so this change gives it a principal set without touching that chain: when the `dev` profile is active, the contributor answers `tenant:everyone:default` and `local:group:dev-all`. It has to be a usable set. Under the deny-by-default rule from ADR-M006 a chunk matches nobody unless one of its principals appears in the caller's set, so a dev profile that synthesises an empty set hands a developer a knowledge base that answers nothing, with no way to tell that apart from a broken search. `docs/SECURITY.md` records that a locally-ingested corpus has to carry at least one of those two principals to be retrievable under the dev profile, which is a consequence of deny-by-default rather than an exception to it.
 
 ### D8 - Principal identifiers: one format, one typed factory
 
@@ -211,7 +97,7 @@ That is the whole mechanism. There is no directory call, no second source, and n
 
 The group names an administrator chooses have to satisfy the D8 character set, since the factory throws rather than mangling. The onboarding runbook says so and the realm export's seeded group demonstrates it.
 
-There is no principal cache in this version. The previous design cached the resolved set in Redis for the shorter of the remaining token lifetime and five minutes, and it did that to avoid paying a directory round trip per request. Reading a claim off an already-validated token costs nothing worth caching, and a cache here would only add a second staleness window on top of the token's own. The cache design is preserved in the Deferred section, because it returns with the directory call it exists for.
+There is no principal cache on the token path in this version. The previous design cached the resolved set in Redis for the shorter of the remaining token lifetime and five minutes, and it did that to avoid paying a directory round trip per request. Reading a claim off an already-validated token costs nothing worth caching, and a cache here would only add a second staleness window on top of the token's own. The one cache is on the path without a token (`add-keycloak-login` D20), where each resolution is a call to Keycloak's admin API, and it holds a user's identity for at most the realm access token lifetime, so it is never staler than a token would be. The cache design is preserved in the Deferred section, because it returns with the directory call it exists for.
 
 ### D10 - The principal set is assembled once, immutable, and capped
 
@@ -223,7 +109,9 @@ Contents: `tenant:everyone:{tenantId}` for the caller's tenant, and one principa
 
 The cap is 256 principals. A caller whose resolved set exceeds it fails the request with 403 and an RFC 7807 `application/problem+json` body naming the cap, and no search runs on a truncated set. This is the same refusal ADR-M007 applies to an over-long access list, for the same reason: truncating an allow list silently denies people access they genuinely have, and that symptom is indistinguishable from a bug in retrieval, embedding, chunking, or the model.
 
-The number is a decision this change makes, because the design document caps the set without naming a value. 256 is far above any plausible realm-group count for one person, and it keeps the `IN` clause handed to Qdrant to a size the filter evaluates without trouble. It is configurable.
+The number is a decision this change makes, because the design document caps the set without naming a value. 256 is far above any plausible realm-group count for one person, and it keeps the `IN` clause handed to Qdrant to a size the filter evaluates without trouble. It is configurable: the property `app.identity.max-principals`, environment variable `APP_IDENTITY_MAXPRINCIPALS`, default 256 (owner rule 98 of 2026-10-08).
+
+Accessors (owner decision 65.23 of 2026-10-04): `PrincipalContext.currentPrincipals()` of D3c returns the set, and `TenantContext.currentTenantId()` of `add-keycloak-login` returns the tenant. Code that runs on another thread receives the values captured on the request thread, never calls the accessors there.
 
 ### D14 - A principal set is never silently narrowed
 
@@ -231,7 +119,7 @@ Two paths could produce a set smaller than the truth, and neither may do it quie
 
 A caller whose resolved set exceeds the cap fails the request with 403, per D10, rather than searching on a truncated set.
 
-The dev profile synthesises a deliberate, documented set rather than an empty one, per D5.
+The dev profile synthesises a deliberate, documented set rather than an empty one, per D5b.
 
 The third path this decision used to cover, a directory call that fails and tempts a fallback to the tenant floor, does not exist in this version because there is no directory call. It returns with the directory work, and its reasoning is preserved in the Deferred section, because the reasoning is the expensive part and it will be needed again.
 
@@ -259,7 +147,7 @@ Onboarding a customer onto brokering is an administrative procedure with a writt
 
 Group membership travels in the access token, so a change an administrator makes in Keycloak reaches ascend-ai-agent when the caller next obtains a token. The staleness bound is the access token lifetime, and the realm's SSO session lifetime bounds how long a person can keep refreshing without signing in again. Both are set explicitly in the realm export rather than left at whatever the default happens to be, because they are the number a customer is told.
 
-There is exactly one such window in this version, and it is worth saying so, because the previous design had two that were easy to conflate. Nothing in ascend-ai-agent caches a resolved set (D9), so there is no second window on top of the token's own. An administrator who needs a removal to take effect immediately ends that person's sessions in Keycloak, which is an administrative action with an immediate effect rather than a configuration change.
+There is exactly one such window in this version, and it is worth saying so, because the previous design had two that were easy to conflate. Nothing in ascend-ai-agent caches a set resolved from a token (D9), so there is no second window on top of the token's own. A set resolved without a token (`add-keycloak-login` D20, with the groups of D3c) is cached for at most the access token lifetime, the same bound. An administrator who needs a removal to take effect immediately ends that person's sessions in Keycloak, which is an administrative action with an immediate effect rather than a configuration change.
 
 `docs/SECURITY.md` records the number as a product disclosure, and the number it records is the one the export actually sets.
 
@@ -327,7 +215,7 @@ The key shape is load-bearing and worth keeping. The subject alone is not safe: 
 
 ### Deferred D13 - The login issuer and the directory are configured separately
 
-Configuration separated two axes. `spring.security.oauth2.resourceserver.jwt.issuer-uri` is the single issuer whose tokens are validated. `app.identity.directories` was a list of directory adapters, each with a provider kind (`microsoft-graph`, `google-directory`), the brokered-provider alias it serves, the principal namespace its groups mint into, and its own credentials. An empty list was valid and meant the token claim was the only source of groups.
+Configuration separated two axes. `spring.security.oauth2.resourceserver.jwt.issuer-uri`, read from `KEYCLOAK_ISSUER_URI` in every service (owner answer 98.3 of 2026-10-08, default `http://keycloak:8080/realms/ascend-ai`), is the single issuer whose tokens are validated. `app.identity.directories` was a list of directory adapters, each with a provider kind (`microsoft-graph`, `google-directory`), the brokered-provider alias it serves, the principal namespace its groups mint into, and its own credentials. An empty list was valid and meant the token claim was the only source of groups.
 
 The customer this exists for is the split-provider one: login through Microsoft Entra ID, files in Google Drive, so the groups that decide retrieval come from a directory that never issued the token being validated. A configuration model with one provider slot cannot express that customer at all.
 
@@ -347,7 +235,7 @@ What is configuration and what is code, so a portability claim stays honest: val
 
 A customer who signs in through one vendor and stores files at another has each person represented twice, by two identifiers that share nothing. The only value both systems hold is the email address, so that is the join key, and ADR-M008 is blunt that it is a weak one. The defence is to store each provider's own stable identifier alongside the address rather than instead of it, so a reissued address presents as a conflict instead of as a silent inheritance.
 
-The store was a PostgreSQL table `identity_link` created by a Liquibase changelog, holding the normalized email, the login issuer, each provider's directory subject, the status, created and last-confirmed timestamps, and the conflicting subject recorded at detection. Unique on normalized email within a tenant, indexed on each subject. PostgreSQL rather than Redis because a link is durable state an administrator corrects and an auditor asks about, and it has to survive a flush.
+The store was a PostgreSQL table `identity_link` created by a Flyway versioned SQL migration, holding the normalized email, the login issuer, each provider's directory subject, the status, created and last-confirmed timestamps, and the conflicting subject recorded at detection. Unique on normalized email within a tenant, indexed on each subject. PostgreSQL rather than Redis because a link is durable state an administrator corrects and an auditor asks about, and it has to survive a flush.
 
 Email normalization was one function applied identically everywhere: trim, Unicode NFKC, lowercase, IDNA-encode the domain, strip a `+tag` suffix from the local part. It does not strip dots. Dot-insensitivity is one provider's local-part behaviour rather than an email rule, and applying it generally would merge two genuinely different corporate addresses into one person, which is the same silent-inheritance failure arrived at from the other direction.
 
@@ -395,45 +283,66 @@ Keycloak can store the token it received from the brokered provider and expose i
 
 It answers one real problem: the customer who will not consent to an application identity with directory read permission but will consent to their own people reading their own membership. If that customer arrives once directory lookups exist, this is the mechanism, switched on per brokered provider as a deliberate decision with a named cost.
 
+## Test strategy
+
+- Tenant claim: a token carrying `tenant: acme` resolves `acme`, a token without it resolves `default`, and a resolution without a token of a user whose attribute is `acme` resolves `acme`.
+- Membership: a token carrying two realm groups resolves two `local:group:*` principals plus the tenant pseudo-group, a token carrying no group claim resolves the tenant pseudo-group alone, and two requests whose tokens carry different group claims for the same subject resolve different sets, so nothing is cached between requests.
+- Principal set: assembled once and immutable, so an attempt to add to it after resolution fails, and a resolved set over the cap returns 403 with the cap named and no search executed.
+- Roles contribute nothing: two callers with identical group membership, one `USER` and one `ADMIN`, resolve equal principal sets.
+- Without a token, against a Testcontainers Keycloak: a token and a resolution without a token for the same user resolve equal principal sets and equal tenants.
+- Plug-in only: an architecture test asserts that no class of `add-keycloak-login` imports a class of this change, and that a context without this change's beans still starts with tenant `default` and empty extensions.
+- Brokering, which is optional and therefore tested as a separate section rather than as a precondition of anything above: a second Keycloak realm stands in for a customer's identity provider, a person signing in through the broker reaches a token stamped with the brokered provider's tenant, an upstream token claiming a different tenant does not override it, an upstream group named `ADMIN` yields no `ROLE_ADMIN`, and a brokered person's principals are exactly the Keycloak groups an administrator assigned.
+
 ## Risks / Trade-offs
 
-The first risk is not a bullet, because it is the standing cost of the platform decision rather than a hazard with a mitigation. Choosing self-hosted Keycloak is choosing to operate it. If it is down, nobody signs in, and there is no degraded mode where the product half works. It needs a database, certificates, backups with a restore that has actually been tested, and an upgrade habit that does not slip.
-
-That habit is not optional, and the upstream release cadence is why. There is no long-term support release to sit on. Minor releases land roughly quarterly and patches roughly monthly, breaking changes have shipped inside patch releases rather than only at minor boundaries, and sixteen security advisories were published this year through August. So the operator is patching frequently, cannot treat a patch release as safe to apply blind, and cannot skip a cycle to avoid the reading. The mitigations that exist are ordinary ones: a staging realm on the same version as production, the export as the source of truth so a rebuild is deterministic, and release notes read before every upgrade. None of them removes the cost.
-
 - Connector-synced documents are company-visible in this version, so a customer whose SharePoint has genuinely restricted material gets coarser access in AscendAI than they have at the source. This is the Named limitation section above rather than a bullet with a mitigation, it is a product disclosure, and the alternative under deny-by-default was that every synced document became invisible to everybody.
-- Somebody reads "password sign-in is the default" and enables the direct access grant on the customer-facing client, undoing a defect this change already fixed. D2a states the distinction at length, the realm export asserts `directAccessGrantsEnabled` false on `ascend-flutter`, and the export verification is a task rather than a review item.
-- A shared static service token is a single secret with no rotation story. Mitigated by a constant-time compare, env injection only (never in YAML defaults or logs), fail-fast when unset in the docker posture, a documented rotation procedure, and D6's client-credentials upgrade path. Secret-manager sourcing belongs to `harden-cloud-deployment`.
-- Keycloak adds a boot-order dependency, so the agent fails a JWKS fetch if the issuer is down. Mitigated by compose `depends_on` with a healthcheck on Keycloak, and by the resource server's JWKS fetch being lazy and cached, so brief outages do not kill a running agent.
-- Group membership is only as fresh as the token that carries it, bounded by the access token lifetime that the realm export sets explicitly. An administrator removing somebody from a group takes effect at their next token refresh, not instantly. This is a product disclosure in `docs/SECURITY.md` and the reason the lifetimes are checked in rather than defaulted.
+- Group membership is only as fresh as the token that carries it, bounded by the access token lifetime that the realm export of `add-keycloak-login` sets explicitly. An administrator removing somebody from a group takes effect at their next token refresh, not instantly. This is a product disclosure in `docs/SECURITY.md`.
 - An administrator creating a group whose name breaks the D8 character set gets a factory that throws rather than a principal that silently matches nothing. That is the right failure, and it is a failure a person can hit while doing an ordinary administrative task, so the runbook names the constraint and the export ships a group that demonstrates it.
-- Bruno and e2e breakage, because every existing request lacks credentials. Mitigated by a dedicated migration task, token acquisition scripted in the collection against the development overlay's client, a seeded realm user to make it deterministic, and the dev profile as the manual escape hatch.
-- `sub` re-keys user data if the issuer is ever swapped. Accepted (D3) and documented in `docs/SECURITY.md`. Under D2 this shrinks, because `sub` is Keycloak's own subject and a customer changing what they broker keeps their people's stored data as long as the federated link is preserved.
-- MCP client header injection depends on the Spring AI 1.1.5 connection config surface. Verified approach with a fallback customizer bean (D6), and an integration test pins the header actually leaving the agent.
-- Sibling changes racing on claim names. This change is the declared owner of `sub`, `preferred_username`, and `tenant` semantics, and `add-tenant-isolation` consumes rather than redefines them.
-- Tokens over plain HTTP inside compose. Accepted at this layer, since TLS is `harden-cloud-deployment` scope.
+- A company bean that throws breaks every request of a company deployment. `add-keycloak-login` D22 fails the request rather than building a half identity, and the contributor tests of task 3.5 cover every path.
+- Sibling changes racing on claim names. This change is the declared owner of `tenant` semantics and of the principal format, and `add-tenant-isolation` consumes rather than redefines them.
 - The principal-set cap of 256 is a number this change picked rather than one the design fixed. It is far above any plausible realm-group count for one person, it is configurable, and any breach fails loudly with the cap named in the response body.
-- Two sibling changes are blocked on this one. The principal format (D8) and the identity object shape (D3) are frozen by the tasks marked as blocking in `tasks.md`, and both land before either sibling starts.
-- `add-document-connectors` is now written against a principal namespace this version does not mint. That contradiction is reported to the owner rather than resolved here, and the Named limitation section states what this change can guarantee.
+- Two sibling changes are blocked on this one. The principal format (D8), the tenant claim (D3b) and the principal set (D10) are frozen by the tasks marked as blocking in `tasks.md`, and they land before either sibling starts.
+- `add-document-connectors` was written against a principal namespace this version does not mint. That contradiction is resolved by its own scope cut (its D18), and the Named limitation section states what this change can guarantee.
+- The test tenants share one Keycloak with the personal e2e users of `add-keycloak-login`. They live in their own tenants and their own groups, and the spec that changes Keycloak state (task 8.5) runs one after the other with the other specs that do.
 
 ## Migration Plan
 
-Identity lands before anything that reads it, and the password path lands before brokering, because brokering is optional and nothing may depend on it.
+Company work lands after every personal change, so `add-keycloak-login` and its realm are already in place.
 
-1. Land the Keycloak compose service and the production realm export: roles with `USER` as the default, the application client with PKCE and direct access grants off, the password policy, realm groups and the group protocol mapper, the `tenant` and `email` mappers, and the session and token lifetimes D18 turns into a disclosure. Land the development overlay separately, carrying the seeded user, the `dev-all` group, and the direct-access-grant client the e2e suite uses. Nothing consumes any of it yet, so this is additive and carries no risk.
-2. Prove password sign-in end to end against that realm: an account, a password, Keycloak's own login page, an authorization code exchanged with PKCE, and a token. This is the path the rest of the change is built on.
-3. Land the ascend-ai-agent resource server, the resolved identity (D3), and the principal identifier factory (D8). This is the step `add-tenant-isolation` and `add-document-connectors` are blocked on, and the contract freezes here.
-4. Land group membership from the Keycloak group claim and the principal set with its cap (D9, D10, D14). Retrieval does not read the set yet, so correctness is observable through tests and through the principal-set-size metric before anything depends on it.
-5. Land optional brokering: the disabled template entry proven end to end against a second Keycloak realm standing in for a customer's provider, the hardcoded tenant mapper, the proof that an upstream token cannot override the tenant or mint a role, and the brokering runbook. Nothing earlier in this list depends on this step.
-6. Land downstream service auth in warn-only-when-unset mode (D6). With `SERVICE_AUTH_TOKEN` set in compose the services enforce, local bare runs keep working, and the agent does not have to be sending the token yet.
-7. Land ascend-ai-agent outbound token attachment. This has to ship before compose sets `SERVICE_AUTH_TOKEN` for every service, or the agent starts getting 401s from its own downstream calls.
-8. Flip compose to the secured posture end to end, migrate the Bruno collection and the e2e suite to token acquisition, and verify the full authorization matrix.
-9. Rollback: revert to the previous image tags and unset `SERVICE_AUTH_TOKEN` and the issuer environment variables. The dev profile is the operational escape hatch for a broken identity provider.
+1. Add the `tenant` mapper, realm groups, the group mapper, the disabled brokered-provider template and the organization template to the realm export, and the test tenants and the `dev-all` group to the development overlay. Nothing reads any of it yet.
+2. Register the claim-reading `TenantResolver` and the principal `IdentityContributor`, and land the principal identifier factory (D8). This is the step `add-tenant-isolation` and `add-document-connectors` are blocked on, and the contract freezes here.
+3. Land the principal set with its cap (D9, D10, D14) and the dev principal set (D5b). Retrieval does not read the set yet, so correctness is observable through tests and through the principal-set-size metric before anything depends on it.
+4. Land optional brokering, Organizations routing and the SAML runbook. Nothing earlier in this list depends on this step.
+5. Land the company end-to-end specs against the test tenants.
+6. Rollback: remove this change's two beans. The default beans of `add-keycloak-login` return, every identity is in tenant `default` again with empty extensions, and personal behaviour is unchanged.
+
+## Owner decisions of 2026-10-07
+
+Answer 75.1: the review of 2026-10-07 is fixed here. Item 51: a group name that the principal factory of D8 cannot mint answers 403 `application/problem+json` with a `detail` naming the violated constraint, the same refusal as the principal cap of D10 (tasks 4.4 and 8.3 and the `principal-resolution` spec).
 
 ## Open Questions
 
-- Redirect URIs for the Flutter client are finalized when the app exists. The realm export ships a placeholder loopback pattern (`http://localhost:*`) that the app change updates. Not blocking.
-- The administrator assignment surface for direct uploads stays open, exactly as the design document leaves it. This change ships `local:group:*` as a principal namespace and the factory that mints it, but not the screen or API that assigns those groups to an uploaded document. Whether that lands in `add-tenant-administration` or `add-document-management-api` is a scoping decision outside these three changes. It matters more under this scope cut than it did before, because directly-uploaded documents are now the only ones per-document permissions apply to at all.
-- How a customer's directory groups relate to Keycloak groups, when directory-sourced groups return. Import, mirror, administrator-authored mapping, or resolve at the directory and bypass Keycloak groups entirely are all defensible, and this change deliberately does not pick one. It is the owner's decision, and the Named limitation section names it as the thing that unlocks per-document permissions for connector-synced documents.
-- Which Keycloak construct expresses the mapping from an email domain to a customer's brokered provider. More than one supported shape exists, they differ between versions, and the choice is a login-page concern rather than an authorization one. It is settled during implementation against the version actually deployed, and the requirement it has to satisfy is fixed in D15: a person whose domain matches nothing must not be dropped into a default provider.
-- Whether SAML brokering is in scope for the first customer who asks for corporate sign-on. The mechanism is available and the identity-brokering capability is written to cover it, and since no group data crosses the broker in this version, the SAML and OpenID Connect paths differ in nothing that affects authorization.
+- Closed (owner decision 65.3 of 2026-10-04): the administrator assignment surface for direct uploads is split. `PUT /api/v1/documents/{id}/access` (first planned in `add-document-management-api` D15, moved to `add-tenant-administration` D8 in the dependency fix of 2026-10-05) and retrieval group create, list and member management through the Keycloak Admin API (its D7), groups named `<tenantId>.<name>` so they mint `local:group:<tenantId>.<name>` through this change's factory. Both are company-only work built after the personal version.
+- Closed (owner decision 65.14 of 2026-10-04): directory-sourced groups stay deferred. When they return, a customer's directory groups relate to Keycloak groups through a mapping the administrator writes (a directory group to a Keycloak group of the tenant), not through import, mirroring or resolving at the directory. The Named limitation section stays as written until that work lands.
+- Closed (owner decision 65.15 of 2026-10-04): the mapping from an email domain to a customer's brokered provider uses Keycloak Organizations (an organization per customer with its email domain and its linked identity provider, and the identity-first login with redirect by domain). The requirement of D15 stays: a person whose domain matches nothing is not dropped into a default provider. Task 6.5 tests the routing against the pinned Keycloak version, including the two cases of Keycloak issues 40510 (a user with local credentials such as OTP and a linked provider must still be redirected by domain) and 37824 (a user who types only a user name, with the matching domain in the email of the profile, must still be redirected).
+- Closed (owner decision 65.16 of 2026-10-04): SAML brokering is configuration only. An operator adds a SAML identity provider in the realm from the same shape as the disabled OpenID Connect template, with the same tenant stamp mapper and no mapper that imports an upstream authorization claim, and the runbook in `docs/SECURITY.md` names the steps. This change writes no SAML-specific code, because no group data crosses the broker in this version.
+- Closed (owner decision 65.23 of 2026-10-04): `PrincipalContext.currentPrincipals()` is in this change (D3c), and `TenantContext.currentTenantId()` is in `add-keycloak-login`.
+- Closed (owner answer 70.2 and owner rule of 2026-10-04): basic Keycloak login is personal and moved to `add-keycloak-login`. This change keeps only company parts and plugs into that change.
+
+## Owner decisions of 2026-10-08
+
+Answer 93: the small simplifications of the review are applied where no feature is cut. Item C1: only the two accepted decision records are installed, and the four deferred drafts stay in this change's `decisions/` folder, kept by the archive, with their Status lines saying so (task 7.6). Item C7: the principal type has a private constructor and one public static factory method, so the compiler enforces the single construction path in place of an ArchUnit rule (task 3.4). Item B9: the identity carries `PrincipalSet` only, and `GroupMembership`, which nothing read, is gone (D3c, task 3.5, spec `user-identity`). Item C6: task 4.3 no longer tests that Keycloak issues a new token without a removed group, which is Keycloak's behaviour, nor looks for a Redis key of a cache that is never built. It keeps the one check of our code, that two tokens with different group claims resolve different sets. Item C5: the live-stack check of the principal cap with 257 seeded realm groups is dropped with its spec (answer 91.3), and the cap stays proved by task 4.5. The cap itself, the character refusal and the group freshness disclosure of D18 all stay.
+
+Answer 91.3: the deterministic specs of tasks 8.2 (tenant claims) and 8.3 (group principals, the cap and the character refusal) are dropped, because every check they held is proved by a lower test: the token checks of tasks 1.4 and 8.1 and the integration tests of tasks 2.1, 4.1, 4.4 and 4.5. The test users `e2e-groupchange-acme`, `e2e-overcap-acme` and `e2e-badgroup-acme` and the realm groups `e2e-cap-001` to `e2e-cap-257` go with them (task 8.1), and no README row, Bruno folder or template names the dropped specs (tasks 8.6 and 8.7). The brokered sign-in spec of task 8.5 stays, the one live-stack proof of the brokering flow, and the soul specs move to `e2e-soul` as before (task 8.4).
+
+Answer 87 (rule R1): this change holds no cache, lock or queue of its own. The principal set is built from the token on every request, and the path without a token uses the cache of `add-keycloak-login` D20, so no mechanism changed here.
+
+Answer 88 (rule R2): every company plug-in point of this change stays: the claim-reading `TenantResolver`, the `IdentityContributor`, `PrincipalContext` and optional brokering.
+
+Answer 86.1: a Testcontainers integration test of this change that needs an HTTP fake other than Keycloak runs one Mockoon container that loads the shared file `apps/ascend-agent/e2e/fixtures/scripted-model/scripted-model.json`. The Keycloak integration tests use the Keycloak Testcontainer (answer 89.15 of `add-tenant-administration`).
+
+Answer 85.1: no plan of this change exports a secret in a shell. The e2e user password and the Keycloak admin credentials are read from the repository `.env`, and the Keycloak command line runs inside its container.
+
+Answer 98: every value with a default that this change plans is a setting: the agent reads it from an environment variable, docker compose passes it as `${VAR:-default}` on the `ascend-agent` service, and the code default is the same value. Made external: the group claim name `app.identity.claims.groups` (`APP_IDENTITY_CLAIMS_GROUPS`, `groups`, task 3.5) and the principal set cap `app.identity.max-principals` (`APP_IDENTITY_MAXPRINCIPALS`, `256`, task 4.5), with their rows in `apps/ascend-agent/docs/CONFIGURATION.md` in the same commit (task 7.10). Kept as constants, because they are not operational: the principal format `namespace:type:id`, its 128-character cap and its character set (D8, a format that `add-tenant-isolation` and `add-document-connectors` store and match, so a value per deployment would make stored access lists unreadable elsewhere), the closed namespace and type sets, the claim name `tenant` and its default value `default` (a stable contract, D3b), the dev principal set `tenant:everyone:default` and `local:group:dev-all` (D5b), and the realm, client, group and test user names. The token lifetimes that bound membership freshness (D18) are set in the realm export of `add-keycloak-login`. The deferred directory settings (Deferred D13) are not built. No test of this change uses LM Studio. Stale text fixed by this round (CANON 31.14): the trade-off lines of `decisions/ADR-NNN-directory-is-the-primary-membership-path.md` and `decisions/ADR-NNN-principal-set-never-silently-narrowed.md` no longer point at an open question of this design, which has none on that subject, and name the deferred directory work instead: question 5 under "Open questions" and the section "Deferred: resolving membership from a customer's own directory" of `docs/architecture/permission-aware-retrieval.md`, and Deferred D9a and Deferred D14a of this design.
+
+Answer 98.3: the issuer variable is `KEYCLOAK_ISSUER_URI`, default `http://keycloak:8080/realms/ascend-ai`, the same name in every service. This change adds no issuer setting of its own: it validates tokens of the one issuer of `add-keycloak-login`, and the text of Deferred D13 names the variable next to `spring.security.oauth2.resourceserver.jwt.issuer-uri`.

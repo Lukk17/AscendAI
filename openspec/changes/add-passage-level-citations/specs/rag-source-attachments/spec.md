@@ -60,5 +60,5 @@ The array SHALL be derived from the passages actually injected into the prompt, 
 
 #### Scenario: Sources and citations describe the same documents
 
-- **WHEN** a prompt is answered with `attachSources=true` and citations enabled
+- **WHEN** a prompt is answered with `attachSources=true`
 - **THEN** the set of `documentId` values in `response.citations` that are present equals the set of `documentId` values in `response.sources`, except for citations whose source has no registry row

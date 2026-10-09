@@ -2,7 +2,7 @@
 
 ### Requirement: Client-credentials authentication per tenant
 
-The SharePoint connector SHALL authenticate to Microsoft Graph using the OAuth2 client-credentials flow with a per-tenant Entra ID app registration (directory/tenant id, client id, and a client secret resolved from the encrypted credential store at sync time). Access tokens SHALL be cached in memory until expiry and SHALL never be persisted or logged. An authentication failure SHALL fail the sync run with status `FAILED` and an error summary that identifies the failure class (e.g., invalid client, consent missing) without reproducing the secret or the raw token response.
+The SharePoint connector SHALL authenticate to Microsoft Graph using the OAuth2 client-credentials flow with a per-tenant Entra ID app registration (directory/tenant id, client id, and a client secret resolved through the `ConnectorCredentialStore` of `add-connector-framework` at sync time). Access tokens SHALL be cached in memory until expiry and SHALL never be persisted or logged. An authentication failure SHALL fail the sync run with status `FAILED` and an error summary that identifies the failure class (e.g., invalid client, consent missing) without reproducing the secret or the raw token response.
 
 #### Scenario: Token acquired and used
 
@@ -108,3 +108,30 @@ The SharePoint connector SHALL treat HTTP 429 and throttling 503 responses from 
 - **WHEN** repeated 429 responses exhaust the run's throttling budget mid-sync
 - **THEN** the run ends with status `PARTIAL`
 - **AND** the persisted content cursor reflects only fully processed pages, so the next run resumes the remainder
+
+### Requirement: The SharePoint connector is verified end to end against a Graph stub
+
+Every user-visible behaviour of the SharePoint connector on the framework of `add-connector-framework` SHALL be covered by an end-to-end spec in the ascend-agent suite under `apps/ascend-agent/e2e/testing/`, numbered with the next free number when it is written. The specs SHALL run against a Microsoft Graph stub reached through the configurable Graph and token base addresses of the SharePoint connector, never against a real Microsoft 365 tenant. Their pass criteria SHALL be HTTP status, response body and persisted state in Postgres, Qdrant and the object store, and SHALL NOT be a log line or the wording of a model answer. A check against a real Microsoft 365 tenant SHALL be a manual check, because it needs a tenant and an admin consent that no automated run holds. The connector configuration round trip and the Graph faults (429, 410 and 403) SHALL be proved by the framework's connector API spec and the Graph client tests, and SHALL NOT be repeated by an end-to-end spec of this change (owner answer 91.3 of 2026-10-08). The Graph and token base addresses SHALL be the settings `app.connector.sharepoint.graph-base-url` and `app.connector.sharepoint.token-base-url`, defaulting to the real Microsoft Graph and Microsoft login addresses.
+
+#### Scenario: Sync now lands, updates, skips and deletes
+
+- **WHEN** the sync and history spec triggers syncs while the stub serves new, unchanged, changed and deleted items
+- **THEN** the run history shows `ADDED`, `SKIPPED`, `UPDATED` and `DELETED` outcomes with object keys and no principal identifier
+- **AND** the bucket, the document registry and the Qdrant chunks match each outcome, with every landed chunk carrying `acl` `["tenant:everyone:<tenant>"]` and `acl_source` `tenant-default`
+- **AND** a trigger during a run answers 409 `connector_run_in_progress` with no second run
+
+#### Scenario: Synced documents stay inside their tenant
+
+- **WHEN** the retrieval scope spec sends the same prompt with `attachSources=true` as a user of the owning tenant and as a user of a second tenant
+- **THEN** only the owning tenant's response lists the synced document in `sources`
+
+#### Scenario: A connector that stops syncing turns stale and recovers
+
+- **WHEN** the freshness spec makes every Graph content call fail for longer than the connector's maximum sync age
+- **THEN** the connector reads `stale` true, one `FRESHNESS_CHECK` run is recorded, and every landed document is still stored and indexed
+- **AND** after the stub recovers and a sync succeeds the connector reads `stale` false
+
+#### Scenario: The base addresses default to Microsoft
+
+- **WHEN** the agent starts with neither `app.connector.sharepoint.graph-base-url` nor `app.connector.sharepoint.token-base-url` set
+- **THEN** the connector calls the real Microsoft Graph address and requests its tokens from the real Microsoft login address
