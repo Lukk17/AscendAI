@@ -175,3 +175,23 @@ async def test_empty_content_type_left_alone() -> None:
     # then
     captured = send.await_args_list[0].args[0]
     assert captured["headers"][0] == (b"content-type", b"")
+
+
+@pytest.mark.asyncio
+async def test_problem_json_passes_through_unrewritten() -> None:
+    # given
+    send = AsyncMock()
+    app = _make_app(
+        {
+            "type": "http.response.start",
+            "status": 400,
+            "headers": [(b"content-type", b"application/problem+json")],
+        }
+    )
+
+    # when
+    await ForceJSONUTF8Middleware(app)({"type": "http"}, AsyncMock(), send)
+
+    # then
+    captured = send.await_args_list[0].args[0]
+    assert captured["headers"][0][1] == b"application/problem+json"

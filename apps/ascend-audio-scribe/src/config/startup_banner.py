@@ -1,8 +1,18 @@
-import asyncio
 import logging
-import socket
 import urllib.error
 import urllib.request
+
+from ascend_python_common.startup_banner import (
+    CONFIGURED,
+    CONNECTED,
+    FAILED,
+    NOT_CONFIGURED,
+    BannerCheck,
+    BannerLine,
+    BannerSection,
+    build_banner,
+    warning,
+)
 
 from src.config.config import settings
 
@@ -19,94 +29,94 @@ BANNER = (
     "╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝     ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝╚═════╝ ╚══════╝"
 )
 
-DIVIDER = "-" * 58
-PROBE_TIMEOUT_SECONDS = 2.0
 APP_NAME = "ascend-audio-scribe"
 
 _ALLOWED_PROBE_SCHEMES = ("http://", "https://")
 
 
-def _resolve_host() -> str:
-    try:
-        return socket.gethostname()
-    except OSError:
-        return "localhost"
-
-
-def _key_state(key: str | None) -> str:
-    return "[Configured]" if key else "[Not configured]"
-
-
-def _probe_http_sync(url: str) -> str:
-    # urlopen accepts file:// and other schemes by default; restrict to http(s)
-    # so a misconfigured upstream URL cannot turn the startup probe into a
-    # local-file read or arbitrary scheme handler.
+def _probe_url_sync(label: str, url: str) -> BannerCheck:
     if not url.startswith(_ALLOWED_PROBE_SCHEMES):
-        return f"{url} [FAILED (unsupported scheme)]"
+        return BannerCheck(label=label, target=url, status=FAILED)
     try:
-        with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_SECONDS) as response:  # noqa: S310
+        with urllib.request.urlopen(url, timeout=settings.STARTUP_PROBE_TIMEOUT_SECONDS) as response:  # noqa: S310
             status = response.status
         if 200 <= status < 300:
-            return f"{url} [Connected]"
-        return f"{url} [Warning (status={status})]"
+            return BannerCheck(label=label, target=url, status=CONNECTED)
+        return BannerCheck(label=label, target=url, status=warning(f"status={status}"))
     except urllib.error.HTTPError as exc:
-        return f"{url} [Warning (status={exc.code})]"
+        return BannerCheck(label=label, target=url, status=warning(f"status={exc.code}"))
     except Exception as exc:
         logger.debug("Probe failed for %s: %s", url, exc)
-        return f"{url} [FAILED]"
+        return BannerCheck(label=label, target=url, status=FAILED)
 
 
-async def log_startup_banner() -> None:
-    host = _resolve_host()
-    port = settings.MCP_PORT
-    local_url = f"http://localhost:{port}"
-    hostname_url = f"http://{host}:{port}"
+def _openai_probe_sync() -> BannerCheck:
+    return _probe_url_sync("OpenAI", "https://api.openai.com/v1/models")
 
-    openai_state = _key_state(settings.OPENAI_API_KEY)
-    hf_state = _key_state(settings.HF_TOKEN)
 
-    openai_probe = await asyncio.to_thread(_probe_http_sync, "https://api.openai.com/v1/models")
-    hf_probe = await asyncio.to_thread(_probe_http_sync, "https://huggingface.co")
+def _hf_probe_sync() -> BannerCheck:
+    return _probe_url_sync("HF API", "https://huggingface.co")
 
-    block = "\n".join(
-        [
-            "",
-            BANNER,
-            DIVIDER,
-            f"    Application '{APP_NAME}' is running!",
-            "",
-            "    Access URLs:",
-            f"      Local:     {local_url}",
-            f"      Hostname:  {hostname_url}",
-            "",
-            f"    Profile(s): default (log level: {settings.LOG_LEVEL})",
-            "",
-            "    External services:",
-            f"      OpenAI:    {openai_probe} {openai_state}",
-            f"      HF API:    {hf_probe} {hf_state}",
-            "",
-            "    Actuator:",
-            f"      Health:    {local_url}/health",
-            f"      Ready:     {local_url}/ready",
-            f"      Metrics:   {local_url}/metrics",
-            "",
-            "    API documentation:",
-            f"      OpenAPI:   {local_url}/openapi.json",
-            f"      Swagger:   {local_url}/docs",
-            f"      Redoc:     {local_url}/redoc",
-            "",
-            "    Observability:",
-            "      Logging:   [AscendAudioScribe]-tagged formatter with X-Request-ID correlation",
-            "",
-            "    MCP endpoint:",
-            f"      HTTP:      POST {local_url}/mcp",
-            "",
-            "    REST endpoints:",
-            f"      Local:     POST {local_url}/api/v1/transcribe/local",
-            f"      OpenAI:    POST {local_url}/api/v1/transcribe/openai",
-            f"      HF:        POST {local_url}/api/v1/transcribe/hf",
-            f"      Audacity:  POST {local_url}/api/v1/transcribe/audacity",
-            DIVIDER,
-        ]
+
+def _openai_key_entry() -> BannerLine:
+    state = CONFIGURED if settings.OPENAI_API_KEY else NOT_CONFIGURED
+    return BannerLine(label="OpenAI key", value=f"[{state}]")
+
+
+def _hf_key_entry() -> BannerLine:
+    state = CONFIGURED if settings.HF_TOKEN else NOT_CONFIGURED
+    return BannerLine(label="HF key", value=f"[{state}]")
+
+
+def service_banner_sections() -> list[BannerSection]:
+    local_url = f"http://localhost:{settings.API_PORT}"
+    return [
+        BannerSection(
+            title="External services",
+            entries=(
+                _openai_probe_sync(),
+                _openai_key_entry(),
+                _hf_probe_sync(),
+                _hf_key_entry(),
+            ),
+        ),
+        BannerSection(
+            title="REST endpoints",
+            entries=(
+                BannerLine(label="Local", value=f"POST {local_url}/api/v1/transcribe/local"),
+                BannerLine(label="OpenAI", value=f"POST {local_url}/api/v1/transcribe/openai"),
+                BannerLine(label="HF", value=f"POST {local_url}/api/v1/transcribe/hf"),
+                BannerLine(label="Audacity", value=f"POST {local_url}/api/v1/transcribe/audacity"),
+            ),
+        ),
+        BannerSection(
+            title="API documentation",
+            entries=(
+                BannerLine(label="OpenAPI", value=f"{local_url}/openapi.json"),
+                BannerLine(label="Swagger", value=f"{local_url}/docs"),
+                BannerLine(label="Redoc", value=f"{local_url}/redoc"),
+            ),
+        ),
+        BannerSection(
+            title="Observability",
+            entries=(
+                BannerLine(
+                    label="Logging",
+                    value="[ascend-audio-scribe]-tagged formatter with X-Request-ID correlation",
+                ),
+                BannerLine(label="Health", value=f"{local_url}/health"),
+                BannerLine(label="Ready", value=f"{local_url}/ready"),
+                BannerLine(label="Metrics", value=f"{local_url}/metrics"),
+            ),
+        ),
+    ]
+
+
+def build_service_banner() -> list[str]:
+    return build_banner(
+        service_name=APP_NAME,
+        api_port=settings.API_PORT,
+        log_level=settings.LOG_LEVEL,
+        art=BANNER,
+        sections=service_banner_sections(),
     )
-    logger.info("\n%s", block)

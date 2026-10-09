@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from xml.etree.ElementTree import Element
 
-import defusedxml.ElementTree as DET  # XXE / billion-laughs hardening for untrusted XML
+from defusedxml import ElementTree  # XXE / billion-laughs hardening for untrusted XML
 
 from src.api.exception_handlers import FileSizeExceededError
 from src.config.config import settings
@@ -49,18 +49,16 @@ def _run_subprocess(binary: str, args: list[str]) -> subprocess.CompletedProcess
             capture_output=True,
             timeout=settings.FFMPEG_TIMEOUT_SECONDS,
         )
-        FFMPEG_INVOCATIONS_TOTAL.labels(binary=os.path.basename(binary), outcome="success").inc()
+        FFMPEG_INVOCATIONS_TOTAL.labels(binary=Path(binary).name, outcome="success").inc()
         return result
     except subprocess.TimeoutExpired as exc:
-        FFMPEG_INVOCATIONS_TOTAL.labels(binary=os.path.basename(binary), outcome="timeout").inc()
-        raise OSError(
-            f"{os.path.basename(binary)} timed out after {settings.FFMPEG_TIMEOUT_SECONDS}s"
-        ) from exc
+        FFMPEG_INVOCATIONS_TOTAL.labels(binary=Path(binary).name, outcome="timeout").inc()
+        raise OSError(f"{Path(binary).name} timed out after {settings.FFMPEG_TIMEOUT_SECONDS}s") from exc
     except subprocess.CalledProcessError as exc:
-        FFMPEG_INVOCATIONS_TOTAL.labels(binary=os.path.basename(binary), outcome="error").inc()
+        FFMPEG_INVOCATIONS_TOTAL.labels(binary=Path(binary).name, outcome="error").inc()
         stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
         logger.exception(f"{binary} failed: {stderr}")
-        raise OSError(f"{os.path.basename(binary)} command failed with exit code {exc.returncode}") from exc
+        raise OSError(f"{Path(binary).name} command failed with exit code {exc.returncode}") from exc
 
 
 def _run_ffmpeg(args: list[str]) -> None:
@@ -95,7 +93,7 @@ def _generate_silence(output_path: str, duration_seconds: float) -> None:
 
 
 def _write_concat_list(file_paths: list[str], list_file_path: str) -> None:
-    with open(list_file_path, "w", encoding="utf-8") as f:
+    with Path(list_file_path).open("w", encoding="utf-8") as f:
         for path in file_paths:
             safe_path = path.replace("\\", "/")
             f.write(f"file '{safe_path}'\n")
@@ -123,12 +121,12 @@ def _assemble_clip_blocks(
     if not valid_paths:
         return None
 
-    clip_wav = os.path.join(extraction_dir, f"clip_{clip_index}_{_safe_token()}.wav")
+    clip_wav = str(Path(extraction_dir) / f"clip_{clip_index}_{_safe_token()}.wav")
     if len(valid_paths) == 1:
         _convert_and_normalize(valid_paths[0], clip_wav)
         return clip_wav
 
-    concat_list = os.path.join(extraction_dir, f"clip_{clip_index}_list.txt")
+    concat_list = str(Path(extraction_dir) / f"clip_{clip_index}_list.txt")
     _write_concat_list(valid_paths, concat_list)
     _concat_via_list(concat_list, clip_wav, normalize=True)
     return clip_wav
@@ -147,7 +145,7 @@ def _build_track_from_clips(
 
         gap_sec = offset_sec - current_time_sec
         if gap_sec > 0.001:
-            gap_path = os.path.join(extraction_dir, f"gap_{track_idx}_{clip_idx}_{_safe_token()}.wav")
+            gap_path = str(Path(extraction_dir) / f"gap_{track_idx}_{clip_idx}_{_safe_token()}.wav")
             _generate_silence(gap_path, gap_sec)
             assembled_parts.append(gap_path)
 
@@ -162,12 +160,12 @@ def _build_track_from_clips(
     if not assembled_parts:
         return None
 
-    track_wav = os.path.join(extraction_dir, f"track_{track_idx}_{_safe_token()}.wav")
+    track_wav = str(Path(extraction_dir) / f"track_{track_idx}_{_safe_token()}.wav")
     if len(assembled_parts) == 1:
-        os.rename(assembled_parts[0], track_wav)
+        Path(assembled_parts[0]).rename(track_wav)
         return track_wav
 
-    final_list = os.path.join(extraction_dir, f"track_{track_idx}_final_list.txt")
+    final_list = str(Path(extraction_dir) / f"track_{track_idx}_final_list.txt")
     _write_concat_list(assembled_parts, final_list)
     _concat_via_list(final_list, track_wav, normalize=False)
     return track_wav
@@ -250,11 +248,12 @@ def _safe_zip_extract(zip_path: str, extraction_dir: str) -> None:
 
 
 def _find_single_aup_path(extraction_dir: str) -> str:
-    aup_files: list[str] = []
-    for root_dir, _, files in os.walk(extraction_dir):
-        for f in files:
-            if f.endswith(".aup"):
-                aup_files.append(os.path.join(root_dir, f))
+    aup_files = [
+        str(Path(root_dir) / f)
+        for root_dir, _, files in os.walk(extraction_dir)
+        for f in files
+        if f.endswith(".aup")
+    ]
 
     if not aup_files:
         raise ValueError("No .aup file found in the ZIP folder.")
@@ -264,16 +263,16 @@ def _find_single_aup_path(extraction_dir: str) -> str:
 
 
 def _build_au_file_map(aup_dir: str) -> dict[str, str]:
-    au_file_map: dict[str, str] = {}
-    for root_dir, _, files in os.walk(aup_dir):
-        for f in files:
-            if os.path.splitext(f)[1].lower() in _VALID_AUDIO_EXTS:
-                au_file_map[f] = os.path.join(root_dir, f)
-    return au_file_map
+    return {
+        f: str(Path(root_dir) / f)
+        for root_dir, _, files in os.walk(aup_dir)
+        for f in files
+        if Path(f).suffix.lower() in _VALID_AUDIO_EXTS
+    }
 
 
 def _parse_aup_root(aup_path: str) -> Element:
-    tree = DET.parse(aup_path)
+    tree = ElementTree.parse(aup_path)
     xml_root: Element | None = tree.getroot()
     if xml_root is None:
         raise ValueError("AUP file has no root element")
@@ -285,7 +284,7 @@ def extract_tracks_from_aup(zip_path: str, extraction_dir: str) -> dict[str, str
     _safe_zip_extract(zip_path, extraction_dir)
 
     aup_path = _find_single_aup_path(extraction_dir)
-    aup_dir = os.path.dirname(aup_path)
+    aup_dir = str(Path(aup_path).parent)
     au_file_map = _build_au_file_map(aup_dir)
 
     xml_root = _parse_aup_root(aup_path)
@@ -319,14 +318,14 @@ def _process_craig_imports(
             continue
 
         offset_sec = float(imp.attrib.get("offset", 0.0))
-        track_name = os.path.splitext(filename)[0]
+        track_name = Path(filename).stem
 
-        found_path = au_file_map.get(filename) or au_file_map.get(os.path.basename(filename))
+        found_path = au_file_map.get(filename) or au_file_map.get(Path(filename).name)
         if not found_path:
             logger.warning(f"Could not find imported file: {filename}")
             continue
 
-        track_wav_path = os.path.join(extraction_dir, f"track_{track_idx}_{_safe_token()}.wav")
+        track_wav_path = str(Path(extraction_dir) / f"track_{track_idx}_{_safe_token()}.wav")
         offset_ms = int(offset_sec * 1000)
 
         track_start = time.monotonic()
@@ -381,7 +380,7 @@ def _parse_clips_from_track(track: Element) -> list[dict[str, object]]:
             for aliasfile in _find_elements(block, "pcmaliasblockfile"):
                 filename = aliasfile.attrib.get("aliasfile")
                 if filename:
-                    au_files_in_clip.append(os.path.basename(filename))
+                    au_files_in_clip.append(Path(filename).name)
 
         clips.append({"offset": offset_sec, "au_files": au_files_in_clip})
     return clips

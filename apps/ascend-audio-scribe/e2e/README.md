@@ -155,7 +155,7 @@ Numbered by setup cost. Easiest first.
 
 | #  | Spec | What it proves |
 | :- | :--- | :--- |
-| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /api/v1/transcribe/openai` with the `file` form field missing returns HTTP 422 with a FastAPI validation-error body that names `file` as the missing field. No external API egress required. |
+| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /api/v1/transcribe/openai` with the `file` form field missing returns HTTP 400 (`validation` problem body with an `errors` array that names `file` as the missing field). No external API egress required. |
 | 2  | [testing/2-transcribe-openai-test.md](testing/2-transcribe-openai-test.md) | Upload `meeting-clip.wav` to `POST /api/v1/transcribe/openai` with `stream=false`; HTTP 200, `Content-Type: text/markdown`, body contains the canary phrase substring. Requires `OPENAI_API_KEY`. |
 | 3  | [testing/3-transcribe-hf-test.md](testing/3-transcribe-hf-test.md) | Same as test 2 for `POST /api/v1/transcribe/hf` with `meeting-clip.wav`. Requires `HF_TOKEN`. |
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | MCP `tools/list` over Streamable HTTP at `POST /mcp` advertises the four transcribe tools (`transcribe_local`, `transcribe_openai`, `transcribe_hf`, `transcribe_audacity`) plus `health`, each with the documented argument schema. |

@@ -1,19 +1,14 @@
-from typing import Annotated
-
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from ascend_python_common.settings import McpFetchSettings, RateLimit, ServiceSettings
+from pydantic import Field
 
 
-class Settings(BaseSettings):
+class Settings(ServiceSettings, McpFetchSettings):
     """Centralized application settings. Reads from environment variables automatically."""
-
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     OPENAI_API_KEY: str | None = None
     HF_TOKEN: str | None = None
 
-    MCP_HOST: str = Field(default="0.0.0.0", description="Bind address")
-    MCP_PORT: int = Field(default=7017, description="Service port")
+    API_PORT: int = Field(default=7017, ge=1, le=65535, description="Service port")
     API_TIMEOUT_SECONDS: int = Field(default=120, description="Upstream HTTP client timeout")
 
     SUPPORTED_AUDIO_EXTENSIONS: list[str] = Field(
@@ -72,31 +67,24 @@ class Settings(BaseSettings):
         default=r"^[A-Za-z0-9._/\-]{1,128}$", description="Allowed shape for model identifiers"
     )
 
-    MCP_FILE_URI_ROOT: str | None = Field(
-        default=None,
-        description="When set, enables file:// jailed to this path. Unset ⇒ file:// rejected.",
+    MCP_DOWNLOAD_TIMEOUT_SECONDS: float = Field(
+        default=30.0, gt=0, description="Total wall-clock budget for an MCP HTTP fetch"
     )
-    MCP_ALLOWED_HOSTS: Annotated[list[str], NoDecode] = Field(
-        default_factory=list,
-        description="Hostnames that bypass the SSRF private-IP check (e.g. host.docker.internal "
-        "for the S3-compatible object store).",
-    )
-    MCP_DOWNLOAD_TIMEOUT_SECONDS: int = Field(
-        default=30, description="Total wall-clock budget for an MCP HTTP fetch"
+    FETCH_MAX_REDIRECT_HOPS: int = Field(
+        default=10, ge=0, description="Redirect hops the URI fetch guard follows"
     )
 
-    LOG_LEVEL: str = Field(default="INFO", description="Logging Level")
+    RATE_LIMIT_DEFAULT: RateLimit = Field(
+        default="600/minute", description="Default rate limit for REST routes and MCP tools"
+    )
+    RATE_LIMIT_TRANSCRIBE: RateLimit = Field(
+        default="60/minute", description="Stricter limit on transcription routes and tools"
+    )
 
-    @field_validator("MCP_ALLOWED_HOSTS", mode="before")
-    @classmethod
-    def _split_csv_hosts(cls, value: object) -> object:
-        """Accept comma-separated strings from env vars (docker-compose
-        ergonomics) in addition to the native JSON-list form pydantic-settings
-        expects for `list[str]`."""
-
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return value
+    REDIS_URL: str = Field(
+        default="redis://127.0.0.1:6379/0",
+        description="Shared storage for the rate limit windows, one budget per caller",
+    )
 
 
 settings = Settings()

@@ -12,13 +12,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import shutil
 import tempfile
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 from src.adapters.download_file_manager import (
@@ -29,6 +29,7 @@ from src.adapters.download_file_manager import (
 )
 from src.adapters.file_service import cleanup_temp_file, save_upload_to_temp_async
 from src.api.exception_handlers import UpstreamProviderError
+from src.api.middleware.rate_limit import limiter
 from src.config.config import settings
 from src.observability.metrics import (
     TRANSCRIPTION_DURATION_SECONDS,
@@ -193,20 +194,23 @@ def download_transcript(file_id: str) -> FileResponse:
     file_path = get_transcript_path(file_id)
     if not file_path:
         raise HTTPException(status_code=404, detail="Transcript not found or expired.")
-    return _file_response(file_path, os.path.basename(file_path))
+    return _file_response(file_path, Path(file_path).name)
 
 
 # --- /local --------------------------------------------------------------
 
 
 @rest_router.post("/local", summary="Transcription with a local model", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_local_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     model: ModelForm = "Systran/faster-whisper-large-v3",
     language: LanguageForm = None,
     with_timestamps: WithTimestampsForm = False,
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     lang = _resolve_language(language)
 
     if stream:
@@ -219,11 +223,12 @@ async def transcribe_local_endpoint(
     temp_file_path = ""
     try:
         temp_file_path = await save_upload_to_temp_async(file)
-        all_segments: list[dict[str, Any]] = []
-        async for segment in local_speech_transcription(
-            audio_file_path=temp_file_path, model_path=model, language=lang
-        ):
-            all_segments.append(segment)
+        all_segments: list[dict[str, Any]] = [
+            segment
+            async for segment in local_speech_transcription(
+                audio_file_path=temp_file_path, model_path=model, language=lang
+            )
+        ]
         transcript_text = _build_transcript_text(all_segments, with_timestamps)
         _, file_path = store_transcript(transcript_text, TRANSCRIPT_LOCAL_FILENAME)
         _record(PROVIDER_LOCAL, "success", time.monotonic() - started)
@@ -275,12 +280,15 @@ async def _stream_local(file: UploadFile, model: str, lang: str, with_timestamps
 
 
 @rest_router.post("/openai", summary="Transcription with OpenAI API", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_openai_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     model: ModelForm = "whisper-1",
     language: LanguageForm = None,
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     if not settings.OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY is not configured on the server.")
 
@@ -363,12 +371,15 @@ async def _stream_openai(file: UploadFile, model: str, lang: str) -> AsyncIterat
 
 
 @rest_router.post("/hf", summary="Transcription with Hugging Face provider", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_hf_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     model: ModelForm = "openai/whisper-large-v3",
     hf_provider: HfProviderForm = "hf-inference",
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     if not settings.HF_TOKEN:
         raise ValueError("HF_TOKEN is not configured on the server.")
 
@@ -443,7 +454,9 @@ async def _stream_hf(file: UploadFile, model: str, hf_provider: str) -> AsyncIte
 
 
 @rest_router.post("/audacity", summary="Transcription of Audacity project (.zip)", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_audacity_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     provider: ProviderForm = "local",
     model: ModelForm = "Systran/faster-whisper-large-v3",
@@ -451,6 +464,7 @@ async def transcribe_audacity_endpoint(
     hf_provider: HfProviderForm = "hf-inference",
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise ValueError("File must be a .zip containing an Audacity project.")
 

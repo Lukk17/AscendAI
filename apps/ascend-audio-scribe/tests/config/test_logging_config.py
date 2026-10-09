@@ -1,83 +1,58 @@
 import logging
+import re
 
-from src.config.logging_config import (
-    _LOG_COLORS,
-    CenteredLevelFormatter,
-    CorrelationFilter,
-    get_logger,
-    get_uvicorn_log_config,
-    setup_logging,
-)
-from src.observability.request_context import request_id_ctx
+import pytest
+from _pytest.logging import LogCaptureFixture
+from ascend_python_common.log_config import configure_logging
+from ascend_python_common.settings import ServiceSettings
+
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
-def _record(level: int = logging.INFO, msg: str = "hello") -> logging.LogRecord:
-    return logging.LogRecord(
-        name="test",
-        level=level,
-        pathname=__file__,
-        lineno=1,
-        msg=msg,
-        args=None,
-        exc_info=None,
+def _service_settings(log_level: str, log_format: str) -> ServiceSettings:
+    return ServiceSettings(
+        API_PORT=7017,
+        LOG_LEVEL=log_level,  # type: ignore[arg-type]
+        LOG_FORMAT=log_format,  # type: ignore[arg-type]
+        RATE_LIMIT_DEFAULT="600/minute",
     )
 
 
-def test_centered_level_formatter_pads_level() -> None:
+def test_debug_line_visible_at_debug_level(caplog: LogCaptureFixture) -> None:
     # given
-    fmt = CenteredLevelFormatter("%(log_color)s - %(levelname)s - %(message)s", log_colors=_LOG_COLORS)
-
+    configure_logging("ascend-audio-scribe", _service_settings("DEBUG", "json"))
+    logging.getLogger().addHandler(caplog.handler)
+    probe = logging.getLogger("ascend-audio-scribe.debug-probe")
     # when
-    formatted = fmt.format(_record(logging.INFO))
-
+    with caplog.at_level(logging.DEBUG, logger="ascend-audio-scribe.debug-probe"):
+        probe.debug("debug-marker-3-4")
     # then
-    assert "  INFO  " in formatted
+    assert any(record.message == "debug-marker-3-4" for record in caplog.records)
 
 
-def test_centered_level_formatter_passthrough_when_no_match() -> None:
+def test_no_info_or_access_line_at_warning_level(caplog: LogCaptureFixture) -> None:
     # given
-    fmt = CenteredLevelFormatter("%(log_color)s%(message)s", log_colors=_LOG_COLORS)
-
+    configure_logging("ascend-audio-scribe", _service_settings("WARNING", "json"))
+    logging.getLogger().addHandler(caplog.handler)
+    probe = logging.getLogger("ascend-audio-scribe.quiet-probe")
+    access = logging.getLogger("uvicorn.access")
     # when
-    formatted = fmt.format(_record(msg="plain"))
-
+    probe.debug("suppressed-debug-3-4")
+    probe.info("suppressed-info-3-4")
+    access.info("suppressed-access-3-4")
     # then
-    assert "plain" in formatted
+    assert [record for record in caplog.records if record.name == "ascend-audio-scribe.quiet-probe"] == []
+    assert [record for record in caplog.records if record.name == "uvicorn.access"] == []
 
 
-def test_correlation_filter_injects_request_id() -> None:
+def test_color_line_starts_with_service_name(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     # given
-    token = request_id_ctx.set("req-x")
-
-    # when / then
-    try:
-        record = _record()
-        assert CorrelationFilter().filter(record) is True
-        assert getattr(record, "request_id", None) == "req-x"
-    finally:
-        request_id_ctx.reset(token)
-
-
-def test_setup_logging_installs_correlation_filter() -> None:
+    configure_logging("ascend-audio-scribe", _service_settings("INFO", "color"))
     # when
-    setup_logging()
-
+    logging.getLogger("ascend-audio-scribe.color-probe").info("hello-color-3-4")
+    captured = capsys.readouterr()
     # then
-    root = logging.getLogger()
-    assert any(isinstance(f, CorrelationFilter) for h in root.handlers for f in h.filters)
-
-
-def test_uvicorn_log_config_shape() -> None:
-    # when
-    cfg = get_uvicorn_log_config()
-
-    # then
-    assert cfg["version"] == 1
-    assert "correlation" in cfg["filters"]
-    assert "default" in cfg["formatters"]
-    assert "correlation" in cfg["handlers"]["default"]["filters"]
-
-
-def test_get_logger() -> None:
-    # when / then
-    assert isinstance(get_logger("x"), logging.Logger)
+    [line] = [line for line in ANSI_ESCAPE.sub("", captured.err).splitlines() if "hello-color-3-4" in line]
+    assert line.startswith("[ascend-audio-scribe]")

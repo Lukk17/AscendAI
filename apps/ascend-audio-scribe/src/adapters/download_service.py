@@ -1,13 +1,12 @@
-import ipaddress
 import logging
 import re
-import socket
 from pathlib import Path
 from urllib.parse import urlparse
-from urllib.request import url2pathname
 
 import aiofiles
 import aiohttp
+from ascend_python_common.uri_guard import check_fetch_uri
+from ascend_python_common.uri_guard_aiohttp import PinnedResolver, guarded_get
 
 from src.adapters.file_service import cleanup_temp_file, create_temp_file, safe_suffix_from_filename
 from src.api.exception_handlers import FileSizeExceededError
@@ -26,69 +25,6 @@ def _extract_audio_suffix_from_query(query: str) -> str:
     if match:
         return "." + match.group(1)
     return ""
-
-
-def _resolve_to_ips(hostname: str) -> list[str]:
-    """Resolve a hostname to every IPv4/IPv6 it points at. Empty list on
-    failure - callers treat that as "do not allow"."""
-
-    try:
-        infos = socket.getaddrinfo(hostname, None)
-    except socket.gaierror:
-        return []
-    return list({str(info[4][0]) for info in infos})
-
-
-def _is_safe_ip(addr: str) -> bool:
-    """True only when the IP is publicly routable (not private, loopback,
-    link-local, multicast, reserved, or unspecified). The SSRF guard."""
-
-    try:
-        ip = ipaddress.ip_address(addr)
-    except ValueError:
-        return False
-    return not (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_multicast
-        or ip.is_reserved
-        or ip.is_unspecified
-    )
-
-
-def _validate_http_target(hostname: str | None) -> None:
-    """SSRF guard. Rejects loopback, RFC1918, link-local, cloud metadata
-    (169.254/16), and similar unless the hostname appears verbatim in
-    MCP_ALLOWED_HOSTS (intended for reaching the S3-compatible object
-    store via host.docker.internal)."""
-
-    if not hostname:
-        raise ValueError("URI has no hostname")
-    if hostname in settings.MCP_ALLOWED_HOSTS:
-        return
-    ips = _resolve_to_ips(hostname)
-    if not ips:
-        raise ValueError(f"Could not resolve host '{hostname}'")
-    if not all(_is_safe_ip(ip) for ip in ips):
-        raise ValueError(f"Host '{hostname}' resolves to a non-public address (SSRF blocked)")
-
-
-def _resolve_file_uri(uri_path: str) -> Path:
-    """file:// scheme jail. Requires MCP_FILE_URI_ROOT to be set; resolves the
-    URI path under that root and rejects any traversal outside via realpath."""
-
-    if not settings.MCP_FILE_URI_ROOT:
-        raise ValueError("file:// scheme is disabled (MCP_FILE_URI_ROOT not set)")
-    root = Path(settings.MCP_FILE_URI_ROOT).resolve()
-
-    relative = url2pathname(uri_path)
-    candidate = (root / relative.lstrip("/\\")).resolve()
-    if not candidate.is_relative_to(root):
-        raise ValueError("file:// path escapes MCP_FILE_URI_ROOT jail")
-    if not candidate.exists():
-        raise ValueError(f"File not found: {candidate}")
-    return candidate
 
 
 async def _copy_file_streaming(source: Path, dest_path: str, cap: int) -> None:
@@ -113,7 +49,11 @@ async def _fetch_http_streaming(uri: str, dest_path: str, cap: int) -> None:
     the size cap while looping. Honours Content-Length as an early reject."""
 
     timeout = aiohttp.ClientTimeout(total=settings.MCP_DOWNLOAD_TIMEOUT_SECONDS)
-    async with aiohttp.ClientSession(timeout=timeout) as session, session.get(uri) as response:
+    connector = aiohttp.TCPConnector(resolver=PinnedResolver(), use_dns_cache=False)
+    async with (
+        aiohttp.ClientSession(timeout=timeout, connector=connector) as session,
+        guarded_get(session, uri, settings.fetch_policy()) as response,
+    ):
         if response.status != 200:
             raise ValueError(f"Failed to download from {uri}: HTTP {response.status}")
         content_length = response.content_length
@@ -141,7 +81,10 @@ async def download_to_temp_async(uri: str) -> str:
     scheme = parsed.scheme.lower()
 
     if scheme == "file":
-        source = _resolve_file_uri(parsed.path)
+        target = await check_fetch_uri(uri, settings.fetch_policy())
+        source = target.file_path
+        if source is None or not source.exists():
+            raise ValueError(f"File not found: {source}")
         suffix = safe_suffix_from_filename(str(source))
         temp_path = create_temp_file(suffix)
         try:
@@ -156,7 +99,7 @@ async def download_to_temp_async(uri: str) -> str:
         return temp_path
 
     if scheme in ("http", "https"):
-        _validate_http_target(parsed.hostname)
+        await check_fetch_uri(uri, settings.fetch_policy())
 
         suffix = safe_suffix_from_filename(parsed.path)
         if not suffix and parsed.query:

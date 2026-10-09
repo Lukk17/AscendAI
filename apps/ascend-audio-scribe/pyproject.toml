@@ -1,9 +1,10 @@
 [project]
 name = "ascend-audio-scribe"
-version = "0.9.3"
+version = "0.9.4"
 description = "A dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models."
 requires-python = ">=3.11"
 dependencies = [
+    "ascend-python-common[fetch]==1.0.0",
     "fastapi==0.136.3",
     "anyio==4.13.0",
     "fastmcp==3.3.1",
@@ -16,21 +17,14 @@ dependencies = [
     "python-dotenv==1.2.2",
     "python-multipart==0.0.30",
     "pydub==0.25.1",
-    "colorlog==6.10.1",
     "uvicorn==0.48.0",
     "aiofiles==25.1.0",
-    "aiohttp==3.13.5",
     "defusedxml==0.7.1",
-    "prometheus-client==0.25.0",
-    "prometheus-fastapi-instrumentator==8.0.0",
-    "opentelemetry-api==1.44.0",
-    "opentelemetry-sdk==1.44.0",
-    "opentelemetry-instrumentation-fastapi==0.65b0",
-    "opentelemetry-exporter-otlp==1.44.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "ascend-python-common[dev]==1.0.0",
     "pytest==9.0.3",
     "pytest-mock==3.15.1",
     "pytest-asyncio==1.4.0",
@@ -47,7 +41,13 @@ pythonpath = [".", "src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
-addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100"
+xfail_strict = true
+filterwarnings = [
+    "error",
+    'ignore:Field name "MCP_DOWNLOAD_TIMEOUT_SECONDS".*:UserWarning',
+    'ignore:Field name "FETCH_MAX_REDIRECT_HOPS".*:UserWarning',
+]
+addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100 --strict-markers --strict-config"
 
 [tool.coverage.run]
 branch = true
@@ -65,39 +65,7 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-line-length = 110
-target-version = "py311"
-
-[tool.ruff.lint]
-select = [
-    "E", "F", "I", "N", "UP", "S", "B", "A", "RUF", "SIM", "PL",
-    "C4", "RET", "PIE", "TRY", "PERF", "ARG", "LOG", "G", "T20",
-    "ERA", "PT", "PTH", "FA", "TCH", "DTZ", "ICN", "Q", "TID",
-    "INT", "SLF", "ASYNC", "FURB",
-]
-ignore = [
-    "S101",
-    "PLR0913",
-    "N818",
-    "BLE001",
-    "S110",
-    "PLR2004",
-    "S104",
-    "S311",
-    "PLR0911",
-    "PLC0415",
-    "G004",
-    "TRY003",
-    "TRY300",
-    "TRY301",
-    "PTH",
-    "ASYNC240",
-    "TRY401",
-    "PERF401",
-    "SIM114",
-    "N814",
-    "PLW0108",
-]
+extend = "../../libs/ascend-python-common/tooling/ruff.toml"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
@@ -121,8 +89,9 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
+warn_unreachable = true
 ignore_missing_imports = false
-disable_error_code = ["no-untyped-call", "type-arg"]
+mypy_path = "../../libs/ascend-python-common/src"
 
 [[tool.mypy.overrides]]
 module = [

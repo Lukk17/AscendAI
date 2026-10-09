@@ -17,18 +17,19 @@ ascend-web-hunter) which adopted RFC 7807 envelopes.
 ## Decision
 
 All error responses use `application/problem+json` with the RFC 7807 shape (`type`, `title`, `status`, `instance`,
-optionally `detail`). Three FastAPI exception handlers in `src/api/exception_handlers.py`:
+`code`, `traceId`). The service error registry in `src/api/exception_handlers.py` (handlers come from the library):
 
-- `ValueError` → 400 with `detail` carrying the service-authored message (safe to surface; we wrote it).
-- `FileSizeExceededError` (ValueError subclass) → 413 with `detail` carrying the cap.
-- `Exception` (catch-all) → 500 with `detail` dropped entirely. Only `instance` (request path) is surfaced.
+- `ValueError` → 400 with code `validation` and `detail` carrying the service-authored message (safe to surface; we wrote it). A request the router cannot validate answers 400 with code `validation` and an `errors` array sorted by `field`.
+- `FileSizeExceededError` → 413 with code `file_too_large` and `detail` carrying the cap.
+- `UpstreamProviderError` → 502 with code `upstream_provider` and the service-authored detail.
+- `Exception` (catch-all) → 500 with code `internal` and a fixed generic detail. Only `instance` (request path) plus the fixed detail is surfaced.
 
-The MCP surface uses an equivalent structured envelope:
-`{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+The MCP surface raises registered exceptions mapped to tool errors whose text starts with the registry code:
+`validation: ...`, `file_too_large: ...`, `upstream_provider: ...`, `internal: ...`.
 
-Every error path is correlated by the `X-Request-ID` header (regex-validated, max 128 chars). The full exception
+Every error path is correlated by the `X-Request-ID` header (regex-validated, max 128 chars) and `traceId` (32 lower case hex characters). The full exception
 is logged with `logger.exception(...)` server-side. (`src/api/exception_handlers.py`, `src/api/mcp/mcp_server.py`,
-`src/observability/request_context.py`)
+`ascend-python-common` `errors`, `request_context.py`)
 
 ---
 

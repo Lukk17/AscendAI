@@ -3,8 +3,8 @@ import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import defusedxml.ElementTree as DET
 import pytest
+from defusedxml import ElementTree
 
 from src.api.exception_handlers import FileSizeExceededError
 from src.config.config import settings
@@ -571,7 +571,7 @@ def test_extract_tracks_handles_missing_root(tmp_path: Path, monkeypatch: pytest
         def getroot(self) -> None:
             return None
 
-    monkeypatch.setattr(DET, "parse", lambda _path: _Tree())
+    monkeypatch.setattr(ElementTree, "parse", lambda _path: _Tree())
 
     # when / then
     with pytest.raises(ValueError, match="no root element"):

@@ -2,136 +2,95 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-from contextlib import AsyncExitStack, asynccontextmanager
-from importlib.metadata import version as get_package_version
 from typing import TYPE_CHECKING
 
 import uvicorn
-from fastapi import FastAPI
-from prometheus_fastapi_instrumentator import Instrumentator
+from ascend_python_common.app import ServiceDefinition, create_service_app
 
 from src.adapters.download_file_manager import run_cleanup_loop
-from src.api.exception_handlers import (
-    FileSizeExceededError,
-    UpstreamProviderError,
-    file_size_error_handler,
-    global_exception_handler,
-    upstream_provider_error_handler,
-    value_error_handler,
-)
+from src.api import readiness as readiness_module
+from src.api.exception_handlers import error_registry
 from src.api.mcp.mcp_server import mcp
 from src.api.middleware.force_json_utf8 import ForceJSONUTF8Middleware
-from src.api.readiness import readiness_router
 from src.api.rest.rest_endpoints import rest_router
 from src.config.config import settings
-from src.config.logging_config import get_uvicorn_log_config, setup_logging
-from src.config.startup_banner import log_startup_banner
-from src.observability.request_context import RequestIdMiddleware
+from src.config.startup_banner import build_service_banner
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from ascend_python_common.readiness import ProbeResult
+    from fastapi import FastAPI
 
-setup_logging()
 logger = logging.getLogger("ascend-audio-scribe")
-
-SERVICE_VERSION: str = get_package_version("ascend-audio-scribe")
-
-
-def _configure_otel() -> None:
-    """Activate OTel auto-instrumentation when OTEL_EXPORTER_OTLP_ENDPOINT is set.
-
-    Uses the SDK directly so uvicorn does not need to be launched under
-    `opentelemetry-instrument`, and is a strict no-op when the env var is absent.
-    """
-    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if not endpoint:
-        return
-
-    from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-    service_name = os.getenv("OTEL_SERVICE_NAME", "ascend-audio-scribe")
-    resource = Resource.create({"service.name": service_name})
-    provider = TracerProvider(resource=resource)
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
-    trace.set_tracer_provider(provider)
-    FastAPIInstrumentor().instrument()
-    logger.info("[AscendAudioScribe] OTel tracing enabled → %s", endpoint)
-
 
 # Hold strong refs to background tasks so the loop cannot GC them mid-flight.
 _background_tasks: set[asyncio.Task[None]] = set()
 
 
-def create_app() -> FastAPI:
-    _configure_otel()
+class _CleanupLifespan:
+    async def __aenter__(self) -> None:
+        cleanup_stop = asyncio.Event()
+        self._cleanup_stop = cleanup_stop
+        cleanup_task = asyncio.create_task(run_cleanup_loop(cleanup_stop))
+        self._cleanup_task = cleanup_task
+        _background_tasks.add(cleanup_task)
+        cleanup_task.add_done_callback(_background_tasks.discard)
 
-    mcp_app = mcp.http_app()
+    async def __aexit__(self, *exc_info: object) -> None:
+        self._cleanup_stop.set()
+        await asyncio.gather(self._cleanup_task, return_exceptions=True)
 
-    @asynccontextmanager
-    async def lifespan(fastapi_app: FastAPI) -> AsyncGenerator[None, None]:
-        async with AsyncExitStack() as stack:
-            await stack.enter_async_context(mcp_app.router.lifespan_context(fastapi_app))
 
-            cleanup_stop = asyncio.Event()
-            cleanup_task = asyncio.create_task(run_cleanup_loop(cleanup_stop))
-            _background_tasks.add(cleanup_task)
-            cleanup_task.add_done_callback(_background_tasks.discard)
+def service_lifespan() -> _CleanupLifespan:
+    return _CleanupLifespan()
 
-            await log_startup_banner()
-            try:
-                yield
-            finally:
-                cleanup_stop.set()
-                await asyncio.gather(cleanup_task, return_exceptions=True)
 
-    app = FastAPI(
-        title="ascend-audio-scribe",
-        description="A dynamic speech-to-text service supporting local, OpenAI, and Hugging Face models.",
-        version=SERVICE_VERSION,
-        lifespan=lifespan,
+def _ffmpeg_probe() -> ProbeResult:
+    return readiness_module.probe_ffmpeg()
+
+
+def _tempdir_probe() -> ProbeResult:
+    return readiness_module.probe_temp_dir()
+
+
+def _service_definition() -> ServiceDefinition:
+    return ServiceDefinition(
+        name="ascend-audio-scribe",
+        distribution="ascend-audio-scribe",
+        settings=settings,
+        mcp=mcp,
+        routers=(rest_router,),
+        error_registry=error_registry,
+        probes={
+            "ffmpeg": _ffmpeg_probe,
+            "tempdir": _tempdir_probe,
+        },
+        lifespan=service_lifespan(),
+        tool_rate_limits={
+            "transcribe_local": settings.RATE_LIMIT_TRANSCRIBE,
+            "transcribe_openai": settings.RATE_LIMIT_TRANSCRIBE,
+            "transcribe_hf": settings.RATE_LIMIT_TRANSCRIBE,
+            "transcribe_audacity": settings.RATE_LIMIT_TRANSCRIBE,
+        },
+        rate_limit_storage_uri=settings.REDIS_URL,
+        startup_banner=build_service_banner,
     )
 
-    app.add_middleware(RequestIdMiddleware)
+
+def create_app() -> FastAPI:
+    app = create_service_app(_service_definition())
     app.add_middleware(ForceJSONUTF8Middleware)
-
-    app.add_exception_handler(FileSizeExceededError, file_size_error_handler)
-    app.add_exception_handler(UpstreamProviderError, upstream_provider_error_handler)
-    app.add_exception_handler(ValueError, value_error_handler)
-    app.add_exception_handler(Exception, global_exception_handler)
-
-    app.include_router(rest_router)
-    app.include_router(readiness_router)
-
-    Instrumentator(
-        should_group_status_codes=False,
-        excluded_handlers=["/metrics", "/health", "/ready"],
-    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-
-    @app.get("/health", tags=["health"])
-    def health_check() -> dict[str, str]:
-        """Liveness probe. Always 200 once uvicorn binds; readiness is on /ready."""
-
-        return {"status": "ok", "service": "ascend-audio-scribe"}
-
-    # MCP mount must be last so REST routes win.
-    app.mount("/", mcp_app)
-
     return app
 
 
-app = create_app()
+definition = _service_definition()
+
+app = create_service_app(definition)
+app.add_middleware(ForceJSONUTF8Middleware)
 
 if __name__ == "__main__":
     uvicorn.run(
         "src.main:app",
-        host=settings.MCP_HOST,
-        port=settings.MCP_PORT,
+        host=settings.API_HOST,
+        port=settings.API_PORT,
         reload=False,
-        log_config=get_uvicorn_log_config(),
     )

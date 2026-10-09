@@ -1,6 +1,5 @@
 import contextlib
 import logging
-import os
 import tempfile
 from pathlib import Path
 
@@ -67,6 +66,6 @@ def cleanup_temp_file(file_path: str | None) -> None:
     """Best-effort cleanup; silently swallows OSError because cleanup races
     with concurrent reads are expected on the SSE / FileResponse paths."""
 
-    if file_path and os.path.exists(file_path):
+    if file_path and Path(file_path).exists():
         with contextlib.suppress(OSError):
-            os.remove(file_path)
+            Path(file_path).unlink()

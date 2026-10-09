@@ -8,9 +8,9 @@ so importing this module doesn't require OPENAI_API_KEY.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -83,7 +83,7 @@ def _transcribe_single_chunk(
 
     client = _get_client()
     try:
-        with open(audio_chunk_path, "rb") as audio_file:
+        with Path(audio_chunk_path).open("rb") as audio_file:
             kwargs = _build_create_kwargs(audio_file, model, language, with_timestamps)
             response = client.audio.transcriptions.create(**kwargs)
 
@@ -115,7 +115,7 @@ def _emit_progress(
 
 
 def _check_chunk_size(chunk_path: str, chunk_num: int) -> int:
-    chunk_size = os.path.getsize(chunk_path)
+    chunk_size = Path(chunk_path).stat().st_size
     if chunk_size > settings.OPENAI_API_LIMIT_BYTES:
         raise ValueError(f"Generated chunk {chunk_num} exceeded OpenAI size limit.")
     return chunk_size
@@ -155,7 +155,7 @@ def openai_transcript(
     decode the full audio into Python memory.
     """
 
-    file_size = os.path.getsize(audio_file_path)
+    file_size = Path(audio_file_path).stat().st_size
     logger.info(
         f"[OpenAI] Parameters: language='{language}', api_limit={settings.OPENAI_API_LIMIT_BYTES}, "
         f"target_chunk={settings.TARGET_CHUNK_SIZE_BYTES}, with_timestamps={with_timestamps}"

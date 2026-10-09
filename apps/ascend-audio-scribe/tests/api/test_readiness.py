@@ -154,8 +154,11 @@ def test_is_windows_reflects_os_name() -> None:
 def test_probe_ffmpeg_ok() -> None:
     # given
     with patch.object(readiness_module, "_resolve_on_path", return_value=Path("/usr/bin/ffmpeg")):
-        # when / then
-        assert readiness_module._probe_ffmpeg() == {"status": "ok"}
+        # when
+        probed = readiness_module.probe_ffmpeg()
+        # then
+        assert probed.status == "ok"
+        assert readiness_module._probe_ffmpeg().status == "ok"
 
 
 def test_probe_ffmpeg_missing() -> None:
@@ -164,7 +167,7 @@ def test_probe_ffmpeg_missing() -> None:
         result = readiness_module._probe_ffmpeg()
 
     # then
-    assert result["status"] == "error"
+    assert result.status == "error"
 
 
 def test_probe_ffmpeg_ffprobe_missing() -> None:
@@ -177,15 +180,19 @@ def test_probe_ffmpeg_ffprobe_missing() -> None:
         result = readiness_module._probe_ffmpeg()
 
     # then
-    assert result["status"] == "error"
-    assert "ffprobe" in result["detail"]
+    assert result.status == "error"
+    assert result.details is not None
+    assert "ffprobe" in result.details["detail"]
 
 
 def test_probe_temp_dir_ok(tmp_path: Path) -> None:
     # given
     with patch.object(tempfile, "gettempdir", return_value=str(tmp_path)):
-        # when / then
-        assert readiness_module._probe_temp_dir() == {"status": "ok"}
+        # when
+        probed = readiness_module.probe_temp_dir()
+        # then
+        assert probed.status == "ok"
+        assert readiness_module._probe_temp_dir().status == "ok"
 
 
 def test_probe_temp_dir_missing() -> None:
@@ -194,7 +201,7 @@ def test_probe_temp_dir_missing() -> None:
         result = readiness_module._probe_temp_dir()
 
     # then
-    assert result["status"] == "error"
+    assert result.status == "error"
 
 
 def test_probe_temp_dir_not_writable(tmp_path: Path) -> None:
@@ -206,14 +213,18 @@ def test_probe_temp_dir_not_writable(tmp_path: Path) -> None:
         result = readiness_module._probe_temp_dir()
 
     # then
-    assert result["status"] == "error"
+    assert result.status == "error"
 
 
 def test_ready_endpoint_200_when_clean() -> None:
     # given
+    from ascend_python_common.readiness import ProbeResult
+
     with (
-        patch.object(readiness_module, "_probe_ffmpeg", return_value={"status": "ok"}),
-        patch.object(readiness_module, "_probe_temp_dir", return_value={"status": "ok"}),
+        patch.object(readiness_module, "_probe_ffmpeg", return_value=ProbeResult(status="ok")),
+        patch.object(readiness_module, "_probe_temp_dir", return_value=ProbeResult(status="ok")),
+        patch.object(readiness_module, "probe_ffmpeg", return_value=ProbeResult(status="ok")),
+        patch.object(readiness_module, "probe_temp_dir", return_value=ProbeResult(status="ok")),
         TestClient(app) as client,
     ):
         # when
@@ -226,9 +237,13 @@ def test_ready_endpoint_200_when_clean() -> None:
 
 def test_ready_endpoint_503_when_degraded() -> None:
     # given
+    from ascend_python_common.readiness import ProbeResult
+
     with (
-        patch.object(readiness_module, "_probe_ffmpeg", return_value={"status": "error", "detail": "x"}),
-        patch.object(readiness_module, "_probe_temp_dir", return_value={"status": "ok"}),
+        patch.object(readiness_module, "_probe_ffmpeg", return_value=ProbeResult(status="error")),
+        patch.object(readiness_module, "_probe_temp_dir", return_value=ProbeResult(status="ok")),
+        patch.object(readiness_module, "probe_ffmpeg", return_value=ProbeResult(status="error")),
+        patch.object(readiness_module, "probe_temp_dir", return_value=ProbeResult(status="ok")),
         TestClient(app) as client,
     ):
         # when
@@ -236,4 +251,4 @@ def test_ready_endpoint_503_when_degraded() -> None:
 
         # then
         assert response.status_code == 503
-        assert response.json()["status"] == "degraded"
+        assert response.json()["status"] == "not-ready"

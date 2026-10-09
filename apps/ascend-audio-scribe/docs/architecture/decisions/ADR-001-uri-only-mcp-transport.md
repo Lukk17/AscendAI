@@ -20,17 +20,16 @@ service URLs (`http://qdrant:6333/`, `http://redis:6379/`), or read host secrets
 
 The MCP `audio_uri` parameter only accepts two schemes, each guarded:
 
-1. `http(s)://` - `_validate_http_target` resolves the hostname via `socket.getaddrinfo` and rejects any IP that
-   matches `ipaddress.ip_address(...).is_private | is_loopback | is_link_local | is_multicast | is_reserved |
-   is_unspecified`. Hostnames listed in `MCP_ALLOWED_HOSTS` bypass the check (for the host-published S3-compatible
-   object store, reached via `host.docker.internal`). Unresolvable hostnames are rejected. The download path streams
-   with `MAX_DOWNLOAD_BYTES` enforcement.
+1. `http(s)://` - the library `check_fetch_uri` resolves the hostname and rejects any IP that
+    matches a loopback, private, link-local, multicast, reserved, or unspecified address. Hostnames listed in `ALLOWED_PRIVATE_HOSTS` bypass the private-address check (for the host-published S3-compatible
+    object store, reached via `host.docker.internal`). Unresolvable hostnames are rejected. The download path streams
+    with `MAX_DOWNLOAD_BYTES` enforcement through `guarded_get` with `PinnedResolver`, so every redirect hop is re-checked against the same policy and a public URL that redirects to a private address is refused.
 2. `file://` - disabled by default. Requires `MCP_FILE_URI_ROOT` to be set; URIs are resolved under the root via
-   `pathlib.Path.resolve()` and rejected if `is_relative_to(root)` is False (catches `..` traversal even with
-   symlinks).
+    the library guard and rejected when they escape it (catches `..` traversal even with
+    symlinks).
 
 All other schemes (`ftp`, `data:`, bare paths, Windows drive letters) are rejected with a `ValueError` that maps to
-an MCP `validation_error` envelope. (`src/adapters/download_service.py`)
+a `validation: ` MCP tool error. (`src/adapters/download_service.py`, `ascend-python-common` `uri_guard.py`)
 
 ---
 
@@ -60,12 +59,11 @@ an MCP `validation_error` envelope. (`src/adapters/download_service.py`)
 
 ### Negative
 
-- Adds two env vars (`MCP_FILE_URI_ROOT`, `MCP_ALLOWED_HOSTS`) operators must understand, defined in
-  `src/config/config.py`.
+- Adds two env vars (`MCP_FILE_URI_ROOT`, `ALLOWED_PRIVATE_HOSTS`) operators must understand, defined in
+  `src/config/config.py` via the library `McpFetchSettings` base.
 - DNS resolution adds latency to every HTTP MCP call; with 1-2 ms cache hits this is acceptable.
 
 ### Risks
 
 - **DNS rebinding**: a hostname that initially resolves to a public IP could re-resolve to a private one between the
-  guard check and the aiohttp connect. Mitigation: aiohttp itself resolves at connect time. Defense in depth would
-  pin the resolved IP and pass it to `aiohttp.ClientSession.get(headers={"Host": hostname})`; not yet implemented.
+  guard check and the connect. Mitigation: the download connects through `PinnedResolver`, so the connection goes only to the checked addresses.
