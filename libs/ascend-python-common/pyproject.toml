@@ -1,0 +1,104 @@
+[project]
+name = "ascend-python-common"
+version = "1.0.0"
+description = "Shared platform library for the AscendAI Python services"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.136.3",
+    "uvicorn==0.48.0",
+    "fastmcp==3.3.1",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.1",
+    "mcp==1.30.0",
+    "opentelemetry-api==1.45.0",
+    "opentelemetry-sdk==1.45.0",
+    "opentelemetry-exporter-otlp==1.45.0",
+    "opentelemetry-instrumentation-asgi==0.66b0",
+    "opentelemetry-instrumentation-fastapi==0.66b0",
+    "prometheus-client==0.26.0",
+    "prometheus-fastapi-instrumentator==8.1.0",
+    "colorlog==6.12.0",
+    "python-json-logger==4.2.0",
+    "slowapi==0.1.10",
+    "redis==8.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.3",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.15.15",
+    "mypy==2.1.0",
+    "httpx==0.28.1",
+    "asgi-lifespan==2.1.0",
+]
+fetch = [
+    "aiohttp==3.13.5",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+xfail_strict = true
+filterwarnings = [
+    "error",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+    'ignore:Field name "MCP_DOWNLOAD_TIMEOUT_SECONDS".*:UserWarning',
+    'ignore:Field name "FETCH_MAX_REDIRECT_HOPS".*:UserWarning',
+]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov-branch",
+    "--cov-fail-under=100",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 100
+
+[tool.ruff]
+extend = "tooling/ruff.toml"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101", "S105", "S106", "PLR2004",
+    "SIM117",
+    "RUF059",
+    "B010",
+    "E501",
+    "PLR1711",
+    "PLE2502",
+    "ARG001",
+    "ARG002",
+    "ARG005",
+    "SLF001",
+    "TC002",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = "deprecated.*"
+ignore_errors = true
+follow_imports = "skip"
