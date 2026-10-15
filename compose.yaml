@@ -56,6 +56,8 @@ services:
     image: ascend-ai-ascend-ocr:latest
     container_name: ascend-ocr
     hostname: ascend-ocr
+    logging:
+      driver: json-file
     restart: unless-stopped
     ports:
       - "${OCR_HOST_PORT:-7022}:${OCR_API_PORT:-7022}"
@@ -88,11 +90,11 @@ services:
       - OCR_RESULT_S3_SECRET_KEY=${OCR_RESULT_S3_SECRET_KEY:-password}
       # SSRF guard: the host-published object store (Floci) is reached via
       # the host-bound localhost address (host.docker.internal:9070) per ADR-001.
-      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
+      - ALLOWED_PRIVATE_HOSTS=host.docker.internal,localhost,127.0.0.1
       # file:// is disabled by default; mount a writable dir and set
       # MCP_FILE_URI_ROOT to the in-container path to enable.
       # - MCP_FILE_URI_ROOT=/var/lib/apps/ascend-ocr/uploads
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
       - OTEL_SERVICE_NAME=ascend-ocr
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.3.1
@@ -124,9 +126,11 @@ services:
     image: ascend-ai-ascend-agent:latest
     container_name: ascend-agent
     hostname: ascend-agent
+    logging:
+      driver: json-file
     restart: unless-stopped
     ports:
-      - "9917:9917"
+      - "${AGENT_HOST_PORT:-9917}:9917"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -152,7 +156,8 @@ services:
       # per-provider compaction-model map stays yaml-only (Spring Boot env-var
       # binding for nested Map<String,String> is awkward).
       - APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED=${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:-true}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=${MANAGEMENT_OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:-1.0}
       - OTEL_SERVICE_NAME=ascend-agent
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.2
     networks:
@@ -185,6 +190,8 @@ services:
     image: ascend-ai-ascend-memory:latest
     container_name: ascend-memory
     hostname: ascend-memory
+    logging:
+      driver: json-file
     restart: unless-stopped
     ports:
       - "${MEMORY_API_PORT:-7020}:${MEMORY_API_PORT:-7020}"
@@ -214,7 +221,7 @@ services:
       - SECURITY_HSTS_MAX_AGE_SECONDS=${SECURITY_HSTS_MAX_AGE_SECONDS:-63072000}
       - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-false}
       - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - OTEL_SERVICE_NAME=ascend-memory
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.4
     extra_hosts:
@@ -252,12 +259,15 @@ services:
     image: ascend-ai-ascend-weather-mcp:latest
     container_name: ascend-weather-mcp
     hostname: ascend-weather-mcp
+    logging:
+      driver: json-file
     restart: unless-stopped
     ports:
-      - "9998:9998"
+      - "${WEATHER_MCP_HOST_PORT:-9998}:9998"
     environment:
-      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://otel-collector:4318/v1/traces
-      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+      - SPRING_PROFILES_ACTIVE=docker
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=${MANAGEMENT_OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:-1.0}
       - OTEL_SERVICE_NAME=ascend-weather-mcp
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.4
     # Memory sized from measured usage: peak observed at 374 MiB over 24h
@@ -282,6 +292,8 @@ services:
     image: ascend-ai-ascend-audio-scribe:latest
     container_name: ascend-audio-scribe
     hostname: ascend-audio-scribe
+    logging:
+      driver: json-file
     restart: unless-stopped
     ports:
       - "${AUDIO_SCRIBE_API_PORT:-7017}:${AUDIO_SCRIBE_API_PORT:-7017}"
@@ -292,8 +304,8 @@ services:
       # SSRF guard: the host-published object store (Floci) is reached via
       # the host-bound localhost address (host.docker.internal:9070); allow
       # the loopback aliases.
-      - MCP_ALLOWED_HOSTS=host.docker.internal,localhost,127.0.0.1
-      # Enables file:// URIs jailed to /audio (the host Desktop mount).
+      - ALLOWED_PRIVATE_HOSTS=host.docker.internal,localhost,127.0.0.1
+      # Enables file:// URIs jailed to /audio.
       - MCP_FILE_URI_ROOT=/audio
       - API_HOST=${API_HOST:-0.0.0.0}
       - API_PORT=${AUDIO_SCRIBE_API_PORT:-7017}
@@ -309,12 +321,12 @@ services:
       - FETCH_MAX_REDIRECT_HOPS=${AUDIO_SCRIBE_FETCH_MAX_REDIRECT_HOPS:-10}
       - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-false}
       - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - OTEL_SERVICE_NAME=ascend-audio-scribe
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.9.4
     volumes:
-      - D:/Development/AI/hf-cache:/hf-cache
-      - C:\Users\Lukk\Desktop:/audio
+      - "${HF_CACHE_ROOT:-hf-cache}:/hf-cache"
+      - "${ASCEND_AUDIO_SCRIBE_MEDIA_ROOT:-ascend-audio-scribe-media}:/audio"
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:${AUDIO_SCRIBE_API_PORT:-7017}/health"]
       interval: 30s
@@ -347,8 +359,8 @@ services:
   # Prometheus, since neither JVM heap metrics nor Python RSS metrics see the
   # container's cgroup limit or its own non-heap overhead. First-party
   # exporter (source in infra/observability/container-metrics-exporter/): cAdvisor
-  # was tried first and rejected because Docker Desktop's containerd-backed
-  # image store never populates the legacy overlayfs layerdb metadata
+  # was tried first and rejected because a containerd-backed image store
+  # never populates the legacy overlayfs layerdb metadata
   # cAdvisor's docker handler requires, so it silently reports only the host
   # root cgroup. This exporter reads only the Docker Engine API stats
   # endpoint over the socket, so it needs no /sys or /var/lib/docker mount
@@ -360,6 +372,8 @@ services:
     container_name: container-metrics-exporter
     hostname: container-metrics-exporter
     restart: unless-stopped
+    group_add:
+      - "${DOCKER_SOCKET_GID:-0}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
@@ -374,7 +388,7 @@ services:
           - container-metrics-exporter
 
   prometheus:
-    image: prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
@@ -403,7 +417,7 @@ services:
           - prometheus
 
   grafana:
-    image: grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
+    image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
@@ -427,7 +441,7 @@ services:
           - grafana
 
   loki:
-    image: grafana/loki:3.3.2@sha256:8af2de1abbdd7aa92b27c9bcc96f0f4140c9096b507c77921ffddf1c6ad6c48f
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
     container_name: loki
     hostname: loki
     restart: unless-stopped
@@ -436,6 +450,8 @@ services:
       - -config.expand-env=true
     environment:
       - LOKI_RETENTION_PERIOD=${LOKI_RETENTION_PERIOD:-2160h}
+      - LOKI_RETENTION_DELETE_DELAY=${LOKI_RETENTION_DELETE_DELAY:-2h}
+      - LOKI_RESULTS_CACHE_MAX_SIZE_MB=${LOKI_RESULTS_CACHE_MAX_SIZE_MB:-100}
     volumes:
       - ./infra/observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
@@ -444,35 +460,30 @@ services:
         aliases:
           - loki
 
-  vector:
-    image: timberio/vector:0.42.0-alpine@sha256:913878963fdead8276686ff96831db994acc5c740447b2186da0d87c835d8375
-    container_name: vector
-    hostname: vector
-    restart: unless-stopped
-    command: ["--config", "/etc/vector/vector.toml"]
-    volumes:
-      - ./infra/observability/vector/vector.toml:/etc/vector/vector.toml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      default:
-        aliases:
-          - vector
-
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.114.0@sha256:37fa87091cfaaec7234a27e4e395a40c31c2bfaea97a349a4afef6d9e9681197
+    image: otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
     container_name: otel-collector
     hostname: otel-collector
     restart: unless-stopped
     command: ["--config=/etc/otel-collector/otel-collector-config.yaml"]
+    user: "0"
+    environment:
+      - COLLECTOR_MEMORY_CHECK_INTERVAL=${COLLECTOR_MEMORY_CHECK_INTERVAL:-1s}
+      - COLLECTOR_MEMORY_LIMIT_MIB=${COLLECTOR_MEMORY_LIMIT_MIB:-256}
+      - COLLECTOR_MEMORY_SPIKE_LIMIT_MIB=${COLLECTOR_MEMORY_SPIKE_LIMIT_MIB:-64}
+      - COLLECTOR_BATCH_TIMEOUT=${COLLECTOR_BATCH_TIMEOUT:-1s}
+      - COLLECTOR_BATCH_SIZE=${COLLECTOR_BATCH_SIZE:-1024}
     volumes:
       - ./infra/observability/otel-collector/otel-collector-config.yaml:/etc/otel-collector/otel-collector-config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     networks:
       default:
         aliases:
           - otel-collector
 
   tempo:
-    image: grafana/tempo:2.6.1@sha256:ef4384fce6e8ad22b95b243d8fc165628cda655376fd50e7850536ad89d71d50
+    image: grafana/tempo:3.1.0@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd
     container_name: tempo
     hostname: tempo
     restart: unless-stopped
@@ -481,6 +492,12 @@ services:
       - -config.expand-env=true
     environment:
       - TEMPO_BLOCK_RETENTION=${TEMPO_BLOCK_RETENTION:-2160h}
+      - TEMPO_LOG_LEVEL=${TEMPO_LOG_LEVEL:-info}
+      - TEMPO_MAX_BLOCK_DURATION=${TEMPO_MAX_BLOCK_DURATION:-5m}
+      - TEMPO_SEARCH_DURATION_SLO=${TEMPO_SEARCH_DURATION_SLO:-5s}
+      - TEMPO_SEARCH_THROUGHPUT_BYTES_SLO=${TEMPO_SEARCH_THROUGHPUT_BYTES_SLO:-1073741824}
+      - TEMPO_TRACE_BY_ID_DURATION_SLO=${TEMPO_TRACE_BY_ID_DURATION_SLO:-5s}
+      - OBSERVABILITY_CLUSTER_LABEL=${OBSERVABILITY_CLUSTER_LABEL:-ascend-ai-local}
     volumes:
       - ./infra/observability/tempo/tempo-config.yaml:/etc/tempo/tempo-config.yaml:ro
       - tempo-data:/var/tempo
@@ -495,7 +512,7 @@ services:
     hostname: redis-exporter
     restart: unless-stopped
     environment:
-      - REDIS_ADDR=redis://host.docker.internal:6379
+      - REDIS_ADDR=${REDIS_ADDR:-redis://host.docker.internal:6379}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -509,7 +526,7 @@ services:
     hostname: postgres-exporter
     restart: unless-stopped
     environment:
-      - DATA_SOURCE_URI=host.docker.internal:5432/ascend_ai?sslmode=disable
+      - DATA_SOURCE_URI=${DATA_SOURCE_URI:-host.docker.internal:5432/ascend_ai?sslmode=disable}
       - DATA_SOURCE_USER=${DATA_SOURCE_USER}
       - DATA_SOURCE_PASS=${DATA_SOURCE_PASS}
     extra_hosts:
@@ -524,3 +541,5 @@ volumes:
   grafana-data:
   loki-data:
   tempo-data:
+  hf-cache:
+  ascend-audio-scribe-media:

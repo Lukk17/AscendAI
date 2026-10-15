@@ -2,7 +2,7 @@ stream_over_http_enabled: true
 
 server:
   http_listen_port: 3200
-  log_level: info
+  log_level: ${TEMPO_LOG_LEVEL:-info}
 
 distributor:
   receivers:
@@ -13,10 +13,16 @@ distributor:
         http:
           endpoint: 0.0.0.0:4318
 
-ingester:
-  max_block_duration: 5m
+live_store:
+  max_block_duration: ${TEMPO_MAX_BLOCK_DURATION:-5m}
 
-compactor:
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: ${TEMPO_BLOCK_RETENTION:-2160h}
+
+backend_worker:
   compaction:
     block_retention: ${TEMPO_BLOCK_RETENTION:-2160h}
 
@@ -24,7 +30,7 @@ metrics_generator:
   registry:
     external_labels:
       source: tempo
-      cluster: ascend-ai-local
+      cluster: ${OBSERVABILITY_CLUSTER_LABEL:-ascend-ai-local}
   storage:
     path: /var/tempo/generator/wal
 
@@ -42,10 +48,10 @@ querier:
 
 query_frontend:
   search:
-    duration_slo: 5s
-    throughput_bytes_slo: 1.073741824e+09
+    duration_slo: ${TEMPO_SEARCH_DURATION_SLO:-5s}
+    throughput_bytes_slo: ${TEMPO_SEARCH_THROUGHPUT_BYTES_SLO:-1073741824}
   trace_by_id:
-    duration_slo: 5s
+    duration_slo: ${TEMPO_TRACE_BY_ID_DURATION_SLO:-5s}
 
 overrides:
   defaults:

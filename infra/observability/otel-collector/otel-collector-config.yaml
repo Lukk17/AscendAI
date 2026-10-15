@@ -6,25 +6,179 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  receiver_creator/logs:
+    watch_observers: [docker_observer]
+    receivers:
+      filelog/agent:
+        rule: type == "container" and labels["com.docker.compose.service"] == "ascend-agent" and port == 9917
+        config:
+          include:
+            - /var/lib/docker/containers/`container_id`/`container_id`-json.log
+          operators:
+            - id: container-parser
+              type: container
+            - id: set-service
+              type: add
+              field: resource["service"]
+              value: ascend-agent
+            - id: set-source
+              type: add
+              field: resource["source"]
+              value: docker
+            - id: set-container-name
+              type: add
+              field: resource["container_name"]
+              value: '`name`'
+      filelog/weather:
+        rule: type == "container" and labels["com.docker.compose.service"] == "ascend-weather-mcp" and port == 9998
+        config:
+          include:
+            - /var/lib/docker/containers/`container_id`/`container_id`-json.log
+          operators:
+            - id: container-parser
+              type: container
+            - id: set-service
+              type: add
+              field: resource["service"]
+              value: ascend-weather-mcp
+            - id: set-source
+              type: add
+              field: resource["source"]
+              value: docker
+            - id: set-container-name
+              type: add
+              field: resource["container_name"]
+              value: '`name`'
+      filelog/memory:
+        rule: type == "container" and labels["com.docker.compose.service"] == "ascend-memory" and port == 7020
+        config:
+          include:
+            - /var/lib/docker/containers/`container_id`/`container_id`-json.log
+          operators:
+            - id: container-parser
+              type: container
+            - id: set-service
+              type: add
+              field: resource["service"]
+              value: ascend-memory
+            - id: set-source
+              type: add
+              field: resource["source"]
+              value: docker
+            - id: set-container-name
+              type: add
+              field: resource["container_name"]
+              value: '`name`'
+      filelog/audio:
+        rule: type == "container" and labels["com.docker.compose.service"] == "ascend-audio-scribe" and port == 7017
+        config:
+          include:
+            - /var/lib/docker/containers/`container_id`/`container_id`-json.log
+          operators:
+            - id: container-parser
+              type: container
+            - id: set-service
+              type: add
+              field: resource["service"]
+              value: ascend-audio-scribe
+            - id: set-source
+              type: add
+              field: resource["source"]
+              value: docker
+            - id: set-container-name
+              type: add
+              field: resource["container_name"]
+              value: '`name`'
+      filelog/hunter:
+        rule: type == "container" and labels["com.docker.compose.service"] == "ascend-web-hunter" and port == 7021
+        config:
+          include:
+            - /var/lib/docker/containers/`container_id`/`container_id`-json.log
+          operators:
+            - id: container-parser
+              type: container
+            - id: set-service
+              type: add
+              field: resource["service"]
+              value: ascend-web-hunter
+            - id: set-source
+              type: add
+              field: resource["source"]
+              value: docker
+            - id: set-container-name
+              type: add
+              field: resource["container_name"]
+              value: '`name`'
+      filelog/ocr:
+        rule: type == "container" and labels["com.docker.compose.service"] == "ascend-ocr" and port == 7022
+        config:
+          include:
+            - /var/lib/docker/containers/`container_id`/`container_id`-json.log
+          operators:
+            - id: container-parser
+              type: container
+            - id: set-service
+              type: add
+              field: resource["service"]
+              value: ascend-ocr
+            - id: set-source
+              type: add
+              field: resource["source"]
+              value: docker
+            - id: set-container-name
+              type: add
+              field: resource["container_name"]
+              value: '`name`'
+
+extensions:
+  docker_observer:
+    endpoint: unix:///var/run/docker.sock
+    api_version: "1.44"
+
 processors:
   memory_limiter:
-    check_interval: 1s
-    limit_mib: 256
-    spike_limit_mib: 64
+    check_interval: ${env:COLLECTOR_MEMORY_CHECK_INTERVAL:-1s}
+    limit_mib: ${env:COLLECTOR_MEMORY_LIMIT_MIB:-256}
+    spike_limit_mib: ${env:COLLECTOR_MEMORY_SPIKE_LIMIT_MIB:-64}
 
   batch:
-    timeout: 1s
-    send_batch_size: 1024
+    timeout: ${env:COLLECTOR_BATCH_TIMEOUT:-1s}
+    send_batch_size: ${env:COLLECTOR_BATCH_SIZE:-1024}
 
 exporters:
-  otlp/tempo:
+  otlp_grpc/tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
 
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+  # ─── Cloud migration ──────────────────────────────────────────────────────
+  # To ship logs to a managed backend instead of (or alongside) Loki, add an
+  # exporter of type datadog, awscloudwatchlogs or splunk_hec fed by the logs
+  # pipeline below, with its credentials, then drop or keep otlphttp/loki.
+  # Service containers are never touched. Kept as comments so the cloud-sink
+  # recipe the removed log shipper carried stays with the pipeline that
+  # replaced it.
+  # datadog:
+  #   api:
+  #     key: ${DATADOG_API_KEY}
+  # awscloudwatchlogs:
+  #   region: ${AWS_REGION}
+  #   log_group_name: ascend-ai
+  # splunk_hec:
+  #   endpoint: ${SPLUNK_HEC_ENDPOINT}
+  #   token: ${SPLUNK_HEC_TOKEN}
+
 service:
+  extensions: [docker_observer]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlp/tempo]
+      exporters: [otlp_grpc/tempo]
+    logs:
+      receivers: [receiver_creator/logs]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]

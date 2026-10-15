@@ -21,7 +21,7 @@ query_range:
     cache:
       embedded_cache:
         enabled: true
-        max_size_mb: 100
+        max_size_mb: ${LOKI_RESULTS_CACHE_MAX_SIZE_MB:-100}
 
 schema_config:
   configs:
@@ -35,11 +35,18 @@ schema_config:
 
 limits_config:
   retention_period: ${LOKI_RETENTION_PERIOD:-2160h}
+  otlp_config:
+    resource_attributes:
+      attributes_config:
+        - action: index_label
+          attributes:
+            - service
+            - source
 
 compactor:
   working_directory: /loki/compactor
   retention_enabled: true
-  retention_delete_delay: 2h
+  retention_delete_delay: ${LOKI_RETENTION_DELETE_DELAY:-2h}
   delete_request_store: filesystem
 
 ruler:

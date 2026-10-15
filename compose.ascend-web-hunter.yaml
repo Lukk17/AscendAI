@@ -212,7 +212,7 @@ services:
       # container logs a warning at boot. Port 7900 is not published locally,
       # so only the ngrok tunnel can reach it. The homelab bundle requires it.
       - VNC_PASSWORD=${VNC_PASSWORD:-}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - OTEL_SERVICE_NAME=ascend-web-hunter
       - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.7
     cap_add:

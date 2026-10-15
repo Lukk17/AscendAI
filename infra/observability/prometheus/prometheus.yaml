@@ -13,54 +13,60 @@ scrape_configs:
 
   - job_name: ascend-agent
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets:
-          - ascend-agent:9918
+    dns_sd_configs:
+      - names: [ascend-agent]
+        type: A
+        port: 9918
     relabel_configs:
       - target_label: service
         replacement: ascend-agent
 
   - job_name: ascend-weather-mcp
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets:
-          - ascend-weather-mcp:9998
+    dns_sd_configs:
+      - names: [ascend-weather-mcp]
+        type: A
+        port: 9998
     relabel_configs:
       - target_label: service
         replacement: ascend-weather-mcp
 
   - job_name: ascend-memory
     metrics_path: /metrics
-    static_configs:
-      - targets:
-          - ascend-memory:7020
+    dns_sd_configs:
+      - names: [ascend-memory]
+        type: A
+        port: 7020
     relabel_configs:
       - target_label: service
         replacement: ascend-memory
 
   - job_name: ascend-audio-scribe
     metrics_path: /metrics
-    static_configs:
-      - targets:
-          - ascend-audio-scribe:7017
+    dns_sd_configs:
+      - names: [ascend-audio-scribe]
+        type: A
+        port: 7017
     relabel_configs:
       - target_label: service
         replacement: ascend-audio-scribe
 
   - job_name: ascend-web-hunter
     metrics_path: /metrics
-    static_configs:
-      - targets:
-          - ascend-web-hunter:7021
+    dns_sd_configs:
+      - names: [ascend-web-hunter]
+        type: A
+        port: 7021
     relabel_configs:
       - target_label: service
         replacement: ascend-web-hunter
 
   - job_name: ascend-ocr
     metrics_path: /metrics
-    static_configs:
-      - targets:
-          - ascend-ocr:7022
+    dns_sd_configs:
+      - names: [ascend-ocr]
+        type: A
+        port: 7022
     relabel_configs:
       - target_label: service
         replacement: ascend-ocr
