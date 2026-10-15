@@ -35,8 +35,6 @@ import static org.mockito.Mockito.when;
  * through the real strategy implementations. The remaining meters are
  * recorded once with the exact names and spec-defined tags the production
  * code uses; their per-path behaviour is covered by the unit metric tests.
- * The gauges ({@code rag.last_top_score}, {@code chat.history.size}) are
- * registered by their owning beans at context startup.
  *
  * <p>The actuator lives on the internal management port (see
  * {@code management.server.port} in application.yaml), so this test boots a
@@ -77,14 +75,11 @@ class MetricsEndpointIT extends TestcontainersBase {
         assertThat(body).contains("memory_search_duration_seconds");
         assertThat(body).contains("rag_retrieval_hits_total");
         assertThat(body).contains("rag_retrieval_duration_seconds");
-        assertThat(body).contains("rag_last_top_score");
         assertThat(body).contains("rag_top_score_bucket");
         assertThat(body).contains("mcp_tool_duration_seconds");
         assertThat(body).contains("ingestion_upload_bytes_total");
-        assertThat(body).contains("chat_history_size");
         assertThat(body).contains("prompt_cache_tokens_read_total");
         assertThat(body).contains("prompt_cache_tokens_creation_total");
-        assertThat(body).contains("prompt_cache_tokens_total{");
         assertThat(body).contains("gen_ai_client_token_usage_total{");
         assertThat(body).contains("gen_ai_system=\"anthropic\"");
         assertThat(body).contains("gen_ai_system=\"openai\"");

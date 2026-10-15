@@ -7,7 +7,6 @@ import com.lukk.ascend.ai.agent.service.rag.RagRetrievalResult;
 import com.lukk.ascend.ai.agent.service.rag.SourceRef;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +19,6 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Slf4j
@@ -32,7 +30,6 @@ public class RagRetrievalService {
     private static final String META_MIME_TYPE = "mimeType";
     private static final String METRIC_RETRIEVAL_HITS = "rag.retrieval.hits";
     private static final String METRIC_RETRIEVAL_DURATION = "rag.retrieval.duration";
-    private static final String METRIC_LAST_TOP_SCORE = "rag.last_top_score";
     private static final String METRIC_TOP_SCORE = "rag.top_score";
     private static final String OUTCOME_OK = "ok";
     private static final String OUTCOME_ERROR = "error";
@@ -41,7 +38,6 @@ public class RagRetrievalService {
     private final RagProperties ragProperties;
     private final String defaultBucket;
     private final MeterRegistry meterRegistry;
-    private final AtomicReference<Double> lastTopScore = new AtomicReference<>(0.0);
 
     public RagRetrievalService(VectorStoreResolver vectorStoreResolver,
                                RagProperties ragProperties,
@@ -51,9 +47,6 @@ public class RagRetrievalService {
         this.ragProperties = ragProperties;
         this.defaultBucket = defaultBucket;
         this.meterRegistry = meterRegistry;
-        Gauge.builder(METRIC_LAST_TOP_SCORE, lastTopScore, AtomicReference::get)
-                .description("Top similarity score from the most recent RAG retrieval query")
-                .register(meterRegistry);
     }
 
     public RagRetrievalResult retrieve(String query, String embeddingProvider) {
@@ -116,25 +109,18 @@ public class RagRetrievalService {
                 .tag("provider", provider)
                 .register(meterRegistry);
 
-        double currentMax = 0.0;
         for (Document doc : candidates) {
             Double score = doc.getScore();
             if (score == null) {
                 continue;
             }
             topScoreHistogram.record(score);
-            if (score > currentMax) {
-                currentMax = score;
-            }
             boolean above = score >= threshold;
             Counter.builder(METRIC_RETRIEVAL_HITS)
                     .tag("provider", provider)
                     .tag("above_threshold", String.valueOf(above))
                     .register(meterRegistry)
                     .increment();
-        }
-        if (!candidates.isEmpty()) {
-            lastTopScore.set(currentMax);
         }
     }
 

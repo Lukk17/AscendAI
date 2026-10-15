@@ -21,6 +21,7 @@ management:
       percentiles-histogram:
         mcp.tool.duration: true
         rag.top_score: true
+        http.server.requests: true
 
 app:
   ingestion:

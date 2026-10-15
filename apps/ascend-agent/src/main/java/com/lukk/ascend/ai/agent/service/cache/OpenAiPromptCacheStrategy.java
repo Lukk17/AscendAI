@@ -13,7 +13,6 @@ import org.springframework.util.StringUtils;
 public class OpenAiPromptCacheStrategy implements PromptCacheStrategy {
 
     private static final String METRIC_TOKENS_READ = "prompt_cache.tokens.read";
-    private static final String METRIC_TOKENS_TOTAL = "prompt_cache.tokens.total";
 
     private final String providerName;
     private final MeterRegistry meterRegistry;
@@ -56,7 +55,6 @@ public class OpenAiPromptCacheStrategy implements PromptCacheStrategy {
                 providerName, userId, hit, cached, prompt);
 
         Counter.builder(METRIC_TOKENS_READ).tag("provider", providerName).register(meterRegistry).increment(cached);
-        Counter.builder(METRIC_TOKENS_TOTAL).tag("provider", providerName).register(meterRegistry).increment(prompt);
 
         GenAiTokenUsageRecorder.record(meterRegistry, response, providerName);
     }
