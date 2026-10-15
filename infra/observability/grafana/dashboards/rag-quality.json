@@ -52,7 +52,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Last recorded top similarity score from the most recent RAG query per embedding provider. Metric: rag_last_top_score (gauge).",
+      "description": "95th percentile of the RAG top score histogram per provider over the last 5 minutes. Query: 0.95 quantile of sum by (provider, le) (rate(rag_top_score_bucket[5m])), see the panel expression.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -77,7 +77,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rag_last_top_score",
+          "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(rag_top_score_bucket[5m])))",
           "legendFormat": "{{provider}}",
           "refId": "A"
         }

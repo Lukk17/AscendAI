@@ -21,7 +21,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Prompt cache hit rate per provider - cached tokens read / total prompt tokens. Metric: prompt_cache_tokens_read_total and prompt_cache_tokens_total. A flat line at 0% for a given provider means caching is not activating (regression). Emitted from AnthropicPromptCacheStrategy.recordOutcome() and OpenAiPromptCacheStrategy.recordOutcome().",
+      "description": "Prompt cache hit rate per provider - cached tokens read / gen_ai input tokens. Metric: prompt_cache_tokens_read_total and gen_ai_client_token_usage_total. A flat line at 0% for a given provider means caching is not activating (regression). Emitted from AnthropicPromptCacheStrategy.recordOutcome() and OpenAiPromptCacheStrategy.recordOutcome().",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -45,19 +45,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(prompt_cache_tokens_read_total{provider=\"anthropic\"}[5m]) / (rate(prompt_cache_tokens_total{provider=\"anthropic\"}[5m]) > 0)",
+          "expr": "sum(rate(prompt_cache_tokens_read_total{provider=\"anthropic\"}[5m])) / (sum(rate(gen_ai_client_token_usage_total{gen_ai_system=\"anthropic\",gen_ai_token_type=\"input\"}[5m])) > 0)",
           "legendFormat": "anthropic hit rate",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(prompt_cache_tokens_read_total{provider=\"openai\"}[5m]) / (rate(prompt_cache_tokens_total{provider=\"openai\"}[5m]) > 0)",
+          "expr": "sum(rate(prompt_cache_tokens_read_total{provider=\"openai\"}[5m])) / (sum(rate(gen_ai_client_token_usage_total{gen_ai_system=\"openai\",gen_ai_token_type=\"input\"}[5m])) > 0)",
           "legendFormat": "openai hit rate",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(prompt_cache_tokens_read_total{provider=\"gemini\"}[5m]) / (rate(prompt_cache_tokens_total{provider=\"gemini\"}[5m]) > 0)",
+          "expr": "sum(rate(prompt_cache_tokens_read_total{provider=\"gemini\"}[5m])) / (sum(rate(gen_ai_client_token_usage_total{gen_ai_system=\"gemini\",gen_ai_token_type=\"input\"}[5m])) > 0)",
           "legendFormat": "gemini hit rate",
           "refId": "C"
         }
@@ -87,24 +87,24 @@
       },
       "gridPos": { "h": 10, "w": 8, "x": 16, "y": 1 },
       "id": 3,
-      "description": "Current cache hit rate snapshot per provider over the last 10 minutes. Metric: rate(prompt_cache_tokens_read_total[10m]) / rate(prompt_cache_tokens_total[10m]). A gauge below 10% for any cloud provider while that provider is receiving traffic warrants investigation.",
+      "description": "Current cache hit rate snapshot per provider over the last 10 minutes. Metric: sum(rate(prompt_cache_tokens_read_total[10m])) / sum(rate(gen_ai_client_token_usage_total[10m])). A gauge below 10% for any cloud provider while that provider is receiving traffic warrants investigation.",
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(prompt_cache_tokens_read_total{provider=\"anthropic\"}[10m]) / (rate(prompt_cache_tokens_total{provider=\"anthropic\"}[10m]) > 0)",
+          "expr": "sum(rate(prompt_cache_tokens_read_total{provider=\"anthropic\"}[10m])) / (sum(rate(gen_ai_client_token_usage_total{gen_ai_system=\"anthropic\",gen_ai_token_type=\"input\"}[10m])) > 0)",
           "legendFormat": "anthropic",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(prompt_cache_tokens_read_total{provider=\"openai\"}[10m]) / (rate(prompt_cache_tokens_total{provider=\"openai\"}[10m]) > 0)",
+          "expr": "sum(rate(prompt_cache_tokens_read_total{provider=\"openai\"}[10m])) / (sum(rate(gen_ai_client_token_usage_total{gen_ai_system=\"openai\",gen_ai_token_type=\"input\"}[10m])) > 0)",
           "legendFormat": "openai",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(prompt_cache_tokens_read_total{provider=\"gemini\"}[10m]) / (rate(prompt_cache_tokens_total{provider=\"gemini\"}[10m]) > 0)",
+          "expr": "sum(rate(prompt_cache_tokens_read_total{provider=\"gemini\"}[10m])) / (sum(rate(gen_ai_client_token_usage_total{gen_ai_system=\"gemini\",gen_ai_token_type=\"input\"}[10m])) > 0)",
           "legendFormat": "gemini",
           "refId": "C"
         }
