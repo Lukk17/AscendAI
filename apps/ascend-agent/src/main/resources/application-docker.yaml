@@ -52,3 +52,11 @@ spring:
               url: http://ascend-weather-mcp:9998
             ascend-web-hunter:
               url: http://ascend-web-hunter:7021
+
+management:
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://otel-collector:4318/v1/traces}
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}

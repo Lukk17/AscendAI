@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service.provider;
 
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties.ProviderConfig;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +28,9 @@ class ChatModelResolverTest {
 
     @Mock
     private AiProviderProperties aiProviderProperties;
+
+    @Mock
+    private ObservationRegistry observationRegistry;
 
     @InjectMocks
     private ChatModelResolver chatModelResolver;

@@ -76,9 +76,9 @@ class TestSettingsDefaults:
         # When / Then
         assert Settings().MCP_FILE_URI_ROOT is None
 
-    def test_default_mcp_allowed_hosts_empty(self) -> None:
+    def test_default_allowed_private_hosts_empty(self) -> None:
         # When / Then
-        assert Settings().MCP_ALLOWED_HOSTS == ()
+        assert Settings().ALLOWED_PRIVATE_HOSTS == ()
 
     def test_default_mcp_download_timeout(self) -> None:
         # When / Then

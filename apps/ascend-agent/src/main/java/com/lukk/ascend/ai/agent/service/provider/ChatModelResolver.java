@@ -2,6 +2,7 @@ package com.lukk.ascend.ai.agent.service.provider;
 
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties;
 import com.lukk.ascend.ai.agent.config.properties.AiProviderProperties.ProviderConfig;
+import io.micrometer.observation.ObservationRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class ChatModelResolver {
 
     private final AiProviderProperties aiProviderProperties;
     private final ToolCallTracker toolCallTracker;
+    private final ObservationRegistry observationRegistry;
     private final Map<String, ChatModel> chatModels = new LinkedHashMap<>();
 
     @PostConstruct
@@ -95,6 +97,7 @@ public class ChatModelResolver {
                 .openAiApi(openAiApi)
                 .defaultOptions(options)
                 .toolCallingManager(new TrackingToolCallingManager(ToolCallingManager.builder().build(), toolCallTracker))
+                .observationRegistry(observationRegistry)
                 .build();
     }
 
@@ -115,6 +118,7 @@ public class ChatModelResolver {
                 .anthropicApi(anthropicApi)
                 .defaultOptions(options)
                 .toolCallingManager(new TrackingToolCallingManager(ToolCallingManager.builder().build(), toolCallTracker))
+                .observationRegistry(observationRegistry)
                 .build();
     }
 

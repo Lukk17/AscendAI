@@ -177,7 +177,6 @@ class Settings(ServiceSettings, McpFetchSettings):
         default=("en", "pl", "de", "fr", "es", "it", "pt", "nl", "ch", "japan")
     )
 
-    MCP_ALLOWED_HOSTS: CsvTuple = Field(default=())
     MCP_DOWNLOAD_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
     FETCH_MAX_REDIRECT_HOPS: int = Field(default=0, ge=0)
 
@@ -186,7 +185,7 @@ class Settings(ServiceSettings, McpFetchSettings):
 
     REDIS_URL: str = Field(default="redis://127.0.0.1:6379/0")
 
-    OTEL_EXPORTER_OTLP_ENDPOINT: str = Field(default="http://otel-collector:4317")
+    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = Field(default=None)
 
     # One document is read at a time, and every promise the queue makes about how long
     # a submission waits is computed against that. This value governs both the
