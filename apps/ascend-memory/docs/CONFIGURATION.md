@@ -19,6 +19,7 @@ invoked, so a single deployment can serve `provider=lmstudio`, `provider=openai`
 | `STARTUP_PROBE_TIMEOUT_SECONDS` | `2`                                                       | Time each startup banner check may take. Added by `add-ascend-python-common`. |
 | `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000`                                                | `max-age` of the `strict-transport-security` response header. Added by `add-ascend-python-common`. |
 | `OTEL_SDK_DISABLED`      | `false`                                                            | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset                                                           | OTLP trace export endpoint, export whenever it is set. Added by `add-observability`. |
 
 ---
 

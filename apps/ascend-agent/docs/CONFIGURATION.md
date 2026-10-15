@@ -59,6 +59,9 @@ time via the `model` form field; these are the shipped defaults.
 | `MINIMAX_MODEL`              | No                 | Override default MiniMax model (default `MiniMax-M2.7`).                                     |
 | `LMSTUDIO_MODEL`             | No                 | Override default LM Studio model (default `meta-llama-3.1-8b-instruct`).                     |
 | `EMBEDDING_PROVIDER`         | No                 | Embedding provider: `lmstudio` (default), `openai`, or `gemini`.                             |
+| `MANAGEMENT_OTLP_TRACING_ENDPOINT` | No           | OTLP trace export endpoint (default `http://otel-collector:4318/v1/traces`). Added by `add-observability`. |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | No   | Trace sampling probability (default `1.0`). Added by `add-observability`.                    |
+| `AGENT_HOST_PORT`            | No                 | Published host port (default `9917`). Added by `add-observability`.                          |
 
 ---
 

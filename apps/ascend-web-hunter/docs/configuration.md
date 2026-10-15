@@ -14,7 +14,7 @@ against environment variables and `.env`. The source of truth is
 | `API_HOST` | `0.0.0.0` | Bind address (deliberately broad for the container case) |
 | `LOG_LEVEL` | `INFO` | `DEBUG | INFO | WARNING | ERROR | CRITICAL` |
 | `LOG_FORMAT` | `json` | `json` for log sinks, `color` for a local terminal |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | OTLP trace export endpoint, export whenever it is set |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | OTLP trace export endpoint, export whenever it is set. Added by `add-observability`. |
 | `OTEL_SDK_DISABLED` | `false` | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
 | `RATE_LIMIT_DEFAULT` | `1200/minute` | Flood-protection rate limit for REST routes and MCP tools; `/health`, `/ready`, `/metrics` and `tools/list` are never limited. Compose passes `WEB_HUNTER_RATE_LIMIT_DEFAULT` |
 | `ALLOWED_PRIVATE_HOSTS` | empty | Hosts the URI fetch guard may reach even at a private address. Leave empty, only an e2e sweep sets it. The development compose file fills it from `WEB_HUNTER_ALLOWED_PRIVATE_HOSTS`. |

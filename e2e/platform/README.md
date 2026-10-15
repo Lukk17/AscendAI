@@ -63,8 +63,8 @@ Task 17.9 owns this list. Each entry names the requirement and the reason no swe
 
 - Retention settings (task 15.7): the effective `retention_period` and `block_retention` are read back from the Loki and Tempo config endpoints, not behaviour a request can observe within a sweep.
 - 30 minute load test (task 15.5): it measures capacity and disk growth under sustained prompts, not correctness, so it runs as a one-off measurement rather than a repeatable spec.
-- Token Cost dashboard after a `pricing.yaml` change (task 14.3): new rates need a Grafana restart with an edited file before the dashboard reflects them, so the check is a restart procedure, not a sweep assertion.
-- Scrape interval and Vector migration sinks: configuration values and commented placeholders in `vector.toml`, checked by review rather than by observable behaviour.
+- Token Cost dashboard after a `pricing.yaml` change (task 14.3): new rates need `docker compose restart prometheus` before the dashboard reflects them, so the check is a restart procedure covered by task 13.11, not a sweep assertion.
+- Scrape interval and collector migration exporters: configuration values and the commented `datadog`, `awscloudwatchlogs` and `splunk_hec` exporter stanzas of the collector config, checked by review rather than by observable behaviour.
 - Failure-path metrics such as `memory.extraction.parse_failed` or `memory.insert.failed`: a live provider and ascend-memory cannot be made to fail on demand, so these counters are covered by the metric tests of groups 3 to 6 instead of a live spec.
 
 ## Neighbours

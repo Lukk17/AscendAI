@@ -9,10 +9,10 @@ AscendAI ships a full three-pillar observability stack (metrics, logs, traces) a
 | Pillar | Tool | Access |
 |---|---|---|
 | Metrics | Prometheus + Grafana | Prometheus: http://localhost:7077, Grafana: http://localhost:7078 |
-| Logs | Vector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
+| Logs | OpenTelemetry collector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
 | Traces | OTel Collector + Tempo + Grafana | http://localhost:7078 → Explore → Tempo |
 
-All seven observability containers start automatically with `docker compose up`. There is no profile flag required - observability is always-on. The stack is always on and is core, never a switchable part of the deployment: no service carries a compose profile for observability and no service switches its metric, log, or trace export off.
+All six observability containers start automatically with `docker compose up`. There is no profile flag required - observability is always-on. The stack is always on and is core, never a switchable part of the deployment: no service carries a compose profile for observability and no service switches its metric, log, or trace export off.
 
 Prometheus and Grafana read their operational values from environment variables passed by `compose.yaml`, each in `VAR=${VAR:-default}` form. A change of the committed `infra/observability/prometheus/prometheus.yaml` or of a value needs `docker compose up -d prometheus` (recreate the container for a changed value, restart it for a changed file). Grafana provisioning files expand `${VAR}` with no default form, so the compose line is the only default for the Grafana settings.
 
@@ -67,7 +67,7 @@ Prometheus scrapes every 15 seconds. Scrape targets are in `infra/observability/
 
 ### Logs
 
-Vector reads Docker container stdout/stderr via the Docker socket and ships to Loki with labels `service` (from `container_name`) and `source` (`docker`). No code changes are required in any service - they just write to stdout.
+The OpenTelemetry collector reads the Docker `json-file` logs through a `filelog` receiver per application container and ships to Loki with the resource attributes `service` (the compose service name) and `source` (`docker`). No code changes are required in any service - they just write to stdout.
 
 To query logs in Grafana: Explore → Loki → `{service="ascend-ai-agent"}`.
 
@@ -86,7 +86,7 @@ To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-
 
 ## Metrics Inventory
 
-Every custom metric emitted by the application services. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
+Every custom metric emitted by the application services. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters. The L3 cache hit rate divides cache-read tokens by the input series of `gen_ai_client_token_usage_total`, not by a dedicated total counter.
 
 | Service | Metric | Prometheus name | Type | Tags | Dashboards |
 |---|---|---|---|---|---|
@@ -96,14 +96,11 @@ Every custom metric emitted by the application services. Micrometer converts dot
 | ascend-agent | `memory.search.duration` | `memory_search_duration_seconds_*` | timer | `embedding_provider`, `outcome` | - |
 | ascend-agent | `rag.retrieval.hits` | `rag_retrieval_hits_total` | counter | `provider`, `embedding_provider`, `above_threshold` | AI Pipeline, L2 RAG Quality |
 | ascend-agent | `rag.retrieval.duration` | `rag_retrieval_duration_seconds_*` | timer | `provider`, `outcome` | - |
-| ascend-agent | `rag.last_top_score` | `rag_last_top_score` | gauge | `provider` | L2 RAG Quality |
 | ascend-agent | `rag.top_score` | `rag_top_score_bucket` | histogram | `provider` | L2 RAG Quality |
 | ascend-agent, ascend-weather-mcp | `mcp.tool.duration` | `mcp_tool_duration_seconds_*` | timer | `tool`, `outcome` | AI Pipeline |
 | ascend-agent | `ingestion.upload.bytes` | `ingestion_upload_bytes_total` | counter | `source_type`, `outcome` | L2 RAG Quality |
-| ascend-agent | `chat.history.size` | `chat_history_size` | gauge | `user_id` (top-10 slots only, see Cardinality Rules) | - |
 | ascend-agent | `prompt_cache.tokens.read` | `prompt_cache_tokens_read_total` | counter | `provider` | L3 Cache Hit Rate |
 | ascend-agent | `prompt_cache.tokens.creation` | `prompt_cache_tokens_creation_total` | counter | `provider` (Anthropic only) | L3 Cache Hit Rate |
-| ascend-agent | `prompt_cache.tokens.total` | `prompt_cache_tokens_total` | counter | `provider` | L3 Cache Hit Rate |
 | ascend-web-hunter | `strategy_attempts_total` | `strategy_attempts_total` | counter | `strategy`, `outcome`, `domain` | - |
 | ascend-ocr | `ascendocr_jobs_total` | `ascendocr_jobs_total` | counter | `outcome` | - |
 | ascend-ocr | `ascendocr_job_duration_seconds` | `ascendocr_job_duration_seconds` | histogram | none | - |
@@ -191,7 +188,7 @@ The metrics appear at `/metrics` and are scraped by Prometheus.
 
 ## How to Add a Log Field
 
-Python services log via the standard `logging` module. To add a structured field, use a `LogRecord` extra or a custom formatter. The log line is already tagged with `service` by Vector when it ships to Loki.
+Python services log via the standard `logging` module. To add a structured field, use a `LogRecord` extra or a custom formatter. The log line is already tagged with `service` by the collector when it ships to Loki.
 
 Java services use standard SLF4J + Logback. Structured logging can be added via `net.logstash.logback:logstash-logback-encoder`. The existing setup writes plain text; to add key-value fields, use MDC:
 
@@ -246,7 +243,7 @@ with tracer.start_as_current_span("my-operation") as span:
 
 These rules prevent Prometheus from accumulating millions of time-series (high cardinality) which causes memory exhaustion and slow queries.
 
-1. Never tag metrics with `user_id` directly, with the single exception of the `chat.history.size` gauge which may carry `user_id` for the top-10 active sessions only (rotating slots, see Metrics Inventory). If you need any other per-user state, use a rotating slot gauge (contact the platform team first).
+1. Never tag metrics with `user_id` directly. If you need any per-user state, use a rotating slot gauge (contact the platform team first).
 2. Never tag with free-form strings such as URLs, prompt text, error messages, or model responses. Use a closed set: `outcome` must be one of `ok`, `error`, `timeout`, `rate_limited`, `not_found`. If you need richer error context, write a WARN log line (it goes to Loki and is searchable) instead of adding an unbounded tag.
 3. The `model` tag is allowed because the set of models used is small and known (< 20 values).
 4. When in doubt, query the candidate metric in Prometheus with `count(count by (<tag>) (my_metric))` to estimate cardinality before merging.
@@ -255,48 +252,49 @@ These rules prevent Prometheus from accumulating millions of time-series (high c
 
 ## Token Cost Pricing Rates
 
-Token cost estimates in the L1 dashboard use hardcoded rates from `infra/observability/grafana/dashboards/pricing.yaml`. When a provider changes its pricing:
+Prometheus records the per-provider token rates from `infra/observability/grafana/dashboards/pricing.yaml` at start as the series `token_price_usd_per_1k`, and the L1 dashboard multiplies usage by that series, so the dashboard holds no rate. When a provider changes its pricing:
 
 1. Edit `infra/observability/grafana/dashboards/pricing.yaml` with the new rates.
-2. Update the matching PromQL expressions in `infra/observability/grafana/dashboards/token-cost.json` (the multiplier constants match the rates in `pricing.yaml`).
-3. Restart Grafana to reload the provisioned dashboard.
+2. Restart Prometheus so it re-reads the file and records the new series.
 
 ```bash
-docker compose restart grafana
+docker compose restart prometheus
 ```
 
 ---
 
-## Vector to Cloud Migration
+## Collector to Cloud Migration
 
-If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, edit `infra/observability/vector/vector.toml`. The file contains commented-out sink blocks for each target. Uncomment the desired sink, set the required environment variable, and restart Vector.
+If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, add an exporter of type `datadog`, `awscloudwatchlogs` or `splunk_hec` to `infra/observability/otel-collector/otel-collector-config.yaml`, fed by its `logs` pipeline, with its credentials, then drop or keep `otlphttp/loki`.
 
 ```bash
-docker compose restart vector
+docker compose restart otel-collector
 ```
 
-No service code changes are required. Vector handles the fan-out.
+No service code changes are required. The collector handles the fan-out.
 
 ---
 
 ## Resource Usage
 
-At idle, the seven observability containers consume approximately:
+At idle, the six observability containers consume approximately:
 
 | Container | RAM (idle) |
 |---|---|
 | prometheus | ~80 MB |
 | grafana | ~120 MB |
 | loki | ~80 MB |
-| vector | ~30 MB |
 | otel-collector | ~40 MB |
 | tempo | ~120 MB |
-| **Total** | **~470 MB** |
+| **Total** | **~440 MB** |
 
-Disk retention is bounded:
-- Prometheus: 72 hours (`--storage.tsdb.retention.time=72h`), approximately 200 MB steady state under normal load.
-- Loki: 168 hours (7 days), approximately 500 MB steady state.
-- Tempo: 168 hours (7 days), approximately 300 MB steady state.
+Disk retention is bounded, and the bounds below are measured, not planned. Load test of task 15.5 (180 MiniMax chat prompts, one every 10 seconds, 2026-10-15): Prometheus grew 0.041 MB/min, Loki 0.076 MB/min and Tempo 0.128 MB/min over the last 10 minutes of the run, with the 10-to-20 minute window at 0.042, 0.067 and 0.172 MB/min, so Prometheus and Tempo fall and Loki rises 14 percent, because every prompt of the test reuses one user whose chat history grows turn by turn. Projected per day and over each default retention window:
+
+- Prometheus: about 59 MB per day, about 180 MB over 72 hours (`--storage.tsdb.retention.time=72h`).
+- Loki: about 110 MB per day, about 9.9 GB over 2160 hours.
+- Tempo: about 184 MB per day, about 16.6 GB over 2160 hours.
+
+Reserve 30 GB on one server for the three volumes together.
 
 Total expected disk usage: approximately 1-2 GB steady state on a local development machine running representative traffic.
 

@@ -58,7 +58,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:7021/e2e-canary-no-such-
 curl -s -o /dev/null -w "%{http_code}" http://localhost:7022/e2e-canary-no-such-path
 ```
 
-Wait 10 seconds so Vector ships the lines to Loki.
+Wait 10 seconds so the collector ships the lines to Loki.
 
 ```bash
 sleep 10

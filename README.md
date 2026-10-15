@@ -400,10 +400,9 @@ Full setup and usage in [infra/observability/README.md](infra/observability/READ
 | :------------------ | :-------------- | :------------ | :------------------------------------------------------------------ |
 | **Grafana**         | `7078` → `3000` | Browser UI    | Dashboards + Explore. Anonymous `Viewer`; `admin` / `admin` to edit.|
 | **Prometheus**      | `7077` → `9090` | Browser UI    | Scrapes metrics from the 6 services and Qdrant.                     |
-| **Loki**            | `3100`          | Internal only | Log store; receives logs from Vector.                              |
+| **Loki**            | `3100`          | Internal only | Log store; receives logs from the OTel Collector.                   |
 | **Tempo**           | (none)          | Internal only | Trace store; receives traces from the OTel Collector.              |
-| **Vector**          | (none)          | Internal only | Tails the 6 app containers' Docker logs and ships them to Loki.    |
-| **OTel Collector**  | (none)          | Internal only | Receives OTLP traces from the services and exports them to Tempo.  |
+| **OTel Collector**  | (none)          | Internal only | Receives OTLP traces from the services and exports them to Tempo; tails the 6 app containers' Docker logs and ships them to Loki.  |
 
 #### External prerequisites (not in compose, managed / cloud in production)
 
@@ -433,7 +432,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / object store / PostgreSQL / Redis reset recipes.             |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)                                                                        | Metrics, logs, traces - what is collected, dashboards, how to instrument. |
-| [infra/observability/README.md](infra/observability/README.md)                                                       | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
+| [infra/observability/README.md](infra/observability/README.md)                                                       | Observability stack services (Grafana / Prometheus / Loki / Tempo / OTel), pipeline, and how to view logs. |
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
 | [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |

@@ -5,7 +5,7 @@ This directory holds the full local observability stack for AscendAI: metrics, l
 The three signal types are kept separate end to end:
 
 - Metrics: Prometheus scrapes each service and Grafana visualises them in six provisioned dashboards.
-- Logs: Vector tails the application containers' Docker logs and ships them to Loki. You read them in Grafana's Explore view.
+- Logs: the OpenTelemetry Collector tails the application containers' Docker logs and ships them to Loki. You read them in Grafana's Explore view.
 - Traces: the services export OTLP traces to the OpenTelemetry Collector, which forwards them to Tempo.
 
 ---
@@ -22,10 +22,10 @@ graph LR
     QD["Qdrant"] -->|"/metrics scrape"| PROM
     CADV["Container Metrics Exporter"] -->|"container cgroup memory<br/>/metrics scrape"| PROM
 
-    SVC -->|"docker logs (tailed by Vector)"| VEC["Vector"]
-    VEC -->|"push"| LOKI["Loki"]
+    SVC -->|"docker logs (filelog receiver)"| OTEL["OTel Collector"]
+    OTEL -->|"push"| LOKI["Loki"]
 
-    SVC -->|"OTLP traces"| OTEL["OTel Collector"]
+    SVC -->|"OTLP traces"| OTEL
     OTEL -->|"export"| TEMPO["Tempo"]
 
     PROM --> GRAF["Grafana"]
@@ -43,10 +43,9 @@ graph LR
 | Grafana | `7078` → `3000` | Browser UI | Dashboards and Explore. Anonymous viewing is enabled with the `Viewer` role. Sign in as `admin` / `admin` to edit or save. |
 | Prometheus | `7077` → `9090` | Browser UI / API | Scrapes metrics from the 6 application services, plus Qdrant and the container metrics exporter. 72h retention. |
 | Container Metrics Exporter | `8080` | Internal only | First-party exporter (source in [container-metrics-exporter/](container-metrics-exporter/)) that reads only the Docker Engine API stats endpoint over the Docker socket, no privileged mode or host filesystem mounts. |
-| Loki | `3100` | Internal only | Log store. Receives logs pushed by Vector, queried through Grafana. |
+| Loki | `3100` | Internal only | Log store. Receives logs pushed by the OTel Collector, queried through Grafana. |
 | Tempo | n/a | Internal only | Trace store. Receives traces forwarded by the OTel Collector, queried through Grafana. |
-| Vector | n/a | Internal only | Tails the 6 application containers' Docker logs and ships them to Loki. |
-| OTel Collector | n/a | Internal only | Receives OTLP traces (gRPC `:4317`) from the services and exports them to Tempo. |
+| OTel Collector | n/a | Internal only | Receives OTLP traces (gRPC `:4317`) from the services and exports them to Tempo; tails the 6 application containers' Docker logs and ships them to Loki. |
 
 "Internal only" means the service is reachable on the Compose network by hostname but is not published to the host. You interact with it through Grafana rather than directly.
 
@@ -63,17 +62,11 @@ The object store, on host port `9070`, publishes no Prometheus metrics on any pa
 
 Every scrape job sets a `service` label (e.g. `service="ascend-ai-agent"`), which is what the dashboards filter on.
 
-#### Vector log shipping
+#### OTLP log shipping
 
-Vector ([vector/vector.toml](vector/vector.toml)) reads the Docker log streams of exactly the six application containers and pushes each line to Loki, labelled `service="<container_name>"`.
+The OpenTelemetry collector ([otel-collector/otel-collector-config.yaml](otel-collector/otel-collector-config.yaml)) watches the Docker socket and starts one `filelog` receiver per running container of the six application services, matched on the compose label `com.docker.compose.service` and one port per service. Each receiver reads that container's `json-file` log and sets the resource attributes `service` (the compose service name), `source` (`docker`) and `container_name`, then ships the batch to Loki over OTLP HTTP. Loki indexes `service` and `source` (see `otlp_config` in [loki/loki-config.yaml](loki/loki-config.yaml)), so `{service="<compose service>", source="docker"}` selects a service's logs, and every other attribute stays structured metadata.
 
-The Vector container must be started with the config flag, otherwise it boots with no pipeline:
-
-```text
---config /etc/vector/vector.toml
-```
-
-The main compose file already wires this (`command: ["--config", "/etc/vector/vector.toml"]`). Keep that flag if you edit the service definition.
+The collector must see the socket and the log files, so the compose service mounts `/var/run/docker.sock` and `/var/lib/docker/containers` read-only and runs as root, and every application service sets `logging: driver: json-file` so the collector finds a file whatever default log driver the host has.
 
 ---
 
@@ -90,7 +83,7 @@ The main compose file already wires this (`command: ["--config", "/etc/vector/ve
 
 Five of the six application containers are shipped under their own `service` label value: `ascend-ai-agent`, `ascend-memory`, `ascend-audio-scribe`, `ascend-web-hunter`, and `ascend-ocr`.
 
-`ascend-weather-mcp` is intentionally console-silent: its `application.yml` suppresses console logging to keep the SSE stream clean, so it will not appear in Loki even though Vector is configured to watch it. That is expected, not a gap in the pipeline.
+`ascend-weather-mcp` is intentionally console-silent: its `application.yml` suppresses console logging to keep the SSE stream clean, so it will not appear in Loki even though the collector watches it. That is expected, not a gap in the pipeline.
 
 ---
 
