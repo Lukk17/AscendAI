@@ -31,7 +31,7 @@ TOOL_EVENTS = frozenset({
     "tool.execute.before",
 })
 
-SEPARATOR_RE = re.compile(r"^\s*-{2,}\s*$")
+SEPARATOR_RE = re.compile(r"^\s*-{3}\s*$")
 SKILLS_RE = re.compile(r"^\s*Skills:")
 TASK_RE = re.compile(r"^\s*`{3}.*Tasks:\s*\d+\s*/\s*\d+.*`{3}\s*$")
 DONE_RE = re.compile(r"^\s*~~DONE:.*~~\s*$")
