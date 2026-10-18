@@ -11,6 +11,7 @@ public class NamedByteArrayResource extends ByteArrayResource {
         this.filename = filename;
     }
 
+    // CI verification probe for task 5.2; no behaviour change.
     @Override
     public String getFilename() {
         return filename;
