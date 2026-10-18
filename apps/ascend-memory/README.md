@@ -196,7 +196,7 @@ docker build -t ascend-memory:latest .
 Standalone run, when iterating outside compose:
 
 ```bash
-docker run -d --name ascend-memory -p 7020:7020 -e LMSTUDIO_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
+docker run -d --name ascend-memory --add-host=host.docker.internal:host-gateway -p 7020:7020 -e LMSTUDIO_BASE_URL="http://host.docker.internal:1234/v1" ascend-memory:latest
 ```
 
 **Tag and push to a registry (optional).**

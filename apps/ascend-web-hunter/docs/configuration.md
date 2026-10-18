@@ -22,6 +22,8 @@ against environment variables and `.env`. The source of truth is
 | `STARTUP_PROBE_TIMEOUT_SECONDS` | `2` | Seconds each startup banner check may take. Added by `add-ascend-python-common`. |
 | `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000` | Max age of the strict-transport-security header. Added by `add-ascend-python-common`. |
 | `FETCH_MAX_REDIRECT_HOPS` | `10` | Redirect hops the URI fetch guard follows. Compose passes `WEB_HUNTER_FETCH_MAX_REDIRECT_HOPS`. Added by `add-ascend-python-common`. |
+| `OTEL_SERVICE_NAME` | `ascend-web-hunter` | Service name carried on every exported span. Fixed in `compose.ascend-web-hunter.yaml`. |
+| `OTEL_RESOURCE_ATTRIBUTES` | `service.version=0.0.7` | Resource attributes carried on every exported span. Fixed in `compose.ascend-web-hunter.yaml`. |
 
 ---
 
@@ -68,6 +70,13 @@ corrupt file there is a packaging defect and the service refuses to start. `BLOC
 | `SCROLL_ITERATIONS` | `5` | Scroll steps for infinite-scroll pages |
 | `SCROLL_STEP_PX` | `1500` | Pixels per scroll step |
 | `MAX_REQUESTS_PER_CRAWL` | `5` | Crawlee request cap |
+| `BREAKER_FAILURE_THRESHOLD` | `3` | Consecutive failures before a circuit breaker opens |
+| `BREAKER_RECOVERY_TIMEOUT_SECONDS` | `60.0` | Seconds after which an open breaker moves to half-open and allows one probe |
+| `DOMAIN_METRIC_CARDINALITY_CAP` | `50` | Maximum distinct registrable-domain label values tracked in `STRATEGY_ATTEMPTS_TOTAL`; further domains bucket under `other` |
+| `CRAWLEE_STORAGE_DIR` | `.crawlee_storage` | Out-of-tree directory for Crawlee request queues and key-value stores |
+| `CRAWLEE_MEMORY_MBYTES` | unset | Explicit memory budget in MB for Crawlee's autoscaler; when unset Crawlee infers a budget from total system memory |
+| `PROXY_URL` | empty | Optional outbound proxy URL for all fetch tiers |
+| `READ_CACHE_TTL_SECONDS` | `300` | TTL in seconds for the read-result cache-aside entries |
 
 ---
 
@@ -107,6 +116,10 @@ cost 25 to 33 milliseconds on 50 to 390 kilobyte pages, and because the longer r
 | `SELENIUM_BROWSER_VNC_URL` | `http://localhost:7900` | Local NoVNC fallback |
 | `PUBLIC_VNC_URL` | `http://localhost:7900` | Public NoVNC URL; `http://ngrok:4040/api/tunnels` for dynamic Ngrok |
 | `NOVNC_TIMEOUT_SECONDS` | `600` | NoVNC monitor task lifetime (cookie capture window) |
+| `CHALLENGE_CLEAR_WAIT_SECONDS` | `12.0` | How long the headful Playwright tier waits for a Cloudflare challenge to auto-clear before escalating to NoVNC |
+| `CHALLENGE_DETECTION_MAX_BYTES` | `50000` | Prefix length scanned by the challenge detector |
+| `CHALLENGE_WALL_MAX_BYTES` | `50000` | Max page size for a weak challenge marker |
+| `NOVNC_COOKIE_SYNC_POLL_SECONDS` | `5.0` | Poll interval in seconds for the NoVNC cookie-sync background monitor |
 
 ---
 
@@ -130,6 +143,9 @@ are mandatory there. `SEARXNG_SECRET` is SearXNG's session-signing key, which is
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `REDIS_URL` | `redis://127.0.0.1:6379/0` | Redis for clearance-cookie persistence. Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-web-hunter` |
+| `SESSION_AUTH_TTL_SECONDS` | `1209600` | Sliding TTL for auth cookies (long-lived, 14 days) |
+| `SESSION_WAF_TTL_SECONDS` | `1800` | TTL for WAF-clearance cookies (short-lived, 30 minutes) |
+| `SESSION_DEFAULT_PROFILE` | `default` | Profile label used when no profile is specified per-request |
 | `USER_AGENTS_PATH` | `src/assets/user_agents.json` | Rotated UA pool for cheap tiers |
 | `FILE_ENCODING` | `utf-8` | Default file encoding |
 

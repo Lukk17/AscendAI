@@ -12,7 +12,7 @@ services:
     container_name: docling-serve
     restart: unless-stopped
     ports:
-      - "5001:5001"
+      - "${DOCLING_SERVE_HOST_PORT:-5001}:5001"
     # Keep UVICORN_WORKERS and the memory limit in sync: each easyocr worker peaks ~2 GB.
     shm_size: "2gb"
     deploy:
@@ -35,7 +35,7 @@ services:
     container_name: unstructured-api
     restart: unless-stopped
     ports:
-      - "9080:8000"
+      - "${UNSTRUCTURED_API_HOST_PORT:-9080}:8000"
     # Memory sized from measured usage: all-time peak observed at 2.23 GiB
     # (docker stats, 2026-09-04). 3G keeps roughly 35% headroom over that peak.
     deploy:
@@ -159,7 +159,7 @@ services:
       - MANAGEMENT_OTLP_TRACING_ENDPOINT=${MANAGEMENT_OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
       - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:-1.0}
       - OTEL_SERVICE_NAME=ascend-agent
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.2
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.3
     networks:
       default:
         aliases:
@@ -297,6 +297,8 @@ services:
     restart: unless-stopped
     ports:
       - "${AUDIO_SCRIBE_API_PORT:-7017}:${AUDIO_SCRIBE_API_PORT:-7017}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - HF_HOME=/hf-cache
       - HF_TOKEN=${HF_TOKEN}

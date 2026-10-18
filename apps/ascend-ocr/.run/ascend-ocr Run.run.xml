@@ -31,8 +31,12 @@
               <option name="value" value="50" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
-              <option name="name" value="OCR_REQUEST_TIMEOUT" />
-              <option name="value" value="300" />
+              <option name="name" value="OCR_RESULT_S3_ENDPOINT" />
+              <option name="value" value="http://host.docker.internal:9070" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="OCR_RESULT_S3_PUBLIC_ENDPOINT" />
+              <option name="value" value="http://localhost:9070" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
               <option name="name" value="ENGINE_CACHE_MAX_SIZE" />
@@ -56,6 +60,7 @@
             </DockerPortBindingImpl>
           </list>
         </option>
+        <option name="commandLineOptions" value="--add-host=host.docker.internal:host-gateway --env-file $PROJECT_DIR$/.env" />
         <option name="sourceFilePath" value="apps/ascend-ocr/Dockerfile" />
       </settings>
     </deployment>

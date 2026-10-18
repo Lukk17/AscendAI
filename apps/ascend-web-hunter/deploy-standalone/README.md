@@ -238,8 +238,8 @@ The equivalent file in the repository root is `compose.ascend-web-hunter.yaml`. 
 | Topic | Development stack | This file |
 |---|---|---|
 | ascend-web-hunter image | Built from source with `build:` | Pulled, pinned to a published version tag |
-| SearXNG port 9020 | Published on 127.0.0.1 so the service can run natively against it | Not published |
-| FlareSolverr port 8191 | Published on 127.0.0.1 for the same reason | Not published |
+| SearXNG port 9020 | Published on 127.0.0.1 through `SEARXNG_HOST_PORT` so the service can run natively against it | Not published |
+| FlareSolverr port 8191 | Published on 127.0.0.1 through `FLARESOLVERR_HOST_PORT` for the same reason | Not published |
 | OTEL variables | Set, pointing at the platform collector | Absent |
 | VNC_PASSWORD | Optional. Unset means an unauthenticated desktop and a warning at boot, which is acceptable because port 7900 is not published locally | Required. Compose refuses to start without it |
 | NGROK_AUTHTOKEN | Optional | Required |

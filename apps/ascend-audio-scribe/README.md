@@ -389,7 +389,7 @@ Streamable HTTP (bidirectional over HTTP):
 The MCP tools accept an `audio_uri` argument supporting both local files and HTTP(S) URLs.
 
 > [!NOTE]
-> **Docker users (Postman).** When testing with the provided Postman collection against a Docker container, use the
+> **Docker users (Bruno).** When testing with the provided Bruno collection against a Docker container, use the
 > `{{audio_uri_docker}}` variable (resolves to `http://host.docker.internal:...`) instead of `{{audio_uri}}` in the
 > request body. Using `localhost` from inside the container will fail.
 

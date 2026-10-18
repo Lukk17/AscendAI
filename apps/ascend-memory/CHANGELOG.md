@@ -32,6 +32,12 @@ workflow does not read; if the two ever disagree, this file wins for release pur
 - Docs updated: `AGENTS.md`, `README.md`, arc42 pages 05, 08, 09, ADR-005, and e2e spec 1 with its template now
   assert the `400` problem body.
 
+### Fixed
+- The standalone `docker run` in `README.md` declares `--add-host=host.docker.internal:host-gateway`, so the container reaches LM Studio on Docker Engine for Linux. `fix-linux-docker-host-access`.
+- The `QDRANT_HOST` row names the host gateway mapping. `fix-linux-docker-host-access`.
+- The IDE Docker run configuration declares `--add-host=host.docker.internal:host-gateway`. `fix-linux-docker-host-access`.
+- The configuration reference names `LOG_FORMAT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. `fix-linux-docker-host-access`.
+
 ## [0.1.3] - 2026-10-01
 
 ### Changed

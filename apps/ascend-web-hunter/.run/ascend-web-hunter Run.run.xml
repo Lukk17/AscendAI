@@ -22,6 +22,14 @@
               <option name="name" value="LOG_FORMAT" />
               <option name="value" value="json" />
             </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="SEARXNG_BASE_URL" />
+              <option name="value" value="http://searxng:8080" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="REDIS_URL" />
+              <option name="value" value="redis://host.docker.internal:6379/0" />
+            </DockerEnvVarImpl>
           </list>
         </option>
         <option name="portBindings">
@@ -32,6 +40,7 @@
             </DockerPortBindingImpl>
           </list>
         </option>
+        <option name="commandLineOptions" value="--network ascend-ai_default --add-host=host.docker.internal:host-gateway" />
         <option name="sourceFilePath" value="apps/ascend-web-hunter/Dockerfile" />
       </settings>
     </deployment>

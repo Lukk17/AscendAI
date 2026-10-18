@@ -40,6 +40,10 @@ workflow does not read; if the two ever disagree, this file wins for release pur
   `ascend-python-common[fetch]==1.0.0`; this entry stays the one version of
   this change.
 
+### Fixed
+- The IDE Docker run configuration declares `--add-host=host.docker.internal:host-gateway`, sets `OCR_RESULT_S3_ENDPOINT` and `OCR_RESULT_S3_PUBLIC_ENDPOINT`, reads the store credentials from the repository `.env` through `--env-file`, and drops the deleted `OCR_REQUEST_TIMEOUT`. `fix-linux-docker-host-access`.
+- The configuration reference names `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. `fix-linux-docker-host-access`.
+
 ## [0.3.0] - 2026-10-01
 
 ### Changed

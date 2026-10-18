@@ -54,14 +54,28 @@ time via the `model` form field; these are the shipped defaults.
 | `MINIMAX_ENABLED`            | No                 | Enable MiniMax provider (default `true`).                                                    |
 | `MINIMAX_API_KEY`            | If MiniMax enabled | MiniMax API key.                                                                             |
 | `OPENAI_MODEL`               | No                 | Override default OpenAI model (default `gpt-4o`).                                            |
+| `OPENAI_EXTRACTION_MODEL`    | No                 | Memory extraction model for OpenAI (default `gpt-4o-mini`).                                  |
 | `GEMINI_MODEL`               | No                 | Override default Gemini model (default `gemini-flash-latest`).                               |
+| `GEMINI_EXTRACTION_MODEL`    | No                 | Memory extraction model for Gemini (default `gemini-flash-lite-latest`).                     |
 | `ANTHROPIC_MODEL`            | No                 | Override default Anthropic model (default `claude-sonnet-4-5`).                              |
+| `ANTHROPIC_EXTRACTION_MODEL` | No                 | Memory extraction model for Anthropic (default `claude-3-5-haiku-20241022`).                 |
 | `MINIMAX_MODEL`              | No                 | Override default MiniMax model (default `MiniMax-M2.7`).                                     |
+| `MINIMAX_EXTRACTION_MODEL`   | No                 | Memory extraction model for MiniMax (default `MiniMax-M2.7`).                                |
+| `MODEL_PROVIDER`             | No                 | Default chat provider (default `lmstudio`).                                                  |
 | `LMSTUDIO_MODEL`             | No                 | Override default LM Studio model (default `meta-llama-3.1-8b-instruct`).                     |
 | `EMBEDDING_PROVIDER`         | No                 | Embedding provider: `lmstudio` (default), `openai`, or `gemini`.                             |
+| `SECURITY_ENABLED`           | No                 | Basic-auth toggle (default `false`, so local runs need no auth headers).                     |
+| `SECURITY_USERNAME`          | No                 | Basic-auth username (default `admin`).                                                       |
+| `SECURITY_PASSWORD`          | No                 | Basic-auth password (default `admin`).                                                       |
 | `MANAGEMENT_OTLP_TRACING_ENDPOINT` | No           | OTLP trace export endpoint (default `http://otel-collector:4318/v1/traces`). Added by `add-observability`. |
 | `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | No   | Trace sampling probability (default `1.0`). Added by `add-observability`.                    |
 | `AGENT_HOST_PORT`            | No                 | Published host port (default `9917`). Added by `add-observability`.                          |
+| `SPRING_PROFILES_ACTIVE`     | No                 | Spring profile that activates the container-mode overrides. Compose sets `docker`.           |
+| `APP_MEMORY_CHATHISTORY_REDIS_ENABLED` | No       | Chat-history Redis backend toggle (default `true`).                                          |
+| `APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED` | No    | Chat-history Postgres backend toggle (default `true`).                                       |
+| `APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED` | No | Async summarisation of older chat turns (default `true`).                                    |
+| `OTEL_SERVICE_NAME`          | No                 | Service name carried on every exported span. Fixed in `compose.yaml` as `ascend-agent`.      |
+| `OTEL_RESOURCE_ATTRIBUTES`   | No                 | Resource attributes carried on every exported span. Fixed in `compose.yaml` as `service.version=0.1.3`. |
 
 ---
 

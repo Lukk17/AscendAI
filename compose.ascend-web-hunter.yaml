@@ -23,7 +23,7 @@ services:
       # it over the compose network by alias, so nothing outside needs the port.
       # It stays published because config.py defaults to http://localhost:9020
       # when the service runs natively instead of in a container.
-      - "127.0.0.1:9020:8080"
+      - "127.0.0.1:${SEARXNG_HOST_PORT:-9020}:8080"
     environment:
       - "SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set in .env (at least 32 characters, unique to this deployment)}"
     volumes:
@@ -60,7 +60,7 @@ services:
       # Loopback only. FlareSolverr fetches any URL handed to it, so an
       # all-interfaces binding is a request-forwarding primitive for anything
       # else on the network. Published for the same native-run reason as above.
-      - "127.0.0.1:8191:8191"
+      - "127.0.0.1:${FLARESOLVERR_HOST_PORT:-8191}:8191"
     environment:
       - LOG_LEVEL=info
       - LOG_HTML=false

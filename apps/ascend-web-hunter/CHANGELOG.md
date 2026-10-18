@@ -49,6 +49,11 @@ purposes.
 - The shared library is cut at `1.0.0` now that all four services are migrated. The service pin moves to
   `ascend-python-common==1.0.0`; this entry stays the one version of this change.
 
+### Fixed
+- The standalone `docker run` in `docs/running.md` joins the stack network and calls SearXNG by name, with the host gateway mapping for the host's Redis. `fix-linux-docker-host-access`.
+- The IDE Docker run configuration sets `SEARXNG_BASE_URL` and `REDIS_URL` and joins the stack network with the host gateway mapping. `fix-linux-docker-host-access`.
+- The configuration reference names `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, `BREAKER_FAILURE_THRESHOLD`, `BREAKER_RECOVERY_TIMEOUT_SECONDS`, `CHALLENGE_CLEAR_WAIT_SECONDS`, `CHALLENGE_DETECTION_MAX_BYTES`, `CHALLENGE_WALL_MAX_BYTES`, `CRAWLEE_MEMORY_MBYTES`, `CRAWLEE_STORAGE_DIR`, `DOMAIN_METRIC_CARDINALITY_CAP`, `NOVNC_COOKIE_SYNC_POLL_SECONDS`, `PROXY_URL`, `READ_CACHE_TTL_SECONDS`, `SESSION_AUTH_TTL_SECONDS`, `SESSION_DEFAULT_PROFILE` and `SESSION_WAF_TTL_SECONDS`. `fix-linux-docker-host-access`.
+
 ## [0.0.6] - 2026-10-01
 
 ### Fixed

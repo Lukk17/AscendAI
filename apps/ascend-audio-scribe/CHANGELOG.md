@@ -35,6 +35,9 @@ workflow does not read; if the two ever disagree, this file wins for release pur
 - Docs updated: `AGENTS.md`, `README.md`, ADR-001, ADR-002, and e2e spec 1 with its template now assert the `400`
   problem body.
 
+### Fixed
+- The `audio_uri_docker` Bruno variable carries the container-reachable object store address, the unused `audio_uri` is gone, and the README names Bruno instead of Postman. `fix-linux-docker-host-access`.
+
 ## [0.9.3] - 2026-10-01
 
 ### Changed

@@ -140,6 +140,8 @@ ascend-ai-agent already uses for the same store.
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
 | OTEL_EXPORTER_OTLP_ENDPOINT       | unset                                         | gRPC OTLP collector address. Trace export happens whenever it is set.                    |
 | OTEL_SDK_DISABLED                 | `false`                                       | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
+| OTEL_SERVICE_NAME                 | `ascend-ocr`                                  | Service name carried on every exported span. Fixed in `compose.yaml`.                    |
+| OTEL_RESOURCE_ATTRIBUTES          | `service.version=0.3.1`                       | Resource attributes carried on every exported span. Fixed in `compose.yaml`.             |
 
 ---
 

@@ -166,6 +166,8 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 
 These services must be running before starting docker-compose. In production they map to managed cloud services (e.g., AWS ElastiCache, Qdrant Cloud, S3).
 
+On Docker Engine for Linux each of these services must listen on an address the containers reach (the bridge address or all addresses), see [Reaching the host from a container](docs/DEPLOYMENT.md#reaching-the-host-from-a-container).
+
 | Service | Port(s) | Purpose |
 |---|---|---|
 | PostgreSQL | 5432 | Persistent metadata, chat history, ingestion state |
@@ -174,6 +176,8 @@ These services must be running before starting docker-compose. In production the
 | Object storage (locally: Floci) | 9070 / 9071 | S3-compatible object storage for RAG document ingestion |
 
 ## Docker Compose Services
+
+A container that calls the host follows five rules ([Reaching the host from a container](docs/DEPLOYMENT.md#reaching-the-host-from-a-container)): container to container by name on the shared network, host to container by `127.0.0.1` and a published port, container to host by `host.docker.internal` only together with `extra_hosts` in compose or `--add-host=host.docker.internal:host-gateway` on a `docker run` (needs Docker Engine 20.10 or newer), `localhost` inside a container meaning that container itself, and a `docker run` that calls no other service needing none of this.
 
 Compose is split into two project files. The second is reached only through the main file's `include:`, so every command runs against the main file with no `-f` flag and the merge puts both stacks in one Docker Desktop group:
 

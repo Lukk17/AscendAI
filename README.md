@@ -426,6 +426,7 @@ Canonical index. Every doc the repo ships, in one place.
 | [apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md](apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
 | [docs/architecture/permission-aware-retrieval.md](docs/architecture/permission-aware-retrieval.md)                     | How document access lists reach chunks and get enforced inside the vector search. |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)                                                                        | Every setting of every service, with links to the per-service references of ascend-agent, ascend-memory, ascend-ocr and ascend-web-hunter. |
 | [apps/ascend-web-hunter/deploy-standalone/README.md](apps/ascend-web-hunter/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
 | [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and release workflows, image naming, registries, package visibility. |
 | [contracts/README.md](contracts/README.md)                                                                            | Agent to OCR Pact contract: who writes it, who verifies it, how to regenerate it. |

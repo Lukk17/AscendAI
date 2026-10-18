@@ -89,11 +89,19 @@ Build the image:
 docker build -t ascend-web-hunter:latest .
 ```
 
-Run the container standalone. Inside the Compose network use `http://searxng:8080`; for a single container
-against a host-network SearXNG use `host.docker.internal`:
+Run the container standalone. SearXNG publishes its port on `127.0.0.1` only, so a
+standalone container never reaches it through the host gateway. Join the network of the running stack
+(`ascend-ai_default` for the main stack, `ascend-scrapper_default` for the scraping file alone) and call SearXNG
+by name. The host's Redis is reached through `host.docker.internal` with the host gateway mapping
+(`redis://redis:6379/0` instead when the bundled Redis of the scraping file runs). Remove the compose container
+of the same name and port first, also before the IDE run configuration starts:
 
 ```bash
-docker run -d --name ascend-web-hunter -p 7021:7021 -e SEARXNG_BASE_URL="http://host.docker.internal:9020" ascend-web-hunter:latest
+docker compose rm -sf ascend-web-hunter
+```
+
+```bash
+docker run -d --name ascend-web-hunter --network ascend-ai_default --add-host=host.docker.internal:host-gateway -p 7021:7021 -e SEARXNG_BASE_URL="http://searxng:8080" -e REDIS_URL="redis://host.docker.internal:6379/0" ascend-web-hunter:latest
 ```
 
 Publishing is done by the [Release workflow](../../../.github/workflows/README.md) rather than by hand. It builds
