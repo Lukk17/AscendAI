@@ -331,11 +331,12 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: mypy src tests
 
-      # ascend-audio-scribe and ascend-ocr already bake --cov-fail-under=100
-      # into their own pytest addopts, so `pytest` enforces it. ascend-ocr
-      # deselects the contract marker, which the contract jobs verify.
+      # Every Python service bakes --cov-fail-under=100 into its own pytest
+      # addopts, so plain `pytest` enforces the 100 percent branch coverage
+      # floor. ascend-ocr deselects the contract marker, which the contract
+      # jobs verify.
       - name: Run pytest
-        if: matrix.language == 'python' && matrix.service != 'ascend-web-hunter' && matrix.service != 'ascend-memory' && matrix.service != 'ascend-ocr'
+        if: matrix.language == 'python' && matrix.service != 'ascend-ocr'
         working-directory: ${{ matrix.path }}
         run: pytest
 
@@ -343,14 +344,6 @@ jobs:
         if: matrix.service == 'ascend-ocr'
         working-directory: ${{ matrix.path }}
         run: pytest -m "not contract"
-
-      # ascend-web-hunter and ascend-memory also bake --cov-fail-under=100
-      # into their own pytest addopts now, so the explicit coverage flags
-      # below repeat that gate rather than add it.
-      - name: Run pytest with coverage gate
-        if: matrix.service == 'ascend-web-hunter' || matrix.service == 'ascend-memory'
-        working-directory: ${{ matrix.path }}
-        run: pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 
       # ── Artifact upload (always) ────────────────────────────────────────────
       - name: Upload test results
