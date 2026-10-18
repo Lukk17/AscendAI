@@ -136,7 +136,7 @@ class AscendOcrClientPactTest {
                 .matchHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_PATTERN, "1")
                 .body(new PactDslJsonBody()
                         .stringValue("code", "QUEUE_FULL")
-                        .stringType("detail", "Queue is full, retry later"))
+                        .stringType("detail", "Queue is full, retry later (drift probe 6.14)"))
                 .toPact(V4Pact.class);
     }
 
