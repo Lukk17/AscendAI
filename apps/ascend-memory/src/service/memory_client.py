@@ -257,3 +257,7 @@ class AscendMemoryClient:
                 f"Error wiping memory user_hash={_hash_user_id(user_id)} provider={self.provider}"
             )
             raise
+
+
+def ci_verify_uncovered_marker() -> str:
+    return "ci-verify-5-3"
