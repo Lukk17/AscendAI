@@ -165,3 +165,6 @@ class ReadinessResponse(BaseModel):
     accepting_work: bool
     jobs_queued: int = Field(ge=0)
     jobs_running: int = Field(ge=0)
+
+
+# ci-verify/6-12: throwaway contract-verification probe, no functional change.
