@@ -123,7 +123,7 @@ class JobSubmitResponse(BaseModel):
 
 class JobStatusResponse(BaseModel):
     job_id: str = Field(pattern=JOB_ID_PATTERN)
-    state: JobState
+    status: JobState
     page_count: int = Field(ge=1)
     pages_done: int = Field(ge=0)
     submitted_at: float = Field(ge=0.0)

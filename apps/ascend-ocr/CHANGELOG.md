@@ -8,6 +8,10 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [99.0.0] - 2026-10-18
+
+- Throwaway CI verification entry for task 6.15; never released.
+
 ## [0.3.0] - 2026-10-01
 
 ### Changed
