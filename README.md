@@ -1,7 +1,7 @@
 <h1 align="center">AscendAI</h1>
 
 <p align="center">
-  <strong>Multi-provider AI orchestrator with MCP, RAG, and semantic memory. Built on Spring AI.</strong>
+  <strong>Multi-provider AI orchestrator with MCP, RAG, and semantic memory. Built with Spring AI.</strong>
 </p>
 
 <p align="center">
