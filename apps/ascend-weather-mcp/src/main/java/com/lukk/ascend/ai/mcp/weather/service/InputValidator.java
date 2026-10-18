@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class InputValidator {
 
+    // CI verification probe for task 5.4; no behaviour change.
     public static final int CITY_MAX_LENGTH = 100;
     public static final String DEFAULT_LANGUAGE = "en";
     public static final String DEFAULT_UNIT = "celsius";
