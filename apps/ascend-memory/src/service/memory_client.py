@@ -258,6 +258,4 @@ class AscendMemoryClient:
             )
             raise
 
-
-def ci_verify_uncovered_marker() -> str:
-    return "ci-verify-5-3"
+# CI verification probe for task 5.3; no behaviour change.
