@@ -34,7 +34,7 @@ Task 2.3 removed by owner answer 84.2 of 2026-10-08 (no ascend-audio-scribe e2e 
 
 Task 6.2 removed by owner answer 84.2 of 2026-10-08 (no Linux host checks).
 
-- [ ] 6.3 Check that the plans aligned on 2026-10-08 still read as the design section "Plans aligned" says (`add-ascend-python-common` tasks 8.4 and 10.6 and its proposal, task 9.5 having been removed by owner decision 91.3 of 2026-10-08, `enhance-web-search-crawl-at-scale` design D3 and tasks 1.2 and 1.3, `harden-cloud-deployment` tasks 4, 6.1 and 8.1, `openspec/BUILD_ORDER.md`), and run `openspec validate` with `--strict` on each of those changes and on this one. Acceptance: each reads as recorded and each validation passes.
+- [x] 6.3 Check that the plans aligned on 2026-10-08 still read as the design section "Plans aligned" says (`add-ascend-python-common` tasks 8.4 and 10.6 and its proposal, task 9.5 having been removed by owner decision 91.3 of 2026-10-08, `enhance-web-search-crawl-at-scale` design D3 and tasks 1.2 and 1.3, `harden-cloud-deployment` tasks 4, 6.1 and 8.1, `openspec/BUILD_ORDER.md`), and run `openspec validate` with `--strict` on each of those changes and on this one. Acceptance: each reads as recorded and each validation passes. (owner decision 2026-10-19: closed with the texts as they are, strict length warnings accepted, 27 of 30 shortened)
 
 ## 7. Changelog lines, no new version except the agent's 0.1.3
 
