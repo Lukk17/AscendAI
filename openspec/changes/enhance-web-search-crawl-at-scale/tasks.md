@@ -5,8 +5,8 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
 
 ## 1. Configuration and dependencies
 
-- [ ] 1.1 Add the S3 client and `protego` to `pyproject.toml` with exact pins. Verify `python -m pip install -e ".[dev]"`.
-- [ ] 1.2 Add every setting in `design.md` D2, D3, D5, D7 and D8 to `src/config/config.py`: the shared
+- [x] 1.1 Add the S3 client and `protego` to `pyproject.toml` with exact pins. Verify `python -m pip install -e ".[dev]"`.
+- [x] 1.2 Add every setting in `design.md` D2, D3, D5, D7 and D8 to `src/config/config.py`: the shared
       `OBJECT_STORE_S3_ENDPOINT`, `OBJECT_STORE_S3_ACCESS_KEY` and `OBJECT_STORE_S3_SECRET_KEY`, the crawl
       `CRAWL_RESULT_S3_BUCKET` and `CRAWL_RESULT_S3_PREFIX`, and no `CRAWL_ERASE_DRAIN_SECONDS` (it moved with the erase
       call of design D11 to `add-audit-and-gdpr-compliance`), `CRAWL_RESULT_S3_ENDPOINT`,
@@ -21,7 +21,7 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
       refused at startup. `CRAWL_WORKER_IDLE_SECONDS` has the default 1 and `CRAWL_POLL_AFTER_SECONDS` the default 5
       (owner answer 100.1 of 2026-10-09, design D16). The two object store keys have no default. Verify
       with cases in `tests/config/test_config.py` for every default, every bound and both startup refusals.
-- [ ] 1.3 Add every setting of design D16 to the `ascend-web-hunter` service of `compose.ascend-web-hunter.yaml` and of
+- [x] 1.3 Add every setting of design D16 to the `ascend-web-hunter` service of `compose.ascend-web-hunter.yaml` and of
       `deploy-standalone/compose.yaml` as `- VAR=${VAR:-default}` with the D16 default, the two object store keys as
       `${VAR}` with no default, and add each to the root `.env.example`, `deploy-standalone/.env.example` (a commented
       `# VAR=default` line with a one line comment for a setting with a default, an empty line for each key) and the
@@ -32,7 +32,7 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
       root succeeds and shows that endpoint, every D16 setting with its default and the `extra_hosts` line on
       `ascend-web-hunter`, that `CRAWL_WORKER_CONCURRENCY=8 docker compose config` shows `8`, and that every `${VAR` of
       `deploy-standalone/compose.yaml` appears in `deploy-standalone/.env.example` and in the README table.
-- [ ] 1.4 Owner rule 98 of 2026-10-08, configuration reference: in the same commit as tasks 1.2 and 1.3, add one row per
+- [x] 1.4 Owner rule 98 of 2026-10-08, configuration reference: in the same commit as tasks 1.2 and 1.3, add one row per
       setting of design D16 to `apps/ascend-web-hunter/docs/configuration.md` (variable, default, purpose), each
       description ending with "Added by `enhance-web-search-crawl-at-scale`.", the object store rows in a section of
       their own because `add-file-download` adds to them later. Verify every D16 setting appears there once with the
@@ -40,29 +40,29 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
 
 ## 2. Job model and API
 
-- [ ] 2.1 Create `src/crawl/models.py` with the D2 request model (Pydantic, every bound a `Field` constraint) and the job
+- [x] 2.1 Create `src/crawl/models.py` with the D2 request model (Pydantic, every bound a `Field` constraint) and the job
       record. Every bound and every numeric default comes from the settings of design D16 (`CRAWL_MAX_SEEDS`,
       `CRAWL_MAX_PATTERNS`, `CRAWL_MAX_DEPTH`, `CRAWL_DEFAULT_DEPTH`, `CRAWL_MAX_PAGES`, `CRAWL_DEFAULT_PAGE_BUDGET`), and
       the submission answer's `poll_after_seconds` is `CRAWL_POLL_AFTER_SECONDS`. Verify with tests for each bound, for a
       request with no `max_depth` and no `page_budget` taking the two defaults, for a changed setting changing the
       bound, and for regular-expression syntax being treated as a literal glob.
-- [ ] 2.2 Create `src/api/rest/crawl_endpoints.py` with the four D1 endpoints and mount it in `src/main.py`, and
+- [x] 2.2 Create `src/api/rest/crawl_endpoints.py` with the four D1 endpoints and mount it in `src/main.py`, and
       register every D9 code in the `ErrorRegistry` of `src/api/exception_handlers.py`, so the library's problem
       builder answers every error, with no helper of this change.
       Verify with tests for 202, 200, cancel, and 404 with `Content-Type: application/problem+json`, `code`
       `job_not_found`, `type` `https://ascend.ai/errors/job-not-found` and a `traceId` of 32 lower case hex characters
       when a span is current.
-- [ ] 2.3 Add `crawl_submit`, `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` to `src/api/mcp/mcp_server.py`.
+- [x] 2.3 Add `crawl_submit`, `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` to `src/api/mcp/mcp_server.py`.
       Verify with tests that each returns the same fields as its REST twin, and that an unknown `job_id` answers a
       tool error whose text starts with `job_not_found`, raised as the registered exception and mapped by the library.
-- [ ] 2.4 Implement the tenant scoping of D8 on both surfaces. Verify with tests that a job submitted for tenant
+- [x] 2.4 Implement the tenant scoping of D8 on both surfaces. Verify with tests that a job submitted for tenant
       `acme` is answered 404 `job_not_found` on status and cancel for tenant `globex` and is absent from its list,
       that a call naming no tenant and a call with `X-Ascend-Tenant: default` both run as the tenant `default` (no
       setting changes it), and that `X-Ascend-Tenant: ../acme` is refused with 400 `invalid_tenant` and creates no job.
 
 ## 3. SSRF rules
 
-- [ ] 3.1 Check every seed at submission per D4. Verify with tests that `http://127.0.0.1/`, `http://10.0.0.1/`,
+- [x] 3.1 Check every seed at submission per D4. Verify with tests that `http://127.0.0.1/`, `http://10.0.0.1/`,
       `file:///etc/passwd`, `https://user:pass@example.com/` and a hostname resolving to a private address each get HTTP
       400 with `code` `unsafe_uri` and create no job.
 - [ ] 3.2 Route discovered links, redirect hops, robots.txt and sitemap fetches through the guard and pinning. Verify a
