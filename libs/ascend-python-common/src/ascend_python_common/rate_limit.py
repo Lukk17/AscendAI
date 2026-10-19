@@ -9,10 +9,13 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from limits import parse
 from limits.limits import RateLimitItem
 from slowapi import Limiter
-from slowapi.middleware import SlowAPIASGIMiddleware
+from slowapi.middleware import SlowAPIASGIMiddleware, async_check_limits
 from slowapi.util import get_remote_address
 from starlette.requests import Request
+from starlette.routing import BaseRoute, Match
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from ascend_python_common.route_lookup import resolve_route_handler
 
 logger = logging.getLogger(__name__)
 
@@ -52,21 +55,56 @@ class RateLimitMiddleware(SlowAPIASGIMiddleware):
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path") or ""
-        if path in EXEMPT_PATHS or path == self._mcp_path or path.startswith(self._mcp_path + "/"):
+        if (
+            scope["type"] != "http"
+            or path in EXEMPT_PATHS
+            or path == self._mcp_path
+            or path.startswith(self._mcp_path + "/")
+        ):
             await self.app(scope, receive, send)
 
             return
-        sent_start = False
+        application = scope["app"]
+        limiter: Limiter = application.state.limiter
+        if not limiter.enabled:
+            await self.app(scope, receive, send)
 
-        async def guarded_send(message: Any) -> None:
-            nonlocal sent_start
-            if message["type"] == "http.response.start":
-                if sent_start:
-                    return
-                sent_start = True
-            await send(message)
+            return
+        handler = resolve_route_handler(application.routes, scope)
+        if handler is None or _slowapi_finds_handler(application.routes, scope):
+            await super().__call__(scope, receive, _guarded_send(send))
 
-        await super().__call__(scope, receive, guarded_send)
+            return
+        request = Request(scope, receive=receive, send=send)
+        error_response, _ = await async_check_limits(limiter, request, handler, application)
+        if error_response is not None:
+            await error_response(scope, receive, send)
+
+            return
+        await self.app(scope, receive, send)
+
+
+def _slowapi_finds_handler(routes: list[BaseRoute], scope: Scope) -> bool:
+    for route in routes:
+        match, _ = route.matches(scope)
+        if match == Match.FULL and hasattr(route, "endpoint"):
+            return True
+
+    return False
+
+
+def _guarded_send(send: Send) -> Send:
+    sent_start = False
+
+    async def guarded_send(message: Any) -> None:
+        nonlocal sent_start
+        if message["type"] == "http.response.start":
+            if sent_start:
+                return
+            sent_start = True
+        await send(message)
+
+    return guarded_send
 
 
 def install_rate_limiting(app: FastAPI, limiter: Limiter, mcp_path: str = "/mcp") -> None:

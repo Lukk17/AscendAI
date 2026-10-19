@@ -1,10 +1,10 @@
 [project]
 name = "ascend-memory"
-version = "0.1.4"
+version = "0.1.5"
 description = "AscendAI Memory Service (MCP + REST)"
 requires-python = ">=3.11"
 dependencies = [
-    "ascend-python-common==1.0.0",
+    "ascend-python-common==2.0.0",
     "mem0ai==2.0.4",
     "httpx==0.28.1",
     "qdrant-client==1.16.2",
@@ -12,8 +12,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ascend-python-common[dev]==1.0.0",
-    "httpx2==2.13.1",
+    "ascend-python-common[dev]==2.0.0",
     "pyright==1.1.408"
 ]
 

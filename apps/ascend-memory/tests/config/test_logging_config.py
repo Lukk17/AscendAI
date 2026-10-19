@@ -10,7 +10,11 @@ def test_debug_line_visible_at_debug_level(caplog: LogCaptureFixture) -> None:
     configure_logging(
         "ascend-memory",
         ServiceSettings(
-            API_PORT=7020, LOG_LEVEL="DEBUG", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="6000/minute"
+            API_PORT=7020,
+            LOG_LEVEL="DEBUG",
+            LOG_FORMAT="json",
+            RATE_LIMIT_DEFAULT="6000/minute",
+            MCP_ALLOWED_HOST_HEADERS=("localhost", "127.0.0.1"),
         ),
     )
     logging.getLogger().addHandler(caplog.handler)
@@ -27,7 +31,11 @@ def test_no_info_or_access_line_at_warning_level(caplog: LogCaptureFixture) -> N
     configure_logging(
         "ascend-memory",
         ServiceSettings(
-            API_PORT=7020, LOG_LEVEL="WARNING", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="6000/minute"
+            API_PORT=7020,
+            LOG_LEVEL="WARNING",
+            LOG_FORMAT="json",
+            RATE_LIMIT_DEFAULT="6000/minute",
+            MCP_ALLOWED_HOST_HEADERS=("localhost", "127.0.0.1"),
         ),
     )
     logging.getLogger().addHandler(caplog.handler)
@@ -47,7 +55,11 @@ def test_uvicorn_loggers_route_through_root() -> None:
     configure_logging(
         "ascend-memory",
         ServiceSettings(
-            API_PORT=7020, LOG_LEVEL="WARNING", LOG_FORMAT="json", RATE_LIMIT_DEFAULT="6000/minute"
+            API_PORT=7020,
+            LOG_LEVEL="WARNING",
+            LOG_FORMAT="json",
+            RATE_LIMIT_DEFAULT="6000/minute",
+            MCP_ALLOWED_HOST_HEADERS=("localhost", "127.0.0.1"),
         ),
     )
     # when

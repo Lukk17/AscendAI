@@ -8,7 +8,7 @@ AscendMemory is a semantic memory service that provides REST API and MCP server 
 
 - **Language**: Python 3.11
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.1.4
+- **Version**: 0.1.5
 - **Docker Base**: `python:3.11-slim`
 
 ## Build & Run Commands
@@ -120,6 +120,7 @@ entirely, `resolve_provider()` (`src/service/memory_client.py:25`) falls back to
 - `STARTUP_PROBE_TIMEOUT_SECONDS` - Time each startup banner check may take (default: `2`)
 - `SECURITY_HSTS_MAX_AGE_SECONDS` - `max-age` of the `strict-transport-security` response header (default: `63072000`)
 - `REDIS_URL` - Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-memory` (default: `redis://127.0.0.1:6379/0`)
+- `MCP_ALLOWED_HOST_HEADERS` - Host names the `/mcp` endpoint accepts in the `Host` header, inbound check on the MCP endpoint only (default: `ascend-memory,localhost,127.0.0.1`). This service has no `ALLOWED_PRIVATE_HOSTS` (it fetches no caller URI).
 
 `API_HOST`, `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
 `ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`. The service has no

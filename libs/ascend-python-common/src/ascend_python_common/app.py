@@ -8,6 +8,7 @@ from typing import Any, Final
 from fastapi import APIRouter, FastAPI
 from fastmcp import FastMCP
 from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import Limiter
 from starlette.responses import JSONResponse
 from starlette.routing import BaseRoute, Match
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -56,6 +57,30 @@ class McpPathRoute(BaseRoute):
         await self.app(scope, receive, send)
 
 
+def _ensure_library_middlewares(
+    server: FastMCP,
+    limiter: Limiter,
+    default_limit: str,
+    tool_rate_limits: dict[str, str] | None,
+    service_name: str,
+    error_registry: ErrorRegistry,
+) -> None:
+    present = tuple(server.middleware)
+    if not any(isinstance(middleware, McpRequestLogContextMiddleware) for middleware in present):
+        server.add_middleware(McpRequestLogContextMiddleware())
+    if not any(isinstance(middleware, McpRateLimitMiddleware) for middleware in present):
+        server.add_middleware(
+            McpRateLimitMiddleware(
+                limiter,
+                default_limit,
+                tool_rate_limits,
+                key_prefix=service_name,
+            )
+        )
+    if not any(isinstance(middleware, McpRefusalMiddleware) for middleware in present):
+        server.add_middleware(McpRefusalMiddleware(error_registry))
+
+
 @dataclass(frozen=True, slots=True)
 class ServiceDefinition:
     name: str
@@ -89,22 +114,28 @@ def create_service_app(definition: ServiceDefinition) -> FastAPI:
         otel_endpoint=definition.settings.OTEL_EXPORTER_OTLP_ENDPOINT,
     )
     server = definition.mcp
-    server.add_middleware(McpRequestLogContextMiddleware())
     limiter = build_limiter(
         definition.settings.RATE_LIMIT_DEFAULT,
         definition.rate_limit_storage_uri,
         definition.name,
     )
-    server.add_middleware(
-        McpRateLimitMiddleware(
-            limiter,
-            definition.settings.RATE_LIMIT_DEFAULT,
-            definition.tool_rate_limits,
-            key_prefix=definition.name,
-        )
+    _ensure_library_middlewares(
+        server,
+        limiter,
+        definition.settings.RATE_LIMIT_DEFAULT,
+        definition.tool_rate_limits,
+        definition.name,
+        definition.error_registry,
     )
-    server.add_middleware(McpRefusalMiddleware(definition.error_registry))
-    mcp_asgi_app = server.http_app(path=MCP_PATH, stateless_http=True)
+    mcp_asgi_app = server.http_app(
+        path=MCP_PATH,
+        stateless_http=True,
+        json_response=False,
+        session_idle_timeout=None,
+        host_origin_protection=True,
+        allowed_hosts=list(definition.settings.MCP_ALLOWED_HOST_HEADERS),
+        allowed_origins=[],
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -123,6 +154,13 @@ def create_service_app(definition: ServiceDefinition) -> FastAPI:
         lifespan=lifespan,
         tracer_provider=provider,
         mcp_endpoint_path=MCP_PATH,
+        telemetry={
+            "tracing": False,
+            "metrics": False,
+            "logs": False,
+            "operation_spans": False,
+            "auto_configure": False,
+        },
     )
     app.add_middleware(
         SecurityHeadersMiddleware,

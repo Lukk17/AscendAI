@@ -85,6 +85,7 @@ The settings of `ascend-memory` are listed in its own reference, [apps/ascend-me
 | `ascend-audio-scribe` | `HF_HOME` | `/hf-cache` | Fixed in `compose.yaml`. The Hugging Face cache directory inside the container. | `existing` |
 | `ascend-audio-scribe` | `ALLOWED_PRIVATE_HOSTS` | `host.docker.internal,localhost,127.0.0.1` | Fixed in `compose.yaml`. Hostnames the URI fetch guard may reach at a private address. | `existing` |
 | `ascend-audio-scribe` | `MCP_FILE_URI_ROOT` | `/audio` | Fixed in `compose.yaml`. When set, `file://` URIs are jailed to this directory. | `existing` |
+| `ascend-audio-scribe` | `MCP_ALLOWED_HOST_HEADERS` | `ascend-audio-scribe,localhost,127.0.0.1` | Host names the `/mcp` endpoint accepts in the `Host` header (inbound). Compose reads it as `AUDIO_SCRIBE_MCP_ALLOWED_HOST_HEADERS`. `ALLOWED_PRIVATE_HOSTS` above is outbound. | `add-python-runtime-upgrades` |
 | `ascend-audio-scribe` | `MCP_DOWNLOAD_TIMEOUT_SECONDS` | `30.0` | Total wall-clock budget for an MCP HTTP fetch. | `existing` |
 | `ascend-audio-scribe` | `OTEL_SERVICE_NAME` | `ascend-audio-scribe` | Fixed in `compose.yaml`. Service name carried on every exported span. | `existing` |
 | `ascend-audio-scribe` | `OTEL_RESOURCE_ATTRIBUTES` | `service.version=0.9.4` | Fixed in `compose.yaml`. Resource attributes carried on every exported span. | `existing` |

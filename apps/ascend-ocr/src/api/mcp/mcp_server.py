@@ -2,6 +2,7 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib.metadata import version as package_version
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -67,6 +68,7 @@ async def mcp_lifespan(_app: object) -> AsyncIterator[None]:
 
 mcp: FastMCP = FastMCP(
     "ascend-ocr",
+    version=package_version("ascend-ocr"),
     lifespan=mcp_lifespan,
 )
 

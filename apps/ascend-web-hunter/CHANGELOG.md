@@ -9,6 +9,16 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
+## [0.0.8] - <release date>
+
+### Changed
+- The service follows the shared library version set through `ascend-python-common==2.0.0`
+  (FastAPI 0.147.0, Starlette 1.9.0, uvicorn 0.54.0, FastMCP 4.1.1, MCP SDK 2.3.0,
+  httpx2 2.14.0).
+- The MCP server reports the service name and version in `initialize`.
+- The `/mcp` endpoint accepts only allowed `Host` headers (`ascend-web-hunter,localhost,127.0.0.1`)
+  and no `Origin` header; a refused `Host` answers 421, a refused `Origin` answers 403.
+
 ## [0.0.7]
 
 ### Changed

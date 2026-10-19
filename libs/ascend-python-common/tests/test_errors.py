@@ -1,11 +1,13 @@
 import logging
 import re
+from collections.abc import Iterator
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
+from opentelemetry import trace
 from prometheus_client import REGISTRY
 from pydantic import BaseModel
 
@@ -32,6 +34,18 @@ from ascend_python_common.errors.registry import ErrorRegistry
 from ascend_python_common.tracing import current_trace_id
 
 TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
+
+
+@pytest.fixture(autouse=True)
+def _isolated_global_provider() -> Iterator[None]:
+    from opentelemetry.util._once import Once
+
+    saved_provider = trace._TRACER_PROVIDER
+    trace._TRACER_PROVIDER = None
+    trace._TRACER_PROVIDER_SET_ONCE = Once()
+    yield
+    trace._TRACER_PROVIDER = saved_provider
+    trace._TRACER_PROVIDER_SET_ONCE = Once()
 
 
 def _counter(code: str, surface: str, operation: str) -> float:

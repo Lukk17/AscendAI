@@ -1,4 +1,4 @@
-from ascend_python_common.settings import McpFetchSettings, RateLimit, ServiceSettings
+from ascend_python_common.settings import CsvTuple, McpFetchSettings, RateLimit, ServiceSettings
 from pydantic import Field
 
 
@@ -9,6 +9,10 @@ class Settings(ServiceSettings, McpFetchSettings):
     HF_TOKEN: str | None = None
 
     API_PORT: int = Field(default=7017, ge=1, le=65535, description="Service port")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(
+        default=("ascend-audio-scribe", "localhost", "127.0.0.1"),
+        description="Host names the /mcp endpoint accepts in the Host header",
+    )
     API_TIMEOUT_SECONDS: int = Field(default=120, description="Upstream HTTP client timeout")
 
     SUPPORTED_AUDIO_EXTENSIONS: list[str] = Field(

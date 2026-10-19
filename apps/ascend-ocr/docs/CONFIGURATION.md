@@ -119,6 +119,7 @@ ascend-ai-agent already uses for the same store.
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
 | MCP_FILE_URI_ROOT                 | unset                                         | When set, `file://` is enabled and jailed to this directory via `realpath`. See [ADR-001](architecture/decisions/ADR-001-mcp-file-transport-uri-only.md). |
 | ALLOWED_PRIVATE_HOSTS             | empty                                         | Hostnames that bypass the SSRF private-IP guard. The docker-compose default is `host.docker.internal,localhost,127.0.0.1`. |
+| MCP_ALLOWED_HOST_HEADERS          | `ascend-ocr,localhost,127.0.0.1`               | Host names the `/mcp` endpoint accepts in the `Host` header (inbound). Compose reads it as `OCR_MCP_ALLOWED_HOST_HEADERS`. `ALLOWED_PRIVATE_HOSTS` above is outbound. Added by `add-python-runtime-upgrades`. |
 | MCP_DOWNLOAD_TIMEOUT_SECONDS      | `30.0`                                        | Total aiohttp timeout for the URI fetch.                                                 |
 | FETCH_MAX_REDIRECT_HOPS           | `0`                                           | Redirect hops the URI fetch guard follows. Compose reads it as `OCR_FETCH_MAX_REDIRECT_HOPS`. Added by `add-ascend-python-common`. |
 

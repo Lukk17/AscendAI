@@ -28,7 +28,7 @@ from ascend_python_common.request_context import (
     digest_of_mcp_session_id,
     mcp_request_log_context,
 )
-from ascend_python_common.settings import RateLimit, ServiceSettings
+from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
 
 ABSENT_FIELD = "-"
 CORRELATION_ID = "corr-1"
@@ -40,6 +40,7 @@ ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 class _LogTestSettings(ServiceSettings):
     API_PORT: int = Field(default=7022, ge=1, le=65535)
     RATE_LIMIT_DEFAULT: RateLimit = Field(default="600/minute")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(default=("localhost", "127.0.0.1"))
 
 
 settings = _LogTestSettings()

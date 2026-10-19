@@ -4,6 +4,44 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/). Newest entry on top.
 
+## [2.0.0] - <release date>
+
+### Changed
+- Breaking: the pinned version set moves to FastAPI 0.147.0, Starlette 1.9.0,
+  uvicorn 0.54.0, FastMCP 4.1.1, MCP SDK 2.3.0 and httpx2 2.14.0 (owner pin
+  2026-10-19, design D1). `mcp-types` 2.3.0 arrives with the SDK pin. Every
+  service drops its own `httpx2` dev pin and follows the library set.
+- The `/mcp` endpoint checks the `Host` and `Origin` headers of every request
+  (new setting `MCP_ALLOWED_HOST_HEADERS`, empty refused at start-up, default
+  per service: its compose service name, `localhost`, `127.0.0.1`). A refused
+  `Host` answers 421, a refused `Origin` answers 403, REST routes are not
+  checked (D10).
+- `create_service_app` builds the app with FastAPI telemetry switched off
+  (`tracing`, `metrics`, `logs`, `operation_spans` and `auto_configure` all
+  false, the five keys checked against the installed 0.147.0 source), so the
+  library keeps its single HTTP server span and its single exporter (D4).
+- `http_app` is called with explicit transport settings: `stateless_http=True`,
+  `json_response=False`, `session_idle_timeout=None` (D10).
+- The FastMCP server reports the service version read from
+  `importlib.metadata` in `initialize`, no longer the FastMCP version (D7).
+  Each service passes its version when it builds its server.
+- The MCP log context middleware takes the session digest from the
+  `mcp-session-id` header of the carrying HTTP request through
+  `get_http_request()`, checked against the SDK pattern, with no digest when
+  the header is absent. The `mcp.types` import of that module moved to
+  `mcp_types` (D6).
+- Route lookup for REST rate limiting is the library's own
+  `route_lookup.resolve_route`, which follows Starlette matching into included
+  routers and mounts. slowapi keeps handling directly added routes, and the
+  Prometheus instrumentator 8.1.0 already resolves included routers itself,
+  so it needed no change (D3).
+- The `mcp.session.id` drop now also runs at export time
+  (`_SessionIdScrubbingExporter`), because FastMCP 4.1.1 re-adds the attribute
+  after span start. The start-time processor is unchanged, no new processor
+  and no condition was added (D5, owner decision 93).
+- No warning was silenced and no `noqa`, `type: ignore` or `pragma: no cover`
+  was added.
+
 ## [1.0.0] - <release date>
 
 ### Changed

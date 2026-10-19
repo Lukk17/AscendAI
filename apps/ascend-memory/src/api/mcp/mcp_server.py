@@ -1,4 +1,5 @@
 import logging
+from importlib.metadata import version as package_version
 from typing import Any, NoReturn
 
 from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
@@ -11,7 +12,7 @@ from src.service.memory_client import get_memory_client, resolve_provider, wipe_
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("ascend-memory")
+mcp = FastMCP("ascend-memory", version=package_version("ascend-memory"))
 
 
 def _raise_mapped_error(operation: str, exc: Exception) -> NoReturn:

@@ -78,15 +78,61 @@ sys.modules.update(_real_fastmcp_submodules)
 
 
 from src.main import app  # noqa: E402
-from src.reader.cloudflare.cookie_manager import CookieManager  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def reset_cookie_manager_singleton() -> Iterator[None]:
-    """Cookie singleton bleeds state across tests. Reset before every test."""
-    CookieManager._instance = None
+@pytest_asyncio.fixture(autouse=True)
+async def reset_cookie_manager_singleton() -> AsyncIterator[None]:
+    """Cookie state bleeds across tests. Reset the shared global in place
+    before every test: every strategy holds a reference to that object, so
+    replacing it would leave the old state reachable."""
+    await _reset_global_cookie_manager()
+    _clear_rate_limit_budgets()
     yield
-    CookieManager._instance = None
+    await _reset_global_cookie_manager()
+    _clear_rate_limit_budgets()
+
+
+async def _reset_global_cookie_manager() -> None:
+    import redis.asyncio as async_redis
+
+    import src.reader.cloudflare.cookie_manager as cookie_module
+    from src.config.config import settings as service_settings
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+
+    manager = cookie_module.cookie_manager
+    old_client = manager.redis_client
+    manager._memory_store.clear()
+    if old_client is not None:
+        await old_client.aclose()
+    manager.redis_client = (
+        async_redis.Redis.from_url(service_settings.REDIS_URL, decode_responses=True)
+        if service_settings.REDIS_URL
+        else None
+    )
+    cookie_module.CookieManager._instance = manager
+    novnc_flow_registry._local.clear()
+    _delete_redis_keys(("novnc_flow:*", "session:*"))
+
+
+def _clear_rate_limit_budgets() -> None:
+    _delete_redis_keys(("*LIMITER*", "LIMITER*"))
+
+
+def _delete_redis_keys(patterns: tuple[str, ...]) -> None:
+    import redis as sync_redis
+
+    from src.config.config import settings as service_settings
+
+    client = sync_redis.Redis.from_url(service_settings.REDIS_URL, socket_connect_timeout=2)
+    try:
+        keys: list[str] = []
+        for pattern in patterns:
+            found = client.keys(pattern)
+            keys.extend(key.decode() if isinstance(key, bytes) else key for key in found)
+        if keys:
+            client.delete(*keys)
+    finally:
+        client.close()
 
 
 @pytest.fixture(autouse=True)

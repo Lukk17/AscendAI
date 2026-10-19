@@ -11,8 +11,9 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Final
 
-import mcp.types as mt
+import mcp_types as mt
 from fastmcp import Context
+from fastmcp.server.dependencies import get_http_request
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from mcp.server.streamable_http import MCP_SESSION_ID_HEADER, SESSION_ID_PATTERN
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -176,14 +177,26 @@ class McpRequestLogContextMiddleware(Middleware):
             return await call_next(context)
 
 
+def _header_session_digest() -> str | None:
+    try:
+        request = get_http_request()
+    except RuntimeError:
+        return None
+    raw = request.headers.get(MCP_SESSION_ID_HEADER)
+    if raw is None or not SESSION_ID_PATTERN.fullmatch(raw):
+        return None
+
+    return digest_of_mcp_session_id(raw)
+
+
 def _log_ids_of(fastmcp_context: Context | None) -> tuple[str, str | None]:
     if fastmcp_context is None or fastmcp_context.request_context is None:
-        return bound_correlation_id() or new_correlation_id(), None
+        return bound_correlation_id() or new_correlation_id(), _header_session_digest()
 
     carrying_request = fastmcp_context.request_context.request
     carried_id = correlation_id_of(carrying_request.scope) if carrying_request is not None else None
 
-    return carried_id or new_correlation_id(), digest_of_mcp_session_id(fastmcp_context.session_id)
+    return carried_id or new_correlation_id(), _header_session_digest()
 
 
 class _NeverRaisingLogFilter(logging.Filter, ABC):

@@ -19,6 +19,7 @@ against environment variables and `.env`. The source of truth is
 | `OTEL_SDK_DISABLED` | `false` | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
 | `RATE_LIMIT_DEFAULT` | `1200/minute` | Flood-protection rate limit for REST routes and MCP tools; `/health`, `/ready`, `/metrics` and `tools/list` are never limited. Compose passes `WEB_HUNTER_RATE_LIMIT_DEFAULT` |
 | `ALLOWED_PRIVATE_HOSTS` | empty | Hosts the URI fetch guard may reach even at a private address. Leave empty, only an e2e sweep sets it. The development compose file fills it from `WEB_HUNTER_ALLOWED_PRIVATE_HOSTS`. |
+| `MCP_ALLOWED_HOST_HEADERS` | `ascend-web-hunter,localhost,127.0.0.1` | Host names the `/mcp` endpoint accepts in the `Host` header (inbound). Compose passes `WEB_HUNTER_MCP_ALLOWED_HOST_HEADERS`. `ALLOWED_PRIVATE_HOSTS` above is outbound. Added by `add-python-runtime-upgrades`. |
 | `READINESS_PROBE_TIMEOUT_SECONDS` | `3` | Seconds each readiness probe may take. Added by `add-ascend-python-common`. |
 | `STARTUP_PROBE_TIMEOUT_SECONDS` | `2` | Seconds each startup banner check may take. Added by `add-ascend-python-common`. |
 | `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000` | Max age of the strict-transport-security header. Added by `add-ascend-python-common`. |

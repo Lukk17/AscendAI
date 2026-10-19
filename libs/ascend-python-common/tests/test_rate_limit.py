@@ -147,6 +147,16 @@ def test_default_storage_is_in_memory() -> None:
     assert not first._key_prefix
 
 
+def test_a_disabled_limiter_lets_everything_through() -> None:
+    # given
+    client, limiter = _rest_app()
+    limiter.enabled = False
+    # when
+    answers = [client.get("/limited") for _ in range(3)]
+    # then
+    assert [answer.status_code for answer in answers] == [200, 200, 200]
+
+
 def test_health_is_never_limited() -> None:
     # given
     client, _ = _rest_app()

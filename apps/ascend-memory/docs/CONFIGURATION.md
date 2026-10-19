@@ -24,6 +24,7 @@ invoked, so a single deployment can serve `provider=lmstudio`, `provider=openai`
 | `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000`                                                | `max-age` of the `strict-transport-security` response header. Added by `add-ascend-python-common`. |
 | `OTEL_SDK_DISABLED`      | `false`                                                            | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset                                                           | OTLP trace export endpoint, export whenever it is set. Added by `add-observability`. |
+| `MCP_ALLOWED_HOST_HEADERS` | `ascend-memory,localhost,127.0.0.1`                              | Host names the `/mcp` endpoint accepts in the `Host` header (inbound). Compose reads it as `MEMORY_MCP_ALLOWED_HOST_HEADERS`. This service has no `ALLOWED_PRIVATE_HOSTS` (it fetches no caller URI). Added by `add-python-runtime-upgrades`. |
 
 ---
 

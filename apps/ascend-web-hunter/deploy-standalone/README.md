@@ -288,6 +288,7 @@ The equivalent file in the repository root is `compose.ascend-web-hunter.yaml`. 
 | redis service `container_name` | `ascend-scrapper-redis`, to avoid colliding with the development machine's own pre-existing `redis` container | `redis`, matching every other service in this file; no such collision exists on this bundle's target host |
 | redis service volume | None. The profile is meant for occasional local testing of this bundle, and the development machine's own Redis already persists its own data | `redisdata`, since a lost session here means a human re-solving every Cloudflare challenge by hand |
 | ALLOWED_PRIVATE_HOSTS | Passed from `WEB_HUNTER_ALLOWED_PRIVATE_HOSTS`, empty by default and set only by the start command of an end-to-end sweep | Absent. The bundle passes no allow list to the service |
+| MCP_ALLOWED_HOST_HEADERS | Passed from `WEB_HUNTER_MCP_ALLOWED_HOST_HEADERS`, `ascend-web-hunter,localhost,127.0.0.1` by default, which fills `MCP_ALLOWED_HOST_HEADERS` of the container. Set it when callers reach the service under another host name | Same. Override it in the bundle `.env` when the machine's own host name must reach `/mcp` |
 
 ---
 

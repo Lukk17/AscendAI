@@ -8,6 +8,7 @@ import asyncio
 import logging
 import shutil
 import tempfile
+from importlib.metadata import version as package_version
 from typing import Any, NoReturn
 
 from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 URI_NOT_PROVIDED = "URI not provided"
 
-mcp = FastMCP("ascend-audio-scribe")
+mcp = FastMCP("ascend-audio-scribe", version=package_version("ascend-audio-scribe"))
 
 
 def _resolve_language(language: str | None) -> str:

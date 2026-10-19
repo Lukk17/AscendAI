@@ -6,6 +6,10 @@ from pydantic import Field, field_validator, model_validator
 
 class Settings(ServiceSettings):
     API_PORT: int = Field(default=7021, ge=1, le=65535, description="Port for the FastAPI/MCP server")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(
+        default=("ascend-web-hunter", "localhost", "127.0.0.1"),
+        description="Host names the /mcp endpoint accepts in the Host header",
+    )
 
     # Default to localhost:9020 for local development (accessing host machine port).
     # Docker Compose overrides this to http://searxng:8080 (internal container communication).

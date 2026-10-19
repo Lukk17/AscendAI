@@ -10,7 +10,7 @@ from fastmcp import FastMCP
 
 from ascend_python_common.app import ServiceDefinition, create_service_app
 from ascend_python_common.errors import ErrorRegistry
-from ascend_python_common.settings import RateLimit, ServiceSettings
+from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
 from ascend_python_common.startup_banner import (
     CONFIGURED,
     CONNECTED,
@@ -30,6 +30,7 @@ from ascend_python_common.startup_banner import (
 class _Settings(ServiceSettings):
     API_PORT: int = 9917
     RATE_LIMIT_DEFAULT: RateLimit = "100/minute"
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = ("testserver", "localhost", "127.0.0.1")
 
 
 def _server() -> FastMCP:

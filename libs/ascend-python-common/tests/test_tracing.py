@@ -226,6 +226,56 @@ def test_span_without_a_session_id_keeps_its_attributes(
     assert dict(span.attributes or {}) == {"other": "kept"}
 
 
+def test_export_scrubs_a_session_id_set_after_span_start() -> None:
+    # given: FastMCP enriches its server spans after span start, past the
+    # start-time processor, so the exporter drops the attribute on the way out
+    from opentelemetry.sdk.trace import ReadableSpan
+    from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+
+    from ascend_python_common.tracing import _SessionIdScrubbingExporter
+
+    class _RecordingExporter(SpanExporter):
+        def __init__(self) -> None:
+            self.spans: list[ReadableSpan] = []
+            self.shut_down = False
+            self.flushes = 0
+
+        def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+            self.spans.extend(spans)
+            return SpanExportResult.SUCCESS
+
+        def shutdown(self) -> None:
+            self.shut_down = True
+
+        def force_flush(self, timeout_millis: int = 30000) -> bool:
+            self.flushes += 1
+            return True
+
+    delegate = _RecordingExporter()
+    exporter = _SessionIdScrubbingExporter(delegate)
+    enriched = ReadableSpan(
+        name="tools/call probe",
+        attributes={MCP_SESSION_ID_SPAN_ATTRIBUTE: uuid.uuid4().hex, "other": "kept"},
+    )
+    plain = ReadableSpan(name="GET /sample", attributes={"other": "kept"})
+    bare = ReadableSpan(name="GET /bare")
+    # when
+    result = exporter.export([enriched, plain, bare])
+    flushed = exporter.force_flush()
+    exporter.shutdown()
+    # then
+    assert result is SpanExportResult.SUCCESS
+    assert flushed is True
+    assert delegate.shut_down is True
+    assert delegate.flushes == 1
+    assert [span.name for span in delegate.spans] == ["tools/call probe", "GET /sample", "GET /bare"]
+    [scrubbed, kept, untouched] = delegate.spans
+    assert MCP_SESSION_ID_SPAN_ATTRIBUTE not in (scrubbed.attributes or {})
+    assert dict(scrubbed.attributes or {}) == {"other": "kept"}
+    assert kept.attributes == {"other": "kept"}
+    assert dict(untouched.attributes or {}) == {}
+
+
 def test_sdk_disabled_sends_nothing_while_the_endpoint_is_set(
     shutdown_providers: list[TracerProvider], monkeypatch: pytest.MonkeyPatch
 ) -> None:

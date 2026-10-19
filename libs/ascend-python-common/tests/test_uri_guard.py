@@ -6,7 +6,7 @@ import pytest
 from aiohttp.abc import AbstractResolver, ResolveResult
 from pydantic import Field
 
-from ascend_python_common.settings import McpFetchSettings, RateLimit, ServiceSettings
+from ascend_python_common.settings import CsvTuple, McpFetchSettings, RateLimit, ServiceSettings
 from ascend_python_common.uri_guard import (
     MAX_REDIRECT_HOPS,
     FetchPolicy,
@@ -26,6 +26,7 @@ PUBLIC_V6 = "2606:2800:220:1:248:1893:25c8:1946"
 class _FetchSettings(ServiceSettings, McpFetchSettings):
     API_PORT: int = Field(default=7022, ge=1, le=65535)
     RATE_LIMIT_DEFAULT: RateLimit = Field(default="600/minute")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(default=("testserver", "localhost", "127.0.0.1"))
     MCP_DOWNLOAD_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
     FETCH_MAX_REDIRECT_HOPS: int = Field(default=10, ge=0)
 

@@ -16,6 +16,7 @@ from ascend_python_common.settings import (
 class _TestSettings(ServiceSettings):
     API_PORT: int = Field(default=7022, ge=1, le=65535)
     RATE_LIMIT_DEFAULT: RateLimit = Field(default="600/minute")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(default=("localhost", "127.0.0.1"))
 
 
 class _TestFetchSettings(_TestSettings, McpFetchSettings):
@@ -33,6 +34,7 @@ _SETTINGS_ENV_VARS: tuple[str, ...] = (
     "READINESS_PROBE_TIMEOUT_SECONDS",
     "STARTUP_PROBE_TIMEOUT_SECONDS",
     "SECURITY_HSTS_MAX_AGE_SECONDS",
+    "MCP_ALLOWED_HOST_HEADERS",
     "FETCH_MAX_REDIRECT_HOPS",
     "ALLOWED_PRIVATE_HOSTS",
     "MCP_FILE_URI_ROOT",

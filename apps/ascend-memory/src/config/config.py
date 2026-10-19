@@ -1,6 +1,6 @@
 from typing import TypedDict
 
-from ascend_python_common.settings import RateLimit, ServiceSettings
+from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
 from pydantic import Field
 
 
@@ -52,6 +52,10 @@ PROVIDER_CONFIGS: dict[str, ProviderConfig] = {
 
 class Settings(ServiceSettings):
     API_PORT: int = Field(default=7020, ge=1, le=65535, description="Port for the FastAPI server")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(
+        default=("ascend-memory", "localhost", "127.0.0.1"),
+        description="Host names the /mcp endpoint accepts in the Host header",
+    )
 
     RATE_LIMIT_DEFAULT: RateLimit = Field(
         default="6000/minute",

@@ -7,8 +7,8 @@ ascend-ocr is an OCR (Optical Character Recognition) service that wraps the Padd
 ## Tech Stack
 
 - **Language**: Python 3.11
-- **Framework**: FastAPI + Uvicorn, FastMCP 3.3.1
-- **Version**: 0.3.1
+- **Framework**: FastAPI + Uvicorn, FastMCP 4.1.1
+- **Version**: 0.3.2
 - **Key Libraries**: PaddlePaddle 3.3.1, PaddleOCR 3.7.0, Pillow 12.2.0, aiohttp 3.13.5
 - **Docker Base**: `python:3.11-slim` (multi-stage build with pre-cached models)
 
@@ -336,6 +336,7 @@ logs a `WARNING`, never a refusal, when that service peak meets or exceeds it. S
 - `OCR_TEXT_RECOGNITION_MODEL` - recognition model for the same languages (default `PP-OCRv6_small_rec`). Together with the line above this is the whole model choice, named rather than resolved from the language, and switching family member (`PP-OCRv6_medium_det` / `PP-OCRv6_medium_rec`) is these two variables and a rebuild. A language outside the family would name its own pair in `LANGUAGE_MODEL_OVERRIDES` in `src/config/config.py`, which is empty while `ru` and `korean` are switched off. See [ADR-007](docs/architecture/decisions/ADR-007-explicit-ocr-model-selection.md).
 - `MCP_FILE_URI_ROOT` - when set, enables `file://` URI scheme jailed to this absolute path. Unset by default ⇒ `file://` rejected.
 - `ALLOWED_PRIVATE_HOSTS` - comma-separated hostnames that bypass the SSRF private-IP check. `host.docker.internal` reaches the object store on host ports 9070/9071 from inside the container. Default empty ⇒ strict block.
+- `MCP_ALLOWED_HOST_HEADERS` - Host names the `/mcp` endpoint accepts in the `Host` header, inbound check on the MCP endpoint only (default: `ascend-ocr,localhost,127.0.0.1`). `ALLOWED_PRIVATE_HOSTS` is the outbound direction and one does not replace the other.
 - `MCP_DOWNLOAD_TIMEOUT_SECONDS` - total timeout for MCP HTTP fetch (default `30`).
 - `FETCH_MAX_REDIRECT_HOPS` - redirect hops the URI fetch guard follows (default `0`). Compose reads it as `OCR_FETCH_MAX_REDIRECT_HOPS`.
 - `OCR_WORKER_COUNT` - number of inference worker processes and admission-gate permits, both read from this one setting so they cannot disagree. A memory constraint, not a throughput knob (default `1`).

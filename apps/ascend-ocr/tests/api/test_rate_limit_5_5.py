@@ -6,8 +6,9 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastmcp.exceptions import ToolError
-from fastmcp.tools.tool import ToolResult
+from fastmcp.tools.base import ToolResult
 from httpx import ASGITransport, AsyncClient, Response
+from mcp.types import TextContent
 
 from src.api.mcp.mcp_server import mcp
 from src.config.config import Settings
@@ -117,7 +118,9 @@ class TestOcrSubmitRateLimit:
         rest_over = await _submit_rest(rest_client, "rest-over.png")
         # then - the third submission is refused even though each surface made fewer calls than the limit
         assert rest_first.status_code == 202
-        assert json.loads(str(mcp_result.content[0].text))["state"] == "waiting"
+        first_block = mcp_result.content[0]
+        assert isinstance(first_block, TextContent)
+        assert json.loads(str(first_block.text))["state"] == "waiting"
         assert rest_over.status_code == 429
         assert rest_over.json()["code"] == "rate_limited"
         assert "retry-after" in {key.lower() for key in rest_over.headers}

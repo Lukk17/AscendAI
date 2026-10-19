@@ -41,7 +41,7 @@ from ascend_python_common.request_context import (
     digest_of_mcp_session_id,
     mcp_request_log_context,
 )
-from ascend_python_common.settings import McpFetchSettings, RateLimit, ServiceSettings
+from ascend_python_common.settings import CsvTuple, McpFetchSettings, RateLimit, ServiceSettings
 from ascend_python_common.startup_banner import (
     CONFIGURED,
     CONNECTED,
@@ -93,11 +93,25 @@ _SETTINGS_ENV_VARS: tuple[str, ...] = (
 class _SampleSettings(ServiceSettings):
     API_PORT: int = 9917
     RATE_LIMIT_DEFAULT: RateLimit = "100/minute"
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = ("testserver", "localhost", "127.0.0.1")
 
 
 class _TightSettings(ServiceSettings):
     API_PORT: int = 9917
     RATE_LIMIT_DEFAULT: RateLimit = "2/minute"
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = ("testserver", "localhost", "127.0.0.1")
+
+
+class _GuardedSettings(ServiceSettings):
+    API_PORT: int = 9917
+    RATE_LIMIT_DEFAULT: RateLimit = "100/minute"
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = ("testserver", "localhost", "127.0.0.1")
+
+
+class _DeploymentSettings(ServiceSettings):
+    API_PORT: int = 7021
+    RATE_LIMIT_DEFAULT: RateLimit = "100/minute"
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = ("search-box", "localhost")
 
 
 class JobNotFoundError(Exception):
@@ -199,7 +213,7 @@ def _router() -> APIRouter:
 
 
 def _mcp_server(name: str = MCP_SERVER_NAME) -> FastMCP:
-    server = FastMCP(name)
+    server = FastMCP(name, version=package_version("ascend-python-common"))
 
     @server.tool
     def memory_insert(text: str) -> str:
@@ -286,6 +300,12 @@ def _isolated_tracer() -> Any:
     yield
     trace._TRACER_PROVIDER = saved_provider
     trace._TRACER_PROVIDER_SET_ONCE = Once()
+
+
+@pytest.fixture(params=["legacy", "auto"])
+def mcp_mode(request: pytest.FixtureRequest) -> str:
+    mode: str = request.param
+    return mode
 
 
 def test_a_services_own_refusal() -> None:
@@ -432,7 +452,7 @@ def test_a_refusal_over_rest(caplog: pytest.LogCaptureFixture) -> None:
     assert _counter("JOB_NOT_FOUND", "rest", "/jobs/{job_id}") == before + 1
 
 
-def test_the_same_refusal_over_mcp(caplog: pytest.LogCaptureFixture) -> None:
+def test_the_same_refusal_over_mcp(caplog: pytest.LogCaptureFixture, mcp_mode: str) -> None:
     # given
     definition = _definition()
     create_service_app(definition)
@@ -441,7 +461,7 @@ def test_the_same_refusal_over_mcp(caplog: pytest.LogCaptureFixture) -> None:
 
     async def _calls() -> str:
         # when
-        async with Client(definition.mcp) as mcp_client:
+        async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
             with pytest.raises(ToolError) as exc_info:
                 await mcp_client.call_tool("memory_insert", {"text": ""})
             return str(exc_info.value)
@@ -457,13 +477,13 @@ def test_the_same_refusal_over_mcp(caplog: pytest.LogCaptureFixture) -> None:
     assert _counter("validation", "mcp", "memory_insert") == before + 1
 
 
-def test_two_tools_refused_with_the_same_code() -> None:
+def test_two_tools_refused_with_the_same_code(mcp_mode: str) -> None:
     # given
     definition = _definition()
 
     async def _calls() -> tuple[str, str]:
         # when
-        async with Client(definition.mcp) as mcp_client:
+        async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
             first_error = ""
             second_error = ""
             with pytest.raises(ToolError) as first_info:
@@ -488,14 +508,14 @@ def test_two_tools_refused_with_the_same_code() -> None:
     assert _counter("rate_limited", "mcp", "rate_probe_two") == before_second + 1
 
 
-def test_an_empty_memory_text_over_mcp() -> None:
+def test_an_empty_memory_text_over_mcp(mcp_mode: str) -> None:
     # given
     definition = _definition()
     create_service_app(definition)
 
     async def _calls() -> str:
         # when
-        async with Client(definition.mcp) as mcp_client:
+        async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
             with pytest.raises(ToolError) as exc_info:
                 await mcp_client.call_tool("memory_insert", {"text": "   "})
             return str(exc_info.value)
@@ -508,14 +528,14 @@ def test_an_empty_memory_text_over_mcp() -> None:
     assert message.startswith("validation: ")
 
 
-def test_an_unexpected_failure_over_mcp() -> None:
+def test_an_unexpected_failure_over_mcp(mcp_mode: str) -> None:
     # given
     definition = _definition()
     create_service_app(definition)
 
     async def _calls() -> str:
         # when
-        async with Client(definition.mcp) as mcp_client:
+        async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
             with pytest.raises(ToolError) as exc_info:
                 await mcp_client.call_tool("boom_tool", {})
             return str(exc_info.value)
@@ -680,6 +700,166 @@ def test_sdk_disabled_leaves_no_span_and_no_trace_id(
     assert "traceId" not in body
 
 
+def test_a_request_exports_exactly_one_http_server_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given: the endpoint is set so the sampler records, and the library's
+    # exporter writes to memory instead of the network
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.trace import SpanKind
+
+    exported = InMemorySpanExporter()
+    monkeypatch.setattr("ascend_python_common.tracing.OTLPSpanExporter", lambda endpoint: exported)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
+    client = _client(_definition())
+    # when
+    response = client.get("/health")
+    provider = trace.get_tracer_provider()
+    assert hasattr(provider, "force_flush")
+    provider.force_flush()
+    # then
+    assert response.status_code == 200
+    server_spans = [
+        span
+        for span in exported.get_finished_spans()
+        if span.kind == SpanKind.SERVER and not span.name.endswith(("http send", "http receive"))
+    ]
+    [span] = server_spans
+    assert span.kind == SpanKind.SERVER
+
+
+def test_only_the_library_exporter_is_registered_with_auto_configure_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
+    monkeypatch.setenv("FASTAPI_OTEL_AUTO_CONFIGURE", "true")
+    # when: the lifespan runs, which is where FastAPI would add its own exporters
+    with _client(_definition()):
+        provider = trace.get_tracer_provider()
+        active = getattr(provider, "_active_span_processor", None)
+        processors = getattr(active, "_span_processors", ())
+    # then: only the BatchSpanProcessor the library adds is registered
+    assert len([item for item in processors if isinstance(item, BatchSpanProcessor)]) == 1
+
+
+def test_an_unexpected_exception_emits_no_opentelemetry_log_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given: a real SDK logger provider that keeps every record in memory
+    import opentelemetry._logs._internal as logs_internal
+    from opentelemetry.sdk._logs import LoggerProvider
+    from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter, SimpleLogRecordProcessor
+
+    exported_cls: Any = InMemoryLogRecordExporter
+    exported = exported_cls()
+    provider = LoggerProvider()
+    provider.add_log_record_processor(SimpleLogRecordProcessor(exported))
+    monkeypatch.setattr(logs_internal, "_LOGGER_PROVIDER", provider)
+    client = _client(_definition())
+    # when
+    response = client.get("/boom")
+    # then
+    assert response.status_code == 500
+    assert exported.get_finished_logs() == ()
+
+
+async def test_both_eras_export_no_session_id_below_the_http_server_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given: sampled spans go to memory, and raw HTTP carries no trace context,
+    # so the HTTP server span is the root of every request trace
+    import httpx2
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.trace import SpanKind
+
+    from ascend_python_common.tracing import MCP_SESSION_ID_SPAN_ATTRIBUTE
+
+    exported = InMemorySpanExporter()
+    monkeypatch.setattr("ascend_python_common.tracing.OTLPSpanExporter", lambda endpoint: exported)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
+    definition = _definition()
+    app = create_service_app(definition)
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+    handshake = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "probe", "version": "0.0.1"},
+        },
+    }
+    call = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {"name": "ocr_job_status", "arguments": {}},
+    }
+    sessionless_headers = {
+        **headers,
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "tools/call",
+        "mcp-name": "ocr_job_status",
+    }
+    sessionless_payload = {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+            "name": "ocr_job_status",
+            "arguments": {},
+            "_meta": {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientCapabilities": {},
+                "io.modelcontextprotocol/clientInfo": {"name": "probe", "version": "0.0.1"},
+            },
+        },
+    }
+
+    # when
+    async with app.router.lifespan_context(app):
+        transport = httpx2.ASGITransport(app=app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://testserver") as http:
+            legacy_handshake = await http.post("/mcp", json=handshake, headers=headers)
+            legacy_call = await http.post("/mcp", json=call, headers=headers)
+            sessionless_call = await http.post("/mcp", json=sessionless_payload, headers=sessionless_headers)
+    provider = trace.get_tracer_provider()
+    assert hasattr(provider, "force_flush")
+    provider.force_flush()
+    # then
+    assert legacy_handshake.status_code == 200
+    assert "2025-11-25" in legacy_handshake.text
+    assert legacy_call.status_code == 200
+    assert "status-ok" in legacy_call.text
+    assert sessionless_call.status_code == 200
+    assert "status-ok" in sessionless_call.text
+    spans = [
+        span
+        for span in exported.get_finished_spans()
+        if not span.name.endswith(("http send", "http receive"))
+    ]
+    assert spans != []
+    for span in spans:
+        assert MCP_SESSION_ID_SPAN_ATTRIBUTE not in (span.attributes or {})
+    by_id = {span.context.span_id: span for span in spans}
+    for span in spans:
+        if span.parent is None or not span.parent.is_valid:
+            assert span.kind == SpanKind.SERVER
+            assert span.name.startswith(("POST", "GET"))
+        else:
+            assert span.parent.span_id in by_id
+
+
 def test_a_dependency_is_down() -> None:
     # given
     client = _client(_definition(probes={"qdrant": _failing_probe}))
@@ -730,14 +910,14 @@ def test_too_many_submissions() -> None:
     assert "Retry-After" in refused.headers
 
 
-def test_too_many_tool_calls() -> None:
+def test_too_many_tool_calls(mcp_mode: str) -> None:
     # given
     definition = _definition(settings=_TightSettings())
     create_service_app(definition)
 
     async def _calls() -> str:
         # when
-        async with Client(definition.mcp) as mcp_client:
+        async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
             await mcp_client.call_tool("ocr_submit", {})
             await mcp_client.call_tool("ocr_submit", {})
             with pytest.raises(ToolError) as exc_info:
@@ -762,6 +942,129 @@ def test_health_is_never_limited() -> None:
     answers = [client.get("/health").status_code for _ in range(10)]
     # then
     assert all(status == 200 for status in answers)
+
+
+def test_initialize_reports_the_service_name_and_version() -> None:
+    # given
+    app = create_service_app(_definition())
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "probe", "version": "0.0.1"},
+        },
+    }
+    # when
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/mcp", json=payload, headers=_mcp_headers())
+    # then
+    assert response.status_code == 200
+    line = next(text for text in response.text.splitlines() if text.startswith("data: "))
+    result = json.loads(line[len("data: ") :])["result"]
+    assert result["protocolVersion"] == "2025-11-25"
+    assert result["serverInfo"]["name"] == MCP_SERVER_NAME
+    assert result["serverInfo"]["version"] == package_version("ascend-python-common")
+
+
+def test_an_oversized_body_is_refused_and_the_next_call_succeeds() -> None:
+    # given: a 5 MiB JSON-RPC message, over the 4 MiB limit of the MCP SDK
+    app = create_service_app(_definition())
+    oversized = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": "ocr_job_status", "arguments": {"blob": "a" * (5 * 1024 * 1024)}},
+    }
+    call = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {"name": "ocr_job_status", "arguments": {}},
+    }
+    # when
+    with TestClient(app, raise_server_exceptions=False) as client:
+        refused = client.post("/mcp", json=oversized, headers=_mcp_headers())
+        answered = client.post("/mcp", json=call, headers=_mcp_headers())
+    # then
+    assert refused.status_code == 413
+    assert "mcp-session-id" not in refused.headers
+    assert answered.status_code == 200
+    assert "status-ok" in answered.text
+
+
+def test_a_get_on_the_mcp_endpoint_answers_method_not_allowed() -> None:
+    # given
+    app = create_service_app(_definition())
+    # when
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/mcp")
+    # then
+    assert response.status_code == 405
+    assert "mcp-session-id" not in response.headers
+
+
+def test_an_allowed_host_serves_and_a_foreign_host_is_refused() -> None:
+    # given
+    app = create_service_app(_definition(settings=_GuardedSettings()))
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "probe", "version": "0.0.1"},
+        },
+    }
+    # when
+    with TestClient(app, raise_server_exceptions=False) as client:
+        allowed = client.post("/mcp", json=payload, headers=_mcp_headers())
+        refused = client.post("/mcp", json=payload, headers={**_mcp_headers(), "host": "attacker.example"})
+        health = client.get("/health", headers={"host": "attacker.example"})
+        origin_refused = client.post(
+            "/mcp",
+            json=payload,
+            headers={**_mcp_headers(), "origin": "https://attacker.example"},
+        )
+    # then
+    assert allowed.status_code == 200
+    assert refused.status_code == 421
+    assert "mcp-session-id" not in refused.headers
+    assert health.status_code == 200
+    assert origin_refused.status_code == 403
+    assert "mcp-session-id" not in origin_refused.headers
+
+
+def test_a_deployment_host_name_with_a_port_is_served() -> None:
+    # given
+    app = create_service_app(_definition(settings=_DeploymentSettings()))
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "probe", "version": "0.0.1"},
+        },
+    }
+    # when
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/mcp", json=payload, headers={**_mcp_headers(), "host": "search-box:7021"})
+    # then
+    assert response.status_code == 200
+    assert "mcp-session-id" not in response.headers
+
+
+def test_an_empty_host_allow_list_stops_start_up() -> None:
+    # when
+    with pytest.raises(ValidationError, match="MCP_ALLOWED_HOST_HEADERS"):
+        _SampleSettings(MCP_ALLOWED_HOST_HEADERS=())
+    # then
+    assert True
 
 
 def test_ascend_memory_names_itself() -> None:
@@ -832,6 +1135,7 @@ def test_a_tool_call_reaches_a_container_that_did_not_answer_the_handshake() -> 
 class _FetchSampleSettings(ServiceSettings, McpFetchSettings):
     API_PORT: int = Field(default=7022, ge=1, le=65535)
     RATE_LIMIT_DEFAULT: RateLimit = Field(default="600/minute")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(default=("testserver", "localhost", "127.0.0.1"))
     MCP_DOWNLOAD_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
     FETCH_MAX_REDIRECT_HOPS: int = Field(default=10, ge=0)
 
@@ -874,6 +1178,7 @@ def test_no_service_keeps_a_copy_of_shared_code() -> None:
 
 async def test_a_host_that_resolves_to_a_private_address(
     monkeypatch: pytest.MonkeyPatch,
+    mcp_mode: str,
 ) -> None:
     # given
     loop = asyncio.get_running_loop()
@@ -903,7 +1208,7 @@ async def test_a_host_that_resolves_to_a_private_address(
     )
     create_service_app(definition)
     # when
-    async with Client(definition.mcp) as mcp_client:
+    async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
         with pytest.raises(ToolError) as exc_info:
             await mcp_client.call_tool("read_pdf", {})
         message = str(exc_info.value)
@@ -912,7 +1217,7 @@ async def test_a_host_that_resolves_to_a_private_address(
     assert "10.0.0.5" not in message
 
 
-async def test_a_link_that_leaves_the_file_root(tmp_path: Path) -> None:
+async def test_a_link_that_leaves_the_file_root(tmp_path: Path, mcp_mode: str) -> None:
     # given
     root = tmp_path / "root"
     root.mkdir()
@@ -941,7 +1246,7 @@ async def test_a_link_that_leaves_the_file_root(tmp_path: Path) -> None:
     )
     create_service_app(definition)
     # when
-    async with Client(definition.mcp) as mcp_client:
+    async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
         with pytest.raises(ToolError) as exc_info:
             await mcp_client.call_tool("read_file", {})
         message = str(exc_info.value)
@@ -950,7 +1255,7 @@ async def test_a_link_that_leaves_the_file_root(tmp_path: Path) -> None:
     assert "secret-outside" not in message
 
 
-async def test_user_info_in_an_http_uri(caplog: pytest.LogCaptureFixture) -> None:
+async def test_user_info_in_an_http_uri(caplog: pytest.LogCaptureFixture, mcp_mode: str) -> None:
     # given
     registry = ErrorRegistry()
     registry.register(UnsafeUriError, VALIDATION, str, expected=True)
@@ -973,7 +1278,7 @@ async def test_user_info_in_an_http_uri(caplog: pytest.LogCaptureFixture) -> Non
     logging.getLogger().addHandler(caplog.handler)
     # when
     with caplog.at_level(logging.WARNING):
-        async with Client(definition.mcp) as mcp_client:
+        async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
             with pytest.raises(ToolError) as exc_info:
                 await mcp_client.call_tool("fetch_song", {})
             message = str(exc_info.value)
@@ -985,6 +1290,7 @@ async def test_user_info_in_an_http_uri(caplog: pytest.LogCaptureFixture) -> Non
 
 async def test_a_public_url_that_redirects_to_a_private_address(
     monkeypatch: pytest.MonkeyPatch,
+    mcp_mode: str,
 ) -> None:
     # given
     loop = asyncio.get_running_loop()
@@ -1023,7 +1329,7 @@ async def test_a_public_url_that_redirects_to_a_private_address(
     )
     create_service_app(definition)
     # when
-    async with Client(definition.mcp) as mcp_client:
+    async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
         with pytest.raises(ToolError) as exc_info:
             await mcp_client.call_tool("transcribe", {})
         message = str(exc_info.value)
@@ -1301,7 +1607,7 @@ def _refusal_samples() -> dict[str, float]:
     return found
 
 
-def test_notifications_and_unknown_methods_leave_limits_and_refusals_untouched() -> None:
+def test_notifications_and_unknown_methods_leave_limits_and_refusals_untouched(mcp_mode: str) -> None:
     # given
     definition = _definition()
     before = _refusal_samples()
@@ -1329,7 +1635,7 @@ def test_notifications_and_unknown_methods_leave_limits_and_refusals_untouched()
     assert _refusal_samples() == before
 
     async def _call() -> None:
-        async with Client(definition.mcp) as mcp_client:
+        async with Client(definition.mcp, mode=mcp_mode) as mcp_client:
             result = await mcp_client.call_tool("ocr_submit", {})
             assert result.data == "submitted"
 
@@ -1362,7 +1668,7 @@ async def test_unroutable_messages_keep_the_request_ids_in_the_log_context() -> 
         ),
         MiddlewareContext(
             message=mt.CancelledNotification(
-                params=mt.CancelledNotificationParams(reason="probe", requestId=1)
+                params=mt.CancelledNotificationParams(reason="probe", request_id=1)
             ),
             type="notification",
             method="notifications/cancelled",

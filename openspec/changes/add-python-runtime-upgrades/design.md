@@ -56,12 +56,12 @@ In `libs/ascend-python-common/pyproject.toml`, replacing the kept versions of `a
 
 | Package | From | To | Why |
 |---|---|---|---|
-| `fastapi` | 0.136.3 | 0.142.2 | Latest. Owner asked for it |
+| `fastapi` | 0.136.3 | 0.147.0 | Owner pin 2026-10-19 (design said 0.142.2) |
 | `uvicorn` | 0.48.0 | 0.54.0 | Latest. Owner asked for it |
-| `fastmcp` | 3.3.1 | 4.0.10 | Latest. Owner asked for FastMCP 4 |
+| `fastmcp` | 3.3.1 | 4.1.1 | Owner pin 2026-10-19 for FastMCP 4 (design said 4.0.10) |
 | `mcp` | 1.30.0 (via `mcp>=1.30.0` in ascend-ocr) | 2.3.0 | Latest. Required by FastMCP 4 (`mcp>=2.0.0,<3`). Pinned directly because the library imports `mcp.server.streamable_http` itself |
-| `starlette` | not pinned, 1.7.0 resolved | 1.7.0 | Same version, now pinned, because the library and the services import Starlette types directly and FastMCP 4 sets a floor of 1.0.1 |
-| `httpx2` | not a runtime dependency | 2.13.1 | New runtime dependency of `mcp` 2 and FastMCP 4. Pinned to the version every service's `dev` extra already pins, and each service drops that own `dev` pin |
+| `starlette` | not pinned, 1.7.0 resolved | 1.9.0 | Owner pin 2026-10-19 (design said 1.7.0), because the library and the services import Starlette types directly and FastMCP 4 sets a floor of 1.0.1 |
+| `httpx2` | not a runtime dependency | 2.14.0 | Owner pin 2026-10-19 (design said 2.13.1). New runtime dependency of `mcp` 2 and FastMCP 4. Pinned to the version every service's `dev` extra already pins, and each service drops that own `dev` pin |
 
 Not pinned on purpose: `mcp-types`, which `mcp` pins exactly to its own version (the SDK guide says not to pin it separately). Unchanged: `pydantic==2.13.4` and `pydantic-settings==2.14.1` (the new floors are `pydantic>=2.12` and FastMCP's `pydantic-settings>=2.0`, both met, and the owner's list does not include them), the OpenTelemetry set 1.45.0 and 0.66b0 (FastAPI 0.142.2 needs `opentelemetry-api>=1.44.0`, met), `prometheus-fastapi-instrumentator==8.1.0` (`starlette>=1.0.0,<2`, met), `slowapi==0.1.10`. `sse-starlette` stays transitive and resolves to 3.5.0, above the SDK floor of 3.0.0. The services that import `httpx` themselves (ascend-web-hunter, ascend-memory, ascend-audio-scribe) keep their own `httpx==0.28.1` pin, because `mcp` 2 no longer brings it.
 

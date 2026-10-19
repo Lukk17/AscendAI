@@ -936,14 +936,23 @@ class TestMcpRequestLogContextMiddleware:
         assert getattr(record, "correlation_id", UNBOUND_CORRELATION_ID) != UNBOUND_CORRELATION_ID
         assert not hasattr(record, "mcp_session_id")
 
-    async def test_a_carried_scope_id_is_used_inside_the_session_task(self) -> None:
+    async def test_a_carried_scope_id_is_used_inside_the_session_task(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # given
         from types import SimpleNamespace
 
+        from starlette.datastructures import Headers
+
+        session_id = uuid.uuid4().hex
+        monkeypatch.setattr(
+            "ascend_python_common.request_context.get_http_request",
+            lambda: SimpleNamespace(headers=Headers({"mcp-session-id": session_id})),
+        )
         carrying_scope: dict[str, Any] = {"type": "http", CORRELATION_ID_SCOPE_KEY: CALLER_CHOSEN_ID}
         carrying_request = SimpleNamespace(scope=carrying_scope)
         request_context = SimpleNamespace(request=carrying_request)
-        fastmcp_context = SimpleNamespace(request_context=request_context, session_id=uuid.uuid4().hex)
+        fastmcp_context = SimpleNamespace(request_context=request_context)
         context: MiddlewareContext[mt.Request[Any, Any]] = MiddlewareContext(
             message=mt.ListToolsRequest(method="tools/list"),
             type="request",
@@ -963,4 +972,66 @@ class TestMcpRequestLogContextMiddleware:
         # then
         [record] = records
         assert getattr(record, "correlation_id", None) == CALLER_CHOSEN_ID
-        assert getattr(record, "mcp_session_id", None) == digest_of_mcp_session_id(fastmcp_context.session_id)
+        assert getattr(record, "mcp_session_id", None) == digest_of_mcp_session_id(session_id)
+
+    async def test_a_sessionless_tool_call_logs_an_empty_mcp_session_id(self) -> None:
+        # given: a sessionless request has a context but no session, and no HTTP request
+        from types import SimpleNamespace
+
+        fastmcp_context = SimpleNamespace(request_context=None)
+        context: MiddlewareContext[mt.Request[Any, Any]] = MiddlewareContext(
+            message=mt.CallToolRequest(params=mt.CallToolRequestParams(name="probe-tool", arguments={})),
+            type="request",
+            method="tools/call",
+            fastmcp_context=fastmcp_context,  # type: ignore[arg-type]
+        )
+        records: list[logging.LogRecord] = []
+
+        async def call_next(context: MiddlewareContext[mt.Request[Any, Any]]) -> Any:
+            records.append(_fresh_filtered_record())
+
+            return None
+
+        # when
+        await McpRequestLogContextMiddleware().on_request(context, call_next)
+
+        # then
+        [record] = records
+        assert getattr(record, "correlation_id", UNBOUND_CORRELATION_ID) != UNBOUND_CORRELATION_ID
+        assert not hasattr(record, "mcp_session_id")
+
+    async def test_two_tool_calls_with_one_session_id_log_the_same_digest(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # given: two calls carry the same client session id on their HTTP requests
+        from types import SimpleNamespace
+
+        from starlette.datastructures import Headers
+
+        session_id = uuid.uuid4().hex
+        monkeypatch.setattr(
+            "ascend_python_common.request_context.get_http_request",
+            lambda: SimpleNamespace(headers=Headers({"mcp-session-id": session_id})),
+        )
+        sessionless_context = SimpleNamespace(request_context=None)
+        both_records: list[logging.LogRecord] = []
+
+        async def call_next_twice(context: MiddlewareContext[mt.Request[Any, Any]]) -> Any:
+            both_records.append(_fresh_filtered_record())
+
+            return None
+
+        # when
+        for _ in range(2):
+            two_call_context: MiddlewareContext[mt.Request[Any, Any]] = MiddlewareContext(
+                message=mt.CallToolRequest(params=mt.CallToolRequestParams(name="probe-tool", arguments={})),
+                type="request",
+                method="tools/call",
+                fastmcp_context=sessionless_context,  # type: ignore[arg-type]
+            )
+            await McpRequestLogContextMiddleware().on_request(two_call_context, call_next_twice)
+
+        # then
+        assert [getattr(record, "mcp_session_id", None) for record in both_records] == [
+            digest_of_mcp_session_id(session_id)
+        ] * 2

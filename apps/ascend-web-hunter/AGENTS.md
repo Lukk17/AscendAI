@@ -8,7 +8,7 @@ ascend-web-hunter is an MCP server and REST API for web search and content extra
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.0.7
+- **Version**: 0.0.8
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands
@@ -133,6 +133,7 @@ docker build -t ascend-web-hunter:latest .
 - `SECURITY_HSTS_MAX_AGE_SECONDS` - Max age of the strict-transport-security header (default: `63072000`)
 - `FETCH_MAX_REDIRECT_HOPS` - Redirect hops the URI fetch guard follows (default: `10`)
 - `ALLOWED_PRIVATE_HOSTS` - Hosts the URI fetch guard may reach even at a private address (default: empty)
+- `MCP_ALLOWED_HOST_HEADERS` - Host names the `/mcp` endpoint accepts in the `Host` header, inbound check on the MCP endpoint only (default: `ascend-web-hunter,localhost,127.0.0.1`). `ALLOWED_PRIVATE_HOSTS` is the outbound direction and one does not replace the other.
 
 `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
 `ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`.

@@ -1,5 +1,6 @@
 import logging
 import time
+from importlib.metadata import version as package_version
 from typing import Any, NoReturn
 
 from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
@@ -17,7 +18,7 @@ from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
 
-mcp = FastMCP("ascend-web-hunter")
+mcp = FastMCP("ascend-web-hunter", version=package_version("ascend-web-hunter"))
 search_client = SearxngClient()
 web_reader = WebReader()
 

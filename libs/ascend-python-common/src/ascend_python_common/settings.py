@@ -52,6 +52,9 @@ class ServiceSettings(BaseSettings):
 
     API_HOST: str = Field(default="0.0.0.0")
     API_PORT: int = Field(ge=1, le=65535)
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(
+        description="Host names the /mcp endpoint accepts in the Host header"
+    )
     LOG_LEVEL: LogLevel = Field(default="INFO")
     LOG_FORMAT: Literal["json", "color"] = Field(default="json")
     OTEL_EXPORTER_OTLP_ENDPOINT: str | None = Field(default=None)
@@ -66,6 +69,15 @@ class ServiceSettings(BaseSettings):
         if "MCP_ALLOWED_HOSTS" in os.environ:
             raise ValueError("MCP_ALLOWED_HOSTS is set; use ALLOWED_PRIVATE_HOSTS instead")
         return data
+
+    @field_validator("MCP_ALLOWED_HOST_HEADERS")
+    @classmethod
+    def _refuse_empty_host_allow_list(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not value:
+            raise ValueError(
+                "MCP_ALLOWED_HOST_HEADERS is empty; set it to the host names the /mcp endpoint accepts"
+            )
+        return value
 
     @field_validator("OTEL_EXPORTER_OTLP_ENDPOINT")
     @classmethod

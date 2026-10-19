@@ -15,6 +15,7 @@ def _service_settings(log_level: str, log_format: str) -> ServiceSettings:
         LOG_LEVEL=log_level,  # type: ignore[arg-type]
         LOG_FORMAT=log_format,  # type: ignore[arg-type]
         RATE_LIMIT_DEFAULT="600/minute",
+        MCP_ALLOWED_HOST_HEADERS=("localhost", "127.0.0.1"),
     )
 
 

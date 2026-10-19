@@ -149,6 +149,10 @@ class Settings(ServiceSettings, McpFetchSettings):
 
     API_HOST: str = Field(default="0.0.0.0")
     API_PORT: int = Field(default=7022)
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(
+        default=("ascend-ocr", "localhost", "127.0.0.1"),
+        description="Host names the /mcp endpoint accepts in the Host header",
+    )
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
     LOG_FORMAT: Literal["json", "color"] = Field(default="json")
     # Upper bound of 6 accommodates "korean", the longest code PaddleOCR's own model

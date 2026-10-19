@@ -163,7 +163,7 @@ Path of one refused request. `GET /does-not-exist` matches no route, so the rout
 | [src/ascend_python_common/settings.py](src/ascend_python_common/settings.py) | `ServiceSettings`, `McpFetchSettings`, `CsvTuple`, upper-casing `LogLevel` |
 | [src/ascend_python_common/log_config.py](src/ascend_python_common/log_config.py) | `configure_logging`, JSON or color format, `trace_id` and `span_id` fields, MCP session token masking |
 | [src/ascend_python_common/request_context.py](src/ascend_python_common/request_context.py) | Request id and MCP session digest as pure ASGI middleware plus the FastMCP log context middleware |
-| [src/ascend_python_common/tracing.py](src/ascend_python_common/tracing.py) | Tracer provider with the OTLP exporter only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, span processor dropping `mcp.session.id`, `current_trace_id` |
+| [src/ascend_python_common/tracing.py](src/ascend_python_common/tracing.py) | Tracer provider with the OTLP exporter only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, span processor dropping `mcp.session.id` at span start plus an exporter scrubbing it on the way out, `current_trace_id` |
 | [src/ascend_python_common/errors/codes.py](src/ascend_python_common/errors/codes.py) | `ProblemCode` and the platform codes |
 | [src/ascend_python_common/errors/problem.py](src/ascend_python_common/errors/problem.py) | The one problem body builder |
 | [src/ascend_python_common/errors/registry.py](src/ascend_python_common/errors/registry.py) | `ErrorRegistry`, exception type to code and detail |
@@ -171,7 +171,8 @@ Path of one refused request. `GET /does-not-exist` matches no route, so the rout
 | [src/ascend_python_common/errors/mcp.py](src/ascend_python_common/errors/mcp.py) | FastMCP middleware mapping registered exceptions to tool errors |
 | [src/ascend_python_common/errors/refusals.py](src/ascend_python_common/errors/refusals.py) | Refusal logging and the `ascend_service_errors_total` counter |
 | [src/ascend_python_common/readiness.py](src/ascend_python_common/readiness.py) | Probe types, the aggregator, `/health` and `/ready` bodies |
-| [src/ascend_python_common/rate_limit.py](src/ascend_python_common/rate_limit.py) | The limiter on `ServiceDefinition.rate_limit_storage_uri` (`memory://` by default, Redis for shared budgets), REST wiring, FastMCP per-tool limiting under the same service-name key prefix with in-memory fallback |
+| [src/ascend_python_common/rate_limit.py](src/ascend_python_common/rate_limit.py) | The limiter on `ServiceDefinition.rate_limit_storage_uri` (`memory://` by default, Redis for shared budgets), REST wiring with the library's own route lookup for included routers, FastMCP per-tool limiting under the same service-name key prefix with in-memory fallback |
+| [src/ascend_python_common/route_lookup.py](src/ascend_python_common/route_lookup.py) | Route handler and template resolution through Starlette's own matching, into included routers and mounts |
 | [src/ascend_python_common/security_headers.py](src/ascend_python_common/security_headers.py) | Pure ASGI response headers |
 | [src/ascend_python_common/startup_banner.py](src/ascend_python_common/startup_banner.py) | The banner frame and printing rules, one INFO record per start |
 | [src/ascend_python_common/uri_guard.py](src/ascend_python_common/uri_guard.py) | The URI fetch guard: SSRF check, address pinning, redirect checks, `file://` jail |
@@ -206,6 +207,9 @@ Every service reads these base settings from its environment and its `.env` file
 | `READINESS_PROBE_TIMEOUT_SECONDS` | float, greater than 0 | `3`, the budget of each readiness probe |
 | `STARTUP_PROBE_TIMEOUT_SECONDS` | float, greater than 0 | `2`, the time each startup banner check may take |
 | `SECURITY_HSTS_MAX_AGE_SECONDS` | integer, 0 or more | `63072000`, the `max-age` of the `strict-transport-security` response header |
+| `MCP_ALLOWED_HOST_HEADERS` | comma separated tuple, empty refused at start-up | the service's compose service name, `localhost` and `127.0.0.1`, set by each service subclass |
+
+`MCP_ALLOWED_HOST_HEADERS` is inbound: the `Host` header values the `/mcp` endpoint of a service accepts, read by all four services. `ALLOWED_PRIVATE_HOSTS` below is outbound: the hosts the URI fetch guard may reach even at a private address, read by ascend-ocr, ascend-audio-scribe and ascend-web-hunter. One does not replace the other.
 
 Tracing exports whenever `OTEL_EXPORTER_OTLP_ENDPOINT` is set. OpenTelemetry's standard `OTEL_SDK_DISABLED=true` switches the SDK off.
 

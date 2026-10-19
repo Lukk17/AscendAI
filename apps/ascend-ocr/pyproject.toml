@@ -1,16 +1,12 @@
 [project]
 name = "ascend-ocr"
-version = "0.3.1"
+version = "0.3.2"
 description = "FastAPI + FastMCP OCR microservice for AscendAI"
 requires-python = ">=3.11"
 dependencies = [
-    "ascend-python-common[fetch]==1.0.0",
+    "ascend-python-common[fetch]==2.0.0",
     "paddlepaddle==3.3.1",
     "paddleocr==3.7.0",
-    "fastapi==0.136.3",
-    "fastmcp==3.3.1",
-    "mcp>=1.30.0",
-    "uvicorn==0.48.0",
     "python-multipart==0.0.29",
     "pydantic==2.13.4",
     "pydantic-settings==2.14.1",
@@ -24,14 +20,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ascend-python-common[dev]==1.0.0",
+    "ascend-python-common[dev]==2.0.0",
     "pytest==9.0.3",
     "pytest-asyncio==1.4.0",
     "pytest-mock==3.15.1",
     "pytest-cov==7.1.0",
     "asgi-lifespan==2.1.0",
     "httpx==0.28.1",
-    "httpx2==2.13.1",
     "ruff==0.15.15",
     "mypy==2.1.0",
     "types-aiofiles==25.1.0.20260518",

@@ -34,7 +34,7 @@ not mark the container healthy until the process is responsive.
 Runtime pins live in [pyproject.toml](pyproject.toml). The shape is:
 
 - Python 3.11 (the only version with full PaddlePaddle wheel coverage today)
-- FastAPI 0.136.3, Uvicorn 0.48.0, FastMCP 3.3.1
+- FastAPI 0.147.0, Uvicorn 0.54.0, FastMCP 4.1.1 (via `ascend-python-common`)
 - PaddlePaddle 3.3.1, PaddleOCR 3.7.0, Pillow 12.2.0
 - aiohttp 3.13.5 + aiofiles 25.1.0 for the MCP URL fetch
 - slowapi 0.1.9 for per-IP rate limiting

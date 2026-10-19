@@ -134,6 +134,7 @@ docker build -t ascend-audio-scribe:latest .
 - `SECURITY_HSTS_MAX_AGE_SECONDS` - `max-age` of the `strict-transport-security` response header (default: `63072000`)
 - `FETCH_MAX_REDIRECT_HOPS` - Redirect hops the URI fetch guard follows (default: `10`)
 - `ALLOWED_PRIVATE_HOSTS` - Hosts the URI fetch guard may reach even at a private address (default: empty)
+- `MCP_ALLOWED_HOST_HEADERS` - Host names the `/mcp` endpoint accepts in the `Host` header, inbound check on the MCP endpoint only (default: `ascend-audio-scribe,localhost,127.0.0.1`). `ALLOWED_PRIVATE_HOSTS` is the outbound direction and one does not replace the other.
 - `MCP_FILE_URI_ROOT` - Jail root for `file://` audio URIs (default: unset, `file://` refused)
 
 `API_HOST`, `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the `ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`.

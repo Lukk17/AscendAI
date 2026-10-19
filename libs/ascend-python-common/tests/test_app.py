@@ -29,12 +29,13 @@ from ascend_python_common.errors.codes import VALIDATION
 from ascend_python_common.readiness import ProbeResult
 from ascend_python_common.request_context import CorrelationIdMiddleware
 from ascend_python_common.security_headers import SecurityHeadersMiddleware
-from ascend_python_common.settings import RateLimit, ServiceSettings
+from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
 
 
 class _Settings(ServiceSettings):
     API_PORT: int = 9917
     RATE_LIMIT_DEFAULT: RateLimit = "100/minute"
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = ("testserver", "localhost", "127.0.0.1")
 
 
 async def _ok_probe() -> ProbeResult:
@@ -498,6 +499,17 @@ def test_service_definition_is_frozen() -> None:
         definition.name = "other"  # type: ignore[misc]
     # then
     assert definition.name == "test-service"
+
+
+def test_rebuilding_an_app_does_not_stack_middlewares() -> None:
+    # given
+    definition = _definition()
+    create_service_app(definition)
+    before = list(definition.mcp.middleware)
+    # when
+    create_service_app(definition)
+    # then
+    assert list(definition.mcp.middleware) == before
 
 
 def test_rate_limit_storage_uri_defaults_to_memory() -> None:
