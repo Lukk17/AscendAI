@@ -177,6 +177,27 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | OCR_ROUTE_TIMEOUT_SECONDS | No | Timeout in seconds polling one ascend-ocr job. Code default `300` applies when unset. |
 | AUDIO_SCRIBE_URL | No | Base URL of the ascend-audio-scribe service. Empty turns the audio route off. Code default `http://ascend-audio-scribe:7017` applies when unset. |
 | READ_CACHE_PURGE_RECONNECT_SECONDS | No | Wait in seconds between two connection attempts of the read cache purge subscriber. Code default `5` applies when unset. |
+| OBJECT_STORE_S3_ENDPOINT | No | Address of the S3-compatible store. Default `http://host.docker.internal:9070` applies when unset. |
+| OBJECT_STORE_S3_ACCESS_KEY | No | Access key of the S3-compatible store. Empty when unset. |
+| OBJECT_STORE_S3_SECRET_KEY | No | Secret key of the S3-compatible store. Empty when unset. |
+| CRAWL_MAX_SEEDS | No | Most seeds in one crawl request. Code default `20` applies when unset. |
+| CRAWL_MAX_PATTERNS | No | Most include patterns and most exclude patterns in one crawl request. Code default `50` applies when unset. |
+| CRAWL_MAX_DEPTH | No | Largest `max_depth` a crawl request may ask for. Code default `5` applies when unset. |
+| CRAWL_DEFAULT_DEPTH | No | `max_depth` when the request has none. Code default `2` applies when unset. |
+| CRAWL_MAX_PAGES | No | Largest `page_budget` a crawl request may ask for. Code default `10000` applies when unset. |
+| CRAWL_DEFAULT_PAGE_BUDGET | No | `page_budget` when the request has none. Code default `100` applies when unset. |
+| CRAWL_ROBOTS_OPT_OUT_DOMAINS | No | Seed domains for which `respect_robots` false is accepted. Empty by default. |
+| CRAWL_RESULT_S3_BUCKET | No | Bucket of the crawl results. Code default `web-hunter-crawls` applies when unset. |
+| CRAWL_RESULT_S3_PREFIX | No | Key prefix of the crawl results after the tenant prefix. Code default `crawl-results/` applies when unset. |
+| CRAWL_JOB_RETENTION_SECONDS | No | Lifetime of job records, results, frontier keys and recrawl state. Code default `604800` applies when unset. |
+| CRAWL_DOMAIN_CONCURRENCY | No | Pages of one domain read at once, all instances together. Code default `2` applies when unset. |
+| CRAWL_DEFAULT_DELAY_SECONDS | No | Least time between two fetches of one domain. Code default `1` applies when unset. |
+| CRAWL_PROXY_URL | No | Customer proxy for crawl fetches only. Empty turns it off. |
+| CRAWL_CLAIM_LEASE_SECONDS | No | Lifetime of a page claim. Code default `120` applies when unset. |
+| CRAWL_CLAIM_MAX_EXPIRIES | No | Claim expiries after which a URL counts as failed. Code default `2` applies when unset. |
+| CRAWL_WORKER_CONCURRENCY | No | Crawl worker tasks each instance starts. Code default `4` applies when unset. |
+| CRAWL_WORKER_IDLE_SECONDS | No | Wait of a worker that found nothing to claim. Code default `1` applies when unset. |
+| CRAWL_POLL_AFTER_SECONDS | No | The `poll_after_seconds` hint of a crawl submission. Code default `5` applies when unset. |
 
 The full list of tunable settings, timeouts, extraction thresholds, circuit-breaker values and so on, lives in [../docs/configuration.md](../docs/configuration.md). Every one of them can be added to the `environment:` block of the ascend-web-hunter service.
 

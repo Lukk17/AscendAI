@@ -17,6 +17,7 @@ from src.api.exceptions import (
 )
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
 from src.config.config import settings
+from src.crawl.models import InvalidTenantError, JobNotFoundError
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
 
 EXTERNAL_SERVICE_UNAVAILABLE = ProblemCode("external_service_unavailable", 503)
@@ -25,6 +26,8 @@ BLOCKLIST_REFRESH_THROTTLED = ProblemCode("blocklist_refresh_throttled", 429)
 HUMAN_INTERVENTION_REQUIRED = ProblemCode("human_intervention_required", 428)
 NOVNC_BUSY = ProblemCode("novnc_busy", 409)
 UNSAFE_URI = ProblemCode("unsafe_uri", 400)
+JOB_NOT_FOUND = ProblemCode("job_not_found", 404)
+INVALID_TENANT = ProblemCode("invalid_tenant", 400)
 TIER_DISABLED = ProblemCode("tier_disabled", 409)
 INVALID_PROFILE = ProblemCode("invalid_profile", 400)
 NO_COOKIES_FOR_DOMAIN = ProblemCode("no_cookies_for_domain", 400)
@@ -78,6 +81,8 @@ def _throttle_retry_after(exc: BaseException) -> dict[str, str] | None:
 def build_error_registry() -> ErrorRegistry:
     registry = ErrorRegistry(internal_code=INTERNAL)
     registry.register(UnsafeUriError, UNSAFE_URI, str)
+    registry.register(JobNotFoundError, JOB_NOT_FOUND, str)
+    registry.register(InvalidTenantError, INVALID_TENANT, str)
     registry.register(TierDisabledError, TIER_DISABLED, str)
     registry.register(InvalidProfileError, INVALID_PROFILE, str)
     registry.register(NoCookiesForDomainError, NO_COOKIES_FOR_DOMAIN, str)

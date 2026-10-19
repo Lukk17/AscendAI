@@ -202,6 +202,44 @@ are mandatory there. `SEARXNG_SECRET` is SearXNG's session-signing key, which is
 
 ---
 
+### Crawl jobs at scale
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `CRAWL_MAX_SEEDS` | `20` | Most seeds in one crawl request. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_MAX_PATTERNS` | `50` | Most include patterns and most exclude patterns in one crawl request. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_MAX_DEPTH` | `5` | Largest `max_depth` a crawl request may ask for. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_DEFAULT_DEPTH` | `2` | `max_depth` when the request has none, refused at startup above `CRAWL_MAX_DEPTH`. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_MAX_PAGES` | `10000` | Largest `page_budget` a crawl request may ask for. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_DEFAULT_PAGE_BUDGET` | `100` | `page_budget` when the request has none, refused at startup above `CRAWL_MAX_PAGES`. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_ROBOTS_OPT_OUT_DOMAINS` | empty | Seed domains for which `respect_robots` false is accepted. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_RESULT_S3_BUCKET` | `web-hunter-crawls` | Bucket of the crawl results. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_RESULT_S3_PREFIX` | `crawl-results/` | Key prefix of the crawl results after the tenant prefix. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_JOB_RETENTION_SECONDS` | `604800` | Lifetime of job records, results, frontier keys and recrawl state. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_DOMAIN_CONCURRENCY` | `2` | Pages of one domain read at once, all instances together. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_DEFAULT_DELAY_SECONDS` | `1` | Least time between two fetches of one domain. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_PROXY_URL` | empty | Customer proxy for crawl fetches only. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_CLAIM_LEASE_SECONDS` | `120` | Lifetime of a page claim. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_CLAIM_MAX_EXPIRIES` | `2` | Claim expiries after which a URL counts as failed. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_WORKER_CONCURRENCY` | `4` | Crawl worker tasks each instance starts. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_WORKER_IDLE_SECONDS` | `1` | Wait of a worker that found nothing to claim. Added by `enhance-web-search-crawl-at-scale`. |
+| `CRAWL_POLL_AFTER_SECONDS` | `5` | The `poll_after_seconds` hint of a crawl submission. Added by `enhance-web-search-crawl-at-scale`. |
+
+---
+
+### Object store (shared S3 client)
+
+The object store rows live in a section of their own because `add-file-download`
+adds to them later.
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `OBJECT_STORE_S3_ENDPOINT` | `http://localhost:9070` | Address of the S3-compatible store. Added by `enhance-web-search-crawl-at-scale`. |
+| `OBJECT_STORE_S3_ACCESS_KEY` | empty | Access key of the S3-compatible store. Added by `enhance-web-search-crawl-at-scale`. |
+| `OBJECT_STORE_S3_SECRET_KEY` | empty | Secret key of the S3-compatible store. Added by `enhance-web-search-crawl-at-scale`. |
+
+---
+
 ### Choosing values
 
 - **`READ_TOTAL_BUDGET`**: 90 s is the default; tune up if your typical Playwright sites take more than 30 s

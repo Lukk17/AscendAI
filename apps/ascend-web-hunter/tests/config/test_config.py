@@ -833,3 +833,134 @@ def test_extraction_and_routing_setting_rejects_value_outside_constraint(name: s
         # when / then
         with pytest.raises(ValidationError):
             Settings()
+
+
+_CRAWL_DEFAULTS: dict[str, Any] = {
+    "CRAWL_MAX_SEEDS": 20,
+    "CRAWL_MAX_PATTERNS": 50,
+    "CRAWL_MAX_DEPTH": 5,
+    "CRAWL_DEFAULT_DEPTH": 2,
+    "CRAWL_MAX_PAGES": 10000,
+    "CRAWL_DEFAULT_PAGE_BUDGET": 100,
+    "CRAWL_ROBOTS_OPT_OUT_DOMAINS": (),
+    "CRAWL_RESULT_S3_BUCKET": "web-hunter-crawls",
+    "CRAWL_RESULT_S3_PREFIX": "crawl-results/",
+    "CRAWL_JOB_RETENTION_SECONDS": 604800,
+    "CRAWL_DOMAIN_CONCURRENCY": 2,
+    "CRAWL_DEFAULT_DELAY_SECONDS": 1.0,
+    "CRAWL_PROXY_URL": "",
+    "CRAWL_CLAIM_LEASE_SECONDS": 120,
+    "CRAWL_CLAIM_MAX_EXPIRIES": 2,
+    "CRAWL_WORKER_CONCURRENCY": 4,
+    "CRAWL_WORKER_IDLE_SECONDS": 1.0,
+    "CRAWL_POLL_AFTER_SECONDS": 5,
+    "OBJECT_STORE_S3_ENDPOINT": "http://localhost:9070",
+    "OBJECT_STORE_S3_ACCESS_KEY": "",
+    "OBJECT_STORE_S3_SECRET_KEY": "",
+}
+
+_CRAWL_VALID_OVERRIDES: dict[str, str] = {
+    "CRAWL_MAX_SEEDS": "10",
+    "CRAWL_MAX_PATTERNS": "25",
+    "CRAWL_MAX_DEPTH": "3",
+    "CRAWL_DEFAULT_DEPTH": "1",
+    "CRAWL_MAX_PAGES": "500",
+    "CRAWL_DEFAULT_PAGE_BUDGET": "50",
+    "CRAWL_ROBOTS_OPT_OUT_DOMAINS": "example.com,example.org",
+    "CRAWL_RESULT_S3_BUCKET": "custom-crawls",
+    "CRAWL_RESULT_S3_PREFIX": "custom-prefix/",
+    "CRAWL_JOB_RETENTION_SECONDS": "86400",
+    "CRAWL_DOMAIN_CONCURRENCY": "4",
+    "CRAWL_DEFAULT_DELAY_SECONDS": "2.5",
+    "CRAWL_PROXY_URL": "http://proxy.example.com:8080",
+    "CRAWL_CLAIM_LEASE_SECONDS": "60",
+    "CRAWL_CLAIM_MAX_EXPIRIES": "3",
+    "CRAWL_WORKER_CONCURRENCY": "2",
+    "CRAWL_WORKER_IDLE_SECONDS": "0.5",
+    "CRAWL_POLL_AFTER_SECONDS": "10",
+    "OBJECT_STORE_S3_ENDPOINT": "http://host.docker.internal:9070",
+    "OBJECT_STORE_S3_ACCESS_KEY": "test-key",
+    "OBJECT_STORE_S3_SECRET_KEY": "test-secret",
+}
+
+_CRAWL_REJECTED: dict[str, str] = {
+    "CRAWL_MAX_SEEDS": "0",
+    "CRAWL_MAX_PATTERNS": "0",
+    "CRAWL_MAX_DEPTH": "-1",
+    "CRAWL_DEFAULT_DEPTH": "-1",
+    "CRAWL_MAX_PAGES": "0",
+    "CRAWL_DEFAULT_PAGE_BUDGET": "0",
+    "CRAWL_JOB_RETENTION_SECONDS": "59",
+    "CRAWL_DOMAIN_CONCURRENCY": "0",
+    "CRAWL_DEFAULT_DELAY_SECONDS": "-1",
+    "CRAWL_CLAIM_LEASE_SECONDS": "0",
+    "CRAWL_CLAIM_MAX_EXPIRIES": "0",
+    "CRAWL_WORKER_CONCURRENCY": "0",
+    "CRAWL_WORKER_IDLE_SECONDS": "0",
+    "CRAWL_POLL_AFTER_SECONDS": "0",
+}
+
+
+def test_crawl_setting_defaults() -> None:
+    # given
+    with patch.dict(os.environ, {}, clear=False):
+        for name in list(_CRAWL_DEFAULTS):
+            os.environ.pop(name, None)
+
+        # when
+        settings = Settings()
+
+        # then
+        for name, expected in _CRAWL_DEFAULTS.items():
+            assert getattr(settings, name) == expected
+
+
+@pytest.mark.parametrize("name", sorted(_CRAWL_DEFAULTS))
+def test_crawl_setting_valid_override(name: str) -> None:
+    # given
+    raw = _CRAWL_VALID_OVERRIDES[name]
+
+    # when
+    with patch.dict(os.environ, {name: raw}):
+        settings = Settings()
+
+    # then
+    value = getattr(settings, name)
+    expected = _CRAWL_DEFAULTS[name]
+    if isinstance(expected, tuple):
+        assert value == tuple(item.strip() for item in raw.split(",") if item.strip())
+    elif isinstance(expected, float):
+        assert value == pytest.approx(float(raw))
+    elif isinstance(expected, int):
+        assert value == int(raw)
+    else:
+        assert value == raw
+
+
+@pytest.mark.parametrize("name", sorted(_CRAWL_REJECTED))
+def test_crawl_setting_rejects_value_outside_constraint(name: str) -> None:
+    # given
+    with patch.dict(os.environ, {name: _CRAWL_REJECTED[name]}):
+        # when / then
+        with pytest.raises(ValidationError):
+            Settings()
+
+
+def test_crawl_validator_rejects_default_depth_above_max() -> None:
+    # given
+    env = {"CRAWL_DEFAULT_DEPTH": "6", "CRAWL_MAX_DEPTH": "5"}
+
+    # when / then
+    with patch.dict(os.environ, env):
+        with pytest.raises(ValidationError, match=r"CRAWL_DEFAULT_DEPTH.*CRAWL_MAX_DEPTH"):
+            Settings()
+
+
+def test_crawl_validator_rejects_default_page_budget_above_max() -> None:
+    # given
+    env = {"CRAWL_DEFAULT_PAGE_BUDGET": "20000", "CRAWL_MAX_PAGES": "10000"}
+
+    # when / then
+    with patch.dict(os.environ, env):
+        with pytest.raises(ValidationError, match=r"CRAWL_DEFAULT_PAGE_BUDGET.*CRAWL_MAX_PAGES"):
+            Settings()

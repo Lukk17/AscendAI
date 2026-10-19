@@ -23,11 +23,14 @@ dependencies = [
     "readability-lxml>=0.8.1",
     "extruct==0.18.0",
     "jsonschema==4.26.0",
+    "boto3==1.42.6",
+    "protego==0.7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "ascend-python-common[dev]==2.0.0"
+    "ascend-python-common[dev]==2.0.0",
+    "boto3-stubs[s3]==1.42.6",
 ]
 
 [tool.pytest.ini_options]

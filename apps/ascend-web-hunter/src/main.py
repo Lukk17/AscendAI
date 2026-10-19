@@ -10,6 +10,7 @@ from src.api.exception_handlers import error_registry
 from src.api.mcp.mcp_server import mcp
 from src.api.mcp.mcp_server import search_client as mcp_search_client
 from src.api.rest.blocklist_endpoints import blocklist_router
+from src.api.rest.crawl_endpoints import crawl_router
 from src.api.rest.rest_endpoints import rest_router, rest_router_v2, rest_session_router
 from src.api.rest.rest_endpoints import search_client as rest_search_client
 from src.config.blocklist_loader import blocklist_loader
@@ -132,7 +133,7 @@ def _service_definition() -> ServiceDefinition:
         distribution="ascend-web-hunter",
         settings=settings,
         mcp=mcp,
-        routers=(rest_router, rest_router_v2, rest_session_router, blocklist_router),
+        routers=(rest_router, rest_router_v2, rest_session_router, blocklist_router, crawl_router),
         error_registry=error_registry,
         probes={
             "redis": _redis_probe,

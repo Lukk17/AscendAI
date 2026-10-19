@@ -520,6 +520,163 @@ class Settings(ServiceSettings):
         ),
     )
 
+    # Group 2 position 9 - Crawl jobs at scale (design D16 of `enhance-web-search-crawl-at-scale`)
+    CRAWL_MAX_SEEDS: int = Field(
+        default=20,
+        ge=1,
+        description=(
+            "Most seeds in one crawl request. Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_MAX_PATTERNS: int = Field(
+        default=50,
+        ge=1,
+        description=(
+            "Most include patterns and most exclude patterns in one crawl request. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_MAX_DEPTH: int = Field(
+        default=5,
+        ge=0,
+        description=(
+            "Largest `max_depth` a crawl request may ask for. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_DEFAULT_DEPTH: int = Field(
+        default=2,
+        ge=0,
+        description=(
+            "`max_depth` when the request has none, refused at startup above `CRAWL_MAX_DEPTH`. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_MAX_PAGES: int = Field(
+        default=10000,
+        ge=1,
+        description=(
+            "Largest `page_budget` a crawl request may ask for. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_DEFAULT_PAGE_BUDGET: int = Field(
+        default=100,
+        ge=1,
+        description=(
+            "`page_budget` when the request has none, refused at startup above `CRAWL_MAX_PAGES`. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_ROBOTS_OPT_OUT_DOMAINS: CsvTuple = Field(
+        default=(),
+        description=(
+            "Seed domains for which `respect_robots` false is accepted, a site the operator owns. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_RESULT_S3_BUCKET: str = Field(
+        default="web-hunter-crawls",
+        description=(
+            "Bucket of the crawl results. Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_RESULT_S3_PREFIX: str = Field(
+        default="crawl-results/",
+        description=(
+            "Key prefix of the crawl results after the tenant prefix. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_JOB_RETENTION_SECONDS: int = Field(
+        default=604800,
+        ge=60,
+        description=(
+            "Lifetime of job records, results, frontier keys and recrawl state. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_DOMAIN_CONCURRENCY: int = Field(
+        default=2,
+        ge=1,
+        description=(
+            "Pages of one domain read at once, all instances together. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_DEFAULT_DELAY_SECONDS: float = Field(
+        default=1.0,
+        ge=0,
+        description=(
+            "Least time between two fetches of one domain. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_PROXY_URL: str = Field(
+        default="",
+        description=(
+            "Customer proxy for crawl fetches only. Empty turns it off. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_CLAIM_LEASE_SECONDS: int = Field(
+        default=120,
+        ge=1,
+        description=(
+            "Lifetime of a page claim. Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_CLAIM_MAX_EXPIRIES: int = Field(
+        default=2,
+        ge=1,
+        description=(
+            "Claim expiries after which a URL counts as failed. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_WORKER_CONCURRENCY: int = Field(
+        default=4,
+        ge=1,
+        description=(
+            "Crawl worker tasks each instance starts. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_WORKER_IDLE_SECONDS: float = Field(
+        default=1.0,
+        gt=0,
+        description=(
+            "Wait of a worker that found nothing to claim. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    CRAWL_POLL_AFTER_SECONDS: int = Field(
+        default=5,
+        ge=1,
+        description=(
+            "The `poll_after_seconds` hint of a crawl submission. "
+            "Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    OBJECT_STORE_S3_ENDPOINT: str = Field(
+        default="http://localhost:9070",
+        description=(
+            "Address of the S3-compatible store. Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    OBJECT_STORE_S3_ACCESS_KEY: str = Field(
+        default="",
+        description=(
+            "Access key of the store. Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+    OBJECT_STORE_S3_SECRET_KEY: str = Field(
+        default="",
+        description=(
+            "Secret key of the store. Added by `enhance-web-search-crawl-at-scale`."
+        ),
+    )
+
     # Group 7 - Observability: per-domain metric label cardinality cap
     DOMAIN_METRIC_CARDINALITY_CAP: int = Field(
         default=50,
@@ -621,6 +778,14 @@ class Settings(ServiceSettings):
             value = getattr(self, name)
             if value >= self.CHALLENGE_SCORE_THRESHOLD:
                 raise ValueError(f"{name} must stay below CHALLENGE_SCORE_THRESHOLD")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_crawl_defaults(self) -> "Settings":
+        if self.CRAWL_DEFAULT_DEPTH > self.CRAWL_MAX_DEPTH:
+            raise ValueError("CRAWL_DEFAULT_DEPTH must not exceed CRAWL_MAX_DEPTH")
+        if self.CRAWL_DEFAULT_PAGE_BUDGET > self.CRAWL_MAX_PAGES:
+            raise ValueError("CRAWL_DEFAULT_PAGE_BUDGET must not exceed CRAWL_MAX_PAGES")
         return self
 
 

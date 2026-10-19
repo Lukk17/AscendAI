@@ -5,7 +5,7 @@ from typing import Any, NoReturn
 
 from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
 from ascend_python_common.uri_guard import FetchPolicy, check_fetch_uri
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 
 from src.api.exception_handlers import error_registry
@@ -15,6 +15,14 @@ from src.api.exceptions import (
     NoVNCFlowBusyException,
 )
 from src.config.config import settings
+from src.crawl.job_service import job_service, resolve_tenant
+from src.crawl.models import (
+    CrawlJobList,
+    CrawlJobView,
+    CrawlRequest,
+    CrawlSubmission,
+    JobNotFoundError,
+)
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
 from src.reader.cache_purge import publish_purge
 from src.reader.cloudflare.cookie_manager import cookie_manager
@@ -279,3 +287,115 @@ async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
         "existed": existed,
         "cleared_cache_entries": cleared_cache_entries,
     }
+
+
+def _mcp_tenant(ctx: Context | None) -> str:
+    meta = ctx.request_context.meta if ctx is not None and ctx.request_context is not None else None
+    raw = meta.get("ascend.ai/tenant_id") if isinstance(meta, dict) else None
+    return resolve_tenant(raw if isinstance(raw, str) else None)
+
+
+@mcp.tool()
+async def crawl_submit(
+    seeds: list[str],
+    include_patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
+    max_depth: int | None = None,
+    page_budget: int | None = None,
+    same_domain_only: bool = True,
+    respect_robots: bool = True,
+    output_format: OutputFormat = "text",
+    extraction_schema: dict[str, Any] | None = None,
+    profile: str | None = None,
+    ctx: Context | None = None,
+) -> dict[str, Any]:
+    """
+    Crawl a site as one job and poll it: submit seeds, then read the job back
+    with crawl_job_status until it reaches a terminal state. Results land in
+    the object store and are listed by crawl_job_status.
+    Args:
+        seeds: Absolute http or https URLs the crawl starts from.
+        include_patterns: Glob patterns against the URL path; when set, only
+                          matching links are followed.
+        exclude_patterns: Glob patterns against the URL path that are never followed.
+        max_depth: Link depth below the seeds. Defaults to the service setting.
+        page_budget: Most pages the job reads. Defaults to the service setting.
+        same_domain_only: When True, links outside the seeds' domains are dropped.
+        respect_robots: When True, robots.txt and crawl-delay are honoured.
+        output_format: 'text' for the flat content field, 'structured' to also get title, author,
+                       date and sitename, 'schema' for JSON validated against extraction_schema,
+                       'tables' for HTML tables as rows, 'screenshot' for a base64 PNG.
+        extraction_schema: JSON Schema the 'schema' output format extracts and validates
+                        against. Required with output_format='schema', ignored otherwise.
+        profile: Optional session profile label (e.g. 'work', 'personal').
+    """
+    fields: dict[str, Any] = {
+        "seeds": seeds,
+        "include_patterns": include_patterns or [],
+        "exclude_patterns": exclude_patterns or [],
+        "same_domain_only": same_domain_only,
+        "respect_robots": respect_robots,
+        "output_format": output_format,
+        "extraction_schema": extraction_schema,
+        "profile": profile,
+    }
+    if max_depth is not None:
+        fields["max_depth"] = max_depth
+    if page_budget is not None:
+        fields["page_budget"] = page_budget
+    try:
+        record = await job_service.submit_job(_mcp_tenant(ctx), CrawlRequest(**fields))
+    except Exception as exc:
+        _raise_mapped_error("crawl_submit", exc)
+    return CrawlSubmission(
+        job_id=record.job_id,
+        state=record.state,
+        poll_after_seconds=settings.CRAWL_POLL_AFTER_SECONDS,
+    ).model_dump(mode="json")
+
+
+@mcp.tool()
+async def crawl_job_status(job_id: str, ctx: Context | None = None) -> dict[str, Any]:
+    """
+    Read the state, counts and result keys of one crawl job.
+    Args:
+        job_id: The job identifier a crawl_submit answered.
+    """
+    try:
+        record = await job_service.get_job(_mcp_tenant(ctx), job_id)
+    except Exception as exc:
+        _raise_mapped_error("crawl_job_status", exc)
+    if record is None:
+        _raise_mapped_error("crawl_job_status", JobNotFoundError(job_id))
+    return CrawlJobView.from_record(record).model_dump(mode="json")
+
+
+@mcp.tool()
+async def crawl_list_jobs(ctx: Context | None = None) -> dict[str, Any]:
+    """
+    List the retained crawl jobs of the caller's tenant.
+    """
+    try:
+        records = await job_service.list_jobs(_mcp_tenant(ctx))
+    except Exception as exc:
+        _raise_mapped_error("crawl_list_jobs", exc)
+    return CrawlJobList(
+        jobs=[CrawlJobView.from_record(record) for record in records]
+    ).model_dump(mode="json")
+
+
+@mcp.tool()
+async def crawl_cancel_job(job_id: str, ctx: Context | None = None) -> dict[str, Any]:
+    """
+    Cancel one crawl job. A waiting or running job moves to cancelled; a job
+    in a terminal state is answered unchanged.
+    Args:
+        job_id: The job identifier a crawl_submit answered.
+    """
+    try:
+        record = await job_service.cancel_job(_mcp_tenant(ctx), job_id)
+    except Exception as exc:
+        _raise_mapped_error("crawl_cancel_job", exc)
+    if record is None:
+        _raise_mapped_error("crawl_cancel_job", JobNotFoundError(job_id))
+    return CrawlJobView.from_record(record).model_dump(mode="json")

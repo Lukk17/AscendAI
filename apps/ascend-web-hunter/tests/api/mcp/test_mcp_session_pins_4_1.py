@@ -3,7 +3,7 @@
 This suite mocks the top-level `fastmcp` module in `tests/conftest.py`, so the
 in-memory `fastmcp.Client` and the raw `/mcp` session used by the memory and
 audio-scribe pin tests cannot run here. The pins below call the same tool
-functions the MCP server registers and assert the same contract: the six tool
+functions the MCP server registers and assert the same contract: the ten tool
 names with no explicit rename, every input schema, and the content of each
 tool result, including the `human_intervention_required`, `novnc_busy` and
 `session_expired` result objects of `web_read`.
@@ -16,6 +16,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import src.api.mcp.mcp_server as mcp_module
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.api.mcp.mcp_server import (
+    crawl_cancel_job,
+    crawl_job_status,
+    crawl_list_jobs,
+    crawl_submit,
     session_clear,
     session_establish,
     session_interventions,
@@ -34,6 +38,10 @@ EXPECTED_TOOL_NAMES = {
     "session_interventions",
     "session_status",
     "session_clear",
+    "crawl_submit",
+    "crawl_job_status",
+    "crawl_list_jobs",
+    "crawl_cancel_job",
 }
 
 
@@ -45,6 +53,10 @@ def test_tool_functions_keep_their_mcp_names() -> None:
         "session_interventions": session_interventions,
         "session_status": session_status,
         "session_clear": session_clear,
+        "crawl_submit": crawl_submit,
+        "crawl_job_status": crawl_job_status,
+        "crawl_list_jobs": crawl_list_jobs,
+        "crawl_cancel_job": crawl_cancel_job,
     }
 
     assert set(tools) == EXPECTED_TOOL_NAMES

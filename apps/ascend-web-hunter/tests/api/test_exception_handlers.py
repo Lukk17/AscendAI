@@ -11,6 +11,8 @@ from src.api.exception_handlers import (
     EXTRACTION_FAILED,
     EXTRACTION_NOT_CONFIGURED,
     HUMAN_INTERVENTION_REQUIRED,
+    INVALID_TENANT,
+    JOB_NOT_FOUND,
     NOVNC_BUSY,
     SCREENSHOT_UNAVAILABLE,
     build_error_registry,
@@ -25,6 +27,7 @@ from src.api.exceptions import (
     ScreenshotUnavailableError,
 )
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
+from src.crawl.models import InvalidTenantError, JobNotFoundError
 
 
 def test_value_error_maps_to_validation() -> None:
@@ -329,3 +332,32 @@ def test_challenge_detected_takes_login_type_from_verdict() -> None:
     # then
     assert exc.intervention_type == "login"
     assert exc.verdict.intervention_type == "login"
+
+
+def test_job_not_found_maps_to_404() -> None:
+    # given
+    exc = JobNotFoundError("job1")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == JOB_NOT_FOUND
+    assert entry.code.code == "job_not_found"
+    assert entry.code.status == 404
+    assert "job1" in str(exc)
+
+
+def test_invalid_tenant_maps_to_400_not_validation() -> None:
+    # given
+    exc = InvalidTenantError("../acme")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == INVALID_TENANT
+    assert entry.code.code == "invalid_tenant"
+    assert entry.code.status == 400
