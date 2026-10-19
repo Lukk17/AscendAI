@@ -44,6 +44,14 @@ Canary files (served under `/files/<name>` with the Content-Type below):
 | `macro-doc.docm` (Office, holds `word/vbaProject.bin`) | The LUMEN-BADGER macro memo signs permits after 47 minutes of review. | `afb8135937e3fd4f6f4171c9e433ab249c11a80065359494383ae037616b60e3` |
 | `circuit.kicad_sch` (`text/plain`) | KICAD-CANARY net CLASS_47 assigns 0.35 mm track width to the Mirell bus. | `60ee0a22df6091f0dfa1968e2b45b18e33bbe942ff8e44f3b578818d1a9b0f18` |
 | `firmware.elf` (`application/octet-stream`, `\x7fELF` header) | ELF-CANARY build 7731 for board Mirell-revC | `d64f1c87379dedcb2ac9e533207e43b343c885c364ac076adb438b99358f0a05` |
+| `canary.mp3` (`audio/mpeg`, 1.2 s, one invented word spoken once) | Kaksma | `4aab0d72746265c100b3c13472fe30cef61780eaba3b26743c4ca3219f84e49f` |
+| `oversized.pdf` (`application/pdf`, declared `Content-Length` 52428801, no body bytes sent) | The QUASAR-WREN memorandum files 52428801 blank pages under seal. | `5f2adbaa0ffd1f749efa1716f48b716763538a535fd8ec230cd4f3fd5b3f73a2` |
+
+`canary.mp3` speaks its word once, generated with
+`espeak -v en -s 130 -w canary.wav "kexmar"` plus `lame canary.wav
+canary.mp3`. The declared word is Kaksma: ascend-audio-scribe
+(`POST /api/v1/transcribe/local`, `stream=false`) transcribes the clip as
+"KAKSMA", verified twice on 2026-10-19.
 
 Canary pages (all `text/html; charset=utf-8` unless noted): `/` index,
 `/article` (QUARRY-THRUSH survey, 47 nesting pairs), `/product` (JSON-LD
@@ -63,4 +71,5 @@ name), `/crawl/` sitemap tree down to `/crawl/a/b/c` plus `/crawl/outside` and
 (`text/plain`, disallows `/crawl/disallowed`), `/sitemap.xml`
 (`application/xml`), `/oversized-declared` (large body with `Content-Length`),
 `/oversized-undeclared` (chunked, no `Content-Length`), `/slow` (streams one
-chunk per second, no `Content-Length`).
+chunk per second, no `Content-Length`), `/pdf-link-blocked` (its own canary
+sentence plus a `.pdf` link to `http://e2e-fake-site-blocked:7031/files/canary.pdf`).

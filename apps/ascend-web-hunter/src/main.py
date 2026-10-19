@@ -15,7 +15,10 @@ from src.api.rest.rest_endpoints import search_client as rest_search_client
 from src.config.blocklist_loader import blocklist_loader
 from src.config.config import settings
 from src.config.startup_banner import build_service_banner
+from src.reader.cache_purge import run_subscriber
+from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.novnc.flow_registry import novnc_flow_registry
+from src.reader.web_reader import clear_all_caches, purge_domain_everywhere
 from src.runtime.browser_pool import browser_pool
 
 if TYPE_CHECKING:
@@ -36,9 +39,23 @@ async def _novnc_sweep_loop() -> None:
             logger.warning("shutdown: NoVNC sweep failed: %s", exc)
 
 
+class _ProcessPurgeReader:
+    """PurgeReader over every live WebReader of this process (design D7)."""
+
+    @staticmethod
+    def clear_cache() -> int:
+        return clear_all_caches()
+
+    @staticmethod
+    def clear_cache_for_domain(domain: str) -> int:
+        return purge_domain_everywhere(domain)
+
+
 class _ServiceLifespan:
     def __init__(self) -> None:
         self._novnc_sweeper: asyncio.Task[None] | None = None
+        self._purge_subscriber: asyncio.Task[None] | None = None
+        self._purge_stop = asyncio.Event()
 
     async def __aenter__(self) -> None:
         if blocklist_loader.state is None:
@@ -48,8 +65,21 @@ class _ServiceLifespan:
         logger.info("Blocklist ready: %s rules from %s", rule_count, blocklist_loader.blocklist_path)
         await browser_pool.start()
         self._novnc_sweeper = asyncio.create_task(_novnc_sweep_loop())
+        self._purge_stop = asyncio.Event()
+        self._purge_subscriber = asyncio.create_task(
+            run_subscriber(
+                _ProcessPurgeReader(),
+                lambda: cookie_manager.redis_client,
+                self._purge_stop,
+            )
+        )
 
     async def __aexit__(self, *exc_info: object) -> None:
+        if self._purge_subscriber is not None:
+            self._purge_stop.set()
+            self._purge_subscriber.cancel()
+            await asyncio.gather(self._purge_subscriber, return_exceptions=True)
+            self._purge_subscriber = None
         if self._novnc_sweeper is not None:
             self._novnc_sweeper.cancel()
             await asyncio.gather(self._novnc_sweeper, return_exceptions=True)

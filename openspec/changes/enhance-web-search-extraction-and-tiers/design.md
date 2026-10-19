@@ -64,7 +64,10 @@ library's) and one byte fetch serve the read tiers, document routing and downloa
 - PDF (by `Content-Type` or a `.pdf` main link): bytes are fetched by `stream_to_file`, capped
   at `DOCUMENT_MAX_BYTES` (default 52428800), and posted to docling-serve at `DOCLING_SERVE_URL` (default
   `http://docling-serve:5001`), endpoint `/v1/convert/file`, asking for Markdown. The exact docling-serve path is
-  checked against its pinned image version in task 4.1.
+  checked against its pinned image version in task 4.1: `quay.io/docling-project/docling-serve:1.14.0`
+  (`compose.yaml`) serves `POST /v1/convert/file` with multipart `files` plus `options: {"to_formats": ["md"]}`
+  and answers `{"document": {"md_content": ...}, "status": "success", ...}`, verified live on 2026-10-19
+  against a public PDF (task 6.4).
 - Image: posted to ascend-ocr `POST /v1/ocr/jobs` at `ASCEND_OCR_URL` (default `http://ascend-ocr:7022`), then polled
   with `GET /v1/ocr/jobs/{job_id}` using the poll hint the service returns, up to `OCR_ROUTE_TIMEOUT_SECONDS` (default
   300). The Markdown is read from the result address in the final state.

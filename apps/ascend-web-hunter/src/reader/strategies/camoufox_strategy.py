@@ -22,6 +22,7 @@ from src.reader.cloudflare.challenge_signals import (
 )
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
+from src.reader.screenshot import capture_page
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.validator.url_validator import URLValidator
 
@@ -48,6 +49,13 @@ class CamoufoxStrategy(BaseStrategy):
         extracted: str | None = trafilatura.extract(html)
 
         return extracted or ""
+
+    async def screenshot_page(self, url: str) -> tuple[str, bytes] | None:
+        """Capture a full-page PNG of *url* through a fresh camoufox browser."""
+        proxy = proxy_provider.for_playwright()
+        launch_kwargs: dict[str, Any] = {"headless": settings.PLAYWRIGHT_HEADLESS}
+        async with AsyncCamoufox(**launch_kwargs) as browser:
+            return await capture_page(lambda: self._create_context(browser, url, proxy), url)
 
     async def get_html(self, url: str) -> str:
         proxy = proxy_provider.for_playwright()

@@ -29,11 +29,16 @@ async def test_web_read_forwards_output_format_and_tier() -> None:
         patch("src.api.mcp.mcp_server.settings.FLARESOLVERR_ENABLED", True),
         patch(_READ, new_callable=AsyncMock, return_value=result) as mock_read,
     ):
-        await web_read(_URL, output_format="structured", tier="3-flaresolverr")
+        await web_read(_URL, output_format="structured", tier="3-flaresolverr", extraction_schema=None)
 
     # then
     mock_read.assert_awaited_once_with(
-        _URL, heavy_mode=False, profile=None, output_format="structured", tier="3-flaresolverr"
+        _URL,
+        heavy_mode=False,
+        profile=None,
+        output_format="structured",
+        tier="3-flaresolverr",
+        extraction_schema=None,
     )
 
 
@@ -89,11 +94,11 @@ async def test_structured_with_links_is_rejected() -> None:
 
     # when
     with guard, unread as mock_read:
-        with pytest.raises(Exception, match=r"^validation: .*include_links") as exc_info:
+        with pytest.raises(Exception, match=r"^bad_request: .*include_links") as exc_info:
             await web_read(_URL, include_links=True, output_format="structured")
 
     # then
-    assert str(exc_info.value).startswith("validation: ")
+    assert str(exc_info.value).startswith("bad_request: ")
     mock_read.assert_not_awaited()
 
 
@@ -118,3 +123,44 @@ async def test_session_expired_reaches_the_agent_whole() -> None:
     for field in _SESSION_EXPIRED_FIELDS:
         assert field in payload
     assert payload["status"] == "session_expired"
+
+
+@pytest.mark.asyncio
+async def test_web_read_forwards_schema_and_extraction_schema() -> None:
+    # given
+    result = {"content": {"name": "Red Widget"}, "status": "success", "mode": "1-beautifulsoup"}
+    schema = {"type": "object", "properties": {"name": {"type": "string"}}}
+
+    # when
+    with (
+        patch(_GUARD, return_value=True),
+        patch(_READ, new_callable=AsyncMock, return_value=result) as mock_read,
+    ):
+        payload = await web_read(_URL, output_format="schema", extraction_schema=schema)
+
+    # then
+    assert payload["content"] == {"name": "Red Widget"}
+    mock_read.assert_awaited_once_with(
+        _URL,
+        heavy_mode=False,
+        profile=None,
+        output_format="schema",
+        tier=None,
+        extraction_schema=schema,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_format", ["schema", "tables", "screenshot"])
+async def test_every_non_text_format_with_links_is_refused(output_format: str) -> None:
+    # when
+    with (
+        patch(_GUARD, return_value=True),
+        patch(_READ_WITH_LINKS, new_callable=AsyncMock) as mock_read,
+        pytest.raises(Exception, match=r"^bad_request: ") as exc_info,
+    ):
+        await web_read(_URL, include_links=True, output_format=output_format)  # type: ignore[arg-type]
+
+    # then
+    assert str(exc_info.value).startswith("bad_request: ")
+    mock_read.assert_not_awaited()

@@ -1,16 +1,23 @@
+import base64
 import json
 import logging
 import random
 import time
 from pathlib import Path
 from typing import Any, Literal, cast
+from urllib.parse import urljoin, urlparse
+from weakref import WeakSet
 
 from ascend_python_common.uri_guard import UnsafeUriError
+from bs4 import BeautifulSoup
 
 from src.api.exceptions import (
     ChallengeDetectedException,
+    ExtractionFailedError,
+    ExtractionNotConfiguredError,
     HumanInterventionRequiredException,
     NoVNCFlowBusyException,
+    ScreenshotUnavailableError,
     TierDisabledError,
 )
 from src.config.config import settings
@@ -25,8 +32,15 @@ from src.reader import tier_memory
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import assess, log_verdict, record_verdict
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, cookie_manager
-from src.reader.extraction import extract_structured, extract_text_with_fallback
+from src.reader.document_router import route_document
+from src.reader.extraction import extract_structured, extract_tables, extract_text_with_fallback
 from src.reader.link_annotator import annotate_links
+from src.reader.recipe_store import build_object, replay_valid
+from src.reader.recipe_store import delete as recipe_delete
+from src.reader.recipe_store import lookup as recipe_lookup
+from src.reader.recipe_store import store as recipe_store_put
+from src.reader.schema_extraction import run_model as run_schema_model
+from src.reader.schema_extraction import schema_hash
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
 from src.reader.strategies.camoufox_strategy import CamoufoxStrategy
@@ -55,7 +69,7 @@ TierName = Literal[
     "5-crawlee_adaptive",
     "6-novnc",
 ]
-OutputFormat = Literal["text", "structured"]
+OutputFormat = Literal["text", "structured", "schema", "tables", "screenshot"]
 
 # The ladder order. The escalation chain follows this tuple, never a sort on
 # the tier name, so a new tier is inserted here and nowhere else.
@@ -81,12 +95,26 @@ def _cache_key(
     profile: str | None,
     output_format: str | None,
     tier: TierName | None = None,
+    schema_hash: str = "",
 ) -> str:
     """Return a string key that uniquely identifies a read request for cache-aside."""
     return (
         f"{url}|heavy={heavy_mode}|links={include_links}"
-        f"|profile={profile or ''}|fmt={output_format or 'text'}|tier={tier or ''}"
+        f"|profile={profile or ''}|fmt={output_format or 'text'}|tier={tier or ''}|schema={schema_hash}"
     )
+
+
+_instances: WeakSet["WebReader"] = WeakSet()
+
+
+def purge_domain_everywhere(domain: str) -> int:
+    """Drop one domain's cached reads in every live WebReader of this process."""
+    return sum(reader.clear_cache_for_domain(domain) for reader in list(_instances))
+
+
+def clear_all_caches() -> int:
+    """Drop every live WebReader's whole cache, returning the dropped count."""
+    return sum(reader.clear_cache() for reader in list(_instances))
 
 
 class WebReader:
@@ -102,6 +130,7 @@ class WebReader:
         self.url_validator = url_validator
 
         self._memory_cache: dict[str, tuple[dict[str, Any], float]] = {}
+        _instances.add(self)
 
     def _build_strategies(self, profile: str | None = None) -> dict[str, BaseStrategy]:
         all_strategies: dict[str, BaseStrategy] = {
@@ -317,6 +346,13 @@ class WebReader:
     def _cache_put(self, key: str, result: dict[str, Any]) -> None:
         self._memory_cache[key] = (result, time.monotonic())
 
+    def clear_cache(self) -> int:
+        """Drop the whole in-process read cache, returning the dropped count."""
+        count = len(self._memory_cache)
+        self._memory_cache.clear()
+
+        return count
+
     def clear_cache_for_domain(self, domain: str) -> int:
         """Purge in-process read-result cache entries whose URL belongs to *domain*.
 
@@ -338,6 +374,170 @@ class WebReader:
     # Public read methods
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _main_pdf_link(page_html: str, url: str) -> str | None:
+        """First `.pdf` link of a page, resolved against the page URL (design D6)."""
+        soup = BeautifulSoup(page_html, "html.parser")
+        for anchor in soup.find_all("a", href=True):
+            resolved = urljoin(url, str(anchor.get("href")))
+            if urlparse(resolved).path.lower().endswith(".pdf"):
+                return resolved
+
+        return None
+
+    def _cached_unless_screenshot(
+        self, key: str, fmt: str, url: str
+    ) -> dict[str, Any] | None:
+        if fmt == "screenshot":
+            return None
+        cached = self._cache_get(key)
+        if cached is not None:
+            READ_CACHE_HITS_TOTAL.inc()
+            logger.debug("WebReader: cache hit for %s", url)
+
+        return cached
+
+    @staticmethod
+    def _only_screenshot_capable(
+        strategies: dict[str, BaseStrategy], fmt: str
+    ) -> dict[str, BaseStrategy]:
+        if fmt != "screenshot":
+            return strategies
+        capable = {
+            name: strategy
+            for name, strategy in strategies.items()
+            if getattr(strategy, "screenshot_page", None) is not None
+        }
+        if not capable:
+            raise ScreenshotUnavailableError()
+
+        return capable
+
+    async def _route_direct(self, url: str, key: str, fmt: str) -> dict[str, Any] | None:
+        routed = await route_document(url)
+        if routed is None:
+            return None
+        if routed.ok:
+            result: dict[str, Any] = {
+                "content": routed.content,
+                "status": "success",
+                "mode": "document-router",
+                "route": routed.route,
+            }
+        else:
+            result = {
+                "content": "",
+                "status": "error",
+                "reason": "routing_error",
+                "route": routed.route,
+                "routing_error": routed.error,
+            }
+        if fmt != "screenshot":
+            self._cache_put(key, result)
+
+        return result
+
+    def _cache_result(self, key: str, fmt: str, result: dict[str, Any]) -> None:
+        if fmt != "screenshot":
+            self._cache_put(key, result)
+
+    @staticmethod
+    async def _screenshot_result(
+        name: str, strategy: BaseStrategy, url: str
+    ) -> dict[str, Any] | None:
+        """Base64 PNG from the browser tier that served the read (design D7)."""
+        capture = getattr(strategy, "screenshot_page", None)
+        if capture is None:
+            raise ScreenshotUnavailableError(f"tier {name} cannot produce a screenshot")
+        page = await capture(url)
+        if page is None:
+            return None
+        html, png = page
+        if not ChallengeDetector.is_content_accepted(200, html):
+            verdict = assess(200, html)
+            record_verdict(verdict, "reader")
+            log_verdict(verdict, "reader", url)
+            raise ChallengeDetectedException(verdict)
+
+        return {
+            "content": base64.b64encode(png).decode("ascii"),
+            "status": "success",
+            "mode": name,
+        }
+
+    async def _execute_screenshot_format(
+        self, name: str, strategy: BaseStrategy, url: str, started: float, dlabel: str
+    ) -> dict[str, Any] | None:
+        """One navigation returns the rendered HTML and the PNG (design D7)."""
+        shot = await self._screenshot_result(name, strategy, url)
+        if shot is None:
+            self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
+            logger.info("Strategy %s screenshot capture failed.", name)
+
+            return None
+
+        self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+        await tier_memory.record(url, name)
+
+        return shot
+
+    async def _execute_tables_format(
+        self, name: str, url: str, page_html: str, started: float, dlabel: str
+    ) -> dict[str, Any] | None:
+        tables = extract_tables(page_html)
+        if not tables:
+            self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
+            logger.info("Strategy %s found no tables.", name)
+
+            return None
+
+        flat = " ".join(cell for table in tables for row in table for cell in row)
+        if self.validator.validate(flat):
+            self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+            await tier_memory.record(url, name)
+
+            return {"content": flat, "tables": tables, "status": "success", "mode": name}
+
+        self._record_strategy_outcome(name, "validation_failed", dlabel, time.perf_counter() - started)
+        logger.info("Strategy %s tables validation failed.", name)
+
+        return None
+
+    async def _with_main_pdf(
+        self, url: str, page_html: str, content: str, mode: str, output_format: str | None
+    ) -> dict[str, Any]:
+        """Merge a routed main `.pdf` link into a text result (design D6)."""
+        if output_format not in (None, "text"):
+            return {"content": content, "status": "success", "mode": mode}
+        linked = await self._maybe_route_main_pdf(url, page_html)
+        if linked is None:
+            return {"content": content, "status": "success", "mode": mode}
+        if "content" in linked:
+            return {
+                "content": linked["content"],
+                "status": "success",
+                "mode": mode,
+                "route": linked["route"],
+            }
+
+        return {
+            "content": content,
+            "status": "success",
+            "mode": mode,
+            "route": linked["route"],
+            "routing_error": linked["routing_error"],
+        }
+
+    async def _maybe_route_main_pdf(self, url: str, page_html: str) -> dict[str, Any] | None:
+        """Route a page's main `.pdf` link, or None when the page links none."""
+        link = self._main_pdf_link(page_html, url)
+        if link is None:
+            return None
+        routed = await route_document(link)
+        if routed is None or not routed.ok:
+            return {"route": "pdf", "routing_error": routed.error if routed else "download_failed"}
+        return {"route": "pdf", "content": routed.content}
+
     async def read(
         self,
         url: str,
@@ -345,20 +545,27 @@ class WebReader:
         profile: str | None = None,
         output_format: OutputFormat | None = None,
         tier: TierName | None = None,
+        extraction_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if await self._session_expired(url, profile):
             return self._create_session_expired_response(url, profile)
 
-        key = _cache_key(url, heavy_mode, False, profile, output_format, tier)
-        cached = self._cache_get(key)
+        fmt: str = output_format or "text"
+        if fmt == "schema" and extraction_schema is None:
+            raise ValueError("extraction_schema is required with output_format=schema")
+        digest = schema_hash(extraction_schema) if extraction_schema is not None else ""
+        key = _cache_key(url, heavy_mode, False, profile, fmt, tier, digest)
+        cached = self._cached_unless_screenshot(key, fmt, url)
         if cached is not None:
-            READ_CACHE_HITS_TOTAL.inc()
-            logger.debug("WebReader: cache hit for %s", url)
-
             return cached
+
+        routed = await self._route_direct(url, key, fmt)
+        if routed is not None:
+            return routed
 
         logger.info("Reading URL: %s (heavy_mode: %s, profile: %s, tier: %s)", url, heavy_mode, profile, tier)
         strategies_to_run = await self._select_strategies(url, heavy_mode, profile, tier)
+        strategies_to_run = self._only_screenshot_capable(strategies_to_run, fmt)
         started_at = time.perf_counter()
         budget_exhausted = False
 
@@ -367,9 +574,11 @@ class WebReader:
                 budget_exhausted = True
                 break
 
-            result = await self._execute_strategy(name, strategy, url, output_format=output_format)
+            result = await self._execute_strategy(
+                name, strategy, url, output_format=fmt, extraction_schema=extraction_schema
+            )
             if result:
-                self._cache_put(key, result)
+                self._cache_result(key, fmt, result)
 
                 return result
 
@@ -378,10 +587,11 @@ class WebReader:
                 NOVNC_STRATEGY_NAME,
                 strategies_to_run[NOVNC_STRATEGY_NAME],
                 url,
-                output_format=output_format,
+                output_format=fmt,
+                extraction_schema=extraction_schema,
             )
             if novnc_result:
-                self._cache_put(key, novnc_result)
+                self._cache_result(key, fmt, novnc_result)
 
                 return novnc_result
 
@@ -459,18 +669,96 @@ class WebReader:
     # Internal execution helpers
     # ------------------------------------------------------------------
 
+    async def _extract_with_schema(
+        self,
+        name: str,
+        url: str,
+        page_html: str,
+        extraction_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Schema extraction with recipe replay (design D3 and D4)."""
+        domain = cookie_manager.registrable_domain(url)
+        digest = schema_hash(extraction_schema)
+        selectors = await recipe_lookup(domain, digest)
+        if selectors is not None:
+            replayed = build_object(page_html, selectors, extraction_schema)
+            if replay_valid(replayed, extraction_schema):
+                await tier_memory.record(url, name)
+
+                return {**replayed, "status": "success", "mode": name, "recipe": "replay"}
+            await recipe_delete(domain, digest)
+        text = extract_text_with_fallback(page_html)
+        data, fresh = await run_schema_model(text, extraction_schema)
+        await recipe_store_put(domain, digest, fresh)
+        await tier_memory.record(url, name)
+
+        return {**data, "status": "success", "mode": name, "recipe": "model"}
+
+    async def _format_result(
+        self,
+        name: str,
+        url: str,
+        page_html: str,
+        output_format: str | None,
+        extraction_schema: dict[str, Any] | None,
+        started: float,
+        dlabel: str,
+    ) -> dict[str, Any] | None:
+        """Dispatch one tier's HTML to the requested output format."""
+        if output_format == "schema":
+            if extraction_schema is None:
+                raise ValueError("extraction_schema is required with output_format=schema")
+            schemed = await self._extract_with_schema(name, url, page_html, extraction_schema)
+            self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+
+            return schemed
+
+        if output_format == "tables":
+            return await self._execute_tables_format(name, url, page_html, started, dlabel)
+
+        if output_format == "structured":
+            structured = extract_structured(page_html)
+            structured_content = structured.get("content", "")
+            if self.validator.validate(structured_content):
+                self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+                await tier_memory.record(url, name)
+
+                return {**structured, "status": "success", "mode": name}
+
+            elapsed = time.perf_counter() - started
+            self._record_strategy_outcome(name, "validation_failed", dlabel, elapsed)
+            logger.info("Strategy %s structured validation failed.", name)
+
+            return None
+
+        text = extract_text_with_fallback(page_html)
+        if self.validator.validate(text):
+            self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+            await tier_memory.record(url, name)
+
+            return await self._with_main_pdf(url, page_html, text, name, output_format)
+
+        self._record_strategy_outcome(name, "validation_failed", dlabel, time.perf_counter() - started)
+        logger.info("Strategy %s validation failed.", name)
+
+        return None
+
     async def _execute_strategy(
         self,
         name: str,
         strategy: BaseStrategy,
         url: str,
         output_format: str | None = None,
+        extraction_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         started = time.perf_counter()
         dlabel = domain_label(url)
 
         try:
             logger.info("--- Strategy %s STARTED ---", name)
+
+            if output_format == "screenshot":
+                return await self._execute_screenshot_format(name, strategy, url, started, dlabel)
 
             html = await strategy.get_html(url)
             if not html:
@@ -485,32 +773,9 @@ class WebReader:
                 log_verdict(verdict, "reader", url)
                 raise ChallengeDetectedException(verdict)
 
-            if output_format == "structured":
-                structured = extract_structured(html)
-                content = structured.get("content", "")
-                if self.validator.validate(content):
-                    self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
-                    await tier_memory.record(url, name)
-
-                    return {**structured, "status": "success", "mode": name}
-
-                elapsed = time.perf_counter() - started
-                self._record_strategy_outcome(name, "validation_failed", dlabel, elapsed)
-                logger.info("Strategy %s structured validation failed.", name)
-
-                return None
-
-            content = extract_text_with_fallback(html)
-            if self.validator.validate(content):
-                self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
-                await tier_memory.record(url, name)
-
-                return {"content": content, "status": "success", "mode": name}
-
-            self._record_strategy_outcome(name, "validation_failed", dlabel, time.perf_counter() - started)
-            logger.info("Strategy %s validation failed.", name)
-
-            return None
+            return await self._format_result(
+                name, url, html, output_format, extraction_schema, started, dlabel
+            )
         except ChallengeDetectedException:
             self._record_strategy_outcome(name, "challenge_detected", dlabel, time.perf_counter() - started)
             logger.info(
@@ -528,6 +793,10 @@ class WebReader:
             raise
         except NoVNCFlowBusyException:
             self._record_strategy_outcome(name, "novnc_busy", dlabel, time.perf_counter() - started)
+
+            raise
+        except (ExtractionFailedError, ExtractionNotConfiguredError, ScreenshotUnavailableError):
+            self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
 
             raise
         except Exception as e:

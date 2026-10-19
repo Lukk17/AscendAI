@@ -23,6 +23,7 @@ from src.reader.cloudflare.challenge_signals import (
 )
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
+from src.reader.screenshot import capture_page
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.validator.url_validator import URLValidator
 
@@ -54,6 +55,11 @@ class PatchrightStrategy(BaseStrategy):
         extracted: str | None = trafilatura.extract(html)
 
         return extracted or ""
+
+    async def screenshot_page(self, url: str) -> tuple[str, bytes] | None:
+        """Capture a full-page PNG of *url* through a fresh patched browser."""
+        async with self._launched_browser() as browser:
+            return await capture_page(lambda: self._create_context(browser, url), url)
 
     async def get_html(self, url: str) -> str:
         async with self._launched_browser() as browser:

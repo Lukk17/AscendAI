@@ -1,6 +1,6 @@
 [project]
 name = "ascend-web-hunter"
-version = "0.0.8"
+version = "0.0.12"
 description = "AscendAI Web Search & Scraping Service"
 requires-python = ">=3.12"
 dependencies = [
@@ -85,6 +85,7 @@ module = [
     "camoufox.*",
     "trafilatura.*",    "curl_cffi.*",
     "extruct.*",
+    "jsonschema.*",
     "textstat.*",
     "adblockparser.*",
     "colorlog.*",

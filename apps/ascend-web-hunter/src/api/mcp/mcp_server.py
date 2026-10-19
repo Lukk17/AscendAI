@@ -9,9 +9,14 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from src.api.exception_handlers import error_registry
-from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api.exceptions import (
+    FormatCombinationError,
+    HumanInterventionRequiredException,
+    NoVNCFlowBusyException,
+)
 from src.config.config import settings
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
+from src.reader.cache_purge import publish_purge
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.novnc.flow_registry import flow_shape, novnc_flow_registry
 from src.reader.web_reader import OutputFormat, TierName, WebReader
@@ -82,6 +87,7 @@ async def web_read(
     profile: str | None = None,
     output_format: OutputFormat = "text",
     tier: TierName | None = None,
+    extraction_schema: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Read (scrape) the content of a web page.
@@ -100,21 +106,24 @@ async def web_read(
         heavy_mode: If True, skips lightweight strategies and jumps straight to advanced browser strategies.
         profile: Optional session profile label (e.g. 'work', 'personal') for multi-account sites.
         output_format: 'text' for the flat content field, 'structured' to also get title, author,
-                       date and sitename. Not available together with include_links.
+                       date and sitename, 'schema' for JSON validated against extraction_schema,
+                       'tables' for HTML tables as rows, 'screenshot' for a base64 PNG.
+                       Every format but 'text' is refused together with include_links.
         tier: Start the extraction chain at this tier ('1-beautifulsoup', '2-trafilatura',
               '3-flaresolverr', '4-playwright_stealth', '4a-patchright', '4b-camoufox',
               '5-crawlee_adaptive', '6-novnc') instead of
               where heavy_mode and the stored session would start it. Escalation continues after it.
+        extraction_schema: JSON Schema the 'schema' output format extracts and validates
+                        against. Required with output_format='schema', ignored otherwise.
     """
     await _check_url("web_read", url)
 
-    if include_links and output_format == "structured":
+    if include_links and output_format != "text":
+        _raise_mapped_error("web_read", FormatCombinationError(output_format))
+
+    if output_format == "schema" and extraction_schema is None:
         _raise_mapped_error(
-            "web_read",
-            ValueError(
-                "output_format=structured is not available with include_links: the annotated-links "
-                "response carries the flat content shape plus a link map"
-            ),
+            "web_read", ValueError("extraction_schema is required with output_format=schema")
         )
 
     try:
@@ -129,7 +138,12 @@ async def web_read(
             )
 
         return await web_reader.read(
-            url, heavy_mode=heavy_mode, profile=profile, output_format=output_format, tier=tier
+            url,
+            heavy_mode=heavy_mode,
+            profile=profile,
+            output_format=output_format,
+            tier=tier,
+            extraction_schema=extraction_schema,
         )
     except HumanInterventionRequiredException as exc:
         HUMAN_INTERVENTION_TOTAL.labels(
@@ -257,6 +271,7 @@ async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
         _raise_mapped_error("session_clear", exc)
     domain = cookie_manager.registrable_domain(url)
     cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
+    await publish_purge(domain)
 
     return {
         "status": "cleared",

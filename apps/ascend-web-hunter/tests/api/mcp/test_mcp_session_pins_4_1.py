@@ -70,7 +70,15 @@ def test_tool_input_schemas_pin_required_fields() -> None:
     assert _required_and_optional(web_search) == ({"query"}, {"limit"})
     assert _required_and_optional(web_read) == (
         {"url"},
-        {"include_links", "link_filter", "heavy_mode", "profile", "output_format", "tier"},
+        {
+            "include_links",
+            "link_filter",
+            "heavy_mode",
+            "profile",
+            "output_format",
+            "tier",
+            "extraction_schema",
+        },
     )
     assert _required_and_optional(session_establish) == ({"url"}, {"profile"})
     assert _required_and_optional(session_interventions) == (set(), set())

@@ -9,8 +9,13 @@ from ascend_python_common.uri_guard import FetchPolicy, UnsafeUriError, check_fe
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from src.api.exceptions import InvalidProfileError, NoCookiesForDomainError
+from src.api.exceptions import (
+    FormatCombinationError,
+    InvalidProfileError,
+    NoCookiesForDomainError,
+)
 from src.config.config import settings
+from src.reader.cache_purge import publish_purge
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_IMPORT, cookie_manager
 from src.reader.novnc.flow_registry import flow_shape, novnc_flow_registry
 from src.reader.web_reader import OutputFormat, TierName, WebReader
@@ -45,7 +50,16 @@ class ReadRequest(BaseModel):
         default="text",
         description=(
             "'text' returns the flat content field. 'structured' adds title, author, date and "
-            "sitename alongside it, and is not available together with include_links."
+            "sitename alongside it. 'schema' returns JSON validated against extraction_schema. "
+            "'tables' returns each HTML table as rows. 'screenshot' returns a base64 PNG. "
+            "Every format but 'text' is refused together with include_links."
+        ),
+    )
+    extraction_schema: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "JSON Schema the 'schema' output format extracts and validates against. "
+            "Required with output_format='schema', ignored otherwise."
         ),
     )
     tier: TierName | None = Field(
@@ -241,14 +255,10 @@ async def read_url_v2(request: ReadRequest) -> dict[str, Any]:
     """
     url_str = str(request.url)
     await check_fetch_uri(url_str, _fetch_policy())
-    if request.include_links and request.output_format == "structured":
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "output_format=structured is not available with include_links: the annotated-links "
-                "response carries the flat content shape plus a link map"
-            ),
-        )
+    if request.include_links and request.output_format != "text":
+        raise FormatCombinationError(request.output_format)
+    if request.output_format == "schema" and request.extraction_schema is None:
+        raise ValueError("extraction_schema is required with output_format=schema")
     if request.include_links:
         result = await web_reader.read_with_links(
             url_str,
@@ -265,6 +275,7 @@ async def read_url_v2(request: ReadRequest) -> dict[str, Any]:
             profile=request.profile,
             output_format=request.output_format,
             tier=request.tier,
+            extraction_schema=request.extraction_schema,
         )
 
     return {"url": url_str, **result}
@@ -311,6 +322,7 @@ async def clear_session(request: SessionClearRequest) -> dict[str, Any]:
     existed = await session_manager.clear(url_str, request.profile)
     domain = cookie_manager.registrable_domain(url_str)
     cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
+    await publish_purge(domain)
 
     return {
         "status": "cleared",

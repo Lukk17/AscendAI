@@ -51,6 +51,35 @@ def extract_embedded_metadata(html: str) -> dict[str, Any]:
     }
 
 
+def extract_tables(html: str) -> list[list[list[str]]]:
+    """Parse every HTML table into rows of cell texts (design D7).
+
+    One entry per table, one list of cell texts per row, header and body rows
+    alike. A page with no tables yields an empty list, never an error.
+    """
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        logger.warning("table extraction failed", exc_info=True)
+
+        return []
+    tables: list[list[list[str]]] = []
+    for table in soup.find_all("table"):
+        rows: list[list[str]] = []
+        for row in table.find_all("tr"):
+            cells = [
+                cell
+                for cell in (cell.get_text(" ", strip=True) for cell in row.find_all(["th", "td"]))
+                if cell
+            ]
+            if cells:
+                rows.append(cells)
+        if rows:
+            tables.append(rows)
+
+    return tables
+
+
 def _readability_extract(html: str) -> dict[str, Any]:
     """Extract main content via readability-lxml and return a structured dict."""
     doc = Document(html)

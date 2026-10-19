@@ -5,10 +5,14 @@ from ascend_python_common.errors import INTERNAL, VALIDATION, ErrorRegistry, Pro
 from ascend_python_common.uri_guard import UnsafeUriError
 
 from src.api.exceptions import (
+    ExtractionFailedError,
+    ExtractionNotConfiguredError,
+    FormatCombinationError,
     HumanInterventionRequiredException,
     InvalidProfileError,
     NoCookiesForDomainError,
     NoVNCFlowBusyException,
+    ScreenshotUnavailableError,
     TierDisabledError,
 )
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
@@ -24,6 +28,10 @@ UNSAFE_URI = ProblemCode("unsafe_uri", 400)
 TIER_DISABLED = ProblemCode("tier_disabled", 409)
 INVALID_PROFILE = ProblemCode("invalid_profile", 400)
 NO_COOKIES_FOR_DOMAIN = ProblemCode("no_cookies_for_domain", 400)
+EXTRACTION_NOT_CONFIGURED = ProblemCode("extraction_not_configured", 400)
+SCREENSHOT_UNAVAILABLE = ProblemCode("screenshot_unavailable", 400)
+BAD_FORMAT_COMBINATION = ProblemCode("bad_request", 400)
+EXTRACTION_FAILED = ProblemCode("extraction_failed", 502)
 
 
 def _human_detail(exc: BaseException) -> str:
@@ -73,6 +81,10 @@ def build_error_registry() -> ErrorRegistry:
     registry.register(TierDisabledError, TIER_DISABLED, str)
     registry.register(InvalidProfileError, INVALID_PROFILE, str)
     registry.register(NoCookiesForDomainError, NO_COOKIES_FOR_DOMAIN, str)
+    registry.register(ExtractionNotConfiguredError, EXTRACTION_NOT_CONFIGURED, str)
+    registry.register(ScreenshotUnavailableError, SCREENSHOT_UNAVAILABLE, str)
+    registry.register(FormatCombinationError, BAD_FORMAT_COMBINATION, str)
+    registry.register(ExtractionFailedError, EXTRACTION_FAILED, str, expected=True)
     registry.register(ValueError, VALIDATION, str)
     registry.register(
         httpx.HTTPError,

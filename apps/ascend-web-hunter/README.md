@@ -118,6 +118,10 @@ browser rationale in
 - **Singleton Chromium.** One browser process across requests, per-request context. Saves ~1 second per
   Playwright invocation versus the per-request launch pattern.
 - **Budget-bounded reads.** `READ_TOTAL_BUDGET=90s` caps wall-clock across tiers 1-5. NoVNC exempt.
+- **Structured extraction.** `output_format` `structured` adds embedded JSON-LD, OpenGraph and microdata
+  in `metadata`; `schema` extracts caller-defined JSON through a configurable model endpoint with
+  self-healing per-domain selector recipes; `tables` returns HTML tables as rows; `screenshot` returns
+  a base64 PNG from the serving browser tier.
 - **Observability ready.** `/health` (liveness), `/ready` (dependency probes), `/metrics` (Prometheus
   counters), `X-Request-ID` middleware on every response.
 - **Remote CAPTCHA solving via Ngrok.** Solve from a phone, no SSH required. See
@@ -184,6 +188,20 @@ and `.env`. The most-used variables:
 | `CHALLENGE_WEIGHT_MANY_LINKS` | `-20`                    | Weight of the many_links guard signal |
 | `CHALLENGE_WEIGHT_PHRASE_TITLE` | `60`                   | Weight of the phrase_title signal |
 | `CHALLENGE_WEIGHT_PHRASE_BODY` | `30`                    | Weight of the phrase_body signal |
+| `EXTRACTION_SCHEMA_MAX_BYTES` | `16384`                    | Maximum size in bytes of the caller-supplied extraction schema |
+| `EXTRACTION_LLM_BASE_URL` | empty                          | Base URL of the OpenAI-compatible extraction endpoint; empty turns the schema format off |
+| `EXTRACTION_LLM_MODEL` | empty                           | Model name sent to the extraction endpoint |
+| `EXTRACTION_LLM_API_KEY` | empty                          | API key for the extraction endpoint, read from the repository `.env` file only |
+| `EXTRACTION_LLM_MAX_INPUT_CHARS` | `60000`                 | Page text characters sent to the extraction endpoint before the cap cuts them |
+| `EXTRACTION_LLM_TIMEOUT_SECONDS` | `60`                   | Timeout in seconds for one extraction model call |
+| `RECIPE_TTL_SECONDS` | `604800`                          | TTL in seconds for a stored extraction recipe |
+| `RECIPE_SELECTOR_MAX_CHARS` | `512`                      | Maximum characters of one stored CSS selector |
+| `DOCUMENT_MAX_BYTES` | `52428800`                        | Maximum bytes fetched for one routed PDF, image or audio file |
+| `DOCLING_SERVE_URL` | `http://docling-serve:5001`          | Base URL of the docling-serve conversion service; empty turns the PDF route off |
+| `ASCEND_OCR_URL` | `http://ascend-ocr:7022`                | Base URL of the ascend-ocr service; empty turns the image route off |
+| `OCR_ROUTE_TIMEOUT_SECONDS` | `300`                       | Timeout in seconds polling one ascend-ocr job |
+| `AUDIO_SCRIBE_URL` | `http://ascend-audio-scribe:7017`   | Base URL of the ascend-audio-scribe service; empty turns the audio route off |
+| `READ_CACHE_PURGE_RECONNECT_SECONDS` | `5`                | Wait in seconds between two connection attempts of the read cache purge subscriber |
 
 Full settings reference in [docs/configuration.md](docs/configuration.md).
 

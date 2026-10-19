@@ -84,7 +84,21 @@ be run on its own.
     of the same site, fully automated: a cold read of `scrapingcourse.com` stores `cf_clearance`, and a read of the
     same page under a different address must answer HTTP 200 with `status="success"` faster than the cold read,
     never a 428. A 428 is a FAIL and register defect A61 until its fix lands. Runs after test 6, which reads the
-    same site, and not alongside tests 6, 7, 8 or 10. Twelve specs in all, eleven of them automated.
+    same site, and not alongside tests 6, 7, 8 or 10.
+13. [13-structured-extraction-test.md](13-structured-extraction-test.md). Deterministic formats on the shared
+    fake site: structured JSON-LD metadata, tables cell for cell, and screenshot twice on the pinned
+    Playwright tier with the request log proving the second read re-ran the chain. Reads only, no NoVNC
+    flow, safe beside every spec.
+14. [14-document-routing-test.md](14-document-routing-test.md). Non-HTML routing against the full stack:
+    direct PDF, image (OCR job to terminal state), audio, oversized PDF refused before reading, and a page
+    linking a PDF under the blocked name. OCR engine-bound and docling-bound, so the whole spec runs alone
+    in the quarantine lane.
+15. [15-schema-extraction-ai-test.md](15-schema-extraction-ai-test.md). Schema extraction with the real
+    hosted model (provider `minimax`, model `MiniMax-M2.7`, never LM Studio): validated answer, recipe
+    stored with TTL, replay without the model, drift rebuild, second schema separation, prompt-injection
+    resistance, unsatisfiable schema refusal. Writes only `recipe:e2e-fake-site:*`, safe beside every
+    spec. Token use goes into the run record and the spec's `docs/E2E_COST.md` row. Fifteen specs in all,
+    fourteen of them automated (spec 11 needs a human).
 
 ## Cross-cutting conventions
 

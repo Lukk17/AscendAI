@@ -159,7 +159,12 @@ async def test_read_post_heavy_mode_forwarded(client: AsyncClient) -> None:
     # then
     assert resp.status_code == 200
     mock_read.assert_awaited_once_with(
-        "http://unit.com/", heavy_mode=True, profile=None, output_format="text", tier=None
+        "http://unit.com/",
+        heavy_mode=True,
+        profile=None,
+        output_format="text",
+        tier=None,
+        extraction_schema=None,
     )
 
 

@@ -107,7 +107,12 @@ async def test_mcp_web_read_calls_read_when_include_links_false() -> None:
     # then
     assert result == mock_content
     mock_read.assert_awaited_once_with(
-        "http://mcp.com", heavy_mode=False, profile=None, output_format="text", tier=None
+        "http://mcp.com",
+        heavy_mode=False,
+        profile=None,
+        output_format="text",
+        tier=None,
+        extraction_schema=None,
     )
 
 

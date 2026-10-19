@@ -129,6 +129,12 @@ def build_pages() -> None:
         f"<article><p>{CANARY_ARTICLE}</p>"
         f'<img src="http://e2e-fake-site-blocked:{PORT}/canary.png" alt="x"></article>',
     )
+    PAGES["/pdf-link-blocked"] = (
+        "Blocked PDF link",
+        "<article><p>The HALCYON-PLOVER index lists one sealed PDF under glass.</p>"
+        f'<a href="http://e2e-fake-site-blocked:{PORT}/files/canary.pdf">sealed memorandum</a>'
+        "</article>",
+    )
     PAGES["/script-nav"] = (
         "Script nav",
         "<article><p>Stay here.</p></article>"
@@ -186,6 +192,8 @@ FILE_CONTENT_TYPES = {
     "canary.pdf": "application/pdf",
     "canary.png": "image/png",
     "canary.zip": "application/zip",
+    "canary.mp3": "audio/mpeg",
+    "oversized.pdf": "application/pdf",
     "clean-doc.docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "macro-doc.docm": "application/vnd.ms-word.document.macroEnabled.12",
     "circuit.kicad_sch": "text/plain",
@@ -303,6 +311,10 @@ async def content_handler(request: Request) -> Response:
     if path in PAGES:
         response, page_body = _serve_page(path)
         return _finish(request, path, response, page_body)
+    if path == "/files/oversized.pdf":
+        resp = Response(b"", media_type="application/pdf")
+        resp.headers["content-length"] = str(52428800 + 1)
+        return _finish(request, path, resp, b"")
     if path.startswith("/files/"):
         response, file_body = await _serve_file(path[len("/files/") :])
         return _finish(request, path, response, file_body)

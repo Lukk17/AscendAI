@@ -7,6 +7,7 @@ from src.reader.extraction import (
     _ensemble_score,
     extract_embedded_metadata,
     extract_structured,
+    extract_tables,
     extract_text_with_fallback,
 )
 
@@ -266,3 +267,51 @@ def test_extract_structured_carries_metadata_beside_the_article_fields() -> None
     # then
     assert result["metadata"]["json-ld"][0]["name"] == "Northwind Lamp"
     assert result["title"] or result["content"]
+
+
+_TABLE_HTML = """
+<html><body><article>
+<p>This opening paragraph explains the quarterly figures in plain sentences for everyone.</p>
+<table><tr><th>Product name</th><th>Quarterly revenue</th></tr>
+<tr><td>Red Widget</td><td>Nineteen thousand dollars in the first quarter</td></tr>
+<tr><td>Blue Widget</td><td>Twenty one thousand dollars in the first quarter</td></tr>
+</table>
+<table><tr><td>Lonely cell</td></tr></table>
+</article></body></html>
+"""
+
+
+def test_extract_tables_returns_rows_cell_for_cell() -> None:
+    # when
+    tables = extract_tables(_TABLE_HTML)
+
+    # then
+    assert tables == [
+        [
+            ["Product name", "Quarterly revenue"],
+            ["Red Widget", "Nineteen thousand dollars in the first quarter"],
+            ["Blue Widget", "Twenty one thousand dollars in the first quarter"],
+        ],
+        [["Lonely cell"]],
+    ]
+
+
+def test_extract_tables_skips_empty_rows_and_tables() -> None:
+    # when
+    tables = extract_tables("<html><body><table><tr></tr><tr><th></th></tr></table></body></html>")
+
+    # then
+    assert tables == []
+
+
+def test_extract_tables_without_tables_is_empty() -> None:
+    assert extract_tables(_GOOD_HTML) == []
+
+
+def test_extract_tables_parse_error_is_empty() -> None:
+    # when
+    with patch("src.reader.extraction.BeautifulSoup", side_effect=ValueError("bad markup")):
+        tables = extract_tables(_GOOD_HTML)
+
+    # then
+    assert tables == []

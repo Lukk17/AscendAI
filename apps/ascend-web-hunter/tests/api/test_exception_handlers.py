@@ -4,15 +4,26 @@ import httpx
 from ascend_python_common.errors.registry import resolve_extensions
 
 from src.api.exception_handlers import (
+    BAD_FORMAT_COMBINATION,
     BLOCKLIST_REFRESH_INVALID,
     BLOCKLIST_REFRESH_THROTTLED,
     EXTERNAL_SERVICE_UNAVAILABLE,
+    EXTRACTION_FAILED,
+    EXTRACTION_NOT_CONFIGURED,
     HUMAN_INTERVENTION_REQUIRED,
     NOVNC_BUSY,
+    SCREENSHOT_UNAVAILABLE,
     build_error_registry,
     error_registry,
 )
-from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api.exceptions import (
+    ExtractionFailedError,
+    ExtractionNotConfiguredError,
+    FormatCombinationError,
+    HumanInterventionRequiredException,
+    NoVNCFlowBusyException,
+    ScreenshotUnavailableError,
+)
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
 
 
@@ -190,6 +201,62 @@ def test_novnc_busy_extensions_keep_old_members_for_plain_raise() -> None:
         "max_concurrent_flows": 0,
         "flows": [],
     }
+
+
+def test_extraction_not_configured_maps_to_400() -> None:
+    # given
+    exc = ExtractionNotConfiguredError()
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == EXTRACTION_NOT_CONFIGURED
+    assert entry.code.status == 400
+    assert "EXTRACTION_LLM_BASE_URL" in str(exc)
+
+
+def test_screenshot_unavailable_maps_to_400() -> None:
+    # given
+    exc = ScreenshotUnavailableError()
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == SCREENSHOT_UNAVAILABLE
+    assert entry.code.status == 400
+
+
+def test_format_combination_maps_to_bad_request_400() -> None:
+    # given
+    exc = FormatCombinationError("tables")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == BAD_FORMAT_COMBINATION
+    assert entry.code.code == "bad_request"
+    assert entry.code.status == 400
+    assert "include_links" in str(exc)
+
+
+def test_extraction_failed_maps_to_502_and_is_expected() -> None:
+    # given
+    exc = ExtractionFailedError("the model answer was not JSON")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == EXTRACTION_FAILED
+    assert entry.code.status == 502
+    assert entry.expected is True
 
 
 def test_internal_code_is_the_registry_default() -> None:

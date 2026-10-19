@@ -1,5 +1,6 @@
 """A caller who selects a switched-off tier is refused with 409 tier_disabled (task 2.8)."""
 
+import re
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -34,8 +35,12 @@ async def test_rest_disabled_camoufox_answers_409_and_runs_no_tier(client: Async
 
     # then
     assert resp.status_code == 409
+    assert "application/problem+json" in resp.headers["content-type"]
     body = resp.json()
     assert body["code"] == "tier_disabled"
+    assert body["type"] == "https://ascend.ai/errors/tier-disabled"
+    assert body["instance"] == "/api/v2/web/read"
+    assert re.fullmatch(r"[0-9a-f]{32}", body["traceId"]) is not None
     assert "4b-camoufox" in body["detail"]
     mock_execute.assert_not_awaited()
 

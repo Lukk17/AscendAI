@@ -35,7 +35,7 @@ async def test_rest_read_starts_the_chain_at_the_patched_tier(
     # then
     assert resp.status_code == 200
     mock_read.assert_awaited_once_with(
-        _URL, heavy_mode=False, profile=None, output_format="text", tier=tier
+        _URL, heavy_mode=False, profile=None, output_format="text", tier=tier, extraction_schema=None
     )
 
 
@@ -55,5 +55,5 @@ async def test_mcp_web_read_starts_the_chain_at_the_patched_tier(tier: str) -> N
     # then
     assert payload["mode"] == tier
     mock_read.assert_awaited_once_with(
-        _URL, heavy_mode=False, profile=None, output_format="text", tier=tier
+        _URL, heavy_mode=False, profile=None, output_format="text", tier=tier, extraction_schema=None
     )

@@ -166,10 +166,10 @@ async def test_mcp_read_bad_combination_raises_validation_tool_error() -> None:
     url = "http://example.com/"
     # when
     with patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True):
-        with pytest.raises(Exception, match=r"^validation: ") as exc_info:
+        with pytest.raises(Exception, match=r"^bad_request: ") as exc_info:
             await web_read(url, include_links=True, output_format="structured")
     # then
-    assert str(exc_info.value).startswith("validation: ")
+    assert str(exc_info.value).startswith("bad_request: ")
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,26 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
+## [0.0.12] - <release date>
+
+### Added
+- Structured extraction on `output_format` `structured`: JSON-LD, OpenGraph and microdata parsed by
+  `extruct` into a `metadata` object; a parse error leaves it empty and never fails the read.
+- Scored ensemble: trafilatura and readability-lxml both run on every extraction and the higher scoring
+  result wins, ties to trafilatura (ADR-016, superseding the ADR-009 recall pass).
+- Schema-guided extraction on `output_format` `schema` with `extraction_schema`, produced by a
+  configurable OpenAI-compatible endpoint (`EXTRACTION_LLM_*`), with per-domain self-healing CSS
+  selector recipes in Redis (ADR-017).
+- Non-HTML routing: PDFs convert through docling-serve, images read through the ascend-ocr job API and
+  audio transcribes through ascend-audio-scribe, every file fetched by the shared `stream_to_file`
+  capped at `DOCUMENT_MAX_BYTES`. A routing failure returns the HTML extraction with a `routing_error`.
+- Two more output formats: `tables` (HTML tables as rows) and `screenshot` (base64 PNG from the
+  browser tier that served the read). Four new problem codes: `extraction_not_configured`,
+  `screenshot_unavailable`, `bad_request` (for `include_links` with any format but `text`) and the
+  expected upstream `extraction_failed`.
+- Cross-container read-cache purge: clearing a session publishes the domain on the `read_cache_purge`
+  Redis channel and every container's subscriber drops that domain's cached reads.
+
 ## [0.0.8] - <release date>
 
 ### Changed

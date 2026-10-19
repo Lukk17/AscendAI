@@ -8,7 +8,7 @@ ascend-web-hunter is an MCP server and REST API for web search and content extra
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.0.8
+- **Version**: 0.0.12
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands
@@ -149,6 +149,20 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - `FLARESOLVERR_ENABLED` - Route reads through the 3-flaresolverr tier (default: `false`)
 - `CAMOUFOX_ENABLED` - Route reads through the 4b-camoufox tier (default: `true`)
 - `TIER_MEMORY_TTL_SECONDS` - TTL in seconds for the per-domain tier memory (default: `86400`)
+- `EXTRACTION_SCHEMA_MAX_BYTES` - Maximum size in bytes of the caller-supplied extraction schema (default: `16384`)
+- `EXTRACTION_LLM_BASE_URL` - Base URL of the OpenAI-compatible endpoint schema extraction calls; empty turns the schema format off (default: empty)
+- `EXTRACTION_LLM_MODEL` - Model name sent to the extraction endpoint (default: empty)
+- `EXTRACTION_LLM_API_KEY` - API key for the extraction endpoint, read from the repository `.env` file only (default: empty)
+- `EXTRACTION_LLM_MAX_INPUT_CHARS` - Page text characters sent to the extraction endpoint before the cap cuts them (default: `60000`)
+- `EXTRACTION_LLM_TIMEOUT_SECONDS` - Timeout in seconds for one extraction model call (default: `60`)
+- `RECIPE_TTL_SECONDS` - TTL in seconds for a stored extraction recipe (default: `604800`)
+- `RECIPE_SELECTOR_MAX_CHARS` - Maximum characters of one stored CSS selector (default: `512`)
+- `DOCUMENT_MAX_BYTES` - Maximum bytes fetched for one routed PDF, image or audio file (default: `52428800`)
+- `DOCLING_SERVE_URL` - Base URL of the docling-serve document conversion service; empty turns the PDF route off (default: `http://docling-serve:5001`)
+- `ASCEND_OCR_URL` - Base URL of the ascend-ocr service; empty turns the image route off (default: `http://ascend-ocr:7022`)
+- `OCR_ROUTE_TIMEOUT_SECONDS` - Timeout in seconds polling one ascend-ocr job (default: `300`)
+- `AUDIO_SCRIBE_URL` - Base URL of the ascend-audio-scribe service; empty turns the audio route off (default: `http://ascend-audio-scribe:7017`)
+- `READ_CACHE_PURGE_RECONNECT_SECONDS` - Wait in seconds between two connection attempts of the read cache purge subscriber (default: `5`)
 - `NETWORKIDLE_POLL_MS` - Page-quiet poll interval in milliseconds for browser tiers (default: `1000`)
 - `SCROLL_PAUSE_MS` - Pause in milliseconds between two scroll steps (default: `200`)
 - `REDIS_URL` - Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-web-hunter`, and for clearance-cookie persistence (default: `redis://127.0.0.1:6379/0`)

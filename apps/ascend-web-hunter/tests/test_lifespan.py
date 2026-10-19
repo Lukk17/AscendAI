@@ -324,6 +324,39 @@ async def test_lifespan_exit_tolerates_shutdown_failure(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
+async def test_lifespan_starts_purge_subscriber_and_cancels_it_on_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The lifespan subscribes to the read-cache purge channel and cancels the
+    subscriber on exit (task 5.5)."""
+    # given
+    from src import main as main_module
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+    from src.runtime.browser_pool import browser_pool
+
+    async def fake_shutdown() -> None:
+        return None
+
+    async def fake_stop() -> None:
+        return None
+
+    monkeypatch.setattr(novnc_flow_registry, "shutdown", fake_shutdown)
+    monkeypatch.setattr(browser_pool, "stop", fake_stop)
+    lifespan = main_module.service_lifespan()
+
+    # when
+    await lifespan.__aenter__()
+    task = lifespan._purge_subscriber
+    assert task is not None
+    await lifespan.__aexit__(None, None, None)
+
+    # then
+    assert task.cancelled()
+    assert lifespan._purge_subscriber is None
+    assert lifespan._purge_stop.is_set()
+
+
+@pytest.mark.asyncio
 async def test_lifespan_exit_without_enter_skips_sweeper_cancel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

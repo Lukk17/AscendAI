@@ -181,6 +181,27 @@ are mandatory there. `SEARXNG_SECRET` is SearXNG's session-signing key, which is
 
 ---
 
+### Structured extraction, recipes and document routing
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `EXTRACTION_SCHEMA_MAX_BYTES` | `16384` | Maximum size in bytes of the caller-supplied extraction schema. Added by `enhance-web-search-extraction-and-tiers`. |
+| `EXTRACTION_LLM_BASE_URL` | empty | Base URL of the OpenAI-compatible endpoint schema extraction calls. Empty turns the schema format off. Added by `enhance-web-search-extraction-and-tiers`. |
+| `EXTRACTION_LLM_MODEL` | empty | Model name sent to the extraction endpoint. Added by `enhance-web-search-extraction-and-tiers`. |
+| `EXTRACTION_LLM_API_KEY` | empty | API key for the extraction endpoint, read from the repository `.env` file only. Added by `enhance-web-search-extraction-and-tiers`. |
+| `EXTRACTION_LLM_MAX_INPUT_CHARS` | `60000` | Page text characters sent to the extraction endpoint before the cap cuts them. Added by `enhance-web-search-extraction-and-tiers`. |
+| `EXTRACTION_LLM_TIMEOUT_SECONDS` | `60` | Timeout in seconds for one extraction model call. Added by `enhance-web-search-extraction-and-tiers`. |
+| `RECIPE_TTL_SECONDS` | `604800` | TTL in seconds for a stored extraction recipe. Added by `enhance-web-search-extraction-and-tiers`. |
+| `RECIPE_SELECTOR_MAX_CHARS` | `512` | Maximum characters of one stored CSS selector. Added by `enhance-web-search-extraction-and-tiers`. |
+| `DOCUMENT_MAX_BYTES` | `52428800` | Maximum bytes fetched for one routed PDF, image or audio file. Added by `enhance-web-search-extraction-and-tiers`. |
+| `DOCLING_SERVE_URL` | `http://docling-serve:5001` | Base URL of the docling-serve document conversion service. Empty turns the PDF route off. Added by `enhance-web-search-extraction-and-tiers`. |
+| `ASCEND_OCR_URL` | `http://ascend-ocr:7022` | Base URL of the ascend-ocr service. Empty turns the image route off. Added by `enhance-web-search-extraction-and-tiers`. |
+| `OCR_ROUTE_TIMEOUT_SECONDS` | `300` | Timeout in seconds polling one ascend-ocr job. Added by `enhance-web-search-extraction-and-tiers`. |
+| `AUDIO_SCRIBE_URL` | `http://ascend-audio-scribe:7017` | Base URL of the ascend-audio-scribe service. Empty turns the audio route off. Added by `enhance-web-search-extraction-and-tiers`. |
+| `READ_CACHE_PURGE_RECONNECT_SECONDS` | `5` | Wait in seconds between two connection attempts of the read cache purge subscriber. Added by `enhance-web-search-extraction-and-tiers`. |
+
+---
+
 ### Choosing values
 
 - **`READ_TOTAL_BUDGET`**: 90 s is the default; tune up if your typical Playwright sites take more than 30 s

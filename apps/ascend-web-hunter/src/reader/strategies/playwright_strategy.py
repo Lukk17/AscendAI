@@ -23,6 +23,7 @@ from src.reader.cloudflare.challenge_signals import (
 )
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
+from src.reader.screenshot import capture_page
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.runtime.browser_pool import browser_pool
 from src.validator.url_validator import URLValidator
@@ -52,6 +53,12 @@ class PlaywrightStrategy(BaseStrategy):
         extracted: str | None = trafilatura.extract(html)
 
         return extracted or ""
+
+    async def screenshot_page(self, url: str) -> tuple[str, bytes] | None:
+        """Capture a full-page PNG of *url* through a fresh stealth context."""
+        browser = await browser_pool.get_browser()
+
+        return await capture_page(lambda: self._create_stealth_context(browser, url), url)
 
     async def get_html(self, url: str) -> str:
         browser = await browser_pool.get_browser()
