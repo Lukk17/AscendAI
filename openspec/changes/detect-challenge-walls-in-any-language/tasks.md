@@ -10,7 +10,7 @@ and it gates calling the change done.
 
 ## 1. Configuration
 
-- [ ] 1.1 Add to `src/config/config.py`, each with a `Field` carrying its default, its constraint and a description, the
+- [x] 1.1 Add to `src/config/config.py`, each with a `Field` carrying its default, its constraint and a description, the
       seven tuning settings `CHALLENGE_SCORE_THRESHOLD` (100), `CHALLENGE_RICH_CONTENT_WORDS` (150),
       `CHALLENGE_FORM_DOMINANCE_RATIO` (0.6, above 0 and at most 1), `CHALLENGE_MIN_WORDS_PER_KB` (2.0),
       `CHALLENGE_THIN_LINK_COUNT` (5), `CHALLENGE_RICH_LINK_COUNT` (20) and `CHALLENGE_SHAPE_MAX_BYTES` (500000), and
@@ -29,16 +29,16 @@ and it gates calling the change done.
       values). Verify with cases in `tests/config/test_config.py` for each default, a valid override and a rejected
       value outside its constraint, and by the tests of sections 4 and 9 asserting the boundaries at the defaults and
       one boundary moved by an override.
-- [ ] 1.2 Add a model validator rejecting a `CHALLENGE_WALL_MAX_BYTES` above `CHALLENGE_SHAPE_MAX_BYTES`, a weight of
+- [x] 1.2 Add a model validator rejecting a `CHALLENGE_WALL_MAX_BYTES` above `CHALLENGE_SHAPE_MAX_BYTES`, a weight of
       a signal other than `definitive_header` and `status_empty_body` at or above `CHALLENGE_SCORE_THRESHOLD` (no
       single such signal may decide a wall, `design.md` Decision 2), a positive weight for `rich_content` or
       `many_links`, a negative weight for any other signal, and a `CHALLENGE_THIN_LINK_COUNT` above
       `CHALLENGE_RICH_LINK_COUNT`. Verify with one test per rule asserting construction fails and that the message
       names the settings involved.
-- [ ] 1.3 Reword the descriptions of `CHALLENGE_DETECTION_MAX_BYTES` and `CHALLENGE_WALL_MAX_BYTES` to the meanings
+- [x] 1.3 Reword the descriptions of `CHALLENGE_DETECTION_MAX_BYTES` and `CHALLENGE_WALL_MAX_BYTES` to the meanings
       in `design.md`'s configuration table, without changing their defaults. Verify by asserting both defaults are
       unchanged in `tests/config/test_config.py`.
-- [ ] 1.4 Pass every setting of task 1.1 and the two existing settings of task 1.3 through the `ascend-web-hunter`
+- [x] 1.4 Pass every setting of task 1.1 and the two existing settings of task 1.3 through the `ascend-web-hunter`
       service of `compose.ascend-web-hunter.yaml` and of `deploy-standalone/compose.yaml` as
       `- <NAME>=${<NAME>:-<default>}` with the default of the settings, for example
       `- CHALLENGE_SCORE_THRESHOLD=${CHALLENGE_SCORE_THRESHOLD:-100}` and
@@ -53,7 +53,7 @@ and it gates calling the change done.
 
 ## 2. The catalogue file
 
-- [ ] 2.1 Rewrite `src/reader/cloudflare/challenge_dictionary.json` into the one maintained catalogue file with the
+- [x] 2.1 Rewrite `src/reader/cloudflare/challenge_dictionary.json` into the one maintained catalogue file with the
       three sections from `design.md` Decision 4: `vendors` holding the marker table from Decision 3 with `signal`,
       `source` and `verified_on` per marker, `phrases` holding the sixteen ids with their canonical English and a
       `provenance` per translation, and `login_title_patterns` copied verbatim from the current dictionary. No source
@@ -61,9 +61,9 @@ and it gates calling the change done.
       `tests/reader/cloudflare/test_challenge_dictionary.py`, which loads the file, asserts every marker has a
       non-empty `source` URL and a `verified_on` date, asserts every translation has a `provenance`, and asserts every
       phrase id in Decision 4's table is present exactly once.
-- [ ] 2.3 Carry every string the old dictionary held into the rewritten file under its new section. Verify with a test
+- [x] 2.3 Carry every string the old dictionary held into the rewritten file under its new section. Verify with a test
       that lists the old dictionary's strings and finds each one in the loaded catalogue.
-- [ ] 2.4 Make the detector load the catalogue file directly through one loader in `challenge_signals.py`, which
+- [x] 2.4 Make the detector load the catalogue file directly through one loader in `challenge_signals.py`, which
       normalises every phrase at load time and fails loudly on a missing or malformed file instead of the current
       silent fallback to empty lists. Verify with a test that a missing file raises at import with a message naming
       the path, matching the packaging-defect rule ADR-008 applies to the blocklist.
@@ -72,20 +72,20 @@ Task 2.2 removed by owner decision 93 of 2026-10-08.
 
 ## 3. Vendor signatures
 
-- [ ] 3.1 Implement the `definitive_header`, `vendor_presence` and `vendor_script` signals in
+- [x] 3.1 Implement the `definitive_header`, `vendor_presence` and `vendor_script` signals in
       `src/reader/cloudflare/challenge_signals.py` as pure functions over a lower-cased header map, a cookie name
       sequence and the prefix, returning at most one `FiredSignal` each with the vendor and the marker that matched.
       Verify with `tests/reader/cloudflare/test_challenge_signals.py` covering, per vendor in Decision 3, one
       positive case per marker and one negative case with a near-miss string.
-- [ ] 3.2 Implement `interstitial_structure` over the prefix, including the Cloudflare element ids and classes, the
+- [x] 3.2 Implement `interstitial_structure` over the prefix, including the Cloudflare element ids and classes, the
       `Ray ID:` regex carried over from today, the DataDome host, the Incapsula path and texts, the PerimeterX id and
       path, the Amazon form action, image host and input, and the Akamai reference pattern gated on status 403.
       Verify with one positive fixture per marker and a test that the Akamai pattern does not fire on a 200.
-- [ ] 3.3 Assert the once-per-verdict rule: a page carrying two reCAPTCHA scripts and three Cloudflare markers fires
+- [x] 3.3 Assert the once-per-verdict rule: a page carrying two reCAPTCHA scripts and three Cloudflare markers fires
       `vendor_script` once and `interstitial_structure` once. Verify with a test counting fired signal ids.
-- [ ] 3.4 Assert header handling is case-insensitive and tolerant: `CF-Mitigated`, `cf-mitigated` and a header map
+- [x] 3.4 Assert header handling is case-insensitive and tolerant: `CF-Mitigated`, `cf-mitigated` and a header map
       of `None` all behave as specified. Verify with a parametrised test.
-- [ ] 3.5 Measure Amazon's live captcha page form action on the five capture locales `amazon.de`, `amazon.fr`,
+- [x] 3.5 Measure Amazon's live captcha page form action on the five capture locales `amazon.de`, `amazon.fr`,
       `amazon.it`, `amazon.es` and `amazon.co.jp`, and on the four spec 7 already measured (`amazon.com`,
       `amazon.pl`, `amazon.co.uk` and `amazon.se`), with a direct `curl -sS` of `/errors/validateCaptcha` and record the `action` attribute of the
       form in each response in the catalogue file's `notes` for the Amazon vendor. Keep both paths in the marker
@@ -95,103 +95,103 @@ Task 2.2 removed by owner decision 93 of 2026-10-08.
 
 ## 4. The verdict and the structure and shape signals
 
-- [ ] 4.1 Add `FiredSignal` and `ChallengeVerdict` to `challenge_signals.py` as frozen dataclasses per `design.md`
+- [x] 4.1 Add `FiredSignal` and `ChallengeVerdict` to `challenge_signals.py` as frozen dataclasses per `design.md`
       Decision 1, with the `accepted` property. Verify with a test that the dataclasses are immutable and that
       `accepted` is false for a wall with content, false for content-free clean page, and true otherwise.
-- [ ] 4.2 Implement the family B status signals with the empty-body case carrying the definitive weight. Verify with
+- [x] 4.2 Implement the family B status signals with the empty-body case carrying the definitive weight. Verify with
       a parametrised test over 403, 429, 503, 200 and 404 crossed with empty, small and large bodies.
-- [ ] 4.3 Implement `captcha_input`, `captcha_element`, `form_dominance` and `script_only_body` with
+- [x] 4.3 Implement `captcha_input`, `captcha_element`, `form_dominance` and `script_only_body` with
       `lxml.html.fromstring` on the prefix, each as a pure function over the parsed tree. Verify with tests using
       minimal documents for each attribute the design names, a `form_dominance` case just above and just below the
       ratio, a `script_only_body` case with and without the `noscript`, and the `geetest_` prefix case.
-- [ ] 4.4 Implement the password-input classifier so a wall verdict whose dominant form carries
+- [x] 4.4 Implement the password-input classifier so a wall verdict whose dominant form carries
       `input type="password"` has `intervention_type="login"`. Verify with a test that the type is `captcha` when the
       password input is in a form that does not dominate, and `login` when it does.
-- [ ] 4.5 Implement Decision 6: a parse failure records a zero-weight `parse_failed` signal and the other families
+- [x] 4.5 Implement Decision 6: a parse failure records a zero-weight `parse_failed` signal and the other families
       still run. Verify with a test feeding bytes that make `fromstring` raise, asserting the signal is recorded, a
       definitive header still yields a wall, and the word floor still applies.
-- [ ] 4.6 Implement family D over one trafilatura extraction shared with the word floor, bounded by
+- [x] 4.6 Implement family D over one trafilatura extraction shared with the word floor, bounded by
       `CHALLENGE_SHAPE_MAX_BYTES`, with the two negative guards. Verify with tests at each boundary named in the
       configuration table, a test that a page above the shape bound contributes no family D signal and passes the
       floor, and a test that trafilatura is called exactly once per `assess`.
-- [ ] 4.7 Implement `assess` as the sum of fired weights compared with the threshold, with a definitive signal
+- [x] 4.7 Implement `assess` as the sum of fired weights compared with the threshold, with a definitive signal
       forcing `wall` regardless of the sum. Verify with a test that a definitive header beside `rich_content` and
       `many_links` is still a wall, and that the twelve worked examples in `design.md` Decision 2 produce the scores
       and verdicts printed there at the default settings, one parametrised case per row.
-- [ ] 4.8 Reimplement `is_blocked`, `has_real_content` and `is_content_accepted` as readers of `assess`, keeping
+- [x] 4.8 Reimplement `is_blocked`, `has_real_content` and `is_content_accepted` as readers of `assess`, keeping
       their two-argument forms working. Verify by the existing `tests/reader/cloudflare/test_challenge_detector.py`
       passing with only the changes named in `design.md` migration step 4, each rewritten test stating its new
       expectation in its docstring.
 
 ## 5. The phrase supplement
 
-- [ ] 5.1 Implement the normalisation function (NFKC, casefold, punctuation stripped, whitespace collapsed) in
+- [x] 5.1 Implement the normalisation function (NFKC, casefold, punctuation stripped, whitespace collapsed) in
       `challenge_signals.py` and use it from both the catalogue loader and the matcher. Verify with a test that
       `Just a moment...`, `Just a moment…` and `JUST A MOMENT` normalise to one string, and that the loader calls the
       same function rather than defining its own.
-- [ ] 5.2 Capture the Cloudflare phrases: open a page that serves a Cloudflare managed challenge in a Playwright
+- [x] 5.2 Capture the Cloudflare phrases: open a page that serves a Cloudflare managed challenge in a Playwright
       context with `locale` set to each of the thirty codes, record the rendered `title` and heading, and record the
       same page through `curl_cffi`. Add each captured translation to the catalogue file with its provenance. Verify by
       the corpus fixtures from task 8.2 firing `phrase_title` or `phrase_body` for every captured language, and by
       writing the answer to Open Question 3 into `design.md` with the two captures as evidence.
-- [ ] 5.3 Capture the Amazon phrases from the captcha page of the five capture locales in task 3.5, extending the
+- [x] 5.3 Capture the Amazon phrases from the captcha page of the five capture locales in task 3.5, extending the
       four locales spec 7 already measured, and add them with provenance. Verify by the corpus test firing the phrase on each locale fixture.
-- [ ] 5.4 Implement `phrase_title` and `phrase_body` over the normalised title and the normalised visible text of the
+- [x] 5.4 Implement `phrase_title` and `phrase_body` over the normalised title and the normalised visible text of the
       prefix. Verify with a test that a phrase in the title fires `phrase_title` and not `phrase_body`, that the
       Polish translation the dictionary already carries fires on a Polish fixture, and that an article quoting
       `Just a moment...` in its body with `rich_content` fired is not a wall.
-- [ ] 5.5 Make `test_challenge_dictionary.py` print the phrase by language table, and commit that table into
+- [x] 5.5 Make `test_challenge_dictionary.py` print the phrase by language table, and commit that table into
       `docs/challenge-detection.md` under a heading that names the capture date. Verify the table's language columns match the thirty codes and its phrase rows match the sixteen
       ids.
 
 ## 6. Wiring the call sites
 
-- [ ] 6.1 Add `verdict` to `ChallengeDetectedException` in `src/api/exceptions.py`, with the message naming the
+- [x] 6.1 Add `verdict` to `ChallengeDetectedException` in `src/api/exceptions.py`, with the message naming the
       vendor and the score, and take `intervention_type` from the verdict. Verify with tests in
       `tests/api/test_exception_handlers.py` that the exception's existing attribute and message shape are
       preserved for callers that read them.
-- [ ] 6.2 Move `curl_cffi_fetcher.py` to pass the status, the headers and the set-cookie names. Verify with a test
+- [x] 6.2 Move `curl_cffi_fetcher.py` to pass the status, the headers and the set-cookie names. Verify with a test
       that a 403 with `cf-mitigated: challenge` and a rich body raises `ChallengeDetectedException` with vendor
       `cloudflare`, and that redirect handling is unchanged.
-- [ ] 6.3 Move `playwright_strategy.py` to pass the initial response's status, `all_headers()` and the context's
+- [x] 6.3 Move `playwright_strategy.py` to pass the initial response's status, `all_headers()` and the context's
       cookie names on all four calls, keeping the clear-wait loop's shape. Verify with a test that a challenge that
       clears within the wait produces content, one that does not raises after the wait, and that the headers passed
       on the post-render call are those of the initial response.
-- [ ] 6.4 Move `flaresolverr_strategy.py` and `crawlee_strategy.py` to pass what each has. Verify with tests that
+- [x] 6.4 Move `flaresolverr_strategy.py` and `crawlee_strategy.py` to pass what each has. Verify with tests that
       the FlareSolverr solution's cookie names reach the verdict and that the Crawlee result container carries the
       final status and headers.
-- [ ] 6.5 Move `novnc_strategy.py`'s `_poll_captcha` to one `assess` call with the storage state's cookie names,
+- [x] 6.5 Move `novnc_strategy.py`'s `_poll_captcha` to one `assess` call with the storage state's cookie names,
       deriving `page_blocked` and `cleared` from the verdict. Verify with the existing monitor tests passing and one
       new test that a rendered wall with a `cf_clearance` cookie present still captures, as today.
-- [ ] 6.6 Leave `web_reader.py`'s two calls on the two-argument form and make them log the verdict at the level
+- [x] 6.6 Leave `web_reader.py`'s two calls on the two-argument form and make them log the verdict at the level
       the Observability section of `design.md` specifies. Verify with a caplog test on both the `read` and the
       `read_with_links` paths.
-- [ ] 6.7 Grep `src/` for `is_blocked(200,` and `is_content_accepted(200,` and confirm the only remaining
+- [x] 6.7 Grep `src/` for `is_blocked(200,` and `is_content_accepted(200,` and confirm the only remaining
       hard-coded 200 is in `web_reader.py`. Verify by the grep output being exactly those two lines.
 
 ## 7. Observability
 
-- [ ] 7.1 Add `CHALLENGE_SIGNALS_FIRED_TOTAL`, `CHALLENGE_VERDICTS_TOTAL` and `CHALLENGE_SCORE` to
+- [x] 7.1 Add `CHALLENGE_SIGNALS_FIRED_TOTAL`, `CHALLENGE_VERDICTS_TOTAL` and `CHALLENGE_SCORE` to
       `src/observability/metrics.py` with the labels and buckets in `design.md`, the histogram's boundaries being the
       bucket list of the Observability section plus `CHALLENGE_SCORE_THRESHOLD` when the list does not already hold it.
       Verify with cases in `tests/observability/test_metrics.py` asserting each name, type, label set and the bucket
       boundaries at the default threshold and at an overridden one.
-- [ ] 7.2 Increment them from `assess` and from the tier that calls it, with the tier name passed in. Verify with a
+- [x] 7.2 Increment them from `assess` and from the tier that calls it, with the tier name passed in. Verify with a
       test that one wall verdict with four signals produces four signal increments, one verdict increment under
       `wall` and the tier, and one histogram observation at the score.
-- [ ] 7.3 Assert the vendor label is bounded: a test iterates every fixture in the corpus and asserts the set of
+- [x] 7.3 Assert the vendor label is bounded: a test iterates every fixture in the corpus and asserts the set of
       `vendor` label values used is a subset of the catalogue's vendor names plus `none`.
-- [ ] 7.4 Emit the verdict log line at the level the design specifies and assert with a caplog test that it carries
+- [x] 7.4 Emit the verdict log line at the level the design specifies and assert with a caplog test that it carries
       the score, the vendor, the type and the signal ids, and that no line carries a cookie value, a header value
       outside the four allowlisted names, or more than the matched marker of any evidence.
 
 ## 8. The fixture corpus
 
-- [ ] 8.1 Create `tests/fixtures/challenge_walls/manifest.json` with the schema in `design.md` Decision 7 and a
+- [x] 8.1 Create `tests/fixtures/challenge_walls/manifest.json` with the schema in `design.md` Decision 7 and a
       `README.md` beside it stating the capture rules, the size bound, the trimming rule and the no-secrets rule.
       Verify with `tests/reader/cloudflare/test_challenge_corpus.py` loading the manifest and asserting every entry
       has every required field and every `path` exists.
-- [ ] 8.2 Capture the Cloudflare walls: the managed challenge through `curl_cffi` with its 403 and headers, and the
+- [x] 8.2 Capture the Cloudflare walls: the managed challenge through `curl_cffi` with its 403 and headers, and the
       rendered challenge through Playwright in `en`, `pl`, `de`, `fr`, `ja` and `ar`. Verify by the corpus test
       asserting `definitive_header` on the curl capture and `interstitial_structure` on each rendered capture.
 - [ ] 8.3 Capture the Amazon captcha page from the five capture locales in task 3.5 (`amazon.de`, `amazon.fr`,
@@ -202,10 +202,10 @@ Task 2.2 removed by owner decision 93 of 2026-10-08.
       corpus test asserting each vendor's `vendor_script` and the wall verdict, and by the hCaptcha demo fixture
       asserting a wall so the contract of spec 11 is pinned by a unit test. Spec 7 has no Part 3: its human part
       moved to spec 11.
-- [ ] 8.5 Build synthetic fixtures, marked `synthetic: true`, for Akamai, Imperva, Kasada, PerimeterX, DDoS-Guard
+- [x] 8.5 Build synthetic fixtures, marked `synthetic: true`, for Akamai, Imperva, Kasada, PerimeterX, DDoS-Guard
       and AWS WAF from the cited markers alone. Verify by the corpus test asserting the wall verdict and by a test
       that every synthetic entry is listed in `design.md` Open Question 4.
-- [ ] 8.6 Add a `notes` rule to the corpus README: when a spec 7 run records a real wall from a vendor that has a
+- [x] 8.6 Add a `notes` rule to the corpus README: when a spec 7 run records a real wall from a vendor that has a
       synthetic fixture, the run's raw response is captured into the corpus and the synthetic entry is replaced in
       the same commit. Verify by the README carrying the rule and the manifest test rejecting two entries for one
       vendor where one is synthetic.
@@ -221,7 +221,7 @@ Task 2.2 removed by owner decision 93 of 2026-10-08.
 
 ## 9. Verification gates
 
-- [ ] 9.1 Make the corpus test print the fixture, score, margin and fired-signal table, with fixtures within
+- [x] 9.1 Make the corpus test print the fixture, score, margin and fired-signal table, with fixtures within
       twenty points of the threshold under their own heading, and paste that table into `design.md` under Open
       Question 1 with the run date. Verify the table has one row per manifest entry and that every wall has a
       positive margin and every counterexample a negative one.
@@ -233,7 +233,7 @@ Task 2.2 removed by owner decision 93 of 2026-10-08.
 - [ ] 9.3 Run `.venv/Scripts/python.exe -m ruff check .` and `.venv/Scripts/python.exe -m mypy src tests`
       (`.venv/bin/python` on Linux and macOS). Verify both are clean, with
       no suppression added.
-- [ ] 9.4 Measure the cost of `assess` on the largest fixture in the corpus and on the largest page in spec 7's
+- [x] 9.4 Measure the cost of `assess` on the largest fixture in the corpus and on the largest page in spec 7's
       matrix, with `time.perf_counter` around one hundred calls each, and record both figures in `design.md`
       Decision 8. Verify the per-call figure on the largest fixture is under 50 milliseconds, and if it is not, bound
       it by lowering the default of the setting `CHALLENGE_SHAPE_MAX_BYTES` in `config.py`, in the two compose lines and
@@ -242,7 +242,7 @@ Task 2.2 removed by owner decision 93 of 2026-10-08.
 
 ## 10. Documentation and decisions
 
-- [ ] 10.1 Add the two existing `CHALLENGE_*` settings `docs/configuration.md` does not list and every setting of task
+- [x] 10.1 Add the two existing `CHALLENGE_*` settings `docs/configuration.md` does not list and every setting of task
       1.1 to the tables in `apps/ascend-web-hunter/AGENTS.md`, `README.md` and `docs/configuration.md`, the rows of
       `docs/configuration.md` in the same commit as the settings, each new row with its default and its description
       ending with "Added by `detect-challenge-walls-in-any-language`." (owner rule 98 of 2026-10-08, the per-service
@@ -252,16 +252,16 @@ Task 2.2 removed by owner decision 93 of 2026-10-08.
       `docs/README.md`. Verify each of the two existing names and every name of task 1.1 appears in all three tables,
       that every row this change adds to `docs/configuration.md` ends with "Added by
       `detect-challenge-walls-in-any-language`.", and that the new page is reachable from the documentation map.
-- [ ] 10.2 Write `docs/architecture/decisions/ADR-014-scored-challenge-detection.md` in the existing ADR format:
+- [x] 10.2 Write `docs/architecture/decisions/ADR-014-scored-challenge-detection.md` in the existing ADR format:
       the scoring model, the family order, the definitive signals, the guard, the one catalogue file and its
       provenance rule, and the corpus as the admission rule, with the rejected alternatives from `design.md`
       Decisions 1, 2 and 4. Verify the file follows the structure of ADR-003 and ADR-008 and is added to the
       decisions `README.md` index, and that ADR-013 is the sibling change's record and is not touched.
-- [ ] 10.3 Amend ADR-001 rather than superseding it: its Related section names `is_blocked`, `is_login_required` and
+- [x] 10.3 Amend ADR-001 rather than superseding it: its Related section names `is_blocked`, `is_login_required` and
       `is_login_redirect_url`, and its Decision section says `ChallengeDetectedException` short-circuits to NoVNC.
       Point the Related entry at `assess` and the verdict, dated, and leave the rest intact. Verify ADR-001's status
       line and its other content are unchanged.
-- [ ] 10.4 Add two rows to `docs/DEFECT_REGISTER.md`: one for the false negative spec 7's "pending anti-bot fix"
+- [x] 10.4 Add two rows to `docs/DEFECT_REGISTER.md`: one for the false negative spec 7's "pending anti-bot fix"
       paragraph describes, moved to Fixed with this change's commit once it lands, and one Found and not fixed row
       for `ERROR_KEYWORDS` failing validation on an article that mentions a captcha, with the measurement that shows
       it. Verify both rows follow the register's column layout and that no other row is touched.

@@ -10,9 +10,9 @@ Every Python command runs through the `.venv` of the folder it names (`.venv/Scr
 
 ## 2. ascend-memory preparation, on the old versions
 
-- [ ] 2.1 Add the tests that pin today's MCP behaviour where missing: the tool names and input schemas of `tools/list`, and the content and structured content of each tool result, over a 2025-11-25 session (design D9). Verify: they pass on the current code.
-- [ ] 2.2 Remove every camelCase read of an MCP model field in `src` and `tests`, and give each FastMCP client in the tests an explicit protocol era where FastMCP 3 accepts one (design D8, D9). Verify: `git grep -n -E "inputSchema|isError|structuredContent|mimeType|nextCursor|serverInfo" -- apps/ascend-memory/src apps/ascend-memory/tests` returns nothing.
-- [ ] 2.3 Run the service gate from `apps/ascend-memory`: `python -m ruff check .`, `python -m ruff format --check .`, `python -m mypy src tests`, `python -m pytest`. Verify: all pass with 100 percent branch coverage.
+- [x] 2.1 Add the tests that pin today's MCP behaviour where missing: the tool names and input schemas of `tools/list`, and the content and structured content of each tool result, over a 2025-11-25 session (design D9). Verify: they pass on the current code.
+- [x] 2.2 Remove every camelCase read of an MCP model field in `src` and `tests`, and give each FastMCP client in the tests an explicit protocol era where FastMCP 3 accepts one (design D8, D9). Verify: `git grep -n -E "inputSchema|isError|structuredContent|mimeType|nextCursor|serverInfo" -- apps/ascend-memory/src apps/ascend-memory/tests` returns nothing.
+- [x] 2.3 Run the service gate from `apps/ascend-memory`: `python -m ruff check .`, `python -m ruff format --check .`, `python -m mypy src tests`, `python -m pytest`. Verify: all pass with 100 percent branch coverage.
 
 ## 3. ascend-audio-scribe preparation, on the old versions
 

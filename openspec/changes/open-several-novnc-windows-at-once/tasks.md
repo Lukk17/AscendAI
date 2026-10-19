@@ -8,7 +8,7 @@ change done.
 
 ## 1. Configuration
 
-- [ ] 1.1 Add these settings to `src/config/config.py`, each with a `Field` carrying its default, its constraint and a
+- [x] 1.1 Add these settings to `src/config/config.py`, each with a `Field` carrying its default, its constraint and a
       description, with the defaults of the configuration table in `design.md` (owner rule 98 of 2026-10-08, every
       value with a default is a setting): `NOVNC_MAX_CONCURRENT_FLOWS` (default 4, minimum 1, described as a per
       container memory constraint), `NOVNC_DISPLAY_SIZE` (default `1920x1080`, the value the Dockerfile sets for the
@@ -19,24 +19,24 @@ change done.
       configuration table stays a module constant. Verify with cases in `tests/config/test_config.py` covering each
       default, a valid override and a rejected value below its minimum, and `NOVNC_DISPLAY_SIZE` set to a malformed
       value.
-- [ ] 1.2 Add a model validator that rejects a `NOVNC_DISPLAY_SIZE` that does not read `<width>x<height>`, and a
+- [x] 1.2 Add a model validator that rejects a `NOVNC_DISPLAY_SIZE` that does not read `<width>x<height>`, and a
       display smaller than `NOVNC_WINDOW_WIDTH_PX` by `NOVNC_WINDOW_HEIGHT_PX` on either axis. Verify with tests
       asserting construction fails and that the message names the display size and the window setting it is smaller
       than.
-- [ ] 1.3 Replace `_NOVNC_LOCK_LEASE_GRACE_SECONDS` in `novnc_strategy.py` by the setting
+- [x] 1.3 Replace `_NOVNC_LOCK_LEASE_GRACE_SECONDS` in `novnc_strategy.py` by the setting
       `NOVNC_FLOW_LEASE_GRACE_SECONDS`, which the registry reads, and `_NOVNC_BUSY_RETRY_AFTER_SECONDS` in
       `exception_handlers.py` by the setting `NOVNC_BUSY_RETRY_AFTER_SECONDS`, which the `novnc_busy` registry entry
       reads for its `Retry-After` header, both with today's value as the default (owner rule 98 of 2026-10-08). Verify
       by grepping `src/` for both old names with no match, and by tests asserting the handler's `Retry-After` header is
       30 by default and follows an override of the setting.
-- [ ] 1.4 Keep `ENV NOVNC_DISPLAY_SIZE=1920x1080` in `apps/ascend-web-hunter/Dockerfile` as the image's own value for
+- [x] 1.4 Keep `ENV NOVNC_DISPLAY_SIZE=1920x1080` in `apps/ascend-web-hunter/Dockerfile` as the image's own value for
       a container started without compose, and start Xvfb in `supervisord.conf` with
       `-screen 0 %(ENV_NOVNC_DISPLAY_SIZE)sx24`, so Xvfb and the service read the one variable that compose sets for
       both (task 1.6, owner answer 93 and owner rule 98 of 2026-10-08). Verify that the image builds, that a search of
       `supervisord.conf` finds no `1920` and no `1080`, that in `src/` only the default of `NOVNC_DISPLAY_SIZE` in
       `config.py` holds them, that a test in `tests/config/test_config.py` asserts the Dockerfile `ENV` value equals the
       `Settings` default, and that the startup banner prints the display size the service read.
-- [ ] 1.5 Add `NOVNC_PUBLIC_URL` to `src/config/config.py` (design Decision 11, owner answers 94.4 and 95.1 of
+- [x] 1.5 Add `NOVNC_PUBLIC_URL` to `src/config/config.py` (design Decision 11, owner answers 94.4 and 95.1 of
       2026-10-08): optional, no default, one base address shared by every ascend-web-hunter container, and when set an
       absolute `http` or `https` URL with no path, refused at settings construction otherwise with the setting named.
       Pass it through in the `ascend-web-hunter` service of `compose.ascend-web-hunter.yaml` and of
@@ -47,7 +47,7 @@ change done.
       table of `deploy-standalone/README.md` in the same commit (the sync rule). Verify with cases in
       `tests/config/test_config.py` (unset, a valid URL, a relative value refused, a value with a path refused) and
       `docker compose config` (read only) showing the variable empty on the service and no published port 7900.
-- [ ] 1.6 Pass every setting of task 1.1 through the `ascend-web-hunter` service of `compose.ascend-web-hunter.yaml` and
+- [x] 1.6 Pass every setting of task 1.1 through the `ascend-web-hunter` service of `compose.ascend-web-hunter.yaml` and
       of `deploy-standalone/compose.yaml` as `- <NAME>=${<NAME>:-<default>}` with the default of task 1.1, for example
       `- NOVNC_MAX_CONCURRENT_FLOWS=${NOVNC_MAX_CONCURRENT_FLOWS:-4}` and
       `- NOVNC_DISPLAY_SIZE=${NOVNC_DISPLAY_SIZE:-1920x1080}` (owner rule 98 of 2026-10-08). Under the sync rule, in the
@@ -61,7 +61,7 @@ change done.
 
 ## 2. Window layout
 
-- [ ] 2.1 Create `src/reader/novnc/__init__.py` and `src/reader/novnc/window_layout.py` with a `WindowRect` value
+- [x] 2.1 Create `src/reader/novnc/__init__.py` and `src/reader/novnc/window_layout.py` with a `WindowRect` value
       object carrying the slot and the rectangle, and a pure `rect_for_slot(slot, display_size, window_size,
       cascade_offset)` implementing the wrapping cascade from `design.md` Decision 5, called with the settings
       `NOVNC_DISPLAY_SIZE`, `NOVNC_WINDOW_WIDTH_PX`, `NOVNC_WINDOW_HEIGHT_PX` and `NOVNC_WINDOW_CASCADE_OFFSET_PX` of
@@ -70,17 +70,17 @@ change done.
       the rectangle is fully inside the display on both axes, that two different slots up to the cap give two
       different positions, that the size is constant, and that another display size, window size and offset passed in
       are honoured.
-- [ ] 2.2 Add a test at a deliberately extreme cap (64) proving the modulus keeps every slot on screen. Verify the
+- [x] 2.2 Add a test at a deliberately extreme cap (64) proving the modulus keeps every slot on screen. Verify the
       test fails if the modulus is removed, by asserting the exact boundary slot rather than a range.
 
 ## 3. The flow registry
 
-- [ ] 3.1 Key the registry on the existing public static method `CookieManager.registrable_domain(url)` in
+- [x] 3.1 Key the registry on the existing public static method `CookieManager.registrable_domain(url)` in
       `src/reader/cloudflare/cookie_manager.py`. Do not add a second implementation and do not add any
       `# noqa: SLF001`. Verify with a test in `tests/reader/novnc/test_flow_registry.py` asserting that the flow key
       for a host with a subdomain, a bare host, a host with a port and a malformed input equals
       `CookieManager.registrable_domain(url)` plus the profile, and by grepping `src/` for `SLF001` with no new match.
-- [ ] 3.2 Create `src/reader/novnc/flow_registry.py` with `NoVNCFlow` and `NoVNCFlowRegistry` per `design.md`
+- [x] 3.2 Create `src/reader/novnc/flow_registry.py` with `NoVNCFlow` and `NoVNCFlowRegistry` per `design.md`
       Decision 1, plus the module-level `novnc_flow_registry` instance: the local slot pool and tasks in the process,
       and the flow record in Redis under `novnc_flow:{registrable_domain}:{profile}`, written with `SET NX PX` for the
       lease and deleted on release by a compare and delete script. Verify with
@@ -89,15 +89,15 @@ change done.
       slot and deletes the record, release of an unknown identifier is a no-op, `find` returns a live flow for a
       matching key and `None` otherwise, `active()` and `local()` are ordered by start time, and a Redis error is
       logged once as a WARNING and leaves the flow in the process only.
-- [ ] 3.3 Implement `sweep()` so an expired lease cancels that flow's task, drops its record and frees its slot,
+- [x] 3.3 Implement `sweep()` so an expired lease cancels that flow's task, drops its record and frees its slot,
       and so a flow whose lease has not expired is untouched. Verify with a test that shifts one flow's
       `started_at` past its lease, asserts only that flow's task was cancelled, and asserts a sibling's slot,
       record and task are unaffected.
-- [ ] 3.4 Implement `shutdown()` so it cancels every local flow and waits at most `NOVNC_FLOW_CANCEL_GRACE_SECONDS`
+- [x] 3.4 Implement `shutdown()` so it cancels every local flow and waits at most `NOVNC_FLOW_CANCEL_GRACE_SECONDS`
       in total. Verify with a test using one monitor double that finishes on cancel and one that never does,
       asserting the call returns inside the grace, that both slots are free and both Redis records gone afterwards,
       and that a record written by a second registry on the same fake Redis is untouched.
-- [ ] 3.6 Prove the registry is safe with several containers (owner answer 87 of 2026-10-08): two registry instances
+- [x] 3.6 Prove the registry is safe with several containers (owner answer 87 of 2026-10-08): two registry instances
       on one fake Redis stand for two containers. Verify with tests in `tests/reader/novnc/test_flow_registry.py`
       that a flow reserved on the first is found and joined from the second with the same `flow_id`, `vnc_url` and
       `window`, that two reserves of one key started together on both produce exactly one flow and one join, that
@@ -109,23 +109,23 @@ Task 3.5 removed by owner decision 93 of 2026-10-08.
 
 ## 4. The strategy
 
-- [ ] 4.1 Rewrite `NoVNCStrategy.get_html` to compute the flow key from `registrable_domain(url)` and the effective
+- [x] 4.1 Rewrite `NoVNCStrategy.get_html` to compute the flow key from `registrable_domain(url)` and the effective
       profile, call `registry.find(key)` and, on a hit, raise `HumanInterventionRequiredException` carrying the
       existing flow's `vnc_url` and `flow_id` with `joined=True`, without launching anything. Verify with a test
       asserting a second call for the same domain and profile produces no second `chromium.launch`, no second
       monitor task, and the same `flow_id` and `vnc_url` as the first.
-- [ ] 4.2 On a miss, reserve a slot, resolve the VNC URL, create the monitor task, attach it, and raise. When the
+- [x] 4.2 On a miss, reserve a slot, resolve the VNC URL, create the monitor task, attach it, and raise. When the
       reserve loses the `SET NX` write to another request, raise the 428 of the existing flow with `joined=True`
       instead. Verify with a test asserting a failed VNC resolution releases the slot and deletes the Redis record
       before the exception propagates and leaves the registry empty, and a test asserting a lost write launches no
       browser.
-- [ ] 4.3 Assert the cap path end to end from the strategy: with the cap patched to 2, two distinct domains each get
+- [x] 4.3 Assert the cap path end to end from the strategy: with the cap patched to 2, two distinct domains each get
       a window and the third raises `NoVNCFlowBusyException` carrying `active_flows=2` and `max_concurrent_flows=2`.
       Verify in the rewritten `tests/reader/strategies/test_novnc_concurrency.py`.
-- [ ] 4.4 Delete `_NoVNCFlowLock`, `_novnc_flow_lock`, `_active_monitor_tasks` and `_CDP_REMOTE_DEBUGGING_PORT`, and
+- [x] 4.4 Delete `_NoVNCFlowLock`, `_novnc_flow_lock`, `_active_monitor_tasks` and `_CDP_REMOTE_DEBUGGING_PORT`, and
       delete `tests/reader/strategies/test_novnc_flow_lock.py`. Verify by grepping `src/` and `tests/` for each of
       the four names and getting no matches, and by the suite still passing the coverage gate.
-- [ ] 4.5 Resolve the `vnc_url` of a new flow, when `NOVNC_PUBLIC_URL` is set, as
+- [x] 4.5 Resolve the `vnc_url` of a new flow, when `NOVNC_PUBLIC_URL` is set, as
       `<NOVNC_PUBLIC_URL>/novnc/<hostname>/vnc.html?autoconnect=true&path=novnc/<hostname>/websockify`, with
       `<hostname>` this container's own host name read from the container itself (`socket.gethostname()`, the same
       value as `HOSTNAME`), and through today's `PUBLIC_VNC_URL` resolution and the one Ngrok tunnel when it is unset
@@ -138,86 +138,86 @@ Task 3.5 removed by owner decision 93 of 2026-10-08.
 
 ## 5. The monitor
 
-- [ ] 5.1 Change `_monitor_for_cookies` to take a `NoVNCFlow` and to launch with
+- [x] 5.1 Change `_monitor_for_cookies` to take a `NoVNCFlow` and to launch with
       `--remote-debugging-port=0`, `--remote-debugging-address=127.0.0.1` and the flow's own window position and
       size. Verify with a test capturing the launch arguments of two concurrent flows and asserting neither carries
       `9222`, both carry port `0`, and their `--window-position` values differ.
-- [ ] 5.2 Make the `finally` close only this flow's browser and release only this flow's slot, each wrapped so a
+- [x] 5.2 Make the `finally` close only this flow's browser and release only this flow's slot, each wrapped so a
       failure in one cannot skip the other. Verify with a test where `browser.close()` raises, asserting the slot is
       still released and the outcome metric is still recorded.
-- [ ] 5.3 Catch `asyncio.CancelledError` explicitly: record the outcome `cancelled`, close the browser, release the
+- [x] 5.3 Catch `asyncio.CancelledError` explicitly: record the outcome `cancelled`, close the browser, release the
       slot, re-raise. Verify with a test cancelling a running monitor and asserting the browser was closed, the slot
       freed, the `cancelled` outcome recorded, and the `CancelledError` observed by the awaiting caller.
-- [ ] 5.4 Prove failure isolation: with two flows in flight, make one raise inside its poll loop and assert the
+- [x] 5.4 Prove failure isolation: with two flows in flight, make one raise inside its poll loop and assert the
       other's task is still running, its browser is still open, its slot is still held, and its session record is
       untouched. Verify in `tests/reader/strategies/test_novnc_concurrency.py`.
-- [ ] 5.5 Prove a capture survives a later failure of its own flow: save a state, then make the monitor raise, and
+- [x] 5.5 Prove a capture survives a later failure of its own flow: save a state, then make the monitor raise, and
       assert the record written before the failure is still present and unmodified. Verify no code path in the
       monitor calls `clear_session` by asserting it against a mocked cookie manager across all four outcomes.
 
 ## 6. Lifecycle
 
-- [ ] 6.1 Start a periodic sweeper task in `create_app`'s lifespan every `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS`, sweeping
+- [x] 6.1 Start a periodic sweeper task in `create_app`'s lifespan every `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS`, sweeping
       only this process's flows and taking no Redis lock, and cancel it in the `finally`. Verify with a test driving the
       lifespan with the setting overridden to a short interval, asserting the sweep ran at least twice and that the task is cancelled on
       exit.
-- [ ] 6.2 Call `registry.shutdown()` in the lifespan `finally`, before `browser_pool.stop()`. Verify with a test
+- [x] 6.2 Call `registry.shutdown()` in the lifespan `finally`, before `browser_pool.stop()`. Verify with a test
       asserting a live flow's monitor is cancelled and its browser closed when the lifespan exits, and that the
       ordering against `browser_pool.stop()` is the one specified.
-- [ ] 6.3 Assert the sweeper never raises out of its own loop: make one sweep raise and assert the task is still
+- [x] 6.3 Assert the sweeper never raises out of its own loop: make one sweep raise and assert the task is still
       running afterwards and the exception was logged. Verify the test fails if the guard is removed.
 
 ## 7. The contract
 
-- [ ] 7.1 Add `flow_id`, `joined` and `window` to `HumanInterventionRequiredException`, to the extension members of
+- [x] 7.1 Add `flow_id`, `joined` and `window` to `HumanInterventionRequiredException`, to the extension members of
       the `human_intervention_required` entry of the service's `ErrorRegistry` (the REST problem body that
       `add-ascend-python-common` builds), and to the status object `mcp_server.web_read` returns. Verify with tests
       asserting the pre-existing members (`code`, `detail`, `intervention_type`, `vnc_url` on REST, `status`,
       `intervention_type`, `vnc_url`, `message` on MCP) are byte-identical to before this change for the same
       inputs, and that the three new keys are present with the values from the flow.
-- [ ] 7.2 Add `active_flows`, `max_concurrent_flows` and `flows` to `NoVNCFlowBusyException`, to the extension
+- [x] 7.2 Add `active_flows`, `max_concurrent_flows` and `flows` to `NoVNCFlowBusyException`, to the extension
       members of the `novnc_busy` registry entry (REST problem body) and to the two MCP status objects, and populate
       them and `holder_url` and `holder_profile` from the local flows of the refusing container, oldest first. Each
       entry of `flows` is the flow shape of `design.md` Decision 9, the same one the listing returns. Verify with a
       test at a cap of 3 asserting `holder_url` names the oldest flow and `flows` lists all three in the flow shape
       with a positive `expires_in_seconds` each.
-- [ ] 7.3 Add `GET /api/v2/session/interventions` to `rest_endpoints.py` and `session_interventions` to
+- [x] 7.3 Add `GET /api/v2/session/interventions` to `rest_endpoints.py` and `session_interventions` to
       `mcp_server.py`, both returning the envelope in `design.md` Decision 9 from `active()`, so the flows of every
       container are listed. Verify with tests asserting an empty registry returns `active_flows: 0` with an empty
       list, that a populated one lists each flow once in the flow shape with its window and slot, that a flow written
       by a second registry on the same fake Redis is listed, that the response carries no cookie, storage-state or
       page content, and that both surfaces return the same payload for the same registry state.
-- [ ] 7.4 Update the MCP tool docstrings for `web_read` and `session_establish` so an agent is told to surface the
+- [x] 7.4 Update the MCP tool docstrings for `web_read` and `session_establish` so an agent is told to surface the
       window's slot alongside the `vnc_url` when several windows may be open. Verify the docstrings still name
       `vnc_url` and `status` exactly as ADR-003 requires, with a test asserting both substrings are present.
-- [ ] 7.5 Update the OpenAPI examples `_CAPTCHA_EXAMPLE` and `_LOGIN_EXAMPLE` in `rest_endpoints.py` to the problem
+- [x] 7.5 Update the OpenAPI examples `_CAPTCHA_EXAMPLE` and `_LOGIN_EXAMPLE` in `rest_endpoints.py` to the problem
       body of `design.md` Decision 9, and add a busy example in the same shape. Verify by asserting each example validates against the shape the handler actually produces,
       rather than by eye.
 
 ## 8. Observability
 
-- [ ] 8.1 Add `NOVNC_ACTIVE_FLOWS` (Gauge) and `NOVNC_FLOWS_RECLAIMED_TOTAL` to `src/observability/metrics.py`, and
+- [x] 8.1 Add `NOVNC_ACTIVE_FLOWS` (Gauge) and `NOVNC_FLOWS_RECLAIMED_TOTAL` to `src/observability/metrics.py`, and
       the label `joined` to the existing `HUMAN_INTERVENTION_TOTAL`, with the labels in `design.md`. No counter of
       flows started or joined is added beside it (owner answer 93 of 2026-10-08, review item C12). Verify with cases
       in `tests/observability/test_metrics.py` asserting each name, type and label set.
-- [ ] 8.2 Wire them: every place that increments `HUMAN_INTERVENTION_TOTAL` (the REST handler and the two MCP sites)
+- [x] 8.2 Wire them: every place that increments `HUMAN_INTERVENTION_TOTAL` (the REST handler and the two MCP sites)
       passes the exception's `joined`, reserve sets the gauge, join does not touch the gauge, the cap path increments
       the existing `NOVNC_FLOW_BUSY_TOTAL`, and each reclamation increments with its own reason. Verify with a test
       that runs one of each path and asserts the exact counter deltas, including `joined="false"` for a new flow,
       `joined="true"` for a join, and that join leaves the gauge alone.
-- [ ] 8.3 Add `cancelled` as an outcome on the `6-novnc-monitor` label of `STRATEGY_ATTEMPTS_TOTAL`. Verify with a
+- [x] 8.3 Add `cancelled` as an outcome on the `6-novnc-monitor` label of `STRATEGY_ATTEMPTS_TOTAL`. Verify with a
       test asserting all four outcomes are reachable and that each maps to the path it names.
-- [ ] 8.4 Put `flow_id` and `slot` on every registry, strategy and monitor log line, and the request identifier on
+- [x] 8.4 Put `flow_id` and `slot` on every registry, strategy and monitor log line, and the request identifier on
       the reserve line. Verify with a caplog test asserting each of those lines carries the identifier, and that no
       line carries a cookie value or a storage-state fragment.
 
 ## 9. Proof that F22 stays closed
 
-- [ ] 9.1 Add `tests/reader/strategies/test_novnc_f22_regression.py` driving two concurrent flows for two different
+- [x] 9.1 Add `tests/reader/strategies/test_novnc_f22_regression.py` driving two concurrent flows for two different
       domains through the real `get_html` path with a Playwright double. Assert two distinct `chromium.launch`
       calls, that no two launches share a `--remote-debugging-port` value, that no launch carries `9222`, and that
       the two `--window-position` values differ. Verify the test fails if the fixed port is reintroduced.
-- [ ] 9.2 In the same file, assert the capture half of F22: both flows resolve, and two session records exist under
+- [x] 9.2 In the same file, assert the capture half of F22: both flows resolve, and two session records exist under
       two distinct `session:{domain}:{profile}` keys with the right content in each. Verify the test fails if both
       monitors are pointed at one key.
 - [ ] 9.3 Run the full gate and record the figure:
@@ -232,7 +232,7 @@ Task 3.5 removed by owner decision 93 of 2026-10-08.
 
 ## 10. Documentation and decisions
 
-- [ ] 10.1 Add every setting of tasks 1.1 and 1.5 to the tables in `apps/ascend-web-hunter/AGENTS.md`, `README.md` and
+- [x] 10.1 Add every setting of tasks 1.1 and 1.5 to the tables in `apps/ascend-web-hunter/AGENTS.md`, `README.md` and
       `docs/configuration.md`, the rows of `docs/configuration.md` in the same commit as the setting, each with its
       default and its description ending with "Added by `open-several-novnc-windows-at-once`." (owner rule 98 of
       2026-10-08, the per-service configuration reference), with `NOVNC_MAX_CONCURRENT_FLOWS` documented as a per container memory constraint and
@@ -246,7 +246,7 @@ Task 3.5 removed by owner decision 93 of 2026-10-08.
       Verify each setting name of tasks 1.1 and 1.5 appears in all three files, that every row this change adds to
       `docs/configuration.md` ends with "Added by `open-several-novnc-windows-at-once`.", and that no stale reference to the single-flow
       behaviour remains, by grepping for "only one" and "one at a time" across the module's docs.
-- [ ] 10.2 Write `docs/architecture/decisions/ADR-013-concurrent-human-intervention-windows.md` in the existing
+- [x] 10.2 Write `docs/architecture/decisions/ADR-013-concurrent-human-intervention-windows.md` in the existing
       ADR format: the concurrency model, the per-flow browser and ephemeral CDP port, the cascade layout, the join
       rule, and the widened unauthenticated VNC surface with the recommendation to set `VNC_PASSWORD`. Include the
       rejected alternatives from `design.md` Decisions 4 and 5 with their reasons. Verify the file follows the
@@ -254,12 +254,12 @@ Task 3.5 removed by owner decision 93 of 2026-10-08.
       new listing endpoint is read-only and unauthenticated, exactly like `vnc_url` in the 428 body, that it returns
       no cookies, storage state or page content, and that it discloses only `vnc_url` values the 428 body already
       returns. ADR-009 to ADR-012 already exist, so this record is ADR-013.
-- [ ] 10.3 Amend ADR-003 rather than superseding it: mark the single-flow paragraph and the
+- [x] 10.3 Amend ADR-003 rather than superseding it: mark the single-flow paragraph and the
       `--remote-debugging-port=9222` security bullet as superseded by ADR-013, with the date, and leave the rest of
       the record intact, including the amendment `add-ascend-python-common` made, which marks the 428 and 409 body
       shape as superseded by the problem body. Verify ADR-003's status line and its other content are unchanged, and that the risk it
       recorded ("No cap on concurrent tasks exists today") now points at the setting that answers it.
-- [ ] 10.4 Add one evidence line to F22 in `docs/DEFECT_REGISTER.md` recording that the collision it names cannot
+- [x] 10.4 Add one evidence line to F22 in `docs/DEFECT_REGISTER.md` recording that the collision it names cannot
       recur under the per-flow model, naming this change and the regression test in task 9.1. Verify F22's status
       is not changed and no other row is touched.
 - [ ] 10.5 Bump `version` in `apps/ascend-web-hunter/pyproject.toml`, the version line in
