@@ -114,6 +114,7 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | NGROK_AUTHTOKEN | Yes | Authenticates the ngrok tunnel. |
 | REDIS_URL | No | Where ascend-web-hunter's cookie/session cache lives. Defaults to the bundled Redis (`redis://redis:6379/0`); override to point at an external Redis instead. See [Prerequisites](#prerequisites). |
 | WEB_HUNTER_API_PORT | No | Service port. Code default `7021` applies when unset. |
+| WEB_HUNTER_HOST_PORT | No | Host port of the service. Default `7021` applies when unset. |
 | API_HOST | No | Bind address. Code default `0.0.0.0` applies when unset. |
 | LOG_LEVEL | No | Logging level. Code default `INFO` applies when unset. |
 | LOG_FORMAT | No | Log format, `json` or `color`. Code default `json` applies when unset. |

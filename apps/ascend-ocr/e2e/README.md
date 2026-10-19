@@ -227,7 +227,7 @@ the canonical fan-out shape and measured timings.
 5. The object store is reachable at `http://localhost:9070`, because every successful reading writes its result
    there. `docker logs ascend-ocr 2>&1 | grep "Result store"` should show the endpoint with `[answered]`; a
    `[did NOT answer]` line means every job will finish with `RESULT_STORE_UNAVAILABLE`.
-6. For test 6: the ascend-ocr container's `MCP_ALLOWED_HOSTS` includes `host.docker.internal` (the MCP tool fetches
+6. For test 6: the ascend-ocr container's `ALLOWED_PRIVATE_HOSTS` includes `host.docker.internal` (the MCP tool fetches
    the fixture back out over HTTP after the spec uploads it, rather than reading a container-mounted path).
 
 If the ascend-ocr startup log shows the warmup step failed for the default language, fix that before running the suite,
@@ -284,7 +284,7 @@ Numbered by setup cost. Easiest first.
 | 5  | [testing/5-mcp-tools-list-test.md](testing/5-mcp-tools-list-test.md) | `tools/list` advertises exactly `ocr_submit`, `ocr_job_status`, `ocr_list_jobs` and `ocr_cancel_job`, `ocr_submit` advertises `quality` (`normal` or `high`, default `high`) and `straighten` (default `false`), and the removed `ocr_process` is not advertised under any name. |
 | 6  | [testing/6-mcp-ocr-test.md](testing/6-mcp-ocr-test.md) | `ocr_submit` with `file_uri` set to an object-store URL answers with a job record, `ocr_job_status` reaches `succeeded`, and the stored Markdown carries the canary substring. The fixture is uploaded to the object store's `e2e-fixtures` bucket during Reset state, and ascend-ocr fetches it over HTTP, no container mount involved. |
 | 7  | [testing/7-ready-endpoint-test.md](testing/7-ready-endpoint-test.md) | `GET /ready` returns HTTP 200 with `status="ready"`, `engine_warm=true` once lifespan warm-up has completed, and reports `jobs_queued` and `jobs_running`. Distinct from `/health` per ADR-004. |
-| 8  | [testing/8-mcp-ssrf-rejection-test.md](testing/8-mcp-ssrf-rejection-test.md) | The MCP SSRF guard rejects a link-local IMDS target (`169.254.169.254`) unless it is on `MCP_ALLOWED_HOSTS`, without any outbound connection attempt. |
+| 8  | [testing/8-mcp-ssrf-rejection-test.md](testing/8-mcp-ssrf-rejection-test.md) | The MCP SSRF guard rejects a link-local IMDS target (`169.254.169.254`) unless it is on `ALLOWED_PRIVATE_HOSTS`, without any outbound connection attempt. |
 | 9  | [testing/9-mcp-bad-scheme-test.md](testing/9-mcp-bad-scheme-test.md) | The MCP tool rejects an `ftp://` URI, a `data:` URI and a bare Windows path (read as the scheme `c`) with `UNSAFE_URI`, the scheme guard naming each scheme, and queues nothing. |
 | 10 | [testing/10-mcp-credentials-rejection-test.md](testing/10-mcp-credentials-rejection-test.md) | The MCP tool rejects URIs carrying `user:pass@` userinfo before any DNS lookup or fetch, and the credentials never reach the logs. |
 | 11 | [testing/11-mcp-file-uri-jail-test.md](testing/11-mcp-file-uri-jail-test.md) | `file://` URIs are rejected when `MCP_FILE_URI_ROOT` is unset (default secure posture) and nothing is queued. On a throwaway `ascend-ocr-jail` container started with the root set, a path that `realpath` resolves outside the root is refused by the jail itself, and the container is removed afterwards. |

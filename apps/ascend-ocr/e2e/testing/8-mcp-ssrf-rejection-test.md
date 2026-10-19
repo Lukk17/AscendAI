@@ -4,7 +4,7 @@
 
 - `ocr_submit` with a `file_uri` pointing at the link-local metadata address `169.254.169.254` is refused by the
   SSRF guard, which resolves the host and rejects private, loopback, link-local, multicast and reserved addresses
-  unless the hostname is on `MCP_ALLOWED_HOSTS`.
+  unless the hostname is on `ALLOWED_PRIVATE_HOSTS`.
 - The refusal carries the `UNSAFE_URI` code.
 - No outbound connection is attempted, no identifier is issued, and nothing is queued.
 

@@ -39,6 +39,8 @@ workflow does not read; if the two ever disagree, this file wins for release pur
 - The shared library is cut at `1.0.0` now that all four services are migrated. The service pin moves to
   `ascend-python-common[fetch]==1.0.0`; this entry stays the one version of
   this change.
+- The allow list setting is now `ALLOWED_PRIVATE_HOSTS` (renamed from `MCP_ALLOWED_HOSTS` on 2026-10-04); the
+  service refuses to start while the old name is set.
 
 ### Fixed
 - The IDE Docker run configuration declares `--add-host=host.docker.internal:host-gateway`, sets `OCR_RESULT_S3_ENDPOINT` and `OCR_RESULT_S3_PUBLIC_ENDPOINT`, reads the store credentials from the repository `.env` through `--env-file`, and drops the deleted `OCR_REQUEST_TIMEOUT`. `fix-linux-docker-host-access`.

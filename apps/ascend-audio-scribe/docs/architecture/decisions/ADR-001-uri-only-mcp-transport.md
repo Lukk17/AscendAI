@@ -67,3 +67,10 @@ a `validation: ` MCP tool error. (`src/adapters/download_service.py`, `ascend-py
 
 - **DNS rebinding**: a hostname that initially resolves to a public IP could re-resolve to a private one between the
   guard check and the connect. Mitigation: the download connects through `PinnedResolver`, so the connection goes only to the checked addresses.
+
+---
+
+## Amendment 2026-10-04: the setting is now `ALLOWED_PRIVATE_HOSTS` (add-ascend-python-common, owner answer 68.2)
+
+The allow list setting this record names is `ALLOWED_PRIVATE_HOSTS`. It was renamed from `MCP_ALLOWED_HOSTS` on
+2026-10-04; every other setting keeps its name. The status line above and the rest of this record are unchanged.

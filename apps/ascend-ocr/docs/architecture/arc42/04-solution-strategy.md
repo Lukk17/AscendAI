@@ -101,6 +101,6 @@ single worker" in [07-deployment-view.md](07-deployment-view.md) for the ceiling
 
 Accepting arbitrary URIs in the MCP tool is a classic SSRF surface. The solution is a layered guard described in
 [ADR-001](../decisions/ADR-001-mcp-file-transport-uri-only.md): a small explicit allowlist for internal docker
-hostnames (`MCP_ALLOWED_HOSTS`), combined with a DNS-resolution IP block that rejects private, loopback, link-local,
+hostnames (`ALLOWED_PRIVATE_HOSTS`), combined with a DNS-resolution IP block that rejects private, loopback, link-local,
 and multicast addresses. The `file://` scheme is disabled by default and requires an operator opt-in via
 `MCP_FILE_URI_ROOT`.

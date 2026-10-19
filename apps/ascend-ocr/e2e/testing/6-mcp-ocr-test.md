@@ -37,12 +37,12 @@ curl -fsS http://localhost:9070/_floci/health
 
 Expect HTTP 200 with `"s3":"running"` in the JSON body.
 
-Check the ascend-ocr container has `MCP_ALLOWED_HOSTS` including `host.docker.internal`. The MCP tool's SSRF guard
+Check the ascend-ocr container has `ALLOWED_PRIVATE_HOSTS` including `host.docker.internal`. The MCP tool's SSRF guard
 blocks RFC1918 destinations by default, and the docker-internal `host.docker.internal` host-gateway resolves to a
 private address. See [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md).
 
 ```bash
-docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS
+docker exec ascend-ocr printenv ALLOWED_PRIVATE_HOSTS
 ```
 
 Expect `host.docker.internal,localhost,127.0.0.1`, or any superset containing `host.docker.internal`.

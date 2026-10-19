@@ -79,7 +79,7 @@ compose `healthcheck` stanza should be set). The operator should configure the l
 | `OCR_TEXT_RECOGNITION_MODEL` | `PP-OCRv6_small_rec` | Recognition model for the same languages. The Dockerfile bakes whichever pair these two name. |
 | `SUPPORTED_LANGUAGES` | `en,pl,de,fr,es,it,pt,nl,ch,japan` | Allowlist of valid language codes. A submission in any other code is refused with 400 `UNSUPPORTED_LANGUAGE` before anything is queued. `ru` and `korean` are switched off, see [ADR-011](../decisions/ADR-011-explicit-preprocessing-and-straighten.md). |
 | `MCP_FILE_URI_ROOT` | _(unset)_ | Enables `file://` support; URIs must resolve inside this directory. Unset = `file://` disabled. |
-| `MCP_ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `host.docker.internal,localhost,127.0.0.1` for the standard compose stack, since the S3-compatible object store is reached over the host-published endpoint. |
+| `ALLOWED_PRIVATE_HOSTS` | _(empty)_ | Comma-separated hostnames exempt from the SSRF IP block. Set to `host.docker.internal,localhost,127.0.0.1` for the standard compose stack, since the S3-compatible object store is reached over the host-published endpoint. |
 | `MCP_DOWNLOAD_TIMEOUT_SECONDS` | `30` | Total timeout for the `aiohttp` download session. |
 | `OCR_WORKER_COUNT` | `1` | Inference workers and admission-gate permits, from one setting. See "Memory model and the single worker" below. |
 | `OCR_PAGE_ALLOWANCE_HEADROOM` | `4.5` | The only configured time input: a page is allowed this multiple of its own engine's worst measured page, 112.95 s on the small pair every supported language reads with, 4.5 times a dense Polish A4 prose page measured at 25.1 s with the engine's threads capped to the container's CPUs (the earlier 50.4 s was measured with PaddleOCR's 10 threads throttled under 4 CPUs). See [ADR-010](../decisions/ADR-010-quality-modes-and-service-side-rendering.md). |
@@ -105,7 +105,7 @@ The `compose.yaml` service block sets `API_PORT`, `API_HOST`, `LOG_LEVEL`, `DEFA
 `OCR_RESULT_S3_BUCKET` to `ocr-results`, and the credentials from the host environment. It no longer sets
 `OCR_REQUEST_TIMEOUT` or `OCR_PAGE_TIMEOUT_SECONDS`: both are deleted, and the per-page allowance is derived in
 code from `OCR_PAGE_ALLOWANCE_HEADROOM` and each engine's measured worst page. It also
-sets `MCP_ALLOWED_HOSTS` to `host.docker.internal,localhost,127.0.0.1` and `MCP_DOWNLOAD_TIMEOUT_SECONDS` to 30,
+sets `ALLOWED_PRIVATE_HOSTS` to `host.docker.internal,localhost,127.0.0.1` and `MCP_DOWNLOAD_TIMEOUT_SECONDS` to 30,
 which is what lets the MCP e2e tests reach the host-published object store without any manual addition. See
 [e2e/testing/6-mcp-ocr-test.md](../../../e2e/testing/6-mcp-ocr-test.md).
 

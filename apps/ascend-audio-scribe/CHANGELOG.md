@@ -32,6 +32,8 @@ workflow does not read; if the two ever disagree, this file wins for release pur
   transcription routes and tools; `/health`, `/ready`, `/metrics`, and `tools/list` are never limited.
 - `API_PORT` (default `7017`) is the only port setting. Downloads go through the library guard with redirect
   re-checking and address pinning; `file://` stays jailed to `MCP_FILE_URI_ROOT`.
+- The allow list setting is now `ALLOWED_PRIVATE_HOSTS` (renamed from `MCP_ALLOWED_HOSTS` on 2026-10-04); the
+  service refuses to start while the old name is set.
 - Docs updated: `AGENTS.md`, `README.md`, ADR-001, ADR-002, and e2e spec 1 with its template now assert the `400`
   problem body.
 

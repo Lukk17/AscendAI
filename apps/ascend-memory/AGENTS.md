@@ -109,6 +109,7 @@ entirely, `resolve_provider()` (`src/service/memory_client.py:25`) falls back to
   Only exercised when `MEM0_INFER_MEMORY=true`.
 - `MEM0_INFER_MEMORY` - Enable memory inference (default: false)
 - `API_PORT` - Service port (default: 7020)
+- `MEMORY_HOST_PORT` - Host port of the service (default: 7020)
 - `API_HOST` - Bind address (default: `0.0.0.0`)
 - `LOG_LEVEL` - Logging level (default: `INFO`)
 - `LOG_FORMAT` - Log format, `json` or `color` (default: `json`)
@@ -121,8 +122,8 @@ entirely, `resolve_provider()` (`src/service/memory_client.py:25`) falls back to
 - `REDIS_URL` - Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-memory` (default: `redis://127.0.0.1:6379/0`)
 
 `API_HOST`, `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
-`ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`. The service reads
-no `MCP_ALLOWED_HOSTS` (it fetches no caller URI) and has no `MCP_PORT`.
+`ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`. The service has no
+`ALLOWED_PRIVATE_HOSTS` (it fetches no caller URI) and has no `MCP_PORT`.
 - `QDRANT_HOST` / `QDRANT_PORT` - Qdrant connection
 - `DEFAULT_USER_ID` - Fallback `user_id` when a REST or MCP caller omits it (default: `default_user`)
 - `MAX_USER_ID_LENGTH` - Input cap on `user_id` length (default: `128`)

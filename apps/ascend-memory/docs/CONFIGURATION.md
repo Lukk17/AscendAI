@@ -12,6 +12,7 @@ invoked, so a single deployment can serve `provider=lmstudio`, `provider=openai`
 | :----------------------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------- |
 | `API_HOST`               | `0.0.0.0`                                                          | Bind address.                                                            |
 | `API_PORT`               | `7020`                                                             | Service port. Compose reads it as `MEMORY_API_PORT`.                     |
+| `MEMORY_HOST_PORT`       | `7020`                                                             | Host port of the service. Added by `add-ascend-python-common`.           |
 | `LOG_LEVEL`              | `INFO`                                                             | Log level.                                                               |
 | `LOG_FORMAT`             | `json`                                                             | `json` for log sinks, `color` for local terminal output.                 |
 | `OTEL_SERVICE_NAME`      | `ascend-memory`                                                    | Service name carried on every exported span. Fixed in `compose.yaml`.    |

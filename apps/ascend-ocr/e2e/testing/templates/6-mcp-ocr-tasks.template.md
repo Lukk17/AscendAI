@@ -11,7 +11,7 @@ Copy this file to `../runs/<UTC-timestamp>_6-mcp-ocr-tasks.md` before starting a
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
 - [ ] Object store answers on `http://localhost:9070/_floci/health`
-- [ ] `MCP_ALLOWED_HOSTS` contains `host.docker.internal`
+- [ ] `ALLOWED_PRIVATE_HOSTS` contains `host.docker.internal`
 
 ### Reset state
 

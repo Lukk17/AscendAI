@@ -68,9 +68,18 @@ The settings of `ascend-memory` are listed in its own reference, [apps/ascend-me
 | `ascend-audio-scribe` | `HF_CACHE_ROOT` | `hf-cache` | The source of the `/hf-cache` mount, the Hugging Face model cache, unset means a named volume and a host path means a bind mount. See [Reaching the host from a container](DEPLOYMENT.md#reaching-the-host-from-a-container). | `fix-linux-docker-host-access` |
 | `ascend-audio-scribe` | `ASCEND_AUDIO_SCRIBE_MEDIA_ROOT` | `ascend-audio-scribe-media` | The source of the `/audio` mount, unset means a named volume and a host path means a bind mount. See [Reaching the host from a container](DEPLOYMENT.md#reaching-the-host-from-a-container). | `fix-linux-docker-host-access` |
 | `ascend-audio-scribe` | `API_PORT` | `7017` | Service port. Compose reads it as `AUDIO_SCRIBE_API_PORT`. | `existing` |
+| `ascend-audio-scribe` | `AUDIO_SCRIBE_HOST_PORT` | `7017` | Host port of the service. | `add-ascend-python-common` |
 | `ascend-audio-scribe` | `API_HOST` | `0.0.0.0` | Bind address. | `existing` |
 | `ascend-audio-scribe` | `LOG_LEVEL` | `INFO` | Log level. | `existing` |
 | `ascend-audio-scribe` | `LOG_FORMAT` | `json` | `json` for log sinks, `color` for local terminal output. | `existing` |
+| `ascend-audio-scribe` | `RATE_LIMIT_DEFAULT` | `600/minute` | Flood-protection rate limit for REST routes and MCP tools. Compose reads it as `AUDIO_SCRIBE_RATE_LIMIT_DEFAULT`. | `add-ascend-python-common` |
+| `ascend-audio-scribe` | `RATE_LIMIT_TRANSCRIBE` | `60/minute` | Stricter limit on the four transcription routes and tools. | `add-ascend-python-common` |
+| `ascend-audio-scribe` | `REDIS_URL` | `redis://127.0.0.1:6379/0` | Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-audio-scribe`. | `add-ascend-python-common` |
+| `ascend-audio-scribe` | `READINESS_PROBE_TIMEOUT_SECONDS` | `3` | Budget of each readiness probe. | `add-ascend-python-common` |
+| `ascend-audio-scribe` | `STARTUP_PROBE_TIMEOUT_SECONDS` | `2` | Time each startup banner check may take. | `add-ascend-python-common` |
+| `ascend-audio-scribe` | `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000` | `max-age` of the `strict-transport-security` response header. | `add-ascend-python-common` |
+| `ascend-audio-scribe` | `FETCH_MAX_REDIRECT_HOPS` | `10` | Redirect hops the URI fetch guard follows. Compose reads it as `AUDIO_SCRIBE_FETCH_MAX_REDIRECT_HOPS`. | `add-ascend-python-common` |
+| `ascend-audio-scribe` | `OTEL_SDK_DISABLED` | `false` | OpenTelemetry's standard switch, `true` turns the SDK off. | `add-ascend-python-common` |
 | `ascend-audio-scribe` | `OPENAI_API_KEY` | (none, secret in .env) | Required only for the OpenAI transcription backend. | `existing` |
 | `ascend-audio-scribe` | `HF_TOKEN` | (none, secret in .env) | Hugging Face Inference API token. Required only for the HF transcription backend. | `existing` |
 | `ascend-audio-scribe` | `HF_HOME` | `/hf-cache` | Fixed in `compose.yaml`. The Hugging Face cache directory inside the container. | `existing` |

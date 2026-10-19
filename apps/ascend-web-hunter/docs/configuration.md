@@ -11,6 +11,7 @@ against environment variables and `.env`. The source of truth is
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `API_PORT` | `7021` | Service port. Compose passes `WEB_HUNTER_API_PORT` |
+| `WEB_HUNTER_HOST_PORT` | `7021` | Host port of the service. Added by `add-ascend-python-common`. |
 | `API_HOST` | `0.0.0.0` | Bind address (deliberately broad for the container case) |
 | `LOG_LEVEL` | `INFO` | `DEBUG | INFO | WARNING | ERROR | CRITICAL` |
 | `LOG_FORMAT` | `json` | `json` for log sinks, `color` for a local terminal |

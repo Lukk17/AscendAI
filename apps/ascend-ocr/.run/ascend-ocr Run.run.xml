@@ -43,7 +43,7 @@
               <option name="value" value="2" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>
-              <option name="name" value="MCP_ALLOWED_HOSTS" />
+              <option name="name" value="ALLOWED_PRIVATE_HOSTS" />
               <option name="value" value="host.docker.internal,localhost,127.0.0.1" />
             </DockerEnvVarImpl>
             <DockerEnvVarImpl>

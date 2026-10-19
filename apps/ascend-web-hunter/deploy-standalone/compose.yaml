@@ -158,7 +158,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     ports:
-      - "${WEB_HUNTER_API_PORT:-7021}:${WEB_HUNTER_API_PORT:-7021}"
+      - "${WEB_HUNTER_HOST_PORT:-7021}:${WEB_HUNTER_API_PORT:-7021}"
     extra_hosts:
       # Docker Engine on Linux does not define this name on its own.
       # REDIS_URL below depends on it resolving to the Docker host.

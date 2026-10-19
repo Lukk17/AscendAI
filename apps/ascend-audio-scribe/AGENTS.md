@@ -121,6 +121,7 @@ docker build -t ascend-audio-scribe:latest .
 - Environment variables: `OPENAI_API_KEY`, `HF_TOKEN`, `HF_HOME`
 - `API_HOST` - Bind address (default: `0.0.0.0`)
 - `API_PORT` - Service port (default: 7017)
+- `AUDIO_SCRIBE_HOST_PORT` - Host port of the service (default: 7017)
 - `LOG_LEVEL` - Logging level (default: `INFO`)
 - `LOG_FORMAT` - Log format, `json` or `color` (default: `json`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP trace export endpoint, export whenever it is set, unset by default

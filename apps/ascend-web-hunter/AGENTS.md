@@ -122,6 +122,7 @@ docker build -t ascend-web-hunter:latest .
 
 - `SEARXNG_BASE_URL` - SearXNG endpoint (default: `http://searxng:8080`)
 - `API_PORT` - Service port (default: 7021)
+- `WEB_HUNTER_HOST_PORT` - Host port of the service (default: 7021)
 - `LOG_LEVEL` - Logging level (default: `INFO`)
 - `LOG_FORMAT` - Log format, `json` or `color` (default: `json`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP trace export endpoint, export whenever it is set, unset by default
