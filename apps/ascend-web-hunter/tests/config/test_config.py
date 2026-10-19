@@ -69,23 +69,6 @@ def test_blocklist_refresh_min_interval_default() -> None:
     assert settings.BLOCKLIST_REFRESH_MIN_INTERVAL_SECONDS == 60.0
 
 
-def test_content_recall_fallback_ratio_default() -> None:
-    # given
-    settings = Settings()
-
-    # then
-    assert pytest.approx(0.75) == settings.CONTENT_RECALL_FALLBACK_RATIO
-
-
-@pytest.mark.parametrize("value", ["-0.1", "1.1"])
-def test_content_recall_fallback_ratio_rejects_values_outside_the_unit_interval(value: Any) -> None:
-    # given
-    with patch.dict(os.environ, {"CONTENT_RECALL_FALLBACK_RATIO": value}):
-        # when / then
-        with pytest.raises(ValidationError):
-            Settings()
-
-
 def test_novnc_max_concurrent_flows_default() -> None:
     # given
     with patch.dict(os.environ, {}, clear=False):
@@ -758,6 +741,95 @@ def test_scroll_pause_ms_valid_override() -> None:
 def test_scroll_pause_ms_rejects_non_integer() -> None:
     # given
     with patch.dict(os.environ, {"SCROLL_PAUSE_MS": "soon"}):
+        # when / then
+        with pytest.raises(ValidationError):
+            Settings()
+
+
+_EXTRACTION_DEFAULTS: dict[str, Any] = {
+    "EXTRACTION_SCHEMA_MAX_BYTES": 16384,
+    "EXTRACTION_LLM_BASE_URL": "",
+    "EXTRACTION_LLM_MODEL": "",
+    "EXTRACTION_LLM_API_KEY": "",
+    "EXTRACTION_LLM_MAX_INPUT_CHARS": 60000,
+    "EXTRACTION_LLM_TIMEOUT_SECONDS": 60.0,
+    "RECIPE_TTL_SECONDS": 604800,
+    "RECIPE_SELECTOR_MAX_CHARS": 512,
+    "DOCUMENT_MAX_BYTES": 52428800,
+    "DOCLING_SERVE_URL": "http://docling-serve:5001",
+    "ASCEND_OCR_URL": "http://ascend-ocr:7022",
+    "OCR_ROUTE_TIMEOUT_SECONDS": 300.0,
+    "AUDIO_SCRIBE_URL": "http://ascend-audio-scribe:7017",
+    "READ_CACHE_PURGE_RECONNECT_SECONDS": 5.0,
+}
+
+_EXTRACTION_VALID_OVERRIDES: dict[str, str] = {
+    "EXTRACTION_SCHEMA_MAX_BYTES": "8192",
+    "EXTRACTION_LLM_BASE_URL": "http://localhost:11434",
+    "EXTRACTION_LLM_MODEL": "test-model",
+    "EXTRACTION_LLM_API_KEY": "test-key",
+    "EXTRACTION_LLM_MAX_INPUT_CHARS": "1000",
+    "EXTRACTION_LLM_TIMEOUT_SECONDS": "30",
+    "RECIPE_TTL_SECONDS": "3600",
+    "RECIPE_SELECTOR_MAX_CHARS": "256",
+    "DOCUMENT_MAX_BYTES": "1048576",
+    "DOCLING_SERVE_URL": "http://localhost:5001",
+    "ASCEND_OCR_URL": "http://localhost:7022",
+    "OCR_ROUTE_TIMEOUT_SECONDS": "60",
+    "AUDIO_SCRIBE_URL": "http://localhost:7017",
+    "READ_CACHE_PURGE_RECONNECT_SECONDS": "1",
+}
+
+_EXTRACTION_REJECTED: dict[str, str] = {
+    "EXTRACTION_SCHEMA_MAX_BYTES": "0",
+    "EXTRACTION_LLM_MAX_INPUT_CHARS": "0",
+    "EXTRACTION_LLM_TIMEOUT_SECONDS": "0",
+    "RECIPE_TTL_SECONDS": "59",
+    "RECIPE_SELECTOR_MAX_CHARS": "0",
+    "DOCUMENT_MAX_BYTES": "0",
+    "OCR_ROUTE_TIMEOUT_SECONDS": "0",
+    "READ_CACHE_PURGE_RECONNECT_SECONDS": "0",
+}
+
+
+def test_extraction_and_routing_setting_defaults() -> None:
+    # given
+    with patch.dict(os.environ, {}, clear=False):
+        for name in list(_EXTRACTION_DEFAULTS):
+            os.environ.pop(name, None)
+
+        # when
+        settings = Settings()
+
+        # then
+        for name, expected in _EXTRACTION_DEFAULTS.items():
+            assert getattr(settings, name) == expected
+
+
+@pytest.mark.parametrize("name", sorted(_EXTRACTION_DEFAULTS))
+def test_extraction_and_routing_setting_valid_override(name: str) -> None:
+    # given
+    raw = _EXTRACTION_VALID_OVERRIDES[name]
+
+    # when
+    with patch.dict(os.environ, {name: raw}):
+        settings = Settings()
+
+    # then
+    value = getattr(settings, name)
+    expected = _EXTRACTION_DEFAULTS[name]
+    if isinstance(expected, float):
+        assert value == pytest.approx(float(raw))
+    elif isinstance(expected, int):
+        assert value == int(raw)
+    else:
+        assert value == raw
+
+
+@pytest.mark.parametrize("name", sorted(_EXTRACTION_REJECTED))
+def test_extraction_and_routing_setting_rejects_value_outside_constraint(name: str) -> None:
+    # given
+    with patch.dict(os.environ, {name: _EXTRACTION_REJECTED[name]}):
         # when / then
         with pytest.raises(ValidationError):
             Settings()

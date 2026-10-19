@@ -238,7 +238,7 @@ async def test_beautifulsoup_extract_empty_html(patch_cookies_none: Any) -> None
 @pytest.mark.asyncio
 async def test_trafilatura_extract(patch_cookies_none: Any) -> None:
     # given
-    long_text = "Extracted content. " * 20  # 380 chars, well above READABILITY_FALLBACK_MIN_CHARS
+    long_text = "Extracted content. " * 20  # 380 chars, well above the readability output
 
     # when
     with (

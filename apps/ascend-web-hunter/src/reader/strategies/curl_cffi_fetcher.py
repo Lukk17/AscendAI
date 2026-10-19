@@ -1,22 +1,17 @@
-import ipaddress
 import logging
 from collections.abc import Callable
 from typing import Any
 
 from ascend_python_common.startup_banner import strip_user_info
-from ascend_python_common.uri_guard import (
-    FetchPolicy,
-    FetchTarget,
-    HopAnswer,
-    UnsafeUriError,
-    check_fetch_uri,
-    follow_guarded_redirects,
-)
-from curl_cffi import CurlOpt, requests
+from ascend_python_common.uri_guard import FetchPolicy, UnsafeUriError, check_fetch_uri
+from curl_cffi import requests
 
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
+from src.fetch.pinned_fetch import _resolve_entries, follow_pinned_redirects, make_send_hop
 from src.proxy.proxy_provider import proxy_provider
+
+__all__ = ["_resolve_entries", "fetch_with_curl_cffi"]
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import (
     as_login_verdict,
@@ -38,21 +33,6 @@ def _fetch_policy() -> FetchPolicy:
         file_root=None,
         max_redirect_hops=settings.FETCH_MAX_REDIRECT_HOPS,
     )
-
-
-def _resolve_entries(target: FetchTarget) -> list[str]:
-    if target.host is None or target.port is None:
-        return []
-    try:
-        ipaddress.ip_address(target.host)
-    except ValueError:
-        pass
-    else:
-        return []
-    if not target.addresses:
-        return []
-    rendered = ",".join(f"[{a}]" if ":" in a else a for a in target.addresses)
-    return [f"{target.host}:{target.port}:{rendered}"]
 
 
 async def fetch_with_curl_cffi(
@@ -95,25 +75,16 @@ async def fetch_with_curl_cffi(
             if curl_proxies is not None:
                 extra_kwargs["proxies"] = curl_proxies
 
-            async def send_hop(target: FetchTarget) -> HopAnswer[Any]:
-                session.curl_options[CurlOpt.RESOLVE] = _resolve_entries(target)
-                hop_kwargs: dict[str, Any] = dict(extra_kwargs)
-                response = await session.get(
-                    target.url,
-                    headers=headers,
-                    cookies=flat_cookies,
-                    timeout=settings.EXTRACT_TIMEOUT,
-                    allow_redirects=False,
-                    **hop_kwargs,
-                )
-                return HopAnswer(
-                    status=response.status_code,
-                    location=response.headers.get("location"),
-                    answer=response,
-                )
+            send_hop = make_send_hop(
+                session,
+                headers,
+                flat_cookies,
+                settings.EXTRACT_TIMEOUT,
+                extra_kwargs,
+            )
 
             try:
-                final = await follow_guarded_redirects(first, policy, send_hop)
+                final = await follow_pinned_redirects(first, policy, send_hop)
             except UnsafeUriError:
                 logger.warning("%s: SSRF guard blocked redirect from %s", strategy_label, safe_url)
                 return ""

@@ -404,30 +404,120 @@ class Settings(ServiceSettings):
         ),
     )
 
-    # Group 5 - Extraction quality: readability fallback threshold
-    READABILITY_FALLBACK_MIN_CHARS: int = Field(
-        default=200,
-        description=(
-            "Minimum character count of trafilatura output below which the readability-lxml "
-            "fallback is attempted.  The higher-scoring result (by character count) is returned."
-        ),
-    )
-    CONTENT_RECALL_FALLBACK_RATIO: float = Field(
-        default=0.75,
-        ge=0.0,
-        le=1.0,
-        description=(
-            "Ratio of trafilatura's precision-mode output length to the page's plain text length "
-            "(BeautifulSoup get_text after noise tags are removed) below which a second trafilatura "
-            "pass runs with favor_recall=True. The longer of the two passes is returned. 0 never runs "
-            "the recall pass, 1 always runs it."
-        ),
-    )
-
     # Group 7 - Caching: read-result cache TTL
     READ_CACHE_TTL_SECONDS: int = Field(
         default=300,
         description="TTL in seconds for the read-result cache-aside entries (default 5 min).",
+    )
+    READ_CACHE_PURGE_RECONNECT_SECONDS: float = Field(
+        default=5.0,
+        gt=0,
+        description=(
+            "Wait in seconds between two connection attempts of the read cache purge subscriber. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+
+    # Group 2 position 6 - Schema extraction, recipes and document routing
+    EXTRACTION_SCHEMA_MAX_BYTES: int = Field(
+        default=16384,
+        ge=1,
+        description=(
+            "Maximum size in bytes of the caller-supplied extraction schema. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    EXTRACTION_LLM_BASE_URL: str = Field(
+        default="",
+        description=(
+            "Base URL of the OpenAI-compatible endpoint schema extraction calls. "
+            "Empty turns the schema format off. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    EXTRACTION_LLM_MODEL: str = Field(
+        default="",
+        description=(
+            "Model name sent to the extraction endpoint. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    EXTRACTION_LLM_API_KEY: str = Field(
+        default="",
+        description=(
+            "API key for the extraction endpoint, read from the repository .env file only. "
+            "Empty when unset. Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    EXTRACTION_LLM_MAX_INPUT_CHARS: int = Field(
+        default=60000,
+        ge=1,
+        description=(
+            "Page text characters sent to the extraction endpoint before the cap cuts them. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    EXTRACTION_LLM_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description=(
+            "Timeout in seconds for one extraction model call. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    RECIPE_TTL_SECONDS: int = Field(
+        default=604800,
+        ge=60,
+        description=(
+            "TTL in seconds for a stored extraction recipe. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    RECIPE_SELECTOR_MAX_CHARS: int = Field(
+        default=512,
+        ge=1,
+        description=(
+            "Maximum characters of one stored CSS selector. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    DOCUMENT_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
+        description=(
+            "Maximum bytes fetched for one routed PDF, image or audio file. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    DOCLING_SERVE_URL: str = Field(
+        default="http://docling-serve:5001",
+        description=(
+            "Base URL of the docling-serve document conversion service. "
+            "Empty turns the PDF route off. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    ASCEND_OCR_URL: str = Field(
+        default="http://ascend-ocr:7022",
+        description=(
+            "Base URL of the ascend-ocr service. Empty turns the image route off. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    OCR_ROUTE_TIMEOUT_SECONDS: float = Field(
+        default=300.0,
+        gt=0,
+        description=(
+            "Timeout in seconds polling one ascend-ocr job. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
+    )
+    AUDIO_SCRIBE_URL: str = Field(
+        default="http://ascend-audio-scribe:7017",
+        description=(
+            "Base URL of the ascend-audio-scribe service. Empty turns the audio route off. "
+            "Added by `enhance-web-search-extraction-and-tiers`."
+        ),
     )
 
     # Group 7 - Observability: per-domain metric label cardinality cap

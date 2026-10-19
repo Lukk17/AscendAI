@@ -163,6 +163,20 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | TIER_MEMORY_TTL_SECONDS | No | TTL in seconds for the per-domain tier memory. Code default `86400` applies when unset. |
 | NETWORKIDLE_POLL_MS | No | Page-quiet poll interval in milliseconds for browser tiers. Code default `1000` applies when unset. |
 | SCROLL_PAUSE_MS | No | Pause in milliseconds between two scroll steps. Code default `200` applies when unset. |
+| EXTRACTION_SCHEMA_MAX_BYTES | No | Maximum size in bytes of the caller-supplied extraction schema. Code default `16384` applies when unset. |
+| EXTRACTION_LLM_BASE_URL | No | Base URL of the OpenAI-compatible endpoint schema extraction calls. Empty turns the schema format off. |
+| EXTRACTION_LLM_MODEL | No | Model name sent to the extraction endpoint. Empty until the operator names one. |
+| EXTRACTION_LLM_API_KEY | No | API key for the extraction endpoint, read from the repository `.env` file only. Empty when unset. |
+| EXTRACTION_LLM_MAX_INPUT_CHARS | No | Page text characters sent to the extraction endpoint before the cap cuts them. Code default `60000` applies when unset. |
+| EXTRACTION_LLM_TIMEOUT_SECONDS | No | Timeout in seconds for one extraction model call. Code default `60` applies when unset. |
+| RECIPE_TTL_SECONDS | No | TTL in seconds for a stored extraction recipe. Code default `604800` applies when unset. |
+| RECIPE_SELECTOR_MAX_CHARS | No | Maximum characters of one stored CSS selector. Code default `512` applies when unset. |
+| DOCUMENT_MAX_BYTES | No | Maximum bytes fetched for one routed PDF, image or audio file. Code default `52428800` applies when unset. |
+| DOCLING_SERVE_URL | No | Base URL of the docling-serve document conversion service. Empty turns the PDF route off. Code default `http://docling-serve:5001` applies when unset. |
+| ASCEND_OCR_URL | No | Base URL of the ascend-ocr service. Empty turns the image route off. Code default `http://ascend-ocr:7022` applies when unset. |
+| OCR_ROUTE_TIMEOUT_SECONDS | No | Timeout in seconds polling one ascend-ocr job. Code default `300` applies when unset. |
+| AUDIO_SCRIBE_URL | No | Base URL of the ascend-audio-scribe service. Empty turns the audio route off. Code default `http://ascend-audio-scribe:7017` applies when unset. |
+| READ_CACHE_PURGE_RECONNECT_SECONDS | No | Wait in seconds between two connection attempts of the read cache purge subscriber. Code default `5` applies when unset. |
 
 The full list of tunable settings, timeouts, extraction thresholds, circuit-breaker values and so on, lives in [../docs/configuration.md](../docs/configuration.md). Every one of them can be added to the `environment:` block of the ascend-web-hunter service.
 

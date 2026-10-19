@@ -21,6 +21,8 @@ dependencies = [
     "curl_cffi==0.15.0",
     "tldextract==5.3.0",
     "readability-lxml>=0.8.1",
+    "extruct==0.18.0",
+    "jsonschema==4.26.0",
 ]
 
 [project.optional-dependencies]
@@ -82,6 +84,7 @@ module = [
     "patchright.*",
     "camoufox.*",
     "trafilatura.*",    "curl_cffi.*",
+    "extruct.*",
     "textstat.*",
     "adblockparser.*",
     "colorlog.*",
