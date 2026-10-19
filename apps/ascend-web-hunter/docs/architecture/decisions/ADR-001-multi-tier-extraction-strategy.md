@@ -88,6 +88,7 @@ continuing the loop.
 - `src/reader/web_reader.py` - `WebReader.read`, `WebReader._execute_strategy`.
 - `src/reader/strategies/` - all six strategy implementations.
 - `src/reader/cloudflare/challenge_detector.py` - `ChallengeDetector.is_blocked`, `is_login_required`,
-  `is_login_redirect_url`.
+  `is_login_redirect_url`, all three reading the scored `assess` verdict since 2026-10-19
+  (`detect-challenge-walls-in-any-language`).
 - `src/validator/content_validator.py` - `ContentValidator.validate` governs whether a strategy result is accepted.
 - [ADR-003](ADR-003-novnc-ngrok-captcha-intervention.md) - covers the NoVNC end of the chain.

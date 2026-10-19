@@ -40,7 +40,7 @@ async def test_flaresolverr_success_saves_cf_clearance_and_returns_html() -> Non
         {
             "status": "ok",
             "solution": {
-                "response": "<html><body>Cleared</body></html>",
+                "response": "<html><body><article><p>" + "word " * 30 + "</p></article></body></html>",
                 "cookies": [{"name": "cf_clearance", "value": "abc"}],
                 "userAgent": "UA",
             },
@@ -75,7 +75,7 @@ async def test_flaresolverr_saves_cookies_when_cf_clearance_missing_but_non_empt
         {
             "status": "ok",
             "solution": {
-                "response": "<html><body>X</body></html>",
+                "response": "<html><body><article><p>" + "word " * 30 + "</p></article></body></html>",
                 "cookies": [{"name": "other", "value": "x"}],
                 "userAgent": "UA",
             },
@@ -106,7 +106,7 @@ async def test_flaresolverr_saves_cookies_tagged_with_its_own_producer() -> None
         {
             "status": "ok",
             "solution": {
-                "response": "<html><body>Cleared</body></html>",
+                "response": "<html><body><article><p>" + "word " * 30 + "</p></article></body></html>",
                 "cookies": [{"name": "cf_clearance", "value": "abc"}],
                 "userAgent": "UA",
             },
@@ -165,7 +165,7 @@ async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation()
         {
             "status": "ok",
             "solution": {
-                "response": "<html><body>blocked</body></html>",
+                "response": "<html><body><div id='cf-challenge-running'></div></body></html>",
                 "cookies": [],
                 "userAgent": "UA",
             },
@@ -179,16 +179,53 @@ async def test_flaresolverr_blocked_raises_challenge_for_consistent_escalation()
             "src.reader.strategies.flaresolverr_strategy.ChallengeDetector.is_login_required",
             return_value=False,
         ),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.ChallengeDetector.is_blocked",
-            return_value=True,
-        ),
     ):
         with pytest.raises(ChallengeDetectedException) as exc:
             await FlareSolverrStrategy().get_html("http://test.com")
 
     # then
     assert exc.value.intervention_type == "captcha"
+    assert exc.value.verdict.vendor == "cloudflare"
+
+
+@pytest.mark.asyncio
+async def test_flaresolverr_passes_solution_headers_and_cookie_names_to_verdict() -> None:
+    # given
+    from src.reader.cloudflare.challenge_signals import assess as real_assess
+
+    body = "<html><body><article><p>" + "word " * 200 + "</p></article></body></html>"
+    solution_headers = {"x-dd-b": "1"}
+    session = _make_session(
+        {
+            "status": "ok",
+            "solution": {
+                "response": body,
+                "headers": solution_headers,
+                "cookies": [{"name": "datadome", "value": "abc"}],
+                "userAgent": "UA",
+            },
+        }
+    )
+
+    # when
+    with (
+        patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.cookie_manager.save_flat_cookies",
+            new=AsyncMock(),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.assess",
+            wraps=real_assess,
+        ) as mock_assess,
+    ):
+        result = await FlareSolverrStrategy().get_html("http://test.com")
+
+    # then
+    assert result == body
+    assert mock_assess.call_args.args[0] == 200
+    assert mock_assess.call_args.args[2] == solution_headers
+    assert mock_assess.call_args.args[3] == ["datadome"]
 
 
 @pytest.mark.asyncio

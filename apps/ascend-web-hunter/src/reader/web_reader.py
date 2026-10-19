@@ -19,6 +19,7 @@ from src.observability.metrics import (
     STRATEGY_DURATION_SECONDS,
 )
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.challenge_signals import assess, log_verdict, record_verdict
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, cookie_manager
 from src.reader.extraction import extract_structured, extract_text_with_fallback
 from src.reader.link_annotator import annotate_links
@@ -405,7 +406,10 @@ class WebReader:
                 return None
 
             if not ChallengeDetector.is_content_accepted(200, html):
-                raise ChallengeDetectedException(intervention_type="captcha")
+                verdict = assess(200, html)
+                record_verdict(verdict, "reader")
+                log_verdict(verdict, "reader", url)
+                raise ChallengeDetectedException(verdict)
 
             if output_format == "structured":
                 structured = extract_structured(html)
@@ -466,7 +470,10 @@ class WebReader:
             html = await strategy.get_html(url)
             if html:
                 if not ChallengeDetector.is_content_accepted(200, html):
-                    raise ChallengeDetectedException(intervention_type="captcha")
+                    verdict = assess(200, html)
+                    record_verdict(verdict, "reader")
+                    log_verdict(verdict, "reader", url)
+                    raise ChallengeDetectedException(verdict)
 
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
 

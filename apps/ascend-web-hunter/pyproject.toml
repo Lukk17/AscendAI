@@ -60,6 +60,7 @@ target-version = "py312"
     "ARG005",   # lambda kwarg shims for stub callables
     "SLF001",   # tests intentionally inspect / mutate private members
     "TC002",    # tests don't need TYPE_CHECKING guards for fixture imports
+    "T201",     # corpus and catalogue tests print their reporting tables
 ]
 
 [tool.mypy]
@@ -91,6 +92,7 @@ module = [
     "opentelemetry.instrumentation.*",
     "opentelemetry.sdk.*",
     "readability.*",
+    "lxml.*",
 ]
 ignore_missing_imports = true
 

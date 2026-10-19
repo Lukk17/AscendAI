@@ -18,6 +18,12 @@ from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.challenge_signals import (
+    as_login_verdict,
+    assess,
+    log_verdict,
+    record_verdict,
+)
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
@@ -25,10 +31,27 @@ from src.reader.strategies.base_strategy import BaseStrategy
 if TYPE_CHECKING:
     from bs4 import BeautifulSoup, Tag
     from crawlee.crawlers import ParsedHttpCrawlingContext
+    from playwright.async_api import Response as PlaywrightResponse
 
     from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
+
+_CRAWLEE_TIER = "crawlee"
+
+
+def _response_summary(response: PlaywrightResponse) -> dict[str, Any]:
+    """Final status and headers of one Playwright response for the container."""
+    try:
+        headers = dict(response.headers)
+    except Exception:
+        headers = {}
+    try:
+        status = response.status
+    except Exception:
+        status = 200
+
+    return {"status": status, "headers": headers}
 
 
 class CrawleeStrategy(BaseStrategy):
@@ -49,7 +72,8 @@ class CrawleeStrategy(BaseStrategy):
         return extracted or ""
 
     async def get_html(self, url: str) -> str:
-        result_container: dict[str, str] = {"html": ""}
+        result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
+        last_response: dict[str, Any] = {}
 
         storage_state = await cookie_manager.get_storage_state(url, self.profile)
         fp = self.fingerprint
@@ -91,24 +115,33 @@ class CrawleeStrategy(BaseStrategy):
 
         @crawler.router.default_handler
         async def request_handler(context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag]) -> None:
-            await self._handle_crawlee_request(context, result_container)
+            await self._handle_crawlee_request(context, result_container, last_response)
 
         @crawler.pre_navigation_hook
         async def enable_adblock(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
             await context.page.route("**/*", self.url_validator.route_handler)
+            context.page.on("response", lambda response: last_response.update(_response_summary(response)))
 
         await self._run_crawler_bounded(crawler, url)
-        html = result_container.get("html", "")
+        html: str = result_container.get("html", "")
+        status: int = result_container.get("status", 200)
+        headers: dict[str, str] = result_container.get("headers", {})
+        stored_cookies = (storage_state or {}).get("cookies", [])
+        cookie_names = [str(cookie.get("name", "")) for cookie in stored_cookies]
+
+        verdict = assess(status, html, headers, cookie_names)
+        record_verdict(verdict, _CRAWLEE_TIER)
+        log_verdict(verdict, _CRAWLEE_TIER, url)
 
         if ChallengeDetector.is_login_required(html):
             logger.warning("CrawleeStrategy: Login wall detected on %s", url)
 
-            raise ChallengeDetectedException(intervention_type="login")
+            raise ChallengeDetectedException(as_login_verdict(verdict))
 
-        if ChallengeDetector.is_blocked(200, html):
+        if verdict.wall:
             logger.warning("CrawleeStrategy: WAF/Cloudflare block detected on %s", url)
 
-            raise ChallengeDetectedException(intervention_type="captcha")
+            raise ChallengeDetectedException(verdict)
 
         return html
 
@@ -156,10 +189,14 @@ class CrawleeStrategy(BaseStrategy):
     @staticmethod
     async def _handle_crawlee_request(
         context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag],
-        result_container: dict[str, str],
+        result_container: dict[str, Any],
+        last_response: dict[str, Any],
     ) -> None:
         try:
             result_container["html"] = await context.page.content()
         except Exception:
             snapshot = await context.get_snapshot()
             result_container["html"] = snapshot.html or ""
+        if last_response:
+            result_container["status"] = last_response.get("status", 200)
+            result_container["headers"] = last_response.get("headers", {})

@@ -69,5 +69,6 @@ container diagram and the extraction-strategy escalation sequence. Both are Merm
 
 ### Where else to look
 
+- [challenge-detection.md](challenge-detection.md) for the scored challenge verdict: families, weights, threshold, catalogue provenance and capture rules
 - [../README.md](../README.md) for commands and quick start
 - [../AGENTS.md](../AGENTS.md) for the AI-agent contract

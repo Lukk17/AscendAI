@@ -30,13 +30,9 @@ def large_waf_page() -> str:
 
 
 def test_is_login_required_detects_marker_in_large_page(large_cf_page: str) -> None:
-    # given
-    with patch(
-        "src.reader.cloudflare.challenge_detector._BOT_DICT",
-        {"waf_script_signatures": [], "waf_strict_phrases": [], "login_title_patterns": ["sign in"]},
-    ):
-        # when / then
-        assert ChallengeDetector.is_login_required(large_cf_page) is True
+    """The catalogue carries the login title patterns verbatim, so no patch is needed."""
+    # when / then
+    assert ChallengeDetector.is_login_required(large_cf_page) is True
 
 
 def test_is_blocked_detects_ray_id_in_large_page(large_waf_page: str) -> None:
@@ -50,12 +46,9 @@ def test_is_login_required_clean_large_page_returns_false() -> None:
     big_clean = (
         "<html><head><title>LinkedIn Feed</title></head><body>" + "content " * 10_000 + "</body></html>"
     )
-    with patch(
-        "src.reader.cloudflare.challenge_detector._BOT_DICT",
-        {"waf_script_signatures": [], "waf_strict_phrases": [], "login_title_patterns": ["sign in"]},
-    ):
-        # when / then
-        assert ChallengeDetector.is_login_required(big_clean) is False
+
+    # when / then
+    assert ChallengeDetector.is_login_required(big_clean) is False
 
 
 def test_challenge_detection_max_bytes_setting_respected() -> None:

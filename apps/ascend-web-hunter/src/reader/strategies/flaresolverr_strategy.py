@@ -8,10 +8,18 @@ from src.circuit_breaker.breaker import flaresolverr_breaker
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.challenge_signals import (
+    as_login_verdict,
+    assess,
+    log_verdict,
+    record_verdict,
+)
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, cookie_manager
 from src.reader.strategies.base_strategy import BaseStrategy
 
 logger = logging.getLogger(__name__)
+
+_FLARESOLVERR_TIER = "flaresolverr"
 
 
 class FlareSolverrStrategy(BaseStrategy):
@@ -79,13 +87,23 @@ class FlareSolverrStrategy(BaseStrategy):
                             url, cookie_dict, user_agent, self.profile, PRODUCED_BY_FLARESOLVERR
                         )
 
-                    if ChallengeDetector.is_login_required(html):
-                        logger.warning("FlareSolverrStrategy: Login wall detected on %s", url)
-                        raise ChallengeDetectedException(intervention_type="login")
+                    solution_headers = solution.get("headers")
+                    verdict = assess(
+                        200,
+                        str(html),
+                        dict(solution_headers) if isinstance(solution_headers, dict) else {},
+                        [str(name) for name in cookie_dict],
+                    )
+                    record_verdict(verdict, _FLARESOLVERR_TIER)
+                    log_verdict(verdict, _FLARESOLVERR_TIER, url)
 
-                    if ChallengeDetector.is_blocked(200, html):
+                    if ChallengeDetector.is_login_required(str(html)):
+                        logger.warning("FlareSolverrStrategy: Login wall detected on %s", url)
+                        raise ChallengeDetectedException(as_login_verdict(verdict))
+
+                    if verdict.wall:
                         logger.warning("FlareSolverrStrategy: WAF/Cloudflare block detected on %s", url)
-                        raise ChallengeDetectedException(intervention_type="captcha")
+                        raise ChallengeDetectedException(verdict)
 
                     flaresolverr_breaker.record_success()
                     return str(html)

@@ -12,6 +12,13 @@ from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.challenge_signals import (
+    ChallengeVerdict,
+    as_login_verdict,
+    assess,
+    log_verdict,
+    record_verdict,
+)
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
@@ -19,6 +26,8 @@ from src.runtime.browser_pool import browser_pool
 from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
+
+_PLAYWRIGHT_TIER = "playwright"
 
 _NETWORKIDLE_POLL_MS = 1000
 _MS_PER_SECOND = 1000
@@ -53,12 +62,11 @@ class PlaywrightStrategy(BaseStrategy):
         try:
             if ChallengeDetector.is_login_redirect_url(url):
                 logger.warning("PlaywrightStrategy: Pre-emptive redirect login URI detected on %s", url)
-                raise ChallengeDetectedException(intervention_type="login")
+                raise ChallengeDetectedException(
+                    as_login_verdict(assess(200, "", None, await self._context_cookie_names(context)))
+                )
 
-            timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
-            initial_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-
-            response_status = initial_response.status if initial_response else 200
+            response_status, initial_headers = await self._initial_navigation(page, url)
             poll_start = time.perf_counter()
             extract_deadline = poll_start + settings.EXTRACT_TIMEOUT
             challenge_deadline = poll_start + settings.CHALLENGE_CLEAR_WAIT_SECONDS
@@ -71,12 +79,14 @@ class PlaywrightStrategy(BaseStrategy):
                     await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
                     continue
 
-                if ChallengeDetector.is_login_required(content):
+                verdict = await self._assess_content(page, url, response_status, initial_headers, content)
+
+                if verdict.wall and verdict.intervention_type == "login":
                     logger.warning("PlaywrightStrategy: Login wall detected on %s (early exit)", url)
 
-                    raise ChallengeDetectedException(intervention_type="login")
+                    raise ChallengeDetectedException(verdict)
 
-                if ChallengeDetector.is_blocked(response_status, content):
+                if verdict.wall:
                     if time.perf_counter() >= challenge_deadline:
                         logger.warning(
                             "PlaywrightStrategy: WAF/Cloudflare challenge did not auto-clear within "
@@ -85,7 +95,7 @@ class PlaywrightStrategy(BaseStrategy):
                             url,
                         )
 
-                        raise ChallengeDetectedException(intervention_type="captcha")
+                        raise ChallengeDetectedException(verdict)
                     await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
                     continue
 
@@ -104,23 +114,63 @@ class PlaywrightStrategy(BaseStrategy):
                 "PlaywrightStrategy: Finished rendering %s. Extracted HTML Length: %d", url, len(content)
             )
 
-            if ChallengeDetector.is_blocked(response_status, content):
-                logger.warning("PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url)
+            verdict = await self._assess_content(page, url, response_status, initial_headers, content)
 
-                raise ChallengeDetectedException(intervention_type="captcha")
-
-            if ChallengeDetector.is_login_required(content):
+            if verdict.wall and verdict.intervention_type == "login":
                 logger.warning(
                     "PlaywrightStrategy: Late-stage Login wall detected on %s. Content Length: %d",
                     url,
                     len(content),
                 )
 
-                raise ChallengeDetectedException(intervention_type="login")
+                raise ChallengeDetectedException(verdict)
+
+            if not verdict.accepted:
+                logger.warning("PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url)
+
+                raise ChallengeDetectedException(verdict)
 
             return content
         finally:
             await context.close()
+
+    async def _initial_navigation(self, page: Page, url: str) -> tuple[int, dict[str, str]]:
+        """The initial navigation: response status and headers every later
+        verdict reuses, because a challenge that clears on its own changes the
+        body and the cookies but not the headers of the response that started it."""
+        timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
+        initial_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+
+        response_status = initial_response.status if initial_response else 200
+        initial_headers = await initial_response.all_headers() if initial_response else {}
+
+        return response_status, initial_headers
+
+    async def _context_cookie_names(self, context: BrowserContext) -> list[str]:
+        cookies = await context.cookies()
+
+        return [str(cookie.get("name", "")) for cookie in cookies]
+
+    async def _assess_content(
+        self,
+        page: Page,
+        url: str,
+        response_status: int,
+        initial_headers: dict[str, str],
+        content: str,
+    ) -> ChallengeVerdict:
+        """One verdict over the rendered content with the initial response's
+        status and headers and the context's current cookie names."""
+        verdict = assess(
+            response_status,
+            content,
+            initial_headers,
+            await self._context_cookie_names(page.context),
+        )
+        record_verdict(verdict, _PLAYWRIGHT_TIER)
+        log_verdict(verdict, _PLAYWRIGHT_TIER, url)
+
+        return verdict
 
     async def _scroll_page(self, page: Page) -> None:
         """Scroll down in increments to trigger lazy-load / infinite-scroll content."""

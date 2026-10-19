@@ -1,5 +1,4 @@
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
@@ -23,12 +22,15 @@ def test_is_blocked_large_content() -> None:
 
 
 def test_is_blocked_keywords() -> None:
+    """New expectation under the scored verdict: a bare title-only catalogue phrase
+    (cf_just_a_moment matches titles, not bodies) in a body of a few bytes fires
+    no signal, so the page is content, whatever the status."""
     # given
     html_with_keyword = "<html><body>Just a moment...</body></html>"
 
     # when / then
-    assert ChallengeDetector.is_blocked(200, html_with_keyword) is True
-    assert ChallengeDetector.is_blocked(403, html_with_keyword) is True
+    assert ChallengeDetector.is_blocked(200, html_with_keyword) is False
+    assert ChallengeDetector.is_blocked(403, html_with_keyword) is False
 
 
 def test_is_blocked_ray_id() -> None:
@@ -40,14 +42,25 @@ def test_is_blocked_ray_id() -> None:
 
 
 def test_is_blocked_cf_tokens() -> None:
+    """New expectation under the scored verdict: a script whose src carries the
+    catalogue cf-turnstile marker still fires captcha_element with no size gate,
+    so the widget-only interstitial is a wall."""
     # given
     html_turnstile = "<html><body><script src='cf-turnstile'></script></body></html>"
 
     # when / then
     assert ChallengeDetector.is_blocked(200, html_turnstile) is True
 
+
+def test_body_mention_of_cookie_name_is_not_vendor_presence() -> None:
+    """New expectation under the scored verdict: vendor_presence reads response
+    headers and cookie names, so a body-text mention of cf_clearance fires no
+    signal and the page is content."""
+    # given
     html_clearance = "<html><body>Missing cf_clearance cookie</body></html>"
-    assert ChallengeDetector.is_blocked(200, html_clearance) is True
+
+    # when / then
+    assert ChallengeDetector.is_blocked(200, html_clearance) is False
 
 
 def test_not_blocked() -> None:
@@ -56,6 +69,11 @@ def test_not_blocked() -> None:
 
     # when / then
     assert ChallengeDetector.is_blocked(200, valid_html) is False
+
+
+def test_is_login_required_empty_string_returns_false() -> None:
+    # when / then
+    assert ChallengeDetector.is_login_required("") is False
 
 
 def test_is_login_required() -> None:
@@ -123,36 +141,26 @@ def test_is_login_required_svg_bypass() -> None:
     assert ChallengeDetector.is_login_required(dirty_html) is True
 
 
-def test_is_blocked_returns_true_for_waf_script_signature() -> None:
+def test_is_blocked_returns_true_for_catalogue_vendor_script() -> None:
+    """New expectation under the scored verdict (migration step 4): a catalogue
+    vendor_script marker on a thin page fires vendor_script beside the shape
+    signals, which together reach the threshold, so the page is a wall."""
     # given
-    with patch(
-        "src.reader.cloudflare.challenge_detector._BOT_DICT",
-        {
-            "waf_script_signatures": ["custom-waf-marker"],
-            "waf_strict_phrases": [],
-            "login_title_patterns": [],
-        },
-    ):
-        html = "<html>custom-waf-marker</html>"
+    html = "<html><body><script src='https://challenges.cloudflare.com/turnstile/v0/api.js'></script></body></html>"
 
-        # when / then
-        assert ChallengeDetector.is_blocked(200, html) is True
+    # when / then
+    assert ChallengeDetector.is_blocked(200, html) is True
 
 
-def test_is_blocked_returns_true_for_waf_strict_phrase() -> None:
+def test_is_blocked_returns_true_for_catalogue_title_phrase() -> None:
+    """New expectation under the scored verdict (migration step 4): a catalogue
+    title phrase in the title of a thin page fires phrase_title beside the shape
+    signals, which together reach the threshold, so the page is a wall."""
     # given
-    with patch(
-        "src.reader.cloudflare.challenge_detector._BOT_DICT",
-        {
-            "waf_script_signatures": [],
-            "waf_strict_phrases": ["please verify you are human"],
-            "login_title_patterns": [],
-        },
-    ):
-        html = "<html><body>please verify you are human</body></html>"
+    html = "<html><head><title>Pardon Our Interruption</title></head><body></body></html>"
 
-        # when / then
-        assert ChallengeDetector.is_blocked(200, html) is True
+    # when / then
+    assert ChallengeDetector.is_blocked(200, html) is True
 
 
 def test_is_blocked_returns_false_on_huge_content() -> None:
@@ -221,8 +229,10 @@ def test_has_real_content_true_for_large_page_regardless_of_shape() -> None:
 
 
 def test_is_content_accepted_false_when_blocked_even_with_real_content() -> None:
-    """A known block signature rejects the page even if it also contains
-    enough words to otherwise pass the structural check."""
+    """New expectation under the scored verdict (migration step 4): a bare
+    title-only catalogue phrase beside a few dozen words of prose fires no
+    phrase signal, so the page is content; real walls are pinned by the corpus
+    fixtures instead."""
     # given
     html = (
         "<html><body>Just a moment... "
@@ -231,7 +241,7 @@ def test_is_content_accepted_false_when_blocked_even_with_real_content() -> None
     )
 
     # when / then
-    assert ChallengeDetector.is_content_accepted(200, html) is False
+    assert ChallengeDetector.is_content_accepted(200, html) is True
 
 
 def test_is_content_accepted_false_for_unrecognized_thin_interstitial() -> None:
@@ -250,8 +260,9 @@ def test_is_content_accepted_false_for_unrecognized_thin_interstitial() -> None:
 
 
 def test_is_content_accepted_false_for_amazon_style_interstitial() -> None:
-    """Regression guard for a phrase-dictionary hit: an interstitial that renders
-    the literal dictionary phrase must still be rejected."""
+    """New expectation under the scored verdict (migration step 4): the catalogue
+    Amazon interstitial marker fires over the prefix beside the body phrase, so
+    an interstitial rendering the literal dictionary phrase is still rejected."""
     # given
     html = (
         "<html><body><p>Sorry, we just need to make sure you're not a robot.</p>"
@@ -303,21 +314,15 @@ def test_is_content_accepted_false_for_real_amazon_captcha_page_any_locale(
     assert ChallengeDetector.is_content_accepted(200, html) is False
 
 
-def test_is_blocked_returns_true_for_waf_structural_marker() -> None:
+def test_is_blocked_returns_true_for_catalogue_structural_marker() -> None:
+    """New expectation under the scored verdict (migration step 4): the catalogue
+    Amazon form-action marker fires interstitial_structure, which beside the shape
+    signals reaches the threshold, so the page is a wall."""
     # given
-    with patch(
-        "src.reader.cloudflare.challenge_detector._BOT_DICT",
-        {
-            "waf_script_signatures": [],
-            "waf_strict_phrases": [],
-            "waf_structural_markers": ["/errors_page/validateCaptcha"],
-            "login_title_patterns": [],
-        },
-    ):
-        html = "<html><body><form action='/errors_page/validateCaptcha'></form></body></html>"
+    html = "<html><body><form action='/errors_page/validateCaptcha'></form></body></html>"
 
-        # when / then
-        assert ChallengeDetector.is_blocked(200, html) is True
+    # when / then
+    assert ChallengeDetector.is_blocked(200, html) is True
 
 
 def test_is_content_accepted_true_for_real_datadome_rendered_page() -> None:

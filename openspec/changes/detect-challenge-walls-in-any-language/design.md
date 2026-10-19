@@ -373,6 +373,11 @@ save one call on accepted pages and would couple the detector's bare `trafilatur
 readability fallback, which are different functions with different outputs. Task 9.4 measures the added cost on the
 largest fixture and on the largest real page in spec 7's matrix.
 
+Measured 2026-10-19 with `time.perf_counter` around one hundred `assess` calls each: the largest corpus
+fixture (`rich-403.html`, 189906 bytes) costs 11.3 ms per call, the Amazon captcha page (`amazon-de.html`,
+3817 bytes, the spec 7 matrix shape) costs 4.5 ms per call. Both stay under the 50 ms bound, so no setting,
+compose line, `.env.example` line, bundle README row or `docs/configuration.md` row moves.
+
 ## Configuration
 
 Every row is a setting (owner rule 98 of 2026-10-08). The first seven are new and replace the module constants of
@@ -451,14 +456,30 @@ text cites stay valid.
 
 1. Closed: the 150-word guard stays as a measured task. Task 9.1's corpus margin table, with `nowsecure.nl` captured
    as a fixture, confirms the number or moves it before the change is called done.
+   Measured 2026-10-19 (`test_fixture_score_margin_and_signal_table`, 38 fixtures): every wall has a
+   positive margin and every counterexample a negative one, so the guard holds. Within twenty points of the
+   threshold: `hcaptcha-demo.html` (120, margin 20), `geetest-demo.html` (120, margin 20) and `rich-403.html`
+   (80, margin 20). `nowsecure-rendered.html` scores 140 and is a wall, the deliberate cost of row 12 of the
+   worked examples, accepted by spec 7 row n as `{success, intervention}`. The `nowsecure.nl` homepage serves a
+   thin Turnstile shell with 9 visible words, so no content fixture can be captured from that address; the
+   vendor-content counterexamples carry the guard instead.
 2. Closed: the Amazon marker matches both `/errors/validateCaptcha` and `/errors_page/validateCaptcha`, so neither
    path is dropped. Task 3.5 still records which path each marketplace serves, as evidence for the fixtures.
+   Measured 2026-10-19: all nine marketplaces (`amazon.com`, `amazon.de`, `amazon.fr`, `amazon.it`, `amazon.es`,
+   `amazon.co.uk`, `amazon.se`, `amazon.pl`, `amazon.co.jp`) answer `/errors/validateCaptcha` with the captcha page
+   carrying `action="/errors_page/validateCaptcha"`, recorded in the catalogue file's `notes` for the Amazon vendor.
 3. Closed: Cloudflare's challenge language follows the browser's `navigator.language`. Source, quoted on
    2026-10-04: "Cloudflare Challenges can detect multiple languages and display the localized challenge experience,
    which is determined by `navigator.language` value."
    (https://developers.cloudflare.com/cloudflare-challenges/reference/supported-languages/). The curl tier therefore
    sees only the page's default text, and the translated phrases are a browser-tier signal. Task 5.2 captures them
    through a browser per language.
+   Measured 2026-10-19 on `https://www.scrapingcourse.com/cloudflare-challenge`: the curl_cffi tier sees the
+   default English title `Just a moment...` with HTTP 403 and `cf-mitigated: challenge`; the Playwright tier with
+   `locale` set serves `Cierpliwości...` (pl), `Nur einen Moment…` (de), `Un instant…` (fr),
+   `しばらくお待ちください...` (ja) and `لحظة…` (ar), each with HTTP 403 and `cf-mitigated: challenge`.
+   Titles confirm the decision; the Turnstile body heading on that page (`Performing security verification` and
+   its translations) matches no phrase id and enters no translation.
 4. Closed: the synthetic fixtures for Akamai, Imperva, Kasada, PerimeterX, DDoS-Guard and AWS WAF stay, listed with
    `synthetic: true`, and task 8.6 replaces each one with a real capture when a spec 7 run records one.
 

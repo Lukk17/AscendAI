@@ -1,0 +1,599 @@
+<!DOCTYPE html><html lang="en" class="lenis lenis-smooth" style="font-size: 18px;"><head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>nowsecure.nl</title>
+    <style>
+        *,
+        *::after,
+        *::before {
+            box-sizing: border-box;
+        }
+
+        :root {
+            font-size: 12px;
+            --color-text: #2935ba;
+            --color-bg: #1a0b37;
+            --color-title: #9577cc;
+            --color-link: #2935ba;
+            --color-link-hover: #9577cc;
+            --page-padding: 1rem;
+            --rheight: 15vh;
+        }
+
+        body {
+            margin: 0;
+            color: var(--color-text);
+            font-family: "ouma-latin-variable", -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif;
+            font-variation-settings: "wght" 400;
+            text-transform: uppercase;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background: var(--color-bg);
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: calc(var(--rheight) + 1px);
+            pointer-events: none;
+            z-index: 2000;
+            background-image: linear-gradient(0deg, rgb(0 0 0 / 68%), rgb(15 10 23 / 62%));
+            box-shadow: 0px 0px 10vh rgba(0, 0, 0, 0.8);
+        }
+
+        /* Page Loader */
+        .js .loading::before,
+        .js .loading::after {
+            content: '';
+            position: fixed;
+            z-index: 1000;
+        }
+
+        .js .loading::before {
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--color-bg);
+        }
+
+        .js .loading::after {
+            top: 50%;
+            left: 50%;
+            width: 60px;
+            height: 60px;
+            margin: -30px 0 0 -30px;
+            border-radius: 50%;
+            opacity: 0.4;
+            background: var(--color-link);
+            animation: loaderAnim 0.7s linear infinite alternate forwards;
+
+        }
+
+        @keyframes loaderAnim {
+            to {
+                opacity: 1;
+                transform: scale3d(0.5, 0.5, 1);
+            }
+        }
+
+        a {
+            text-decoration: underline;
+            color: var(--color-link);
+            outline: none;
+            cursor: pointer;
+        }
+
+        a:hover {
+            text-decoration: none;
+            color: var(--color-link-hover);
+            outline: none;
+        }
+
+        /* Better focus styles from https://developer.mozilla.org/en-US/docs/Web/CSS/:focus-visible */
+        a:focus {
+            /* Provide a fallback style for browsers
+     that don't support :focus-visible */
+            outline: none;
+            background: lightgrey;
+        }
+
+        a:focus:not(:focus-visible) {
+            /* Remove the focus indicator on mouse-focus for browsers
+     that do support :focus-visible */
+            background: transparent;
+        }
+
+        a:focus-visible {
+            /* Draw a very noticeable focus style for
+     keyboard-focus on browsers that do support
+     :focus-visible */
+            outline: 2px solid red;
+            background: transparent;
+        }
+
+        .unbutton {
+            background: none;
+            border: 0;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .unbutton:focus {
+            outline: none;
+        }
+
+        .frame {
+            padding: 1.5rem 2rem;
+            display: grid;
+            z-index: 1000;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            grid-row-gap: 1rem;
+            grid-column-gap: 2rem;
+            pointer-events: none;
+            justify-items: start;
+            grid-template-areas: 'title' 'prev' 'back' 'sub' 'sponsor' 'demos';
+        }
+
+        .frame #cdawrap {
+            justify-self: start;
+        }
+
+        .frame a {
+            pointer-events: auto;
+        }
+
+        .frame__title {
+            grid-area: title;
+            font-size: inherit;
+            margin: 0;
+        }
+
+        .frame__back {
+            grid-area: back;
+            justify-self: start;
+        }
+
+        .frame__prev {
+            grid-area: prev;
+            justify-self: start;
+        }
+
+        .frame__sub {
+            grid-area: sub;
+        }
+
+        .frame__demos {
+            grid-area: demos;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .wrap {
+            position: fixed;
+            overflow: hidden;
+            background: var(--color-bg);
+            width: 100%;
+            top: 0;
+            box-shadow: 0 -25px 45px rgba(0, 0, 0, 0.3);
+            height: var(--rheight);
+            transform: scaleY(-1);
+        }
+
+        .demo-2 .wrap {
+            box-shadow: 0 -25px 45px rgba(0, 0, 0, 0.15);
+        }
+
+        .content {
+            position: relative;
+            display: grid;
+            height:100vh;
+            /* grid-template-columns: repeat(auto-fit,minmax(200px,300px)); */
+            /* grid-column-gap: 10vw; */
+            /* grid-row-gap: 10vh; */
+            padding: 0 var(--page-padding) 60vh;
+            width: 100%;
+            margin: var(--rheight) auto 0;
+            justify-content: center;
+            align-items: start;
+            background-image: url(../img/noise.png), radial-gradient(circle, rgb(38 3 130) 0%, rgb(14 3 33) 100%);
+            background-size: 400px, 100% 100vh;
+            background-attachment: fixed;
+        }
+
+
+        .content--reflection {
+            position: absolute;
+            top: 0;
+            margin: 0 auto;
+            filter:  blur(0.2rem);
+        }
+
+        .item {
+            position: relative;
+            margin: 0;
+            /* aspect-ratio: 2/3; */
+            width: 100%;
+        }
+
+
+        .demo-1 .item {
+            perspective: 1000px;
+            transform-style: preserve-3d;
+        }
+
+        .item__inner {
+            width: 100%;
+            height: 100%;
+            margin-top: 50%;
+            filter: drop-shadow(0 0 16rem #2935ba);
+        }
+
+        .item__img {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        .item__img-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-position: 50% 0%;
+            background-size: cover;
+            
+        }
+
+        .item__caption {
+            display: grid;
+            place-items: center;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            mix-blend-mode: plus-lighter;
+        }
+
+        .item__caption-title,
+        .content__title {
+            white-space: nowrap;
+            font-size: inherit;
+            margin: 0;
+            font-size: clamp(1.5rem, 8vw, 3rem);
+            text-transform: uppercase;
+        }
+
+        .item__caption-title {
+            margin: 2rem 0;
+        }
+
+        .content__title {
+            text-align: center;
+            font-size: clamp(2rem, 20vw, 20rem);
+            line-height: 0.5;
+            text-transform: uppercase;
+            grid-column: 1 / -1;
+            width: 100%;
+            color: var(--color-title);
+            font-weight: 600;
+            font-family: "ivymode", sans-serif;
+            mix-blend-mode: overlay;
+            display: flex;
+            justify-content: center;
+        }
+
+        .content__title:not(:first-child) {
+            margin: 10vh auto;
+        }
+
+        .item__caption-meta {
+            margin: 0;
+        }
+
+
+        h3.subtitle {
+            font-size: 2rem;
+            color: rgb(255 250 240 / 106%);
+            padding: 0;
+            margin: 0 auto;
+            width: 100%;
+            right: 2rem;
+            top: 7rem;
+            position: absolute;
+            text-align: right;
+            display: block;
+        }
+
+        h3.subtitle span {
+            font-size: 6rem;
+            color: rgb(255 250 240 / 70%);
+        }
+
+        @media screen and (min-width: 53em) {
+            body {
+                --page-padding: 2rem;
+            }
+
+            .frame {
+                grid-template-columns: auto auto 1fr 1fr;
+                align-content: space-between;
+                grid-template-areas: 'title back prev sponsor demos';
+            }
+
+            .frame #cdawrap,
+            .frame__sub {
+                justify-self: end;
+            }
+        }
+
+        *,
+        ::before,
+        ::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            /* --w: 400;
+            --h: 400;
+            --p: 350; */
+            --w: 100;
+            --h: 100;
+            --p: 200;
+        }
+
+        body {
+            background: #222;
+        }
+
+        .container {
+            width: calc(var(--w) * 1px);
+            height: calc(var(--h) * 1px);
+            perspective: calc(var(--p) * 1px);
+            margin: 0 auto;
+            
+            
+        }
+
+        .cube {
+            transform-style: preserve-3d;
+            width: 100%;
+            height: 100%;
+            
+            /* perspective: calc((var(--p) * 3  )* 1px); */
+            position: relative;
+            transition: transform .5s cubic-bezier(0.5, 1, 0.75, 1.25);
+            animation: spin 2s cubic-bezier(0.5, 1, 0.75, 1.25);
+        }
+
+        .cube.outro {
+            transition: transform .5s cubic-bezier(0.5, 1, 0.75, 1.25);
+            transform: perspective(calc(var(--p) * .5rem)) translateZ(-.875rem);
+        }
+
+        .face {
+            position: absolute;
+            height: 100%;
+            width: 100%;
+            opacity: .9;
+            overflow: hidden;
+            /* background: transparent !important; */
+        }
+
+        .top {
+            transform: rotateX(90deg) translateZ(calc(var(--h) / 2 * 1px));
+            background: rgba(34, 34, 34, 1);
+        }
+
+        .bottom {
+            transform: rotateX(-90deg) translateZ(calc(var(--h) / 2 * 1px));
+            background: rgba(25, 25, 25, 1);
+        }
+
+        .right {
+            transform: rotateY(90deg) translateZ(calc(var(--h) / 2 * 1px));
+            background: rgba(44, 44, 44, 1);
+        }
+
+        .left {
+            transform: rotateY(-90deg) translateZ(calc(var(--h) / 2 * 1px));
+            background: rgba(16, 16, 16, 1);
+        }
+
+        .front {
+            transform: rotateX(0deg) translateZ(calc(var(--h) / 2 * 1px));
+            background: rgba(21, 21, 21, 1);
+        }
+
+        .back {
+            transform: rotateX(-180deg) translateZ(calc(var(--h) / 2 * 1px));
+        }
+
+        .cf-turnstile {
+            transform: rotateX(0deg) translateZ(calc(var(--h) / 2* 1px));
+            
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            /* height: 100%; */
+            /* perspective: 100px; */
+            /* transform-style: preserve-3d; */
+            /* margin-top: 150px;
+            margin-left: 50px; */
+            height: 100%;
+            perspective: calc(var(--p) * 1px);
+            transform-style: preserve-3d;
+            /* margin-top: calc((var(--h) / 4)* 1px); */
+            margin-left: auto;
+            margin-right: auto;
+            /* zoom: 1.1; */
+            /* transform: scale3d(1.1, 1.1, 1); */
+            overflow: hidden;
+        }
+        .cf-turnstile > * {
+            left: 0;
+            position: relative;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% {
+                transform: rotateX(45deg) rotateY(-45deg) rotateZ(-45deg);
+            }
+
+            60% {
+                transform: rotateX(-30deg) rotateY(15deg) rotateZ(45deg);
+            }
+
+            100% {
+                transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+            }
+        }
+
+        @keyframes kinda-idle {
+            0% {
+                transform: rotateX(5deg) rotateY(-5deg) rotateZ(5deg);
+            }
+
+            /* 25% { */
+            /* transform: rotateX(-190deg) rotateY(90deg) rotateZ(-45deg); */
+            /* } */
+            50% {
+                transform: rotateX(-5deg) rotateY(5deg) rotateZ(5deg) ;
+            }
+
+            90% { 
+                transform: translateZ(15px);
+            }
+            100% {
+
+                transform: rotateX(5deg) rotateY(-5deg) rotateZ(-5deg);
+
+            }
+
+        }
+
+        h3.subtitle {
+
+            margin-top: 3rem;
+    }
+        
+
+        h3.subtitle span {
+            font-size: 2.5rem !important;
+        }
+
+        h2.content__title {
+            font-size: 3.8rem !important;
+            color: #50d79a;
+            mix-blend-mode: plus-lighter;
+            margin-top: 3rem;
+        }
+        .content__title {
+            text-align: center;
+            font-size: clamp(2rem, 20vw, 20rem);
+            line-height: 0.5;
+            text-transform: uppercase;
+            grid-column: 1 / -1;
+            width: 100%;
+            color: var(--color-title);
+            font-weight: 600;
+            font-family: "ivymode", sans-serif;
+            mix-blend-mode: overlay;
+            display: flex;
+            justify-content: center;
+        }
+        main {
+            height: 100vh;
+        }
+    </style>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async="" defer=""></script>
+
+</head>
+<body style="--h: 256; --w: 256; --p: 320; overflow: hidden;">
+
+    <main>
+        <div class="content">
+            <h2 class="content__title">NOWSECURE</h2>
+            <h3 class="subtitle">by <span>nodriver</span></h3>
+            <div class="item">
+                <div class="item__inner" style="translate: none; rotate: none; scale: none; filter: contrast(111.573%) brightness(89.2742%); transform-origin: 50% 120%; transform: translate3d(0px, 0px, -99.8187px) rotateX(22.7802deg) scale(1, 0.9357);">
+                    <!-- <div class="item__img"> -->
+                    <!-- <div class="item__img-inner"
+                            style="background-image: url(&quot;img/1.jpg&quot;); translate: none; rotate: none; scale: none; transform: translate3d(0px, 0px, 0px) scale(1.1314, 1.1314);">
+                        </div> -->
+                    <div class="container">
+                        <div class="cube" style="animation-name: kinda-idle; animation-duration: 10s; animation-iteration-count: infinite; animation-timing-function: cubic-bezier(0.5, -0.7, 0.1, 1.5);">
+                            <div class="face front"> 
+				<form>  
+					<div class="cf-turnstile" data-sitekey="3x00000000000000000000FF"><div><div></div><input type="hidden" name="cf-turnstile-response" id="cf-chl-widget-okio5_response"></div></div> 
+				</form>
+
+                            </div>
+                            <div class="face back"></div>
+                            <div class="face right"></div>
+                            <div class="face left"></div>
+                            <div class="face top"></div>
+                            <div class="face bottom"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="wrap">
+            <div class="content content--reflection" style="transform: translateY(-99px);">
+                <h2 class="content__title">NOWSECURE</h2>
+                <h3 class="subtitle">by <span>nodriver</span></h3>
+                <div class="item">
+                    <div class="item__inner" style="translate: none; rotate: none; scale: none; filter: contrast(111.573%) brightness(89.2742%); transform-origin: 50% 120%; transform: translate3d(0px, 0px, -99.8187px) rotateX(22.7802deg) scale(1, 0.9357);">
+                        <!--div class="item__img">
+                            <!== <div class="item__img-inner"
+                                style="background-image: url(&quot;img/1.jpg&quot;); translate: none; rotate: none; scale: none; transform: translate3d(0px, 0px, 0px) scale(1.1314, 1.1314);">
+                            </div>
+                        </div-->
+                        <div class="container">
+                            <div class="cube">
+                                <div class="face front">
+				<form>  
+					<div class="cf-turnstile" data-sitekey="3x00000000000000000000FF"><div><div></div><input type="hidden" name="cf-turnstile-response" id="cf-chl-widget-vfdwz_response"></div></div> 
+				</form>
+                            
+				</div>
+                                <div class="face back"></div>
+                                <div class="face right"></div>
+                                <div class="face left"></div>
+                                <div class="face top"></div>
+                                <div class="face bottom"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        !function (t, e) { "object" == typeof exports && "undefined" != typeof module ? e(exports) : "function" == typeof define && define.amd ? define(["exports"], e) : e((t = t || self).window = t.</script> 
+    <script>
+        let lenis;
+
+        // Selecting DOM elements
+        const contentEl = document.querySelector('.content');
+        const reflectionEl = document.querySelector('.content--reflection');
+      </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cf53fb3dd9c61b',t:'MTc5MjQw</script><iframe height="1" width="1" style="position: absolute; top: 0px; left: 0px; border-width: medium; border-style: none; border-color: currentcolor; border-image: initial; visibility: hidden;"></iframe>
+
+</body></html>

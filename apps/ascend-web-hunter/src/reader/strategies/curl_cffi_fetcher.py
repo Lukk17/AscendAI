@@ -18,9 +18,18 @@ from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.challenge_signals import (
+    as_login_verdict,
+    assess,
+    log_verdict,
+    record_verdict,
+    set_cookie_names,
+)
 from src.reader.cloudflare.cookie_manager import cookie_manager
 
 logger = logging.getLogger(__name__)
+
+_CURL_TIER = "curl_cffi"
 
 
 def _fetch_policy() -> FetchPolicy:
@@ -111,13 +120,22 @@ async def fetch_with_curl_cffi(
 
             response = final.answer
 
+            verdict = assess(
+                response.status_code,
+                response.text,
+                dict(response.headers),
+                set_cookie_names(response.headers),
+            )
+            record_verdict(verdict, _CURL_TIER)
+            log_verdict(verdict, _CURL_TIER, safe_url)
+
             if ChallengeDetector.is_login_required(response.text):
                 logger.warning("%s: Login wall detected on %s", strategy_label, safe_url)
-                raise ChallengeDetectedException(intervention_type="login")
+                raise ChallengeDetectedException(as_login_verdict(verdict))
 
-            if ChallengeDetector.is_blocked(response.status_code, response.text):
+            if verdict.wall:
                 logger.warning("%s: WAF/Cloudflare block detected on %s", strategy_label, safe_url)
-                raise ChallengeDetectedException(intervention_type="captcha")
+                raise ChallengeDetectedException(verdict)
 
             response.raise_for_status()
 
