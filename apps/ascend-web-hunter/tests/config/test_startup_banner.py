@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from ascend_python_common.startup_banner import FAILED, BannerCheck
 
-from src.config.config import settings
+from src.config.config import Settings, settings
 from src.config.startup_banner import (
     BANNER,
     _blocklist_entry,
@@ -129,9 +129,14 @@ def test_probe_url_sync_http_error() -> None:
     # given
     url = "http://upstream/healthz"
     error = urllib.error.HTTPError(url, 502, "Bad Gateway", Message(), None)
-    # when
-    with patch.object(urllib.request, "urlopen", side_effect=error):
-        result = _probe_url_sync("SearXNG", url)
+
+    try:
+        # when
+        with patch.object(urllib.request, "urlopen", side_effect=error):
+            result = _probe_url_sync("SearXNG", url)
+    finally:
+        error.close()
+
     # then
     assert "status=502" in result.status
 
@@ -218,6 +223,47 @@ def test_service_banner_function_is_used_by_definition() -> None:
     # then
     assert isinstance(lines, list)
     assert any("ascend-web-hunter" in line for line in lines)
+
+
+def test_banner_prints_novnc_display_size_from_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    monkeypatch.setattr(settings, "NOVNC_DISPLAY_SIZE", "1600x900")
+    with (
+        patch.object(urllib.request, "urlopen", return_value=_Resp200()),
+        patch("src.config.startup_banner.socket.create_connection") as mock_conn,
+    ):
+        mock_cm = MagicMock()
+        mock_cm.__enter__ = MagicMock(return_value=mock_cm)
+        mock_cm.__exit__ = MagicMock(return_value=False)
+        mock_conn.return_value = mock_cm
+        # when
+        text = "\n".join(build_service_banner())
+    # then
+    assert "NoVNC display" in text
+    assert "1600x900" in text
+
+
+def test_banner_prints_default_novnc_display_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    monkeypatch.delenv("NOVNC_DISPLAY_SIZE", raising=False)
+    monkeypatch.setattr(settings, "NOVNC_DISPLAY_SIZE", Settings().NOVNC_DISPLAY_SIZE)
+    with (
+        patch.object(urllib.request, "urlopen", return_value=_Resp200()),
+        patch("src.config.startup_banner.socket.create_connection") as mock_conn,
+    ):
+        mock_cm = MagicMock()
+        mock_cm.__enter__ = MagicMock(return_value=mock_cm)
+        mock_cm.__exit__ = MagicMock(return_value=False)
+        mock_conn.return_value = mock_cm
+        # when
+        text = "\n".join(build_service_banner())
+    # then
+    assert "NoVNC display" in text
+    assert Settings().NOVNC_DISPLAY_SIZE in text
 
 
 def test_banner_sections_have_expected_titles() -> None:

@@ -89,6 +89,7 @@ def service_banner_sections() -> list[BannerSection]:
                 _flaresolverr_check_sync(),
                 _redis_check_sync(),
                 _blocklist_entry(),
+                BannerLine(label="NoVNC display", value=settings.NOVNC_DISPLAY_SIZE),
             ),
         ),
         BannerSection(

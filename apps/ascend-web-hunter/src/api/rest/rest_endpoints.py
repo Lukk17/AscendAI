@@ -1,3 +1,4 @@
+import time
 from typing import Any
 
 from ascend_python_common.uri_guard import FetchPolicy, check_fetch_uri
@@ -6,12 +7,14 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from src.config.config import settings
 from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.novnc.flow_registry import flow_shape, novnc_flow_registry
 from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
 from src.session.session_manager import session_manager
 
 rest_router = APIRouter(prefix="/api/v1/web", tags=["web_v1"])
 rest_router_v2 = APIRouter(prefix="/api/v2/web", tags=["web_v2"])
+rest_session_router = APIRouter(prefix="/api/v2/session", tags=["web_session"])
 
 MAX_QUERY_LENGTH = 500
 
@@ -87,18 +90,61 @@ _SUCCESS_EXAMPLE = {
     "mode": "1-beautifulsoup",
 }
 _CAPTCHA_EXAMPLE = {
-    "url": "https://example.com",
-    "status": "human_intervention_required",
+    "type": "https://ascend.ai/errors/human-intervention-required",
+    "title": "Precondition Required",
+    "status": 428,
+    "detail": "Manual Captcha resolution required. Please visit: https://edge.example.com/novnc/host-1/vnc.html",
+    "instance": "/api/v2/web/read",
+    "code": "human_intervention_required",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
     "intervention_type": "captcha",
-    "vnc_url": "http://localhost:7900",
-    "message": "Manual Captcha resolution required. Please visit: http://localhost:7900",
+    "vnc_url": "https://edge.example.com/novnc/host-1/vnc.html",
+    "flow_id": "9f2c41ab77de",
+    "joined": False,
+    "window": {"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
 }
 _LOGIN_EXAMPLE = {
-    "url": "https://example.com",
-    "status": "human_intervention_required",
+    "type": "https://ascend.ai/errors/human-intervention-required",
+    "title": "Precondition Required",
+    "status": 428,
+    "detail": "Manual Login authentication required. Please visit: https://edge.example.com/novnc/host-1/vnc.html",
+    "instance": "/api/v2/web/read",
+    "code": "human_intervention_required",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
     "intervention_type": "login",
-    "vnc_url": "http://localhost:7900",
-    "message": "Manual Login authentication required. Please visit: http://localhost:7900",
+    "vnc_url": "https://edge.example.com/novnc/host-1/vnc.html",
+    "flow_id": "9f2c41ab77de",
+    "joined": False,
+    "window": {"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
+}
+_BUSY_EXAMPLE = {
+    "type": "https://ascend.ai/errors/novnc-busy",
+    "title": "Conflict",
+    "status": 409,
+    "detail": (
+        "All 4 intervention windows are in use. "
+        "The oldest is https://nowsecure.nl (profile=default). Try again shortly."
+    ),
+    "instance": "/api/v2/web/read",
+    "code": "novnc_busy",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "holder_url": "https://nowsecure.nl",
+    "holder_profile": "default",
+    "active_flows": 4,
+    "max_concurrent_flows": 4,
+    "flows": [
+        {
+            "flow_id": "9f2c41ab77de",
+            "url": "https://nowsecure.nl",
+            "domain": "nowsecure.nl",
+            "profile": "default",
+            "intervention_type": "captcha",
+            "window": {"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
+            "age_seconds": 207.3,
+            "expires_in_seconds": 412.7,
+            "vnc_url": "https://edge.example.com/novnc/host-1/vnc.html",
+        }
+    ],
 }
 _SESSION_EXPIRED_EXAMPLE = {
     "url": "https://example.com/feed",
@@ -123,6 +169,7 @@ _SESSION_EXPIRED_EXAMPLE = {
                         "success": {"value": _SUCCESS_EXAMPLE},
                         "captcha": {"value": _CAPTCHA_EXAMPLE},
                         "login": {"value": _LOGIN_EXAMPLE},
+                        "busy": {"value": _BUSY_EXAMPLE},
                         "session_expired": {"value": _SESSION_EXPIRED_EXAMPLE},
                     },
                 },
@@ -215,4 +262,23 @@ async def clear_session(request: SessionClearRequest) -> dict[str, Any]:
         "url": url_str,
         "existed": existed,
         "cleared_cache_entries": cleared_cache_entries,
+    }
+
+
+@rest_session_router.get("/interventions")
+async def list_interventions() -> dict[str, Any]:
+    """
+    List the live human-intervention flows of every container.
+
+    Read-only and unauthenticated, like the `vnc_url` in the 428 body. Each
+    entry carries the window of its flow; no cookies, storage state or page
+    content is returned.
+    """
+    flows = await novnc_flow_registry.active()
+    now = time.time()
+
+    return {
+        "active_flows": len(flows),
+        "max_concurrent_flows": settings.NOVNC_MAX_CONCURRENT_FLOWS,
+        "flows": [flow_shape(flow, now) for flow in flows],
     }

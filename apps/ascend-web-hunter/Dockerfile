@@ -40,6 +40,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV DISPLAY=:99
+ENV NOVNC_DISPLAY_SIZE=1920x1080
 ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 
 # Expose ports (API and NoVNC)

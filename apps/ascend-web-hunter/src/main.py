@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -9,11 +10,12 @@ from src.api.exception_handlers import error_registry
 from src.api.mcp.mcp_server import mcp
 from src.api.mcp.mcp_server import search_client as mcp_search_client
 from src.api.rest.blocklist_endpoints import blocklist_router
-from src.api.rest.rest_endpoints import rest_router, rest_router_v2
+from src.api.rest.rest_endpoints import rest_router, rest_router_v2, rest_session_router
 from src.api.rest.rest_endpoints import search_client as rest_search_client
 from src.config.blocklist_loader import blocklist_loader
 from src.config.config import settings
 from src.config.startup_banner import build_service_banner
+from src.reader.novnc.flow_registry import novnc_flow_registry
 from src.runtime.browser_pool import browser_pool
 
 if TYPE_CHECKING:
@@ -23,7 +25,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger("uvicorn")
 
 
+async def _novnc_sweep_loop() -> None:
+    """Periodically reclaim expired local flows. A failing sweep is logged
+    and the loop continues: the sweeper must never raise out of itself."""
+    while True:
+        await asyncio.sleep(settings.NOVNC_FLOW_SWEEP_INTERVAL_SECONDS)
+        try:
+            await novnc_flow_registry.sweep()
+        except Exception as exc:
+            logger.warning("shutdown: NoVNC sweep failed: %s", exc)
+
+
 class _ServiceLifespan:
+    def __init__(self) -> None:
+        self._novnc_sweeper: asyncio.Task[None] | None = None
+
     async def __aenter__(self) -> None:
         if blocklist_loader.state is None:
             logger.critical("Startup Warning: Blocklist was not loaded")
@@ -31,8 +47,17 @@ class _ServiceLifespan:
         rule_count = blocklist_loader.state.rule_count
         logger.info("Blocklist ready: %s rules from %s", rule_count, blocklist_loader.blocklist_path)
         await browser_pool.start()
+        self._novnc_sweeper = asyncio.create_task(_novnc_sweep_loop())
 
     async def __aexit__(self, *exc_info: object) -> None:
+        if self._novnc_sweeper is not None:
+            self._novnc_sweeper.cancel()
+            await asyncio.gather(self._novnc_sweeper, return_exceptions=True)
+            self._novnc_sweeper = None
+        try:
+            await novnc_flow_registry.shutdown()
+        except Exception as exc:
+            logger.warning("shutdown: failed to stop NoVNC flows: %s", exc)
         try:
             await browser_pool.stop()
         except Exception as exc:
@@ -77,7 +102,7 @@ def _service_definition() -> ServiceDefinition:
         distribution="ascend-web-hunter",
         settings=settings,
         mcp=mcp,
-        routers=(rest_router, rest_router_v2, blocklist_router),
+        routers=(rest_router, rest_router_v2, rest_session_router, blocklist_router),
         error_registry=error_registry,
         probes={
             "redis": _redis_probe,

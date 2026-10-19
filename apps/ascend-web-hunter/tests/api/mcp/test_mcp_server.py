@@ -4,7 +4,14 @@ import pytest
 from ascend_python_common.uri_guard import UnsafeUriError
 
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
-from src.api.mcp.mcp_server import session_clear, session_establish, session_status, web_read, web_search
+from src.api.mcp.mcp_server import (
+    session_clear,
+    session_establish,
+    session_interventions,
+    session_status,
+    web_read,
+    web_search,
+)
 from src.session.session_manager import SessionInfo, SessionManager
 
 
@@ -175,6 +182,65 @@ async def test_mcp_web_read_human_intervention_on_links_branch() -> None:
 
 
 @pytest.mark.asyncio
+async def test_mcp_web_read_intervention_carries_flow_fields() -> None:
+    # given
+    window = {"slot": 1, "x": 48, "y": 48, "width": 1280, "height": 800}
+    exc = HumanInterventionRequiredException(
+        vnc_url="http://vnc/x",
+        intervention_type="captcha",
+        flow_id="9f2c41ab77de",
+        joined=True,
+        window=window,
+    )
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
+        patch(
+            "src.api.mcp.mcp_server.web_reader.read",
+            new_callable=AsyncMock,
+            side_effect=exc,
+        ),
+    ):
+        result = await web_read("http://mcp.com")
+
+    # then
+    assert result["status"] == "human_intervention_required"
+    assert result["intervention_type"] == "captcha"
+    assert result["vnc_url"] == "http://vnc/x"
+    assert "vnc/x" in result["message"]
+    assert result["flow_id"] == "9f2c41ab77de"
+    assert result["joined"] is True
+    assert result["window"] == window
+
+
+@pytest.mark.asyncio
+async def test_mcp_web_read_intervention_defaults_present_for_plain_raise() -> None:
+    # given
+    exc = HumanInterventionRequiredException(vnc_url="http://vnc/x", intervention_type="captcha")
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
+        patch(
+            "src.api.mcp.mcp_server.web_reader.read",
+            new_callable=AsyncMock,
+            side_effect=exc,
+        ),
+    ):
+        result = await web_read("http://mcp.com")
+
+    # then
+    assert result["status"] == "human_intervention_required"
+    assert result["intervention_type"] == "captcha"
+    assert result["vnc_url"] == "http://vnc/x"
+    assert "vnc/x" in result["message"]
+    assert result["flow_id"] is None
+    assert result["joined"] is False
+    assert result["window"] is None
+
+
+@pytest.mark.asyncio
 async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload() -> None:
     # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
@@ -194,6 +260,50 @@ async def test_mcp_web_read_catches_novnc_busy_and_returns_structured_payload() 
     assert result["status"] == "novnc_busy"
     assert result["holder_url"] == "http://in-flight.example"
     assert result["holder_profile"] == "default"
+
+
+@pytest.mark.asyncio
+async def test_mcp_web_read_busy_carries_cap_fields() -> None:
+    # given
+    flows = [
+        {
+            "flow_id": "9f2c41ab77de",
+            "url": "https://nowsecure.nl",
+            "domain": "nowsecure.nl",
+            "profile": "default",
+            "intervention_type": "captcha",
+            "window": {"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
+            "age_seconds": 207.3,
+            "expires_in_seconds": 412.7,
+            "vnc_url": "http://vnc/x",
+        }
+    ]
+    exc = NoVNCFlowBusyException(
+        "https://nowsecure.nl",
+        "default",
+        active_flows=1,
+        max_concurrent_flows=4,
+        flows=flows,
+    )
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
+        patch(
+            "src.api.mcp.mcp_server.web_reader.read",
+            new_callable=AsyncMock,
+            side_effect=exc,
+        ),
+    ):
+        result = await web_read("http://mcp.com")
+
+    # then
+    assert result["status"] == "novnc_busy"
+    assert result["holder_url"] == "https://nowsecure.nl"
+    assert result["holder_profile"] == "default"
+    assert result["active_flows"] == 1
+    assert result["max_concurrent_flows"] == 4
+    assert result["flows"] == flows
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +364,122 @@ async def test_mcp_session_establish_returns_novnc_busy_payload() -> None:
     assert result["status"] == "novnc_busy"
     assert result["holder_url"] == "http://in-flight.example"
     assert result["holder_profile"] == "default"
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_establish_busy_carries_cap_fields() -> None:
+    # given
+    flows = [
+        {
+            "flow_id": "9f2c41ab77de",
+            "url": "https://nowsecure.nl",
+            "domain": "nowsecure.nl",
+            "profile": "default",
+            "intervention_type": "captcha",
+            "window": {"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
+            "age_seconds": 207.3,
+            "expires_in_seconds": 412.7,
+            "vnc_url": "http://vnc/x",
+        }
+    ]
+    exc = NoVNCFlowBusyException(
+        "https://nowsecure.nl",
+        "default",
+        active_flows=1,
+        max_concurrent_flows=4,
+        flows=flows,
+    )
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
+        patch.object(SessionManager, "establish", new=AsyncMock(side_effect=exc)),
+    ):
+        result = await session_establish("http://example.com")
+
+    # then
+    assert result["status"] == "novnc_busy"
+    assert result["active_flows"] == 1
+    assert result["max_concurrent_flows"] == 4
+    assert result["flows"] == flows
+
+
+# ---------------------------------------------------------------------------
+# session_interventions MCP tool
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_interventions_empty_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    monkeypatch.setattr(novnc_flow_registry, "_redis", FakeRedis())
+
+    # when
+    result = await session_interventions()
+
+    # then
+    assert result["active_flows"] == 0
+    assert result["flows"] == []
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_interventions_lists_flows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import flow_key_for, novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    fake = FakeRedis()
+    monkeypatch.setattr(novnc_flow_registry, "_redis", fake)
+    flow = await novnc_flow_registry.reserve(
+        key=flow_key_for("https://listed-site.com/1", "default"),
+        url="https://listed-site.com/1",
+        profile="default",
+        intervention_type="captcha",
+    )
+    await novnc_flow_registry.set_vnc_url(flow.flow_id, "http://vnc/vnc.html")
+
+    # when
+    result = await session_interventions()
+
+    # then
+    assert result["active_flows"] == 1
+    assert len(result["flows"]) == 1
+    entry = result["flows"][0]
+    assert entry["flow_id"] == flow.flow_id
+    assert entry["window"]["slot"] == flow.window.slot
+    assert entry["expires_in_seconds"] > 0
+    assert "cookies" not in str(result)
+    assert "storage_state" not in str(result)
+    assert "content" not in str(entry)
+
+    # cleanup
+    await novnc_flow_registry.release(flow.flow_id)
+
+
+# ---------------------------------------------------------------------------
+# tool docstrings name vnc_url and status
+# ---------------------------------------------------------------------------
+
+
+def test_tool_docstrings_name_vnc_url_and_status() -> None:
+    # given / when
+    web_read_doc = web_read.__doc__ or ""
+    establish_doc = session_establish.__doc__ or ""
+
+    # then
+    assert "vnc_url" in web_read_doc
+    assert "status" in web_read_doc
+    assert "slot" in web_read_doc
+    assert "vnc_url" in establish_doc
+    assert "status" in establish_doc
+    assert "slot" in establish_doc
 
 
 # ---------------------------------------------------------------------------

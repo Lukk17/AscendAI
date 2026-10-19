@@ -6,6 +6,7 @@ from ascend_python_common.uri_guard import UnsafeUriError
 
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
+from src.config.config import settings
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
 
 EXTERNAL_SERVICE_UNAVAILABLE = ProblemCode("external_service_unavailable", 503)
@@ -15,21 +16,24 @@ HUMAN_INTERVENTION_REQUIRED = ProblemCode("human_intervention_required", 428)
 NOVNC_BUSY = ProblemCode("novnc_busy", 409)
 UNSAFE_URI = ProblemCode("unsafe_uri", 400)
 
-# Suggested wait before a caller retries a busy NoVNC flow. Not the flow's own
-# timeout (up to 10 minutes): a short, fixed poll interval so a rejected caller
-# gets a fast, actionable answer instead of an opaque long wait.
-_NOVNC_BUSY_RETRY_AFTER_SECONDS = 30
-
 
 def _human_detail(exc: BaseException) -> str:
     assert isinstance(exc, HumanInterventionRequiredException)
-    HUMAN_INTERVENTION_TOTAL.labels(intervention_type=exc.intervention_type).inc()
+    HUMAN_INTERVENTION_TOTAL.labels(
+        intervention_type=exc.intervention_type, joined=str(exc.joined).lower()
+    ).inc()
     return exc.message
 
 
 def _human_extensions(exc: BaseException) -> dict[str, Any] | None:
     assert isinstance(exc, HumanInterventionRequiredException)
-    return {"intervention_type": exc.intervention_type, "vnc_url": exc.vnc_url}
+    return {
+        "intervention_type": exc.intervention_type,
+        "vnc_url": exc.vnc_url,
+        "flow_id": exc.flow_id,
+        "joined": exc.joined,
+        "window": exc.window,
+    }
 
 
 def _novnc_detail(exc: BaseException) -> str:
@@ -40,7 +44,13 @@ def _novnc_detail(exc: BaseException) -> str:
 
 def _novnc_extensions(exc: BaseException) -> dict[str, Any] | None:
     assert isinstance(exc, NoVNCFlowBusyException)
-    return {"holder_url": exc.holder_url, "holder_profile": exc.holder_profile}
+    return {
+        "holder_url": exc.holder_url,
+        "holder_profile": exc.holder_profile,
+        "active_flows": exc.active_flows,
+        "max_concurrent_flows": exc.max_concurrent_flows,
+        "flows": exc.flows,
+    }
 
 
 def _throttle_retry_after(exc: BaseException) -> dict[str, str] | None:
@@ -74,7 +84,7 @@ def build_error_registry() -> ErrorRegistry:
         NoVNCFlowBusyException,
         NOVNC_BUSY,
         _novnc_detail,
-        headers={"Retry-After": str(_NOVNC_BUSY_RETRY_AFTER_SECONDS)},
+        headers={"Retry-After": str(settings.NOVNC_BUSY_RETRY_AFTER_SECONDS)},
         extensions=_novnc_extensions,
     )
     return registry
