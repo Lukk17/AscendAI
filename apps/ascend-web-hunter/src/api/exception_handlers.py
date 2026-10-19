@@ -4,7 +4,13 @@ import httpx
 from ascend_python_common.errors import INTERNAL, VALIDATION, ErrorRegistry, ProblemCode
 from ascend_python_common.uri_guard import UnsafeUriError
 
-from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api.exceptions import (
+    HumanInterventionRequiredException,
+    InvalidProfileError,
+    NoCookiesForDomainError,
+    NoVNCFlowBusyException,
+    TierDisabledError,
+)
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
 from src.config.config import settings
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
@@ -15,6 +21,9 @@ BLOCKLIST_REFRESH_THROTTLED = ProblemCode("blocklist_refresh_throttled", 429)
 HUMAN_INTERVENTION_REQUIRED = ProblemCode("human_intervention_required", 428)
 NOVNC_BUSY = ProblemCode("novnc_busy", 409)
 UNSAFE_URI = ProblemCode("unsafe_uri", 400)
+TIER_DISABLED = ProblemCode("tier_disabled", 409)
+INVALID_PROFILE = ProblemCode("invalid_profile", 400)
+NO_COOKIES_FOR_DOMAIN = ProblemCode("no_cookies_for_domain", 400)
 
 
 def _human_detail(exc: BaseException) -> str:
@@ -61,6 +70,9 @@ def _throttle_retry_after(exc: BaseException) -> dict[str, str] | None:
 def build_error_registry() -> ErrorRegistry:
     registry = ErrorRegistry(internal_code=INTERNAL)
     registry.register(UnsafeUriError, UNSAFE_URI, str)
+    registry.register(TierDisabledError, TIER_DISABLED, str)
+    registry.register(InvalidProfileError, INVALID_PROFILE, str)
+    registry.register(NoCookiesForDomainError, NO_COOKIES_FOR_DOMAIN, str)
     registry.register(ValueError, VALIDATION, str)
     registry.register(
         httpx.HTTPError,

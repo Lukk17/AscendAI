@@ -24,6 +24,7 @@ _TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
 PRODUCED_BY_FLARESOLVERR = "3-flaresolverr"
 PRODUCED_BY_NOVNC = "6-novnc"
 PRODUCED_BY_LOGIN_SEED = "login-seed"
+PRODUCED_BY_IMPORT = "import"
 
 # Reported for a still-valid entry that predates the produced_by field, or whose
 # caller omitted it. Distinct from None, which means no valid stored session exists

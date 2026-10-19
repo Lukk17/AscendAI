@@ -1,8 +1,8 @@
-"""Seed authenticated Playwright storage_state into the ascend-web-hunter session store.
+"""Seed an authenticated Playwright storage_state through the session import endpoint.
 
 For each configured login service, scripts a login, captures the resulting
-storage_state, and persists it under the 'e2e' profile via the service's own
-CookieManager so the Bruno test runs can replay the session.
+storage_state, and sends it to ``POST {WEB_HUNTER_BASE_URL}/api/v2/web/session/import``
+under the 'e2e' profile, so the Bruno test runs can replay the session.
 
 Credentials are hardcoded per service. saucedemo's are its public demo credentials
 (shown on its own login page) - not secrets. A future service that needs real
@@ -16,6 +16,10 @@ import os
 import sys
 from dataclasses import dataclass
 from typing import Any
+
+import httpx
+
+WEB_HUNTER_BASE_URL = os.environ.get("WEB_HUNTER_BASE_URL", "http://localhost:7021")
 
 
 @dataclass(frozen=True)
@@ -47,8 +51,6 @@ SERVICES: tuple[LoginService, ...] = (
 async def _seed_service(service: LoginService) -> None:
     from playwright.async_api import async_playwright
 
-    from src.reader.cloudflare.cookie_manager import PRODUCED_BY_LOGIN_SEED, cookie_manager
-
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
         context = await browser.new_context()
@@ -58,17 +60,25 @@ async def _seed_service(service: LoginService) -> None:
         await page.fill(service.pw_selector, service.password)
         await page.click(service.submit_selector)
         await page.wait_for_load_state("networkidle")
-        storage_state: dict[str, Any] = await context.storage_state()
+        storage_state: Any = await context.storage_state()
         user_agent: str = await page.evaluate("() => navigator.userAgent")
         await browser.close()
 
-    await cookie_manager.save_storage_state(
-        url=service.secure_url,
-        storage_state=storage_state,
-        user_agent=user_agent,
-        profile="e2e",
-        produced_by=PRODUCED_BY_LOGIN_SEED,
-    )
+    async with httpx.AsyncClient(base_url=WEB_HUNTER_BASE_URL, timeout=30) as client:
+        resp = await client.post(
+            "/api/v2/web/session/import",
+            json={
+                "url": service.secure_url,
+                "profile": "e2e",
+                "storage_state": storage_state,
+                "user_agent": user_agent,
+            },
+        )
+    if resp.status_code != 200:
+        sys.stderr.write(
+            f"[seed] {service.name}: import failed with {resp.status_code}: {resp.text}\n"
+        )
+        raise SystemExit(1)
     sys.stdout.write(f"[seed] {service.name}: session seeded under profile 'e2e'.\n")
 
 

@@ -69,3 +69,24 @@ class NoVNCFlowBusyException(Exception):
             )
         )
         super().__init__(self.message)
+
+
+class InvalidProfileError(ValueError):
+    pass
+
+
+class NoCookiesForDomainError(ValueError):
+    pass
+
+
+class TierDisabledError(ValueError):
+    """Raised when a caller selects a tier the operator switched off.
+
+    The message names the tier, so the REST problem body `detail` and the MCP
+    tool error text name it too.
+    """
+
+    def __init__(self, tier: str):
+        self.tier = tier
+        self.message = f"Tier {tier} is disabled by configuration."
+        super().__init__(self.message)

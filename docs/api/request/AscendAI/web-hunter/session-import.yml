@@ -1,0 +1,57 @@
+info:
+  name: session-import
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/import"
+  body:
+    type: json
+    # Manual-use sample: replace the canary cookie values with a real
+    # Playwright storage_state captured on another machine.
+    data: |-
+      {
+        "url": "https://www.example.net/",
+        "profile": "manual",
+        "storage_state": {
+          "cookies": [
+            {
+              "name": "sessionid",
+              "value": "paste-real-value",
+              "domain": ".example.net",
+              "path": "/",
+              "expires": -1,
+              "httpOnly": false,
+              "secure": true,
+              "sameSite": "Lax"
+            }
+          ],
+          "origins": []
+        },
+        "user_agent": "manual-import/1.0"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("response contract: imported status with domain, profile and cookie counts", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("imported");
+            expect(b.domain).to.equal("example.net");
+            expect(b.profile).to.equal("manual");
+            expect(b.auth_cookies).to.be.a("number");
+            expect(b.waf_cookies).to.be.a("number");
+            expect(b.dropped_cookies).to.be.a("number");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

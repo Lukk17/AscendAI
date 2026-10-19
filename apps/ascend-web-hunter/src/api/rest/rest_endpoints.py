@@ -1,12 +1,17 @@
+import random
+import re
 import time
 from typing import Any
+from urllib.parse import urlparse
 
-from ascend_python_common.uri_guard import FetchPolicy, check_fetch_uri
+import tldextract
+from ascend_python_common.uri_guard import FetchPolicy, UnsafeUriError, check_fetch_uri
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
+from src.api.exceptions import InvalidProfileError, NoCookiesForDomainError
 from src.config.config import settings
-from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_IMPORT, cookie_manager
 from src.reader.novnc.flow_registry import flow_shape, novnc_flow_registry
 from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
@@ -65,6 +70,56 @@ class SessionStatusRequest(BaseModel):
 class SessionClearRequest(BaseModel):
     url: HttpUrl
     profile: str | None = None
+
+
+PROFILE_PATTERN = r"[A-Za-z0-9_-]{1,64}"
+
+_WAF_COOKIE_NAMES = frozenset({"cf_clearance", "__cf_bm", "_cfuvid"})
+
+_IMPORT_TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
+
+
+class PlaywrightCookie(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    name: str
+    value: str
+    domain: str
+    path: str = "/"
+    expires: float = -1
+    http_only: bool = Field(default=False, alias="httpOnly")
+    secure: bool = False
+    same_site: str = Field(default="Lax", alias="sameSite")
+
+
+class PlaywrightLocalStorageItem(BaseModel):
+    name: str
+    value: str
+
+
+class PlaywrightOrigin(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    origin: str
+    local_storage: list[PlaywrightLocalStorageItem] = Field(
+        default_factory=list, alias="localStorage"
+    )
+
+
+class PlaywrightStorageState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cookies: list[PlaywrightCookie] = Field(default_factory=list)
+    origins: list[PlaywrightOrigin] = Field(default_factory=list)
+
+
+class SessionImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: HttpUrl
+    profile: str | None = None
+    storage_state: PlaywrightStorageState
+    user_agent: str | None = None
 
 
 @rest_router.get("/search")
@@ -262,6 +317,66 @@ async def clear_session(request: SessionClearRequest) -> dict[str, Any]:
         "url": url_str,
         "existed": existed,
         "cleared_cache_entries": cleared_cache_entries,
+    }
+
+
+@rest_router_v2.post("/session/import")
+async def import_session(request: SessionImportRequest) -> dict[str, Any]:
+    """
+    Store a Playwright storage_state captured outside the service.
+
+    Validates with no address lookup: the URL host must have a registrable
+    domain, the profile must match the identifier pattern, and at least one
+    cookie must belong to the domain. Drops other-domain cookies, saves with
+    the import provenance, and purges the domain read cache like a clear.
+    """
+    url_str = str(request.url)
+    parsed_host = urlparse(url_str).hostname or ""
+    extracted = _IMPORT_TLD_EXTRACT(parsed_host.lower())
+    if not extracted.domain or not extracted.suffix:
+        raise UnsafeUriError(f"URL host has no registrable domain: {parsed_host}")
+    domain = f"{extracted.domain}.{extracted.suffix}"
+
+    effective_profile = (
+        request.profile if request.profile is not None else settings.SESSION_DEFAULT_PROFILE
+    )
+    if re.fullmatch(PROFILE_PATTERN, effective_profile) is None:
+        raise InvalidProfileError(f"profile must match {PROFILE_PATTERN}")
+
+    kept = [
+        cookie
+        for cookie in request.storage_state.cookies
+        if (cookie.domain.lstrip(".").lower() == domain)
+        or (cookie.domain.lstrip(".").lower().endswith(f".{domain}"))
+    ]
+    dropped_cookies = len(request.storage_state.cookies) - len(kept)
+    if not kept:
+        raise NoCookiesForDomainError(f"no cookie belongs to {domain}")
+
+    user_agent = request.user_agent or random.choice(web_reader.user_agents)
+    filtered_state = {
+        "cookies": [cookie.model_dump(by_alias=True) for cookie in kept],
+        "origins": [origin.model_dump(by_alias=True) for origin in request.storage_state.origins],
+    }
+    await cookie_manager.save_storage_state(
+        url_str,
+        filtered_state,
+        user_agent,
+        effective_profile,
+        produced_by=PRODUCED_BY_IMPORT,
+    )
+    web_reader.clear_cache_for_domain(domain)
+
+    auth_cookies = sum(1 for cookie in kept if cookie.name not in _WAF_COOKIE_NAMES)
+    waf_cookies = sum(1 for cookie in kept if cookie.name in _WAF_COOKIE_NAMES)
+
+    return {
+        "status": "imported",
+        "domain": domain,
+        "profile": effective_profile,
+        "auth_cookies": auth_cookies,
+        "waf_cookies": waf_cookies,
+        "dropped_cookies": dropped_cookies,
     }
 
 
