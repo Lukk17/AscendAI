@@ -123,6 +123,41 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | STARTUP_PROBE_TIMEOUT_SECONDS | No | Seconds each startup banner check may take. Code default `2` applies when unset. |
 | SECURITY_HSTS_MAX_AGE_SECONDS | No | Max age of the strict-transport-security header. Code default `63072000` applies when unset. |
 | WEB_HUNTER_FETCH_MAX_REDIRECT_HOPS | No | Redirect hops the URI fetch guard follows. Code default `10` applies when unset. |
+| NOVNC_PUBLIC_URL | No | One base address shared by every container, the web-hunter edge proxy, with no path. Empty for one container without that proxy. |
+| NOVNC_MAX_CONCURRENT_FLOWS | No | Maximum concurrent intervention windows per container. Code default `4` applies when unset. |
+| NOVNC_DISPLAY_SIZE | No | Size of the shared Xvfb display as `<width>x<height>`, read by Xvfb and the service. Code default `1920x1080` applies when unset. |
+| NOVNC_WINDOW_WIDTH_PX | No | Width in pixels of each intervention window. Code default `1280` applies when unset. |
+| NOVNC_WINDOW_HEIGHT_PX | No | Height in pixels of each intervention window. Code default `800` applies when unset. |
+| NOVNC_WINDOW_CASCADE_OFFSET_PX | No | Cascade step in pixels between intervention windows. Code default `48` applies when unset. |
+| NOVNC_FLOW_LEASE_GRACE_SECONDS | No | Teardown grace added on top of the flow timeout before a held flow is reclaimed. Code default `30.0` applies when unset. |
+| NOVNC_FLOW_SWEEP_INTERVAL_SECONDS | No | Interval in seconds between lease-sweeper runs. Code default `30.0` applies when unset. |
+| NOVNC_FLOW_CANCEL_GRACE_SECONDS | No | Bounds reclamation and shutdown. Code default `10.0` applies when unset. |
+| NOVNC_BUSY_RETRY_AFTER_SECONDS | No | Short poll interval answered in the 409 Retry-After header. Code default `30` applies when unset. |
+| CHALLENGE_SCORE_THRESHOLD | No | Score at or above which a page is a wall. Code default `100` applies when unset. |
+| CHALLENGE_RICH_CONTENT_WORDS | No | Extracted words at or above which the rich-content guard fires. Code default `150` applies when unset. |
+| CHALLENGE_FORM_DOMINANCE_RATIO | No | Share of visible text inside forms at or above which form dominance fires. Code default `0.6` applies when unset. |
+| CHALLENGE_MIN_WORDS_PER_KB | No | Extracted words per kilobyte of HTML under which thin text fires. Code default `2.0` applies when unset. |
+| CHALLENGE_THIN_LINK_COUNT | No | Fewer anchors with href than this fires few links. Code default `5` applies when unset. |
+| CHALLENGE_RICH_LINK_COUNT | No | At least this many anchors with href fires the many-links guard. Code default `20` applies when unset. |
+| CHALLENGE_SHAPE_MAX_BYTES | No | Bounds the extraction the shape family uses. Code default `500000` applies when unset. |
+| CHALLENGE_WEIGHT_DEFINITIVE_HEADER | No | Weight of the definitive_header signal. Code default `200` applies when unset. |
+| CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE | No | Weight of the interstitial_structure signal. Code default `80` applies when unset. |
+| CHALLENGE_WEIGHT_VENDOR_SCRIPT | No | Weight of the vendor_script signal. Code default `60` applies when unset. |
+| CHALLENGE_WEIGHT_VENDOR_PRESENCE | No | Weight of the vendor_presence signal. Code default `30` applies when unset. |
+| CHALLENGE_WEIGHT_STATUS_EMPTY_BODY | No | Weight of the status_empty_body signal. Code default `200` applies when unset. |
+| CHALLENGE_WEIGHT_STATUS_SMALL_BODY | No | Weight of the status_small_body signal. Code default `50` applies when unset. |
+| CHALLENGE_WEIGHT_STATUS_LARGE_BODY | No | Weight of the status_large_body signal. Code default `20` applies when unset. |
+| CHALLENGE_WEIGHT_CAPTCHA_INPUT | No | Weight of the captcha_input signal. Code default `50` applies when unset. |
+| CHALLENGE_WEIGHT_CAPTCHA_ELEMENT | No | Weight of the captcha_element signal. Code default `40` applies when unset. |
+| CHALLENGE_WEIGHT_FORM_DOMINANCE | No | Weight of the form_dominance signal. Code default `40` applies when unset. |
+| CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY | No | Weight of the script_only_body signal. Code default `40` applies when unset. |
+| CHALLENGE_WEIGHT_THIN_TEXT | No | Weight of the thin_text signal. Code default `20` applies when unset. |
+| CHALLENGE_WEIGHT_FEW_LINKS | No | Weight of the few_links signal. Code default `20` applies when unset. |
+| CHALLENGE_WEIGHT_NO_ARTICLE | No | Weight of the no_article signal. Code default `20` applies when unset. |
+| CHALLENGE_WEIGHT_RICH_CONTENT | No | Weight of the rich_content guard signal. Code default `-60` applies when unset. |
+| CHALLENGE_WEIGHT_MANY_LINKS | No | Weight of the many_links guard signal. Code default `-20` applies when unset. |
+| CHALLENGE_WEIGHT_PHRASE_TITLE | No | Weight of the phrase_title signal. Code default `60` applies when unset. |
+| CHALLENGE_WEIGHT_PHRASE_BODY | No | Weight of the phrase_body signal. Code default `30` applies when unset. |
 
 The full list of tunable settings, timeouts, extraction thresholds, circuit-breaker values and so on, lives in [../docs/configuration.md](../docs/configuration.md). Every one of them can be added to the `environment:` block of the ascend-web-hunter service.
 

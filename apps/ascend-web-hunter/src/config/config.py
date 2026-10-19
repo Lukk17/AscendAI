@@ -1,5 +1,7 @@
+from urllib.parse import urlparse
+
 from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 
 
 class Settings(ServiceSettings):
@@ -101,6 +103,59 @@ class Settings(ServiceSettings):
         default=5.0,
         description="Poll interval in seconds for the NoVNC cookie-sync background monitor",
     )
+    NOVNC_MAX_CONCURRENT_FLOWS: int = Field(
+        default=4,
+        ge=1,
+        description=(
+            "Maximum concurrent human-intervention windows per container. A per container "
+            "memory constraint as much as a display one: each flow runs its own headful "
+            "Chromium. A request past the cap answers 409."
+        ),
+    )
+    NOVNC_DISPLAY_SIZE: str = Field(
+        default="1920x1080",
+        description=(
+            "Size of the shared Xvfb display as <width>x<height>. Xvfb and the service read "
+            "the same variable; the Dockerfile also sets it for a container started without compose."
+        ),
+    )
+    NOVNC_WINDOW_WIDTH_PX: int = Field(
+        default=1280,
+        ge=1,
+        description="Width in pixels of each intervention window. Wide enough for a reCAPTCHA image grid.",
+    )
+    NOVNC_WINDOW_HEIGHT_PX: int = Field(
+        default=800,
+        ge=1,
+        description="Height in pixels of each intervention window.",
+    )
+    NOVNC_WINDOW_CASCADE_OFFSET_PX: int = Field(
+        default=48,
+        ge=1,
+        description="Cascade step in pixels between intervention windows. Wider than a fluxbox title bar.",
+    )
+    NOVNC_FLOW_LEASE_GRACE_SECONDS: float = Field(
+        default=30.0,
+        gt=0,
+        description="Teardown grace added on top of NOVNC_TIMEOUT_SECONDS before a held flow is reclaimed.",
+    )
+    NOVNC_FLOW_SWEEP_INTERVAL_SECONDS: float = Field(
+        default=30.0,
+        gt=0,
+        description="Interval in seconds between lease-sweeper runs. One lease grace period.",
+    )
+    NOVNC_FLOW_CANCEL_GRACE_SECONDS: float = Field(
+        default=10.0,
+        gt=0,
+        description="Bounds reclamation and shutdown. A browser that has not closed in this time will not.",
+    )
+    NOVNC_BUSY_RETRY_AFTER_SECONDS: int = Field(
+        default=30,
+        ge=1,
+        description=(
+            "Short actionable poll interval answered in the 409 Retry-After header, not the flow timeout."
+        ),
+    )
     PLAYWRIGHT_HEADLESS: bool = Field(
         default=False,
         description=(
@@ -154,6 +209,14 @@ class Settings(ServiceSettings):
         default="http://localhost:7900",
         description="Public Internet-facing VNC URL (can be Ngrok api string)",
     )
+    NOVNC_PUBLIC_URL: str | None = Field(
+        default=None,
+        description=(
+            "One base address shared by every ascend-web-hunter container, the address of the "
+            "web-hunter edge proxy, an absolute http or https URL with no path. Unset keeps "
+            "today's PUBLIC_VNC_URL resolution and the one Ngrok tunnel, which serve one container."
+        ),
+    )
     REDIS_URL: str = Field(
         default="redis://127.0.0.1:6379/0",
         description="Redis connection URL for cookie storage",
@@ -176,20 +239,114 @@ class Settings(ServiceSettings):
     # Challenge detection
     CHALLENGE_DETECTION_MAX_BYTES: int = Field(
         default=50_000,
+        ge=1,
         description=(
-            "Prefix length scanned by ChallengeDetector. Pages larger than this "
-            "were previously skipped entirely; now we scan only the prefix."
+            "Prefix length scanned by the vendor, structure and phrase families. "
+            "Only the first bytes of a page are read for those signals."
         ),
     )
     CHALLENGE_WALL_MAX_BYTES: int = Field(
         default=50_000,
+        ge=1,
         description=(
-            "Max page size for a weak marker (an embedded Turnstile widget or a "
-            "cf_clearance token) to count as a block. A real page can host a Turnstile "
-            "widget while serving full content (e.g. nowsecure.nl), so these only signal "
-            "a challenge wall on an interstitial-sized page. Strong markers (Ray ID, "
-            "interstitial phrases, third-party captcha scripts) fire regardless of size."
+            "Page size under which a 403, 429 or 503 body counts as small, and under "
+            "which the word floor is computed. Larger pages pass the word floor automatically."
         ),
+    )
+
+    # Challenge scoring: tuning values (design Decision 2, owner rule 98 of 2026-10-08)
+    CHALLENGE_SCORE_THRESHOLD: int = Field(
+        default=100,
+        ge=1,
+        le=10_000,
+        description="Score at or above which a page is a wall. No non-definitive signal reaches it alone.",
+    )
+    CHALLENGE_RICH_CONTENT_WORDS: int = Field(
+        default=150,
+        ge=1,
+        description="Extracted words at or above which the rich-content guard fires.",
+    )
+    CHALLENGE_FORM_DOMINANCE_RATIO: float = Field(
+        default=0.6,
+        gt=0,
+        le=1.0,
+        description="Share of visible text inside forms at or above which form dominance fires.",
+    )
+    CHALLENGE_MIN_WORDS_PER_KB: float = Field(
+        default=2.0,
+        gt=0,
+        description="Extracted words per kilobyte of HTML under which thin text fires.",
+    )
+    CHALLENGE_THIN_LINK_COUNT: int = Field(
+        default=5,
+        ge=0,
+        description="Fewer anchors with href than this fires few links.",
+    )
+    CHALLENGE_RICH_LINK_COUNT: int = Field(
+        default=20,
+        ge=0,
+        description="At least this many anchors with href fires the many-links guard.",
+    )
+    CHALLENGE_SHAPE_MAX_BYTES: int = Field(
+        default=500_000,
+        ge=1,
+        description="Bounds the extraction the shape family uses. Larger pages contribute no shape signal.",
+    )
+
+    # Challenge scoring: per-signal weights (design Decision 2, owner rule 98 of 2026-10-08)
+    CHALLENGE_WEIGHT_DEFINITIVE_HEADER: int = Field(
+        default=200, ge=-1_000, le=1_000, description="Weight of the definitive_header signal."
+    )
+    CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE: int = Field(
+        default=80, ge=-1_000, le=1_000, description="Weight of the interstitial_structure signal."
+    )
+    CHALLENGE_WEIGHT_VENDOR_SCRIPT: int = Field(
+        default=60, ge=-1_000, le=1_000, description="Weight of the vendor_script signal."
+    )
+    CHALLENGE_WEIGHT_VENDOR_PRESENCE: int = Field(
+        default=30, ge=-1_000, le=1_000, description="Weight of the vendor_presence signal."
+    )
+    CHALLENGE_WEIGHT_STATUS_EMPTY_BODY: int = Field(
+        default=200, ge=-1_000, le=1_000, description="Weight of the status_empty_body signal."
+    )
+    CHALLENGE_WEIGHT_STATUS_SMALL_BODY: int = Field(
+        default=50, ge=-1_000, le=1_000, description="Weight of the status_small_body signal."
+    )
+    CHALLENGE_WEIGHT_STATUS_LARGE_BODY: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the status_large_body signal."
+    )
+    CHALLENGE_WEIGHT_CAPTCHA_INPUT: int = Field(
+        default=50, ge=-1_000, le=1_000, description="Weight of the captcha_input signal."
+    )
+    CHALLENGE_WEIGHT_CAPTCHA_ELEMENT: int = Field(
+        default=40, ge=-1_000, le=1_000, description="Weight of the captcha_element signal."
+    )
+    CHALLENGE_WEIGHT_FORM_DOMINANCE: int = Field(
+        default=40, ge=-1_000, le=1_000, description="Weight of the form_dominance signal."
+    )
+    CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY: int = Field(
+        default=40, ge=-1_000, le=1_000, description="Weight of the script_only_body signal."
+    )
+    CHALLENGE_WEIGHT_THIN_TEXT: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the thin_text signal."
+    )
+    CHALLENGE_WEIGHT_FEW_LINKS: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the few_links signal."
+    )
+    CHALLENGE_WEIGHT_NO_ARTICLE: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the no_article signal."
+    )
+    CHALLENGE_WEIGHT_RICH_CONTENT: int = Field(
+        default=-60, ge=-1_000, le=1_000, description="Weight of the rich_content guard signal."
+    )
+    CHALLENGE_WEIGHT_MANY_LINKS: int = Field(
+        default=-20, ge=-1_000, le=1_000, description="Weight of the many_links guard signal."
+    )
+    CHALLENGE_WEIGHT_PHRASE_TITLE: int = Field(
+        default=60, ge=-1_000, le=1_000, description="Weight of the phrase_title signal."
+    )
+    CHALLENGE_WEIGHT_PHRASE_BODY: int = Field(
+        default=30, ge=-1_000, le=1_000, description="Weight of the phrase_body signal."
     )
 
     # Crawlee storage root (outside src/ to avoid committing runtime state)
@@ -259,6 +416,100 @@ class Settings(ServiceSettings):
         default=60.0,
         description="Seconds after which an open breaker moves to half-open and allows one probe.",
     )
+
+    @model_validator(mode="after")
+    def _validate_novnc_display_size(self) -> "Settings":
+        parts = self.NOVNC_DISPLAY_SIZE.split("x")
+        if len(parts) != 2 or not all(part.isdigit() for part in parts):
+            raise ValueError(
+                f"NOVNC_DISPLAY_SIZE {self.NOVNC_DISPLAY_SIZE!r} must read <width>x<height>, e.g. '1920x1080'"
+            )
+        width, height = int(parts[0]), int(parts[1])
+        if width < self.NOVNC_WINDOW_WIDTH_PX:
+            raise ValueError(
+                f"NOVNC_DISPLAY_SIZE {self.NOVNC_DISPLAY_SIZE!r} is smaller than "
+                f"NOVNC_WINDOW_WIDTH_PX ({self.NOVNC_WINDOW_WIDTH_PX}) on the x axis"
+            )
+        if height < self.NOVNC_WINDOW_HEIGHT_PX:
+            raise ValueError(
+                f"NOVNC_DISPLAY_SIZE {self.NOVNC_DISPLAY_SIZE!r} is smaller than "
+                f"NOVNC_WINDOW_HEIGHT_PX ({self.NOVNC_WINDOW_HEIGHT_PX}) on the y axis"
+            )
+        return self
+
+    @field_validator("NOVNC_PUBLIC_URL")
+    @classmethod
+    def _validate_novnc_public_url(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        parsed = urlparse(value)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.path != "":
+            raise ValueError(
+                f"NOVNC_PUBLIC_URL must be an absolute http or https URL with no path, got {value!r}"
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_challenge_weights(self) -> "Settings":
+        if self.CHALLENGE_WALL_MAX_BYTES > self.CHALLENGE_SHAPE_MAX_BYTES:
+            raise ValueError(
+                "CHALLENGE_WALL_MAX_BYTES must not exceed CHALLENGE_SHAPE_MAX_BYTES"
+            )
+        if self.CHALLENGE_THIN_LINK_COUNT > self.CHALLENGE_RICH_LINK_COUNT:
+            raise ValueError(
+                "CHALLENGE_THIN_LINK_COUNT must not exceed CHALLENGE_RICH_LINK_COUNT"
+            )
+        if self.CHALLENGE_WEIGHT_RICH_CONTENT > 0:
+            raise ValueError(
+                "CHALLENGE_WEIGHT_RICH_CONTENT must not be positive"
+            )
+        if self.CHALLENGE_WEIGHT_MANY_LINKS > 0:
+            raise ValueError(
+                "CHALLENGE_WEIGHT_MANY_LINKS must not be positive"
+            )
+        negative_guards = {
+            "CHALLENGE_WEIGHT_RICH_CONTENT",
+            "CHALLENGE_WEIGHT_MANY_LINKS",
+        }
+        allowed_single = {
+            "CHALLENGE_WEIGHT_DEFINITIVE_HEADER",
+            "CHALLENGE_WEIGHT_STATUS_EMPTY_BODY",
+        }
+        weight_names = (
+            "CHALLENGE_WEIGHT_DEFINITIVE_HEADER",
+            "CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE",
+            "CHALLENGE_WEIGHT_VENDOR_SCRIPT",
+            "CHALLENGE_WEIGHT_VENDOR_PRESENCE",
+            "CHALLENGE_WEIGHT_STATUS_EMPTY_BODY",
+            "CHALLENGE_WEIGHT_STATUS_SMALL_BODY",
+            "CHALLENGE_WEIGHT_STATUS_LARGE_BODY",
+            "CHALLENGE_WEIGHT_CAPTCHA_INPUT",
+            "CHALLENGE_WEIGHT_CAPTCHA_ELEMENT",
+            "CHALLENGE_WEIGHT_FORM_DOMINANCE",
+            "CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY",
+            "CHALLENGE_WEIGHT_THIN_TEXT",
+            "CHALLENGE_WEIGHT_FEW_LINKS",
+            "CHALLENGE_WEIGHT_NO_ARTICLE",
+            "CHALLENGE_WEIGHT_RICH_CONTENT",
+            "CHALLENGE_WEIGHT_MANY_LINKS",
+            "CHALLENGE_WEIGHT_PHRASE_TITLE",
+            "CHALLENGE_WEIGHT_PHRASE_BODY",
+        )
+        for name in weight_names:
+            if name in negative_guards or name in allowed_single:
+                continue
+            value = getattr(self, name)
+            if value < 0:
+                raise ValueError(f"{name} must not be negative")
+        for name in weight_names:
+            if name in allowed_single:
+                continue
+            value = getattr(self, name)
+            if value >= self.CHALLENGE_SCORE_THRESHOLD:
+                raise ValueError(
+                    f"{name} must stay below CHALLENGE_SCORE_THRESHOLD"
+                )
+        return self
 
 
 settings = Settings()

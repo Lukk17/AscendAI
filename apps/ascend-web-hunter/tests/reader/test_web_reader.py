@@ -20,6 +20,81 @@ _ARTICLE_HTML = (
     "</p></article></body></html>"
 )
 
+_WALL_HTML = "<html><body><div id='cf-challenge-running'></div></body></html>"
+
+_LOGIN_WALL_HTML = (
+    "<html><body>"
+    "<div id='cf-challenge-running'></div>"
+    "<p>" + " ".join(["outside"] * 39) + "</p>"
+    "<form><p>" + " ".join(["inside"] * 61) + "</p>"
+    "<input name='captcha'><input type='password' name='pw'></form>"
+    "</body></html>"
+)
+
+
+def _challenge(intervention_type: str) -> ChallengeDetectedException:
+    """A ChallengeDetectedException carrying a real scored verdict, so the
+    reader's fall-through and escalation paths are exercised, not the
+    constructor."""
+    from src.reader.cloudflare.challenge_signals import as_login_verdict, assess
+
+    html = _LOGIN_WALL_HTML if intervention_type == "login" else _WALL_HTML
+    verdict = assess(200, html)
+    assert verdict.wall is True
+    if intervention_type == "login":
+        verdict = as_login_verdict(verdict)
+    assert verdict.intervention_type == intervention_type
+
+    return ChallengeDetectedException(verdict)
+
+
+@pytest.mark.asyncio
+async def test_execute_strategy_logs_verdict_on_challenge(caplog: pytest.LogCaptureFixture) -> None:
+    """The read path logs the scored verdict when the second look trips."""
+    # given
+    import logging
+
+    reader = WebReader()
+    strategy = MagicMock()
+    strategy.get_html = AsyncMock(return_value=_WALL_HTML)
+
+    # when
+    with caplog.at_level(logging.INFO):
+        result = await reader._execute_strategy("1-beautifulsoup", strategy, "http://test.com")
+
+    # then
+    assert result is None
+    assert any(
+        "Challenge verdict:" in record.getMessage()
+        and "vendor=cloudflare" in record.getMessage()
+        and "type=captcha" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_html_strategy_logs_verdict_on_challenge(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The read_with_links path logs the scored verdict when the second look trips."""
+    # given
+    import logging
+
+    reader = WebReader()
+    strategy = MagicMock()
+    strategy.get_html = AsyncMock(return_value=_WALL_HTML)
+
+    # when
+    with caplog.at_level(logging.INFO):
+        result = await reader._execute_html_strategy("1-beautifulsoup", strategy, "http://test.com")
+
+    # then
+    assert result == ""
+    assert any(
+        "Challenge verdict:" in record.getMessage() and "vendor=cloudflare" in record.getMessage()
+        for record in caplog.records
+    )
+
 
 @pytest.fixture(autouse=True)
 def _default_no_stored_session() -> Any:
@@ -320,7 +395,7 @@ async def test_read_falls_through_to_novnc_when_challenge_unsolved() -> None:
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
-            new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha")),
+            new=AsyncMock(side_effect=_challenge("captcha")),
         ),
         patch(
             "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
@@ -361,11 +436,11 @@ async def test_read_returns_failure_when_all_tiers_including_novnc_fail() -> Non
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
-            new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login")),
+            new=AsyncMock(side_effect=_challenge("login")),
         ),
         patch(
             "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
-            new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha")),
+            new=AsyncMock(side_effect=_challenge("captcha")),
         ),
         patch(
             "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
@@ -517,7 +592,7 @@ async def test_read_with_links_falls_through_to_novnc_on_challenge() -> None:
     with (
         patch(
             "src.reader.strategies.beautifulsoup_strategy.BeautifulSoupStrategy.get_html",
-            new=AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login")),
+            new=AsyncMock(side_effect=_challenge("login")),
         ),
         patch(
             "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
@@ -860,7 +935,7 @@ async def test_execute_html_strategy_falls_through_on_challenge() -> None:
     # given
     reader = WebReader()
     strategy = MagicMock()
-    strategy.get_html = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="login"))
+    strategy.get_html = AsyncMock(side_effect=_challenge("login"))
 
     # when
     result = await reader._execute_html_strategy("1-beautifulsoup", strategy, "http://test.com")
@@ -875,7 +950,7 @@ async def test_execute_strategy_falls_through_on_challenge() -> None:
     # given
     reader = WebReader()
     strategy = MagicMock()
-    strategy.get_html = AsyncMock(side_effect=ChallengeDetectedException(intervention_type="captcha"))
+    strategy.get_html = AsyncMock(side_effect=_challenge("captcha"))
 
     # when
     result = await reader._execute_strategy("1-beautifulsoup", strategy, "http://test.com")

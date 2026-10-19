@@ -14,5 +14,7 @@
 | [ADR-010](ADR-010-producer-aware-session-replay.md) | Every session record names the tier that produced it; a FlareSolverr-produced clearance is replayed by FlareSolverr first, everything else keeps routing to the browser tiers. | Accepted |
 | [ADR-011](ADR-011-caller-selectable-starting-tier.md) | A caller may name the tier the escalation chain starts at; escalation continues from there, and a login-redirect URL still outranks it. | Accepted |
 | [ADR-012](ADR-012-connect-time-address-pinning.md) | The in-process fetch connects to the address its own SSRF lookup validated, via CURLOPT_RESOLVE; the browser and out-of-process tiers keep pre-dispatch validation as residual risk. | Accepted |
+| [ADR-013](ADR-013-concurrent-human-intervention-windows.md) | Concurrent human-intervention windows on one shared display: per-container slots, Redis flow records, joins, ephemeral CDP ports, cascade layout, owner-named VNC URLs. | Accepted |
+| [ADR-014](ADR-014-scored-challenge-detection.md) | Scored challenge verdict over five signal families, catalogue with provenance, fixture corpus as the admission rule. | Accepted |
 
 For monorepo-level decisions see [`../../../../../docs/architecture/decisions/`](../../../../../docs/architecture/decisions/).

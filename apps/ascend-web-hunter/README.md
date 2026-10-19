@@ -135,8 +135,45 @@ and `.env`. The most-used variables:
 | `PLAYWRIGHT_HEADLESS`| `false`                            | Headless Chromium; flip to `true` in CI / no X       |
 | `PUBLIC_VNC_URL`     | `http://localhost:7900`            | NoVNC URL (or `http://ngrok:4040/api/tunnels`)       |
 | `NOVNC_TIMEOUT_SECONDS` | `600`                           | NoVNC monitor task lifetime                          |
+| `NOVNC_MAX_CONCURRENT_FLOWS` | `4`                      | Maximum concurrent intervention windows per container |
+| `NOVNC_DISPLAY_SIZE` | `1920x1080`                      | Shared Xvfb display size, read by Xvfb and the service |
+| `NOVNC_WINDOW_WIDTH_PX` | `1280`                      | Width in pixels of each intervention window          |
+| `NOVNC_WINDOW_HEIGHT_PX` | `800`                      | Height in pixels of each intervention window         |
+| `NOVNC_WINDOW_CASCADE_OFFSET_PX` | `48`                | Cascade step in pixels between intervention windows  |
+| `NOVNC_FLOW_LEASE_GRACE_SECONDS` | `30.0`              | Teardown grace before a held flow is reclaimed       |
+| `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS` | `30.0`           | Interval in seconds between lease-sweeper runs       |
+| `NOVNC_FLOW_CANCEL_GRACE_SECONDS` | `10.0`             | Bounds reclamation and shutdown                      |
+| `NOVNC_BUSY_RETRY_AFTER_SECONDS` | `30`                | Short poll interval in the 409 Retry-After header    |
+| `NOVNC_PUBLIC_URL` | unset                            | One base address shared by every container; unset keeps `PUBLIC_VNC_URL` |
 | `RATE_LIMIT_DEFAULT` | `1200/minute`                    | Flood-protection rate limit for REST routes and MCP tools |
 | `ALLOWED_PRIVATE_HOSTS` | empty                         | Hosts the URI fetch guard may reach even at a private address; leave empty, only an e2e sweep sets it |
+| `CHALLENGE_DETECTION_MAX_BYTES` | `50000`                  | Prefix length scanned by the vendor, structure and phrase families |
+| `CHALLENGE_WALL_MAX_BYTES` | `50000`                      | Page size under which a 403, 429 or 503 body counts as small, and under which the word floor is computed |
+| `CHALLENGE_SCORE_THRESHOLD` | `100`                      | Score at or above which a page is a wall |
+| `CHALLENGE_RICH_CONTENT_WORDS` | `150`                  | Extracted words at or above which the rich-content guard fires |
+| `CHALLENGE_FORM_DOMINANCE_RATIO` | `0.6`               | Share of visible text inside forms at or above which form dominance fires |
+| `CHALLENGE_MIN_WORDS_PER_KB` | `2.0`                     | Extracted words per kilobyte of HTML under which thin text fires |
+| `CHALLENGE_THIN_LINK_COUNT` | `5`                        | Fewer anchors with href than this fires few links |
+| `CHALLENGE_RICH_LINK_COUNT` | `20`                       | At least this many anchors with href fires the many-links guard |
+| `CHALLENGE_SHAPE_MAX_BYTES` | `500000`                   | Bounds the extraction the shape family uses |
+| `CHALLENGE_WEIGHT_DEFINITIVE_HEADER` | `200`            | Weight of the definitive_header signal |
+| `CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE` | `80`       | Weight of the interstitial_structure signal |
+| `CHALLENGE_WEIGHT_VENDOR_SCRIPT` | `60`                   | Weight of the vendor_script signal |
+| `CHALLENGE_WEIGHT_VENDOR_PRESENCE` | `30`               | Weight of the vendor_presence signal |
+| `CHALLENGE_WEIGHT_STATUS_EMPTY_BODY` | `200`             | Weight of the status_empty_body signal |
+| `CHALLENGE_WEIGHT_STATUS_SMALL_BODY` | `50`              | Weight of the status_small_body signal |
+| `CHALLENGE_WEIGHT_STATUS_LARGE_BODY` | `20`              | Weight of the status_large_body signal |
+| `CHALLENGE_WEIGHT_CAPTCHA_INPUT` | `50`                   | Weight of the captcha_input signal |
+| `CHALLENGE_WEIGHT_CAPTCHA_ELEMENT` | `40`                 | Weight of the captcha_element signal |
+| `CHALLENGE_WEIGHT_FORM_DOMINANCE` | `40`                | Weight of the form_dominance signal |
+| `CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY` | `40`              | Weight of the script_only_body signal |
+| `CHALLENGE_WEIGHT_THIN_TEXT` | `20`                       | Weight of the thin_text signal |
+| `CHALLENGE_WEIGHT_FEW_LINKS` | `20`                       | Weight of the few_links signal |
+| `CHALLENGE_WEIGHT_NO_ARTICLE` | `20`                      | Weight of the no_article signal |
+| `CHALLENGE_WEIGHT_RICH_CONTENT` | `-60`                  | Weight of the rich_content guard signal |
+| `CHALLENGE_WEIGHT_MANY_LINKS` | `-20`                    | Weight of the many_links guard signal |
+| `CHALLENGE_WEIGHT_PHRASE_TITLE` | `60`                   | Weight of the phrase_title signal |
+| `CHALLENGE_WEIGHT_PHRASE_BODY` | `30`                    | Weight of the phrase_body signal |
 
 Full settings reference in [docs/configuration.md](docs/configuration.md).
 

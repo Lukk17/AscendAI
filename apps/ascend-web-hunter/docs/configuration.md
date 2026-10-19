@@ -120,7 +120,42 @@ cost 25 to 33 milliseconds on 50 to 390 kilobyte pages, and because the longer r
 | `CHALLENGE_CLEAR_WAIT_SECONDS` | `12.0` | How long the headful Playwright tier waits for a Cloudflare challenge to auto-clear before escalating to NoVNC |
 | `CHALLENGE_DETECTION_MAX_BYTES` | `50000` | Prefix length scanned by the challenge detector |
 | `CHALLENGE_WALL_MAX_BYTES` | `50000` | Max page size for a weak challenge marker |
+| `CHALLENGE_SCORE_THRESHOLD` | `100` | Score at or above which a page is a wall. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_RICH_CONTENT_WORDS` | `150` | Extracted words at or above which the rich-content guard fires. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_FORM_DOMINANCE_RATIO` | `0.6` | Share of visible text inside forms at or above which form dominance fires. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_MIN_WORDS_PER_KB` | `2.0` | Extracted words per kilobyte of HTML under which thin text fires. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_THIN_LINK_COUNT` | `5` | Fewer anchors with href than this fires few links. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_RICH_LINK_COUNT` | `20` | At least this many anchors with href fires the many-links guard. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_SHAPE_MAX_BYTES` | `500000` | Bounds the extraction the shape family uses. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_DEFINITIVE_HEADER` | `200` | Weight of the definitive_header signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE` | `80` | Weight of the interstitial_structure signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_VENDOR_SCRIPT` | `60` | Weight of the vendor_script signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_VENDOR_PRESENCE` | `30` | Weight of the vendor_presence signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_STATUS_EMPTY_BODY` | `200` | Weight of the status_empty_body signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_STATUS_SMALL_BODY` | `50` | Weight of the status_small_body signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_STATUS_LARGE_BODY` | `20` | Weight of the status_large_body signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_CAPTCHA_INPUT` | `50` | Weight of the captcha_input signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_CAPTCHA_ELEMENT` | `40` | Weight of the captcha_element signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_FORM_DOMINANCE` | `40` | Weight of the form_dominance signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY` | `40` | Weight of the script_only_body signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_THIN_TEXT` | `20` | Weight of the thin_text signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_FEW_LINKS` | `20` | Weight of the few_links signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_NO_ARTICLE` | `20` | Weight of the no_article signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_RICH_CONTENT` | `-60` | Weight of the rich_content guard signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_MANY_LINKS` | `-20` | Weight of the many_links guard signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_PHRASE_TITLE` | `60` | Weight of the phrase_title signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_PHRASE_BODY` | `30` | Weight of the phrase_body signal. Added by `detect-challenge-walls-in-any-language`. |
 | `NOVNC_COOKIE_SYNC_POLL_SECONDS` | `5.0` | Poll interval in seconds for the NoVNC cookie-sync background monitor |
+| `NOVNC_MAX_CONCURRENT_FLOWS` | `4` | Maximum concurrent intervention windows per container: a per container memory constraint as much as a display one. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_DISPLAY_SIZE` | `1920x1080` | Size of the shared Xvfb display as `<width>x<height>`, read by Xvfb and the service from the same variable; the Dockerfile also sets it for a container started without compose. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_WINDOW_WIDTH_PX` | `1280` | Width in pixels of each intervention window, wide enough for a reCAPTCHA image grid. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_WINDOW_HEIGHT_PX` | `800` | Height in pixels of each intervention window; leaves 280 px of the 1080 display for the cascade and browser chrome. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_WINDOW_CASCADE_OFFSET_PX` | `48` | Cascade step in pixels between intervention windows, wider than a fluxbox title bar. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_FLOW_LEASE_GRACE_SECONDS` | `30.0` | Teardown grace added on top of `NOVNC_TIMEOUT_SECONDS` before a held flow is reclaimed. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS` | `30.0` | Interval in seconds between lease-sweeper runs, one lease grace period. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_FLOW_CANCEL_GRACE_SECONDS` | `10.0` | Bounds reclamation and shutdown. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_BUSY_RETRY_AFTER_SECONDS` | `30` | Short actionable poll interval answered in the 409 `Retry-After` header, not the flow timeout. Added by `open-several-novnc-windows-at-once`. |
+| `NOVNC_PUBLIC_URL` | unset | One base address shared by every container, the address of the web-hunter edge proxy of `scale-web-hunter-across-containers` with no path, from which each container builds `<NOVNC_PUBLIC_URL>/novnc/<hostname>/vnc.html` for its own flows. No NoVNC port is published by any container. Unset keeps `PUBLIC_VNC_URL` and the one Ngrok tunnel. Added by `open-several-novnc-windows-at-once`. |
 
 ---
 
