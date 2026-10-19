@@ -5,8 +5,8 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
 
 ## 1. Configuration and dependencies
 
-- [ ] 1.1 Add `extruct` and `jsonschema` to `pyproject.toml` with exact pins. Verify `python -m pip install -e ".[dev]"`.
-- [ ] 1.2 Add every setting named in `design.md` D3 to D7 to `src/config/config.py` with its default and constraint:
+- [x] 1.1 Add `extruct` and `jsonschema` to `pyproject.toml` with exact pins. Verify `python -m pip install -e ".[dev]"`.
+- [x] 1.2 Add every setting named in `design.md` D3 to D7 to `src/config/config.py` with its default and constraint:
       `EXTRACTION_SCHEMA_MAX_BYTES` (16384), `EXTRACTION_LLM_BASE_URL` (empty), `EXTRACTION_LLM_MODEL` (empty),
       `EXTRACTION_LLM_API_KEY` (a secret, empty when unset, no default value written anywhere),
       `EXTRACTION_LLM_MAX_INPUT_CHARS` (60000), `EXTRACTION_LLM_TIMEOUT_SECONDS` (60), `RECIPE_TTL_SECONDS` (604800),
@@ -17,16 +17,16 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
       compose default of task 1.5 (owner rule 98 of 2026-10-08). Verify with cases in `tests/config/test_config.py` for
       each default, a valid override and a rejected value.
 
-- [ ] 1.3 Move the curl_cffi `send_hop` of `fetch_with_curl_cffi` and its call to the library's
+- [x] 1.3 Move the curl_cffi `send_hop` of `fetch_with_curl_cffi` and its call to the library's
       `follow_guarded_redirects` into `src/fetch/pinned_fetch.py` per D6, without a copy and with no redirect loop of
       this change, and keep the signature of `fetch_with_curl_cffi`. Verify the existing `curl_cffi` fetcher tests pass
       unchanged, that an absolute, a relative and a protocol-relative redirect to a private address are each refused
       with no request sent, that an 11th redirect is not followed (`MAX_REDIRECT_HOPS` of the library), and that a
       search of `src/` for `Location` handling finds it only in the library call.
-- [ ] 1.4 Create `src/fetch/byte_fetch.py` with `stream_to_file` per D6 on top of `pinned_fetch`. Verify against a
+- [x] 1.4 Create `src/fetch/byte_fetch.py` with `stream_to_file` per D6 on top of `pinned_fetch`. Verify against a
       local test server: a declared `Content-Length` above the limit is refused before reading, an undeclared body
       that passes the limit is stopped and its file deleted, and a body under the limit is written whole.
-- [ ] 1.5 Pass every setting of task 1.2 through the `ascend-web-hunter` service of `compose.ascend-web-hunter.yaml`
+- [x] 1.5 Pass every setting of task 1.2 through the `ascend-web-hunter` service of `compose.ascend-web-hunter.yaml`
       and of `deploy-standalone/compose.yaml` as `- <NAME>=${<NAME>:-<default>}` with the default of task 1.2, for
       example `- EXTRACTION_LLM_TIMEOUT_SECONDS=${EXTRACTION_LLM_TIMEOUT_SECONDS:-60}` and
       `- DOCLING_SERVE_URL=${DOCLING_SERVE_URL:-http://docling-serve:5001}`, the empty ones as
@@ -45,7 +45,7 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
 
 ## 2. Embedded data and the ensemble
 
-- [ ] 2.1 Parse JSON-LD, OpenGraph and microdata with `extruct` into `metadata` on the `structured` result in
+- [x] 2.1 Parse JSON-LD, OpenGraph and microdata with `extruct` into `metadata` on the `structured` result in
       `src/reader/extraction.py`. Verify with fixtures in `tests/fixtures/` and a test for a parse error leaving
       `metadata` empty.
 - [ ] 2.2 Replace the recall pass with the D2 ensemble. Verify with a fixture where readability wins, one where
