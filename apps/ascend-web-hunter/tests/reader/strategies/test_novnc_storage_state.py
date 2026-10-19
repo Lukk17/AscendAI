@@ -330,9 +330,7 @@ async def test_novnc_captcha_monitor_captures_rendered_wall_with_clearance_cooki
     page.goto = AsyncMock()
     page.evaluate = AsyncMock(return_value="Mozilla/5.0")
     page.url = "https://example.com/"
-    page.content = AsyncMock(
-        return_value="<html><body><div id='cf-challenge-running'></div></body></html>"
-    )
+    page.content = AsyncMock(return_value="<html><body><div id='cf-challenge-running'></div></body></html>")
 
     context = MagicMock()
     context.new_page = AsyncMock(return_value=page)

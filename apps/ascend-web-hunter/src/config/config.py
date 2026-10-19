@@ -452,21 +452,13 @@ class Settings(ServiceSettings):
     @model_validator(mode="after")
     def _validate_challenge_weights(self) -> "Settings":
         if self.CHALLENGE_WALL_MAX_BYTES > self.CHALLENGE_SHAPE_MAX_BYTES:
-            raise ValueError(
-                "CHALLENGE_WALL_MAX_BYTES must not exceed CHALLENGE_SHAPE_MAX_BYTES"
-            )
+            raise ValueError("CHALLENGE_WALL_MAX_BYTES must not exceed CHALLENGE_SHAPE_MAX_BYTES")
         if self.CHALLENGE_THIN_LINK_COUNT > self.CHALLENGE_RICH_LINK_COUNT:
-            raise ValueError(
-                "CHALLENGE_THIN_LINK_COUNT must not exceed CHALLENGE_RICH_LINK_COUNT"
-            )
+            raise ValueError("CHALLENGE_THIN_LINK_COUNT must not exceed CHALLENGE_RICH_LINK_COUNT")
         if self.CHALLENGE_WEIGHT_RICH_CONTENT > 0:
-            raise ValueError(
-                "CHALLENGE_WEIGHT_RICH_CONTENT must not be positive"
-            )
+            raise ValueError("CHALLENGE_WEIGHT_RICH_CONTENT must not be positive")
         if self.CHALLENGE_WEIGHT_MANY_LINKS > 0:
-            raise ValueError(
-                "CHALLENGE_WEIGHT_MANY_LINKS must not be positive"
-            )
+            raise ValueError("CHALLENGE_WEIGHT_MANY_LINKS must not be positive")
         negative_guards = {
             "CHALLENGE_WEIGHT_RICH_CONTENT",
             "CHALLENGE_WEIGHT_MANY_LINKS",
@@ -506,9 +498,7 @@ class Settings(ServiceSettings):
                 continue
             value = getattr(self, name)
             if value >= self.CHALLENGE_SCORE_THRESHOLD:
-                raise ValueError(
-                    f"{name} must stay below CHALLENGE_SCORE_THRESHOLD"
-                )
+                raise ValueError(f"{name} must stay below CHALLENGE_SCORE_THRESHOLD")
         return self
 
 

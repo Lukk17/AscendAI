@@ -375,6 +375,61 @@ async def test_file_inside_root_passes(tmp_path: Path) -> None:
     assert target.host is None
 
 
+async def test_absolute_file_uri_resolves_relative_to_the_root(tmp_path: Path) -> None:
+    # given
+    root = tmp_path / "root"
+    root.mkdir()
+    inner = root / "src.wav"
+    inner.write_bytes(b"abcd")
+    policy = FetchPolicy(file_root=root)
+    # when
+    target = await check_fetch_uri("file:///src.wav", policy)
+    # then
+    assert target.file_path == inner.resolve()
+    assert target.host is None
+
+
+async def test_relative_file_uri_resolves_under_the_root(tmp_path: Path) -> None:
+    # given
+    root = tmp_path / "root"
+    root.mkdir()
+    inner = root / "inner.txt"
+    inner.write_text("text")
+    policy = FetchPolicy(file_root=root)
+    # when
+    target = await check_fetch_uri("file:inner.txt", policy)
+    # then
+    assert target.file_path == inner.resolve()
+    assert target.host is None
+
+
+async def test_symlinked_dir_inside_root_pointing_outside_is_refused(tmp_path: Path) -> None:
+    # given
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "evil.txt").write_text("evil")
+    (root / "mid").symlink_to(outside, target_is_directory=True)
+    policy = FetchPolicy(file_root=root)
+    # when
+    with pytest.raises(UnsafeUriError):
+        await check_fetch_uri("file:///mid/evil.txt", policy)
+
+
+async def test_bare_name_through_a_symlink_inside_root_is_refused(tmp_path: Path) -> None:
+    # given
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret")
+    (root / "link.txt").symlink_to(outside)
+    policy = FetchPolicy(file_root=root)
+    # when
+    with pytest.raises(UnsafeUriError):
+        await check_fetch_uri("file:///link.txt", policy)
+
+
 def test_fetch_policy_from_mixin_names_hosts_root_and_hops(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

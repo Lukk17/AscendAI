@@ -226,6 +226,22 @@ def test_span_without_a_session_id_keeps_its_attributes(
     assert dict(span.attributes or {}) == {"other": "kept"}
 
 
+def test_sdk_disabled_sends_nothing_while_the_endpoint_is_set(
+    shutdown_providers: list[TracerProvider], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
+    exported = InMemorySpanExporter()
+    provider, _ = _build(shutdown_providers, otel_endpoint=OTEL_ENDPOINT, exporter=exported)
+    client = TestClient(_sample_app(provider))
+    # when
+    response = client.get(SAMPLE_PATH)
+    provider.force_flush()
+    # then
+    assert response.status_code == 200
+    assert list(exported.get_finished_spans()) == []
+
+
 def test_sdk_disabled_hands_out_noop_tracers(
     shutdown_providers: list[TracerProvider], monkeypatch: pytest.MonkeyPatch
 ) -> None:

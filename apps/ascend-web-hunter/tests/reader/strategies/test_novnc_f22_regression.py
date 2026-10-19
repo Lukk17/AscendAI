@@ -9,13 +9,13 @@ contention impossible) and writes only its own session key.
 """
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.api.exceptions import HumanInterventionRequiredException
-from src.reader.novnc.flow_registry import flow_key_for, novnc_flow_registry
+from src.reader.novnc.flow_registry import novnc_flow_registry
 from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from tests.reader.novnc.test_flow_registry import FakeRedis
 
@@ -24,9 +24,7 @@ from tests.reader.novnc.test_flow_registry import FakeRedis
 def _isolated_registry(monkeypatch: pytest.MonkeyPatch) -> Any:
     fake = FakeRedis()
     monkeypatch.setattr(novnc_flow_registry, "_redis", fake)
-    monkeypatch.setattr(
-        "src.reader.cloudflare.cookie_manager.cookie_manager.redis_client", None
-    )
+    monkeypatch.setattr("src.reader.cloudflare.cookie_manager.cookie_manager.redis_client", None)
     novnc_flow_registry._local.clear()
     yield fake
     novnc_flow_registry._local.clear()
@@ -83,9 +81,7 @@ async def _drive_two_flows_to_resolution() -> tuple[Any, Any]:
             "src.reader.strategies.novnc_strategy.async_playwright",
             side_effect=[factory_a, factory_b],
         ),
-        patch(
-            "src.reader.strategies.novnc_strategy.assess", return_value=_accepted_verdict()
-        ),
+        patch("src.reader.strategies.novnc_strategy.assess", return_value=_accepted_verdict()),
     ):
         with pytest.raises(HumanInterventionRequiredException):
             await NoVNCStrategy("default").get_html("https://regression-a.com/")
@@ -93,7 +89,7 @@ async def _drive_two_flows_to_resolution() -> tuple[Any, Any]:
             await NoVNCStrategy("default").get_html("https://regression-b.com/")
         tasks = [flow.task for flow in novnc_flow_registry.local()]
         assert len(tasks) == 2
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*cast("list[asyncio.Task[None]]", tasks))
 
     return factory_a, factory_b
 

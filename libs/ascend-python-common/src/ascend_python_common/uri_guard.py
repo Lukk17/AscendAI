@@ -78,7 +78,18 @@ def _check_file_uri(uri: str, url_path: str, policy: FetchPolicy) -> FetchTarget
     if root is None:
         raise UnsafeUriError("file URI fetching is disabled")
     resolved_root = root.resolve()
-    candidate = (resolved_root / unquote(url_path).lstrip("/\\")).resolve()
+    unquoted = unquote(url_path)
+    requested = Path(unquoted)
+    if not requested.is_absolute():
+        candidate = (resolved_root / requested).resolve()
+    else:
+        resolved = requested.resolve()
+        if resolved.is_relative_to(resolved_root):
+            candidate = resolved
+        elif len(requested.parts) == 2 and ".." not in requested.parts:
+            candidate = (resolved_root / requested.name).resolve()
+        else:
+            raise UnsafeUriError("file URI escapes its root")
     if not candidate.is_relative_to(resolved_root):
         raise UnsafeUriError("file URI escapes its root")
     return FetchTarget(url=uri, host=None, port=None, file_path=candidate)

@@ -5,29 +5,42 @@ import logging
 import re
 import socket
 import tomllib
+from dataclasses import replace
 from importlib.metadata import version as package_version
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import mcp.types as mt
 import pytest
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, FastAPI, UploadFile
 from fastapi.testclient import TestClient
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
-from prometheus_client import REGISTRY
+from fastmcp.server.middleware import MiddlewareContext
+from prometheus_client import REGISTRY, CollectorRegistry
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import Field, ValidationError
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from ascend_python_common import __version__
 from ascend_python_common.app import ServiceDefinition, create_service_app
-from ascend_python_common.errors import ErrorRegistry
+from ascend_python_common.errors import ErrorRegistry, McpRefusalMiddleware
 from ascend_python_common.errors.codes import (
     INTERNAL_FIXED_DETAIL,
     RATE_LIMITED,
     VALIDATION,
     ProblemCode,
 )
+from ascend_python_common.rate_limit import McpRateLimitMiddleware, build_limiter
 from ascend_python_common.readiness import ProbeResult
-from ascend_python_common.request_context import digest_of_mcp_session_id
+from ascend_python_common.request_context import (
+    CorrelationIdLogFilter,
+    McpRequestLogContextMiddleware,
+    digest_of_mcp_session_id,
+    mcp_request_log_context,
+)
 from ascend_python_common.settings import McpFetchSettings, RateLimit, ServiceSettings
 from ascend_python_common.startup_banner import (
     CONFIGURED,
@@ -1181,3 +1194,233 @@ def test_a_service_drops_the_coverage_gate(tmp_path: Path) -> None:
     # then
     assert "--cov-fail-under=99" in low.read_text(encoding="utf-8")
     assert "--strict-markers" not in no_markers.read_text(encoding="utf-8")
+
+
+def _mcp_headers() -> dict[str, str]:
+    return {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+
+
+def test_handshake_serves_both_2025_eras() -> None:
+    # given
+    app = create_service_app(_definition())
+    # when
+    with TestClient(app, raise_server_exceptions=False) as client:
+        answers = [
+            client.post(
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": protocol,
+                        "capabilities": {},
+                        "clientInfo": {"name": "probe", "version": "0.0.1"},
+                    },
+                },
+                headers=_mcp_headers(),
+            )
+            for protocol in ("2025-06-18", "2025-11-25")
+        ]
+    # then
+    assert [answer.status_code for answer in answers] == [200, 200]
+    assert "2025-06-18" in answers[0].text
+    assert "2025-11-25" in answers[1].text
+    assert all("mcp-session-id" not in answer.headers for answer in answers)
+
+
+def test_request_metrics_carry_the_route_template() -> None:
+    # given: a fresh registry, because the global one keeps the metrics of the
+    # first instrumented app of the process while this suite builds many
+    fresh = CollectorRegistry()
+    app = FastAPI()
+    router = APIRouter()
+
+    @router.get("/jobs/{job_id}")
+    def read_job(job_id: str) -> dict[str, str]:
+        return {"job_id": job_id}
+
+    app.include_router(router)
+    Instrumentator(registry=fresh).instrument(app).expose(app, endpoint="/metrics")
+    client = TestClient(app, raise_server_exceptions=False)
+    # when
+    found = client.get("/jobs/some-unknown-id-xyz")
+    series = client.get("/metrics").text
+    # then
+    assert found.status_code == 200
+    assert found.json() == {"job_id": "some-unknown-id-xyz"}
+    assert 'handler="/jobs/{job_id}"' in series
+    assert 'handler="/jobs/some-unknown-id-xyz"' not in series
+
+
+_probe_limiter = build_limiter("100/minute")
+
+
+def _strict_router() -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/strict")
+    @_probe_limiter.limit("2/minute")
+    def strict(request: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok"})
+
+    @router.get("/plain")
+    def plain() -> dict[str, str]:
+        return {"status": "ok"}
+
+    return router
+
+
+def test_a_stricter_limit_on_an_included_router_route() -> None:
+    # given
+    definition = _definition()
+    app = create_service_app(replace(definition, routers=(*definition.routers, _strict_router())))
+    client = TestClient(app, raise_server_exceptions=False)
+    # when
+    first = client.get("/strict")
+    second = client.get("/strict")
+    refused = client.get("/strict")
+    other = client.get("/plain")
+    # then
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert refused.status_code == 429
+    assert refused.json()["code"] == "rate_limited"
+    assert other.status_code == 200
+
+
+def _refusal_samples() -> dict[str, float]:
+    found: dict[str, float] = {}
+    for family in REGISTRY.collect():
+        for sample in family.samples:
+            if sample.name == "ascend_service_errors_total":
+                found[repr(sorted(sample.labels.items()))] = float(sample.value)
+    return found
+
+
+def test_notifications_and_unknown_methods_leave_limits_and_refusals_untouched() -> None:
+    # given
+    definition = _definition()
+    before = _refusal_samples()
+    app = create_service_app(definition)
+    # when
+    with TestClient(app, raise_server_exceptions=False) as client:
+        initialized = client.post(
+            "/mcp", json={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=_mcp_headers()
+        )
+        cancelled = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"reason": "probe"}},
+            headers=_mcp_headers(),
+        )
+        unknown = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 9, "method": "unknown/method", "params": {}},
+            headers=_mcp_headers(),
+        )
+    # then
+    assert initialized.status_code == 202
+    assert cancelled.status_code == 202
+    assert unknown.status_code == 200
+    assert "error" in unknown.text
+    assert _refusal_samples() == before
+
+    async def _call() -> None:
+        async with Client(definition.mcp) as mcp_client:
+            result = await mcp_client.call_tool("ocr_submit", {})
+            assert result.data == "submitted"
+
+    asyncio.run(_call())
+
+
+async def test_unroutable_messages_keep_the_request_ids_in_the_log_context() -> None:
+    # given
+    records: list[logging.LogRecord] = []
+
+    class _ListHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    handler = _ListHandler()
+    handler.addFilter(CorrelationIdLogFilter())
+    probe_logger = logging.getLogger("unroutable-probe")
+    probe_logger.addHandler(handler)
+    middleware = McpRequestLogContextMiddleware()
+
+    async def _log_inside(context: MiddlewareContext[Any]) -> str:
+        probe_logger.warning("handled %s", context.method)
+        return "ok"
+
+    contexts: list[MiddlewareContext[Any]] = [
+        MiddlewareContext(
+            message=mt.InitializedNotification(),
+            type="notification",
+            method="notifications/initialized",
+        ),
+        MiddlewareContext(
+            message=mt.CancelledNotification(
+                params=mt.CancelledNotificationParams(reason="probe", requestId=1)
+            ),
+            type="notification",
+            method="notifications/cancelled",
+        ),
+        MiddlewareContext(message={"method": "unknown/method"}, type="request", method="unknown/method"),
+    ]
+    # when
+    try:
+        with mcp_request_log_context("req-1", "digest-1"):
+            for context in contexts:
+                assert await middleware(context, _log_inside) == "ok"
+    finally:
+        probe_logger.removeHandler(handler)
+    # then
+    assert [getattr(record, "correlation_id", None) for record in records] == ["req-1"] * 3
+
+
+async def test_notification_is_neither_counted_nor_limited() -> None:
+    # given
+    limiter = build_limiter("1/minute")
+    middleware = McpRateLimitMiddleware(limiter, "1/minute", None, key_prefix="probe")
+    calls: list[str | None] = []
+
+    async def _next(context: MiddlewareContext[Any]) -> str:
+        calls.append(context.method)
+        return "ok"
+
+    tool_context = MiddlewareContext(
+        message=SimpleNamespace(name="probe-tool"), type="request", method="tools/call"
+    )
+    notification = MiddlewareContext(
+        message=mt.InitializedNotification(),
+        type="notification",
+        method="notifications/initialized",
+    )
+    # when
+    assert await middleware(tool_context, _next) == "ok"
+    with pytest.raises(ToolError, match="rate_limited"):
+        await middleware(tool_context, _next)
+    result = await middleware(notification, _next)
+    # then
+    assert result == "ok"
+    assert calls == ["tools/call", "notifications/initialized"]
+
+
+async def test_unknown_method_is_not_mapped_to_a_refusal() -> None:
+    # given
+    registry = ErrorRegistry()
+    registry.register(ValueError, VALIDATION, str)
+    middleware = McpRefusalMiddleware(registry)
+    before = _refusal_samples()
+
+    async def _boom(context: MiddlewareContext[Any]) -> str:
+        raise ValueError("bad input")
+
+    unknown = MiddlewareContext(message={"method": "unknown/method"}, type="request", method="unknown/method")
+    # when
+    with pytest.raises(ValueError, match="bad input"):
+        await middleware(unknown, _boom)
+    # then
+    assert _refusal_samples() == before
