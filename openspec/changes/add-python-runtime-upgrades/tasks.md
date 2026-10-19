@@ -3,10 +3,10 @@ Every Python command runs through the `.venv` of the folder it names (`.venv/Scr
 ## 1. Preconditions and the library's tests on the old versions
 
 - [ ] 1.1 Check the preconditions: this change is build group 2, position 2 of the owner build order of 2026-10-04, so `add-ascend-python-common` (position 1) is applied and archived (`openspec list` does not show it), no later change is needed (owner answer 70.1 of 2026-10-04: the change is checked against today's agent, Spring Boot 3.5.14 and Spring AI 1.1.5), the library folder `libs/ascend-python-common` exists, and every service pins it. Then check the latest releases again (`https://pypi.org/pypi/<name>/json` for `fastapi`, `starlette`, `uvicorn`, `fastmcp`, `mcp`, `httpx2`, `pydantic`), and if any is newer than design D1, stop and ask the owner which version to take. Verify: `add-ascend-python-common` is absent from `openspec list`, `apps/ascend-agent/gradle/libs.versions.toml` still names Spring AI 1.1.5, and the version check is recorded in this task line with its date.
-- [ ] 1.2 Check that the required edits of design "Required edits to other changes" are made in the other changes, or ask the owner whether to make them now. Verify: a short report names each target change and whether its edit is made.
-- [ ] 1.3 Write the library tests of `specs/python-mcp-runtime/spec.md` that can pass on FastMCP 3 and MCP SDK 1: the handshake with 2025-06-18 and 2025-11-25, the session digest from the client's header, one HTTP server span per request, nothing sent to a set `OTEL_EXPORTER_OTLP_ENDPOINT` with `OTEL_SDK_DISABLED=true` (owner decision 89.14 of 2026-10-08), a stricter limit on a route of an included router, and the route template in the request metrics for a route with a path parameter (design D3, D5, D6). Verify: they pass on the old versions under the library's 100 percent branch gate.
-- [ ] 1.4 Write the library tests that send `notifications/initialized`, `notifications/cancelled` and an unknown method through the log context, rate limit and refusal middlewares (design D6): no log line without the request's ids, no rate limit hit, no refusal counted. Verify: they pass on the old versions.
-- [ ] 1.5 Run the library gate from `libs/ascend-python-common`: `python -m ruff check .`, `python -m ruff format --check .`, `python -m mypy src tests`, `python -m pytest`. Verify: all four pass with 100 percent branch coverage.
+- [x] 1.2 Check that the required edits of design "Required edits to other changes" are made in the other changes, or ask the owner whether to make them now. Verify: a short report names each target change and whether its edit is made.
+- [x] 1.3 Write the library tests of `specs/python-mcp-runtime/spec.md` that can pass on FastMCP 3 and MCP SDK 1: the handshake with 2025-06-18 and 2025-11-25, the session digest from the client's header, one HTTP server span per request, nothing sent to a set `OTEL_EXPORTER_OTLP_ENDPOINT` with `OTEL_SDK_DISABLED=true` (owner decision 89.14 of 2026-10-08), a stricter limit on a route of an included router, and the route template in the request metrics for a route with a path parameter (design D3, D5, D6). Verify: they pass on the old versions under the library's 100 percent branch gate.
+- [x] 1.4 Write the library tests that send `notifications/initialized`, `notifications/cancelled` and an unknown method through the log context, rate limit and refusal middlewares (design D6): no log line without the request's ids, no rate limit hit, no refusal counted. Verify: they pass on the old versions.
+- [x] 1.5 Run the library gate from `libs/ascend-python-common`: `python -m ruff check .`, `python -m ruff format --check .`, `python -m mypy src tests`, `python -m pytest`. Verify: all four pass with 100 percent branch coverage.
 
 ## 2. ascend-memory preparation, on the old versions
 
@@ -16,21 +16,21 @@ Every Python command runs through the `.venv` of the folder it names (`.venv/Scr
 
 ## 3. ascend-audio-scribe preparation, on the old versions
 
-- [ ] 3.1 Pin today's MCP behaviour as in 2.1, for the transcription tools and `health`. Verify: the tests pass on the current code.
-- [ ] 3.2 Remove camelCase reads and name the client era as in 2.2. Verify: the `git grep` of 2.2 for `apps/ascend-audio-scribe` returns nothing.
-- [ ] 3.3 Run the service gate from `apps/ascend-audio-scribe` as in 2.3. Verify: all pass with 100 percent branch coverage.
+- [x] 3.1 Pin today's MCP behaviour as in 2.1, for the transcription tools and `health`. Verify: the tests pass on the current code.
+- [x] 3.2 Remove camelCase reads and name the client era as in 2.2. Verify: the `git grep` of 2.2 for `apps/ascend-audio-scribe` returns nothing.
+- [x] 3.3 Run the service gate from `apps/ascend-audio-scribe` as in 2.3. Verify: all pass with 100 percent branch coverage.
 
 ## 4. ascend-web-hunter preparation, on the old versions
 
-- [ ] 4.1 Pin today's MCP behaviour as in 2.1, including the `human_intervention_required`, `novnc_busy` and `session_expired` result objects of `web_read`. Verify: the tests pass on the current code.
-- [ ] 4.2 Remove camelCase reads and name the client era as in 2.2. Verify: the `git grep` of 2.2 for `apps/ascend-web-hunter` returns nothing.
+- [x] 4.1 Pin today's MCP behaviour as in 2.1, including the `human_intervention_required`, `novnc_busy` and `session_expired` result objects of `web_read`. Verify: the tests pass on the current code.
+- [x] 4.2 Remove camelCase reads and name the client era as in 2.2. Verify: the `git grep` of 2.2 for `apps/ascend-web-hunter` returns nothing.
 - [ ] 4.3 Run the service gate from `apps/ascend-web-hunter` as in 2.3, on Python 3.12. Verify: all pass with 100 percent branch coverage.
 
 ## 5. ascend-ocr preparation, on the old versions
 
-- [ ] 5.1 Pin today's MCP behaviour as in 2.1, for `ocr_submit`, `ocr_job_status`, `ocr_list_jobs` and `ocr_cancel_job`, including the `CODE: detail` tool errors. Verify: the tests pass on the current code.
-- [ ] 5.2 Remove camelCase reads and name the client era as in 2.2, in every test that still lives in the service after `add-ascend-python-common`. Verify: the `git grep` of 2.2 for `apps/ascend-ocr` returns nothing.
-- [ ] 5.3 Run the service gate from `apps/ascend-ocr` as in 2.3, and the Pact provider verification `python -m pytest -m contract --no-cov`. Verify: both pass, with 100 percent branch coverage on the gate.
+- [x] 5.1 Pin today's MCP behaviour as in 2.1, for `ocr_submit`, `ocr_job_status`, `ocr_list_jobs` and `ocr_cancel_job`, including the `CODE: detail` tool errors. Verify: the tests pass on the current code.
+- [x] 5.2 Remove camelCase reads and name the client era as in 2.2, in every test that still lives in the service after `add-ascend-python-common`. Verify: the `git grep` of 2.2 for `apps/ascend-ocr` returns nothing.
+- [x] 5.3 Run the service gate from `apps/ascend-ocr` as in 2.3, and the Pact provider verification `python -m pytest -m contract --no-cov`. Verify: both pass, with 100 percent branch coverage on the gate.
 
 ## 6. The upgrade commit
 
