@@ -37,6 +37,16 @@ _CRAWLER_FACTORY_PATH = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _seed_url_check_passes() -> Any:
+    """The seed-URL guard check is unit-tested separately; keep these tests hermetic."""
+    with patch(
+        "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+        new=AsyncMock(return_value=MagicMock()),
+    ):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_crawlee_uses_playwright_headless_setting() -> Any:
     """headless kwarg passed to AdaptivePlaywrightCrawler must equal settings.PLAYWRIGHT_HEADLESS."""
@@ -269,3 +279,59 @@ async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
         assert seen_at_construction["value"] == str(storage_dir.resolve())
     finally:
         os.environ.pop("CRAWLEE_STORAGE_DIR", None)
+
+
+@pytest.mark.asyncio
+async def test_crawlee_seed_url_refusal_aborts_before_crawl() -> None:
+    """A seed URL the guard refuses never reaches the crawler: UnsafeUriError propagates."""
+    # given
+    from ascend_python_common.uri_guard import UnsafeUriError
+
+    # when / then
+    with (
+        patch(_CRAWLER_FACTORY_PATH, return_value=_mock_crawler()),
+        patch(
+            "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+            new=AsyncMock(side_effect=UnsafeUriError("URI resolves to a non-public address")),
+        ),
+    ):
+        with pytest.raises(UnsafeUriError):
+            await CrawleeStrategy(_mock_url_validator()).get_html("http://169.254.169.254/")
+
+
+@pytest.mark.asyncio
+async def test_crawlee_refused_navigation_raises_unsafe_uri() -> None:
+    """A navigation the guard refused fails the tier even when the crawl ran."""
+    # given
+    from ascend_python_common.uri_guard import UnsafeUriError
+
+    captured: dict[str, Any] = {}
+    fake_context = MagicMock()
+    fake_context.page.context.route = AsyncMock()
+    fake_context.page.context.route_web_socket = None
+    fake_context.page.on = MagicMock()
+
+    async def fake_run(urls: list[str]) -> None:
+        await captured["pre_nav"](fake_context)
+
+    def fake_crawler_factory(**kwargs: Any) -> MagicMock:
+        crawler = MagicMock()
+        crawler.router.default_handler = lambda f: f
+        crawler.pre_navigation_hook = lambda f: captured.setdefault("pre_nav", f)
+        crawler.run = AsyncMock(side_effect=fake_run)
+        return crawler
+
+    # when / then
+    with (
+        patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory),
+        patch(
+            "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.install_browser_guard",
+            new=AsyncMock(return_value=["http://169.254.169.254/"]),
+        ),
+    ):
+        with pytest.raises(UnsafeUriError):
+            await CrawleeStrategy(_mock_url_validator()).get_html("https://example.com/article")

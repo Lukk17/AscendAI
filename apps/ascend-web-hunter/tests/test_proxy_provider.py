@@ -222,6 +222,10 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
             new=AsyncMock(return_value=None),
         ),
         patch(
+            "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+            new=AsyncMock(return_value=MagicMock()),
+        ),
+        patch(
             "src.reader.strategies.crawlee_strategy.proxy_provider.for_playwright", return_value=proxy_dict
         ),
         patch("src.reader.strategies.crawlee_strategy.trafilatura.extract", return_value=None),
@@ -357,6 +361,10 @@ async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
         patch(
             "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
             new=AsyncMock(return_value=stored_state),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+            new=AsyncMock(return_value=MagicMock()),
         ),
         patch("src.reader.strategies.crawlee_strategy.proxy_provider.for_playwright", return_value=None),
         patch("src.reader.strategies.crawlee_strategy.trafilatura.extract", return_value=None),

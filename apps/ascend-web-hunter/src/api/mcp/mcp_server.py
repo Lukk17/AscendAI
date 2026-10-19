@@ -102,7 +102,8 @@ async def web_read(
         output_format: 'text' for the flat content field, 'structured' to also get title, author,
                        date and sitename. Not available together with include_links.
         tier: Start the extraction chain at this tier ('1-beautifulsoup', '2-trafilatura',
-              '3-flaresolverr', '4-playwright_stealth', '5-crawlee_adaptive', '6-novnc') instead of
+              '3-flaresolverr', '4-playwright_stealth', '4a-patchright', '4b-camoufox',
+              '5-crawlee_adaptive', '6-novnc') instead of
               where heavy_mode and the stored session would start it. Escalation continues after it.
     """
     await _check_url("web_read", url)

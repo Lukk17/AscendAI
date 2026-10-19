@@ -631,3 +631,133 @@ def test_challenge_validator_rejects_thin_above_rich_link_count() -> None:
     with patch.dict(os.environ, env):
         with pytest.raises(ValidationError, match=r"CHALLENGE_THIN_LINK_COUNT.*CHALLENGE_RICH_LINK_COUNT"):
             Settings()
+
+
+def test_flaresolverr_enabled_default() -> None:
+    # when
+    settings = Settings()
+
+    # then
+    assert settings.FLARESOLVERR_ENABLED is False
+
+
+def test_flaresolverr_enabled_valid_override() -> None:
+    # given
+    with patch.dict(os.environ, {"FLARESOLVERR_ENABLED": "true"}):
+        # when
+        settings = Settings()
+
+        # then
+        assert settings.FLARESOLVERR_ENABLED is True
+
+
+def test_flaresolverr_enabled_rejects_non_boolean() -> None:
+    # given
+    with patch.dict(os.environ, {"FLARESOLVERR_ENABLED": "maybe"}):
+        # when / then
+        with pytest.raises(ValidationError):
+            Settings()
+
+
+def test_camoufox_enabled_default() -> None:
+    # when
+    settings = Settings()
+
+    # then
+    assert settings.CAMOUFOX_ENABLED is True
+
+
+def test_camoufox_enabled_valid_override() -> None:
+    # given
+    with patch.dict(os.environ, {"CAMOUFOX_ENABLED": "false"}):
+        # when
+        settings = Settings()
+
+        # then
+        assert settings.CAMOUFOX_ENABLED is False
+
+
+def test_camoufox_enabled_rejects_non_boolean() -> None:
+    # given
+    with patch.dict(os.environ, {"CAMOUFOX_ENABLED": "maybe"}):
+        # when / then
+        with pytest.raises(ValidationError):
+            Settings()
+
+
+def test_tier_memory_ttl_seconds_default() -> None:
+    # when
+    settings = Settings()
+
+    # then
+    assert settings.TIER_MEMORY_TTL_SECONDS == 86400
+
+
+def test_tier_memory_ttl_seconds_valid_override() -> None:
+    # given
+    with patch.dict(os.environ, {"TIER_MEMORY_TTL_SECONDS": "3600"}):
+        # when
+        settings = Settings()
+
+        # then
+        assert settings.TIER_MEMORY_TTL_SECONDS == 3600
+
+
+def test_tier_memory_ttl_seconds_rejects_below_minimum() -> None:
+    # given
+    with patch.dict(os.environ, {"TIER_MEMORY_TTL_SECONDS": "59"}):
+        # when / then
+        with pytest.raises(ValidationError):
+            Settings()
+
+
+def test_networkidle_poll_ms_default() -> None:
+    # when
+    settings = Settings()
+
+    # then
+    assert settings.NETWORKIDLE_POLL_MS == 1000
+
+
+def test_networkidle_poll_ms_valid_override() -> None:
+    # given
+    with patch.dict(os.environ, {"NETWORKIDLE_POLL_MS": "500"}):
+        # when
+        settings = Settings()
+
+        # then
+        assert settings.NETWORKIDLE_POLL_MS == 500
+
+
+def test_networkidle_poll_ms_rejects_non_integer() -> None:
+    # given
+    with patch.dict(os.environ, {"NETWORKIDLE_POLL_MS": "soon"}):
+        # when / then
+        with pytest.raises(ValidationError):
+            Settings()
+
+
+def test_scroll_pause_ms_default() -> None:
+    # when
+    settings = Settings()
+
+    # then
+    assert settings.SCROLL_PAUSE_MS == 200
+
+
+def test_scroll_pause_ms_valid_override() -> None:
+    # given
+    with patch.dict(os.environ, {"SCROLL_PAUSE_MS": "100"}):
+        # when
+        settings = Settings()
+
+        # then
+        assert settings.SCROLL_PAUSE_MS == 100
+
+
+def test_scroll_pause_ms_rejects_non_integer() -> None:
+    # given
+    with patch.dict(os.environ, {"SCROLL_PAUSE_MS": "soon"}):
+        # when / then
+        with pytest.raises(ValidationError):
+            Settings()

@@ -111,7 +111,7 @@ async def _reset_global_cookie_manager() -> None:
     )
     cookie_module.CookieManager._instance = manager
     novnc_flow_registry._local.clear()
-    _delete_redis_keys(("novnc_flow:*", "session:*"))
+    _delete_redis_keys(("novnc_flow:*", "session:*", "tier_memory:*"))
 
 
 def _clear_rate_limit_budgets() -> None:

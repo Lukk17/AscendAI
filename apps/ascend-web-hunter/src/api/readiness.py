@@ -40,6 +40,8 @@ async def probe_searxng() -> ProbeResult:
 
 
 async def probe_flaresolverr() -> ProbeResult:
+    if not settings.FLARESOLVERR_ENABLED:
+        return ProbeResult(status="skipped")
     try:
         async with httpx.AsyncClient(timeout=settings.READINESS_PROBE_TIMEOUT_SECONDS) as client:
             response = await client.post(

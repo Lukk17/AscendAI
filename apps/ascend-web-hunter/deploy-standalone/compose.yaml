@@ -208,6 +208,11 @@ services:
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
       - VALIDATION_MIN_WORDS=10
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      - FLARESOLVERR_ENABLED=${FLARESOLVERR_ENABLED:-false}
+      - CAMOUFOX_ENABLED=${CAMOUFOX_ENABLED:-true}
+      - TIER_MEMORY_TTL_SECONDS=${TIER_MEMORY_TTL_SECONDS:-86400}
+      - NETWORKIDLE_POLL_MS=${NETWORKIDLE_POLL_MS:-1000}
+      - SCROLL_PAUSE_MS=${SCROLL_PAUSE_MS:-200}
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-hunter:4040/api/tunnels
       # Defaults to the bundled Redis above, which now starts unconditionally
       # with the stack. Override to redis://host.docker.internal:6379/0 to

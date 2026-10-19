@@ -147,6 +147,8 @@ async def test_one_failing_flow_leaves_sibling_untouched() -> None:
     dying_page.content = AsyncMock(side_effect=_PollBlowUp)
     dying_page.evaluate = AsyncMock(return_value="UA")
     dying_context = MagicMock()
+    dying_context.route = AsyncMock()
+    dying_context.route_web_socket = None
     dying_context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
     dying_context.new_page = AsyncMock(return_value=dying_page)
     dying_browser = MagicMock()
@@ -158,6 +160,8 @@ async def test_one_failing_flow_leaves_sibling_untouched() -> None:
     steady_page.content = AsyncMock(return_value="<html><body>wall</body></html>")
     steady_page.evaluate = AsyncMock(return_value="UA")
     steady_context = MagicMock()
+    steady_context.route = AsyncMock()
+    steady_context.route_web_socket = None
     steady_context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
     steady_context.new_page = AsyncMock(return_value=steady_page)
     steady_browser = MagicMock()

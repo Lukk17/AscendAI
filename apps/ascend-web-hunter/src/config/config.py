@@ -181,6 +181,19 @@ class Settings(ServiceSettings):
         default=1500,
         description="Pixels to scroll per step when loading dynamic content",
     )
+    NETWORKIDLE_POLL_MS: int = Field(
+        default=1000,
+        description=(
+            "Page-quiet poll interval in milliseconds for browser tiers. "
+            "Added by `enhance-web-search-tier-ladder`."
+        ),
+    )
+    SCROLL_PAUSE_MS: int = Field(
+        default=200,
+        description=(
+            "Pause in milliseconds between two scroll steps. Added by `enhance-web-search-tier-ladder`."
+        ),
+    )
 
     MIN_FLESCH_SCORE: float = Field(default=20.0, description="Minimum Flesch reading ease score")
     MIN_TTR: float = Field(default=0.1, description="Minimum Type-Token Ratio for repetition check")
@@ -200,6 +213,14 @@ class Settings(ServiceSettings):
     FLARESOLVERR_URL: str = Field(
         default="http://localhost:8191/v1",
         description="URL for FlareSolverr instance",
+    )
+    FLARESOLVERR_ENABLED: bool = Field(
+        default=False,
+        description="Route reads through the 3-flaresolverr tier. Off by default for one release.",
+    )
+    CAMOUFOX_ENABLED: bool = Field(
+        default=True,
+        description="Route reads through the 4b-camoufox tier. Disable on hosts with little memory.",
     )
     SELENIUM_BROWSER_CDP_URL: str = Field(
         default="ws://localhost:4444/playwright",
@@ -238,6 +259,13 @@ class Settings(ServiceSettings):
     SESSION_DEFAULT_PROFILE: str = Field(
         default="default",
         description="Profile label used when no profile is specified per-request",
+    )
+    TIER_MEMORY_TTL_SECONDS: int = Field(
+        default=86400,
+        ge=60,
+        description=(
+            "TTL in seconds for the per-domain tier memory. Added by `enhance-web-search-tier-ladder`."
+        ),
     )
 
     # Challenge detection

@@ -52,6 +52,8 @@ def _factory(page_url: str, *, goto_ok: bool = True) -> Any:
     page.goto = AsyncMock() if goto_ok else AsyncMock(side_effect=RuntimeError("nav"))
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.storage_state = AsyncMock(return_value={"cookies": [{"name": "k", "value": "v"}], "origins": []})
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
@@ -129,6 +131,8 @@ async def test_monitor_records_rejected_outcome_when_timeout_still_blocked() -> 
     page.evaluate = AsyncMock(return_value="UA")
     page.content = AsyncMock(return_value="<html><body><div id='cf-challenge-running'></div></body></html>")
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()

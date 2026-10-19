@@ -66,6 +66,8 @@ def _build_playwright_factory(
     page.content = AsyncMock(return_value="<html><body>ordinary page</body></html>")
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     # Monitor now calls storage_state(), not cookies()
     context.storage_state = AsyncMock(return_value={"cookies": cookies or [], "origins": []})
     context.new_page = AsyncMock(return_value=page)
@@ -369,6 +371,8 @@ async def test_capture_survives_later_failure_of_own_flow(monkeypatch: pytest.Mo
     page.goto = AsyncMock()
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.storage_state = AsyncMock(side_effect=[saved_state, _PollBlowUp()])
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
@@ -407,6 +411,8 @@ def _outcome_factory(page_url: str, content: str) -> Any:
     page.content = AsyncMock(return_value=content)
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
@@ -583,6 +589,8 @@ async def test_monitor_log_lines_carry_flow_id_and_slot_but_no_secrets(
     page.content = AsyncMock(return_value=f"<html><body>article {planted_fragment}</body></html>")
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.storage_state = AsyncMock(
         return_value={"cookies": [{"name": "li_at", "value": planted_cookie_value}], "origins": []}
     )

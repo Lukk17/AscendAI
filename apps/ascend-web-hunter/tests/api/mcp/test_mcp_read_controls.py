@@ -26,6 +26,7 @@ async def test_web_read_forwards_output_format_and_tier() -> None:
     # when
     with (
         patch(_GUARD, return_value=True),
+        patch("src.api.mcp.mcp_server.settings.FLARESOLVERR_ENABLED", True),
         patch(_READ, new_callable=AsyncMock, return_value=result) as mock_read,
     ):
         await web_read(_URL, output_format="structured", tier="3-flaresolverr")

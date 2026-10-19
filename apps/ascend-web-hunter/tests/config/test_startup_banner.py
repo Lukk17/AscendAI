@@ -285,3 +285,30 @@ def test_banner_redis_check_strips_user_info_on_render() -> None:
     # then
     assert "pw" not in rendered
     assert rendered == "redis://host:6379/0 [Connected]"
+
+
+def test_banner_shows_flaresolverr_disabled_when_flag_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    monkeypatch.setattr(settings, "FLARESOLVERR_ENABLED", False)
+
+    # when
+    text = "\n".join(build_service_banner())
+
+    # then
+    assert "FLARESOLVERR_ENABLED=false" in text
+
+
+def test_banner_shows_flaresolverr_probe_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    monkeypatch.setattr(settings, "FLARESOLVERR_ENABLED", True)
+
+    # when
+    text = "\n".join(build_service_banner())
+
+    # then
+    assert "FLARESOLVERR_ENABLED=false" not in text
+    assert "FlareSolverr" in text

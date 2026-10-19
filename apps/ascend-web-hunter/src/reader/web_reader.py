@@ -3,12 +3,15 @@ import logging
 import random
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from ascend_python_common.uri_guard import UnsafeUriError
 
 from src.api.exceptions import (
     ChallengeDetectedException,
     HumanInterventionRequiredException,
     NoVNCFlowBusyException,
+    TierDisabledError,
 )
 from src.config.config import settings
 from src.observability.domain_label import domain_label
@@ -18,6 +21,7 @@ from src.observability.metrics import (
     STRATEGY_ATTEMPTS_TOTAL,
     STRATEGY_DURATION_SECONDS,
 )
+from src.reader import tier_memory
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import assess, log_verdict, record_verdict
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, cookie_manager
@@ -25,9 +29,11 @@ from src.reader.extraction import extract_structured, extract_text_with_fallback
 from src.reader.link_annotator import annotate_links
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
+from src.reader.strategies.camoufox_strategy import CamoufoxStrategy
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 from src.reader.strategies.novnc_strategy import NoVNCStrategy
+from src.reader.strategies.patchright_strategy import PatchrightStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
 from src.session.session_manager import session_manager
@@ -44,10 +50,28 @@ TierName = Literal[
     "2-trafilatura",
     "3-flaresolverr",
     "4-playwright_stealth",
+    "4a-patchright",
+    "4b-camoufox",
     "5-crawlee_adaptive",
     "6-novnc",
 ]
 OutputFormat = Literal["text", "structured"]
+
+# The ladder order. The escalation chain follows this tuple, never a sort on
+# the tier name, so a new tier is inserted here and nowhere else.
+TIER_ORDER: tuple[TierName, ...] = (
+    "1-beautifulsoup",
+    "2-trafilatura",
+    "3-flaresolverr",
+    "4-playwright_stealth",
+    "4a-patchright",
+    "4b-camoufox",
+    "5-crawlee_adaptive",
+    "6-novnc",
+)
+
+_PATCHRIGHT_TIER_NAME: TierName = "4a-patchright"
+_CAMOUFOX_TIER_NAME: TierName = "4b-camoufox"
 
 
 def _cache_key(
@@ -80,16 +104,22 @@ class WebReader:
         self._memory_cache: dict[str, tuple[dict[str, Any], float]] = {}
 
     def _build_strategies(self, profile: str | None = None) -> dict[str, BaseStrategy]:
-        return {
+        all_strategies: dict[str, BaseStrategy] = {
             "1-beautifulsoup": BeautifulSoupStrategy(self._get_random_user_agent, profile),
             "2-trafilatura": TrafilaturaStrategy(self._get_random_user_agent, profile),
             PRODUCED_BY_FLARESOLVERR: FlareSolverrStrategy(profile),
             "4-playwright_stealth": PlaywrightStrategy(
                 self._get_random_user_agent, self.url_validator, profile
             ),
+            _PATCHRIGHT_TIER_NAME: PatchrightStrategy(
+                self._get_random_user_agent, self.url_validator, profile
+            ),
+            _CAMOUFOX_TIER_NAME: CamoufoxStrategy(self.url_validator, profile),
             "5-crawlee_adaptive": CrawleeStrategy(self.url_validator, profile),
             NOVNC_STRATEGY_NAME: NoVNCStrategy(profile),
         }
+
+        return {name: all_strategies[name] for name in TIER_ORDER}
 
     def _load_user_agents(self) -> list[str]:
         ua_path = Path(settings.USER_AGENTS_PATH)
@@ -115,11 +145,33 @@ class WebReader:
 
     @staticmethod
     def _browser_tiers(strategies: dict[str, BaseStrategy]) -> dict[str, BaseStrategy]:
-        return {
-            "4-playwright_stealth": strategies["4-playwright_stealth"],
-            "5-crawlee_adaptive": strategies["5-crawlee_adaptive"],
-            NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME],
-        }
+        names = (
+            "4-playwright_stealth",
+            _PATCHRIGHT_TIER_NAME,
+            _CAMOUFOX_TIER_NAME,
+            "5-crawlee_adaptive",
+            NOVNC_STRATEGY_NAME,
+        )
+
+        return {name: strategies[name] for name in names if name in strategies}
+
+    @staticmethod
+    def _drop_disabled_tiers(strategies: dict[str, BaseStrategy]) -> dict[str, BaseStrategy]:
+        """Skip tiers the operator switched off. A caller that names a disabled
+        tier explicitly is answered by the caller, not by silently running past
+        it, so the drop applies only to the unselected chain."""
+        if not settings.FLARESOLVERR_ENABLED:
+            strategies = {
+                name: strategy
+                for name, strategy in strategies.items()
+                if name != PRODUCED_BY_FLARESOLVERR
+            }
+        if not settings.CAMOUFOX_ENABLED:
+            strategies = {
+                name: strategy for name, strategy in strategies.items() if name != _CAMOUFOX_TIER_NAME
+            }
+
+        return strategies
 
     @staticmethod
     def _from_tier(strategies: dict[str, BaseStrategy], tier: TierName) -> dict[str, BaseStrategy]:
@@ -127,6 +179,16 @@ class WebReader:
         names = list(strategies)
 
         return {name: strategies[name] for name in names[names.index(tier) :]}
+
+    @staticmethod
+    def _require_tier_enabled(tier: str) -> None:
+        """Refuse a caller-selected tier the operator switched off. The drop in
+        `_drop_disabled_tiers` only applies to the unselected chain; naming a
+        disabled tier is answered, never silently run past."""
+        if tier == PRODUCED_BY_FLARESOLVERR and not settings.FLARESOLVERR_ENABLED:
+            raise TierDisabledError(PRODUCED_BY_FLARESOLVERR)
+        if tier == _CAMOUFOX_TIER_NAME and not settings.CAMOUFOX_ENABLED:
+            raise TierDisabledError(_CAMOUFOX_TIER_NAME)
 
     async def _select_strategies(
         self,
@@ -146,18 +208,28 @@ class WebReader:
         # An explicit tier is the most specific instruction a caller can give, so it
         # outranks heavy_mode and the producer-aware routing below (ADR-011).
         if tier is not None:
+            self._require_tier_enabled(tier)
+
             return self._from_tier(strategies, tier)
 
+        strategies = self._drop_disabled_tiers(strategies)
+
         if not await self._prefer_browser(url, heavy_mode, profile):
+            remembered = await tier_memory.get(url)
+            if remembered is not None and remembered in strategies:
+                return self._from_tier(strategies, cast("TierName", remembered))
+
             return strategies
 
         if not heavy_mode:
             producer = await cookie_manager.get_stored_session_producer(url, profile)
-            if producer == PRODUCED_BY_FLARESOLVERR:
+            if producer == PRODUCED_BY_FLARESOLVERR and settings.FLARESOLVERR_ENABLED:
                 return {
                     PRODUCED_BY_FLARESOLVERR: strategies[PRODUCED_BY_FLARESOLVERR],
                     **self._browser_tiers(strategies),
                 }
+            if producer == PRODUCED_BY_FLARESOLVERR:
+                return self._browser_tiers(strategies)
 
         return self._browser_tiers(strategies)
 
@@ -356,6 +428,7 @@ class WebReader:
                 content, links = annotate_links(html, url, link_filter)
                 if self.validator.validate(content):
                     result = {"content": content, "links": links, "status": "success", "mode": name}
+                    await tier_memory.record(url, name)
                     self._cache_put(key, result)
 
                     return result
@@ -375,6 +448,7 @@ class WebReader:
                         "status": "success",
                         "mode": NOVNC_STRATEGY_NAME,
                     }
+                    await tier_memory.record(url, NOVNC_STRATEGY_NAME)
                     self._cache_put(key, result)
 
                     return result
@@ -416,6 +490,7 @@ class WebReader:
                 content = structured.get("content", "")
                 if self.validator.validate(content):
                     self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+                    await tier_memory.record(url, name)
 
                     return {**structured, "status": "success", "mode": name}
 
@@ -428,6 +503,7 @@ class WebReader:
             content = extract_text_with_fallback(html)
             if self.validator.validate(content):
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
+                await tier_memory.record(url, name)
 
                 return {"content": content, "status": "success", "mode": name}
 
@@ -442,6 +518,10 @@ class WebReader:
             )
 
             return None
+        except UnsafeUriError:
+            self._record_strategy_outcome(name, "unsafe_uri", dlabel, time.perf_counter() - started)
+
+            raise
         except HumanInterventionRequiredException:
             self._record_strategy_outcome(name, "human_intervention", dlabel, time.perf_counter() - started)
 
@@ -483,6 +563,10 @@ class WebReader:
             logger.info("Strategy %s returned empty HTML.", name)
         except HumanInterventionRequiredException:
             self._record_strategy_outcome(name, "human_intervention", dlabel, time.perf_counter() - started)
+
+            raise
+        except UnsafeUriError:
+            self._record_strategy_outcome(name, "unsafe_uri", dlabel, time.perf_counter() - started)
 
             raise
         except NoVNCFlowBusyException:

@@ -17,9 +17,18 @@ _ALL_TIERS = [
     "2-trafilatura",
     "3-flaresolverr",
     "4-playwright_stealth",
+    "4a-patchright",
+    "4b-camoufox",
     "5-crawlee_adaptive",
     NOVNC_STRATEGY_NAME,
 ]
+
+
+@pytest.fixture(autouse=True)
+def _all_tiers_enabled() -> Any:
+    """These tests pin the routing mechanics, not the operator flags: run with every tier on."""
+    with patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", True):
+        yield
 
 
 @pytest.mark.asyncio

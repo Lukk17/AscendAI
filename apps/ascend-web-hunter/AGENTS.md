@@ -98,10 +98,18 @@ docker build -t ascend-web-hunter:latest .
   `[ascend-web-hunter]`). There is no service `logging_config.py` and no `log_config` argument on `uvicorn.run`.
 
 **Multi-tiered extraction strategy** (escalation order):
-1. `curl_cffi` - fast, lightweight HTTP client
-2. FlareSolverr - Cloudflare bypass proxy
-3. Playwright - headless browser automation
-4. NoVNC - human intervention for complex CAPTCHAs (via Ngrok tunnel)
+1. `1-beautifulsoup` - fast, lightweight HTTP client
+2. `2-trafilatura` - fast, lightweight HTTP client
+3. `3-flaresolverr` - Cloudflare bypass proxy (only while `FLARESOLVERR_ENABLED=true`, default `false`)
+4. `4-playwright_stealth` - headless browser automation
+5. `4a-patchright` - patched Chromium build
+6. `4b-camoufox` - Firefox-family fingerprint (only while `CAMOUFOX_ENABLED=true`, default `true`)
+7. `5-crawlee_adaptive` - adaptive crawler
+8. `6-novnc` - human intervention for complex CAPTCHAs (via Ngrok tunnel)
+
+A domain that succeeded at a tier before restarts at the remembered tier for `TIER_MEMORY_TTL_SECONDS`
+(default `86400`). Browser waits `NETWORKIDLE_POLL_MS` (default `1000`) and `SCROLL_PAUSE_MS` (default
+`200`) come from the same settings every browser tier reads.
 
 **Key Features**:
 - SearXNG integration for privacy-respecting meta-search
@@ -138,6 +146,11 @@ docker build -t ascend-web-hunter:latest .
 `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
 `ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`.
 - `FLARESOLVERR_URL` - FlareSolverr endpoint
+- `FLARESOLVERR_ENABLED` - Route reads through the 3-flaresolverr tier (default: `false`)
+- `CAMOUFOX_ENABLED` - Route reads through the 4b-camoufox tier (default: `true`)
+- `TIER_MEMORY_TTL_SECONDS` - TTL in seconds for the per-domain tier memory (default: `86400`)
+- `NETWORKIDLE_POLL_MS` - Page-quiet poll interval in milliseconds for browser tiers (default: `1000`)
+- `SCROLL_PAUSE_MS` - Pause in milliseconds between two scroll steps (default: `200`)
 - `REDIS_URL` - Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-web-hunter`, and for clearance-cookie persistence (default: `redis://127.0.0.1:6379/0`)
 - `BLOCKLIST_URL` - Ad blocklist source. Only reached by `POST /api/v1/blocklist/refresh`; never fetched at startup
 - `BLOCKLIST_PATH` - Path to the vendored blocklist file (default `src/assets/fanboy-annoyance.txt`), loaded at

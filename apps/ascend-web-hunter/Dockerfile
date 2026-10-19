@@ -37,6 +37,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install /opt/ascend-python-common && \
     pip install .
 
+# Fetch both browser builds at image build time, pinned to the pyproject
+# versions. A missing browser binary is a startup error, never a download
+# at request time. The base image already carries the system libraries
+# Chromium needs, so no --with-deps here.
+RUN python -m patchright install chromium && \
+    python -m camoufox fetch
+
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV DISPLAY=:99

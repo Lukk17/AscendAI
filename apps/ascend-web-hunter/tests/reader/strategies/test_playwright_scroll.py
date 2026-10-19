@@ -32,6 +32,8 @@ def _make_browser_and_page() -> tuple[MagicMock, MagicMock, MagicMock]:
     context.new_page = AsyncMock(return_value=page)
     context.close = AsyncMock()
     context.cookies = AsyncMock(return_value=[])
+    context.route = AsyncMock()
+    context.route_web_socket = None
     page.context = context
 
     browser = MagicMock()

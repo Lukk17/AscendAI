@@ -15,6 +15,19 @@ D21). `is_safe_external_url`, `pin_safe_host` and their helpers left
 `ALLOWED_PRIVATE_HOSTS` skips the address check, a setting no production
 file sets (owner answer 67.3). The rest of this record is unchanged.
 
+## Amendment, 2026-10-19 (enhance-web-search-tier-ladder)
+
+The browser and out-of-process tiers no longer keep only pre-dispatch validation: `src/reader/browser_guard.py`
+installs one guarded route handler on every browser context (`4-playwright_stealth`, `4a-patchright`,
+`4b-camoufox`, `5-crawlee_adaptive`, the browser of `6-novnc`), with `service_workers="block"`, before the
+first navigation. The handler applies the ad blocklist, then `check_fetch_uri` with the web-hunter policy,
+aborts refusals with `route.abort("blockedbyclient")`, and fetches passes through
+`route.fetch(max_redirects=0)` handed to the browser with `route.fulfill(response=...)`, so every redirect
+hop re-enters the handler. The residual window below is unchanged in kind: `route.fetch` resolves the host
+again, so the connect-time address pinning of D1 and D2 is still not applied inside the browser path. That
+residual DNS rebinding window is accepted for the same reason D4 accepted it. See
+[ADR-015](ADR-015-patched-browser-tiers-and-tier-memory.md) D4.
+
 ## Context
 
 `is_safe_external_url` resolves a hostname with `socket.getaddrinfo`, checks every address it gets back against the

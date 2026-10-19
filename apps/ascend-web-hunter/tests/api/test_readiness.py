@@ -226,7 +226,10 @@ async def test_probe_flaresolverr_posts_sessions_list() -> None:
     mock_client.__aenter__.return_value = mock_client
     mock_client.post = AsyncMock(return_value=response)
     # when
-    with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
+    with (
+        patch("src.api.readiness.settings.FLARESOLVERR_ENABLED", True),
+        patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client),
+    ):
         result = await probe_flaresolverr()
     # then
     assert result.status == "ok"
@@ -244,7 +247,10 @@ async def test_probe_flaresolverr_non_200_is_error() -> None:
     mock_client.__aenter__.return_value = mock_client
     mock_client.post = AsyncMock(return_value=response)
     # when
-    with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
+    with (
+        patch("src.api.readiness.settings.FLARESOLVERR_ENABLED", True),
+        patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client),
+    ):
         result = await probe_flaresolverr()
     # then
     assert result == ProbeResult(status="error")
@@ -259,7 +265,10 @@ async def test_probe_flaresolverr_exception_redacted() -> None:
     mock_client.__aenter__.return_value = mock_client
     mock_client.post = AsyncMock(side_effect=RuntimeError("net"))
     # when
-    with patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client):
+    with (
+        patch("src.api.readiness.settings.FLARESOLVERR_ENABLED", True),
+        patch("src.api.readiness.httpx.AsyncClient", return_value=mock_client),
+    ):
         result = await probe_flaresolverr()
     # then
     assert result == ProbeResult(status="error")
@@ -335,3 +344,34 @@ def test_probe_flaresolverr_breaker_half_open() -> None:
         result = readiness_module.probe_flaresolverr_breaker()
     # then
     assert result == ProbeResult(status="degraded", details={"breaker": "half_open"})
+
+
+@pytest.mark.asyncio
+async def test_probe_flaresolverr_skipped_when_disabled() -> None:
+    # given
+    from src.api.readiness import probe_flaresolverr
+
+    # when
+    with patch("src.api.readiness.settings.FLARESOLVERR_ENABLED", False):
+        result = await probe_flaresolverr()
+
+    # then
+    assert result == ProbeResult(status="skipped")
+
+
+@pytest.mark.asyncio
+async def test_ready_ignores_unreachable_flaresolverr_when_disabled(client: AsyncClient) -> None:
+    # given
+    patches = _patch_all_ok()
+
+    # when: the real flaresolverr probe runs with the flag off, so no URL is probed
+    with patches[0], patches[1], patches[3], patches[4], patch(
+        "src.api.readiness.settings.FLARESOLVERR_ENABLED", False
+    ):
+        resp = await client.get("/ready")
+
+    # then
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ready"
+    assert body["checks"]["flaresolverr"]["status"] == "skipped"

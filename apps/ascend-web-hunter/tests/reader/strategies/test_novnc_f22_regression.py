@@ -51,6 +51,8 @@ def _factory(page_url: str, cookie_name: str) -> Any:
     page.content = AsyncMock(return_value="<html><body>ok</body></html>")
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.storage_state = AsyncMock(
         return_value={"cookies": [{"name": cookie_name, "value": "TOKEN"}], "origins": []}
     )

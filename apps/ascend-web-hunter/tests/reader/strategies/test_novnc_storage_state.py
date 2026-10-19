@@ -65,6 +65,8 @@ async def test_novnc_monitor_saves_storage_state_not_cookies() -> None:
     page.url = "https://linkedin.com/feed"
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(return_value=mock_storage_state)
     # cookies() should NOT be called
@@ -118,6 +120,8 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears() -> None
     page.content = AsyncMock(return_value="<html><title>Just a moment...</title></html>")
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     # First poll: still challenged (no clearance). Second poll: clearance issued.
     context.storage_state = AsyncMock(
@@ -182,6 +186,8 @@ async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_se
     )
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
 
@@ -227,6 +233,8 @@ async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page() 
     page.content = AsyncMock(return_value="<html><body>" + "genuine article text " * 50 + "</body></html>")
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
 
@@ -278,6 +286,8 @@ async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance
     )
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(
         return_value={"cookies": [{"name": "datadome", "value": "SOLVED"}], "origins": []}
@@ -333,6 +343,8 @@ async def test_novnc_captcha_monitor_captures_rendered_wall_with_clearance_cooki
     page.content = AsyncMock(return_value="<html><body><div id='cf-challenge-running'></div></body></html>")
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(
         return_value={"cookies": [{"name": "cf_clearance", "value": "abc"}], "origins": []}

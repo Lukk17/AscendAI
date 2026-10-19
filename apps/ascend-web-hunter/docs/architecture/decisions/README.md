@@ -16,5 +16,6 @@
 | [ADR-012](ADR-012-connect-time-address-pinning.md) | The in-process fetch connects to the address its own SSRF lookup validated, via CURLOPT_RESOLVE; the browser and out-of-process tiers keep pre-dispatch validation as residual risk. | Accepted |
 | [ADR-013](ADR-013-concurrent-human-intervention-windows.md) | Concurrent human-intervention windows on one shared display: per-container slots, Redis flow records, joins, ephemeral CDP ports, cascade layout, owner-named VNC URLs. | Accepted |
 | [ADR-014](ADR-014-scored-challenge-detection.md) | Scored challenge verdict over five signal families, catalogue with provenance, fixture corpus as the admission rule. | Accepted |
+| [ADR-015](ADR-015-patched-browser-tiers-and-tier-memory.md) | Patched browser tiers (`4a-patchright`, `4b-camoufox`), FlareSolverr off by default, the guarded browser route handler and per-domain tier memory. | Accepted |
 
 For monorepo-level decisions see [`../../../../../docs/architecture/decisions/`](../../../../../docs/architecture/decisions/).

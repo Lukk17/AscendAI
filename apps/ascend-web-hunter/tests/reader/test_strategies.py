@@ -331,6 +331,8 @@ def _wire_browser_pool(monkeypatch: Any, page: Any) -> None:
     context.new_page = AsyncMock(return_value=page)
     context.close = AsyncMock()
     context.cookies = AsyncMock(return_value=[])
+    context.route = AsyncMock()
+    context.route_web_socket = None
     page.context = context
 
     browser = MagicMock()
@@ -754,6 +756,16 @@ async def test_playwright_retries_after_transient_networkidle_wait_error(monkeyp
 # Crawlee strategy
 
 
+@pytest.fixture(autouse=True)
+def _crawlee_seed_url_check_passes() -> Any:
+    """The seed-URL guard check is unit-tested separately; keep these tests hermetic."""
+    with patch(
+        "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+        new=AsyncMock(return_value=MagicMock()),
+    ):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_crawlee_strategy_extract_returns_trafilatura_result() -> None:
     # when
@@ -937,7 +949,7 @@ async def test_crawlee_response_summary_tolerates_broken_response() -> None:
 @pytest.mark.asyncio
 async def test_crawlee_decorated_handlers_executed() -> Any:
     """The crawlee strategy registers two decorated inner functions
-    (request_handler and enable_adblock). Capture them and invoke directly so
+    (request_handler and install_guard). Capture them and invoke directly so
     their bodies are covered."""
     # given
     captured: dict[str, Any] = {}
@@ -968,13 +980,14 @@ async def test_crawlee_decorated_handlers_executed() -> Any:
     context_playwright = MagicMock()
     context_playwright.page = MagicMock()
     context_playwright.page.content = AsyncMock(return_value="<html>x</html>")
-    context_playwright.page.route = AsyncMock()
+    context_playwright.page.context.route = AsyncMock()
+    context_playwright.page.context.route_web_socket = None
 
     # when
     await captured["pre_nav"](context_playwright)
 
     # then
-    context_playwright.page.route.assert_awaited_once()
+    context_playwright.page.context.route.assert_awaited_once()
 
     container_handler = captured["default"]
     # The default handler routes through _handle_crawlee_request which we already cover.

@@ -37,6 +37,14 @@ async def test_read_with_links_propagates_428_when_novnc_raises() -> None:
             new=AsyncMock(return_value=""),
         ),
         patch(
+            "src.reader.strategies.patchright_strategy.PatchrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.camoufox_strategy.CamoufoxStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
             "src.reader.strategies.crawlee_strategy.CrawleeStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
@@ -96,6 +104,14 @@ async def test_read_propagates_novnc_busy_instead_of_swallowing_it() -> None:
         ),
         patch(
             "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.patchright_strategy.PatchrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.camoufox_strategy.CamoufoxStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(

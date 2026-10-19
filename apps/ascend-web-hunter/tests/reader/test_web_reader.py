@@ -202,6 +202,7 @@ async def test_read_routes_flaresolverr_first_when_producer_is_flaresolverr() ->
     first, not skipped straight to the browser tiers."""
     # when
     with (
+        patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", True),
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
             new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
@@ -307,6 +308,42 @@ async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first() ->
 
 
 @pytest.mark.asyncio
+async def test_read_routes_browser_first_when_flaresolverr_producer_and_flag_off() -> None:
+    """With FLARESOLVERR_ENABLED=false a stored FlareSolverr-produced session is replayed
+    by the browser tiers, not by FlareSolverr: its clearance was bound to FlareSolverr's
+    fingerprint, but its auth cookies may not be."""
+    # given
+    flaresolverr_mock = AsyncMock(return_value=_ARTICLE_HTML)
+
+    # when
+    with (
+        patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", False),
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
+        ),
+        patch(
+            "src.reader.web_reader.cookie_manager.get_stored_session_producer",
+            new=AsyncMock(return_value=PRODUCED_BY_FLARESOLVERR),
+        ),
+        patch(
+            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
+            new=flaresolverr_mock,
+        ),
+        patch(
+            "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=_ARTICLE_HTML),
+        ),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+    ):
+        result = await WebReader().read("http://test.com")
+
+    # then
+    assert result["mode"] == "4-playwright_stealth"
+    flaresolverr_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flaresolverr() -> None:
     # given
     raw_html = (
@@ -316,6 +353,7 @@ async def test_read_with_links_routes_flaresolverr_first_when_producer_is_flares
 
     # when
     with (
+        patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", True),
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
             new=AsyncMock(return_value={"cookies": [{"name": "cf_clearance", "value": "x"}], "origins": []}),
@@ -410,6 +448,14 @@ async def test_read_falls_through_to_novnc_when_challenge_unsolved() -> None:
             new=AsyncMock(return_value=""),
         ),
         patch(
+            "src.reader.strategies.patchright_strategy.PatchrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.camoufox_strategy.CamoufoxStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
             "src.reader.strategies.crawlee_strategy.CrawleeStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
@@ -452,6 +498,14 @@ async def test_read_returns_failure_when_all_tiers_including_novnc_fail() -> Non
         ),
         patch(
             "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.patchright_strategy.PatchrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.camoufox_strategy.CamoufoxStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
@@ -604,6 +658,14 @@ async def test_read_with_links_falls_through_to_novnc_on_challenge() -> None:
         ),
         patch(
             "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.patchright_strategy.PatchrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.camoufox_strategy.CamoufoxStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(
@@ -1037,6 +1099,14 @@ async def test_read_rejects_amazon_style_interstitial_and_escalates() -> None:
         ),
         patch(
             "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.patchright_strategy.PatchrightStrategy.get_html",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "src.reader.strategies.camoufox_strategy.CamoufoxStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(

@@ -96,6 +96,7 @@ async def test_read_forwards_the_tier_on_the_links_path(client: AsyncClient) -> 
     with (
         patch(_READ_WITH_LINKS, new_callable=AsyncMock, return_value=result) as mock_read,
         patch(_GUARD, return_value=True),
+        patch("src.api.rest.rest_endpoints.settings.FLARESOLVERR_ENABLED", True),
     ):
         resp = await client.post(
             "/api/v2/web/read",

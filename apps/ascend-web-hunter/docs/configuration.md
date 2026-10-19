@@ -62,6 +62,12 @@ corrupt file there is a packaging defect and the service refuses to start. `BLOC
 
 ### Strategy chain
 
+The read ladder climbs `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr` (only while
+`FLARESOLVERR_ENABLED` is true), `4-playwright_stealth`, `4a-patchright`, `4b-camoufox` (only while
+`CAMOUFOX_ENABLED` is true), `5-crawlee_adaptive` and `6-novnc`, in that order. A caller may start the
+chain at any tier with the `tier` field. A domain that succeeded at a tier before restarts at the
+remembered tier for `TIER_MEMORY_TTL_SECONDS`.
+
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `READ_TOTAL_BUDGET` | `90.0` | Wall-clock cap (seconds) across tiers 1-5. NoVNC exempt. |
@@ -71,6 +77,8 @@ corrupt file there is a packaging defect and the service refuses to start. `BLOC
 | `DYNAMIC_CONTENT_WAIT` | `2000` | Playwright post-load settle (milliseconds) |
 | `SCROLL_ITERATIONS` | `5` | Scroll steps for infinite-scroll pages |
 | `SCROLL_STEP_PX` | `1500` | Pixels per scroll step |
+| `NETWORKIDLE_POLL_MS` | `1000` | Page-quiet poll interval in milliseconds for browser tiers. Added by `enhance-web-search-tier-ladder`. |
+| `SCROLL_PAUSE_MS` | `200` | Pause in milliseconds between two scroll steps. Added by `enhance-web-search-tier-ladder`. |
 | `MAX_REQUESTS_PER_CRAWL` | `5` | Crawlee request cap |
 | `BREAKER_FAILURE_THRESHOLD` | `3` | Consecutive failures before a circuit breaker opens |
 | `BREAKER_RECOVERY_TIMEOUT_SECONDS` | `60.0` | Seconds after which an open breaker moves to half-open and allows one probe |
@@ -114,6 +122,8 @@ cost 25 to 33 milliseconds on 50 to 390 kilobyte pages, and because the longer r
 | :--- | :--- | :--- |
 | `PLAYWRIGHT_HEADLESS` | `false` | Set `true` in CI or any container without an X server |
 | `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr Cloudflare-bypass endpoint |
+| `FLARESOLVERR_ENABLED` | `false` | Route reads through the 3-flaresolverr tier. Added by `enhance-web-search-tier-ladder`. |
+| `CAMOUFOX_ENABLED` | `true` | Route reads through the 4b-camoufox tier. Added by `enhance-web-search-tier-ladder`. |
 | `SELENIUM_BROWSER_CDP_URL` | `ws://localhost:4444/playwright` | CDP URL for remote browser (legacy naming) |
 | `SELENIUM_BROWSER_VNC_URL` | `http://localhost:7900` | Local NoVNC fallback |
 | `PUBLIC_VNC_URL` | `http://localhost:7900` | Public NoVNC URL; `http://ngrok:4040/api/tunnels` for dynamic Ngrok |
@@ -183,6 +193,7 @@ are mandatory there. `SEARXNG_SECRET` is SearXNG's session-signing key, which is
 | `SESSION_AUTH_TTL_SECONDS` | `1209600` | Sliding TTL for auth cookies (long-lived, 14 days) |
 | `SESSION_WAF_TTL_SECONDS` | `1800` | TTL for WAF-clearance cookies (short-lived, 30 minutes) |
 | `SESSION_DEFAULT_PROFILE` | `default` | Profile label used when no profile is specified per-request |
+| `TIER_MEMORY_TTL_SECONDS` | `86400` | TTL in seconds for the per-domain tier memory. Added by `enhance-web-search-tier-ladder`. |
 | `USER_AGENTS_PATH` | `src/assets/user_agents.json` | Rotated UA pool for cheap tiers |
 | `FILE_ENCODING` | `utf-8` | Default file encoding |
 

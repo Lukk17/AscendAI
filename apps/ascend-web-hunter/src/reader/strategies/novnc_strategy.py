@@ -10,12 +10,14 @@ from src.api.exceptions import HumanInterventionRequiredException
 from src.config.config import settings
 from src.observability.domain_label import domain_label
 from src.observability.metrics import STRATEGY_ATTEMPTS_TOTAL
+from src.reader.browser_guard import install_browser_guard
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import assess, log_verdict, record_verdict
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC, cookie_manager
 from src.reader.fingerprint import get_default_fingerprint
 from src.reader.novnc.flow_registry import NoVNCFlow, flow_key_for, novnc_flow_registry
 from src.reader.strategies.base_strategy import BaseStrategy
+from src.validator.url_validator import url_validator as shared_url_validator
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +180,9 @@ async def _monitor_for_cookies(flow: NoVNCFlow) -> None:
                 timezone_id=fp.timezone_id,
                 geolocation=fp.geolocation,
                 permissions=["geolocation"],
+                service_workers="block",
             )
+            await install_browser_guard(context, shared_url_validator)
 
             page = await context.new_page()
 

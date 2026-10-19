@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import trafilatura
+from ascend_python_common.uri_guard import UnsafeUriError, check_fetch_uri
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
@@ -17,6 +18,7 @@ from crawlee.crawlers import (
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
+from src.reader.browser_guard import install_browser_guard, web_hunter_fetch_policy
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import (
     as_login_verdict,
@@ -72,6 +74,7 @@ class CrawleeStrategy(BaseStrategy):
         return extracted or ""
 
     async def get_html(self, url: str) -> str:
+        await check_fetch_uri(url, web_hunter_fetch_policy())
         result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
         last_response: dict[str, Any] = {}
 
@@ -83,6 +86,7 @@ class CrawleeStrategy(BaseStrategy):
             "timezone_id": fp.timezone_id,
             "geolocation": fp.geolocation,
             "permissions": ["geolocation"],
+            "service_workers": "block",
         }
         if storage_state is not None:
             browser_new_context_options["storage_state"] = storage_state
@@ -118,11 +122,20 @@ class CrawleeStrategy(BaseStrategy):
             await self._handle_crawlee_request(context, result_container, last_response)
 
         @crawler.pre_navigation_hook
-        async def enable_adblock(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-            await context.page.route("**/*", self.url_validator.route_handler)
+        async def install_guard(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+            result_container["refused_navigations"] = await install_browser_guard(
+                context.page.context, self.url_validator
+            )
             context.page.on("response", lambda response: last_response.update(_response_summary(response)))
 
         await self._run_crawler_bounded(crawler, url)
+        refused_navigations: list[str] = result_container.get("refused_navigations", [])
+        if refused_navigations:
+            logger.warning(
+                "CrawleeStrategy: Blocked navigation detected post-render on %s", url
+            )
+
+            raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}")
         html: str = result_container.get("html", "")
         status: int = result_container.get("status", 200)
         headers: dict[str, str] = result_container.get("headers", {})

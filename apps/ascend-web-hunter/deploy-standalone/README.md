@@ -158,6 +158,11 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | CHALLENGE_WEIGHT_MANY_LINKS | No | Weight of the many_links guard signal. Code default `-20` applies when unset. |
 | CHALLENGE_WEIGHT_PHRASE_TITLE | No | Weight of the phrase_title signal. Code default `60` applies when unset. |
 | CHALLENGE_WEIGHT_PHRASE_BODY | No | Weight of the phrase_body signal. Code default `30` applies when unset. |
+| FLARESOLVERR_ENABLED | No | Route reads through the 3-flaresolverr tier. Code default `false` applies when unset. |
+| CAMOUFOX_ENABLED | No | Route reads through the 4b-camoufox tier. Code default `true` applies when unset. |
+| TIER_MEMORY_TTL_SECONDS | No | TTL in seconds for the per-domain tier memory. Code default `86400` applies when unset. |
+| NETWORKIDLE_POLL_MS | No | Page-quiet poll interval in milliseconds for browser tiers. Code default `1000` applies when unset. |
+| SCROLL_PAUSE_MS | No | Pause in milliseconds between two scroll steps. Code default `200` applies when unset. |
 
 The full list of tunable settings, timeouts, extraction thresholds, circuit-breaker values and so on, lives in [../docs/configuration.md](../docs/configuration.md). Every one of them can be added to the `environment:` block of the ascend-web-hunter service.
 
