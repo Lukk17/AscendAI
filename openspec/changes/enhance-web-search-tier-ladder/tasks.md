@@ -4,9 +4,9 @@ Every command runs from `apps/ascend-web-hunter/` through the module's own virtu
 
 ## 1. Configuration and dependencies
 
-- [ ] 1.1 Add `patchright` and `camoufox` to `pyproject.toml` with exact pinned versions. Verify
+- [x] 1.1 Add `patchright` and `camoufox` to `pyproject.toml` with exact pinned versions. Verify
       `python -m pip install -e ".[dev]"` succeeds and `python -c "import patchright, camoufox"` exits 0.
-- [ ] 1.2 Add `FLARESOLVERR_ENABLED` (bool, default `false`), `CAMOUFOX_ENABLED` (bool, default `true`) and
+- [x] 1.2 Add `FLARESOLVERR_ENABLED` (bool, default `false`), `CAMOUFOX_ENABLED` (bool, default `true`) and
       `TIER_MEMORY_TTL_SECONDS` (int, default `86400`, minimum `60`) to `src/config/config.py`, and turn the two waits
       `playwright_strategy.py` holds as code today into settings with today's values as defaults (owner answer 100.3 of
       2026-10-09, design Answer 100.3): `NETWORKIDLE_POLL_MS` (int, default `1000`, the page-quiet poll interval, today
@@ -15,10 +15,10 @@ Every command runs from `apps/ascend-web-hunter/` through the module's own virtu
       `_NETWORKIDLE_POLL_MS` and the literal `200` are removed. Verify with cases in
       `tests/config/test_config.py` for each default, a valid override and a rejected value. The default in
       `config.py` is the same value as the compose default of task 1.4 (owner rule 98 of 2026-10-08).
-- [ ] 1.3 Fetch both browser builds at image build time in `apps/ascend-web-hunter/Dockerfile`. Verify
+- [x] 1.3 Fetch both browser builds at image build time in `apps/ascend-web-hunter/Dockerfile`. Verify
       `docker build -t ascend-web-hunter:latest .` succeeds and a container started from it launches each browser
       once with no network fetch, by reading its logs.
-- [ ] 1.4 Pass the five settings of task 1.2 through the `ascend-web-hunter` service of
+- [x] 1.4 Pass the five settings of task 1.2 through the `ascend-web-hunter` service of
       `compose.ascend-web-hunter.yaml` and of `deploy-standalone/compose.yaml` as `- <NAME>=${<NAME>:-<default>}`
       with the default of task 1.2: `- FLARESOLVERR_ENABLED=${FLARESOLVERR_ENABLED:-false}`,
       `- CAMOUFOX_ENABLED=${CAMOUFOX_ENABLED:-true}` and
@@ -35,7 +35,7 @@ Every command runs from `apps/ascend-web-hunter/` through the module's own virtu
 
 ## 2. The two tiers
 
-- [ ] 2.1 Create `src/reader/strategies/patchright_strategy.py` mirroring `playwright_strategy.py`: session
+- [x] 2.1 Create `src/reader/strategies/patchright_strategy.py` mirroring `playwright_strategy.py`: session
       `storage_state` replay, the fingerprint, the proxy seam, the browser request guard of design D6 built on the library
       guard of `add-ascend-python-common` (`check_fetch_uri` and its `FetchTarget`, owner answer 63.2), scroll
       handling and the `ChallengeDetector.assess` verdict on the initial response and after render. It reads the
@@ -44,15 +44,15 @@ Every command runs from `apps/ascend-web-hunter/` through the module's own virtu
       98 and Answer 100.3). Verify with
       `tests/reader/strategies/test_patchright_strategy.py` using a mocked browser, covering replay, a wall verdict
       raising `ChallengeDetectedException`, and a clean page returning HTML.
-- [ ] 2.2 Create `src/reader/strategies/camoufox_strategy.py` the same way, with the Firefox fingerprint family per
+- [x] 2.2 Create `src/reader/strategies/camoufox_strategy.py` the same way, with the Firefox fingerprint family per
       `design.md` D4. Verify with `tests/reader/strategies/test_camoufox_strategy.py`, including a test that a stored
       Chromium user agent is not injected into Camoufox.
-- [ ] 2.3 Add `4a-patchright` and `4b-camoufox` to `TierName` and to `TIER_ORDER` in `src/reader/web_reader.py`
+- [x] 2.3 Add `4a-patchright` and `4b-camoufox` to `TierName` and to `TIER_ORDER` in `src/reader/web_reader.py`
       after `4-playwright_stealth`, and register both strategies. Verify with a test that a page blocking
       `4-playwright_stealth` and `4a-patchright` succeeds at `4b-camoufox`, and that `CAMOUFOX_ENABLED=false` skips it.
-- [ ] 2.4 Accept the two new values on REST (`tier` field) and MCP (`web_read` `tier` argument, docstring included).
+- [x] 2.4 Accept the two new values on REST (`tier` field) and MCP (`web_read` `tier` argument, docstring included).
       Verify with tests in `tests/api/` that both values start the chain at that tier.
-- [ ] 2.5 Create `src/reader/browser_guard.py` with the guarded route handler of design D6 (ad blocklist, then
+- [x] 2.5 Create `src/reader/browser_guard.py` with the guarded route handler of design D6 (ad blocklist, then
       `check_fetch_uri` with the web-hunter policy, `route.abort("blockedbyclient")` on a refusal,
       `route.fetch(max_redirects=0)` and `route.fulfill(response=...)` on a pass, `data:` and `blob:` passed), and the
       WebSocket check with `context.route_web_socket` when the pinned Playwright version offers it. Install it on the
@@ -62,16 +62,16 @@ Every command runs from `apps/ascend-web-hunter/` through the module's own virtu
       of 2026-10-04. Verify with `tests/reader/test_browser_guard.py` using a faked route: a private URL is aborted and
       never fetched, a public URL is fetched with `max_redirects=0` and fulfilled, a blocklisted URL is aborted, `data:`
       passes, `ftp:` is refused, and a refused main navigation raises `UnsafeUriError`.
-- [ ] 2.6 Integration test `tests/integration/test_browser_ssrf.py` with a real Chromium and a real Firefox on a local
+- [x] 2.6 Integration test `tests/integration/test_browser_ssrf.py` with a real Chromium and a real Firefox on a local
       test server reached through the resolver seam of the tests: for each browser tier, a public page that redirects
       to `169.254.169.254`, a page that loads an image from `10.0.0.5`, and a page that sets `window.location` to
       `127.0.0.1:6379`. Verify that the private addresses receive no connection (a listener on each stays silent), the
       redirect and the script navigation answer `unsafe_uri` on REST and as a tool error on MCP, and the page with the
       private image is still returned. Record the read time of the e2e pages with and without the guard under this
       task.
-- [ ] 2.7 Amend ADR-012 and write ADR-015 (task 5.2) with the browser request guard and the residual DNS rebinding
+- [x] 2.7 Amend ADR-012 and write ADR-015 (task 5.2) with the browser request guard and the residual DNS rebinding
       window of `route.fetch`. Verify both files name `browser_guard.py`.
-- [ ] 2.8 Owner answer 94.6 of 2026-10-08 (design D7): while `CAMOUFOX_ENABLED` is false, a REST read whose `tier` is
+- [x] 2.8 Owner answer 94.6 of 2026-10-08 (design D7): while `CAMOUFOX_ENABLED` is false, a REST read whose `tier` is
       `4b-camoufox` answers HTTP 409 with a problem body of `code` `tier_disabled` whose `detail` names `4b-camoufox`,
       and the MCP `web_read` call with that `tier` answers a tool error starting with `tier_disabled: ` that names the
       same tier. Register `tier_disabled` in the service's error registry with status 409, the one status of the code,
@@ -82,36 +82,36 @@ Every command runs from `apps/ascend-web-hunter/` through the module's own virtu
 
 ## 3. FlareSolverr behind the flag
 
-- [ ] 3.1 Skip `3-flaresolverr` in the ladder when `FLARESOLVERR_ENABLED` is false and answer HTTP 409 (REST, owner
+- [x] 3.1 Skip `3-flaresolverr` in the ladder when `FLARESOLVERR_ENABLED` is false and answer HTTP 409 (REST, owner
       answer 94.6 of 2026-10-08, design D7: one status for the code `tier_disabled`, confirmed for this tier by owner
       answer 95.3 of 2026-10-08, the same answer as the switched-off `4b-camoufox`) with a
       problem body of `code` `tier_disabled` or a `ToolError` (MCP) starting with `tier_disabled: `, naming the disabled
       tier, when a caller selects it (owner answer 67.7 of 2026-10-04, design D2). Verify with tests for both surfaces and both
       flag values.
-- [ ] 3.2 Probe FlareSolverr in `src/api/readiness.py` and show it in `src/config/startup_banner.py` only when enabled.
+- [x] 3.2 Probe FlareSolverr in `src/api/readiness.py` and show it in `src/config/startup_banner.py` only when enabled.
       Verify with tests that `/ready` ignores an unreachable `FLARESOLVERR_URL` when the flag is false.
-- [ ] 3.3 Route a stored session with `produced_by` `3-flaresolverr` to the browser tiers when the flag is false, per
+- [x] 3.3 Route a stored session with `produced_by` `3-flaresolverr` to the browser tiers when the flag is false, per
       the MODIFIED requirement in `specs/web-search-authenticated-sessions/spec.md`. Verify with a test in
       `tests/reader/test_web_reader.py`.
 
 ## 4. Tier memory
 
-- [ ] 4.1 Create `src/reader/tier_memory.py` with `get(url)` and `record(url, tier)` over the key
+- [x] 4.1 Create `src/reader/tier_memory.py` with `get(url)` and `record(url, tier)` over the key
       `tier_memory:{CookieManager.registrable_domain(url)}` and `TIER_MEMORY_TTL_SECONDS`. Verify with
       `tests/reader/test_tier_memory.py` using a fake Redis: set, overwrite by a cheaper tier, no overwrite by a dearer
       tier, expiry, and a Redis error returning `None` with a WARNING log.
-- [ ] 4.2 Start the ladder at the remembered tier in `web_reader.py`, with caller `tier` and session producer taking
+- [x] 4.2 Start the ladder at the remembered tier in `web_reader.py`, with caller `tier` and session producer taking
       precedence. Verify with tests for each precedence case.
 
 ## 5. Documentation
 
-- [ ] 5.1 Update `apps/ascend-web-hunter/AGENTS.md`, `README.md` and `docs/configuration.md` with the ladder, the two
+- [x] 5.1 Update `apps/ascend-web-hunter/AGENTS.md`, `README.md` and `docs/configuration.md` with the ladder, the two
       tier values and the five settings of task 1.2. The rows of `docs/configuration.md` (the per-service configuration reference
       of ascend-web-hunter, owner rule 98 of 2026-10-08) go in the same commit as the settings of task 1.2, each with
       its default and its description ending with "Added by `enhance-web-search-tier-ladder`.". Verify each setting
       name appears in all three files and that each row this change adds to `docs/configuration.md` ends with "Added by
       `enhance-web-search-tier-ladder`.".
-- [ ] 5.2 Write `docs/architecture/decisions/ADR-015-patched-browser-tiers-and-tier-memory.md` and add it to the
+- [x] 5.2 Write `docs/architecture/decisions/ADR-015-patched-browser-tiers-and-tier-memory.md` and add it to the
       decisions `README.md` index. Amend ADR-011 with the two new public values, dated. Verify ADR-011's existing
       values are unchanged.
 - [ ] 5.3 Bump `pyproject.toml`, the `AGENTS.md` version line and the version in
@@ -121,9 +121,9 @@ Every command runs from `apps/ascend-web-hunter/` through the module's own virtu
 
 ## 6. Verification
 
-- [ ] 6.1 Run the test gate, `python -m ruff check .` and `python -m mypy src tests`. Verify all pass with no suppression
+- [x] 6.1 Run the test gate, `python -m ruff check .` and `python -m mypy src tests`. Verify all pass with no suppression
       added.
-- [ ] 6.2 Rebuild the stack from the repository root with `docker compose up -d --build` and read
+- [x] 6.2 Rebuild the stack from the repository root with `docker compose up -d --build` and read
       `https://nowsecure.nl` through `POST /api/v2/web/read` with `tier` `4a-patchright`. Verify HTTP 200 or 428, never
       500, and that `/metrics` counts the tier.
 - [ ] 6.3 Record the image size before and after in the CHANGELOG entry from 5.3.
