@@ -23,7 +23,7 @@ Each of the four Python services SHALL declare the shared library `ascend-python
 
 ### Requirement: Every REST error is an RFC 7807 problem body
 
-Every 4xx and 5xx answer of the REST surface of every Python service SHALL be a body with media type `application/problem+json` and the fields `type`, `title`, `status`, `detail`, `instance` and the extension fields `code` and `traceId`. `type` SHALL be `https://ascend.ai/errors/` followed by the code in lower case with every `_` replaced by `-`. `title` SHALL be the HTTP reason phrase of the status. `instance` SHALL be the request path. `traceId` SHALL be the 32 character lower case hex trace id of the request's trace, and SHALL be left out only when no trace is current, never empty and never invented. Only the answer of the service's internal code (an exception no code is registered for) SHALL carry a fixed detail. Every other 5xx, which reports another service or an upstream (a 502, 503 or 504, or a named upstream code such as ascend-ocr's `DOWNLOAD_FAILED`), SHALL keep the detail of its registered code, so the caller learns what failed. No detail SHALL name an internal host, an internal path, an exception class, a traceback or the user info of a URI. Extra fields a code carries SHALL be extension members at the top level of the body and SHALL NOT replace a standard member. A service SHALL keep its own codes, and the platform codes SHALL be these, defined by the shared library for the same cases in every service: `validation`, `bad_request`, `unauthorized` (401, for a missing or refused service token), `not_found`, `method_not_allowed`, `not_acceptable`, `content_too_large`, `unsupported_media_type`, `rate_limited`, `http_error` and `internal`. There is no exception to this rule.
+Every Python 4xx/5xx SHALL use `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, `code`, `traceId`. `type` SHALL be `https://ascend.ai/errors/` plus lower-case code with `-` for `_`. `title` SHALL be the reason phrase and `instance` the path. `traceId` SHALL be the 32 hex trace id, omitted only with no trace, never empty or invented. Only the internal code SHALL use a fixed detail; other 5xx (502, 503, 504, named upstream like `DOWNLOAD_FAILED`) SHALL keep their detail. No `detail` SHALL name hosts, paths, classes, tracebacks, or URI user info. Extra fields SHALL stay top-level. Platform codes SHALL be `validation`, `bad_request`, `unauthorized` (401), `not_found`, `method_not_allowed`, `not_acceptable`, `content_too_large`, `unsupported_media_type`, `rate_limited`, `http_error`, `internal`.
 
 #### Scenario: A service's own refusal
 
@@ -79,7 +79,7 @@ A request whose parameters, form fields or body fail validation SHALL answer HTT
 
 ### Requirement: Refusals are logged once and counted per code
 
-An expected refusal SHALL be logged as exactly one WARNING line that names its code, with no traceback, on both surfaces. An unexpected exception SHALL be logged at ERROR with its traceback. Every refusal and every unexpected exception SHALL increment the counter `ascend_service_errors_total` with the labels `code`, `surface` and `operation`, where `surface` is `rest` or `mcp` and `operation` is the route template on REST, the tool name on MCP, and `unmatched` for a request that matches no route. `operation` SHALL never hold a raw request path.
+An expected refusal SHALL log exactly one WARNING line naming its code, with no traceback, on both surfaces. An unexpected exception SHALL log at ERROR with its traceback. Every refusal and exception SHALL increment `ascend_service_errors_total` with `code`, `surface` (`rest` or `mcp`) and `operation` (route template, tool name, or `unmatched`). `operation` SHALL never hold a raw path.
 
 #### Scenario: A refusal over REST
 
@@ -114,7 +114,7 @@ A refused MCP tool call SHALL fail as a tool error whose text is `<code>: <detai
 
 ### Requirement: Every service reads the same base settings
 
-Every Python service SHALL read `API_HOST`, `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT` and `RATE_LIMIT_DEFAULT` with the same names, types and bounds. `API_PORT` SHALL be between 1 and 65535. `LOG_LEVEL` SHALL be one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`, accepted in any letter case. `LOG_FORMAT` SHALL be `json` or `color`, default `json`. `OTEL_EXPORTER_OTLP_ENDPOINT` SHALL be unset by default, and a set value SHALL be an absolute http or https URL. No service SHALL read a custom switch for trace export. A rate limit setting SHALL be a limit expression such as `60/minute`. Every Python service SHALL also read `READINESS_PROBE_TIMEOUT_SECONDS` (greater than 0, default `3`), `STARTUP_PROBE_TIMEOUT_SECONDS` (greater than 0, default `2`) and `SECURITY_HSTS_MAX_AGE_SECONDS` (0 or more, default `63072000`), and every compose service of a Python service SHALL pass each setting it reads as `${VAR:-default}` with the default the code uses. A service that fetches caller-supplied URIs over MCP SHALL also read `ALLOWED_PRIVATE_HOSTS`, `MCP_FILE_URI_ROOT` and `MCP_DOWNLOAD_TIMEOUT_SECONDS` with the same names and types, and a service that follows redirects SHALL read `FETCH_MAX_REDIRECT_HOPS` (0 or more). No service SHALL read the old name `MCP_ALLOWED_HOSTS`, which `ALLOWED_PRIVATE_HOSTS` replaces. Every service SHALL refuse to start while `MCP_ALLOWED_HOSTS` is present in its environment, with a start-up error that names `MCP_ALLOWED_HOSTS` and tells the operator to use `ALLOWED_PRIVATE_HOSTS`, and a non-zero exit before its port accepts a connection. A value outside its bounds SHALL stop start-up with an error naming the setting.
+Every service SHALL read `API_HOST`, `API_PORT` (1 to 65535), `LOG_LEVEL` (one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`, any case), `LOG_FORMAT` (`json` or `color`, default `json`), `OTEL_EXPORTER_OTLP_ENDPOINT` (unset default, set must be absolute http or https URL) and `RATE_LIMIT_DEFAULT` (like `60/minute`) alike, with no custom trace switch. It SHALL also read `READINESS_PROBE_TIMEOUT_SECONDS` (over 0, default `3`), `STARTUP_PROBE_TIMEOUT_SECONDS` (over 0, default `2`) and `SECURITY_HSTS_MAX_AGE_SECONDS` (0 or more, default `63072000`), passed as `${VAR:-default}`. Fetchers SHALL read `ALLOWED_PRIVATE_HOSTS`, `MCP_FILE_URI_ROOT`, `MCP_DOWNLOAD_TIMEOUT_SECONDS`, followers `FETCH_MAX_REDIRECT_HOPS` (0 or more). No service SHALL read `MCP_ALLOWED_HOSTS` and SHALL refuse start with it present, naming it and `ALLOWED_PRIVATE_HOSTS`, exiting non-zero. Bad values SHALL stop start-up naming the setting.
 
 #### Scenario: A leftover old allow list name stops start-up
 
@@ -144,7 +144,7 @@ Every Python service SHALL read `API_HOST`, `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT
 
 ### Requirement: Logging honours the configured level and format
 
-Every Python service SHALL log at the level `LOG_LEVEL` sets and in the format `LOG_FORMAT` sets, for its own loggers, for the web server's loggers (access lines included) and for the MCP framework's loggers, all through one handler. In the `json` format every line SHALL carry `timestamp`, `level`, `name`, `module`, `message`, `service`, `correlation_id`, `mcp_session_id`, `trace_id` and `span_id`. The `color` format SHALL start every line with `[<service name>]`, for example `[ascend-audio-scribe]`.
+Every service SHALL log at `LOG_LEVEL` and in `LOG_FORMAT`, for its own, web server (access included) and MCP loggers, through one handler. In `json` every line SHALL carry `timestamp`, `level`, `name`, `module`, `message`, `service`, `correlation_id`, `mcp_session_id`, `trace_id`, `span_id`. In `color` every line SHALL start with `[<service name>]`.
 
 #### Scenario: DEBUG lines appear only at DEBUG
 
@@ -158,7 +158,7 @@ Every Python service SHALL log at the level `LOG_LEVEL` sets and in the format `
 
 ### Requirement: Every request carries a correlation id and an MCP session digest
 
-Every HTTP request SHALL be bound to a correlation id: the inbound `x-request-id` when it is 1 to 128 characters of letters, digits, `.`, `_`, `:` and `-`, otherwise a new random id. The id SHALL be echoed in the `x-request-id` response header, on error responses too, and SHALL be the `correlation_id` of every log line written while the request is served. For a request to the MCP endpoint that carries an acceptable `mcp-session-id` header, and for the response that creates a session, the log lines SHALL carry `mcp_session_id`, the first 16 hex characters of the SHA-256 digest of the session id. The raw session id SHALL never appear in a log line or an exported span.
+Every HTTP request SHALL bind a correlation id: inbound `x-request-id` when 1 to 128 chars of letters, digits, `.`, `_`, `:` and `-`, else a new random id. The id SHALL be echoed in the `x-request-id` response header, errors included, and SHALL be the `correlation_id` of its log lines. MCP session lines SHALL carry `mcp_session_id`, the first 16 hex of the SHA-256 digest. The raw session id SHALL never appear in logs or spans.
 
 #### Scenario: An unsafe request id
 
@@ -182,7 +182,7 @@ Every HTTP request SHALL be bound to a correlation id: the inbound `x-request-id
 
 ### Requirement: Every request has a trace, and export is optional
 
-Every Python service SHALL start a trace for every HTTP request, continuing the caller's trace when the request carries a valid `traceparent` header, whether or not export is enabled. Spans SHALL be exported over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT` whenever that setting is set, and SHALL NOT be exported when it is unset or empty. OpenTelemetry's standard setting `OTEL_SDK_DISABLED=true` SHALL switch tracing off entirely, as the OpenTelemetry SDK defines it: no span is recorded or exported, and a problem body then leaves `traceId` out, because no trace is current. No exported span SHALL carry an MCP session id, raw or as a digest.
+Every service SHALL start a trace per HTTP request, continuing a valid `traceparent`, with or without export. Spans SHALL export over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT` when set, and SHALL NOT export when unset or empty. `OTEL_SDK_DISABLED=true` SHALL switch tracing off entirely with no span recorded or exported, leaving `traceId` out. No exported span SHALL carry an MCP session id, raw or digest.
 
 #### Scenario: Export disabled
 
@@ -208,7 +208,7 @@ Every Python service SHALL start a trace for every HTTP request, continuing the 
 
 ### Requirement: Health, readiness and metrics have one shape
 
-Every Python service SHALL answer `GET /health` with HTTP 200 and `{"status": "ok", "service": <name>, "version": <version>}` whenever the process can answer, independent of every dependency. `GET /ready` SHALL answer HTTP 200 with `status` `ready` when every probe of the service reports `ok` or `skipped`, and HTTP 503 with `status` `not-ready` otherwise, with the body `{"status", "service", "version", "checks"}`, where `checks` maps each probe name to an object with at least `status` (`ok`, `skipped`, `degraded` or `error`). A probe that does not answer within `READINESS_PROBE_TIMEOUT_SECONDS` SHALL report `error`. A probe SHALL never put a credential, a connection string or an exception text into the body. `GET /metrics` SHALL expose Prometheus metrics. `/health`, `/ready` and `/metrics` SHALL NOT be rate limited and SHALL NOT be counted in the request metrics.
+GET /health SHALL be 200 ok with service/version always. GET /ready SHALL be 200 ready if all probes ok/skipped else 503 not-ready, with status,service,version,checks each at least status ok/skipped/degraded/error. Past READINESS_PROBE_TIMEOUT_SECONDS SHALL be error, never leaking credentials, strings, or exception text. GET /metrics SHALL be Prometheus. The three SHALL skip limiting and metrics.
 
 #### Scenario: A dependency is down
 
@@ -229,7 +229,7 @@ Every Python service SHALL answer `GET /health` with HTTP 200 and `{"status": "o
 
 ### Requirement: Every service limits the request rate of each caller
 
-Every Python service SHALL limit the number of requests each caller address may make per time window, on REST routes and on MCP tool calls, as flood protection and not as a throughput cap, with limits read from settings: `RATE_LIMIT_DEFAULT` for every limited operation, and a named setting of the service for each operation it limits more strictly. A request over the limit SHALL answer HTTP 429 with a problem body of code `rate_limited` and a `Retry-After` header on REST, and SHALL fail with a tool error starting with `rate_limited: ` on MCP. Listing the MCP tools SHALL NOT be limited. A caller's REST and MCP calls SHALL draw from one budget. Several containers of one service that keep their limits in one shared Redis SHALL draw a caller's calls from one budget, and ascend-memory, ascend-audio-scribe, ascend-ocr and ascend-web-hunter SHALL each keep their limits in the Redis of their `REDIS_URL`, under a key prefix of their own, so two services never share a window. When that Redis cannot be reached, each container SHALL keep limiting on its own and SHALL NOT refuse a request because of the Redis failure.
+SHALL limit per address on REST/MCP as flood protection via RATE_LIMIT_DEFAULT plus stricter named settings. Over-limit REST SHALL be 429 rate_limited with Retry-After, MCP SHALL fail rate_limited:. Listing SHALL NOT limit. REST/MCP SHALL share one budget. Sharing Redis SHALL share one budget, each of the four SHALL use its REDIS_URL own prefix. Without Redis SHALL limit alone and SHALL NOT refuse for Redis failure.
 
 #### Scenario: Too many submissions
 
@@ -259,7 +259,7 @@ Every Python service SHALL limit the number of requests each caller address may 
 
 ### Requirement: Caller-supplied URIs pass one fetch guard
 
-A Python service that fetches a URI a caller names, over MCP or REST, SHALL check it with the library's one fetch guard before any byte is fetched or read. The guard SHALL accept only `http`, `https` and `file` URIs. It SHALL refuse a URI that does not parse or carries an invalid port, an HTTP URI that carries user info or no host name, and an HTTP host that is not on `ALLOWED_PRIVATE_HOSTS` and whose lookup fails, answers no address, or answers any private, loopback, link-local, multicast, reserved or unspecified address. ascend-web-hunter SHALL use the same guard with no file root and with the hosts of its own `ALLOWED_PRIVATE_HOSTS` setting, which SHALL be empty by default and which no production file SHALL set. The connection to a host that is not on `ALLOWED_PRIVATE_HOSTS` SHALL go only to the addresses the guard checked, never to the answer of a second lookup. A service that follows redirects SHALL resolve every redirect target against the URL of the hop that returned it and check it with the same guard before any request is sent to it, SHALL never follow a redirect to a `file://` URI, and SHALL follow at most the number of hops its `FETCH_MAX_REDIRECT_HOPS` setting allows, 10 by default in ascend-audio-scribe and ascend-web-hunter and 0 by default in ascend-ocr. It SHALL refuse every `file://` URI while `MCP_FILE_URI_ROOT` is unset, and every `file://` path whose real path lies outside the real path of `MCP_FILE_URI_ROOT`. A refusal SHALL answer with the code the service registers for it, and its detail SHALL name neither the root path nor the user info of the URI.
+Fetchers of caller URIs SHALL check each URI with the one guard before any fetch. The guard SHALL accept only `http`, `https`, `file`. It SHALL refuse unparsable URIs, bad ports, HTTP user info or missing host, and hosts off `ALLOWED_PRIVATE_HOSTS` whose lookup fails, answers none, or answers private, loopback, link-local, multicast, reserved, or unspecified. Connections SHALL use only checked addresses. Redirects SHALL resolve against the hop URL, pass the same guard, never target `file://`, and stop after `FETCH_MAX_REDIRECT_HOPS` (default 10 in ascend-audio-scribe and ascend-web-hunter, 0 in ascend-ocr). `file://` SHALL need `MCP_FILE_URI_ROOT` set and a real path inside it. Refusal details SHALL name neither root nor user info. ascend-web-hunter SHALL keep `ALLOWED_PRIVATE_HOSTS` empty by default with no file root.
 
 #### Scenario: A host that resolves to a private address
 
@@ -304,7 +304,7 @@ A Python service that fetches a URI a caller names, over MCP or REST, SHALL chec
 
 ### Requirement: The startup banner has one frame and hides secrets
 
-Every Python service SHALL write one startup banner, as one log record, after its own start-up work is done, with the frame, the layout and the status words of the library: the service name, the access URLs, the log level, the `/health`, `/ready`, `/metrics` and `/mcp` lines, then the service's own sections, each with its values in one column. A check line SHALL end in `[Connected]`, `[FAILED]`, `[Warning (<reason>)]`, `[Configured]` or `[Not configured]`. The service SHALL supply only its own content lines. No banner line SHALL hold a secret value or the user info of a URI.
+Every service SHALL write one startup banner as one log record after start-up, with the library frame: service name, access URLs, log level, `/health`, `/ready`, `/metrics`, `/mcp` lines, then its own sections in one column. A check line SHALL end in `[Connected]`, `[FAILED]`, `[Warning (<reason>)]`, `[Configured]` or `[Not configured]`. No banner line SHALL hold a secret value or URI user info.
 
 #### Scenario: A connection string with a password
 
@@ -319,7 +319,7 @@ Every Python service SHALL write one startup banner, as one log record, after it
 
 ### Requirement: The MCP endpoint and server name are the same everywhere
 
-Every Python service SHALL serve its MCP endpoint at the path `/mcp` on the same port as its REST surface, `API_PORT`, and SHALL have no separate MCP port setting, and SHALL name its MCP server after the service, for example `ascend-memory`. Only that one path SHALL reach the MCP endpoint. Every other path SHALL reach the REST surface and its problem answers. The MCP endpoint SHALL run in FastMCP's stateless HTTP mode, so any container of a service SHALL answer any MCP request, the answer to `initialize` SHALL carry no `mcp-session-id` header, and no tool SHALL rely on a message the server sends to the client between requests.
+Every service SHALL serve MCP at `/mcp` on `API_PORT`, with no separate MCP port, named after the service like `ascend-memory`. Only that path SHALL reach MCP, other paths SHALL reach REST. MCP SHALL run in FastMCP stateless HTTP mode so any container answers any request, `initialize` answers carry no `mcp-session-id` header, and no tool SHALL rely on server-to-client messages between requests.
 
 #### Scenario: ascend-memory names itself
 

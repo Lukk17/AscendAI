@@ -4,7 +4,7 @@
 
 ### Requirement: The edge gateway is the only publicly bound service
 
-`compose.yaml` SHALL define a `gateway` service (Caddy 2, image pinned by version and digest) that is the only compose service publishing ports on all host interfaces: its container ports `80` and `443` on the host ports `GATEWAY_HTTP_HOST_PORT` (default `80`) and `GATEWAY_HTTPS_HOST_PORT` (default `443`). The gateway SHALL terminate TLS, through ACME when `ASCEND_DOMAIN` is a real domain and through Caddy's internal CA when `ASCEND_DOMAIN` is `localhost` or unset. Its configuration SHALL live in `gateway/Caddyfile` and SHALL proxy to `ascend-agent:9917`. The gateway SHALL carry no compose profile. The gateway SHALL NOT route to Grafana, the object store or the agent's management port `9918`, and SHALL NOT route any path of the agent's site to another service. Keycloak of `add-keycloak-login`, which lands before this change, is a separate service on its own host address and port and SHALL appear in `gateway/Caddyfile` only as a separate site address with its own host name, which carries the per-client-address rate limits on the Keycloak login and token endpoints. The gateway SHALL NOT route any path of the agent's site to Keycloak.
+compose.yaml SHALL define gateway Caddy 2 pinned version digest as only all-interface publisher: 80 on GATEWAY_HTTP_HOST_PORT 80 and 443 on GATEWAY_HTTPS_HOST_PORT 443. SHALL end TLS via ACME for real ASCEND_DOMAIN else internal CA, proxy ascend-agent:9917, no profile. SHALL NOT route Grafana, object store, 9918, nor agent paths elsewhere. Keycloak SHALL be only own site own host proxying keycloak:8080 with per-address login/token limits, no agent path to Keycloak.
 
 #### Scenario: External port scan shows only 80 and 443
 
@@ -36,7 +36,7 @@
 
 ### Requirement: Internal service ports bind to loopback by default
 
-Every host-port publication in `compose.yaml` and `compose.ascend-web-hunter.yaml` except the gateway's SHALL use the form `"${EXPOSE_BIND:-127.0.0.1}:${<SERVICE>_HOST_PORT:-<host-port>}:<container-port>"`, where `<SERVICE>_HOST_PORT` is the host port setting of that service with today's port as its default (owner answer 100.6 of 2026-10-09). The services loki, otel-collector, tempo, container-metrics-exporter and the bundled redis SHALL publish no host port. `compose.yaml` SHALL stay the single compose entry point.
+Every host publication except the gateway SHALL use `"${EXPOSE_BIND:-127.0.0.1}:${<SERVICE>_HOST_PORT:-<host-port>}:<container-port>"`, with today port as default. loki, otel-collector, tempo, container-metrics-exporter and bundled redis SHALL publish no host port. `compose.yaml` SHALL stay the single entry point.
 
 #### Scenario: Fresh clone binds services to loopback
 
@@ -52,7 +52,7 @@ Every host-port publication in `compose.yaml` and `compose.ascend-web-hunter.yam
 
 ### Requirement: Credentials flow from the environment with a production startup guard
 
-Every credential the stack consumes SHALL come from environment variables backed by `.env`: Postgres user and password, Redis password, Qdrant API key, object store access and secret key, ascend-ocr result store keys, Grafana admin user and password, the SearXNG secret, and the service token `SERVICE_AUTH_TOKEN` of `add-keycloak-login`. `GRAFANA_ADMIN_PASSWORD` and `SEARXNG_SECRET` SHALL use compose's `${VAR:?message}` form, and every deployment SHALL set them, because Grafana is an always-on service and compose checks the SearXNG guard in every deployment. Other credentials MAY keep development defaults outside the `production` Spring profile. Under the `production` Spring profile ascend-agent SHALL refuse to start while any object store, Postgres, Redis or Qdrant credential is unset, blank or equal to a known weak value, among them every development default, and the refusal SHALL name the property without printing its value. `application-production.yaml` SHALL set each of these credentials from its environment variable with no default, so an unset variable stops start-up with Spring's own error naming it, and the one production startup guard `ProductionStartupGuard` of `add-keycloak-login` SHALL refuse a blank or weak value.
+All credentials including SERVICE_AUTH_TOKEN SHALL come from env via .env. GRAFANA_ADMIN_PASSWORD and SEARXNG_SECRET SHALL use ${VAR:?message} always. Others MAY keep dev defaults outside production. Under production ascend-agent SHALL refuse start while any object store, Postgres, Redis or Qdrant credential unset, blank or weak, naming property not value. application-production.yaml SHALL set each from env no default, ProductionStartupGuard SHALL refuse blank or weak.
 
 #### Scenario: Missing required secret fails compose
 
@@ -82,7 +82,7 @@ Every credential the stack consumes SHALL come from environment variables backed
 
 ### Requirement: The object store is never public
 
-The gateway SHALL have no route to the object store, and the object store SHALL NOT be published on a public interface by any file of this repository. The object store addresses of the agent (`S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`) and of ascend-ocr (`OCR_RESULT_S3_ENDPOINT`, `OCR_RESULT_S3_PUBLIC_ENDPOINT`) SHALL come from the environment with today's local values as defaults. The deployment guide SHALL require both public endpoint variables to equal the private object store address in production, because only containers on the private network follow presigned links.
+The gateway SHALL have no object store route, and no committed file SHALL publish it publicly. Agent (`S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`) and ascend-ocr (`OCR_RESULT_S3_ENDPOINT`, `OCR_RESULT_S3_PUBLIC_ENDPOINT`) addresses SHALL come from env with today local defaults. The guide SHALL require both public endpoints equal the private address in production, since only private-network containers follow presigned links.
 
 #### Scenario: Presigned links point at the private address in production
 
@@ -117,7 +117,7 @@ The compose files SHALL contain no personal absolute paths. ascend-audio-scribe 
 
 ### Requirement: SSRF allowlists have no loopback default
 
-`ALLOWED_PRIVATE_HOSTS` on ascend-ocr and ascend-audio-scribe SHALL be `${ALLOWED_PRIVATE_HOSTS:-}`. The committed compose files SHALL NOT list `localhost`, `127.0.0.1` or `host.docker.internal` as a default. Local development opts in with `ALLOWED_PRIVATE_HOSTS=host.docker.internal` in `.env`, and a cloud deployment lists only the private object store host. Both services SHALL declare `extra_hosts: ["host.docker.internal:host-gateway"]`, so the name resolves on Linux Docker Engine too, where `host.docker.internal` does not resolve by itself. The old name `MCP_ALLOWED_HOSTS`, renamed by `add-ascend-python-common`, SHALL NOT appear in any committed compose file or in `.env.example`.
+`ALLOWED_PRIVATE_HOSTS` on ascend-ocr and ascend-audio-scribe SHALL be `${ALLOWED_PRIVATE_HOSTS:-}`. Committed files SHALL NOT default `localhost`, `127.0.0.1` or `host.docker.internal`. Local dev opts in with `ALLOWED_PRIVATE_HOSTS=host.docker.internal` in `.env`, cloud lists only the private object host. Both services SHALL declare `extra_hosts: ["host.docker.internal:host-gateway"]` for Linux. `MCP_ALLOWED_HOSTS` SHALL appear in no committed file or `.env.example`.
 
 #### Scenario: Host fetch is blocked by default
 
@@ -161,7 +161,7 @@ Grafana SHALL run with `GF_AUTH_ANONYMOUS_ENABLED=false` and admin credentials f
 
 ### Requirement: Compose declares production runtime posture
 
-`compose.yaml` SHALL define its own `x-logging` anchor (json-file, `max-size` from `DOCKER_LOG_MAX_SIZE` with the default `10m`, `max-file` from `DOCKER_LOG_MAX_FILE` with the default `3`, owner rule 98 of 2026-10-08) and apply it to every service it defines, because anchors do not cross `include:`. It SHALL define healthchecks for every service it defines, SHALL make ascend-agent wait on ascend-memory, docling-serve, unstructured-api and keycloak with `condition: service_healthy`, SHALL set `no-new-privileges:true` on every service, and SHALL pin every pulled image by version and digest.
+`compose.yaml` SHALL define its own `x-logging` anchor (json-file, `max-size` from `DOCKER_LOG_MAX_SIZE` default `10m`, `max-file` from `DOCKER_LOG_MAX_FILE` default `3`) and apply it to every service it defines. It SHALL define healthchecks for every service, make ascend-agent wait on ascend-memory, docling-serve, unstructured-api and keycloak with `condition: service_healthy`, set `no-new-privileges:true` on every service, and pin every pulled image by version and digest.
 
 #### Scenario: Agent waits for healthy dependencies
 
@@ -190,7 +190,7 @@ ascend-agent SHALL NOT mount the Docker socket. The only services that mount it 
 
 ### Requirement: The deployment guide covers one cloud VM per customer
 
-`docs/DEPLOYMENT.md` SHALL describe: DNS for `ASCEND_DOMAIN`, TLS through the gateway and the local internal CA, `.env` preparation, which stack provides the four data stores, the production checklist (`production` Spring profile, no development credentials, public endpoint variables set to the private object store address, external port scan), and backup and restore steps for Postgres, Redis, Qdrant and the object store for container and managed-service topologies. The production checklist SHALL require the Keycloak issuer variable to be set and `SERVICE_AUTH_TOKEN` to hold a non-default value, which the production guard of `add-keycloak-login` (its D21) checks, and SHALL NOT name the removed `SECURITY_ENABLED`, `SECURITY_USERNAME` and `SECURITY_PASSWORD` variables.
+docs/DEPLOYMENT.md SHALL describe DNS for ASCEND_DOMAIN, TLS via gateway and local CA, .env prep, which stack has the four stores, production checklist, backup plus restore for Postgres, Redis, Qdrant, object store for container and managed. Checklist SHALL require Keycloak issuer and non-default SERVICE_AUTH_TOKEN, and SHALL NOT name removed SECURITY_ENABLED, SECURITY_USERNAME, SECURITY_PASSWORD.
 
 #### Scenario: An operator deploys from the guide alone
 

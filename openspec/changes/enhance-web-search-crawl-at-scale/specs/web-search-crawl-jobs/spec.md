@@ -16,7 +16,7 @@ ascend-web-hunter SHALL expose `POST /api/v1/crawl/jobs`, `GET /api/v1/crawl/job
 
 ### Requirement: Crawl errors are problem bodies
 
-Every REST error of the crawl API SHALL be an RFC 7807 problem body with media type `application/problem+json`, `type` `https://ascend.ai/errors/` followed by the code with every `_` replaced by `-`, `title`, `status`, `detail`, `instance`, the extension field `code` and the extension field `traceId`, built by the shared problem builder of the `ascend-python-common` library. `traceId` SHALL be the 32 character lower case hex trace id of the current OpenTelemetry span when one is valid, and SHALL be left out otherwise, never empty and never invented. A 5xx detail SHALL NOT name an internal host, path or exception text.
+Crawl REST errors SHALL be RFC 7807 problem bodies with `application/problem+json`, `type` `https://ascend.ai/errors/` plus code with `-` for `_`, `title`, `status`, `detail`, `instance`, `code`, `traceId`, built by the shared `ascend-python-common` builder. `traceId` SHALL be the 32 lower hex trace id when valid, else omitted, never empty or invented. A 5xx `detail` SHALL NOT name internal hosts, paths, or exception text.
 
 #### Scenario: Error body carries the trace id
 
@@ -30,7 +30,7 @@ Every REST error of the crawl API SHALL be an RFC 7807 problem body with media t
 
 ### Requirement: Crawl jobs are tenant scoped
 
-Every crawl job SHALL belong to one tenant, taken from the MCP request metadata key `ascend.ai/tenant_id` or the REST header `X-Ascend-Tenant`, and SHALL default to the tenant `default`, the tenant a personal deployment runs as, when neither names one, with no setting that changes it. No tool argument SHALL name a tenant. A tenant outside `[a-z0-9-]{1,64}` SHALL be refused with HTTP 400 `invalid_tenant`. The job record, the frontier keys, the recrawl state and every result object SHALL carry the tenant, and status, list and cancel SHALL see only the jobs of the caller's tenant.
+Every crawl job SHALL belong to one tenant from MCP `ascend.ai/tenant_id` or REST `X-Ascend-Tenant`, defaulting to `default` with no setting changing it. No tool argument SHALL name a tenant. Outside `[a-z0-9-]{1,64}` SHALL be refused 400 `invalid_tenant`. Records, frontier keys, recrawl state and results SHALL carry the tenant, and status, list and cancel SHALL see only the caller tenant.
 
 #### Scenario: A job of another tenant is not found
 
@@ -45,7 +45,7 @@ Every crawl job SHALL belong to one tenant, taken from the MCP request metadata 
 
 ### Requirement: Crawl request bounds
 
-A crawl request SHALL carry 1 to `CRAWL_MAX_SEEDS` seeds, glob `include_patterns` and `exclude_patterns` of at most `CRAWL_MAX_PATTERNS` each, a `max_depth` up to `CRAWL_MAX_DEPTH`, a `page_budget` up to `CRAWL_MAX_PAGES`, `same_domain_only`, `respect_robots`, and the single-read fields `output_format`, `extraction_schema` and `profile`. A request with no `max_depth` SHALL use `CRAWL_DEFAULT_DEPTH` (default 2), and one with no `page_budget` SHALL use `CRAWL_DEFAULT_PAGE_BUDGET` (default 100). Every bound and default SHALL be a setting read from the environment, with the defaults `CRAWL_MAX_SEEDS` 20, `CRAWL_MAX_PATTERNS` 50, `CRAWL_MAX_DEPTH` 5 and `CRAWL_MAX_PAGES` 10000. The crawl SHALL visit only URLs inside these bounds.
+Crawl requests SHALL carry 1 to CRAWL_MAX_SEEDS seeds, patterns at most CRAWL_MAX_PATTERNS each, max_depth to CRAWL_MAX_DEPTH, page_budget to CRAWL_MAX_PAGES, plus same_domain_only, respect_robots, output_format, extraction_schema, profile. Missing max_depth SHALL use CRAWL_DEFAULT_DEPTH (2), missing page_budget CRAWL_DEFAULT_PAGE_BUDGET (100). Bounds and defaults SHALL be env settings defaulting 20, 50, 5, 10000. Only inside-bound URLs SHALL be visited.
 
 #### Scenario: Crawl respects scope
 
@@ -79,7 +79,7 @@ Every seed SHALL be checked at submission, and a seed that is not `http` or `htt
 
 ### Requirement: Results stored in Floci under a configured prefix
 
-Crawl results SHALL be written through the one S3 client of the service in `src/storage/object_store.py`, to the S3-compatible store at `OBJECT_STORE_S3_ENDPOINT` (Floci locally, host port 9070) in `CRAWL_RESULT_S3_BUCKET` under `tenant/<tenantId>/` followed by `CRAWL_RESULT_S3_PREFIX`, as one `pages.ndjson` index and one file per page, all under the job's own key prefix. The connection SHALL be configured only by `OBJECT_STORE_S3_ENDPOINT`, `OBJECT_STORE_S3_ACCESS_KEY` and `OBJECT_STORE_S3_SECRET_KEY`.
+Crawl results SHALL be written through the one S3 client in `src/storage/object_store.py` to `OBJECT_STORE_S3_ENDPOINT` (Floci locally, host port 9070) in `CRAWL_RESULT_S3_BUCKET` under `tenant/<tenantId>/` plus `CRAWL_RESULT_S3_PREFIX`, as one `pages.ndjson` index and one file per page under the job prefix. The connection SHALL use only `OBJECT_STORE_S3_ENDPOINT`, `OBJECT_STORE_S3_ACCESS_KEY`, `OBJECT_STORE_S3_SECRET_KEY`.
 
 #### Scenario: Results land under the tenant and the prefix
 
@@ -88,7 +88,7 @@ Crawl results SHALL be written through the one S3 client of the service in `src/
 
 ### Requirement: Redis frontier with per-domain politeness
 
-The frontier SHALL be Redis-backed and SHALL enforce, per registrable domain, a crawl delay and a concurrency cap, seed from sitemaps, and honour robots.txt. `respect_robots=false` SHALL be accepted only for domains listed in `CRAWL_ROBOTS_OPT_OUT_DOMAINS`. Several workers SHALL share one frontier without fetching a URL twice. Every running ascend-web-hunter instance SHALL work on the jobs submitted to any instance. The per-domain concurrency cap, the crawl delay and the page budget SHALL hold for all instances together. A cancel received by any instance SHALL stop the job on every instance. A URL claimed by an instance that stops SHALL be claimed again by another instance after its claim lease ends. A URL whose claim lease ends `CRAWL_CLAIM_MAX_EXPIRIES` times (default 2) SHALL be counted as failed. The claim lease SHALL last `CRAWL_CLAIM_LEASE_SECONDS` (default 120), and each instance SHALL read at most `CRAWL_WORKER_CONCURRENCY` (default 4) pages at once across all jobs. Every change of shared crawl state SHALL be atomic in Redis.
+Frontier SHALL be Redis, per-domain delay and cap, sitemaps, robots.txt. respect_robots=false SHALL need CRAWL_ROBOTS_OPT_OUT_DOMAINS. Workers SHALL share one frontier, no double fetch. Any instance SHALL work any jobs. Caps,delay,budget SHALL hold together. Any cancel SHALL stop all. Dead claims SHALL return after CRAWL_CLAIM_LEASE_SECONDS (120), fail after CRAWL_CLAIM_MAX_EXPIRIES (2). Each SHALL read at most CRAWL_WORKER_CONCURRENCY (4) at once. All shared changes SHALL be atomic.
 
 #### Scenario: The domain cap holds across instances
 
@@ -127,7 +127,7 @@ The frontier SHALL be Redis-backed and SHALL enforce, per registrable domain, a 
 
 ### Requirement: Incremental recrawl
 
-ascend-web-hunter SHALL store per crawled URL its content hash, `ETag`, `Last-Modified` and the result key of the page file that holds that content, and SHALL send conditional requests on a recrawl. On a 304 or an unchanged hash it SHALL copy the earlier page file forward into the new job's results with a server-side copy of the object store, SHALL NOT upload the page again, and SHALL mark the page `unchanged`, so every job's results hold every page the job reached until that job expires. When the earlier page file no longer exists, it SHALL fetch the page without conditional headers and write it as a new file.
+Each crawled URL SHALL store content hash, `ETag`, `Last-Modified` and page file key, and recrawls SHALL send conditional requests. On 304 or unchanged hash the earlier file SHALL be copied forward by server-side object copy with no re-upload and marked `unchanged`, so each job keeps every reached page until expiry. Missing earlier files SHALL be fetched without conditional headers as new files.
 
 #### Scenario: Unchanged page copied forward
 
@@ -146,7 +146,7 @@ ascend-web-hunter SHALL store per crawled URL its content hash, `ETag`, `Last-Mo
 
 ### Requirement: Crawl progress and recrawl state expire
 
-Every part of the crawl store SHALL have a bound of `CRAWL_JOB_RETENTION_SECONDS`. Job records and results SHALL expire after it. The frontier keys of a job are its domain queues, its seen set, its in-flight counters, its claim set, its next fetch times and its page lines. The frontier keys of a job SHALL be deleted when the job reaches `succeeded`, `failed` or `cancelled`, and every frontier key SHALL carry a Redis expiry of `CRAWL_JOB_RETENTION_SECONDS`, set when it is created and set again on every write. Each recrawl state hash SHALL carry a Redis expiry of `CRAWL_JOB_RETENTION_SECONDS`, set again whenever a job of that tenant and scope writes it.
+Every crawl store part SHALL expire after `CRAWL_JOB_RETENTION_SECONDS`. Job records and results SHALL expire after it. Frontier keys (domain queues, seen set, in-flight counters, claim set, next fetch times, page lines) SHALL be deleted at `succeeded`, `failed` or `cancelled`, each carrying a Redis expiry of that bound set on create and on write. Each recrawl hash SHALL carry the same expiry, reset on each write of that tenant scope.
 
 #### Scenario: Frontier keys go when the job ends
 

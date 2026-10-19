@@ -2,7 +2,7 @@
 
 ### Requirement: Keycloak login and token endpoints are rate limited
 
-The login form endpoint (`/realms/ascend-ai/login-actions/authenticate`) and the token endpoint (`/realms/ascend-ai/protocol/openid-connect/token`) SHALL be rate limited per client address in the reverse proxy in front of Keycloak, so a password guessing run is slowed before Keycloak brute-force detection locks an account. A request over the limit SHALL receive HTTP 429 and SHALL NOT reach Keycloak. The limit values SHALL be configuration, not code: the gateway SHALL read them from its environment with a default, and compose SHALL pass them as `${VAR:-default}` with the same default (owner rule 98 of 2026-10-08). The defaults SHALL be 10 events per 1 minute per client address (`KEYCLOAK_LOGIN_RATE_LIMIT_EVENTS` 10, `KEYCLOAK_LOGIN_RATE_LIMIT_WINDOW` `1m`, owner answer 102.2 of 2026-10-09). The rule SHALL live on the Keycloak site of `gateway/Caddyfile`, which this change creates after `add-keycloak-login` has added Keycloak (owner answer 72.1 of 2026-10-06).
+Login (/realms/ascend-ai/login-actions/authenticate) and token (/realms/ascend-ai/protocol/openid-connect/token) SHALL be rate limited per address in the proxy before Keycloak. Over-limit SHALL answer 429 and SHALL NOT reach Keycloak. Limits SHALL be env with defaults as VAR:-default: 10 per 1m per address (KEYCLOAK_LOGIN_RATE_LIMIT_EVENTS 10, KEYCLOAK_LOGIN_RATE_LIMIT_WINDOW 1m). The rule SHALL live on the Keycloak site of gateway/Caddyfile.
 
 #### Scenario: A burst of token requests is refused
 

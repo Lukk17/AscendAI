@@ -12,12 +12,7 @@
 
 ### Requirement: Readiness answers 503 whenever the service cannot take work
 
-The readiness endpoint SHALL report the service as ready only when it is both warmed up and able to take work. It
-SHALL report not-ready when the engine has never warmed, when the worker pool is unusable, when a worker is being
-replaced, or when the in-flight job is past its budget and has not yet been reclaimed. It SHALL answer with the
-shared readiness body of `python-service-platform`: HTTP 200 and `status` `ready` when ready, HTTP 503 and `status`
-`not-ready` when not. Its `checks` SHALL hold `engine` with `warm`, `worker_pool` with `accepting_work`, and `jobs`
-with `queued` and `running`, so an operator still tells a busy service from a stuck one.
+Readiness SHALL report ready only when warmed up and able to take work. It SHALL report not-ready when the engine never warmed, the pool is unusable, a worker is being replaced, or the in-flight job passed its budget unreclaimed. It SHALL use the shared `python-service-platform` body: HTTP 200 `ready` when ready, HTTP 503 `not-ready` when not. `checks` SHALL hold `engine` with `warm`, `worker_pool` with `accepting_work`, and `jobs` with `queued` and `running`.
 
 #### Scenario: Occupied by a job past its budget
 
