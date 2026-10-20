@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+import redis.asyncio as redis
 import uvicorn
 from ascend_python_common.app import ServiceDefinition, create_service_app
 
@@ -16,6 +17,7 @@ from src.api.rest.rest_endpoints import search_client as rest_search_client
 from src.config.blocklist_loader import blocklist_loader
 from src.config.config import settings
 from src.config.startup_banner import build_service_banner
+from src.crawl.worker import Worker
 from src.reader.cache_purge import run_subscriber
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.novnc.flow_registry import novnc_flow_registry
@@ -57,6 +59,13 @@ class _ServiceLifespan:
         self._novnc_sweeper: asyncio.Task[None] | None = None
         self._purge_subscriber: asyncio.Task[None] | None = None
         self._purge_stop = asyncio.Event()
+        self._crawl_stop = asyncio.Event()
+        self._crawl_tasks: list[asyncio.Task[None]] = []
+        self._crawl_redis: redis.Redis | None = None
+
+    def _build_crawl_worker(self) -> Worker:
+        self._crawl_redis = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        return Worker(self._crawl_redis)
 
     async def __aenter__(self) -> None:
         if blocklist_loader.state is None:
@@ -74,8 +83,27 @@ class _ServiceLifespan:
                 self._purge_stop,
             )
         )
+        worker = self._build_crawl_worker()
+        self._crawl_stop = asyncio.Event()
+        self._crawl_tasks = [
+            asyncio.create_task(worker.run_forever(self._crawl_stop))
+            for _ in range(settings.CRAWL_WORKER_CONCURRENCY)
+        ]
 
     async def __aexit__(self, *exc_info: object) -> None:
+        if self._crawl_tasks:
+            self._crawl_stop.set()
+            for task in self._crawl_tasks:
+                task.cancel()
+            await asyncio.gather(*self._crawl_tasks, return_exceptions=True)
+            self._crawl_tasks = []
+        if self._crawl_redis is not None:
+            try:
+                await self._crawl_redis.aclose()
+            except Exception as exc:
+                logger.warning("shutdown: failed to close crawl Redis: %s", exc)
+            finally:
+                self._crawl_redis = None
         if self._purge_subscriber is not None:
             self._purge_stop.set()
             self._purge_subscriber.cancel()

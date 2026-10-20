@@ -97,8 +97,12 @@ be run on its own.
     hosted model (provider `minimax`, model `MiniMax-M2.7`, never LM Studio): validated answer, recipe
     stored with TTL, replay without the model, drift rebuild, second schema separation, prompt-injection
     resistance, unsatisfiable schema refusal. Writes only `recipe:e2e-fake-site:*`, safe beside every
-    spec. Token use goes into the run record and the spec's `docs/E2E_COST.md` row. Fifteen specs in all,
-    fourteen of them automated (spec 11 needs a human).
+    spec. Token use goes into the run record and the spec's `docs/E2E_COST.md` row.
+16. [16-crawl-jobs-test.md](16-crawl-jobs-test.md). Crawl jobs on the fake site crawl tree: submission
+    and polling, result index under the tenant prefix with depth, pattern and robots bounds, unsafe
+    links counted, unchanged pages copied forward on recrawl, tenant isolation across two tenants, and
+    cancel while running. Mutates only the two tenants' crawl data and the fake site request log.
+    Sixteen specs in all, fifteen of them automated (spec 11 needs a human).
 
 ## Cross-cutting conventions
 

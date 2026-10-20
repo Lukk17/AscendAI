@@ -152,5 +152,7 @@ MANIFEST
 # Crawlee runtime state - request queues and key-value stores are ephemeral
 # artifacts produced at scrape time. They contain scraped URLs and responses
 # and must not be committed.
-apps/ascend-web-hunter/src/storage/
+apps/ascend-web-hunter/src/storage/request_queues/
+apps/ascend-web-hunter/src/storage/key_value_stores/
+apps/ascend-web-hunter/src/storage/datasets/
 apps/ascend-web-hunter/.crawlee_storage/

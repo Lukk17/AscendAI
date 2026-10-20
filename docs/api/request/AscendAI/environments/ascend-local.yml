@@ -12,3 +12,7 @@ variables:
     value: ../../../../apps/ascend-agent/e2e/fixtures
   - name: audioScribeFixtures
     value: ../../../../apps/ascend-audio-scribe/e2e/fixtures
+  - name: tenant
+    value: e2e-crawl-a
+  - name: job_id
+    value: ""

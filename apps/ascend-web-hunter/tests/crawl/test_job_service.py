@@ -3,21 +3,27 @@ from unittest.mock import AsyncMock
 
 import pytest
 from ascend_python_common.uri_guard import UnsafeUriError
+from fakeredis.aioredis import FakeRedis
 
 from src.config.config import settings
 from src.crawl.job_service import (
     CrawlJobService,
-    job_key,
-    job_key_pattern,
     resolve_tenant,
 )
+from src.crawl.keys import (
+    RUNNABLE_KEY,
+    job_key,
+    job_key_pattern,
+    queue_key,
+    runnable_member,
+    seen_key,
+)
 from src.crawl.models import CrawlRequest, InvalidTenantError, JobRecord
-from tests.crawl.fakes import FakeRedis
 
 
 @pytest.fixture
 def fake_redis() -> FakeRedis:
-    return FakeRedis()
+    return FakeRedis(decode_responses=True)
 
 
 @pytest.fixture
@@ -32,6 +38,16 @@ def stub_guard(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     check = AsyncMock()
     monkeypatch.setattr("src.crawl.job_service.check_fetch_uri", check)
     return check
+
+
+@pytest.fixture
+def public_guard(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def allow(url: str, policy: Any) -> Any:
+        from ascend_python_common.uri_guard import FetchTarget
+
+        return FetchTarget(url=url, host=None, port=None)
+
+    monkeypatch.setattr("src.crawl.job_service.check_fetch_uri", allow)
 
 
 def _request(**kwargs: Any) -> CrawlRequest:
@@ -51,8 +67,23 @@ async def test_submit_stores_record_with_retention(
     assert record.state == "waiting"
     assert len(record.job_id) == 32
     key = job_key("acme", record.job_id)
-    assert fake_redis.store[key] == record.model_dump_json()
-    assert fake_redis.ttls[key] == settings.CRAWL_JOB_RETENTION_SECONDS
+    assert await fake_redis.get(key) == record.model_dump_json()
+    ttl = await fake_redis.ttl(key)
+    assert settings.CRAWL_JOB_RETENTION_SECONDS - 2 <= ttl <= settings.CRAWL_JOB_RETENTION_SECONDS
+
+
+async def test_submit_writes_queues_seen_and_runnable_together(
+    service: CrawlJobService, fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # when
+    record = await service.submit_job("acme", _request())
+
+    # then
+    assert await fake_redis.lrange(queue_key("acme", record.job_id, "example.com"), 0, -1) == [
+        "0\thttps://example.com/"
+    ]
+    assert await fake_redis.sismember(seen_key("acme", record.job_id), "https://example.com/")
+    assert await fake_redis.zscore(RUNNABLE_KEY, runnable_member("acme", record.job_id)) is not None
 
 
 async def test_submit_checks_every_seed(
@@ -85,6 +116,15 @@ async def test_submit_refuses_unsafe_seed_and_creates_no_job(
     assert await service.list_jobs("acme") == []
 
 
+async def test_submit_refuses_opt_out_seed(
+    service: CrawlJobService, public_guard: None
+) -> None:
+    # when / then
+    with pytest.raises(ValueError, match="respect_robots=false is refused"):
+        await service.submit_job("acme", _request(respect_robots=False))
+    assert await service.list_jobs("acme") == []
+
+
 async def test_get_missing_returns_none(service: CrawlJobService) -> None:
     # when
     record = await service.get_job("acme", "nope")
@@ -97,7 +137,7 @@ async def test_get_corrupt_returns_none(
     service: CrawlJobService, fake_redis: FakeRedis
 ) -> None:
     # given
-    await fake_redis.setex(job_key("acme", "bad"), 60, "not-json{{{")
+    await fake_redis.set(job_key("acme", "bad"), "not-json{{{", ex=60)
     # when
     record = await service.get_job("acme", "bad")
 
@@ -127,7 +167,7 @@ async def test_list_skips_corrupt(
 ) -> None:
     # given
     record = await service.submit_job("acme", _request())
-    await fake_redis.setex(job_key("acme", "bad"), 60, "not-json{{{")
+    await fake_redis.set(job_key("acme", "bad"), "not-json{{{", ex=60)
     # when
     records = await service.list_jobs("acme")
 
@@ -178,6 +218,21 @@ async def test_cancel_waiting_moves_to_cancelled(
     assert stored.state == "cancelled"
 
 
+async def test_cancel_deletes_frontier_keys(
+    service: CrawlJobService, fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # given
+    submitted = await service.submit_job("acme", _request())
+
+    # when
+    await service.cancel_job("acme", submitted.job_id)
+
+    # then
+    assert await fake_redis.exists(queue_key("acme", submitted.job_id, "example.com")) == 0
+    assert await fake_redis.exists(seen_key("acme", submitted.job_id)) == 0
+    assert await fake_redis.zscore(RUNNABLE_KEY, runnable_member("acme", submitted.job_id)) is None
+
+
 async def test_cancel_terminal_returns_unchanged(
     service: CrawlJobService, fake_redis: FakeRedis
 ) -> None:
@@ -188,7 +243,7 @@ async def test_cancel_terminal_returns_unchanged(
         state="succeeded",
         request=_request(),
     )
-    await fake_redis.setex(job_key("acme", "done1"), 60, record.model_dump_json())
+    await fake_redis.set(job_key("acme", "done1"), record.model_dump_json(), ex=60)
 
     # when
     cancelled = await service.cancel_job("acme", "done1")

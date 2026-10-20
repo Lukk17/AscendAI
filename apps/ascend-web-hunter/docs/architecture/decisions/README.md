@@ -17,5 +17,6 @@
 | [ADR-013](ADR-013-concurrent-human-intervention-windows.md) | Concurrent human-intervention windows on one shared display: per-container slots, Redis flow records, joins, ephemeral CDP ports, cascade layout, owner-named VNC URLs. | Accepted |
 | [ADR-014](ADR-014-scored-challenge-detection.md) | Scored challenge verdict over five signal families, catalogue with provenance, fixture corpus as the admission rule. | Accepted |
 | [ADR-015](ADR-015-patched-browser-tiers-and-tier-memory.md) | Patched browser tiers (`4a-patchright`, `4b-camoufox`), FlareSolverr off by default, the guarded browser route handler and per-domain tier memory. | Accepted |
+| [ADR-019](ADR-019-crawl-jobs.md) | Polling crawl jobs over a shared Redis frontier: Lua-claimed URLs, per-domain politeness, Floci results with incremental recrawl, several instances sharing one crawl. | Accepted |
 
 For monorepo-level decisions see [`../../../../../docs/architecture/decisions/`](../../../../../docs/architecture/decisions/).

@@ -9,6 +9,17 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
+## [0.0.13] - <release date>
+
+### Added
+- Polling crawl jobs (`POST /api/v1/crawl/jobs`, status, list, cancel, plus the `crawl_submit`,
+  `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` MCP tools) over a shared Redis
+  frontier: several instances share one crawl through Lua claim scripts with per-domain politeness,
+  results land in Floci under `tenant/<tenantId>/`, recrawls copy unchanged pages forward
+  server-side. Every seed, discovered link, redirect hop, robots.txt and sitemap fetch passes the
+  same SSRF guard and connect-time pinning as a single read. Tests run the Lua scripts through
+  `fakeredis` (Lua support via `lupa`).
+
 ## [0.0.12] - <release date>
 
 ### Added

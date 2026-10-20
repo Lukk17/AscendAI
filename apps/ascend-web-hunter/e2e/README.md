@@ -137,8 +137,11 @@ pipeline plus an in-process blocklist. The execution constraints:
 | Reads only, no shared state | 13 | Fetches three fake-site pages through the tier chain with a real browser for the screenshot step. Opens no NoVNC flow and writes no key any other spec reads. Safe beside every spec. |
 | Quarantine lane, full stack | 14 | Docling-bound (step 1) and OCR engine-bound (step 2), so the whole spec runs alone in the quarantine lane with the other exclusive specs. Mutates `session:*` for no domain (no login), but its OCR jobs live in the shared ascend-ocr queue, so no other OCR or docling work may run beside it. Safe beside nothing while it runs; its reset deletes the OCR jobs it created. |
 | Redis recipe keys only, AI-run | 15 | Writes only `recipe:e2e-fake-site:*`, seeded and removed by the test itself except for the TTL the scenario preconditions grant. No overlap with any session key. Safe beside every spec. Token use goes into the run record. |
+| Crawl jobs with tenant isolation, recrawl and cancel | 16 | Mutates only the two tenants' crawl data (`tenant/e2e-crawl-a/`, `tenant/e2e-crawl-b/`, `crawl_*:e2e-crawl-a:*`, `crawl_*:e2e-crawl-b:*`) and the fake site request log, which its reset empties. Runs beside every spec that does not reset that log. |
 
-Recommended layout: run test 1 first (offline, fail-fast on validator bugs without burning egress), then tests
+Recommended layout: run test 1 first (offline, fail-fast on validator bugs without burning egress), then test
+16 (its reset empties the fake site request log, so tests 13, 14 and 15, which assert on that log, never
+overlap it), then tests
 2, 4, 5, 9, 13, 15 in parallel or sequential (none needs FlareSolverr, and only 13's screenshot step needs the
 image's Playwright), then test 6 (highest egress cost,
 needs FlareSolverr and Playwright), then test 12 (after test 6 because both write `session:scrapingcourse.com:default`,

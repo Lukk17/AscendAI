@@ -8,7 +8,7 @@ ascend-web-hunter is an MCP server and REST API for web search and content extra
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.0.12
+- **Version**: 0.0.13
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands
@@ -117,6 +117,13 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - Session persistence in Redis
 - Ad/annoyance blocklist filtering
 - Content validation (minimum word count)
+- Polling crawl jobs (`POST /api/v1/crawl/jobs`, status, list, cancel, plus the `crawl_submit`,
+  `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` MCP tools) over a shared Redis frontier:
+  several instances share one crawl through Lua-claimed URLs with per-domain politeness, results land in
+  Floci under `tenant/<tenantId>/`, recrawls copy unchanged pages forward. Every seed, discovered link,
+  redirect hop, robots.txt and sitemap fetch passes the same SSRF guard and connect-time pinning as a
+  single read. Honest ceiling: the hundreds-of-thousands-of-pages class per job across several workers.
+  See [ADR-019](docs/architecture/decisions/ADR-019-crawl-jobs.md).
 
 ## Key Dependencies
 
@@ -210,6 +217,27 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - `VNC_PASSWORD` - Password for the NoVNC desktop. Consumed by `docker-entrypoint.sh`, not by `config.py`. Unset means
   x11vnc runs with `-nopw` and the container logs a warning at boot. Required in the standalone deployment. The VNC
   protocol truncates it to 8 characters.
+- `CRAWL_MAX_SEEDS` - Most seeds in one crawl request (default: `20`)
+- `CRAWL_MAX_PATTERNS` - Most include patterns and most exclude patterns in one crawl request (default: `50`)
+- `CRAWL_MAX_DEPTH` - Largest `max_depth` a crawl request may ask for (default: `5`)
+- `CRAWL_DEFAULT_DEPTH` - `max_depth` when the request has none, refused at startup above `CRAWL_MAX_DEPTH` (default: `2`)
+- `CRAWL_MAX_PAGES` - Largest `page_budget` a crawl request may ask for (default: `10000`)
+- `CRAWL_DEFAULT_PAGE_BUDGET` - `page_budget` when the request has none, refused at startup above `CRAWL_MAX_PAGES` (default: `100`)
+- `CRAWL_ROBOTS_OPT_OUT_DOMAINS` - Seed domains for which `respect_robots` false is accepted, a site the operator owns (default: empty)
+- `CRAWL_RESULT_S3_BUCKET` - Bucket of the crawl results (default: `web-hunter-crawls`)
+- `CRAWL_RESULT_S3_PREFIX` - Key prefix of the crawl results after the tenant prefix (default: `crawl-results/`)
+- `CRAWL_JOB_RETENTION_SECONDS` - Lifetime of job records, results, frontier keys and recrawl state (default: `604800`)
+- `CRAWL_DOMAIN_CONCURRENCY` - Pages of one domain read at once, all instances together (default: `2`)
+- `CRAWL_DEFAULT_DELAY_SECONDS` - Least time between two fetches of one domain (default: `1`)
+- `CRAWL_PROXY_URL` - Customer proxy for crawl fetches only, empty turns it off (default: empty)
+- `CRAWL_CLAIM_LEASE_SECONDS` - Lifetime of a page claim (default: `120`)
+- `CRAWL_CLAIM_MAX_EXPIRIES` - Claim expiries after which a URL counts as failed (default: `2`)
+- `CRAWL_WORKER_CONCURRENCY` - Crawl worker tasks each instance starts (default: `4`)
+- `CRAWL_WORKER_IDLE_SECONDS` - Wait of a worker that found nothing to claim (default: `1`)
+- `CRAWL_POLL_AFTER_SECONDS` - The `poll_after_seconds` hint of a crawl submission (default: `5`)
+- `OBJECT_STORE_S3_ENDPOINT` - Address of the S3-compatible store (default: `http://localhost:9070`)
+- `OBJECT_STORE_S3_ACCESS_KEY` - Access key of the store (default: empty)
+- `OBJECT_STORE_S3_SECRET_KEY` - Secret key of the store (default: empty)
 
 Two more are consumed by sibling containers rather than by this service, and both are mandatory for the scrapper stack:
 `SEARXNG_SECRET` (SearXNG's session key, which is why `infra/searxng/settings.yml` carries no `secret_key`) and

@@ -204,6 +204,24 @@ are mandatory there. `SEARXNG_SECRET` is SearXNG's session-signing key, which is
 
 ### Crawl jobs at scale
 
+`POST /api/v1/crawl/jobs` answers HTTP 202 with a `job_id`, state `waiting` and a `poll_after_seconds`
+hint; `GET /api/v1/crawl/jobs/{job_id}` and `GET /api/v1/crawl/jobs` read status and list,
+`DELETE /api/v1/crawl/jobs/{job_id}` cancels. The MCP tools `crawl_submit`, `crawl_job_status`,
+`crawl_list_jobs` and `crawl_cancel_job` carry the same fields. Every job belongs to one tenant from
+REST `X-Ascend-Tenant` (or `default` with no header); a job of another tenant answers 404
+`job_not_found`, and a tenant outside `[a-z0-9-]{1,64}` is refused with 400 `invalid_tenant`.
+
+SSRF rules: every seed is checked at submission with the same guard single reads use, and a seed with
+a scheme other than `http` or `https`, with userinfo, or resolving to a non-public address is refused
+with HTTP 400 `unsafe_uri` and no job is created. Every discovered link, redirect hop, robots.txt
+fetch and sitemap fetch goes through the same guard and connect-time pinning; a link that fails is
+dropped and counted as `skipped_unsafe`.
+
+Honest scale: the ceiling is the hundreds-of-thousands-of-pages class per job across several
+workers. Several ascend-web-hunter containers share one crawl through Redis Lua scripts, with a
+per-domain concurrency cap and crawl delay that hold for all instances together. See
+[ADR-019](architecture/decisions/ADR-019-crawl-jobs.md).
+
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `CRAWL_MAX_SEEDS` | `20` | Most seeds in one crawl request. Added by `enhance-web-search-crawl-at-scale`. |

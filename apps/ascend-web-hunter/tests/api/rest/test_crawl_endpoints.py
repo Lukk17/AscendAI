@@ -5,12 +5,12 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 from httpx import AsyncClient
 
 from src.config.config import settings
 from src.crawl import job_service as job_service_module
 from src.crawl.job_service import job_service
-from tests.crawl.fakes import FakeRedis
 
 _TRACE_RE = re.compile(r"[0-9a-f]{32}")
 
@@ -19,7 +19,7 @@ _SEED = "https://example.com/"
 
 @pytest.fixture
 def fake_redis(monkeypatch: pytest.MonkeyPatch) -> FakeRedis:
-    fake = FakeRedis()
+    fake = FakeRedis(decode_responses=True)
     monkeypatch.setattr(job_service, "_client", fake)
     return fake
 
@@ -77,7 +77,7 @@ async def test_status_returns_state_counts_and_keys(
     assert body["tenant_id"] == "default"
     assert body["state"] == "waiting"
     assert body["counts"] == {
-        "queued": 0,
+        "queued": 1,
         "fetched": 0,
         "unchanged": 0,
         "failed": 0,

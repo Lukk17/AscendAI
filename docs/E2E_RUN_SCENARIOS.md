@@ -13,8 +13,8 @@ more than one suite's runners share a host.
 
 It also defines one [service suite](#service-suites) per service, plus one Platform suite for the stack-wide observability specs: the way to run a single service's end-to-end specs alone, without running every other suite to test that one service.
 
-The repository ships 65 specs total across the seven suites (11 + 5 + 6 + 20 + 7 + 12 + 4). No single scenario below runs
-all 65 with nobody at the keyboard, because one spec (`ascend-web-hunter` spec 11, `11-captcha-solve-and-capture`)
+The repository ships 66 specs total across the seven suites (11 + 5 + 6 + 20 + 7 + 13 + 4). No single scenario below runs
+all 66 with nobody at the keyboard, because one spec (`ascend-web-hunter` spec 11, `11-captcha-solve-and-capture`)
 needs a human to solve an hCaptcha challenge through NoVNC. Scenarios 3 and 4 run every spec, and both need a human present for that one spec. No spec needs LM Studio: every enabled provider row in the Bruno requests the specs run selects a hosted provider. So Scenario 2 runs the same specs as Scenario 1, and Scenario 4 the same as Scenario 3. The LM Studio column records only whether LM Studio is running on the host during the sweep.
 
 ---
@@ -29,12 +29,12 @@ Before running any end-to-end test, ask which scenario or which service suite fr
 
 | Scenario | Stack | LM Studio | Human at keyboard | Spec count |
 | :------- | :---- | :-------- | :----------------- | :--------- |
-| 1 | Full (`ascend-ai`, includes the scraping stack) | Off | No | 64 |
-| 2 | Full (`ascend-ai`, includes the scraping stack) | On | No | 64 |
-| 3 | Full (`ascend-ai`, includes the scraping stack) | Off | Yes | 65 |
-| 4 | Full (`ascend-ai`, includes the scraping stack) | On | Yes | 65 |
-| 5 | Scraping only (`ascend-scrapper`) | Not applicable | Yes | 12 |
-| 6 | Scraping only (`ascend-scrapper`) | Not applicable | No | 11 |
+| 1 | Full (`ascend-ai`, includes the scraping stack) | Off | No | 65 |
+| 2 | Full (`ascend-ai`, includes the scraping stack) | On | No | 65 |
+| 3 | Full (`ascend-ai`, includes the scraping stack) | Off | Yes | 66 |
+| 4 | Full (`ascend-ai`, includes the scraping stack) | On | Yes | 66 |
+| 5 | Scraping only (`ascend-scrapper`) | Not applicable | Yes | 13 |
+| 6 | Scraping only (`ascend-scrapper`) | Not applicable | No | 12 |
 
 ---
 
@@ -107,9 +107,9 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 | ascend-memory | 1-6 | 6 |
 | ascend-ocr | 1-20 | 20 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-10, 12-15 | 14 |
+| ascend-web-hunter | 1-10, 12-16 | 15 |
 | platform | tasks 17.3, 17.5, 17.6, 17.7 | 4 |
-| Total | | 67 |
+| Total | | 68 |
 
 ### Skipped specs
 
@@ -126,8 +126,10 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
    [Global ordering rules](#global-ordering-rules) for the measured cost of breaking this rule.
 3. Weather spec 7 runs last within the weather suite, because it restarts the `ascend-weather-mcp` container.
 4. Memory runs its full chain, specs 1 through 6, in any order or in parallel, since all six specs use disjoint user ids per its own README.
-5. Web-hunter's own chain: spec 1, then specs 2, 4, 5, 9 in parallel, then spec 6, then spec 12 (same site as spec
-   6, and before spec 7 because spec 7's reset would wipe its capture), then spec 7 (fully automated, its
+5. Web-hunter's own chain: spec 1, then spec 16 (its reset empties the fake site request log, so
+    specs 13, 14 and 15, which assert on that log, never overlap it), then specs 2, 4, 5, 9 in
+    parallel, then spec 6, then spec 12 (same site as spec 6, and before spec 7 because spec 7's reset
+    would wipe its capture), then spec 7 (fully automated, its
     `409 novnc_busy` rows retried per its own `Retry-After` rule), then spec 3, then spec 8, then spec 10 alone.
     Spec 11 does not run in this scenario.
 
@@ -165,9 +167,9 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 | ascend-memory | 1-6 | 6 |
 | ascend-ocr | 1-20 | 20 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-10, 12-15 | 14 |
+| ascend-web-hunter | 1-10, 12-16 | 15 |
 | platform | tasks 17.3, 17.5, 17.6, 17.7 | 4 |
-| Total | | 67 |
+| Total | | 68 |
 
 ### Skipped specs
 
@@ -212,9 +214,9 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 | ascend-memory | 1-6 | 6 |
 | ascend-ocr | 1-20 | 20 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-15 | 15 |
+| ascend-web-hunter | 1-16 | 16 |
 | platform | tasks 17.3, 17.5, 17.6, 17.7 | 4 |
-| Total | | 68 |
+| Total | | 69 |
 
 ### Skipped specs
 
@@ -263,9 +265,9 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 | ascend-memory | 1-6 | 6 |
 | ascend-ocr | 1-20 | 20 |
 | ascend-weather-mcp | 1-7 | 7 |
-| ascend-web-hunter | 1-15 | 15 |
+| ascend-web-hunter | 1-16 | 16 |
 | platform | tasks 17.3, 17.5, 17.6, 17.7 | 4 |
-| Total | | 68 |
+| Total | | 69 |
 
 ### Skipped specs
 
@@ -314,8 +316,8 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 
 | Suite | Specs run | Count |
 | :---- | :-------- | :---- |
-| ascend-web-hunter | 1-13 | 13 |
-| Total | | 13 |
+| ascend-web-hunter | 1-13, 16 | 14 |
+| Total | | 14 |
 
 ### Skipped specs
 
@@ -324,7 +326,8 @@ None. Only the web-hunter suite runs in this scenario, and it runs in full.
 ### Run order
 
 Web-hunter's own chain, unmodified by any cross-suite constraint since no other suite is running: spec 1, then
-specs 2, 4, 5, 9, 13 in parallel, then spec 6, then spec 12 (same site as spec 6, and before spec 7 because spec 7's
+spec 16 (its reset empties the fake site request log, so spec 13, which asserts on that log, never overlaps
+it), then specs 2, 4, 5, 9, 13 in parallel, then spec 6, then spec 12 (same site as spec 6, and before spec 7 because spec 7's
 reset would wipe its capture), then spec 7 (fully automated, its `409 novnc_busy` rows retried per its own
 `Retry-After` rule), then spec 3, then spec 8, then spec 10 alone, then spec 11 (`11-captcha-solve-and-capture`)
 last, human-gated. The runner posts the exact `vnc_url` string from spec 11's Call 1 response into the chat
@@ -361,8 +364,8 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 
 | Suite | Specs run | Count |
 | :---- | :-------- | :---- |
-| ascend-web-hunter | 1-10, 12, 13 | 12 |
-| Total | | 12 |
+| ascend-web-hunter | 1-10, 12, 13, 16 | 13 |
+| Total | | 13 |
 
 ### Skipped specs
 
@@ -371,7 +374,7 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 ### Run order
 
 Web-hunter's own chain, same as [Scenario 5's run order](#run-order-4) through spec 10, with spec 12 in its place
-after spec 6 and spec 13 in the parallel group. Spec 11 does not run.
+after spec 6, spec 13 in the parallel group and spec 16 after spec 1. Spec 11 does not run.
 
 ### Post-sweep
 
@@ -566,7 +569,7 @@ Resets: specs 1 through 6 need none. Spec 7's own Reset state restarts the `asce
 ### ascend-web-hunter service suite
 
 - Compose: either project. On the scraping project alone (`ascend-scrapper`), this service suite is [Scenario 5](#scenario-5-human-captcha-scraping-compose-only) with spec 11 or [Scenario 6](#scenario-6-automated-scraping-compose-only) without it, and their preconditions apply unchanged, including the bundled `ascend-scrapper-redis` when the host has no Redis. When the `ascend-ai` project is already up, run the same specs against the four containers it includes (`searxng`, `flaresolverr`, `ascend-web-hunter`, `ngrok-ascend-web-hunter`) with no project switch. Never have both projects up, per [Compose projects and the shared container names](#compose-projects-and-the-shared-container-names).
-- External prerequisites: Redis `:6379` on the host, or the bundled Redis on the scraping project. PostgreSQL, Qdrant and the object store are not used.
+- External prerequisites: Redis `:6379` on the host, or the bundled Redis on the scraping project. PostgreSQL and Qdrant are not used. The object store `:9070` on the host is used by spec 16 for the crawl result objects.
 - LM Studio: not applicable.
 - Human at keyboard: only for spec 11. Leave spec 11 out when nobody is at the keyboard.
 - Credentials in `.env`: `SEARXNG_SECRET` (mandatory), `NGROK_AUTHTOKEN`. `VNC_PASSWORD` is optional in this dev stack and worth setting before a human opens the tunnel for spec 11.
@@ -591,8 +594,9 @@ docker run -d --name e2e-fake-site --network ascend-ai_default --network-alias e
 | 11 | [11-captcha-solve-and-capture-test.md](../apps/ascend-web-hunter/e2e/testing/11-captcha-solve-and-capture-test.md) |
 | 12 | [12-clearance-reuse-test.md](../apps/ascend-web-hunter/e2e/testing/12-clearance-reuse-test.md) |
 | 13 | [13-structured-extraction-test.md](../apps/ascend-web-hunter/e2e/testing/13-structured-extraction-test.md) |
+| 16 | [16-crawl-jobs-test.md](../apps/ascend-web-hunter/e2e/testing/16-crawl-jobs-test.md) |
 
-Run order: [Scenario 5's run order](#run-order-4), whichever project is up. Spec 14 needs the full `ascend-ai` stack and spec 15 the scenario preconditions, so neither runs in this suite. Spec 11, when it runs, goes last, alone, on the main session, with its `vnc_url` pasted verbatim and the human's confirmation before the capture check.
+Run order: [Scenario 5's run order](#run-order-4) with spec 16 after spec 1, whichever project is up. Spec 14 needs the full `ascend-ai` stack and spec 15 the scenario preconditions, so neither runs in this suite. Spec 11, when it runs, goes last, alone, on the main session, with its `vnc_url` pasted verbatim and the human's confirmation before the capture check.
 
 Resets: each spec's own Reset state names the Redis keys it wipes. The conflicts between specs 3, 6, 7, 8, 10, 11 and 12 over shared `session:*` keys are why the order is fixed, and [apps/ascend-web-hunter/e2e/README.md](../apps/ascend-web-hunter/e2e/README.md) "Parallelism and execution order" gives the reason for each. On the scraping project with the bundled Redis, every `docker exec redis` command targets `ascend-scrapper-redis`.
 
@@ -685,7 +689,7 @@ since been corrected and extended (see the `07469b9` and `23597ac` commits), so 
 | [apps/ascend-memory/e2e/README.md](../apps/ascend-memory/e2e/README.md) | ascend-memory's 6 specs and its provider dependency |
 | [apps/ascend-ocr/e2e/README.md](../apps/ascend-ocr/e2e/README.md) | ascend-ocr's 20 specs and the engine-bound exclusivity rule |
 | [apps/ascend-weather-mcp/e2e/README.md](../apps/ascend-weather-mcp/e2e/README.md) | ascend-weather-mcp's 7 specs |
-| [apps/ascend-web-hunter/e2e/README.md](../apps/ascend-web-hunter/e2e/README.md) | ascend-web-hunter's 15 specs, including the human-gated spec 11, the automated reuse proof in spec 12, the deterministic formats of spec 13, the quarantine-lane routing of spec 14 and the AI-run schema extraction of spec 15 |
+| [apps/ascend-web-hunter/e2e/README.md](../apps/ascend-web-hunter/e2e/README.md) | ascend-web-hunter's 16 specs, including the human-gated spec 11, the automated reuse proof in spec 12, the deterministic formats of spec 13, the quarantine-lane routing of spec 14 and the AI-run schema extraction of spec 15 |
 | [e2e/platform/README.md](../e2e/platform/README.md) | platform's 4 specs: metrics and targets, logs reach Loki, actuator exposure, AI traffic observability |
 | [.agents/skills/e2e-runbooks/SKILL.md](../.agents/skills/e2e-runbooks/SKILL.md) | The general spec / tasks-template / runs methodology and the default concurrency cap |
 | [docs/E2E_COST.md](E2E_COST.md) | Per-provider dollar cost of a sweep, rolled up from each run record's token fields |

@@ -126,6 +126,14 @@ browser rationale in
   counters), `X-Request-ID` middleware on every response.
 - **Remote CAPTCHA solving via Ngrok.** Solve from a phone, no SSH required. See
   [ADR-003](docs/architecture/decisions/ADR-003-novnc-ngrok-captcha-intervention.md).
+- **Polling crawl jobs.** `POST /api/v1/crawl/jobs` (answer 202), status, list and cancel, plus the
+  `crawl_submit`, `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` MCP tools. Several
+  instances share one crawl through Lua-claimed URLs in Redis with per-domain politeness; results land
+  in Floci under `tenant/<tenantId>/`; recrawls copy unchanged pages forward server-side. Every seed,
+  discovered link, redirect hop, robots.txt and sitemap fetch passes the same SSRF guard and
+  connect-time pinning as a single read. Honest ceiling: the hundreds-of-thousands-of-pages class per
+  job across several workers. See
+  [ADR-019](docs/architecture/decisions/ADR-019-crawl-jobs.md).
 
 ---
 
@@ -202,6 +210,27 @@ and `.env`. The most-used variables:
 | `OCR_ROUTE_TIMEOUT_SECONDS` | `300`                       | Timeout in seconds polling one ascend-ocr job |
 | `AUDIO_SCRIBE_URL` | `http://ascend-audio-scribe:7017`   | Base URL of the ascend-audio-scribe service; empty turns the audio route off |
 | `READ_CACHE_PURGE_RECONNECT_SECONDS` | `5`                | Wait in seconds between two connection attempts of the read cache purge subscriber |
+| `CRAWL_MAX_SEEDS` | `20`                                     | Most seeds in one crawl request |
+| `CRAWL_MAX_PATTERNS` | `50`                                  | Most include patterns and most exclude patterns in one crawl request |
+| `CRAWL_MAX_DEPTH` | `5`                                        | Largest `max_depth` a crawl request may ask for |
+| `CRAWL_DEFAULT_DEPTH` | `2`                                  | `max_depth` when the request has none |
+| `CRAWL_MAX_PAGES` | `10000`                                   | Largest `page_budget` a crawl request may ask for |
+| `CRAWL_DEFAULT_PAGE_BUDGET` | `100`                          | `page_budget` when the request has none |
+| `CRAWL_ROBOTS_OPT_OUT_DOMAINS` | empty                      | Seed domains for which `respect_robots` false is accepted |
+| `CRAWL_RESULT_S3_BUCKET` | `web-hunter-crawls`                 | Bucket of the crawl results |
+| `CRAWL_RESULT_S3_PREFIX` | `crawl-results/`                   | Key prefix of the crawl results after the tenant prefix |
+| `CRAWL_JOB_RETENTION_SECONDS` | `604800`                     | Lifetime of job records, results, frontier keys and recrawl state |
+| `CRAWL_DOMAIN_CONCURRENCY` | `2`                            | Pages of one domain read at once, all instances together |
+| `CRAWL_DEFAULT_DELAY_SECONDS` | `1`                         | Least time between two fetches of one domain |
+| `CRAWL_PROXY_URL` | empty                                    | Customer proxy for crawl fetches only |
+| `CRAWL_CLAIM_LEASE_SECONDS` | `120`                         | Lifetime of a page claim |
+| `CRAWL_CLAIM_MAX_EXPIRIES` | `2`                           | Claim expiries after which a URL counts as failed |
+| `CRAWL_WORKER_CONCURRENCY` | `4`                           | Crawl worker tasks each instance starts |
+| `CRAWL_WORKER_IDLE_SECONDS` | `1`                           | Wait of a worker that found nothing to claim |
+| `CRAWL_POLL_AFTER_SECONDS` | `5`                            | The `poll_after_seconds` hint of a crawl submission |
+| `OBJECT_STORE_S3_ENDPOINT` | `http://localhost:9070`           | Address of the S3-compatible store |
+| `OBJECT_STORE_S3_ACCESS_KEY` | empty                        | Access key of the store |
+| `OBJECT_STORE_S3_SECRET_KEY` | empty                        | Secret key of the store |
 
 Full settings reference in [docs/configuration.md](docs/configuration.md).
 

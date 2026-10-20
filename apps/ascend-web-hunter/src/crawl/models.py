@@ -2,7 +2,7 @@ import fnmatch
 from datetime import UTC, datetime
 from typing import Any, Final, Literal
 
-from pydantic import AnyUrl, BaseModel, Field, model_validator
+from pydantic import AnyUrl, BaseModel, Field, field_validator, model_validator
 
 from src.config.config import settings
 from src.reader.web_reader import OutputFormat
@@ -85,6 +85,19 @@ class JobRecord(BaseModel):
     error: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    claim_expiries: dict[str, int] = Field(default_factory=dict)
+    domains: list[str] = Field(default_factory=list)
+    pending: int = Field(default=0, ge=0)
+
+    @field_validator("claim_expiries", mode="before")
+    @classmethod
+    def _coerce_expiries(cls, value: object) -> object:
+        # The Redis Lua scripts round-trip the record through cjson, which
+        # reads an empty map back as an empty array. A list here is that
+        # artifact, never a real expiry count.
+        if isinstance(value, list):
+            return {}
+        return value
 
 
 def match_glob(patterns: list[str], path: str) -> bool:

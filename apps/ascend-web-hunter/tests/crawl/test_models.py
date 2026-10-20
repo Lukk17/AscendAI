@@ -271,3 +271,17 @@ def test_job_list_view() -> None:
 
     # then
     assert [job.job_id for job in listing.jobs] == ["job1"]
+
+
+def test_claim_expiries_list_coerced_to_empty_map() -> None:
+    # given a record JSON round-tripped through the Lua scripts, whose
+    # JSON layer reads an empty map back as an empty array
+    record = JobRecord(
+        job_id="job1",
+        tenant_id="acme",
+        request=_req(seeds=["https://example.com/"]),
+        claim_expiries=["x"],  # type: ignore[arg-type]
+    )
+
+    # then the artifact is coerced back to the map shape
+    assert record.claim_expiries == {}

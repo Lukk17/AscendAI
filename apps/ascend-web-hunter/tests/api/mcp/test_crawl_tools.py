@@ -3,6 +3,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 from fastmcp.exceptions import ToolError
 from httpx import AsyncClient
 
@@ -15,7 +16,6 @@ from src.api.mcp.mcp_server import (
 )
 from src.crawl import job_service as job_service_module
 from src.crawl.job_service import job_service
-from tests.crawl.fakes import FakeRedis
 
 
 def _ctx(tenant: str | None) -> Any:
@@ -32,7 +32,7 @@ def _ns(**kwargs: Any) -> Any:
 
 @pytest.fixture
 def fake_redis(monkeypatch: pytest.MonkeyPatch) -> FakeRedis:
-    fake = FakeRedis()
+    fake = FakeRedis(decode_responses=True)
     monkeypatch.setattr(job_service, "_client", fake)
     return fake
 

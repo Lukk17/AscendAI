@@ -1,6 +1,6 @@
 [project]
 name = "ascend-web-hunter"
-version = "0.0.12"
+version = "0.0.13"
 description = "AscendAI Web Search & Scraping Service"
 requires-python = ">=3.12"
 dependencies = [
@@ -31,6 +31,8 @@ dependencies = [
 dev = [
     "ascend-python-common[dev]==2.0.0",
     "boto3-stubs[s3]==1.42.6",
+    "fakeredis==2.40.0",
+    "lupa==2.8",
 ]
 
 [tool.pytest.ini_options]

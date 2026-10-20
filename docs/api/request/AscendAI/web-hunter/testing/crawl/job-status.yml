@@ -1,0 +1,36 @@
+info:
+  name: job-status
+  type: http
+  seq: 31
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/crawl/jobs/{{job_id}}"
+  headers:
+    - name: X-Ascend-Tenant
+      value: "{{tenant}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status carries state, counts and tenant", function () {
+            const b = res.getBody();
+            expect(b.job_id).to.equal("{{job_id}}");
+            expect(["waiting", "running", "succeeded", "failed", "cancelled"]).to.include(b.state);
+            expect(b.counts.queued).to.be.a("number");
+            expect(b.counts.fetched).to.be.a("number");
+            expect(b.counts.unchanged).to.be.a("number");
+            expect(b.counts.failed).to.be.a("number");
+            expect(b.counts.skipped_unsafe).to.be.a("number");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
