@@ -65,19 +65,19 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
 - [x] 3.1 Check every seed at submission per D4. Verify with tests that `http://127.0.0.1/`, `http://10.0.0.1/`,
       `file:///etc/passwd`, `https://user:pass@example.com/` and a hostname resolving to a private address each get HTTP
       400 with `code` `unsafe_uri` and create no job.
-- [ ] 3.2 Route discovered links, redirect hops, robots.txt and sitemap fetches through the guard and pinning. Verify a
+- [x] 3.2 Route discovered links, redirect hops, robots.txt and sitemap fetches through the guard and pinning. Verify a
       link to a private address is dropped and counted as `skipped_unsafe`.
 
 ## 4. Frontier, workers and politeness
 
-- [ ] 4.1 Create `src/crawl/frontier.py` per D5. Verify with a fake Redis that two workers never claim the same URL and
+- [x] 4.1 Create `src/crawl/frontier.py` per D5. Verify with a fake Redis that two workers never claim the same URL and
       the per-domain cap holds.
-- [ ] 4.2 Create `src/crawl/robots.py`. Verify a disallowed path is not fetched, `Crawl-delay` is honoured, sitemap URLs
+- [x] 4.2 Create `src/crawl/robots.py`. Verify a disallowed path is not fetched, `Crawl-delay` is honoured, sitemap URLs
       seed the frontier, and `respect_robots=false` is refused for a domain not in `CRAWL_ROBOTS_OPT_OUT_DOMAINS`.
-- [ ] 4.3 Create `src/crawl/worker.py` reading each page through `WebReader` and honouring depth, patterns,
+- [x] 4.3 Create `src/crawl/worker.py` reading each page through `WebReader` and honouring depth, patterns,
       `same_domain_only` and `page_budget`. Verify with a fixture site that a faked `WebReader` serves on the test side,
       with no allowed test host and no seam in the service (owner decision 90 of 2026-10-08).
-- [ ] 4.4 Owner decision 87 of 2026-10-08, design D15. Tests first, against a Redis that runs the Lua scripts in the
+- [x] 4.4 Owner decision 87 of 2026-10-08, design D15. Tests first, against a Redis that runs the Lua scripts in the
       test (the test tool is chosen at implementation time and named in the CHANGELOG entry): the submission script
       writes the job record, the seed queues, the seen set and the `crawl_runnable` member together, the first claim
       moves the job to `running`, two workers of two simulated instances never claim the same URL, the domain cap, the
@@ -88,7 +88,7 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
       `CRAWL_WORKER_IDLE_SECONDS` (design D16, under a fake clock) before it reads `crawl_runnable` again. Then write the
       scripts in `src/crawl/frontier.py` and start the worker tasks in the service lifespan. Verify: the tests fail
       before the code and pass after, inside the gate.
-- [ ] 4.5 Design D15, cancel and an instance that stops. Tests first: a cancel through one instance moves the job to
+- [x] 4.5 Design D15, cancel and an instance that stops. Tests first: a cancel through one instance moves the job to
       `cancelled`, removes it from `crawl_runnable` and deletes its frontier keys, a worker of a second instance that
       finishes a page of it writes nothing, and a cancelled job never turns back into `running` or `succeeded`. A claim
       whose lease deadline has passed is taken back by the next claim of any instance, with the URL at the front of its
@@ -98,25 +98,25 @@ Start only after `add-ascend-python-common` is applied, so ascend-web-hunter alr
       worker tasks (default 4), and a test shows one instance never reads more than that many pages at once (design
       D15, owner answer 94.1 of 2026-10-08).
       Verify: the tests fail before the code and pass after, inside the gate.
-- [ ] 4.6 Make every change of the job record a script of task 4.4 or 4.5, so no code path writes the record outside
+- [x] 4.6 Make every change of the job record a script of task 4.4 or 4.5, so no code path writes the record outside
       them. Verify a test with two simulated instances that update the counts of one job at the same time and lose no
       update.
 
 ## 5. Results and recrawl
 
-- [ ] 5.0 Create `src/storage/object_store.py` per D3: one S3 client configured by the `OBJECT_STORE_S3_*` settings,
+- [x] 5.0 Create `src/storage/object_store.py` per D3: one S3 client configured by the `OBJECT_STORE_S3_*` settings,
       with multipart upload from a file, get and put of a small JSON object, head, delete, server-side copy inside a
       bucket, list by prefix with a continuation token, bucket creation and presigning a `GET`. Verify each operation with tests against a stubbed S3
       endpoint, and that no other module of the service creates an S3 client.
-- [ ] 5.1 Create `src/crawl/result_store.py` per D3 on the client of 5.0. Verify with a stubbed S3 client that keys
+- [x] 5.1 Create `src/crawl/result_store.py` per D3 on the client of 5.0. Verify with a stubbed S3 client that keys
       start with `tenant/<tenantId>/` followed by the prefix and the NDJSON lines match the pages.
-- [ ] 5.2 Implement D6. Verify with a stubbed S3 client that a 304 and an equal hash both copy the earlier page file
+- [x] 5.2 Implement D6. Verify with a stubbed S3 client that a 304 and an equal hash both copy the earlier page file
       to the new job's key with a server-side copy (no upload of page bytes), mark the page `unchanged` with the new
       key in `pages.ndjson` and in the recrawl state, that the new job's page file is still readable after the
       earlier job's objects are deleted, that a missing earlier file makes the request go out without conditional
       headers and the page be written as a new file, and that a source that vanishes between the head and the copy
       leads to one unconditional fetch and a written file.
-- [ ] 5.3 Implement the expiry of D12. Verify with a fake Redis that the frontier keys of a job are gone when it reaches
+- [x] 5.3 Implement the expiry of D12. Verify with a fake Redis that the frontier keys of a job are gone when it reaches
       `succeeded`, `failed` and `cancelled`, that every frontier key and every recrawl state hash carries an expiry of
       `CRAWL_JOB_RETENTION_SECONDS` set again on each write, and that a recrawl state hash of another tenant is never
       written by a job.
@@ -126,19 +126,20 @@ Task 5.5 moved to `add-audit-and-gdpr-compliance` (dependency fix of 2026-10-05)
 
 ## 6. Proxy hook
 
-- [ ] 6.1 Add `CRAWL_PROXY_URL` to `src/proxy/proxy_provider.py` per D7 and the MODIFIED requirement in
+- [x] 6.1 Add `CRAWL_PROXY_URL` to `src/proxy/proxy_provider.py` per D7 and the MODIFIED requirement in
       `specs/web-search-antibot-evasion/spec.md`. Verify a crawl uses it and a single read does not.
 
 ## 7. Documentation and verification
 
-- [ ] 7.1 Update `AGENTS.md`, `README.md` and `docs/configuration.md` (its prose around the rows of task 1.4) with the API, the settings, the SSRF rules and the
+- [x] 7.1 Update `AGENTS.md`, `README.md` and `docs/configuration.md` (its prose around the rows of task 1.4) with the API, the settings, the SSRF rules and the
       honest scale statement. Write `docs/architecture/decisions/ADR-019-crawl-jobs.md` for the crawl model (design
       D14), including how several instances share one crawl (design D15), with its line in the ADR index. Verify every setting appears in all three files and the index links ADR-019.
 - [ ] 7.2 Bump `version` in `pyproject.toml`, the version line in `AGENTS.md` and the version in
       `docs/architecture/arc42/02-constraints.md` from `0.0.14` (set by `add-web-session-import`) to `0.0.15` with one
       `## [0.0.15]` CHANGELOG entry at the top (design D14, owner decision of 2026-10-08, one named version per change,
       in build order). Verify the four agree and `## [0.0.15]` is the topmost version heading.
-- [ ] 7.3 Run the gate, `python -m ruff check .` and `python -m mypy src tests`. Verify all pass with no suppression.
+      Stale base recorded 2026-10-20: `0.0.14` exists nowhere in the service, the bump went `0.0.12` to `0.0.13`, so this verify cannot pass as written.
+- [x] 7.3 Run the gate, `python -m ruff check .` and `python -m mypy src tests`. Verify all pass with no suppression.
 - [ ] 7.4 With the stack up, crawl a small public documentation site with `page_budget` 10 and confirm the job reaches
       `succeeded`, `pages.ndjson` exists in Floci under `tenant/default/` followed by the prefix, and a second run marks
       unchanged pages and holds a page file for each of them under its own job id. Verify by reading the objects back
@@ -152,14 +153,14 @@ Owner request of 2026-10-04: every behaviour this change adds has an end-to-end 
 body check and the scenario rule are design D10 to D14 of `add-web-search-scraping-e2e`, built by its tasks 7.1 to 7.3, 7.5 and 7.6 and by `add-ascend-python-common` (build group 2, position 1), which carries its tasks 7.4, 7.7 and 7.8 (the Bruno variables, the problem body check and the allow list) since the dependency fix of 2026-10-05.
 Task 7.4 stays as the first live check, and the spec below makes that check repeatable. The e2e checks of the tenant erase and export calls (owner answer 70.3 of 2026-10-04) moved with those calls to `add-audit-and-gdpr-compliance`, which adds them to the spec below in place (owner decision 91.3 of 2026-10-08 removed the refusal spec of task 8.2, so its task 10.10 extends the jobs spec of task 8.3).
 
-- [ ] 8.1 Write the job record, the frontier keys and the recrawl state hash under the exact Redis key names of design
+- [x] 8.1 Write the job record, the frontier keys and the recrawl state hash under the exact Redis key names of design
       D13 (`crawl_job:{tenantId}:{job_id}`, `crawl_queue:{tenantId}:{job_id}:{domain}`, `crawl_seen:{tenantId}:{job_id}`,
       `crawl_inflight:{tenantId}:{job_id}:{domain}`, `crawl_recrawl:{tenantId}:{scope}`, and the D15 keys
       `crawl_claims:{tenantId}:{job_id}`, `crawl_next_fetch:{tenantId}:{job_id}:{domain}`, `crawl_pages:{tenantId}:{job_id}`
       and `crawl_runnable`), built in one place in `src/crawl/`. Verify with a fake Redis that a job of tenant `acme`
       writes only keys that match `crawl_*:acme:*`, apart from its member `acme:<job_id>` in `crawl_runnable`, and that
       each key name equals its D13 pattern.
-- [ ] 8.3 Write the new automated spec `apps/ascend-web-hunter/e2e/testing/<N>-crawl-jobs-test.md` and its template,
+- [x] 8.3 Write the new automated spec `apps/ascend-web-hunter/e2e/testing/<N>-crawl-jobs-test.md` and its template,
       against the fake site's small crawl site under its allowed name `e2e-fake-site` (design D12 of `add-web-search-scraping-e2e`, owner answer 67.3 of 2026-10-04): a
       sitemap, a robots.txt that disallows one path, pages down to depth 3, a page outside the include pattern and a
       page that links to a fake site path under the blocked name `e2e-fake-site-blocked`. Tenants `e2e-crawl-a` and `e2e-crawl-b`. Reset deletes both tenants'
@@ -187,7 +188,7 @@ Task 7.4 stays as the first live check, and the spec below makes that check repe
       (`submit-fake-site.yml`, `job-status.yml`, `job-list.yml`, `job-cancel.yml`, the requests of the removed task 8.2
       are not written), each with its assertions in the request file, the tenant
       from an env variable. Verify each runs with `bru run "<file>" --env ascend-local` against a live stack.
-- [ ] 8.5 Add the spec of task 8.3 to the spec lists, counts and run order of scenarios 1 to 6 and of the
+- [x] 8.5 Add the spec of task 8.3 to the spec lists, counts and run order of scenarios 1 to 6 and of the
       ascend-web-hunter service suite in `docs/E2E_RUN_SCENARIOS.md`, after spec 1, and to
       `e2e/README.md`'s capability table and `e2e/testing/README.md`'s ordered list. Verify every count still adds up.
 - [ ] 8.6 Ask the owner which run scenario to use, then run the spec of task 8.3. Verify its run record under
