@@ -51,40 +51,6 @@ services:
         aliases:
           - searxng
 
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0@sha256:139dfee1c6f89249c8d665d1333a42e8ec74ec0a86bc6bb1c8461e10d3a66a47
-    container_name: flaresolverr
-    restart: unless-stopped
-    logging: *default-logging
-    ports:
-      # Loopback only. FlareSolverr fetches any URL handed to it, so an
-      # all-interfaces binding is a request-forwarding primitive for anything
-      # else on the network. Published for the same native-run reason as above.
-      - "127.0.0.1:${FLARESOLVERR_HOST_PORT:-8191}:8191"
-    environment:
-      - LOG_LEVEL=info
-      - LOG_HTML=false
-      - CAPTCHA_SOLVER=none
-      - TZ=UTC
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8191/health"]
-      interval: 10s
-      timeout: 5s
-      start_period: 60s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: 2G
-        reservations:
-          cpus: "0.25"
-          memory: 512M
-    networks:
-      default:
-        aliases:
-          - flaresolverr
-
   # ─── Optional bundled Redis (profile: redis) ───
 
   # Off by default: this machine already runs its own Redis as an external
@@ -229,8 +195,6 @@ services:
       - SEARXNG_X_FORWARDED_FOR=0.0.0.0
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
       - VALIDATION_MIN_WORDS=10
-      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
-      - FLARESOLVERR_ENABLED=${FLARESOLVERR_ENABLED:-false}
       - CAMOUFOX_ENABLED=${CAMOUFOX_ENABLED:-true}
       - TIER_MEMORY_TTL_SECONDS=${TIER_MEMORY_TTL_SECONDS:-86400}
       - NETWORKIDLE_POLL_MS=${NETWORKIDLE_POLL_MS:-1000}
@@ -298,8 +262,6 @@ services:
     shm_size: "2gb"
     depends_on:
       searxng:
-        condition: service_healthy
-      flaresolverr:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${WEB_HUNTER_API_PORT:-7021}/health"]

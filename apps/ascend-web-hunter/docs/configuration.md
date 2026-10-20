@@ -62,9 +62,8 @@ corrupt file there is a packaging defect and the service refuses to start. `BLOC
 
 ### Strategy chain
 
-The read ladder climbs `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr` (only while
-`FLARESOLVERR_ENABLED` is true), `4-playwright_stealth`, `4a-patchright`, `4b-camoufox` (only while
-`CAMOUFOX_ENABLED` is true), `5-crawlee_adaptive` and `6-novnc`, in that order. A caller may start the
+The read ladder climbs `1-beautifulsoup`, `2-trafilatura`, `4-playwright_stealth`, `4a-patchright`,
+`4b-camoufox` (only while `CAMOUFOX_ENABLED` is true), `5-crawlee_adaptive` and `6-novnc`, in that order. A caller may start the
 chain at any tier with the `tier` field. A domain that succeeded at a tier before restarts at the
 remembered tier for `TIER_MEMORY_TTL_SECONDS`.
 
@@ -103,8 +102,6 @@ scoring ensemble result wins, with ties going to trafilatura. Changed by
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `PLAYWRIGHT_HEADLESS` | `false` | Set `true` in CI or any container without an X server |
-| `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr Cloudflare-bypass endpoint |
-| `FLARESOLVERR_ENABLED` | `false` | Route reads through the 3-flaresolverr tier. Added by `enhance-web-search-tier-ladder`. |
 | `CAMOUFOX_ENABLED` | `true` | Route reads through the 4b-camoufox tier. Added by `enhance-web-search-tier-ladder`. |
 | `SELENIUM_BROWSER_CDP_URL` | `ws://localhost:4444/playwright` | CDP URL for remote browser (legacy naming) |
 | `SELENIUM_BROWSER_VNC_URL` | `http://localhost:7900` | Local NoVNC fallback |

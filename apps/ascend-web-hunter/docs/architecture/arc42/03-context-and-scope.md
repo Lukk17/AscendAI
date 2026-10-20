@@ -18,7 +18,6 @@ graph TB
     end
 
     SearXNG["SearXNG<br/>(:9020)"]
-    FlareSolverr["FlareSolverr<br/>(:8191)"]
     Redis["Redis<br/>(:6379)"]
     Ngrok["Ngrok<br/>(public internet)"]
     TargetSite["Target website<br/>(public internet)"]
@@ -29,8 +28,6 @@ graph TB
     MCP -->|"HTML search"| SearXNG
     REST -->|"HTTP extraction"| TargetSite
     MCP -->|"HTTP extraction"| TargetSite
-    REST -->|"Cloudflare bypass"| FlareSolverr
-    MCP -->|"Cloudflare bypass"| FlareSolverr
     REST -->|"Cookie read/write"| Redis
     MCP -->|"Cookie read/write"| Redis
     REST -->|"428 → VNC URL"| Human
@@ -48,9 +45,8 @@ graph TB
 | MCP `web_search` tool | Inbound | MCP / Streamable HTTP | Same as REST search; used by ascend-ai-agent. |
 | MCP `web_read` tool | Inbound | MCP / Streamable HTTP | Same as REST read; used by ascend-ai-agent. |
 | SearXNG `GET /search` | Outbound | HTTP/HTML | Fetches search results. Parsed with BeautifulSoup. |
-| FlareSolverr `POST /v1` | Outbound | HTTP/JSON | Submits URLs for Cloudflare bypass. Returns solved HTML + cookies. |
 | Redis `SETEX / GET` | Outbound | Redis protocol | Stores and retrieves per-domain session cookies with TTL. |
-| Target sites | Outbound | HTTP/HTTPS | Direct page fetches by strategies 1, 2, 4, 5. Strategy 3 fetches via FlareSolverr. |
+| Target sites | Outbound | HTTP/HTTPS | Direct page fetches by every strategy. |
 | NoVNC / Ngrok | Outbound (URL returned to caller) | HTTP | VNC URL sent to the human operator via the 428 response body. |
 
 ---

@@ -36,10 +36,10 @@ graph TB
 | :--- | :--- | :--- |
 | Security | REST caller sends `url: "http://169.254.169.254/latest/meta-data/"` | The shared guard resolves to a link-local address and refuses; handler returns a 400 problem body with code `unsafe_uri`. |
 | Security | MCP `web_read` receives `url: "http://localhost:6379"` | Same SSRF guard; 400 returned to the agent. |
-| Availability | Target page is Cloudflare-protected, strategies 1 and 2 return empty | Strategy 3 (FlareSolverr) is invoked; if it succeeds, response carries `mode="3-flaresolverr"`. |
+| Availability | Target page is Cloudflare-protected, strategies 1 and 2 return empty | The Playwright browser tier is invoked; if it succeeds, response carries `mode="4-playwright_stealth"`. |
 | Availability | Target page requires CAPTCHA; strategies 1-5 fail | Strategy 6 (NoVNC) raises 428 with `vnc_url`. ascend-ai-agent displays the URL to the user. |
 | Transparency | Caller wants to know extraction cost | `response.mode` is always set: `"1-beautifulsoup"` means zero escalation cost; `"4-playwright_stealth"` means a full browser was launched. |
-| Transparency | Operator checks container startup | Startup banner includes `SEARXNG_BASE_URL`, `FLARESOLVERR_URL`, `REDIS_URL`, and all timeout values. |
+| Transparency | Operator checks container startup | Startup banner includes `SEARXNG_BASE_URL`, `REDIS_URL`, and all timeout values. |
 
 ---
 

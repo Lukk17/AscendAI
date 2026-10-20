@@ -138,20 +138,21 @@ PowerShell:
 Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","output_format":"structured"}'
 ```
 
-Starting tier. Names where the escalation chain starts: `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr`,
-`4-playwright_stealth`, `5-crawlee_adaptive` or `6-novnc`, the same strings a read returns in `mode`. Escalation
-continues through the tiers after it. An unknown value is rejected with HTTP 400 (`validation` problem body).
+Starting tier. Names where the escalation chain starts: `1-beautifulsoup`, `2-trafilatura`,
+`4-playwright_stealth`, `4a-patchright`, `4b-camoufox`, `5-crawlee_adaptive` or `6-novnc`, the same strings a read
+returns in `mode`. Escalation continues through the tiers after it. An unknown value is rejected with HTTP 400
+(`validation` problem body).
 
 Bash:
 
 ```bash
-curl -X POST http://localhost:7021/api/v2/web/read -H "Content-Type: application/json" -d '{"url":"https://example.com","tier":"3-flaresolverr"}'
+curl -X POST http://localhost:7021/api/v2/web/read -H "Content-Type: application/json" -d '{"url":"https://example.com","tier":"4-playwright_stealth"}'
 ```
 
 PowerShell:
 
 ```powershell
-Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","tier":"3-flaresolverr"}'
+Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/read -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","tier":"4-playwright_stealth"}'
 ```
 
 An expired session. When a stored login for the target domain and profile no longer validates, the read stops

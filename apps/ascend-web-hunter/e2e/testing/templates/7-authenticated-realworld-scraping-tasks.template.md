@@ -11,7 +11,6 @@ boxes as you go. Record each best-effort row's actual verdict and any skip under
 
 - [ ] `bru --version` returns a version string.
 - [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
-- [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable).
 
 ### Reset state
 

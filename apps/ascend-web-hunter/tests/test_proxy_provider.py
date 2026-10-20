@@ -17,7 +17,6 @@ def test_proxy_disabled_by_default() -> None:
     assert not p.enabled
     assert p.for_curl_cffi() is None
     assert p.for_playwright() is None
-    assert p.for_flaresolverr() is None
 
 
 def test_proxy_enabled_when_url_set() -> None:
@@ -29,7 +28,6 @@ def test_proxy_enabled_when_url_set() -> None:
     assert p.enabled
     assert p.for_curl_cffi() == {"http": "socks5://proxy:1080", "https": "socks5://proxy:1080"}
     assert p.for_playwright() == {"server": "socks5://proxy:1080"}
-    assert p.for_flaresolverr() == {"url": "socks5://proxy:1080"}
 
 
 @pytest.mark.asyncio
@@ -131,64 +129,6 @@ async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_hos
     # Both the initial call and the hop call must carry proxies
     for call in session.get.call_args_list:
         assert call.kwargs.get("proxies") == proxy_dict
-
-
-@pytest.mark.asyncio
-async def test_flaresolverr_strategy_injects_proxy_into_payload() -> None:
-    """When proxy_provider.for_flaresolverr() returns a dict, it is added to the POST payload."""
-    # given
-    from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
-
-    fs_proxy = {"url": "http://proxy:8080"}
-    payload_sent: dict[str, Any] = {}
-
-    response = MagicMock()
-    response.json = MagicMock(
-        return_value={
-            "status": "ok",
-            "solution": {"response": "<html>ok</html>", "cookies": [], "userAgent": "UA"},
-        }
-    )
-    response.raise_for_status = MagicMock()
-    session = MagicMock()
-    session.__aenter__ = AsyncMock(return_value=session)
-    session.__aexit__ = AsyncMock(return_value=False)
-
-    async def capture_post(url: Any, *, json: Any, **_kwargs: Any) -> Any:
-        payload_sent.update(json)
-        return response
-
-    session.post = capture_post
-
-    mock_breaker = MagicMock()
-    mock_breaker.is_open = False
-
-    # when
-    with (
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.proxy_provider.for_flaresolverr",
-            return_value=fs_proxy,
-        ),
-        patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.cookie_manager.get_flat_cookies",
-            new=AsyncMock(return_value={}),
-        ),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.cookie_manager.get_user_agent",
-            new=AsyncMock(return_value=None),
-        ),
-        patch("src.reader.strategies.flaresolverr_strategy.flaresolverr_breaker", mock_breaker),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.ChallengeDetector.is_login_required",
-            return_value=False,
-        ),
-        patch("src.reader.strategies.flaresolverr_strategy.ChallengeDetector.is_blocked", return_value=False),
-    ):
-        await FlareSolverrStrategy().get_html("https://example.com")
-
-    # then
-    assert payload_sent.get("proxy") == fs_proxy
 
 
 @pytest.mark.asyncio

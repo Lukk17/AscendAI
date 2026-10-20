@@ -17,12 +17,6 @@ def _no_banner_network() -> tuple[Any, ...]:
             ),
         ),
         patch(
-            "src.config.startup_banner._flaresolverr_check_sync",
-            return_value=BannerCheck(
-                label="FlareSolverr", target="http://localhost:8191", status="Connected"
-            ),
-        ),
-        patch(
             "src.config.startup_banner._redis_check_sync",
             return_value=BannerCheck(label="Redis", target="redis://127.0.0.1:6379/0", status="Connected"),
         ),
@@ -69,7 +63,6 @@ async def test_lifespan_logs_warning_when_rest_search_client_close_fails() -> No
         ),
         _no_banner_network()[0],
         _no_banner_network()[1],
-        _no_banner_network()[2],
     ):
         app: FastAPI = main_module.create_app()
         async with LifespanManager(app):
@@ -91,7 +84,6 @@ async def test_lifespan_logs_warning_when_browser_pool_stop_fails() -> None:
         ),
         _no_banner_network()[0],
         _no_banner_network()[1],
-        _no_banner_network()[2],
     ):
         app: FastAPI = main_module.create_app()
         async with LifespanManager(app):
@@ -117,7 +109,6 @@ async def test_lifespan_logs_warning_when_mcp_search_client_close_fails() -> Non
         ),
         _no_banner_network()[0],
         _no_banner_network()[1],
-        _no_banner_network()[2],
     ):
         app: FastAPI = main_module.create_app()
         async with LifespanManager(app):

@@ -118,7 +118,7 @@ async def web_read(
                        'tables' for HTML tables as rows, 'screenshot' for a base64 PNG.
                        Every format but 'text' is refused together with include_links.
         tier: Start the extraction chain at this tier ('1-beautifulsoup', '2-trafilatura',
-              '3-flaresolverr', '4-playwright_stealth', '4a-patchright', '4b-camoufox',
+              '4-playwright_stealth', '4a-patchright', '4b-camoufox',
               '5-crawlee_adaptive', '6-novnc') instead of
               where heavy_mode and the stored session would start it. Escalation continues after it.
         extraction_schema: JSON Schema the 'schema' output format extracts and validates

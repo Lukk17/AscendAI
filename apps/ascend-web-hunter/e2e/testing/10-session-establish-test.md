@@ -59,7 +59,7 @@ needs a short, bounded wait, not the full 10-minute ceiling. But when the monito
 genuinely challenged or slow-loading target), the call still leaves a live, resource-consuming browser + VNC
 session running in the background for up to 10 minutes. Running this spec back to back without letting a previous
 run's monitor finish will stack multiple live headful browsers in the same container. Treat it as the highest
-per-run resource cost in this module's suite, higher than test 6 or 7's Playwright/FlareSolverr usage, even though -
+per-run resource cost in this module's suite, higher than test 6 or 7's browser-tier usage, even though -
 like every other ascend-web-hunter spec - it makes no call to any priced LLM or embedding provider and so still
 belongs in the cost-free set in dollar terms.
 

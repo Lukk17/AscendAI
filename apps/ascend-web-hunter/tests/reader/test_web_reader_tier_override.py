@@ -8,14 +8,13 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC
 from src.reader.web_reader import NOVNC_STRATEGY_NAME, WebReader, _cache_key
 
 _URL = "https://example.com/article"
 _ALL_TIERS = [
     "1-beautifulsoup",
     "2-trafilatura",
-    "3-flaresolverr",
     "4-playwright_stealth",
     "4a-patchright",
     "4b-camoufox",
@@ -27,7 +26,7 @@ _ALL_TIERS = [
 @pytest.fixture(autouse=True)
 def _all_tiers_enabled() -> Any:
     """These tests pin the routing mechanics, not the operator flags: run with every tier on."""
-    with patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", True):
+    with patch("src.reader.web_reader.settings.CAMOUFOX_ENABLED", True):
         yield
 
 
@@ -43,7 +42,7 @@ async def test_the_first_tier_selects_the_whole_chain() -> None:
 @pytest.mark.asyncio
 async def test_a_middle_tier_keeps_every_tier_after_it() -> None:
     # when
-    selected = await WebReader()._select_strategies(_URL, heavy_mode=False, tier="3-flaresolverr")
+    selected = await WebReader()._select_strategies(_URL, heavy_mode=False, tier="4-playwright_stealth")
 
     # then
     assert list(selected) == _ALL_TIERS[2:]
@@ -74,12 +73,12 @@ async def test_an_explicit_tier_outranks_the_producer_routing() -> None:
     # when
     with patch(
         "src.reader.web_reader.cookie_manager.get_stored_session_producer",
-        new=AsyncMock(return_value=PRODUCED_BY_FLARESOLVERR),
+        new=AsyncMock(return_value=PRODUCED_BY_NOVNC),
     ):
         selected = await WebReader()._select_strategies(_URL, heavy_mode=False, tier="4-playwright_stealth")
 
     # then
-    assert list(selected) == _ALL_TIERS[3:]
+    assert list(selected) == _ALL_TIERS[2:]
 
 
 @pytest.mark.asyncio

@@ -20,7 +20,6 @@ runtime:
             expect(b.checks).to.be.an("object");
             expect(b.checks.redis).to.have.property("status");
             expect(b.checks.searxng).to.have.property("status");
-            expect(b.checks.flaresolverr).to.have.property("status");
         });
 
 settings:

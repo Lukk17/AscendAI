@@ -13,7 +13,7 @@
 ### What it is
 
 ascend-web-hunter is a Python microservice (port 7021) that exposes two surfaces over one process: a REST API for
-direct callers and an MCP server for AI agents. It runs SearXNG queries and reads pages through an eight-tier
+direct callers and an MCP server for AI agents. It runs SearXNG queries and reads pages through a seven-tier
 escalation chain that walks from cheap HTTP fetches to a remote browser session humans can drive over VNC.
 
 Pages get extracted by whichever tier wins first. WAFs (Cloudflare, Turnstile), login walls, and JavaScript
@@ -71,7 +71,6 @@ graph TB
     Reader[WebReader<br/>strategy chain]
     BS[1: BeautifulSoup<br/>curl_cffi + Chrome120]
     TR[2: Trafilatura<br/>curl_cffi + Chrome120]
-    FS[3: FlareSolverr<br/>Cloudflare bypass<br/>off by default]
     PW[4: Playwright Stealth<br/>singleton Chromium]
     PR[4a: Patchright<br/>patched Chromium]
     CF[4b: Camoufox<br/>Firefox fingerprint]
@@ -86,13 +85,12 @@ graph TB
     MCP --> Reader
     Reader --> BS
     BS -.miss.-> TR
-    TR -.miss.-> FS
-    FS -.miss.-> PW
+    TR -.miss.-> PW
     PW -.miss.-> PR
     PR -.miss.-> CF
     CF -.miss.-> CR
     CR -.miss.-> NV
-    BS & TR & FS -.cf_clearance.-> Redis
+    BS & TR -.cf_clearance.-> Redis
     NV -.session.-> Redis
     REST -.search.-> SX
     MCP -.search.-> SX
@@ -109,7 +107,7 @@ browser rationale in
 
 - **Two surfaces, one process.** REST under `/api/v1`, `/api/v2` and MCP at `/mcp`. Same orchestrator behind
   both. See [docs/api-examples.md](docs/api-examples.md).
-- **Eight-tier escalation chain.** Cheap tiers handle the easy 80%, patched browser tiers (`4a-patchright`,
+- **Seven-tier escalation chain.** Cheap tiers handle the easy 80%, patched browser tiers (`4a-patchright`,
   `4b-camoufox`) cover the sites that fingerprint stock Playwright, the rest escalates to Crawlee and NoVNC for
   the irreducible human-needed cases.
 - **PSL-aware cookie persistence.** Clearance cookies keyed by registrable domain via `tldextract`. Sites under
@@ -146,8 +144,6 @@ and `.env`. The most-used variables:
 | :------------------- | :--------------------------------- | :--------------------------------------------------- |
 | `API_PORT`           | `7021`                             | Service port                                         |
 | `SEARXNG_BASE_URL`   | `http://localhost:9020`            | SearXNG meta-search instance                         |
-| `FLARESOLVERR_URL`   | `http://localhost:8191/v1`         | FlareSolverr Cloudflare-bypass instance              |
-| `FLARESOLVERR_ENABLED` | `false`                          | Route reads through the 3-flaresolverr tier            |
 | `CAMOUFOX_ENABLED` | `true`                               | Route reads through the 4b-camoufox tier               |
 | `TIER_MEMORY_TTL_SECONDS` | `86400`                       | TTL in seconds for the per-domain tier memory          |
 | `NETWORKIDLE_POLL_MS` | `1000`                          | Page-quiet poll interval in milliseconds for browser tiers |

@@ -616,32 +616,6 @@ def test_challenge_validator_rejects_thin_above_rich_link_count() -> None:
             Settings()
 
 
-def test_flaresolverr_enabled_default() -> None:
-    # when
-    settings = Settings()
-
-    # then
-    assert settings.FLARESOLVERR_ENABLED is False
-
-
-def test_flaresolverr_enabled_valid_override() -> None:
-    # given
-    with patch.dict(os.environ, {"FLARESOLVERR_ENABLED": "true"}):
-        # when
-        settings = Settings()
-
-        # then
-        assert settings.FLARESOLVERR_ENABLED is True
-
-
-def test_flaresolverr_enabled_rejects_non_boolean() -> None:
-    # given
-    with patch.dict(os.environ, {"FLARESOLVERR_ENABLED": "maybe"}):
-        # when / then
-        with pytest.raises(ValidationError):
-            Settings()
-
-
 def test_camoufox_enabled_default() -> None:
     # when
     settings = Settings()

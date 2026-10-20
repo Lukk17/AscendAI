@@ -147,14 +147,6 @@ def _searxng_breaker_probe() -> "ProbeResult":
     return readiness_module.probe_searxng_breaker()
 
 
-async def _flaresolverr_probe() -> "ProbeResult":
-    return await readiness_module.probe_flaresolverr()
-
-
-def _flaresolverr_breaker_probe() -> "ProbeResult":
-    return readiness_module.probe_flaresolverr_breaker()
-
-
 def _service_definition() -> ServiceDefinition:
     return ServiceDefinition(
         name="ascend-web-hunter",
@@ -167,8 +159,6 @@ def _service_definition() -> ServiceDefinition:
             "redis": _redis_probe,
             "searxng": _searxng_probe,
             "searxng_breaker": _searxng_breaker_probe,
-            "flaresolverr": _flaresolverr_probe,
-            "flaresolverr_breaker": _flaresolverr_breaker_probe,
         },
         lifespan=service_lifespan(),
         startup_banner=build_service_banner,

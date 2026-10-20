@@ -4,6 +4,14 @@
 
 Accepted, 2026-09-10
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+The FlareSolverr branch of the producer-aware replay is removed: a stored
+session of any producer starts the read at the browser tiers, and records
+the FlareSolverr tier stored get no special handling and no migration. Only
+the browser rule of this record survives. The rest of this record is
+unchanged. See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
 ## Context
 
 `WebReader._prefer_browser` treated "a stored session exists for this URL" as a single boolean, regardless of

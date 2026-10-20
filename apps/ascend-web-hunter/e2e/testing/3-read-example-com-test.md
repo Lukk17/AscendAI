@@ -10,7 +10,7 @@
 - The extracted content contains the canary phrase `"Example Domain"` (the `<h1>` of `example.com`, deliberately
   stable since the IETF reserves the domain for documentation).
 - The lightweight extraction tier (curl_cffi) is sufficient - `example.com` has no Cloudflare WAF, no JavaScript
-  challenge, no CAPTCHA. The test does NOT require Playwright or FlareSolverr; if it falls through to those
+  challenge, no CAPTCHA. The test does NOT require Playwright or any heavier tier; if it falls through to those
   tiers, the test still passes provided the canary phrase is found.
 
 ## Prerequisites

@@ -157,14 +157,6 @@ curl -fsS http://localhost:7021/health
 
 Expect HTTP 200 with `{"status":"ok"}`.
 
-Check FlareSolverr is reachable (used by the Cloudflare tiers).
-
-```bash
-curl -fsS http://localhost:8191/
-```
-
-Expect HTTP 200.
-
 Part 2 (saucedemo) needs no credentials: saucedemo's public demo credentials are hardcoded in the harness.
 
 ## Reset state

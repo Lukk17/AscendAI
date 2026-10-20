@@ -99,23 +99,22 @@ async def test_structured_read_returns_the_structured_contract(client: AsyncClie
 @pytest.mark.asyncio
 async def test_read_forwards_the_tier_on_the_links_path(client: AsyncClient) -> None:
     # given
-    result = {"content": "X", "links": {}, "status": "success", "mode": "3-flaresolverr"}
+    result = {"content": "X", "links": {}, "status": "success", "mode": "4-playwright_stealth"}
 
     # when
     with (
         patch(_READ_WITH_LINKS, new_callable=AsyncMock, return_value=result) as mock_read,
         patch(_GUARD, return_value=True),
-        patch("src.api.rest.rest_endpoints.settings.FLARESOLVERR_ENABLED", True),
     ):
         resp = await client.post(
             "/api/v2/web/read",
-            json={"url": _URL, "include_links": True, "tier": "3-flaresolverr"},
+            json={"url": _URL, "include_links": True, "tier": "4-playwright_stealth"},
         )
 
     # then
     assert resp.status_code == 200
     mock_read.assert_awaited_once_with(
-        _URL, None, heavy_mode=False, profile=None, output_format="text", tier="3-flaresolverr"
+        _URL, None, heavy_mode=False, profile=None, output_format="text", tier="4-playwright_stealth"
     )
 
 

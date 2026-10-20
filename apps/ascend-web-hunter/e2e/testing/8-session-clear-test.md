@@ -91,7 +91,7 @@ job, not a failure.
 
 Seed a session record for `example.net` so the "existing session" call has something real to remove. The fixture
 [fixtures/session-clear-seed.json](../fixtures/session-clear-seed.json) holds the same JSON shape
-`CookieManager.save_storage_state` produces, so the test needs no login flow, no FlareSolverr, and no human. It
+`CookieManager.save_storage_state` produces, so the test needs no login flow, no browser tier, and no human. It
 only needs a record to exist under the key the service reads. Copy it into the `redis` container first. Piping
 JSON through a PowerShell or bash pipe into `redis-cli -x` mangles it (PowerShell prepends a BOM, and bash treats
 a bare quoted string as a command), and a file plus shell redirection avoids both. The path below is relative to

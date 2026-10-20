@@ -78,32 +78,27 @@ sequenceDiagram
 
 ---
 
-### Extraction escalation - Cloudflare block → FlareSolverr
+### Extraction escalation - Cloudflare block falls through to the browser tiers
 
 ```mermaid
 sequenceDiagram
     participant WR as WebReader
     participant BS as BeautifulSoupStrategy
     participant TR as TrafilaturaStrategy
-    participant FS as FlareSolverrStrategy
-    participant FlareSolverr as FlareSolverr :8191
+    participant PW as PlaywrightStrategy
     participant Redis as Redis :6379
     participant CV as ContentValidator
 
     WR->>BS: extract(url)
     BS->>BS: ChallengeDetector.is_blocked → raises ChallengeDetectedException
-    BS-->>WR: ChallengeDetectedException propagates
-    WR->>WR: short-circuit to 6-novnc
-    note over WR: ChallengeDetectedException skips straight to NoVNC,<br/>not to FlareSolverr. FlareSolverr runs only when<br/>BeautifulSoup returns empty without raising.
+    BS-->>WR: ChallengeDetectedException falls through
     WR->>TR: extract(url)
     TR-->>WR: "" (empty - blocked but no exception)
-    WR->>FS: extract(url)
-    FS->>FlareSolverr: POST {cmd:"request.get", url:...}
-    FlareSolverr-->>FS: {status:"ok", solution:{response:html, cookies:[...]}}
-    FS->>Redis: save_session_data(url, {cf_clearance:...}, user_agent)
-    FS-->>WR: extracted text
+    WR->>PW: extract(url)
+    PW->>Redis: save_storage_state(url, {cf_clearance:...}, user_agent)
+    PW-->>WR: extracted text
     WR->>CV: validate(text) → True
-    WR-->>caller: {content, status="success", mode="3-flaresolverr"}
+    WR-->>caller: {content, status="success", mode="4-playwright_stealth"}
 ```
 
 ---

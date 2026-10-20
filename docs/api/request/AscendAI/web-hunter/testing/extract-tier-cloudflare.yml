@@ -8,8 +8,8 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
   body:
     type: json
-    # A genuine Cloudflare challenge page (the curl tier is blocked) that FlareSolverr
-    # solves and that returns real content -- proves the Cloudflare/FlareSolverr tier.
+    # A genuine Cloudflare challenge page (the curl tier is blocked) that a browser tier
+    # solves and that returns real content -- proves the Cloudflare browser-tier path.
     data: |-
       {
         "url": "https://www.scrapingcourse.com/cloudflare-challenge",

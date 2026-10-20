@@ -66,14 +66,6 @@ curl -fsS http://localhost:7021/health
 
 Expect HTTP 200 with `{"status":"ok"}`.
 
-Check FlareSolverr is reachable (Call 1 walks every automated tier before it escalates to NoVNC).
-
-```bash
-curl -fsS http://localhost:8191/
-```
-
-Expect HTTP 200.
-
 Check Redis is reachable from the host's Docker context (the capture check reads the key the monitor writes).
 
 ```bash

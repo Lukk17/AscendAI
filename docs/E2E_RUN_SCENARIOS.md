@@ -40,10 +40,10 @@ Before running any end-to-end test, ask which scenario or which service suite fr
 
 ## Compose projects and the shared container names
 
-Both compose files declare the same four container names: `searxng`, `flaresolverr`, `ascend-web-hunter`, and
+Both compose files declare the same three container names: `searxng`, `ascend-web-hunter`, and
 `ngrok-ascend-web-hunter`. [compose.yaml](../compose.yaml) (project `ascend-ai`) pulls in
 [compose.ascend-web-hunter.yaml](../compose.ascend-web-hunter.yaml) via `include:`, so the full stack already
-contains those four containers. Running the scraping file as its own project (`ascend-scrapper`) at the same time
+contains those three containers. Running the scraping file as its own project (`ascend-scrapper`) at the same time
 fails on a name conflict, so only one of the two projects is ever up. Switching means `docker compose down` on the
 project being left, not `stop`, because a stopped container still holds its name.
 
@@ -294,7 +294,7 @@ docker rm -f e2e-fake-site
 ### Preconditions
 
 - Compose: `ascend-scrapper` project up alone (`docker compose -f compose.ascend-web-hunter.yaml up -d --build`).
-  `ascend-ai` project down first, since both projects share the same four container names.
+  `ascend-ai` project down first, since both projects share the same three container names.
 - Local-dev prerequisites: none of PostgreSQL or Qdrant are needed, since no suite in this scenario
   touches the agent, memory, OCR, audio, or weather containers. Redis is needed, but supplied by the bundled
   `redis` service (container name `ascend-scrapper-redis`), not the host's external-prerequisite Redis: set
@@ -568,7 +568,7 @@ Resets: specs 1 through 6 need none. Spec 7's own Reset state restarts the `asce
 
 ### ascend-web-hunter service suite
 
-- Compose: either project. On the scraping project alone (`ascend-scrapper`), this service suite is [Scenario 5](#scenario-5-human-captcha-scraping-compose-only) with spec 11 or [Scenario 6](#scenario-6-automated-scraping-compose-only) without it, and their preconditions apply unchanged, including the bundled `ascend-scrapper-redis` when the host has no Redis. When the `ascend-ai` project is already up, run the same specs against the four containers it includes (`searxng`, `flaresolverr`, `ascend-web-hunter`, `ngrok-ascend-web-hunter`) with no project switch. Never have both projects up, per [Compose projects and the shared container names](#compose-projects-and-the-shared-container-names).
+- Compose: either project. On the scraping project alone (`ascend-scrapper`), this service suite is [Scenario 5](#scenario-5-human-captcha-scraping-compose-only) with spec 11 or [Scenario 6](#scenario-6-automated-scraping-compose-only) without it, and their preconditions apply unchanged, including the bundled `ascend-scrapper-redis` when the host has no Redis. When the `ascend-ai` project is already up, run the same specs against the three containers it includes (`searxng`, `ascend-web-hunter`, `ngrok-ascend-web-hunter`) with no project switch. Never have both projects up, per [Compose projects and the shared container names](#compose-projects-and-the-shared-container-names).
 - External prerequisites: Redis `:6379` on the host, or the bundled Redis on the scraping project. PostgreSQL and Qdrant are not used. The object store `:9070` on the host is used by spec 16 for the crawl result objects.
 - LM Studio: not applicable.
 - Human at keyboard: only for spec 11. Leave spec 11 out when nobody is at the keyboard.

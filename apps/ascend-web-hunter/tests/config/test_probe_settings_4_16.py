@@ -42,20 +42,12 @@ async def test_ready_answers_503_when_probe_times_out(client: AsyncClient) -> No
         "src.api.readiness.probe_searxng",
         new=AsyncMock(return_value=ProbeResult(status="error")),
     )
-    ok_flare = patch(
-        "src.api.readiness.probe_flaresolverr",
-        new=AsyncMock(return_value=ProbeResult(status="ok")),
-    )
     ok_searxng_breaker = patch(
         "src.api.readiness.probe_searxng_breaker",
         return_value=ProbeResult(status="ok", details={"breaker": "closed"}),
     )
-    ok_flare_breaker = patch(
-        "src.api.readiness.probe_flaresolverr_breaker",
-        return_value=ProbeResult(status="ok", details={"breaker": "closed"}),
-    )
     # when
-    with ok_redis, timed_out, ok_flare, ok_searxng_breaker, ok_flare_breaker:
+    with ok_redis, timed_out, ok_searxng_breaker:
         response = await client.get("/ready")
     # then
     assert response.status_code == 503

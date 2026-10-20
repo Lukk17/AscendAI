@@ -28,6 +28,13 @@ again, so the connect-time address pinning of D1 and D2 is still not applied ins
 residual DNS rebinding window is accepted for the same reason D4 accepted it. See
 [ADR-015](ADR-015-patched-browser-tiers-and-tier-memory.md) D4.
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+FlareSolverr leaves the out-of-process tier list: the tier that fetched
+through it is deleted, so only Crawlee still fetches out of process. The
+pinning rule and the residual window are unchanged. The rest of this record
+is unchanged. See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
 ## Context
 
 `is_safe_external_url` resolves a hostname with `socket.getaddrinfo`, checks every address it gets back against the

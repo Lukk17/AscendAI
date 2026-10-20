@@ -4,6 +4,13 @@
 
 Accepted - 2026-05-31
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+The `3-flaresolverr` tier is removed, with its doubled-timeout rule and
+its circuit breaker. The budget, the singleton browser and the recursion
+guard are unchanged. The rest of this record is unchanged.
+See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
 ## Context
 
 The original `WebReader` chain had three independent timeouts but no overall budget, so a worst-case escalation

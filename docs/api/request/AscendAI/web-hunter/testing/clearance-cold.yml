@@ -9,7 +9,7 @@ http:
   body:
     type: json
     # Spec 12 Call 1: read a genuine Cloudflare challenge page with NO session stored. The curl
-    # tier is blocked, FlareSolverr solves the challenge, and the reader stores the site's
+    # tier is blocked, a browser tier solves the challenge, and the reader stores the site's
     # session under session:scrapingcourse.com:default with cf_clearance in its waf entry.
     data: |-
       {

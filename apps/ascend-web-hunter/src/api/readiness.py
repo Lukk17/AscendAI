@@ -5,7 +5,7 @@ import httpx
 import redis.asyncio as redis
 from ascend_python_common.readiness import ProbeResult
 
-from src.circuit_breaker.breaker import BreakerState, flaresolverr_breaker, searxng_breaker
+from src.circuit_breaker.breaker import BreakerState, searxng_breaker
 from src.config.config import settings
 
 logger = logging.getLogger(__name__)
@@ -39,21 +39,6 @@ async def probe_searxng() -> ProbeResult:
         return ProbeResult(status="error")
 
 
-async def probe_flaresolverr() -> ProbeResult:
-    if not settings.FLARESOLVERR_ENABLED:
-        return ProbeResult(status="skipped")
-    try:
-        async with httpx.AsyncClient(timeout=settings.READINESS_PROBE_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                settings.FLARESOLVERR_URL,
-                json={"cmd": "sessions.list"},
-            )
-            return ProbeResult(status="ok") if response.status_code == 200 else ProbeResult(status="error")
-    except Exception as exc:
-        logger.warning("/ready: flaresolverr probe failed: %s", exc)
-        return ProbeResult(status="error")
-
-
 def _breaker_result(breaker_state: BreakerState) -> ProbeResult:
     if breaker_state is BreakerState.OPEN:
         return ProbeResult(status="degraded", details={"breaker": "open"})
@@ -64,7 +49,3 @@ def _breaker_result(breaker_state: BreakerState) -> ProbeResult:
 
 def probe_searxng_breaker() -> ProbeResult:
     return _breaker_result(searxng_breaker.state)
-
-
-def probe_flaresolverr_breaker() -> ProbeResult:
-    return _breaker_result(flaresolverr_breaker.state)

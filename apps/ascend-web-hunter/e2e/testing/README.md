@@ -60,7 +60,7 @@ be run on its own.
 4. [4-mcp-tools-list-test.md](4-mcp-tools-list-test.md). MCP `tools/list` advertises `web_search` and `web_read`.
 5. [5-mcp-search-test.md](5-mcp-search-test.md). MCP `tools/call` for `web_search` returns structured results.
 6. [6-tiered-scraping-test.md](6-tiered-scraping-test.md). Per-tier regression sweep (`curl_cffi` static,
-   FlareSolverr Cloudflare, Playwright JS-rendered) against real sites.
+   browser-tier Cloudflare, Playwright JS-rendered) against real sites.
 7. [7-authenticated-realworld-scraping-test.md](7-authenticated-realworld-scraping-test.md). Real-world URL matrix
    plus automated saucedemo login-reuse. Two parts, both automated, no human step. Runs after test 6 because its
    reset flushes every `session:*` key.

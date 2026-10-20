@@ -53,17 +53,6 @@ def _searxng_check_sync() -> BannerCheck:
     return _probe_url_sync("SearXNG", settings.SEARXNG_BASE_URL.rstrip("/") + "/healthz")
 
 
-def _flaresolverr_check_sync() -> BannerCheck:
-    return _probe_url_sync("FlareSolverr", settings.FLARESOLVERR_URL.rsplit("/v1", 1)[0])
-
-
-def _flaresolverr_entry() -> BannerCheck | BannerLine:
-    if not settings.FLARESOLVERR_ENABLED:
-        return BannerLine(label="FlareSolverr", value="disabled by FLARESOLVERR_ENABLED=false")
-
-    return _flaresolverr_check_sync()
-
-
 def _redis_check_sync() -> BannerCheck:
     parsed = urlparse(settings.REDIS_URL)
     host = parsed.hostname or "localhost"
@@ -93,7 +82,6 @@ def service_banner_sections() -> list[BannerSection]:
             title="External services",
             entries=(
                 _searxng_check_sync(),
-                _flaresolverr_entry(),
                 _redis_check_sync(),
                 _blocklist_entry(),
                 BannerLine(label="NoVNC display", value=settings.NOVNC_DISPLAY_SIZE),

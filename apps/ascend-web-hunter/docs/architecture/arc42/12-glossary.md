@@ -10,7 +10,6 @@
 | **BaseStrategy** | Abstract base class (`src/reader/strategies/base_strategy.py`) that all six strategies implement. Defines `extract(url)` and `get_html(url)`. |
 | **BeautifulSoupStrategy** | Lightweight HTTP extraction using `curl_cffi` with Chrome120 TLS impersonation and BeautifulSoup HTML parsing. Strategy 1 in the chain. |
 | **TrafilaturaStrategy** | Same `curl_cffi` transport as BeautifulSoupStrategy; uses the Trafilatura extraction pipeline instead of BeautifulSoup for better boilerplate removal. Strategy 2. |
-| **FlareSolverrStrategy** | Delegates the HTTP request to a running FlareSolverr instance, which uses undetected-chromedriver to solve Cloudflare challenges. Saves `cf_clearance` cookies to `CookieManager`. Strategy 3. |
 | **PlaywrightStrategy** | Launches a real Chromium browser (headless=False) with `playwright-stealth` to mask automation fingerprints. Polls for network idle and checks for challenges at each iteration. Strategy 4. |
 | **CrawleeStrategy** | Uses Crawlee's `AdaptivePlaywrightCrawler` with geolocation context. More resilient to sites that detect standard Playwright. Strategy 5. |
 | **NoVNCStrategy** | Raises `HumanInterventionRequiredException` and spawns a background task that monitors the browser session for completed challenges. Strategy 6 (human-in-the-loop). |
@@ -32,8 +31,7 @@
 | **output_format** | Request field choosing between the flat `content` field (`text`, the default) and the structured article shape with title, author, date and sitename (`structured`). Not available together with `include_links`. See [ADR-007](../decisions/ADR-007-structured-output-and-readability-fallback.md). |
 | **session_expired** | Read outcome returned with HTTP 200 when a stored login for the target domain and profile no longer validates. No tier runs, and the message names the domain, the profile and the establish operation that fixes it. |
 | **Settings** | Pydantic-settings class (`src/config/config.py`). Reads from env vars and `.env` file. Single `settings` singleton imported across the codebase. |
-| **FlareSolverr** | Open-source proxy service that uses undetected-chromedriver to solve Cloudflare WAF challenges and return the solved HTML plus cookies. Runs as a separate container at port 8191 in the scrapper compose stack. |
 | **SearXNG** | Self-hosted meta-search engine that aggregates results from multiple search providers without exposing queries to those providers. Runs at port 9020 in the scrapper compose stack. See [ADR-004](../decisions/ADR-004-searxng-meta-search-backend.md). |
-| **curl_cffi** | Python library that provides an async HTTP client with TLS fingerprint impersonation. Used by strategies 1, 2, and 3 (`impersonate="chrome120"`) to avoid TLS-based bot detection. |
-| **trafilatura** | Python library for main-content extraction from HTML. Strips boilerplate (navigation, ads, footers). Used by `TrafilaturaStrategy` and `FlareSolverrStrategy`. |
+| **curl_cffi** | Python library that provides an async HTTP client with TLS fingerprint impersonation. Used by strategies 1 and 2 (`impersonate="chrome120"`) to avoid TLS-based bot detection. |
+| **trafilatura** | Python library for main-content extraction from HTML. Strips boilerplate (navigation, ads, footers). Used by `TrafilaturaStrategy`. |
 | **playwright-stealth** | Playwright plugin (`playwright_stealth`) that applies browser fingerprint masking patches to reduce Playwright detection by anti-bot systems. Used by `PlaywrightStrategy`. |

@@ -6,7 +6,6 @@ the helper methods return the proxy dict in the format each tier expects:
 
   - curl_cffi:       {"http": url, "https": url}
   - Playwright:      {"server": url} (may include username/password keys)
-  - FlareSolverr:    {"url": url}   (the 'proxy' field inside the request JSON)
 
 The same abstraction offers the customer-supplied crawl proxy
 CRAWL_PROXY_URL (design D7). It is used only by crawl jobs, never by single
@@ -19,7 +18,6 @@ only. The project never runs a proxy.
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any
 from urllib.parse import urlparse
 
 from src.config.config import settings
@@ -81,15 +79,6 @@ class ProxyProvider:
         if self._url is None:
             return None
         return _playwright_server(self._url)
-
-    def for_flaresolverr(self) -> dict[str, Any] | None:
-        """Return proxy dict for FlareSolverr's ``proxy`` payload field, or None."""
-        crawl = _crawl_url()
-        if crawl is not None:
-            return {"url": crawl}
-        if self._url is None:
-            return None
-        return {"url": self._url}
 
 
 proxy_provider = ProxyProvider()

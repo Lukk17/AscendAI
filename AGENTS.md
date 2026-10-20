@@ -184,7 +184,7 @@ Compose is split into two project files. The second is reached only through the 
 - **`compose.yaml`** (project `ascend-ai`) - main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
 - **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) - web-scraping stack, pulled in by the main file's `include:`.
 
-Both files use the same four fixed container names, `searxng`, `flaresolverr`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
+Both files use the same three fixed container names, `searxng`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
 
 ```bash
 docker compose down
@@ -224,7 +224,6 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 | Service | Port | Purpose |
 |---|---|---|
 | SearXNG | 9020 (bound to 127.0.0.1) | Privacy-respecting meta search engine |
-| FlareSolverr | 8191 (bound to 127.0.0.1) | Cloudflare bypass proxy for web scraping |
 | ascend-web-hunter | 7021 | Web search & scraping MCP |
 | ngrok-ascend-web-hunter | - | Ngrok tunnel for NoVNC CAPTCHA intervention |
 

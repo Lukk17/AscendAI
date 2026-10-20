@@ -10,13 +10,12 @@ The AscendAI repository runs this stack as part of a larger platform. That devel
 
 This directory is the deployment counterpart. It pulls published images instead of building, drops everything that depends on services which are not here, and is written for Docker Engine on Linux. The two are kept deliberately different, and every difference is listed under [Differences from the development stack](#differences-from-the-development-stack) below.
 
-Five containers run by default:
+Four containers run by default:
 
 | Container | Purpose | Reachable from |
 |---|---|---|
 | ascend-web-hunter | The service itself. REST API and MCP server. | Host, on port 7021 |
 | searxng | Meta-search engine the service queries. | Inside the stack only |
-| flaresolverr | Cloudflare challenge solver, runs its own Chrome. | Inside the stack only |
 | ngrok-ascend-web-hunter | Public tunnel to the NoVNC desktop for CAPTCHA solving. | Outbound only |
 | redis | Session/cookie cache, so a solved Cloudflare challenge stays solved across requests. | Inside the stack only |
 
@@ -28,14 +27,14 @@ Five containers run by default:
 |---|---|
 | Docker Engine | 20.10 or newer, with the Compose plugin |
 | Redis | Bundled and starts automatically with the stack. Point at your own instead; see below. |
-| Free RAM | Roughly 4.5 GB free, on top of whatever the host already uses. See [Resource footprint](#resource-footprint) |
+| Free RAM | Roughly 3.5 GB free, on top of whatever the host already uses. See [Resource footprint](#resource-footprint) |
 | CPU | 2 cores is enough. CPU contention costs scraping speed, not stability. |
 | Free port | 7021 on the host. Nothing else is published. |
 | Ngrok account | Free tier, for the CAPTCHA-intervention tunnel |
 
 Redis holds authentication cookies and Cloudflare clearance tokens between requests, so that a challenge solved once keeps working afterwards. Without it the service still runs, but every request starts from a cold session and `/ready` reports degraded.
 
-This bundle ships its own Redis as a fifth container, on by default, so the bundle stays self-contained without requiring you to run one yourself. `REDIS_URL` already defaults to this bundled instance, so nothing else needs setting: the plain quick-start command below is enough. Where Redis actually lives determines what `REDIS_URL` must be if you want something other than the bundled default:
+This bundle ships its own Redis as a fourth container, on by default, so the bundle stays self-contained without requiring you to run one yourself. `REDIS_URL` already defaults to this bundled instance, so nothing else needs setting: the plain quick-start command below is enough. Where Redis actually lives determines what `REDIS_URL` must be if you want something other than the bundled default:
 
 | Redis location | REDIS_URL | Note |
 |---|---|---|
@@ -77,15 +76,15 @@ All three secrets are required. Compose refuses to start and names the missing v
 
 ### Verifying it works
 
-Containers come up in order. SearXNG, FlareSolverr and Redis must report healthy before ascend-web-hunter is allowed to start. That takes about 30 to 60 seconds from cold, bounded by FlareSolverr launching Chrome; Redis reports healthy well before that.
+Containers come up in order. SearXNG and Redis must report healthy before ascend-web-hunter is allowed to start. That takes about 30 seconds from cold; Redis reports healthy well before that.
 
-Watch the status until all five are up and four show healthy (ngrok has no healthcheck).
+Watch the status until all four are up and three show healthy (ngrok has no healthcheck).
 
 ```bash
 docker compose ps
 ```
 
-Then ask the service itself. The readiness endpoint probes Redis, SearXNG and FlareSolverr and reports each one separately.
+Then ask the service itself. The readiness endpoint probes Redis and SearXNG and reports each one separately.
 
 ```bash
 curl -s http://localhost:7021/ready
@@ -158,7 +157,6 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | CHALLENGE_WEIGHT_MANY_LINKS | No | Weight of the many_links guard signal. Code default `-20` applies when unset. |
 | CHALLENGE_WEIGHT_PHRASE_TITLE | No | Weight of the phrase_title signal. Code default `60` applies when unset. |
 | CHALLENGE_WEIGHT_PHRASE_BODY | No | Weight of the phrase_body signal. Code default `30` applies when unset. |
-| FLARESOLVERR_ENABLED | No | Route reads through the 3-flaresolverr tier. Code default `false` applies when unset. |
 | CAMOUFOX_ENABLED | No | Route reads through the 4b-camoufox tier. Code default `true` applies when unset. |
 | TIER_MEMORY_TTL_SECONDS | No | TTL in seconds for the per-domain tier memory. Code default `86400` applies when unset. |
 | NETWORKIDLE_POLL_MS | No | Page-quiet poll interval in milliseconds for browser tiers. Code default `1000` applies when unset. |
@@ -244,14 +242,13 @@ The shipped numbers are sized for an 8 GB host that is already running other thi
 | Container | CPU limit | Memory limit | CPU reserved | Memory reserved |
 |---|---|---|---|---|
 | ascend-web-hunter | 1.5 | 2560M | 0.25 | 512M |
-| flaresolverr | 1.0 | 1280M | 0.15 | 256M |
 | searxng | 0.5 | 384M | 0.1 | 128M |
 | ngrok-ascend-web-hunter | 0.25 | 96M | 0.05 | 32M |
 | redis | 0.25 | 256M | 0.05 | 64M |
 
-Memory ceilings total 4.5 GB, with the bundled Redis running as it does by default. Scale Redis to zero to use an external instance instead and the ceiling drops to 4.2 GB. Reservations, which is what the stack actually holds at rest, total about 1.0 GB and 0.6 CPU with the bundled Redis running, or about 0.9 GB and 0.55 CPU with it scaled to zero. Redis's own 256M ceiling is sized against its measured 46 MiB peak elsewhere on the platform (`docs/architecture/memory-budget.md`), with headroom for session growth.
+Memory ceilings total 3.3 GB, with the bundled Redis running as it does by default. Scale Redis to zero to use an external instance instead and the ceiling drops to 3.0 GB. Reservations, which is what the stack actually holds at rest, total about 0.7 GB and 0.45 CPU with the bundled Redis running, or about 0.7 GB and 0.4 CPU with it scaled to zero. Redis's own 256M ceiling is sized against its measured 46 MiB peak elsewhere on the platform (`docs/architecture/memory-budget.md`), with headroom for session growth.
 
-Do the arithmetic before deploying. Take the host's total RAM, subtract what it already uses, and the remainder must exceed 4.5 GB, the stack's default footprint, with something left over for page cache. Scaling the bundled Redis to zero to use an external instance instead brings that down to 4.2 GB. On an 8 GB host already using 2.3 GB, that leaves 5.7 GB free, the stack can claim at most 4.5 GB of it, and a little over 1 GB stays spare. On a 4 GB host these numbers do not fit and the stack will start killing containers under load.
+Do the arithmetic before deploying. Take the host's total RAM, subtract what it already uses, and the remainder must exceed 3.3 GB, the stack's default footprint, with something left over for page cache. Scaling the bundled Redis to zero to use an external instance instead brings that down to 3.0 GB. On an 8 GB host already using 2.3 GB, that leaves 5.7 GB free, the stack can claim at most 3.3 GB of it, and over 2 GB stays spare. On a 4 GB host these numbers do not fit and the stack will start killing containers under load.
 
 Two things interact and are easy to miss.
 
@@ -293,7 +290,7 @@ docker compose up -d ascend-web-hunter
 
 Published tags are listed at [hub.docker.com/r/lukk17/ascend-ai-ascend-web-hunter/tags](https://hub.docker.com/r/lukk17/ascend-ai-ascend-web-hunter/tags). The same images are published to `ghcr.io/lukk17/ascend-ai-ascend-web-hunter` if you prefer GitHub's registry. Both are public and neither needs a login to pull.
 
-Upstream images, SearXNG, FlareSolverr, and the bundled Redis, are pinned too. SearXNG ships a new build most days and its search engines break as the sites they scrape change, so it is worth bumping every few months even when nothing appears wrong.
+Upstream images, SearXNG and the bundled Redis, are pinned too. SearXNG ships a new build most days and its search engines break as the sites they scrape change, so it is worth bumping every few months even when nothing appears wrong.
 
 ---
 
@@ -301,7 +298,7 @@ Upstream images, SearXNG, FlareSolverr, and the bundled Redis, are pinned too. S
 
 The service has no authentication. Anything that can reach port 7021 can make it fetch arbitrary URLs. That is fine on a trusted network and not fine on an untrusted one. If the host is exposed beyond your own network, put it behind a reverse proxy with authentication rather than publishing the port directly.
 
-SearXNG and FlareSolverr publish no ports at all here. They are reachable only from inside the stack. FlareSolverr in particular will fetch any URL handed to it, so exposing it to a wider network hands out a request-forwarding tool.
+SearXNG publishes no ports at all here. It is reachable only from inside the stack.
 
 The container runs with `SYS_ADMIN` capability, which Chromium's sandbox needs. It is rendering untrusted web content with an elevated capability, which is worth knowing about even though it is the standard way to run a browser in a container.
 
@@ -315,7 +312,6 @@ The equivalent file in the repository root is `compose.ascend-web-hunter.yaml`. 
 |---|---|---|
 | ascend-web-hunter image | Built from source with `build:` | Pulled, pinned to a published version tag |
 | SearXNG port 9020 | Published on 127.0.0.1 through `SEARXNG_HOST_PORT` so the service can run natively against it | Not published |
-| FlareSolverr port 8191 | Published on 127.0.0.1 through `FLARESOLVERR_HOST_PORT` for the same reason | Not published |
 | OTEL variables | Set, pointing at the platform collector | Absent |
 | VNC_PASSWORD | Optional. Unset means an unauthenticated desktop and a warning at boot, which is acceptable because port 7900 is not published locally | Required. Compose refuses to start without it |
 | NGROK_AUTHTOKEN | Optional | Required |
@@ -324,7 +320,7 @@ The equivalent file in the repository root is `compose.ascend-web-hunter.yaml`. 
 | shm_size | 2gb | 1gb, to fit inside the smaller memory ceiling |
 | REDIS_URL default | `redis://host.docker.internal:6379/0`, the development machine's own external-prerequisite Redis | `redis://redis:6379/0`, the bundled Redis below, since this bundle is meant to be self-contained |
 | redis service activation | Gated behind the `redis` Compose profile: off by default, since this host already runs its own Redis as an external prerequisite and a second instance would split session data | Runs unconditionally: this bundle has no external Redis to fall back to, so it must always be present for the bundle to stay self-contained |
-| ascend-web-hunter `depends_on` redis | Absent. Compose refuses to resolve a `depends_on` that crosses a profile boundary, so a profiled `redis` cannot be a dependency here | Present, `condition: service_healthy`, now that the profile boundary is gone. Costs no measurable startup time, since Redis's health arrives well before searxng's or flaresolverr's |
+| ascend-web-hunter `depends_on` redis | Absent. Compose refuses to resolve a `depends_on` that crosses a profile boundary, so a profiled `redis` cannot be a dependency here | Present, `condition: service_healthy`, now that the profile boundary is gone. Costs no measurable startup time, since Redis's health arrives well before searxng's |
 | redis service `container_name` | `ascend-scrapper-redis`, to avoid colliding with the development machine's own pre-existing `redis` container | `redis`, matching every other service in this file; no such collision exists on this bundle's target host |
 | redis service volume | None. The profile is meant for occasional local testing of this bundle, and the development machine's own Redis already persists its own data | `redisdata`, since a lost session here means a human re-solving every Cloudflare challenge by hand |
 | ALLOWED_PRIVATE_HOSTS | Passed from `WEB_HUNTER_ALLOWED_PRIVATE_HOSTS`, empty by default and set only by the start command of an end-to-end sweep | Absent. The bundle passes no allow list to the service |

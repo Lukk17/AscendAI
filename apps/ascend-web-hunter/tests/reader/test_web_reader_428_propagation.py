@@ -29,10 +29,6 @@ async def test_read_with_links_propagates_428_when_novnc_raises() -> None:
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
-            new=AsyncMock(return_value=""),
-        ),
-        patch(
             "src.reader.strategies.playwright_strategy.PlaywrightStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
@@ -96,10 +92,6 @@ async def test_read_propagates_novnc_busy_instead_of_swallowing_it() -> None:
         ),
         patch(
             "src.reader.strategies.trafilatura_strategy.TrafilaturaStrategy.get_html",
-            new=AsyncMock(return_value=""),
-        ),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.FlareSolverrStrategy.get_html",
             new=AsyncMock(return_value=""),
         ),
         patch(

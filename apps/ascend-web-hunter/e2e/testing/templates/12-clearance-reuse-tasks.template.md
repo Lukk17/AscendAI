@@ -11,7 +11,6 @@ go. Record both calls' `mode` and `responseTime` under Additional tasks I did.
 
 - [ ] `bru --version` returns a version string.
 - [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
-- [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable).
 - [ ] `docker exec redis redis-cli PING` returns `PONG`.
 
 ### Reset state

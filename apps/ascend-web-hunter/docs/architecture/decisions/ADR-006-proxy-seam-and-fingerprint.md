@@ -4,6 +4,13 @@
 
 Accepted - 2026-06-15
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+The proxy seam loses its FlareSolverr branch: `ProxyProvider.for_flaresolverr`
+is deleted, and the FlareSolverr row of the proxy table no longer applies.
+The curl and Playwright branches are unchanged. The rest of this record is
+unchanged. See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
 ## Context
 
 Anti-bot systems on target sites (LinkedIn, Cloudflare-protected domains) detect automation using several signals:

@@ -7,7 +7,7 @@ Change close-web-search-scraping-follow-ups, task 2.1.
 import time
 from typing import Any
 
-from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, CookieManager
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC, CookieManager
 
 _URL = "https://example.com/article"
 
@@ -37,7 +37,7 @@ async def test_a_captured_login_has_auth_cookies() -> None:
     # given
     manager = _fresh()
     await manager.save_storage_state(
-        _URL, {"cookies": [_cookie("li_at")], "origins": []}, "ua", None, PRODUCED_BY_FLARESOLVERR
+        _URL, {"cookies": [_cookie("li_at")], "origins": []}, "ua", None, PRODUCED_BY_NOVNC
     )
 
     # when / then
@@ -59,7 +59,7 @@ async def test_a_lapsed_login_still_has_auth_cookies() -> None:
 async def test_a_waf_only_record_has_no_auth_cookies() -> None:
     # given
     manager = _fresh()
-    await manager.save_flat_cookies(_URL, {"cf_clearance": "x"}, "ua", None, PRODUCED_BY_FLARESOLVERR)
+    await manager.save_flat_cookies(_URL, {"cf_clearance": "x"}, "ua", None, PRODUCED_BY_NOVNC)
 
     # when / then
     assert await manager.has_auth_cookies(_URL) is False
@@ -88,7 +88,7 @@ async def test_a_waf_only_record_is_still_a_session_record() -> None:
     session apart from one that was never established."""
     # given
     manager = _fresh()
-    await manager.save_flat_cookies(_URL, {"cf_clearance": "x"}, "ua", None, PRODUCED_BY_FLARESOLVERR)
+    await manager.save_flat_cookies(_URL, {"cf_clearance": "x"}, "ua", None, PRODUCED_BY_NOVNC)
 
     # when / then
     assert await manager.has_session_record(_URL) is True

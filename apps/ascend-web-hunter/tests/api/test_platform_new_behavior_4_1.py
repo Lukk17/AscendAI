@@ -181,10 +181,6 @@ async def test_ready_not_ready_body_on_503(client: AsyncClient) -> None:
             new=AsyncMock(return_value=ProbeResult(status="error")),
         ),
         patch(
-            "src.api.readiness.probe_flaresolverr",
-            new=AsyncMock(return_value=ProbeResult(status="ok")),
-        ),
-        patch(
             "src.api.readiness.probe_redis",
             new=AsyncMock(return_value=ProbeResult(status="skipped")),
         ),
@@ -192,13 +188,9 @@ async def test_ready_not_ready_body_on_503(client: AsyncClient) -> None:
             "src.api.readiness.probe_searxng_breaker",
             return_value=ProbeResult(status="ok"),
         ),
-        patch(
-            "src.api.readiness.probe_flaresolverr_breaker",
-            return_value=ProbeResult(status="ok"),
-        ),
     )
     # when
-    with probes_down[0], probes_down[1], probes_down[2], probes_down[3], probes_down[4]:
+    with probes_down[0], probes_down[1], probes_down[2]:
         response = await client.get("/ready")
     # then
     assert response.status_code == 503

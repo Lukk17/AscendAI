@@ -109,7 +109,6 @@ def test_tier_order_lists_the_patched_tiers_between_playwright_and_crawlee() -> 
     assert list(TIER_ORDER) == [
         "1-beautifulsoup",
         "2-trafilatura",
-        "3-flaresolverr",
         "4-playwright_stealth",
         "4a-patchright",
         "4b-camoufox",
@@ -119,24 +118,18 @@ def test_tier_order_lists_the_patched_tiers_between_playwright_and_crawlee() -> 
 
 
 @pytest.mark.asyncio
-async def test_disabled_flaresolverr_is_skipped_from_the_chain() -> None:
+async def test_stored_session_starts_at_the_browser_tiers() -> None:
     # when
-    with patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", False):
+    with (
+        patch(
+            "src.reader.web_reader.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value={"cookies": [{"name": "li_at", "value": "x"}], "origins": []}),
+        ),
+    ):
         selected = await WebReader()._select_strategies(_URL, heavy_mode=False)
 
     # then
-    assert "3-flaresolverr" not in selected
-    assert next(iter(selected)) == "1-beautifulsoup"
-
-
-@pytest.mark.asyncio
-async def test_enabled_flaresolverr_stays_in_the_chain() -> None:
-    # when
-    with patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", True):
-        selected = await WebReader()._select_strategies(_URL, heavy_mode=False)
-
-    # then
-    assert "3-flaresolverr" in selected
+    assert next(iter(selected)) == "4-playwright_stealth"
 
 
 @pytest.mark.asyncio
@@ -165,27 +158,22 @@ async def test_caller_tier_outranks_memory() -> None:
 
 
 @pytest.mark.asyncio
-async def test_session_producer_outranks_memory() -> None:
+async def test_stored_session_outranks_memory() -> None:
     # when
     with (
         patch(
             "src.reader.web_reader.tier_memory.get",
             new=AsyncMock(return_value="2-trafilatura"),
         ),
-        patch("src.reader.web_reader.settings.FLARESOLVERR_ENABLED", True),
         patch(
             "src.reader.web_reader.cookie_manager.get_storage_state",
             new=AsyncMock(return_value={"cookies": [{"name": "li_at", "value": "x"}], "origins": []}),
-        ),
-        patch(
-            "src.reader.web_reader.cookie_manager.get_stored_session_producer",
-            new=AsyncMock(return_value="3-flaresolverr"),
         ),
     ):
         selected = await WebReader()._select_strategies(_URL, heavy_mode=False)
 
     # then
-    assert next(iter(selected)) == "3-flaresolverr"
+    assert next(iter(selected)) == "4-playwright_stealth"
 
 
 @pytest.mark.asyncio

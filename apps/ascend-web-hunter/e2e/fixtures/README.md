@@ -5,7 +5,7 @@ string arguments only - no file uploads.
 
 - `session-clear-seed.json` - a synthetic minimal `storage_state` record used by test 8
   ([../testing/8-session-clear-test.md](../testing/8-session-clear-test.md)) to seed a session for `example.net`
-  directly in Redis, without a login flow, FlareSolverr, or a human. `docker cp`'d into the `redis` container and
+  directly in Redis, without a login flow, a browser tier, or a human. `docker cp`'d into the `redis` container and
   loaded via `redis-cli -x SETEX ... < file`, since piping the JSON through a shell pipe corrupts it (PowerShell
   prepends a BOM, bash treats a bare quoted string as a command).
 - `session-status-expired-seed.json` - the same kind of synthetic `storage_state` record, used by test 9

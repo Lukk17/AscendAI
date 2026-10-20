@@ -32,8 +32,8 @@ of the hop that returned it first, as RFC 9110 section 10.2.2 requires, and the 
 that same check, so an ordinary relative redirect is followed and one that resolves onto an internal address is
 still refused. Those tiers also pin what they
 connect to: the socket opens against an address the guard authorised rather than
-against a second, possibly different, answer to a second lookup. FlareSolverr and Crawlee fetch out of process, and
-Playwright and NoVNC fetch through a browser the pool launches once, so all four keep pre-dispatch validation only
+against a second, possibly different, answer to a second lookup. Crawlee fetches out of process, and
+Playwright and NoVNC fetch through a browser the pool launches once, so all three keep pre-dispatch validation only
 and their rebinding window is accepted residual risk. Both halves are recorded in
 [ADR-012](../decisions/ADR-012-connect-time-address-pinning.md).
 

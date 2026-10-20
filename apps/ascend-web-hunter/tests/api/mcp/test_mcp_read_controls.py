@@ -21,15 +21,14 @@ _SESSION_EXPIRED_FIELDS = ["content", "status", "profile", "message"]
 @pytest.mark.asyncio
 async def test_web_read_forwards_output_format_and_tier() -> None:
     # given
-    result = {"content": "X", "status": "success", "mode": "3-flaresolverr"}
+    result = {"content": "X", "status": "success", "mode": "4-playwright_stealth"}
 
     # when
     with (
         patch(_GUARD, return_value=True),
-        patch("src.api.mcp.mcp_server.settings.FLARESOLVERR_ENABLED", True),
         patch(_READ, new_callable=AsyncMock, return_value=result) as mock_read,
     ):
-        await web_read(_URL, output_format="structured", tier="3-flaresolverr", extraction_schema=None)
+        await web_read(_URL, output_format="structured", tier="4-playwright_stealth", extraction_schema=None)
 
     # then
     mock_read.assert_awaited_once_with(
@@ -37,7 +36,7 @@ async def test_web_read_forwards_output_format_and_tier() -> None:
         heavy_mode=False,
         profile=None,
         output_format="structured",
-        tier="3-flaresolverr",
+        tier="4-playwright_stealth",
         extraction_schema=None,
     )
 

@@ -222,18 +222,6 @@ The settings of `ascend-memory` are listed in its own reference, [apps/ascend-me
 
 ---
 
-### flaresolverr
-
-| Service | Variable | Default | What it does | Added by |
-| :------ | :------- | :------ | :----------- | :------- |
-| `flaresolverr` | `FLARESOLVERR_HOST_PORT` | `8191` | The loopback host port of FlareSolverr, and a native run with a changed value also sets `FLARESOLVERR_URL` | `fix-linux-docker-host-access` |
-| `flaresolverr` | `LOG_LEVEL` | `info` | Fixed in `compose.ascend-web-hunter.yaml`. FlareSolverr log level. | `existing` |
-| `flaresolverr` | `LOG_HTML` | `false` | Fixed in `compose.ascend-web-hunter.yaml`. HTML log output toggle. | `existing` |
-| `flaresolverr` | `CAPTCHA_SOLVER` | `none` | Fixed in `compose.ascend-web-hunter.yaml`. CAPTCHA solver selection. | `existing` |
-| `flaresolverr` | `TZ` | `UTC` | Fixed in `compose.ascend-web-hunter.yaml`. Container timezone. | `existing` |
-
----
-
 ### redis
 
 No setting.

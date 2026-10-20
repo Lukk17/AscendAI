@@ -22,7 +22,6 @@ graph TB
             subgraph "strategies"
                 bs["strategies/beautifulsoup_strategy.py"]
                 traf["strategies/trafilatura_strategy.py"]
-                flare["strategies/flaresolverr_strategy.py"]
                 pw["strategies/playwright_strategy.py"]
                 crawlee["strategies/crawlee_strategy.py"]
                 novnc["strategies/novnc_strategy.py"]
@@ -66,7 +65,6 @@ graph TB
     mcp --> url
     webreader --> bs
     webreader --> traf
-    webreader --> flare
     webreader --> pw
     webreader --> crawlee
     webreader --> novnc
@@ -74,7 +72,6 @@ graph TB
     webreader --> detector
     bs --> cookies
     traf --> cookies
-    flare --> cookies
     novnc --> cookies
     pw --> url
     crawlee --> url
@@ -94,7 +91,6 @@ graph TB
 | `WebReader` | `src/reader/web_reader.py` | Ordered dict of six strategies. Iterates until `ContentValidator` passes or all strategies exhausted. |
 | `BeautifulSoupStrategy` | `src/reader/strategies/beautifulsoup_strategy.py` | `curl_cffi` Chrome120 impersonation + BeautifulSoup parse. Reads cached session from `CookieManager`. |
 | `TrafilaturaStrategy` | `src/reader/strategies/trafilatura_strategy.py` | Same `curl_cffi` transport; Trafilatura extraction pipeline instead of BeautifulSoup. |
-| `FlareSolverrStrategy` | `src/reader/strategies/flaresolverr_strategy.py` | Posts URL to FlareSolverr, parses solved HTML with Trafilatura, saves `cf_clearance` to `CookieManager`. |
 | `PlaywrightStrategy` | `src/reader/strategies/playwright_strategy.py` | Headless=False Chromium with `playwright-stealth`. Polls for network idle; runs adblock route filter. |
 | `CrawleeStrategy` | `src/reader/strategies/crawlee_strategy.py` | Crawlee `AdaptivePlaywrightCrawler`; geolocation context; adblock route filter. |
 | `NoVNCStrategy` | `src/reader/strategies/novnc_strategy.py` | Spawns background cookie monitor; raises `HumanInterventionRequiredException` with resolved VNC URL. |

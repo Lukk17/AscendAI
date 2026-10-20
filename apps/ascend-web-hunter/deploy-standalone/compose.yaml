@@ -45,36 +45,6 @@ services:
         aliases:
           - searxng
 
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
-    container_name: flaresolverr
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      - LOG_LEVEL=info
-      - LOG_HTML=false
-      - CAPTCHA_SOLVER=none
-      - TZ=UTC
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8191/health"]
-      interval: 10s
-      timeout: 5s
-      start_period: 60s
-      retries: 5
-    deploy:
-      resources:
-        # Runs its own Chrome, which is why this is the second-largest budget.
-        limits:
-          cpus: "1.0"
-          memory: 1280M
-        reservations:
-          cpus: "0.15"
-          memory: 256M
-    networks:
-      default:
-        aliases:
-          - flaresolverr
-
   # ─── Bundled Redis ───
 
   # Runs unconditionally: this bundle has no operator-supplied Redis to fall
@@ -86,8 +56,8 @@ services:
   #
   # ascend-web-hunter below waits for this container to report healthy
   # before starting (depends_on, condition: service_healthy), the same way
-  # it already waits on searxng and flaresolverr. Redis's own start_period
-  # is 10s against searxng's 30s and flaresolverr's 60s, so this adds no
+  # it already waits on searxng. Redis's own start_period
+  # is 10s against searxng's 30s, so this adds no
   # measurable startup time; it only closes the race where the first request
   # after a cold start would otherwise hit ascend-web-hunter before Redis is
   # ready and get an avoidably degraded response. ascend-web-hunter's own
@@ -207,8 +177,6 @@ services:
       - SEARXNG_X_FORWARDED_FOR=0.0.0.0
       - BLOCKLIST_URL=https://secure.fanboy.co.nz/fanboy-annoyance.txt
       - VALIDATION_MIN_WORDS=10
-      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
-      - FLARESOLVERR_ENABLED=${FLARESOLVERR_ENABLED:-false}
       - CAMOUFOX_ENABLED=${CAMOUFOX_ENABLED:-true}
       - TIER_MEMORY_TTL_SECONDS=${TIER_MEMORY_TTL_SECONDS:-86400}
       - NETWORKIDLE_POLL_MS=${NETWORKIDLE_POLL_MS:-1000}
@@ -276,8 +244,6 @@ services:
     shm_size: "1gb"
     depends_on:
       searxng:
-        condition: service_healthy
-      flaresolverr:
         condition: service_healthy
       redis:
         condition: service_healthy

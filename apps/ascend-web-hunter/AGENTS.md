@@ -92,20 +92,19 @@ docker build -t ascend-web-hunter:latest .
   (`human_intervention_required`, `novnc_busy`, `session_expired`) are successful tool results, not errors, and
   keep their `status`-keyed shape.
 - `/health` answers `200 {"status": "ok", "service": "ascend-web-hunter", "version": ...}` without touching a
-  dependency. `/ready` aggregates the `redis`, `searxng`, `flaresolverr`, `searxng_breaker`, and
-  `flaresolverr_breaker` probes and answers `200 {"status": "ready", ...}` or `503 {"status": "not-ready", ...}`.
+  dependency. `/ready` aggregates the `redis`, `searxng`, and `searxng_breaker` probes and answers
+  `200 {"status": "ready", ...}` or `503 {"status": "not-ready", ...}`.
 - Logging comes from the library (`LOG_LEVEL` honoured, `LOG_FORMAT` selects `json` or `color`, lines start with
   `[ascend-web-hunter]`). There is no service `logging_config.py` and no `log_config` argument on `uvicorn.run`.
 
 **Multi-tiered extraction strategy** (escalation order):
 1. `1-beautifulsoup` - fast, lightweight HTTP client
 2. `2-trafilatura` - fast, lightweight HTTP client
-3. `3-flaresolverr` - Cloudflare bypass proxy (only while `FLARESOLVERR_ENABLED=true`, default `false`)
-4. `4-playwright_stealth` - headless browser automation
-5. `4a-patchright` - patched Chromium build
-6. `4b-camoufox` - Firefox-family fingerprint (only while `CAMOUFOX_ENABLED=true`, default `true`)
-7. `5-crawlee_adaptive` - adaptive crawler
-8. `6-novnc` - human intervention for complex CAPTCHAs (via Ngrok tunnel)
+3. `4-playwright_stealth` - headless browser automation
+4. `4a-patchright` - patched Chromium build
+5. `4b-camoufox` - Firefox-family fingerprint (only while `CAMOUFOX_ENABLED=true`, default `true`)
+6. `5-crawlee_adaptive` - adaptive crawler
+7. `6-novnc` - human intervention for complex CAPTCHAs (via Ngrok tunnel)
 
 A domain that succeeded at a tier before restarts at the remembered tier for `TIER_MEMORY_TTL_SECONDS`
 (default `86400`). Browser waits `NETWORKIDLE_POLL_MS` (default `1000`) and `SCROLL_PAUSE_MS` (default
@@ -128,7 +127,6 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 ## Key Dependencies
 
 - SearXNG (port 9020 via docker-compose)
-- FlareSolverr (port 8191) for Cloudflare bypass
 - Redis (port 6379) for session persistence. External prerequisite in the development stack; bundled and runs unconditionally in `deploy-standalone/` (no published ports either way)
 - Ngrok for NoVNC tunnel (optional, for CAPTCHA intervention)
 - Playwright for browser automation
@@ -152,8 +150,6 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 
 `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
 `ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`.
-- `FLARESOLVERR_URL` - FlareSolverr endpoint
-- `FLARESOLVERR_ENABLED` - Route reads through the 3-flaresolverr tier (default: `false`)
 - `CAMOUFOX_ENABLED` - Route reads through the 4b-camoufox tier (default: `true`)
 - `TIER_MEMORY_TTL_SECONDS` - TTL in seconds for the per-domain tier memory (default: `86400`)
 - `EXTRACTION_SCHEMA_MAX_BYTES` - Maximum size in bytes of the caller-supplied extraction schema (default: `16384`)
@@ -249,8 +245,8 @@ The full reference, including every timeout and threshold, is [docs/configuratio
 
 Two compose files run this service and they are deliberately different:
 
-- `../../compose.ascend-web-hunter.yaml` at the repo root. Development. Builds from source, publishes SearXNG and
-  FlareSolverr on loopback so the service can run natively against them, exports OTLP telemetry to the platform
+- `../../compose.ascend-web-hunter.yaml` at the repo root. Development. Builds from source, publishes SearXNG
+  on loopback so the service can run natively against it, exports OTLP telemetry to the platform
   collector.
 - [`deploy-standalone/compose.yaml`](deploy-standalone/README.md). Standalone single-host deployment. Pulls published images pinned to
   a version tag, publishes nothing but port 7021, no telemetry, requires `VNC_PASSWORD`.
@@ -259,7 +255,7 @@ The full list of intended differences is in [deploy-standalone/README.md](deploy
 identical in both files.
 
 The development file and the main stack (`../../compose.yaml`, project `ascend-ai`, which pulls the development file in through
-`include:`) use the same four fixed container names, `searxng`, `flaresolverr`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`,
+`include:`) use the same three fixed container names, `searxng`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`,
 so only one of the two projects runs at a time. Switching means `docker compose down` on the project you leave, which removes its
 containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create
 its containers with a name conflict. Running the development file alone (project `ascend-scrapper`) on a host without its own

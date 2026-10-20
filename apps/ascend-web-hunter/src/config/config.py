@@ -210,14 +210,6 @@ class Settings(ServiceSettings):
         description="Keywords indicating extraction failure",
     )
 
-    FLARESOLVERR_URL: str = Field(
-        default="http://localhost:8191/v1",
-        description="URL for FlareSolverr instance",
-    )
-    FLARESOLVERR_ENABLED: bool = Field(
-        default=False,
-        description="Route reads through the 3-flaresolverr tier. Off by default for one release.",
-    )
     CAMOUFOX_ENABLED: bool = Field(
         default=True,
         description="Route reads through the 4b-camoufox tier. Disable on hosts with little memory.",

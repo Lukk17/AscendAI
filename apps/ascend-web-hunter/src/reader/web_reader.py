@@ -31,7 +31,7 @@ from src.observability.metrics import (
 from src.reader import tier_memory
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import assess, log_verdict, record_verdict
-from src.reader.cloudflare.cookie_manager import PRODUCED_BY_FLARESOLVERR, cookie_manager
+from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.document_router import route_document
 from src.reader.extraction import extract_structured, extract_tables, extract_text_with_fallback
 from src.reader.link_annotator import annotate_links
@@ -45,7 +45,6 @@ from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
 from src.reader.strategies.camoufox_strategy import CamoufoxStrategy
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
-from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
 from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from src.reader.strategies.patchright_strategy import PatchrightStrategy
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
@@ -62,7 +61,6 @@ SESSION_EXPIRED_STATUS = "session_expired"
 TierName = Literal[
     "1-beautifulsoup",
     "2-trafilatura",
-    "3-flaresolverr",
     "4-playwright_stealth",
     "4a-patchright",
     "4b-camoufox",
@@ -76,7 +74,6 @@ OutputFormat = Literal["text", "structured", "schema", "tables", "screenshot"]
 TIER_ORDER: tuple[TierName, ...] = (
     "1-beautifulsoup",
     "2-trafilatura",
-    "3-flaresolverr",
     "4-playwright_stealth",
     "4a-patchright",
     "4b-camoufox",
@@ -136,7 +133,6 @@ class WebReader:
         all_strategies: dict[str, BaseStrategy] = {
             "1-beautifulsoup": BeautifulSoupStrategy(self._get_random_user_agent, profile),
             "2-trafilatura": TrafilaturaStrategy(self._get_random_user_agent, profile),
-            PRODUCED_BY_FLARESOLVERR: FlareSolverrStrategy(profile),
             "4-playwright_stealth": PlaywrightStrategy(
                 self._get_random_user_agent, self.url_validator, profile
             ),
@@ -189,12 +185,6 @@ class WebReader:
         """Skip tiers the operator switched off. A caller that names a disabled
         tier explicitly is answered by the caller, not by silently running past
         it, so the drop applies only to the unselected chain."""
-        if not settings.FLARESOLVERR_ENABLED:
-            strategies = {
-                name: strategy
-                for name, strategy in strategies.items()
-                if name != PRODUCED_BY_FLARESOLVERR
-            }
         if not settings.CAMOUFOX_ENABLED:
             strategies = {
                 name: strategy for name, strategy in strategies.items() if name != _CAMOUFOX_TIER_NAME
@@ -214,8 +204,6 @@ class WebReader:
         """Refuse a caller-selected tier the operator switched off. The drop in
         `_drop_disabled_tiers` only applies to the unselected chain; naming a
         disabled tier is answered, never silently run past."""
-        if tier == PRODUCED_BY_FLARESOLVERR and not settings.FLARESOLVERR_ENABLED:
-            raise TierDisabledError(PRODUCED_BY_FLARESOLVERR)
         if tier == _CAMOUFOX_TIER_NAME and not settings.CAMOUFOX_ENABLED:
             raise TierDisabledError(_CAMOUFOX_TIER_NAME)
 
@@ -249,16 +237,6 @@ class WebReader:
                 return self._from_tier(strategies, cast("TierName", remembered))
 
             return strategies
-
-        if not heavy_mode:
-            producer = await cookie_manager.get_stored_session_producer(url, profile)
-            if producer == PRODUCED_BY_FLARESOLVERR and settings.FLARESOLVERR_ENABLED:
-                return {
-                    PRODUCED_BY_FLARESOLVERR: strategies[PRODUCED_BY_FLARESOLVERR],
-                    **self._browser_tiers(strategies),
-                }
-            if producer == PRODUCED_BY_FLARESOLVERR:
-                return self._browser_tiers(strategies)
 
         return self._browser_tiers(strategies)
 

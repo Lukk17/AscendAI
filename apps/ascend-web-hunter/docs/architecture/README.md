@@ -21,7 +21,7 @@
 | :--- | :--- | :--- |
 | 1 | [Introduction and goals](arc42/01-introduction-and-goals.md) | What the service does and who depends on it |
 | 2 | [Constraints](arc42/02-constraints.md) | Python 3.12, Playwright base image, single-process, external service dependencies |
-| 3 | [Context and scope](arc42/03-context-and-scope.md) | ascend-ai-agent caller, SearXNG, FlareSolverr, Ngrok, Redis |
+| 3 | [Context and scope](arc42/03-context-and-scope.md) | ascend-ai-agent caller, SearXNG, Ngrok, Redis |
 | 4 | [Solution strategy](arc42/04-solution-strategy.md) | Dual surface, ordered strategy chain, 428 human-intervention protocol |
 | 5 | [Building block view](arc42/05-building-block-view.md) | Module map: api, reader, search, validator, config |
 | 6 | [Runtime view](arc42/06-runtime-view.md) | Search path, extraction escalation, NoVNC trigger |

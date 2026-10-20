@@ -11,7 +11,6 @@ Add anything you did beyond the spec under **Additional tasks I did**.
 
 - [ ] `bru --version` returns a version string.
 - [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
-- [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable, needed for row 2).
 - [ ] `curl -fsS https://en.wikipedia.org/wiki/Web_scraping` returns HTTP 200 (host outbound HTTPS works).
 - [ ] The `<script>`-stripped raw markup of `https://quotes.toscrape.com/js/` does NOT contain
   `The world as we have created it` (the spec's `Invoke-WebRequest` one-liner prints `False`), confirming row 3's
@@ -40,7 +39,7 @@ Add anything you did beyond the spec under **Additional tasks I did**.
 - [ ] Row 1: the content field, lowercased, contains `"web scraping"`.
 - [ ] Row 2: `status="success"` with content length ≥ 50 (Cloudflare challenge solved, not the block page).
 - [ ] Row 3: content contains `"The world as we have created it"`, and the `mode` from step 4 is one of
-  `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive`, or the NoVNC tier, never `1-beautifulsoup` or
+  `4-playwright_stealth`, `4a-patchright`, `4b-camoufox`, `5-crawlee_adaptive`, or the NoVNC tier, never `1-beautifulsoup` or
   `2-trafilatura` (proves a browser executed the page JS).
 
 ### Verdict

@@ -20,6 +20,13 @@ purposes.
   same SSRF guard and connect-time pinning as a single read. Tests run the Lua scripts through
   `fakeredis` (Lua support via `lupa`).
 
+### Removed
+- The `3-flaresolverr` tier, its strategy, its `FLARESOLVERR_URL` and `FLARESOLVERR_ENABLED`
+  settings, its `flaresolverr` container in both compose files, and its readiness probes, banner
+  entry, circuit breaker, proxy branch and cookie producer constant. Passing `3-flaresolverr`
+  is refused like any value outside the allowed set, and no future tier reuses the name or the
+  number 3 (ADR-018).
+
 ## [0.0.12] - <release date>
 
 ### Added

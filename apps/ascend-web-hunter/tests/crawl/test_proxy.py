@@ -18,7 +18,6 @@ def test_single_read_never_uses_crawl_proxy(monkeypatch: pytest.MonkeyPatch) -> 
     # then it uses PROXY_URL only
     assert provider.for_curl_cffi() == {"http": "http://proxy:8080", "https": "http://proxy:8080"}
     assert provider.for_playwright() == {"server": "http://proxy:8080"}
-    assert provider.for_flaresolverr() == {"url": "http://proxy:8080"}
 
 
 def test_crawl_uses_crawl_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -33,7 +32,6 @@ def test_crawl_uses_crawl_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
             "https": "http://crawl-proxy:8080",
         }
         assert provider.for_playwright() == {"server": "http://crawl-proxy:8080"}
-        assert provider.for_flaresolverr() == {"url": "http://crawl-proxy:8080"}
 
     # and the context does not leak into later single reads
     assert provider.for_curl_cffi() == {"http": "http://proxy:8080", "https": "http://proxy:8080"}
@@ -48,7 +46,6 @@ def test_crawl_without_crawl_proxy_keeps_direct_egress(monkeypatch: pytest.Monke
     with crawl_proxy():
         assert provider.for_curl_cffi() is None
         assert provider.for_playwright() is None
-        assert provider.for_flaresolverr() is None
 
 
 def test_crawl_proxy_credentials_split_for_playwright(monkeypatch: pytest.MonkeyPatch) -> None:

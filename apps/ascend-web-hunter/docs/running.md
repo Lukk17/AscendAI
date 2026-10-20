@@ -108,12 +108,12 @@ Publishing is done by the [Release workflow](../../../.github/workflows/README.m
 multi-arch and pushes `v<version>` and `latest` to both `lukk17/ascend-ai-ascend-web-hunter` and
 `ghcr.io/lukk17/ascend-ai-ascend-web-hunter`. The version comes from `[project].version` in `pyproject.toml`.
 
-The Compose-orchestrated path (recommended) brings up SearXNG, FlareSolverr and the Ngrok bridge in one shot. Run it
+The Compose-orchestrated path (recommended) brings up SearXNG and the Ngrok bridge in one shot. Run it
 from the repository root so it goes into the `ascend-ai` project rather than creating a second project that fights over
 the same container names:
 
 ```bash
-docker compose up -d --build searxng flaresolverr ascend-web-hunter ngrok-ascend-web-hunter
+docker compose up -d --build searxng ascend-web-hunter ngrok-ascend-web-hunter
 ```
 
 Redis is not part of that stack. It has to be running separately on port 6379, which is what `REDIS_URL` points at.
@@ -157,15 +157,15 @@ then re-call `web_read`.
 
 `output_format` is `text` (the flat `content` field, the default) or `structured` (adds `title`, `author`, `date`
 and `sitename`), and `structured` is refused together with `include_links`. `tier` names where the chain starts,
-one of `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive` or
-`6-novnc`, and escalation continues through the tiers after it.
+one of `1-beautifulsoup`, `2-trafilatura`, `4-playwright_stealth`, `4a-patchright`, `4b-camoufox`,
+`5-crawlee_adaptive` or `6-novnc`, and escalation continues through the tiers after it.
 
 ---
 
 ### Startup readiness banner
 
 On startup the service logs one multi-line INFO record. It contains an ASCII banner, the bound access URLs,
-parallel 2-second probes for SearXNG / FlareSolverr / Redis, and the full list of REST and observability
+parallel 2-second probes for SearXNG / Redis, and the full list of REST and observability
 endpoints. Implementation in [src/config/startup_banner.py](../src/config/startup_banner.py).
 
 ---
@@ -175,7 +175,7 @@ endpoints. Implementation in [src/config/startup_banner.py](../src/config/startu
 | Endpoint | Purpose |
 | :--- | :--- |
 | `GET /health` | Liveness (always 200 when the process is alive) |
-| `GET /ready` | Readiness: probes Redis, SearXNG, FlareSolverr; 200 only when all upstreams respond |
+| `GET /ready` | Readiness: probes Redis and SearXNG; 200 only when all upstreams respond |
 | `GET /metrics` | Prometheus counters and histograms (strategy outcomes, durations, intervention rate) |
 | `GET /docs` | Swagger UI |
 | `GET /redoc` | Redoc |
