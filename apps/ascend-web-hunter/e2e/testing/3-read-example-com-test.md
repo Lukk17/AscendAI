@@ -7,8 +7,9 @@
   - `url` equal to `"https://www.example.com/"`.
   - `status` equal to `"success"` (the success enum value emitted by the extraction pipeline).
   - A non-empty string field carrying the extracted content (`content` or equivalent - see Expected).
-- The extracted content contains the canary phrase `"Example Domain"` (the `<h1>` of `example.com`, deliberately
-  stable since the IETF reserves the domain for documentation).
+- The extracted content contains the canary phrase `"this domain is for use in documentation examples"` (the
+  body paragraph of `example.com`; the former `<h1>Example Domain</h1>` no longer exists upstream, only
+  `<title>` plus the paragraph).
 - The lightweight extraction tier (curl_cffi) is sufficient - `example.com` has no Cloudflare WAF, no JavaScript
   challenge, no CAPTCHA. The test does NOT require Playwright or any heavier tier; if it falls through to those
   tiers, the test still passes provided the canary phrase is found.
@@ -37,7 +38,7 @@ Check outbound HTTPS to `example.com` works from this host (independently of the
 curl -fsS https://www.example.com/
 ```
 
-Expect HTTP 200 with an `<h1>Example Domain</h1>` in the body. If this fails, the host cannot reach the public
+Expect HTTP 200 with a body containing `"This domain is for use in documentation examples"`. If this fails, the host cannot reach the public
 internet and the test cannot pass for environmental reasons.
 
 ## Reset state
@@ -81,7 +82,8 @@ HTTP 200. The JSON body matches:
   on the extraction tier): `content`, `text`, or `markdown`. The runner accepts any string value of any of these
   fields with length ≥ 50 characters.
 - The content-carrying field (whichever one is populated), when lowercased, contains the substring
-  `"example domain"` (the verbatim canary phrase from the `<h1>` element).
+  `"this domain is for use in documentation examples"` (the verbatim canary phrase from the page's body
+  paragraph).
 
 Total call duration is typically 1-10 s for the curl_cffi tier. A duration > 60 s indicates the pipeline
 escalated to Playwright or NoVNC - log it under **Additional tasks I did** but do not fail the test if the

@@ -10,7 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_3-read-example-com-tasks.md` before s
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
-- [ ] Outbound HTTPS works: `curl -fsS https://www.example.com/` returns HTTP 200 with `<h1>Example Domain</h1>`
+- [ ] Outbound HTTPS works: `curl -fsS https://www.example.com/` returns HTTP 200 with `"This domain is for use in documentation examples"`
 
 ### Reset state
 
@@ -26,7 +26,7 @@ Copy this file to `../runs/<UTC-timestamp>_3-read-example-com-tasks.md` before s
 - [ ] Body `url` equals `"https://www.example.com/"`
 - [ ] Body `status` equals `"success"`
 - [ ] One of `content` / `text` / `markdown` is a string with length ≥ 50 characters
-- [ ] The populated content field (lowercased) contains `"example domain"`
+- [ ] The populated content field (lowercased) contains `"this domain is for use in documentation examples"`
 
 ### Verdict
 
