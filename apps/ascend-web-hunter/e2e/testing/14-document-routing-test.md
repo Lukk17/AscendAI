@@ -9,7 +9,8 @@ alone in the quarantine lane.
 1. A direct read of the fake site canary PDF answers HTTP 200 with Markdown holding the PDF's canary
    sentence.
 2. A direct read of the canary PNG answers HTTP 200 with the OCR Markdown holding the image's canary
-   word, and the ascend-ocr job list then holds that job in a terminal state.
+   word, and the finished job is then absent from the ascend-ocr job list (it lists only queued and
+   running work by design).
 3. A direct read of the canary audio clip `files/canary.mp3` (under 60 seconds, holding one invented
    word) answers HTTP 200 with a transcript holding that word.
 4. A direct read of `files/oversized.pdf`, whose declared `Content-Length` is above
@@ -134,15 +135,16 @@ bru run "web-hunter/testing/extraction/route-private-link.yml" --env ascend-loca
 
 - **Call 1:** HTTP 200. Body `content` holds `"HELIX-FINCH"`, the canary sentence of `canary.pdf`.
 - **Call 2:** HTTP 200. Body `content` holds `"Mirellion"`, the canary word of `canary.png`. The
-  ascend-ocr job list then holds that job in a terminal state:
+  finished job is then absent from the ascend-ocr job list:
 
   ```bash
   curl -fsS http://localhost:7022/v1/ocr/jobs | python3 -c "import json,sys; print(sorted(j['state'] for j in json.load(sys.stdin)['jobs']))"
   ```
 
-  Expect the printed list to hold `"succeeded"`.
-- **Call 3:** HTTP 200. Body `content` holds `"KAKSMA"`, the invented word the `canary.mp3` clip speaks
-  once (recorded in [fixtures/README.md](../fixtures/README.md) as Kaksma).
+  Expect the printed list to hold no `"succeeded"`: finished work is not listed, `GET /v1/ocr/jobs`
+  lists only queued and running work by design.
+- **Call 3:** HTTP 200. Body `content` holds `"KAKSMA"` or `"Kaxma"` (case-insensitive match), the invented word the `canary.mp3` clip speaks
+  once (CPU transcribes `KAKSMA`, GPU transcribes `Kaxma.` via whisper-large-v3; recorded in [fixtures/README.md](../fixtures/README.md) as Kaksma).
 - **Call 4:** HTTP 200 with a `routing_error` field. The request log shows the oversized path was
   requested but no body bytes were sent for it:
 

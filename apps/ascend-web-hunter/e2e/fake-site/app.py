@@ -73,19 +73,34 @@ def product_body(layout: int) -> str:
         return (
             "<main><section><div>"
             f"<h2>{CANARY_PRODUCT_NAME}</h2><p>Only 7 left in the Mirell warehouse.</p>"
+            "<p>The instrument tracks meridian transits for survey crews working the Mirell "
+            "shoreline. Brass dials hold calibration through cold mornings and damp boat crossings.</p>"
+            "<p>The warehouse team checks each mount, hinge and etched ring before packing "
+            "the crate for delivery.</p>"
             f'<script type="application/ld+json">{json.dumps(ld)}</script>'
             "</div></section></main>"
         )
     return (
         "<article><header><h1>Product</h1></header>"
         f'<script type="application/ld+json">{json.dumps(ld)}</script>'
-        f"<p>{CANARY_PRODUCT_NAME} is priced at {CANARY_PRODUCT_PRICE} USD.</p></article>"
+        f"<p>{CANARY_PRODUCT_NAME} is priced at {CANARY_PRODUCT_PRICE} USD.</p>"
+        "<p>The instrument tracks meridian transits for survey crews working the Mirell "
+        "shoreline. Brass dials hold calibration through cold mornings and damp boat crossings.</p>"
+        "<p>The warehouse team checks each mount, hinge and etched ring before packing "
+        "the crate for delivery.</p></article>"
     )
 
 
 def article_table() -> str:
     rows = "".join(f"<tr><td>{s}</td><td>{n}</td><td>{p}</td></tr>" for s, n, p in CANARY_TABLE_ROWS)
-    return f"<article><h1>Stock table</h1><table><tbody>{rows}</tbody></table></article>"
+    return (
+        "<article><h1>Stock table</h1>"
+        "<p>The Mirell field store counts feeders, hutches and perches each Friday before the "
+        "supply boat arrives. Keepers log broken latches and restock seed alongside the survey notes.</p>"
+        f"<table><tbody>{rows}</tbody></table>"
+        "<p>Low stock on the Helix Finch perch triggers a reorder, while the Lumen Badger hutch "
+        "ships only in pairs for safe handling.</p></article>"
+    )
 
 
 PAGES: dict[str, Any] = {}
@@ -142,18 +157,50 @@ def build_pages() -> None:
     )
     PAGES["/crawl/"] = (
         "Crawl index",
-        "<h1>Crawl</h1><ul><li><a href='/crawl/a'>a</a></li>"
+        "<article><h1>Crawl</h1>"
+        "<p>The Mirell shore trail starts at the index cairn. Walkers sign the logbook before "
+        "following the marked path toward the lower bird hides.</p><ul><li><a href='/crawl/a'>a</a></li>"
         "<li><a href='/crawl/outside'>outside</a></li>"
-        "<li><a href='/crawl/blocked-link'>blocked-link</a></li></ul>",
+        "<li><a href='/crawl/blocked-link'>blocked-link</a></li></ul></article>",
     )
-    PAGES["/crawl/a"] = ("A", "<h1>A</h1><a href='/crawl/a/b'>b</a>")
-    PAGES["/crawl/a/b"] = ("B", "<h1>B</h1><a href='/crawl/a/b/c'>c</a>")
-    PAGES["/crawl/a/b/c"] = ("C", f"<h1>C</h1><p>{CANARY_ARTICLE}</p>")
-    PAGES["/crawl/outside"] = ("Outside", "<h1>Outside the include pattern</h1>")
-    PAGES["/crawl/disallowed"] = ("Disallowed", "<h1>Robots says no</h1>")
+    PAGES["/crawl/a"] = (
+        "A",
+        "<article><h1>A</h1>"
+        "<p>The first trail marker stands beside the basalt steps above Lake Mirell. Survey teams "
+        "rest here and check their maps before climbing onward.</p>"
+        "<a href='/crawl/a/b'>b</a></article>",
+    )
+    PAGES["/crawl/a/b"] = (
+        "B",
+        "<article><h1>B</h1>"
+        "<p>The second hide overlooks the nesting cliffs where the survey counts thrush pairs. "
+        "Volunteers keep quiet and record each sighting in the shared notebook.</p>"
+        "<a href='/crawl/a/b/c'>c</a></article>",
+    )
+    PAGES["/crawl/a/b/c"] = (
+        "C",
+        f"<article><h1>C</h1><p>{CANARY_ARTICLE}</p>"
+        "<p>The cliff path ends at the observation platform facing the open water. Crews compare "
+        "field notes there before hiking back down the shore trail.</p></article>",
+    )
+    PAGES["/crawl/outside"] = (
+        "Outside",
+        "<article><h1>Outside the include pattern</h1>"
+        "<p>This meadow sits beyond the survey boundary and stays out of the crawl pattern. "
+        "Hikers reach it by a farm track that leaves the marked Mirell trail.</p></article>",
+    )
+    PAGES["/crawl/disallowed"] = (
+        "Disallowed",
+        "<article><h1>Robots says no</h1>"
+        "<p>This nesting hollow stays closed while the robot rules bar every crawler. Rangers "
+        "patrol the fence line until the breeding season ends.</p></article>",
+    )
     PAGES["/crawl/blocked-link"] = (
         "Blocked link",
-        f"<h1>Blocked</h1><a href='http://e2e-fake-site-blocked:{PORT}/article'>private</a>",
+        "<article><h1>Blocked</h1>"
+        "<p>The jetty gate leads to a private boathouse that crawlers must never follow. Staff "
+        "ferry survey crates across by hand instead of opening the gate.</p>"
+        f"<a href='http://e2e-fake-site-blocked:{PORT}/article'>private</a></article>",
     )
     PAGES["/wall-ko"] = (
         "KO",

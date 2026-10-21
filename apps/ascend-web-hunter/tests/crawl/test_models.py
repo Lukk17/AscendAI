@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Any
 
@@ -285,3 +286,45 @@ def test_claim_expiries_list_coerced_to_empty_map() -> None:
 
     # then the artifact is coerced back to the map shape
     assert record.claim_expiries == {}
+
+
+@pytest.mark.parametrize("field", ["include_patterns", "exclude_patterns"])
+def test_empty_map_pattern_coerced_to_empty_list(field: str) -> None:
+    # given a request JSON round-tripped through the Lua scripts, whose
+    # cjson layer writes an empty array back as an empty map
+    payload: dict[str, Any] = {"seeds": ["https://example.com/"], field: {}}
+
+    # when
+    request = CrawlRequest(**payload)
+
+    # then the artifact is coerced back to the list shape
+    assert getattr(request, field) == []
+
+
+@pytest.mark.parametrize("field", ["include_patterns", "exclude_patterns"])
+def test_non_empty_map_pattern_still_rejected(field: str) -> None:
+    # given a map with entries, which is genuine bad input and not the artifact
+    payload: dict[str, Any] = {"seeds": ["https://example.com/"], field: {"a": "/x/*"}}
+
+    # when / then
+    with pytest.raises(ValidationError):
+        CrawlRequest(**payload)
+
+
+def test_job_record_heals_lua_empty_map_patterns() -> None:
+    # given a stored record as real Redis leaves it after a script round-trip
+    record = JobRecord(
+        job_id="job1",
+        tenant_id="acme",
+        request=_req(seeds=["https://example.com/"]),
+    )
+    payload: dict[str, Any] = json.loads(record.model_dump_json())
+    payload["request"]["include_patterns"] = {}
+    payload["request"]["exclude_patterns"] = {}
+
+    # when the status poll reads it back
+    restored = JobRecord.model_validate_json(json.dumps(payload))
+
+    # then it validates instead of answering 404
+    assert restored.request.include_patterns == []
+    assert restored.request.exclude_patterns == []

@@ -44,6 +44,23 @@ def _groups(*urls: str) -> str:
     return json.dumps([{"domain": "example.com", "urls": [{"u": url, "d": 0} for url in urls]}])
 
 
+def _request_with_patterns(**overrides: object) -> dict[str, object]:
+    request: dict[str, object] = {
+        "seeds": ["https://example.com/"],
+        "include_patterns": [],
+        "exclude_patterns": [],
+        "max_depth": 2,
+        "page_budget": 10,
+        "same_domain_only": True,
+        "respect_robots": True,
+        "output_format": "text",
+        "extraction_schema": None,
+        "profile": None,
+    }
+    request.update(overrides)
+    return request
+
+
 async def _record(client: async_redis.Redis) -> dict[str, Any]:
     raw = await client.get(job_key(TENANT, JOB))
     assert isinstance(raw, str)
@@ -158,6 +175,21 @@ async def test_submit_writes_record_queues_seen_and_runnable(
     assert await redis.ttl(queue_key(TENANT, JOB, "example.com")) > 0
 
 
+async def test_submit_normalizes_empty_map_patterns(frontier: Frontier, redis: FakeRedis) -> None:
+    # given a record whose empty pattern lists already came back as maps
+    await _submit(
+        frontier,
+        job_json=_job_json(
+            request=_request_with_patterns(include_patterns={}, exclude_patterns={})
+        ),
+    )
+
+    # then the stored record carries the list shape again
+    stored = await _record(redis)
+    assert stored["request"]["include_patterns"] == []
+    assert stored["request"]["exclude_patterns"] == []
+
+
 async def test_first_claim_moves_job_to_running(frontier: Frontier, redis: FakeRedis) -> None:
     # given
     await _submit(frontier)
@@ -168,6 +200,46 @@ async def test_first_claim_moves_job_to_running(frontier: Frontier, redis: FakeR
     # then
     assert answer == ["claimed", "https://example.com/", "0"]
     assert (await _record(redis))["state"] == "running"
+
+
+async def test_claim_heals_empty_map_patterns(frontier: Frontier, redis: FakeRedis) -> None:
+    # given a submitted job whose record real Redis corrupted to maps
+    await _submit(frontier)
+    raw = await redis.get(job_key(TENANT, JOB))
+    assert isinstance(raw, str)
+    payload: dict[str, Any] = json.loads(raw)
+    payload["request"] = _request_with_patterns(include_patterns={}, exclude_patterns={})
+    await redis.set(job_key(TENANT, JOB), json.dumps(payload))
+
+    # when it is claimed
+    answer = await frontier.claim(**_claim_kwargs(frontier))
+
+    # then the claim works and the record carries the list shape again
+    assert answer == ["claimed", "https://example.com/", "0"]
+    stored = await _record(redis)
+    assert stored["request"]["include_patterns"] == []
+    assert stored["request"]["exclude_patterns"] == []
+
+
+async def test_claim_keeps_non_empty_patterns(frontier: Frontier, redis: FakeRedis) -> None:
+    # given a submitted job with real pattern lists
+    await _submit(
+        frontier,
+        job_json=_job_json(
+            request=_request_with_patterns(
+                include_patterns=["/keep/*"], exclude_patterns=["*/secret/*"]
+            )
+        ),
+    )
+
+    # when it is claimed
+    answer = await frontier.claim(**_claim_kwargs(frontier))
+
+    # then the claim works and the lists are untouched
+    assert answer == ["claimed", "https://example.com/", "0"]
+    stored = await _record(redis)
+    assert stored["request"]["include_patterns"] == ["/keep/*"]
+    assert stored["request"]["exclude_patterns"] == ["*/secret/*"]
 
 
 async def test_two_workers_never_claim_same_url(frontier: Frontier) -> None:
@@ -359,6 +431,26 @@ async def test_finish_moves_to_succeeded_when_nothing_is_left(
     assert answer == ["succeeded"]
     assert (await _record(redis))["state"] == "succeeded"
     assert await redis.zscore(RUNNABLE_KEY, MEMBER) is None
+
+
+async def test_finish_heals_empty_map_patterns(frontier: Frontier, redis: FakeRedis) -> None:
+    # given a claimed URL whose record real Redis corrupted to maps
+    await _submit(frontier)
+    assert (await frontier.claim(**_claim_kwargs(frontier)))[0] == "claimed"
+    raw = await redis.get(job_key(TENANT, JOB))
+    assert isinstance(raw, str)
+    payload: dict[str, Any] = json.loads(raw)
+    payload["request"] = _request_with_patterns(include_patterns={}, exclude_patterns={})
+    await redis.set(job_key(TENANT, JOB), json.dumps(payload))
+
+    # when it finishes with no new links
+    answer = await frontier.finish(**_finish_kwargs())
+
+    # then the job succeeds and the record carries the list shape again
+    assert answer == ["succeeded"]
+    stored = await _record(redis)
+    assert stored["request"]["include_patterns"] == []
+    assert stored["request"]["exclude_patterns"] == []
 
 
 async def test_finish_counts_unchanged_failed_and_skipped(frontier: Frontier, redis: FakeRedis) -> None:

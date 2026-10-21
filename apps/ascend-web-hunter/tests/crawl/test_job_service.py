@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -67,7 +68,11 @@ async def test_submit_stores_record_with_retention(
     assert record.state == "waiting"
     assert len(record.job_id) == 32
     key = job_key("acme", record.job_id)
-    assert await fake_redis.get(key) == record.model_dump_json()
+    stored = await fake_redis.get(key)
+    assert stored is not None
+    # The submit script round-trips the record through cjson like every
+    # other script, so the stored bytes may differ while the record is equal.
+    assert JobRecord.model_validate_json(stored) == record
     ttl = await fake_redis.ttl(key)
     assert settings.CRAWL_JOB_RETENTION_SECONDS - 2 <= ttl <= settings.CRAWL_JOB_RETENTION_SECONDS
 
@@ -143,6 +148,29 @@ async def test_get_corrupt_returns_none(
 
     # then
     assert record is None
+
+
+async def test_get_returns_record_after_lua_round_trip(
+    service: CrawlJobService, fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # given a submitted job as real Redis leaves it after a script
+    # round-trip: both empty pattern lists came back as empty maps
+    submitted = await service.submit_job("acme", _request())
+    raw = await fake_redis.get(job_key("acme", submitted.job_id))
+    assert isinstance(raw, str)
+    payload: dict[str, Any] = json.loads(raw)
+    payload["request"]["include_patterns"] = {}
+    payload["request"]["exclude_patterns"] = {}
+    await fake_redis.set(job_key("acme", submitted.job_id), json.dumps(payload), ex=60)
+
+    # when the status poll reads it back
+    record = await service.get_job("acme", submitted.job_id)
+
+    # then it returns the record instead of answering 404
+    assert record is not None
+    assert record.job_id == submitted.job_id
+    assert record.request.include_patterns == []
+    assert record.request.exclude_patterns == []
 
 
 async def test_list_returns_only_own_tenant(

@@ -53,6 +53,17 @@ class CrawlRequest(BaseModel):
     extraction_schema: dict[str, Any] | None = None
     profile: str | None = None
 
+    @field_validator("include_patterns", "exclude_patterns", mode="before")
+    @classmethod
+    def _coerce_empty_map_patterns(cls, value: object) -> object:
+        # The Redis Lua scripts round-trip the record through cjson, which
+        # reads an empty JSON array back as an empty Lua table and writes it
+        # back as an empty JSON object. An empty map here is that artifact,
+        # never a real pattern list.
+        if isinstance(value, dict) and len(value) == 0:
+            return []
+        return value
+
     @model_validator(mode="after")
     def _enforce_current_bounds(self) -> "CrawlRequest":
         bounds = (

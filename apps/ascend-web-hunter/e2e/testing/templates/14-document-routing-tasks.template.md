@@ -31,8 +31,8 @@ Copy this file to `../runs/<UTC-timestamp>_14-document-routing-tasks.md` before 
 ### Expected
 
 - [ ] Call 1 body: `content` holds `"HELIX-FINCH"`
-- [ ] Call 2 body: `content` holds `"Mirellion"`, and the OCR job list holds a job in state `"succeeded"`
-- [ ] Call 3 body: `content` holds `"KAKSMA"`
+- [ ] Call 2 body: `content` holds `"Mirellion"`, and the finished job is absent from the OCR job list (it lists only queued and running work by design)
+- [ ] Call 3 body: `content` holds `"KAKSMA"` or `"Kaxma"` (case-insensitive; CPU `KAKSMA` vs GPU `Kaxma.`)
 - [ ] Call 4 body: `routing_error` field present; the request log entry for `/files/oversized.pdf` has `bytes_sent` equal to `0`
 - [ ] Call 5 body: `content` holds `"HALCYON-PLOVER"` plus `routing_error`; the request log holds `/pdf-link-blocked` and no path containing `e2e-fake-site-blocked`
 - [ ] Deleted the OCR jobs the run created (job list empty again)

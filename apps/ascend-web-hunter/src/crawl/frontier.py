@@ -36,9 +36,39 @@ from src.crawl.keys import (
     seen_key,
 )
 
-SUBMIT_SCRIPT = """
+# cjson reads an empty JSON array back as an empty Lua table, which the
+# encoder writes back as an empty JSON object. Every script below rewrites
+# the job record, so each one pins both pattern lists to the array shape
+# right after decoding, the same way CLAIM_SCRIPT already pins a missing
+# claim_expiries to a map. `cjson.empty_array` is that marker on real Redis;
+# the FakeRedis test double lacks it (nil), where a fresh table already
+# encodes as an array.
+_NORMALIZE_PATTERN_LISTS = """
+local _request = job['request']
+if _request ~= nil then
+  local _empty_list = cjson.empty_array
+  if _empty_list == nil then
+    _empty_list = {}
+  end
+  local _include = _request['include_patterns']
+  if type(_include) ~= 'table' or next(_include) == nil then
+    _request['include_patterns'] = _empty_list
+  end
+  local _exclude = _request['exclude_patterns']
+  if type(_exclude) ~= 'table' or next(_exclude) == nil then
+    _request['exclude_patterns'] = _empty_list
+  end
+end
+"""
+
+SUBMIT_SCRIPT = (
+    """
+local job = cjson.decode(ARGV[1])
+"""
+    + _NORMALIZE_PATTERN_LISTS
+    + """
 local groups = cjson.decode(ARGV[5])
-redis.call('SETEX', KEYS[1], ARGV[2], ARGV[1])
+redis.call('SETEX', KEYS[1], ARGV[2], cjson.encode(job))
 for _, group in ipairs(groups) do
   local qkey = 'crawl_queue:' .. ARGV[6] .. ':' .. ARGV[7] .. ':' .. group['domain']
   for _, item in ipairs(group['urls']) do
@@ -51,13 +81,18 @@ redis.call('EXPIRE', KEYS[2], ARGV[2])
 redis.call('ZADD', KEYS[3], ARGV[3], ARGV[4])
 return {'ok'}
 """
+)
 
-CLAIM_SCRIPT = """
+CLAIM_SCRIPT = (
+    """
 local raw = redis.call('GET', KEYS[1])
 if not raw then
   return {'gone'}
 end
 local job = cjson.decode(raw)
+"""
+    + _NORMALIZE_PATTERN_LISTS
+    + """
 local state = job['state']
 if state ~= 'waiting' and state ~= 'running' then
   return {'idle', state}
@@ -121,13 +156,18 @@ job['updated_at'] = ARGV[9]
 redis.call('SETEX', KEYS[1], ARGV[6], cjson.encode(job))
 return {'claimed', url, depth}
 """
+)
 
-FINISH_SCRIPT = """
+FINISH_SCRIPT = (
+    """
 local raw = redis.call('GET', KEYS[1])
 if not raw then
   return {'gone'}
 end
 local job = cjson.decode(raw)
+"""
+    + _NORMALIZE_PATTERN_LISTS
+    + """
 local state = job['state']
 if state == 'cancelled' then
   return {'cancelled'}
@@ -194,13 +234,18 @@ end
 redis.call('SETEX', KEYS[1], ARGV[5], cjson.encode(job))
 return {final}
 """
+)
 
-CANCEL_SCRIPT = """
+CANCEL_SCRIPT = (
+    """
 local raw = redis.call('GET', KEYS[1])
 if not raw then
   return {'gone'}
 end
 local job = cjson.decode(raw)
+"""
+    + _NORMALIZE_PATTERN_LISTS
+    + """
 local state = job['state']
 if state ~= 'waiting' and state ~= 'running' then
   return {'idle', state}
@@ -221,13 +266,18 @@ job['updated_at'] = ARGV[1]
 redis.call('SETEX', KEYS[1], ARGV[2], cjson.encode(job))
 return {'cancelled'}
 """
+)
 
-MARK_SCRIPT = """
+MARK_SCRIPT = (
+    """
 local raw = redis.call('GET', KEYS[1])
 if not raw then
   return {'gone'}
 end
 local job = cjson.decode(raw)
+"""
+    + _NORMALIZE_PATTERN_LISTS
+    + """
 local state = job['state']
 if state ~= 'waiting' and state ~= 'running' then
   return {'idle', state}
@@ -249,13 +299,18 @@ job['updated_at'] = ARGV[1]
 redis.call('SETEX', KEYS[1], ARGV[2], cjson.encode(job))
 return {'failed'}
 """
+)
 
-ADD_SCRIPT = """
+ADD_SCRIPT = (
+    """
 local raw = redis.call('GET', KEYS[1])
 if not raw then
   return {'gone'}
 end
 local job = cjson.decode(raw)
+"""
+    + _NORMALIZE_PATTERN_LISTS
+    + """
 local state = job['state']
 if state ~= 'waiting' and state ~= 'running' then
   return {'idle', state}
@@ -289,14 +344,19 @@ job['updated_at'] = ARGV[1]
 redis.call('SETEX', KEYS[1], ARGV[2], cjson.encode(job))
 return {'added', added}
 """
+)
 
 
-SET_INDEX_SCRIPT = """
+SET_INDEX_SCRIPT = (
+    """
 local raw = redis.call('GET', KEYS[1])
 if not raw then
   return {'gone'}
 end
 local job = cjson.decode(raw)
+"""
+    + _NORMALIZE_PATTERN_LISTS
+    + """
 if job['state'] ~= 'succeeded' then
   return {'idle', job['state']}
 end
@@ -305,6 +365,7 @@ job['updated_at'] = ARGV[1]
 redis.call('SETEX', KEYS[1], ARGV[2], cjson.encode(job))
 return {'ok'}
 """
+)
 
 
 class Frontier:
