@@ -16,14 +16,15 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("Status code is 422", function () {
-            expect(res.getStatus()).to.equal(422);
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
         });
-        test("detail array contains missing-field error for query", function () {
-            const detail = res.getBody().detail;
-            expect(detail).to.be.an("array");
-            const queryError = detail.find(e => e.type === "missing" && e.loc && e.loc.includes("query"));
-            expect(queryError, "missing error for 'query' field not found").to.exist;
+        test("validation body names the missing query field", function () {
+            const body = res.getBody();
+            expect(body.code).to.equal("validation");
+            expect(body.errors).to.be.an("array");
+            const queryError = body.errors.find(e => e.field === "query");
+            expect(queryError, "validation error for 'query' field not found").to.exist;
         });
 
 settings:

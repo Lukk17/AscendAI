@@ -19,11 +19,11 @@ _TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
 
 # `produced_by` values written by every code path that saves a session, and read back
 # by WebReader to decide whether a stored clearance can be replayed by the tier that
-# earned it. The FlareSolverr and NoVNC values match the WebReader strategy names so a
+# earned it. The NoVNC value matches the WebReader strategy name so a
 # stored producer can be looked up directly as a strategy key.
-PRODUCED_BY_FLARESOLVERR = "3-flaresolverr"
 PRODUCED_BY_NOVNC = "6-novnc"
 PRODUCED_BY_LOGIN_SEED = "login-seed"
+PRODUCED_BY_IMPORT = "import"
 
 # Reported for a still-valid entry that predates the produced_by field, or whose
 # caller omitted it. Distinct from None, which means no valid stored session exists
@@ -419,8 +419,8 @@ class CookieManager:
         return self._auth_ttl_remaining_from_entry(record["auth"])
 
     # ---------------------------------------------------------------------------
-    # Legacy compatibility: still used by FlareSolverrStrategy which receives a
-    # flat cookie dict + user_agent from FlareSolverr's response.
+    # Flat-cookie save path: converts a flat cookie dict + user_agent to
+    # Playwright storage_state format and persists it.
     # ---------------------------------------------------------------------------
     async def save_flat_cookies(
         self,

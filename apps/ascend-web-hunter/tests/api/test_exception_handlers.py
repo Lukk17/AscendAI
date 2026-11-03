@@ -1,89 +1,363 @@
-import json
+from unittest.mock import patch
 
 import httpx
-import pytest
-from fastapi import Request
+from ascend_python_common.errors.registry import resolve_extensions
 
 from src.api.exception_handlers import (
-    global_exception_handler,
-    httpx_exception_handler,
-    human_intervention_exception_handler,
-    novnc_flow_busy_exception_handler,
+    BAD_FORMAT_COMBINATION,
+    BLOCKLIST_REFRESH_INVALID,
+    BLOCKLIST_REFRESH_THROTTLED,
+    EXTERNAL_SERVICE_UNAVAILABLE,
+    EXTRACTION_FAILED,
+    EXTRACTION_NOT_CONFIGURED,
+    HUMAN_INTERVENTION_REQUIRED,
+    INVALID_TENANT,
+    JOB_NOT_FOUND,
+    NOVNC_BUSY,
+    SCREENSHOT_UNAVAILABLE,
+    build_error_registry,
+    error_registry,
 )
-from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api.exceptions import (
+    ExtractionFailedError,
+    ExtractionNotConfiguredError,
+    FormatCombinationError,
+    HumanInterventionRequiredException,
+    NoVNCFlowBusyException,
+    ScreenshotUnavailableError,
+)
+from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
+from src.crawl.models import InvalidTenantError, JobNotFoundError
 
 
-def _make_request() -> Request:
-    scope = {
-        "type": "http",
-        "method": "GET",
-        "path": "/test",
-        "raw_path": b"/test",
-        "query_string": b"",
-        "headers": [],
-        "server": ("test", 80),
-        "scheme": "http",
-        "client": ("127.0.0.1", 0),
-        "root_path": "",
+def test_value_error_maps_to_validation() -> None:
+    # given
+    exc = ValueError("query must not be empty")
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code.code == "validation"
+    assert entry.code.status == 400
+
+
+def test_httpx_error_maps_to_external_service_unavailable() -> None:
+    # given
+    exc = httpx.HTTPError("upstream blew up")
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code == EXTERNAL_SERVICE_UNAVAILABLE
+    assert entry.code.status == 503
+
+
+def test_blocklist_validation_error_maps_to_502() -> None:
+    # given
+    exc = BlocklistValidationError("no usable rules")
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code == BLOCKLIST_REFRESH_INVALID
+    assert entry.code.status == 502
+
+
+def test_blocklist_throttled_error_maps_to_429_with_retry_after() -> None:
+    # given
+    exc = BlocklistRefreshThrottledError(12.0)
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code == BLOCKLIST_REFRESH_THROTTLED
+    assert entry.code.status == 429
+    assert callable(entry.headers)
+
+
+def test_human_intervention_maps_to_428_with_extensions() -> None:
+    # given
+    exc = HumanInterventionRequiredException(vnc_url="http://vnc:7900", intervention_type="captcha")
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code == HUMAN_INTERVENTION_REQUIRED
+    assert entry.code.status == 428
+    assert callable(entry.extensions)
+
+
+def test_novnc_busy_maps_to_409_with_retry_after_and_extensions() -> None:
+    # given
+    exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+    # when
+    entry = build_error_registry().lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code == NOVNC_BUSY
+    assert entry.code.status == 409
+    assert entry.headers == {"Retry-After": "30"}
+    assert callable(entry.extensions)
+
+
+def test_human_intervention_extensions_carry_flow_fields() -> None:
+    # given
+    window = {"slot": 2, "x": 96, "y": 96, "width": 1280, "height": 800}
+    exc = HumanInterventionRequiredException(
+        vnc_url="http://vnc/x",
+        intervention_type="captcha",
+        flow_id="9f2c41ab77de",
+        joined=True,
+        window=window,
+    )
+
+    # when
+    entry = error_registry.lookup(exc)
+    assert entry is not None
+    assert entry.extensions is not None
+    extensions = resolve_extensions(entry, exc)
+
+    # then
+    assert extensions == {
+        "intervention_type": "captcha",
+        "vnc_url": "http://vnc/x",
+        "flow_id": "9f2c41ab77de",
+        "joined": True,
+        "window": window,
     }
 
-    return Request(scope)
 
-
-@pytest.mark.asyncio
-async def test_httpx_exception_handler_returns_503():
-    # when
-    response = await httpx_exception_handler(_make_request(), httpx.HTTPError("upstream"))
-
-    # then
-    assert response.status_code == 503
-
-
-@pytest.mark.asyncio
-async def test_global_exception_handler_returns_500():
-    # when
-    response = await global_exception_handler(_make_request(), RuntimeError("boom"))
-
-    # then
-    assert response.status_code == 500
-
-
-@pytest.mark.asyncio
-async def test_human_intervention_handler_returns_428_captcha():
+def test_human_intervention_extensions_keep_old_members_for_plain_raise() -> None:
     # given
-    exc = HumanInterventionRequiredException(vnc_url="http://vnc", intervention_type="captcha")
+    exc = HumanInterventionRequiredException(vnc_url="http://vnc/x", intervention_type="captcha")
 
     # when
-    response = await human_intervention_exception_handler(_make_request(), exc)
+    entry = error_registry.lookup(exc)
+    assert entry is not None
+    assert entry.extensions is not None
+    extensions = resolve_extensions(entry, exc)
 
     # then
-    assert response.status_code == 428
+    assert extensions == {
+        "intervention_type": "captcha",
+        "vnc_url": "http://vnc/x",
+        "flow_id": None,
+        "joined": False,
+        "window": None,
+    }
 
 
-@pytest.mark.asyncio
-async def test_human_intervention_handler_returns_428_login():
+def test_novnc_busy_extensions_carry_cap_fields() -> None:
     # given
-    exc = HumanInterventionRequiredException(vnc_url="http://vnc/log", intervention_type="login")
+    flows = [
+        {
+            "flow_id": "9f2c41ab77de",
+            "url": "https://nowsecure.nl",
+            "domain": "nowsecure.nl",
+            "profile": "default",
+            "intervention_type": "captcha",
+            "window": {"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
+            "age_seconds": 207.3,
+            "expires_in_seconds": 412.7,
+            "vnc_url": "http://vnc/x",
+        }
+    ]
+    exc = NoVNCFlowBusyException(
+        "https://nowsecure.nl",
+        "default",
+        active_flows=1,
+        max_concurrent_flows=4,
+        flows=flows,
+    )
 
     # when
-    response = await human_intervention_exception_handler(_make_request(), exc)
+    entry = error_registry.lookup(exc)
+    assert entry is not None
+    assert entry.extensions is not None
+    extensions = resolve_extensions(entry, exc)
 
     # then
-    assert response.status_code == 428
+    assert extensions == {
+        "holder_url": "https://nowsecure.nl",
+        "holder_profile": "default",
+        "active_flows": 1,
+        "max_concurrent_flows": 4,
+        "flows": flows,
+    }
 
 
-@pytest.mark.asyncio
-async def test_novnc_flow_busy_handler_returns_409_with_retry_after():
+def test_novnc_busy_extensions_keep_old_members_for_plain_raise() -> None:
     # given
     exc = NoVNCFlowBusyException("http://in-flight.example", "default")
 
     # when
-    response = await novnc_flow_busy_exception_handler(_make_request(), exc)
+    entry = error_registry.lookup(exc)
+    assert entry is not None
+    assert entry.extensions is not None
+    extensions = resolve_extensions(entry, exc)
 
     # then
-    assert response.status_code == 409
-    assert response.headers["Retry-After"] == "30"
-    body = json.loads(response.body)
-    assert body["status"] == "novnc_busy"
-    assert body["holder_url"] == "http://in-flight.example"
-    assert body["holder_profile"] == "default"
+    assert extensions == {
+        "holder_url": "http://in-flight.example",
+        "holder_profile": "default",
+        "active_flows": 0,
+        "max_concurrent_flows": 0,
+        "flows": [],
+    }
+
+
+def test_extraction_not_configured_maps_to_400() -> None:
+    # given
+    exc = ExtractionNotConfiguredError()
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == EXTRACTION_NOT_CONFIGURED
+    assert entry.code.status == 400
+    assert "EXTRACTION_LLM_BASE_URL" in str(exc)
+
+
+def test_screenshot_unavailable_maps_to_400() -> None:
+    # given
+    exc = ScreenshotUnavailableError()
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == SCREENSHOT_UNAVAILABLE
+    assert entry.code.status == 400
+
+
+def test_format_combination_maps_to_bad_request_400() -> None:
+    # given
+    exc = FormatCombinationError("tables")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == BAD_FORMAT_COMBINATION
+    assert entry.code.code == "bad_request"
+    assert entry.code.status == 400
+    assert "include_links" in str(exc)
+
+
+def test_extraction_failed_maps_to_502_and_is_expected() -> None:
+    # given
+    exc = ExtractionFailedError("the model answer was not JSON")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == EXTRACTION_FAILED
+    assert entry.code.status == 502
+    assert entry.expected is True
+
+
+def test_internal_code_is_the_registry_default() -> None:
+    # given
+    registry = build_error_registry()
+    # when
+    internal = registry.internal_code
+    # then
+    assert internal.code == "internal"
+    assert internal.status == 500
+
+
+def test_novnc_busy_retry_after_follows_setting_override() -> None:
+    # given
+    exc = NoVNCFlowBusyException("http://in-flight.example", "default")
+    with patch("src.api.exception_handlers.settings.NOVNC_BUSY_RETRY_AFTER_SECONDS", 45):
+        # when
+        entry = build_error_registry().lookup(exc)
+
+        # then
+        assert entry is not None
+        assert entry.headers == {"Retry-After": "45"}
+
+
+def test_challenge_detected_carries_verdict() -> None:
+    # given
+    from src.api.exceptions import ChallengeDetectedException
+    from src.reader.cloudflare.challenge_signals import assess
+
+    wall_html = "<html><body><div id='cf-challenge-running'></div></body></html>"
+
+    # when
+    verdict = assess(200, wall_html)
+    exc = ChallengeDetectedException(verdict)
+
+    # then
+    assert exc.verdict is verdict
+    assert exc.intervention_type == verdict.intervention_type == "captcha"
+    assert exc.verdict.vendor == "cloudflare"
+
+
+def test_challenge_detected_message_names_vendor_and_score() -> None:
+    # given
+    from src.api.exceptions import ChallengeDetectedException
+    from src.reader.cloudflare.challenge_signals import assess
+
+    wall_html = "<html><body><div id='cf-challenge-running'></div></body></html>"
+
+    # when
+    verdict = assess(200, wall_html)
+    exc = ChallengeDetectedException(verdict)
+
+    # then
+    assert "cloudflare" in exc.message
+    assert str(verdict.score) in exc.message
+    assert str(exc) == exc.message
+
+
+def test_challenge_detected_takes_login_type_from_verdict() -> None:
+    # given
+    from src.api.exceptions import ChallengeDetectedException
+    from src.reader.cloudflare.challenge_signals import as_login_verdict, assess
+
+    wall_html = "<html><body><div id='cf-challenge-running'></div></body></html>"
+
+    # when
+    verdict = as_login_verdict(assess(200, wall_html))
+    exc = ChallengeDetectedException(verdict)
+
+    # then
+    assert exc.intervention_type == "login"
+    assert exc.verdict.intervention_type == "login"
+
+
+def test_job_not_found_maps_to_404() -> None:
+    # given
+    exc = JobNotFoundError("job1")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == JOB_NOT_FOUND
+    assert entry.code.code == "job_not_found"
+    assert entry.code.status == 404
+    assert "job1" in str(exc)
+
+
+def test_invalid_tenant_maps_to_400_not_validation() -> None:
+    # given
+    exc = InvalidTenantError("../acme")
+
+    # when
+    entry = error_registry.lookup(exc)
+
+    # then
+    assert entry is not None
+    assert entry.code == INVALID_TENANT
+    assert entry.code.code == "invalid_tenant"
+    assert entry.code.status == 400

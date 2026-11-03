@@ -5,8 +5,8 @@
 **Note on upstream availability**: SearXNG aggregates from external search engines that rate-limit and CAPTCHA-block per IP. Empty result arrays are an acceptable PASS - they prove the MCP layer + service-to-SearXNG plumbing is healthy. Upstream engine content guarantees are out of scope.
 
 
-- The MCP `initialize` handshake against `POST /mcp` returns HTTP 200 and an `Mcp-Session-Id` response header
-  whose value is a 32 character hexadecimal session id without hyphens.
+- The MCP `initialize` handshake against `POST /mcp` returns HTTP 200. The service is stateless and answers
+  no `Mcp-Session-Id` response header.
 - A subsequent MCP `tools/call` for `web_search` with `arguments={"query": "OpenStreetMap", "limit": 3}` returns
   HTTP 200 and a JSON-RPC `result`.
 - The `result` carries the search hits in MCP's standard `content` array. At least one `content` entry has
@@ -31,7 +31,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 Check the SearXNG backend is reachable from the host.
 
@@ -54,8 +54,8 @@ Two steps.
 cd docs/api/request/AscendAI
 ```
 
-**Step 1.** Open an MCP session via the `initialize` handshake. Capture the `Mcp-Session-Id` value from the
-response headers.
+**Step 1.** Send the MCP `initialize` handshake. Expect HTTP 200 with no `Mcp-Session-Id` response header
+(the service is stateless; verified by full header dump).
 
 **PowerShell:**
 
@@ -69,20 +69,18 @@ curl.exe -fsS -i -X POST http://localhost:7021/mcp -H "Content-Type: application
 curl -fsS -i -X POST http://localhost:7021/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
-Look for `Mcp-Session-Id: <session id>` in the response. The value is a 32 character hexadecimal session id without hyphens,
-as FastMCP emits it. Use that session id as the value of the `mcp_session_id` env-var in
-the next step.
+No `Mcp-Session-Id` is emitted (the service is stateless), so any dummy value is used as the `mcp_session_id`
+env-var in the next step.
 
-**Step 2.** Send the `tools/call` with the captured session ID injected:
+**Step 2.** Send the `tools/call` with a dummy session ID injected:
 
 ```bash
-bru run "web-hunter/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=<paste session id from step 1>"
+bru run "web-hunter/testing/mcp-search.yml" --env ascend-local --env-var "mcp_session_id=00000000000000000000000000000000"
 ```
 
 ## Expected
 
-Step 1 returns HTTP 200 and the response headers include an `Mcp-Session-Id` line whose value is a
-32 character hexadecimal session id without hyphens, as FastMCP emits it.
+Step 1 returns HTTP 200 with no `Mcp-Session-Id` response header (the service is stateless).
 
 Step 2 returns HTTP 200. The JSON-RPC response body matches:
 

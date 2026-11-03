@@ -25,9 +25,9 @@ ascend-ai-agent SHALL NOT write user prompt text or attached document content to
 - **WHEN** `apps/ascend-agent/src/main/resources/application.yaml` is read
 - **THEN** its `logging.level` block references `com.lukk.ascend.ai.agent` and contains no `com.lukk.ai.agent` entry
 
-### Requirement: Platform-wide redaction convention covers all six services
+### Requirement: Platform-wide redaction convention covers all seven services
 
-A written redaction convention SHALL be documented (in `docs/COMPLIANCE.md`) and applied across ascend-ai-agent, ascend-weather-mcp, ascend-audio-scribe, ascend-web-hunter, AscendMemory, and ascend-ocr: user-supplied content - prompts, documents, transcripts, memory text, scraped page content, OCR output - is never passed as a log argument; logs carry lengths, counts, hashes, and identifiers instead. Each Python service's `[ServiceName]`-prefixed logging SHALL be audited against the convention as part of this change and any content leakage fixed.
+A written redaction convention SHALL be documented (in `docs/COMPLIANCE.md`) and applied across ascend-ai-agent, ascend-weather-mcp, ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr, and `ascend-openclaw-host` of `add-openclaw-plugin-host`, whose containers of both roles share one log format: user-supplied content - prompts, documents, transcripts, memory text, scraped page content, OCR output - is never passed as a log argument; logs carry lengths, counts, hashes, and identifiers instead. Each Python service's `[ServiceName]`-prefixed logging SHALL be audited against the convention as part of this change and any content leakage fixed.
 
 #### Scenario: Python service logs metadata, not content
 
@@ -38,4 +38,4 @@ A written redaction convention SHALL be documented (in `docs/COMPLIANCE.md`) and
 #### Scenario: Convention is documented
 
 - **WHEN** `docs/COMPLIANCE.md` is read
-- **THEN** it contains the redaction convention with concrete allowed/forbidden log-argument examples applicable to all six services
+- **THEN** it contains the redaction convention with concrete allowed/forbidden log-argument examples applicable to all seven services

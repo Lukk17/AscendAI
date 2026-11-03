@@ -18,8 +18,10 @@ ENV PYTHONUNBUFFERED=1 \
 RUN pip install --no-cache-dir prometheus-client==0.26.0
 
 # Primary group 0 (root) so this non-root user gets group-read/write on the
-# bind-mounted /var/run/docker.sock, which Docker Desktop and Docker Engine
-# both create as root:root mode 660. No other elevated privilege is granted.
+# bind-mounted /var/run/docker.sock. Docker Desktop creates the socket as
+# root:root, Docker Engine for Linux as root:docker, and compose adds the
+# socket's group through DOCKER_SOCKET_GID. No other elevated privilege
+# is granted.
 RUN useradd --system --uid 10001 --gid 0 --shell /usr/sbin/nologin exporter
 
 WORKDIR /app

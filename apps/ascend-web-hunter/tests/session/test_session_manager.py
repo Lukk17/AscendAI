@@ -17,7 +17,7 @@ def mgr() -> SessionManager:
 
 
 @pytest.mark.asyncio
-async def test_status_returns_none_when_no_session(mgr: SessionManager):
+async def test_status_returns_none_when_no_session(mgr: SessionManager) -> None:
     # when
     with patch(
         "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
@@ -35,7 +35,7 @@ async def test_status_returns_none_when_no_session(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_status_returns_expired_when_record_exists_but_ttl_zero(mgr: SessionManager):
+async def test_status_returns_expired_when_record_exists_but_ttl_zero(mgr: SessionManager) -> None:
     # when
     with patch(
         "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
@@ -52,7 +52,7 @@ async def test_status_returns_expired_when_record_exists_but_ttl_zero(mgr: Sessi
 
 
 @pytest.mark.asyncio
-async def test_status_returns_active_when_ttl_positive(mgr: SessionManager):
+async def test_status_returns_active_when_ttl_positive(mgr: SessionManager) -> None:
     # when
     with patch(
         "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
@@ -71,7 +71,7 @@ async def test_status_returns_active_when_ttl_positive(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_status_returns_active_with_no_auth_key_in_record(mgr: SessionManager):
+async def test_status_returns_active_with_no_auth_key_in_record(mgr: SessionManager) -> None:
     # when
     with patch(
         "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
@@ -89,7 +89,9 @@ async def test_status_returns_active_with_no_auth_key_in_record(mgr: SessionMana
 
 
 @pytest.mark.asyncio
-async def test_status_does_not_report_active_for_a_freshly_saved_empty_cookie_jar(mgr: SessionManager):
+async def test_status_does_not_report_active_for_a_freshly_saved_empty_cookie_jar(
+    mgr: SessionManager,
+) -> None:
     """establish() legitimately writes a record with zero cookies for a page
     nobody was challenged on (see NoVNCStrategy's monitor). status() must not
     read that record's timestamp alone as grounds to report an active
@@ -124,7 +126,7 @@ async def test_status_does_not_report_active_for_a_freshly_saved_empty_cookie_ja
     assert info.status != "active"
 
 
-def test_session_info_to_dict(mgr: SessionManager):
+def test_session_info_to_dict(mgr: SessionManager) -> None:
     # given
     from src.session.session_manager import SessionInfo
 
@@ -143,7 +145,7 @@ def test_session_info_to_dict(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_validate_returns_false_when_ttl_expired(mgr: SessionManager):
+async def test_validate_returns_false_when_ttl_expired(mgr: SessionManager) -> None:
     # when
     with patch(
         "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
@@ -156,7 +158,7 @@ async def test_validate_returns_false_when_ttl_expired(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_validate_returns_false_when_no_cookies(mgr: SessionManager):
+async def test_validate_returns_false_when_no_cookies(mgr: SessionManager) -> None:
     # when
     with (
         patch(
@@ -175,7 +177,7 @@ async def test_validate_returns_false_when_no_cookies(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_validate_slides_ttl_on_success(mgr: SessionManager):
+async def test_validate_slides_ttl_on_success(mgr: SessionManager) -> None:
     # when
     with (
         patch(
@@ -202,7 +204,7 @@ async def test_validate_slides_ttl_on_success(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_clear_delegates_to_cookie_manager_and_returns_existed(mgr: SessionManager):
+async def test_clear_delegates_to_cookie_manager_and_returns_existed(mgr: SessionManager) -> None:
     # when
     with patch(
         "src.session.session_manager.cookie_manager.clear_session",
@@ -216,7 +218,7 @@ async def test_clear_delegates_to_cookie_manager_and_returns_existed(mgr: Sessio
 
 
 @pytest.mark.asyncio
-async def test_clear_is_idempotent_when_nothing_stored(mgr: SessionManager):
+async def test_clear_is_idempotent_when_nothing_stored(mgr: SessionManager) -> None:
     # when
     with patch(
         "src.session.session_manager.cookie_manager.clear_session",
@@ -229,7 +231,7 @@ async def test_clear_is_idempotent_when_nothing_stored(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_establish_returns_vnc_url(mgr: SessionManager):
+async def test_establish_returns_vnc_url(mgr: SessionManager) -> None:
     # given
     exc = HumanInterventionRequiredException("http://vnc:7900", "login")
 
@@ -245,7 +247,7 @@ async def test_establish_returns_vnc_url(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_establish_forwards_named_profile_to_novnc_strategy(mgr: SessionManager):
+async def test_establish_forwards_named_profile_to_novnc_strategy(mgr: SessionManager) -> None:
     """The profile argument must reach the browser strategy, not be silently
     discarded: establish() with profile="work" must construct NoVNCStrategy
     with that profile."""
@@ -269,7 +271,7 @@ async def test_establish_forwards_named_profile_to_novnc_strategy(mgr: SessionMa
 
 
 @pytest.mark.asyncio
-async def test_establish_defaults_profile_when_none_given(mgr: SessionManager):
+async def test_establish_defaults_profile_when_none_given(mgr: SessionManager) -> None:
     """No profile given falls back to the configured default, matching status()/clear()."""
     # given
     exc = HumanInterventionRequiredException("http://vnc:7900", "captcha")
@@ -290,7 +292,7 @@ async def test_establish_defaults_profile_when_none_given(mgr: SessionManager):
 
 
 @pytest.mark.asyncio
-async def test_establish_raises_runtime_error_when_no_intervention(mgr: SessionManager):
+async def test_establish_raises_runtime_error_when_no_intervention(mgr: SessionManager) -> None:
     # when / then
     with patch(
         "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",

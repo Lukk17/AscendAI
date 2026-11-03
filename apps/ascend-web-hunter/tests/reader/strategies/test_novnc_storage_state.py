@@ -1,15 +1,54 @@
 """Tests for NoVNC monitor using context.storage_state() (task 1.5)."""
 
 import contextlib
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.config.config import settings
+from src.reader.cloudflare.challenge_signals import ChallengeVerdict
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC
+from src.reader.novnc.flow_registry import NoVNCFlow, flow_key_for
+from src.reader.novnc.window_layout import rect_for_slot
+
+
+def _verdict(*, wall: bool, accepted: bool) -> ChallengeVerdict:
+    return ChallengeVerdict(
+        score=200 if wall else 0,
+        threshold=100,
+        signals=(),
+        vendor=None,
+        wall=wall,
+        has_content=accepted,
+        intervention_type="captcha",
+    )
+
+
+def _make_flow(url: str, intervention_type: str, profile: str = "default") -> NoVNCFlow:
+    window = rect_for_slot(
+        0,
+        settings.NOVNC_DISPLAY_SIZE,
+        (settings.NOVNC_WINDOW_WIDTH_PX, settings.NOVNC_WINDOW_HEIGHT_PX),
+        settings.NOVNC_WINDOW_CASCADE_OFFSET_PX,
+    )
+
+    return NoVNCFlow(
+        flow_id="c3d4e5f6a7b8",
+        key=flow_key_for(url, profile),
+        url=url,
+        profile=profile,
+        intervention_type=intervention_type,
+        window=window,
+        vnc_url="http://vnc/vnc.html?autoconnect=true",
+        started_at=time.time(),
+        request_id="test-request",
+        lease_started=time.monotonic(),
+    )
 
 
 @pytest.mark.asyncio
-async def test_novnc_monitor_saves_storage_state_not_cookies():
+async def test_novnc_monitor_saves_storage_state_not_cookies() -> None:
     """
     The background monitor must call save_storage_state (not save_session_data/cookies).
     We verify by checking that save_storage_state is awaited and that context.storage_state()
@@ -26,6 +65,8 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
     page.url = "https://linkedin.com/feed"
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(return_value=mock_storage_state)
     # cookies() should NOT be called
@@ -55,7 +96,7 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
         patch("asyncio.sleep", new=AsyncMock(side_effect=StopAsyncIteration)),
     ):
         with contextlib.suppress(StopAsyncIteration):
-            await ns._monitor_for_cookies("https://linkedin.com/login", "login")
+            await ns._monitor_for_cookies(_make_flow("https://linkedin.com/login", "login"))
 
     # then
     mock_save.assert_awaited()
@@ -65,7 +106,7 @@ async def test_novnc_monitor_saves_storage_state_not_cookies():
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
+async def test_novnc_captcha_monitor_saves_once_when_clearance_appears() -> None:
     """The captcha monitor must persist the session only after a cf_clearance cookie
     appears, then stop - never overwrite a good clearance on later polls."""
     # given
@@ -79,6 +120,8 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
     page.content = AsyncMock(return_value="<html><title>Just a moment...</title></html>")
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     # First poll: still challenged (no clearance). Second poll: clearance issued.
     context.storage_state = AsyncMock(
@@ -106,19 +149,25 @@ async def test_novnc_captcha_monitor_saves_once_when_clearance_appears():
         ) as mock_save,
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
         patch("src.reader.strategies.novnc_strategy.asyncio.sleep", new=AsyncMock()),
+        patch(
+            "src.reader.strategies.novnc_strategy.assess",
+            return_value=_verdict(wall=True, accepted=False),
+        ),
     ):
-        await ns._monitor_for_cookies("https://nowsecure.nl/", "captcha")
+        await ns._monitor_for_cookies(_make_flow("https://nowsecure.nl/", "captcha"))
 
     # then
     # Saved exactly once - on the poll where cf_clearance appeared - then broke out.
     mock_save.assert_awaited_once()
-    saved_state = mock_save.await_args.args[1]
+    await_args = mock_save.await_args
+    assert await_args is not None
+    saved_state = await_args.args[1]
     assert any(c["name"] == "cf_clearance" for c in saved_state["cookies"])
-    assert mock_save.await_args.args[-1] == PRODUCED_BY_NOVNC
+    assert await_args.args[-1] == PRODUCED_BY_NOVNC
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_session():
+async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_session() -> None:
     """The reported bug: an Allegro-style DataDome block page (no cf_clearance,
     no literal 'datadome' string) must never be declared cleared, and no
     session may be written for it."""
@@ -137,6 +186,8 @@ async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_se
     )
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
 
@@ -158,14 +209,14 @@ async def test_novnc_captcha_monitor_rejects_allegro_style_block_never_writes_se
         ) as mock_save,
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 0),
     ):
-        await ns._monitor_for_cookies("https://allegro.pl/oferta/example", "captcha")
+        await ns._monitor_for_cookies(_make_flow("https://allegro.pl/oferta/example", "captcha"))
 
     # then
     mock_save.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page():
+async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page() -> None:
     """establish() is the proactive counterpart to passive capture: a call
     against an ordinary page that already shows real content on the very
     first poll, with no block ever observed, must still persist a session
@@ -182,6 +233,8 @@ async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page():
     page.content = AsyncMock(return_value="<html><body>" + "genuine article text " * 50 + "</body></html>")
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
 
@@ -202,15 +255,19 @@ async def test_novnc_captcha_monitor_writes_session_for_never_challenged_page():
             new=AsyncMock(),
         ) as mock_save,
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch(
+            "src.reader.strategies.novnc_strategy.assess",
+            return_value=_verdict(wall=False, accepted=True),
+        ),
     ):
-        await ns._monitor_for_cookies("https://ordinary-site.example/", "captcha")
+        await ns._monitor_for_cookies(_make_flow("https://ordinary-site.example/", "captcha"))
 
     # then
     mock_save.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance():
+async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance() -> None:
     """For non-Cloudflare captchas (e.g. DataDome) there is no cf_clearance cookie; the
     monitor must capture once the challenge wall is gone."""
     # given
@@ -229,6 +286,8 @@ async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance
     )
 
     context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
     context.new_page = AsyncMock(return_value=page)
     context.storage_state = AsyncMock(
         return_value={"cookies": [{"name": "datadome", "value": "SOLVED"}], "origins": []}
@@ -252,10 +311,72 @@ async def test_novnc_captcha_monitor_saves_when_wall_clears_without_cf_clearance
         ) as mock_save,
         patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
         patch("src.reader.strategies.novnc_strategy.asyncio.sleep", new=AsyncMock()),
+        patch(
+            "src.reader.strategies.novnc_strategy.assess",
+            side_effect=[
+                _verdict(wall=True, accepted=False),
+                _verdict(wall=False, accepted=True),
+            ],
+        ),
     ):
-        await ns._monitor_for_cookies("https://www.indeed.com/jobs", "captcha")
+        await ns._monitor_for_cookies(_make_flow("https://www.indeed.com/jobs", "captcha"))
 
     # then
     mock_save.assert_awaited_once()
-    saved_state = mock_save.await_args.args[1]
+    await_args = mock_save.await_args
+    assert await_args is not None
+    saved_state = await_args.args[1]
     assert any(c["name"] == "datadome" for c in saved_state["cookies"])
+
+
+@pytest.mark.asyncio
+async def test_novnc_captcha_monitor_captures_rendered_wall_with_clearance_cookie() -> None:
+    """One assess call carries the wall: a rendered wall with a cf_clearance
+    cookie present still captures, as today."""
+    # given
+    from src.reader.strategies import novnc_strategy as ns
+
+    page = MagicMock()
+    page.goto = AsyncMock()
+    page.evaluate = AsyncMock(return_value="Mozilla/5.0")
+    page.url = "https://example.com/"
+    page.content = AsyncMock(return_value="<html><body><div id='cf-challenge-running'></div></body></html>")
+
+    context = MagicMock()
+    context.route = AsyncMock()
+    context.route_web_socket = None
+    context.new_page = AsyncMock(return_value=page)
+    context.storage_state = AsyncMock(
+        return_value={"cookies": [{"name": "cf_clearance", "value": "abc"}], "origins": []}
+    )
+
+    browser = MagicMock()
+    browser.new_context = AsyncMock(return_value=context)
+    browser.close = AsyncMock()
+
+    mock_p = MagicMock()
+    mock_p.__aenter__ = AsyncMock(return_value=mock_p)
+    mock_p.__aexit__ = AsyncMock(return_value=False)
+    mock_p.chromium.launch = AsyncMock(return_value=browser)
+
+    # when
+    with (
+        patch("src.reader.strategies.novnc_strategy.async_playwright", return_value=mock_p),
+        patch(
+            "src.reader.strategies.novnc_strategy.cookie_manager.save_storage_state",
+            new=AsyncMock(),
+        ) as mock_save,
+        patch("src.reader.strategies.novnc_strategy.settings.NOVNC_TIMEOUT_SECONDS", 60),
+        patch("src.reader.strategies.novnc_strategy.asyncio.sleep", new=AsyncMock()),
+    ):
+        resolved, page_blocked = await ns._poll_captcha(
+            page,
+            "https://example.com/",
+            {"cookies": [{"name": "cf_clearance", "value": "abc"}], "origins": []},
+            None,
+        )
+
+    # then
+    assert resolved is True
+    assert page_blocked is True
+    mock_save.assert_awaited_once()

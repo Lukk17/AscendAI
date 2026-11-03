@@ -104,6 +104,10 @@ local development, set these in your OS environment so they survive shell restar
   See [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
 - `HF_HOME`. Local directory where Hugging Face caches downloaded models. Prevents re-downloading large models
   every restart.
+- `ALLOWED_PRIVATE_HOSTS`. Comma separated host names the URI fetch guard may reach even at a private address
+  (default: empty, so only public addresses are fetched). `compose.yaml` sets `host.docker.internal,localhost,127.0.0.1`
+  so an MCP `audio_uri` can reach the host-published S3-compatible object store. It is the outbound direction and a
+  different setting from the inbound `MCP_ALLOWED_HOST_HEADERS`.
 
 When you POST a transcription request you still pass the public model identifier in the `model` field; the
 `transformers` library transparently maps it to the cached files under `HF_HOME`.
@@ -151,6 +155,10 @@ pip install -r pytorch-requirements.txt
 ```
 
 ```bash
+pip install -e "../../libs/ascend-python-common[fetch]"
+```
+
+```bash
 pip install -e ".[dev]"
 ```
 
@@ -166,6 +174,10 @@ python -m venv .venv
 
 ```powershell
 pip install -r pytorch-requirements.txt
+```
+
+```powershell
+pip install -e ../../libs/ascend-python-common[fetch]
 ```
 
 ```powershell
@@ -381,7 +393,7 @@ Streamable HTTP (bidirectional over HTTP):
 The MCP tools accept an `audio_uri` argument supporting both local files and HTTP(S) URLs.
 
 > [!NOTE]
-> **Docker users (Postman).** When testing with the provided Postman collection against a Docker container, use the
+> **Docker users (Bruno).** When testing with the provided Bruno collection against a Docker container, use the
 > `{{audio_uri_docker}}` variable (resolves to `http://host.docker.internal:...`) instead of `{{audio_uri}}` in the
 > request body. Using `localhost` from inside the container will fail.
 
@@ -498,15 +510,16 @@ standard Python app and the MCP server.
 
 Four diagnostic surfaces follow the platform's standard observability stack:
 
-- `GET /health` - liveness probe. Always returns `200 {"status": "ok"}` once uvicorn has bound. Targeted by the Docker
+- `GET /health` - liveness probe. Always returns `200 {"status": "ok", "service": "ascend-audio-scribe", "version": ...}` once uvicorn has bound, regardless of upstream state. Targeted by the Docker
   `HEALTHCHECK` and the `docker-compose` healthcheck. Kubernetes liveness probes should hit this.
-- `GET /ready` - readiness probe. Checks `ffmpeg` and `ffprobe` are on PATH and the system temp dir is writable.
-  Returns `200 {"status": "ready"}` when every probe is ok, otherwise `503 {"status": "degraded", "checks": {...}}`.
+- `GET /ready` - readiness probe. Checks `ffmpeg` and `ffprobe` are on PATH and the system temp dir is writable. Probes run at once with a 3 s budget through the `ascend-python-common` readiness aggregator.
+  Returns `200 {"status": "ready", "service": "ascend-audio-scribe", "version": ..., "checks": {...}}` when every probe is ok or skipped, otherwise `503 {"status": "not-ready", ...}` with the same shape.
 - `GET /metrics` - Prometheus payload. Counters labelled `provider={local,openai,huggingface}` and `outcome` for
   request totals + bytes processed, plus per-operation duration histograms. Audacity track count and ffmpeg
   invocation counters are also exposed.
-- `X-Request-ID` middleware - every request echoes (or generates) a correlation ID, injected into every log line via
-  `[request_id]` so requests can be reassembled from log aggregation without bespoke tracing plumbing.
+- `X-Request-ID` middleware - every request echoes (or generates) a correlation ID, injected into every log line for that
+  request, so requests can be reassembled from log aggregation without bespoke tracing plumbing. Log lines start with
+  `[ascend-audio-scribe]` and honour `LOG_LEVEL`; `LOG_FORMAT` selects `json` (containers) or `color` (local runs). Logging comes from `ascend-python-common`.
 
 ### Error contract
 
@@ -514,15 +527,18 @@ All errors use [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem docume
 application/problem+json`.
 
 - `400` - validation failure (`ValueError` raised in the request lifecycle, e.g. unsafe URI, unsupported provider,
-  missing API key). Body includes `detail` with the service-authored failure reason.
+  missing API key, or a request the router cannot validate). Body includes `code: "validation"`, `detail` with the service-authored failure reason, and an `errors` array sorted by `field` (each entry has `field` and `message`) when the router rejects the request.
+- `404` - unknown path (`code: "not_found"`). `405` - wrong method (`code: "method_not_allowed"`, with an `Allow` header).
 - `413` - upload, download, or Audacity zip exceeds the configured size cap (`MAX_UPLOAD_BYTES`,
-  `MAX_DOWNLOAD_BYTES`, `MAX_ZIP_UNCOMPRESSED_BYTES`; all default 5 GiB).
-- `422` - pydantic schema validation failure (Form / Query parameter shape).
-- `500` - unhandled exception. Body intentionally omits `detail` so upstream stack traces or DSNs never reach the
-  caller. Full diagnostics live in the service logs, correlated by `X-Request-ID`.
+  `MAX_DOWNLOAD_BYTES`, `MAX_ZIP_UNCOMPRESSED_BYTES`; all default 5 GiB) with code `file_too_large`.
+- `502` - upstream transcription provider failure with code `upstream_provider` and the service-authored detail.
+- `500` - unhandled exception with code `internal` and a fixed generic detail. Body intentionally omits the exception message so upstream stack traces or DSNs never reach the
+  caller. Full diagnostics live in the service logs, correlated by `X-Request-ID` and `traceId`.
 
-The MCP surface returns structured envelopes instead of HTTP status codes (MCP tool results are JSON):
-`{"status": "error", "code": "validation_error" | "internal_error", "operation": "...", "message": "..."}`.
+Every body also carries `type`, `title`, `status`, `instance`, and `traceId` (32 lower case hex characters).
+
+MCP refusals are tool errors instead of HTTP status codes (MCP tool results are JSON). The error text starts with
+the registry code: `validation: ...` for refused input, `file_too_large: ...` for over-cap downloads, `upstream_provider: ...` for provider failures, `internal: ...` for unexpected failures.
 
 On success, the four `transcribe_*` tools return a flat envelope, single-encoded, with no nested JSON string to
 parse: `{"status": "success", "source": "...", "model": "...", "language": "...", "transcription": "..."}`. `source`
@@ -534,7 +550,7 @@ is the provider that produced the result (`local`, `openai`, `huggingface`, or t
 
 ### Startup readiness banner
 
-On startup, [src/config/startup_banner.py](src/config/startup_banner.py) logs a single multi-line INFO entry with an
+On startup, [src/config/startup_banner.py](src/config/startup_banner.py) passes the art text, content lines, and probe results into the `ascend-python-common` banner frame, which emits a single multi-line INFO log entry with an
 ANSI Shadow `AUDIO SCRIBE` banner, access URLs, API-key state for OpenAI and Hugging Face, live HTTP probe results,
 and the list of observability and REST endpoints. Shared convention with every other long-running service in the
 repo. See [.agents/skills/coding-standards/SKILL.md](../../.agents/skills/coding-standards/SKILL.md).

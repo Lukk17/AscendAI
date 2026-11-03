@@ -1,38 +1,43 @@
 import logging
-from typing import Any
+import time
+from importlib.metadata import version as package_version
+from typing import Any, NoReturn
 
+from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
+from src.api.exception_handlers import error_registry
 from src.config.config import settings
+from src.observability.metrics import (
+    MEMORY_DELETE_DURATION_SECONDS,
+    MEMORY_INSERT_DURATION_SECONDS,
+    MEMORY_OPERATIONS_TOTAL,
+    MEMORY_SEARCH_DURATION_SECONDS,
+    MEMORY_WIPE_DURATION_SECONDS,
+    outcome_for_exception,
+)
 from src.service.memory_client import get_memory_client, resolve_provider, wipe_user_all_collections
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("AscendMemory")
+mcp = FastMCP("ascend-memory", version=package_version("ascend-memory"))
 
 
-def _structured_error(operation: str, exc: Exception) -> dict[str, Any]:
-    """Same error envelope every tool returns when something goes wrong.
-    Logs the full exception server-side, surfaces only the message client-
-    side. ValueErrors are user-actionable (unknown provider, bad input);
-    everything else maps to a generic 'internal_error' code."""
+def _raise_mapped_error(operation: str, exc: Exception) -> NoReturn:
+    """Re-raise a failure as a tool error whose text starts with the registry code.
 
-    if isinstance(exc, ValueError):
-        return {
-            "status": "error",
-            "code": "validation_error",
-            "operation": operation,
-            "message": str(exc),
-        }
+    The code and detail come from the service error registry, the same mapping
+    the library McpRefusalMiddleware applies to registered exceptions.
+    """
+
+    entry = error_registry.lookup(exc)
+    if entry is not None:
+        raise ToolError(f"{entry.code.code}: {resolve_detail(entry, exc)}") from exc
 
     logger.exception(f"MCP {operation} failed")
 
-    return {
-        "status": "error",
-        "code": "internal_error",
-        "operation": operation,
-        "message": "An internal error occurred. Check service logs.",
-    }
+    raise ToolError(f"{INTERNAL.code}: {INTERNAL_FIXED_DETAIL}") from exc
 
 
 @mcp.tool()
@@ -51,6 +56,9 @@ def memory_insert(
         metadata: Optional metadata.
     """
 
+    started = time.monotonic()
+    outcome = "ok"
+    provider_label = "unknown"
     try:
         if not text or not text.strip():
             raise ValueError("text must not be empty")
@@ -58,6 +66,7 @@ def memory_insert(
             raise ValueError(f"text exceeds maximum length of {settings.MAX_MEMORY_TEXT_LENGTH} characters")
 
         resolved_provider = resolve_provider(provider)
+        provider_label = resolved_provider
         effective_user_id = user_id or settings.DEFAULT_USER_ID
 
         results = get_memory_client(resolved_provider).add(
@@ -66,7 +75,11 @@ def memory_insert(
 
         return {"status": "success", "results": results}
     except Exception as exc:
-        return _structured_error("memory_insert", exc)
+        outcome = outcome_for_exception(exc)
+        _raise_mapped_error("memory_insert", exc)
+    finally:
+        MEMORY_INSERT_DURATION_SECONDS.labels(provider=provider_label).observe(time.monotonic() - started)
+        MEMORY_OPERATIONS_TOTAL.labels(operation="insert", outcome=outcome).inc()
 
 
 @mcp.tool()
@@ -85,6 +98,9 @@ def memory_search(
         provider: Embedding provider; defaults to MEM0_DEFAULT_PROVIDER.
     """
 
+    started = time.monotonic()
+    outcome = "ok"
+    provider_label = "unknown"
     try:
         if not query or not query.strip():
             raise ValueError("query must not be empty")
@@ -94,6 +110,7 @@ def memory_search(
             raise ValueError(f"limit must be between 1 and {settings.MAX_SEARCH_LIMIT}")
 
         resolved_provider = resolve_provider(provider)
+        provider_label = resolved_provider
         effective_user_id = user_id or settings.DEFAULT_USER_ID
 
         results = get_memory_client(resolved_provider).search(
@@ -102,7 +119,13 @@ def memory_search(
 
         return {"status": "success", "results": results}
     except Exception as exc:
-        return _structured_error("memory_search", exc)
+        outcome = outcome_for_exception(exc)
+        _raise_mapped_error("memory_search", exc)
+    finally:
+        MEMORY_SEARCH_DURATION_SECONDS.labels(embedding_provider=provider_label).observe(
+            time.monotonic() - started
+        )
+        MEMORY_OPERATIONS_TOTAL.labels(operation="search", outcome=outcome).inc()
 
 
 @mcp.tool()
@@ -114,16 +137,24 @@ def memory_delete(memory_id: str, provider: str | None = None) -> dict[str, Any]
         provider: Embedding provider; defaults to MEM0_DEFAULT_PROVIDER.
     """
 
+    started = time.monotonic()
+    outcome = "ok"
+    provider_label = "unknown"
     try:
         if not memory_id or not memory_id.strip():
             raise ValueError("memory_id must not be empty")
 
         resolved_provider = resolve_provider(provider)
+        provider_label = resolved_provider
         get_memory_client(resolved_provider).delete(memory_id=memory_id)
 
         return {"status": "success", "message": f"Memory {memory_id} deleted."}
     except Exception as exc:
-        return _structured_error("memory_delete", exc)
+        outcome = outcome_for_exception(exc)
+        _raise_mapped_error("memory_delete", exc)
+    finally:
+        MEMORY_DELETE_DURATION_SECONDS.labels(provider=provider_label).observe(time.monotonic() - started)
+        MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome=outcome).inc()
 
 
 @mcp.tool()
@@ -135,14 +166,23 @@ def memory_wipe(user_id: str | None = None, provider: str | None = None) -> dict
         provider: Embedding provider; defaults to MEM0_DEFAULT_PROVIDER.
     """
 
+    started = time.monotonic()
+    outcome = "ok"
+    provider_label = "unknown"
     try:
         effective_user_id = user_id or settings.DEFAULT_USER_ID
 
         if provider is None or not provider.strip():
+            provider_label = "all"
             wipe_user_all_collections(user_id=effective_user_id)
         else:
-            get_memory_client(resolve_provider(provider)).wipe_user(user_id=effective_user_id)
+            provider_label = resolve_provider(provider)
+            get_memory_client(provider_label).wipe_user(user_id=effective_user_id)
 
         return {"status": "success", "message": f"All memories wiped for user {effective_user_id}."}
     except Exception as exc:
-        return _structured_error("memory_wipe", exc)
+        outcome = outcome_for_exception(exc)
+        _raise_mapped_error("memory_wipe", exc)
+    finally:
+        MEMORY_WIPE_DURATION_SECONDS.labels(provider=provider_label).observe(time.monotonic() - started)
+        MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome=outcome).inc()

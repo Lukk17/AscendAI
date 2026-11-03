@@ -8,6 +8,11 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `build.gradle.kts` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.1.3] - <commit date>
+
+### Documentation
+- The configuration reference names `SPRING_PROFILES_ACTIVE`, `APP_MEMORY_CHATHISTORY_REDIS_ENABLED`, `APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED`, `APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, `MODEL_PROVIDER`, `SECURITY_ENABLED`, `SECURITY_USERNAME`, `SECURITY_PASSWORD`, `OPENAI_EXTRACTION_MODEL`, `GEMINI_EXTRACTION_MODEL`, `ANTHROPIC_EXTRACTION_MODEL` and `MINIMAX_EXTRACTION_MODEL`. `fix-linux-docker-host-access`.
+
 ## [0.1.2] - 2026-10-01
 
 ### Changed

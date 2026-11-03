@@ -4,7 +4,11 @@ Draft. The number is assigned at implementation time: it takes the next free num
 
 ## Status
 
-Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 12.8 installs into `apps/ascend-agent/docs/architecture/decisions/`, taking the next free number at that time.
+Proposed, 2026-09-04. Amended 2026-09-04, see Amendment below. Accepted when the OpenSpec change `add-auth-and-identity` lands. This file is the draft that task 7.6 installs into `apps/ascend-agent/docs/architecture/decisions/`, taking the next free number at that time.
+
+## Amendment, 2026-10-04
+
+The OpenSpec change was split on 2026-10-04 (owner answer 70.2 and the owner rule of 2026-10-04: the personal assistant comes first). Keycloak as the identity layer, the one realm, the one issuer, password sign-in on Keycloak's own login page and the app client land first, in the personal change `add-keycloak-login`, for the one tenant `default`. That change installs no record of its own for them, so this record states them. The parts of this record about customers (the tenant claim, one brokered provider per customer, and routing by email domain) land with `add-auth-and-identity`, which plugs into `add-keycloak-login` and installs this record.
 
 ## Amendment, 2026-09-04
 
@@ -71,4 +75,5 @@ The realm export stops being a test fixture and becomes the provisioning of a re
 - ADR-NNN-directory-is-the-primary-membership-path, which decides which membership path is primary once directory lookups exist, and which is deferred with them
 - ADR-NNN-group-attributes-cross-the-broker-in-force-mode, which decides how group identifiers cross the broker, and which is deferred because none do in this version
 - ADR-NNN-directory-configured-separately-from-issuer and ADR-NNN-identity-link-storage-and-lifecycle, deferred for the same reason
+- The four deferred records above are drafts kept in the archived folder of the OpenSpec change `add-auth-and-identity` (`decisions/`), not installed decision records
 - OpenSpec changes `add-tenant-isolation`, `add-usage-metering-and-quotas`, and `add-audit-and-gdpr-compliance`, whose single-issuer assumption this record confirms rather than disturbs

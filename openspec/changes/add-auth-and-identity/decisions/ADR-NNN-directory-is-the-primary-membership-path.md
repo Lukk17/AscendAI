@@ -4,7 +4,7 @@ Draft. The number is assigned at implementation time: it takes the next free num
 
 ## Status
 
-Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `apps/ascend-agent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
+Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This draft is not installed into `apps/ascend-agent/docs/architecture/decisions/`: it stays in the change's `decisions/` folder, which the archive keeps under `openspec/changes/archive/`, next to the Deferred section of the design (owner answer 93 of 2026-10-08).
 
 ## Deferral, 2026-09-04
 
@@ -42,7 +42,7 @@ Where ascend-ai-agent validates a directly-issued provider token instead of a br
 
 The Google path is always a directory call. A Google customer with no directory adapter configured resolves the tenant floor and nothing else, and that is documented as a deployment shape rather than as a fault.
 
-This refines ADR-M007 rather than contradicting its intent, which was that a claim is used only when it can be trusted. What is new is the finding that on the brokered path trustworthiness cannot be established at all. Amending ADR-M007 and `docs/architecture/permission-aware-retrieval.md` to match is task 12.11 of the change.
+This refines ADR-M007 rather than contradicting its intent, which was that a claim is used only when it can be trusted. What is new is the finding that on the brokered path trustworthiness cannot be established at all. Amending ADR-M007 and `docs/architecture/permission-aware-retrieval.md` to match is task 7.8 of the change.
 
 ## Consequences
 
@@ -55,9 +55,9 @@ This refines ADR-M007 rather than contradicting its intent, which was that a cla
 
 ### Trade-offs
 
-- Every cache miss now pays a directory call, for every customer with an adapter configured rather than only for over-cap users. Directory availability becomes product availability on that path, which ADR-NNN-principal-set-never-silently-narrowed already accepted deliberately and turns into a 503 rather than a quiet narrowing. The design document's open question about synchronous resolution latency against a large directory stays open and gets more weight, not less.
+- Every cache miss now pays a directory call, for every customer with an adapter configured rather than only for over-cap users. Directory availability becomes product availability on that path, which ADR-NNN-principal-set-never-silently-narrowed already accepted deliberately and turns into a 503 rather than a quiet narrowing. The open question about synchronous resolution latency against a large directory (question 5 under "Open questions" in `docs/architecture/permission-aware-retrieval.md`) belongs to the deferred directory work, the section "Deferred: resolving membership from a customer's own directory" of that document and the entries Deferred D9a and Deferred D14a in the Deferred section of the `add-auth-and-identity` design. It stays open with that work and gets more weight, not less, when the work returns.
 - Directory credentials become a per-customer prerequisite rather than a fallback arrangement. A customer who will consent to sign-in but not to an application identity reading their directory now has no working small-tenant path unless they are genuinely small, and the stored-token escape hatch is the only other answer.
-- ADR-M007 and the retrieval design now say something this change does not do, until task 12.11 lands. That is a real inconsistency for the duration, and it is called out in the task rather than papered over.
+- ADR-M007 and the retrieval design now say something this change does not do, until task 7.8 lands. That is a real inconsistency for the duration, and it is called out in the task rather than papered over.
 - The claim path still exists and still has to be maintained and tested, for the small tenant and for the direct-issuer escape hatch. Two paths is more than one, and deleting the claim path would have been simpler and would have removed a legitimate configuration.
 
 ### Alternatives considered

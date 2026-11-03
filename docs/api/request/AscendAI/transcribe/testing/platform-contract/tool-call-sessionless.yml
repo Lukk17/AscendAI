@@ -1,0 +1,71 @@
+info:
+  name: tool-call-sessionless
+  type: http
+  seq: 105
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7017/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: mcp-protocol-version
+      value: 2026-07-28
+    - name: mcp-method
+      value: tools/call
+    - name: mcp-name
+      value: health
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 105,
+        "method": "tools/call",
+        "params": {
+          "name": "health",
+          "arguments": {},
+          "_meta": {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {},
+            "io.modelcontextprotocol/clientInfo": {
+              "name": "probe",
+              "version": "0.0.1"
+            }
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("no mcp-session-id response header", function () {
+            expect(res.getHeader("mcp-session-id")).to.equal(undefined);
+        });
+        test("content and structured content match the pin", function () {
+            const body = res.getBody();
+            const isText = typeof body === "string";
+            const dataLine = isText
+                ? body.split("\n").find(function (line) { return line.indexOf("data:") === 0; })
+                : undefined;
+            const envelope = dataLine !== undefined
+                ? JSON.parse(dataLine.replace(/^data:\s*/, ""))
+                : (isText ? JSON.parse(body) : body);
+            const result = envelope.result;
+            const expected = { status: "ok" };
+            expect(JSON.parse(result.content[0].text)).to.eql(expected);
+            expect(result.structuredContent).to.eql(expected);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

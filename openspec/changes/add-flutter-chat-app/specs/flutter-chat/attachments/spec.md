@@ -16,7 +16,7 @@ The app SHALL allow the user to select an image file and include it in the promp
 - **THEN** the request to `POST /api/v1/ai/prompt/stream` SHALL include both the `prompt` text field and the `image` file part
 
 #### Scenario: Vision-unsupported model rejection
-- **WHEN** the backend returns `415 Unsupported Media Type` because the selected model lacks vision capabilities
+- **WHEN** the backend returns `415 Unsupported Media Type` with `code` `vision_unsupported` because the selected model lacks vision capabilities
 - **THEN** the app SHALL display an error notification explaining that the current model does not support image input
 
 ### Requirement: User can attach a document to a prompt

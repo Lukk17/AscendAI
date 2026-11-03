@@ -97,6 +97,26 @@ PowerShell:
 docker compose build --no-cache
 ```
 
+#### Reaching the host from a container
+
+A container that calls an address on the host follows five rules:
+
+1. Container to container: the container name or the compose service name on the shared network.
+2. Host to container: `127.0.0.1` and a published port.
+3. Container to host: `host.docker.internal` only together with `extra_hosts: "host.docker.internal:host-gateway"` on that compose service, `--add-host=host.docker.internal:host-gateway` on a `docker run`, or `ExtraHosts` with the same value through the Docker Engine API. Needs Docker Engine 20.10 or newer.
+4. Inside a container, `localhost` and `127.0.0.1` mean that container itself.
+5. A `docker run` that calls no other service needs none of this.
+
+The mapping comes from the Docker documentation. `extra_hosts` with `host-gateway` maps a name to the host, and on Linux it resolves to the host's address on the default bridge network, while Docker Desktop provides `host.docker.internal` by itself ([compose networking](https://docs.docker.com/compose/how-tos/networking/)). `--add-host` accepts the same special value ([docker run reference](https://docs.docker.com/reference/cli/docker/container/run/)). The daemon supports `host.docker.internal` on Linux since Engine 20.10.0 ([release notes](https://docs.docker.com/engine/release-notes/20.10/), moby/moby#40007). The daemon creates its Unix socket accessible by members of the `docker` group ([post-install steps](https://docs.docker.com/engine/install/linux-postinstall/)). `group_add` adds the container user to further groups by name or by number, and a name is looked up inside the container, so the host's `docker` group is added by its number ([compose file reference](https://docs.docker.com/reference/compose-file/services/)).
+
+On Docker Engine for Linux each host prerequisite (PostgreSQL 5432, Redis 6379, Qdrant 6333, the object store 9070, LM Studio 1234) must listen on the Docker bridge address or on all addresses, because a call through `host.docker.internal` arrives at the bridge address, never at `127.0.0.1`, and a host firewall must accept the Docker bridge subnets on those ports. Concretely that means the Postgres `listen_addresses` setting, the Redis `bind` line, a container port published on `0.0.0.0` rather than `127.0.0.1`, and the LM Studio setting that serves on the local network. The GPU reservation of ascend-audio-scribe needs the NVIDIA Container Toolkit on a Linux host. The socket reader finds the group to join with one command:
+
+```bash
+stat -c %g /var/run/docker.sock
+```
+
+Put the printed number into `DOCKER_SOCKET_GID` (default `0`, the socket's group on Docker Desktop), see its [row](CONFIGURATION.md#container-metrics-exporter) in the configuration reference. The two volume sources of ascend-audio-scribe are settings too: [HF_CACHE_ROOT](CONFIGURATION.md#ascend-audio-scribe) (default `hf-cache`, the Hugging Face model cache) and [ASCEND_AUDIO_SCRIBE_MEDIA_ROOT](CONFIGURATION.md#ascend-audio-scribe) (default `ascend-audio-scribe-media`, the `/audio` mount that `MCP_FILE_URI_ROOT=/audio` jails `file://` URIs to). A plain name is a named volume and a host path is a bind mount of that folder.
+
 ---
 
 ### Publishing Docker images
@@ -150,6 +170,7 @@ the entire sync check. Changing one means changing the other in the same commit.
 
 ### See also
 
+- [CONFIGURATION.md](CONFIGURATION.md). Every setting of every service.
 - [../README.md](../README.md). Monorepo overview, Quick Start, ports.
 - [../apps/ascend-web-hunter/deploy-standalone/README.md](../apps/ascend-web-hunter/deploy-standalone/README.md). Standalone web-search deployment.
 - [../.github/workflows/README.md](../.github/workflows/README.md). CI and release workflows, image naming, registries.

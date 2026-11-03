@@ -34,4 +34,4 @@ called by ascend-ai-agent through the Model Context Protocol. It has no database
 | 2 | Security | User-supplied URLs pass SSRF validation before any outbound request; private/loopback addresses are blocked. |
 | 3 | Transparency | The response `mode` field always identifies which strategy produced the content. Callers can observe escalation cost. |
 | 4 | Session reuse | Cloudflare clearance cookies acquired by any strategy are persisted to Redis and reused on subsequent requests to the same domain. |
-| 5 | Operational simplicity | A single `SEARXNG_BASE_URL` and `FLARESOLVERR_URL` env var covers the two most common deployment variants; defaults work for local development. |
+| 5 | Operational simplicity | A single `SEARXNG_BASE_URL` env var covers the most common deployment variant; defaults work for local development. |

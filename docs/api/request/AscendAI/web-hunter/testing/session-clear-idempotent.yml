@@ -9,7 +9,7 @@ http:
   body:
     type: json
     # example.com never accumulates a session through the normal tiers (tier 1
-    # curl_cffi serves it directly, so FlareSolverr's cookie-save path never
+    # curl_cffi serves it directly, so no tier's cookie-save path ever
     # fires for it), so this documents the deliberate no-op / idempotent path.
     data: |-
       {

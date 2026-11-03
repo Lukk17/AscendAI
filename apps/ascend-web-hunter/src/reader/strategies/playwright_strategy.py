@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 import trafilatura
+from ascend_python_common.uri_guard import UnsafeUriError
 from playwright.async_api import Browser, BrowserContext, Page
 from playwright.async_api import Error as PlaywrightError
 from playwright_stealth import Stealth
@@ -11,16 +12,26 @@ from playwright_stealth import Stealth
 from src.api.exceptions import ChallengeDetectedException
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
+from src.reader.browser_guard import install_browser_guard
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.challenge_signals import (
+    ChallengeVerdict,
+    as_login_verdict,
+    assess,
+    log_verdict,
+    record_verdict,
+)
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
+from src.reader.screenshot import capture_page
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.runtime.browser_pool import browser_pool
 from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
 
-_NETWORKIDLE_POLL_MS = 1000
+_PLAYWRIGHT_TIER = "playwright"
+
 _MS_PER_SECOND = 1000
 
 
@@ -43,22 +54,27 @@ class PlaywrightStrategy(BaseStrategy):
 
         return extracted or ""
 
+    async def screenshot_page(self, url: str) -> tuple[str, bytes] | None:
+        """Capture a full-page PNG of *url* through a fresh stealth context."""
+        browser = await browser_pool.get_browser()
+
+        return await capture_page(lambda: self._create_stealth_context(browser, url), url)
+
     async def get_html(self, url: str) -> str:
         browser = await browser_pool.get_browser()
         context = await self._create_stealth_context(browser, url)
         page = await context.new_page()
 
-        await self._apply_protections(page)
+        refused_navigations = await self._apply_protections(page)
 
         try:
             if ChallengeDetector.is_login_redirect_url(url):
                 logger.warning("PlaywrightStrategy: Pre-emptive redirect login URI detected on %s", url)
-                raise ChallengeDetectedException(intervention_type="login")
+                raise ChallengeDetectedException(
+                    as_login_verdict(assess(200, "", None, await self._context_cookie_names(context)))
+                )
 
-            timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
-            initial_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-
-            response_status = initial_response.status if initial_response else 200
+            response_status, initial_headers = await self._initial_navigation(page, url, refused_navigations)
             poll_start = time.perf_counter()
             extract_deadline = poll_start + settings.EXTRACT_TIMEOUT
             challenge_deadline = poll_start + settings.CHALLENGE_CLEAR_WAIT_SECONDS
@@ -68,15 +84,17 @@ class PlaywrightStrategy(BaseStrategy):
                 try:
                     content = await page.content()
                 except PlaywrightError:
-                    await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
+                    await page.wait_for_timeout(settings.NETWORKIDLE_POLL_MS)
                     continue
 
-                if ChallengeDetector.is_login_required(content):
+                verdict = await self._assess_content(page, url, response_status, initial_headers, content)
+
+                if verdict.wall and verdict.intervention_type == "login":
                     logger.warning("PlaywrightStrategy: Login wall detected on %s (early exit)", url)
 
-                    raise ChallengeDetectedException(intervention_type="login")
+                    raise ChallengeDetectedException(verdict)
 
-                if ChallengeDetector.is_blocked(response_status, content):
+                if verdict.wall:
                     if time.perf_counter() >= challenge_deadline:
                         logger.warning(
                             "PlaywrightStrategy: WAF/Cloudflare challenge did not auto-clear within "
@@ -85,12 +103,12 @@ class PlaywrightStrategy(BaseStrategy):
                             url,
                         )
 
-                        raise ChallengeDetectedException(intervention_type="captcha")
-                    await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
+                        raise ChallengeDetectedException(verdict)
+                    await page.wait_for_timeout(settings.NETWORKIDLE_POLL_MS)
                     continue
 
                 try:
-                    await page.wait_for_load_state("networkidle", timeout=_NETWORKIDLE_POLL_MS)
+                    await page.wait_for_load_state("networkidle", timeout=settings.NETWORKIDLE_POLL_MS)
                     break
                 except PlaywrightError:
                     pass
@@ -104,29 +122,100 @@ class PlaywrightStrategy(BaseStrategy):
                 "PlaywrightStrategy: Finished rendering %s. Extracted HTML Length: %d", url, len(content)
             )
 
-            if ChallengeDetector.is_blocked(response_status, content):
-                logger.warning("PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url)
-
-                raise ChallengeDetectedException(intervention_type="captcha")
-
-            if ChallengeDetector.is_login_required(content):
-                logger.warning(
-                    "PlaywrightStrategy: Late-stage Login wall detected on %s. Content Length: %d",
-                    url,
-                    len(content),
-                )
-
-                raise ChallengeDetectedException(intervention_type="login")
-
-            return content
+            return await self._assess_post_render(
+                page, url, response_status, initial_headers, content, refused_navigations
+            )
         finally:
             await context.close()
+
+    async def _initial_navigation(
+        self, page: Page, url: str, refused_navigations: list[str]
+    ) -> tuple[int, dict[str, str]]:
+        """The initial navigation: response status and headers every later
+        verdict reuses, because a challenge that clears on its own changes the
+        body and the cookies but not the headers of the response that started it.
+        A navigation the guard refused ends here with `UnsafeUriError` instead of
+        a bare transport error."""
+        timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
+        try:
+            initial_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+        except PlaywrightError as exc:
+            if refused_navigations:
+                raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}") from exc
+
+            raise
+
+        response_status = initial_response.status if initial_response else 200
+        initial_headers = await initial_response.all_headers() if initial_response else {}
+
+        return response_status, initial_headers
+
+    async def _assess_post_render(
+        self,
+        page: Page,
+        url: str,
+        response_status: int,
+        initial_headers: dict[str, str],
+        content: str,
+        refused_navigations: list[str],
+    ) -> str:
+        """One verdict over the rendered content, then the refusal check: a
+        page whose script navigated to a refused address fails the tier even
+        when the rendered content itself looks clean."""
+        verdict = await self._assess_content(page, url, response_status, initial_headers, content)
+
+        if verdict.wall and verdict.intervention_type == "login":
+            logger.warning(
+                "PlaywrightStrategy: Late-stage Login wall detected on %s. Content Length: %d",
+                url,
+                len(content),
+            )
+
+            raise ChallengeDetectedException(verdict)
+
+        if not verdict.accepted:
+            logger.warning("PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url)
+
+            raise ChallengeDetectedException(verdict)
+
+        if refused_navigations:
+            logger.warning("PlaywrightStrategy: Blocked navigation detected post-render on %s", url)
+
+            raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}")
+
+        return content
+
+    async def _context_cookie_names(self, context: BrowserContext) -> list[str]:
+        cookies = await context.cookies()
+
+        return [str(cookie.get("name", "")) for cookie in cookies]
+
+    async def _assess_content(
+        self,
+        page: Page,
+        url: str,
+        response_status: int,
+        initial_headers: dict[str, str],
+        content: str,
+    ) -> ChallengeVerdict:
+        """One verdict over the rendered content with the initial response's
+        status and headers and the context's current cookie names."""
+        verdict = assess(
+            response_status,
+            content,
+            initial_headers,
+            await self._context_cookie_names(page.context),
+        )
+        record_verdict(verdict, _PLAYWRIGHT_TIER)
+        log_verdict(verdict, _PLAYWRIGHT_TIER, url)
+
+        return verdict
 
     async def _scroll_page(self, page: Page) -> None:
         """Scroll down in increments to trigger lazy-load / infinite-scroll content."""
         for _ in range(settings.SCROLL_ITERATIONS):
             await page.evaluate(f"window.scrollBy(0, {settings.SCROLL_STEP_PX})")
-            await page.wait_for_timeout(200)
+            await page.wait_for_timeout(settings.SCROLL_PAUSE_MS)
 
     async def _create_stealth_context(self, browser: Browser, url: str) -> BrowserContext:
         fp = self.fingerprint
@@ -141,6 +230,7 @@ class PlaywrightStrategy(BaseStrategy):
             "timezone_id": fp.timezone_id,
             "geolocation": fp.geolocation,
             "permissions": ["geolocation"],
+            "service_workers": "block",
         }
         if stored_state is not None:
             kwargs["storage_state"] = stored_state
@@ -151,7 +241,8 @@ class PlaywrightStrategy(BaseStrategy):
 
         return await browser.new_context(**kwargs)
 
-    async def _apply_protections(self, page: Page) -> None:
+    async def _apply_protections(self, page: Page) -> list[str]:
         stealth = Stealth()
         await stealth.apply_stealth_async(page)
-        await page.route("**/*", self.url_validator.route_handler)
+
+        return await install_browser_guard(page.context, self.url_validator)

@@ -1,0 +1,37 @@
+info:
+  name: route-private-link
+  type: http
+  seq: 29
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/pdf-link-blocked",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("blocked PDF link keeps the page text with a routing error", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.content).to.include("HALCYON-PLOVER");
+            expect(b.routing_error).to.be.a("string");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

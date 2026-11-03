@@ -43,13 +43,13 @@ runtime:
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
             expect(JSON.stringify(envelope)).to.include("UNSAFE_URI");
         });
-        test("The refusal comes from the jail, not from file:// being switched off", function () {
+        test("The refusal is the shared guard text and never names the jail root", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
             const text = JSON.stringify(envelope);
-            expect(text).to.include("escapes MCP_FILE_URI_ROOT");
-            expect(text).to.not.include("MCP_FILE_URI_ROOT is unset");
+            expect(text).to.include("UNSAFE_URI");
+            expect(text).to.not.include("MCP_FILE_URI_ROOT");
         });
         test("Nothing outside the root was read", function () {
             const sseBody = res.getBody();

@@ -1,3 +1,33 @@
+## MODIFIED Requirements
+
+### Requirement: Similarity threshold is applied at vector-search time
+
+`RagRetrievalService` SHALL pass a similarity threshold of `0.0` to the `SearchRequest`, so every candidate the mandatory tenant and access list filter permits comes back with its score, and SHALL apply `app.rag.similarity-threshold` in Java to that permitted candidate list, logging the scores of the near misses. The service SHALL NOT drop the entire result set merely because the top-ranked hit fails the threshold. Owner decision 65.22 of 2026-10-04: knowledge search keeps the Java score filter, and this text replaces the earlier statement that Qdrant filters by the threshold server-side, which the code never did.
+
+#### Scenario: All hits above threshold are returned
+
+- **WHEN** Qdrant has 5 hits with scores `[0.91, 0.85, 0.80, 0.74, 0.60]` and the threshold is `0.75`
+- **THEN** the retrieved context contains 3 hits (`0.91`, `0.85`, `0.80`)
+- **AND** does NOT contain the hits with scores `0.74` and `0.60`
+
+#### Scenario: Top hit below threshold does NOT drop other hits
+
+- **WHEN** Qdrant returns hits `[0.74, 0.80, 0.85]` (top hit fails threshold but others pass)
+- **THEN** the retrieved context contains 2 hits (`0.80`, `0.85`)
+- **AND** the assembler logs `RAG Context Injected: YES` (not NO)
+
+#### Scenario: All hits below threshold
+
+- **WHEN** all hits returned by Qdrant are below the threshold
+- **THEN** the retrieved context is empty
+- **AND** the assembler logs `RAG Context Injected: NO`
+
+#### Scenario: The search request carries no server-side threshold
+
+- **WHEN** a prompt is served with RAG enabled and `app.rag.similarity-threshold` is `0.75`
+- **THEN** the `SearchRequest` handed to the vector store has a similarity threshold of `0.0`
+- **AND** the threshold of `0.75` is applied in Java to the permitted candidates
+
 ## ADDED Requirements
 
 ### Requirement: Mandatory tenant and access-list filter on similarity search
@@ -65,13 +95,27 @@ When either the tenant context or the principal set is unresolved, retrieval SHA
 
 ### Requirement: Exactly one method issues the similarity search
 
-Production code SHALL contain exactly one method that calls `VectorStore.similaritySearch(...)`, and that method SHALL be the one that composes the filter expression described above (today `RagRetrievalService.performSimilaritySearch`). No other production class SHALL call it, directly or through a wrapper. This SHALL be enforced by an architecture test that fails the build when a second call site appears, so the filter cannot be bypassed by a future code path that builds its own `SearchRequest`.
+Production code SHALL contain exactly one method that calls `VectorStore.similaritySearch(...)`, `TenantFilteredVectorSearch.search`, and that method SHALL be the one that composes the filter expression described above. `RagRetrievalService.performSimilaritySearch` SHALL search through it with the target `KNOWLEDGE`, and the capability index search of `add-agent-skills` (`CapabilityIndex.search`) SHALL search through it with the target `CAPABILITIES`, whose mandatory filter admits only global entries and entries of the caller's tenant and which SHALL fail closed when no tenant is resolved. The method SHALL choose the vector store from the target, so a caller cannot pair a store with a weaker filter. No other production class SHALL call `similaritySearch`, directly or through a wrapper. This SHALL be enforced by an architecture test that fails the build when a second call site appears, so the filter cannot be bypassed by a future code path that builds its own `SearchRequest`.
+
+That method SHALL accept an optional narrowing conjunct from its caller, built through `FilterExpressionBuilder` and always joined with AND to the mandatory tenant and access-list filter. The narrowing conjunct SHALL NOT replace the mandatory filter or remove either of its two conjuncts, and the architecture test SHALL stay unchanged.
+
+#### Scenario: A narrowing conjunct is joined, never substituted
+
+- **WHEN** `add-obsidian-vault` searches one vault's notes with the narrowing conjunct `connector_id == <vault's connector id>`
+- **THEN** the `SearchRequest` carries the `tenant_id` equality, the `acl` set-intersection and the `connector_id` conjunct, joined with AND
+- **AND** no chunk outside the caller's tenant and access list is returned
 
 #### Scenario: A second call site fails the build
 
-- **WHEN** a production class other than `RagRetrievalService` calls `VectorStore.similaritySearch(...)`
+- **WHEN** a production class other than `TenantFilteredVectorSearch` calls `VectorStore.similaritySearch(...)`
 - **THEN** the architecture test fails
 - **AND** the failure names the offending class
+
+#### Scenario: Capability index search stays in the caller's tenant
+
+- **WHEN** a caller of tenant `globex` runs `skill_search` while tenant `acme` has a skill matching the query and a global skill also matches
+- **THEN** the search goes through `TenantFilteredVectorSearch.search` with the target `CAPABILITIES`
+- **AND** the result holds the global skill and no entry of tenant `acme`
 
 #### Scenario: Every issued search carries both conjuncts
 

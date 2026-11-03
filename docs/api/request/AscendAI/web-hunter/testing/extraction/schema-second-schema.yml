@@ -1,0 +1,45 @@
+info:
+  name: schema-second-schema
+  type: http
+  seq: 32
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/product",
+        "include_links": false,
+        "heavy_mode": false,
+        "output_format": "schema",
+        "extraction_schema": {
+          "type": "object",
+          "properties": {
+            "sku": {"type": "string"}
+          },
+          "required": ["sku"]
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("second schema answers its own field, not the cached step 1 answer", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.content.sku).to.be.a("string");
+            expect(b.content).to.not.have.property("name");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

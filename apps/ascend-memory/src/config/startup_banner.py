@@ -1,15 +1,23 @@
-import asyncio
 import logging
-import socket
 import urllib.error
 import urllib.request
 
+from ascend_python_common.startup_banner import (
+    CONFIGURED,
+    CONNECTED,
+    FAILED,
+    NOT_CONFIGURED,
+    BannerCheck,
+    BannerLine,
+    BannerSection,
+    build_banner,
+    warning,
+)
+
 from src.config.config import PROVIDER_CONFIGS, settings
 
-logger = logging.getLogger("uvicorn")
+logger = logging.getLogger(__name__)
 
-# ASCII banner art has fixed glyph width; wrapping or splitting would corrupt
-# the figlet rendering. E501 silenced on the banner lines only.
 BANNER = (
     " █████╗ ███████╗ ██████╗███████╗███╗   ██╗██████╗     ███╗   ███╗███████╗███╗   ███╗ ██████╗ ██████╗ ██╗   ██╗\n"  # noqa: E501
     "██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗    ████╗ ████║██╔════╝████╗ ████║██╔═══██╗██╔══██╗╚██╗ ██╔╝\n"  # noqa: E501
@@ -19,100 +27,79 @@ BANNER = (
     "╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═══╝╚═════╝     ╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   "  # noqa: E501
 )
 
-DIVIDER = "-" * 58
-PROBE_TIMEOUT_SECONDS = 2.0
 APP_NAME = "ascend-memory"
-
-
-def _resolve_host() -> str:
-    try:
-        return socket.gethostname()
-    except OSError:
-        return "localhost"
-
 
 _ALLOWED_PROBE_SCHEMES = ("http://", "https://")
 
 
-def _probe_http_sync(url: str) -> str:
-    # urlopen accepts file:// and other schemes by default; restrict to http(s)
-    # so a misconfigured QDRANT_HOST cannot turn the startup probe into an
-    # accidental local-file read.
-    if not url.startswith(_ALLOWED_PROBE_SCHEMES):
-        return f"{url} [FAILED (unsupported scheme)]"
+def _probe_qdrant_sync() -> BannerCheck:
+    target = f"http://{settings.QDRANT_HOST}:{settings.QDRANT_PORT}/"
+    if not target.startswith(_ALLOWED_PROBE_SCHEMES):
+        return BannerCheck(label="Qdrant", target=target, status=FAILED)
     try:
-        with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_SECONDS) as response:  # noqa: S310
+        with urllib.request.urlopen(target, timeout=settings.STARTUP_PROBE_TIMEOUT_SECONDS) as response:  # noqa: S310
             status = response.status
         if 200 <= status < 300:
-            return f"{url} [Connected]"
-        return f"{url} [Warning (status={status})]"
+            return BannerCheck(label="Qdrant", target=target, status=CONNECTED)
+        return BannerCheck(label="Qdrant", target=target, status=warning(f"status={status}"))
     except urllib.error.HTTPError as exc:
-        return f"{url} [Warning (status={exc.code})]"
+        return BannerCheck(label="Qdrant", target=target, status=warning(f"status={exc.code}"))
     except Exception as exc:
-        logger.debug("Probe failed for %s: %s", url, exc)
-        return f"{url} [FAILED]"
+        logger.debug("Probe failed for %s: %s", target, exc)
+        return BannerCheck(label="Qdrant", target=target, status=FAILED)
 
 
-def _describe_default_embedding() -> str:
+def _embedding_banner_entry() -> BannerLine | BannerCheck:
     provider = settings.MEM0_DEFAULT_PROVIDER
     config = PROVIDER_CONFIGS.get(provider)
     if config is None:
-        return f"{provider} [Warning (provider not in PROVIDER_CONFIGS)]"
-    base_url = getattr(settings, config["base_url_setting"], "unknown")
-    api_key = getattr(settings, config["api_key_setting"], "")
-    key_state = "[Configured]" if api_key else "[Not configured]"
+        return BannerCheck(label="Embedding", target=provider, status=warning("unknown provider"))
+    base_url = str(getattr(settings, config["base_url_setting"], "unknown"))
+    api_key = str(getattr(settings, config["api_key_setting"], ""))
+    key_state = CONFIGURED if api_key else NOT_CONFIGURED
     model = config["embedding_model"]
     dims = config["embedding_dims"]
-
-    return f"{base_url} ({provider}, model={model}, dims={dims}) {key_state}"
-
-
-async def log_startup_banner() -> None:
-    host = _resolve_host()
-    port = settings.API_PORT
-    local_url = f"http://localhost:{port}"
-    hostname_url = f"http://{host}:{port}"
-
-    qdrant_url = f"http://{settings.QDRANT_HOST}:{settings.QDRANT_PORT}/"
-    qdrant_status = await asyncio.to_thread(_probe_http_sync, qdrant_url)
-
-    block = "\n".join(
-        [
-            "",
-            BANNER,
-            DIVIDER,
-            f"    Application '{APP_NAME}' is running!",
-            "",
-            "    Access URLs:",
-            f"      Local:     {local_url}",
-            f"      Hostname:  {hostname_url}",
-            "",
-            f"    Profile(s): default (log level: {settings.LOG_LEVEL})",
-            "",
-            "    External services:",
-            f"      Qdrant:    {qdrant_status}",
-            f"      Embedding: {_describe_default_embedding()}",
-            "",
-            "    Actuator:",
-            f"      Health:    {local_url}/health",
-            "",
-            "    API documentation:",
-            f"      OpenAPI:   {local_url}/openapi.json",
-            f"      Swagger:   {local_url}/docs",
-            f"      Redoc:     {local_url}/redoc",
-            "",
-            "    Observability:",
-            "      Logging:   uvicorn formatter (src.config.logging_config)",
-            "",
-            "    MCP endpoint:",
-            f"      HTTP:      POST {local_url}/mcp",
-            "",
-            "    REST endpoints:",
-            f"      Insert:    POST   {local_url}/api/v1/memory/insert",
-            f"      Search:    GET    {local_url}/api/v1/memory/search",
-            f"      Delete:    DELETE {local_url}/api/v1/memory",
-            f"      Wipe:      POST   {local_url}/api/v1/memory/wipe",
-            DIVIDER,
-        ]
+    return BannerLine(
+        label="Embedding",
+        value=f"{base_url} ({provider}, model={model}, dims={dims}) [{key_state}]",
     )
-    logger.info("\n%s", block)
+
+
+def service_banner_sections() -> list[BannerSection]:
+    local_url = f"http://localhost:{settings.API_PORT}"
+    return [
+        BannerSection(
+            title="External services",
+            entries=(
+                _probe_qdrant_sync(),
+                _embedding_banner_entry(),
+            ),
+        ),
+        BannerSection(
+            title="REST endpoints",
+            entries=(
+                BannerLine(label="Insert", value=f"POST {local_url}/api/v1/memory/insert"),
+                BannerLine(label="Search", value=f"GET {local_url}/api/v1/memory/search"),
+                BannerLine(label="Delete", value=f"DELETE {local_url}/api/v1/memory"),
+                BannerLine(label="Wipe", value=f"POST {local_url}/api/v1/memory/wipe"),
+            ),
+        ),
+        BannerSection(
+            title="API documentation",
+            entries=(
+                BannerLine(label="OpenAPI", value=f"{local_url}/openapi.json"),
+                BannerLine(label="Swagger", value=f"{local_url}/docs"),
+                BannerLine(label="Redoc", value=f"{local_url}/redoc"),
+            ),
+        ),
+    ]
+
+
+def build_service_banner() -> list[str]:
+    return build_banner(
+        service_name=APP_NAME,
+        api_port=settings.API_PORT,
+        log_level=settings.LOG_LEVEL,
+        art=BANNER,
+        sections=service_banner_sections(),
+    )

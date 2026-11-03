@@ -1,0 +1,40 @@
+info:
+  name: intervention-window-duplicate-join
+  type: http
+  seq: 63
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Rejoin of the e2e-w2 window: joined true with the same flow.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/turnstile-wall",
+        "include_links": false,
+        "heavy_mode": false,
+        "profile": "e2e-w2"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 428", function () {
+            expect(res.getStatus()).to.equal(428);
+        });
+        test("rejoin answers joined with the same flow", function () {
+            const b = res.getBody();
+            expect(b.code).to.equal("human_intervention_required");
+            expect(b.joined).to.equal(true);
+            expect(b.flow_id).to.be.a("string").and.not.empty;
+            expect(b.vnc_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

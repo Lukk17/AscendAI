@@ -3,7 +3,7 @@ import sys
 from unittest.mock import mock_open, patch
 
 
-def test_module_falls_back_when_dictionary_missing():
+def test_module_falls_back_when_dictionary_missing() -> None:
     """If challenge_dictionary.json cannot be loaded the module falls back to empty heuristics."""
     # given
     sys.modules.pop("src.reader.cloudflare.challenge_detector", None)
@@ -15,7 +15,7 @@ def test_module_falls_back_when_dictionary_missing():
     importlib.import_module("src.reader.cloudflare.challenge_detector")
 
 
-def test_module_loads_real_dictionary_on_normal_import():
+def test_module_loads_real_dictionary_on_normal_import() -> None:
     """Smoke test the import on the happy path; ensures both paths are covered."""
     # given
     sys.modules.pop("src.reader.cloudflare.challenge_detector", None)

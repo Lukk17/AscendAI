@@ -13,10 +13,10 @@ flagged for the OpenAI and HuggingFace backends.
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 import tempfile
 from contextlib import contextmanager, suppress
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from src.config.config import settings
@@ -42,7 +42,7 @@ def chunked_audio(audio_path: str, chunk_seconds: int) -> Generator[list[str], N
     """
 
     work_dir = tempfile.mkdtemp(prefix=f"ascendaudioscribe_chunks_{secrets.token_hex(4)}_")
-    pattern = os.path.join(work_dir, "chunk_%05d.wav")
+    pattern = str(Path(work_dir) / "chunk_%05d.wav")
 
     args = [
         settings.FFMPEG_PATH,
@@ -76,9 +76,7 @@ def chunked_audio(audio_path: str, chunk_seconds: int) -> Generator[list[str], N
             capture_output=True,
             timeout=settings.FFMPEG_TIMEOUT_SECONDS,
         )
-        chunks = sorted(
-            os.path.join(work_dir, name) for name in os.listdir(work_dir) if name.endswith(".wav")
-        )
+        chunks = sorted(str(p) for p in Path(work_dir).iterdir() if p.name.endswith(".wav"))
         if not chunks:
             raise OSError("ffmpeg segment produced no chunks")
         logger.info(f"ffmpeg produced {len(chunks)} chunks in {work_dir}")
@@ -89,8 +87,8 @@ def chunked_audio(audio_path: str, chunk_seconds: int) -> Generator[list[str], N
         stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
         raise OSError(f"ffmpeg segmentation failed: {stderr}") from exc
     finally:
-        for f in os.listdir(work_dir):
+        for p in Path(work_dir).iterdir():
             with suppress(OSError):
-                os.remove(os.path.join(work_dir, f))
+                p.unlink()
         with suppress(OSError):
-            os.rmdir(work_dir)
+            Path(work_dir).rmdir()

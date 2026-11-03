@@ -4,6 +4,14 @@
 
 Accepted - 2026-05-31
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+FlareSolverr is no longer a session writer: the strategy that saved its
+clearances is deleted with the `PRODUCED_BY_FLARESOLVERR` constant, and
+records it stored get no special handling and no migration. Cookie
+persistence itself is unchanged. The rest of this record is unchanged.
+See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
 ## Context
 
 Cloudflare clearance cookies (`cf_clearance`) are short-lived session tokens that prove a client has passed a

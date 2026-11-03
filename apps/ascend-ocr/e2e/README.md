@@ -48,6 +48,7 @@ apps/ascend-ocr/e2e/
     ├── 18-ocr-straighten-crumpled-photo-test.md  # a crumpled page read with straighten=true, all 21 lines present
     ├── 19-ocr-crumpled-photo-default-test.md     # the same page in normal mode, not straightened by default
     ├── 20-mcp-unsupported-language-test.md       # ocr_submit refuses lang korean before fetching the URI
+    ├── 21-platform-contract-test.md
     ├── templates/                       # run-record templates (immutable), one per spec
     │   ├── README.md
     │   ├── 1-invalid-input-tasks.template.md
@@ -69,14 +70,15 @@ apps/ascend-ocr/e2e/
     │   ├── 17-ocr-rotated-photo-tasks.template.md
     │   ├── 18-ocr-straighten-crumpled-photo-tasks.template.md
     │   ├── 19-ocr-crumpled-photo-default-tasks.template.md
-    │   └── 20-mcp-unsupported-language-tasks.template.md
+    │   ├── 20-mcp-unsupported-language-tasks.template.md
+    │   └── 21-platform-contract-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<feature>-tasks.md   # one per executed test (gitignored)
 ```
 
-Tests are number-prefixed by setup cost. Twenty specs fall into two execution classes. Reject-fast specs (1, 5, 7,
-8, 9, 10, 11, 12, 20) return before any inference, and all but spec 11 finish in well under 2 seconds. Engine-bound specs
+Tests are number-prefixed by setup cost. Twenty one specs fall into two execution classes. Reject-fast specs (1, 5, 7,
+8, 9, 10, 11, 12, 20, 21) return before any inference, and all but spec 11 finish in well under 2 seconds. Engine-bound specs
 (2, 3, 4, 6, 13, 14, 15, 16, 17, 18, 19) put one or more documents through the single OCR worker and must run one at a
 time. `1` covers the three refusals at the request boundary: a submission with no file, the removed synchronous
 endpoint, and a submission in a language the service does not read (`korean`). `2`-`4` submit a canary PNG over REST
@@ -199,11 +201,11 @@ The execution constraints:
 | :--- | :--- | :--- |
 | Engine-bound: run one at a time | 2, 3, 4, 6, 13, 14, 15, 16, 17, 18, 19 | Each puts at least one document through the single OCR worker, CPU-only on the container's 4-core budget. The service now queues rather than refusing, so two of these running at once do not fail each other, they serialise: the second waits for the first, and both take longer in wall time than either alone. Never with each other, and the next row says what else must be idle. |
 | Engine-bound: run alone, no runner of any suite active | 2, 3, 4, 6, 13, 14, 15, 16, 17, 18, 19 | The one OCR worker reads one document at a time and uses every CPU the container is given (`cpu_threads` set to the container's CPU limit, defect register F57). A second engine-bound spec would wait in the queue behind the first, and any other runner on the host, from this suite or from any other module's sweep, takes CPU away from inference, so the recorded timings stop being true. Measured on 2026-09-10 with the English fixture: 59.2 seconds on a quiet host, 160.9 seconds on a loaded one, on the slower and heavier `PP-OCRv5_server` pair the service ran then. The failure mode has changed with the job surface: nothing times out at the HTTP layer any more, because no connection is held. What a loaded host does instead is push a page past its engine's page allowance (112.95 s on the small pair at the default `OCR_PAGE_ALLOWANCE_HEADROOM`), which stops the whole document with `OCR_FAILED`. That is a real failure, not a flake, and the fix is the host or the allowance rather than a retry. Start one of these eleven only when nothing else is running anywhere, not even a reject-fast spec of this suite. |
-| Reject-fast: safe in parallel | 1, 5, 7, 8, 9, 10, 11, 12, 20 | Each returns before anything is queued (FastAPI validation, the unsupported-language refusal, `tools/list`, `/ready`, an MCP guard rejection, or the magic-byte sniffer), finishing in well under 2 seconds. Spec 11 is the one exception to the timing: its jail steps start a throwaway `ascend-ocr-jail` container on `127.0.0.1:7023` with `MCP_FILE_URI_ROOT` set, wait for it to come up, and remove it, which takes up to about two minutes and warms an engine that reads nothing. Safe to run all nine in parallel up to the runner's default cap of 5 concurrent. Specs 1, 9, 11, 12 and 20 each assert an empty job listing, so they need `/ready` to report nothing queued and nothing running before they start. |
+| Reject-fast: safe in parallel | 1, 5, 7, 8, 9, 10, 11, 12, 20, 21 | Each returns before anything is queued (FastAPI validation, the unsupported-language refusal, `tools/list`, `/ready`, an MCP guard rejection, or the magic-byte sniffer), finishing in well under 2 seconds. Spec 11 is the one exception to the timing: its jail steps start a throwaway `ascend-ocr-jail` container on `127.0.0.1:7023` with `MCP_FILE_URI_ROOT` set, wait for it to come up, and remove it, which takes up to about two minutes and warms an engine that reads nothing. Spec 21 runs the shared platform contract: health and readiness, the problem bodies and the errors counter, a stateless `initialize` for two protocol versions, one `ocr_list_jobs` call in the session and sessionless forms, the foreign `Host` and `Origin` refusals, the 5 MiB 413, one refused tool call, the `job-not-found` 404 and the route-template metrics series, submitting nothing. Safe to run all ten in parallel up to the runner's default cap of 5 concurrent. Specs 1, 9, 11, 12, 20 and 21 each assert an empty job listing, so they need `/ready` to report nothing queued and nothing running before they start. |
 | Needs a clean queue and a clean bucket | 2, 3, 4, 6, 13, 14, 15, 16, 17, 18, 19 | Each asserts either a listing, a queue count or the absence of a record, so a previous run's leftovers make them fail for the wrong reason. Run the two reset commands above first. |
 | Cold engine for new language | none today | All shipped models (`en`, `pl`) are pre-cached at image build time and warmed at startup; the first call for a known language does not pay an engine-load cost. Add a reset row here if a future test exercises a language outside the pre-cached set. |
 
-Recommended layout: dispatch all 9 reject-fast specs in parallel first (runner cap of 5, queue 4, 4 minutes 35
+Recommended layout: dispatch all 10 reject-fast specs in parallel first (runner cap of 5, queue 5, 4 minutes 35
 seconds in aggregate in the sweep of 2026-09-25), wait for every one of them to return and for `ascend-ocr-jail` to be
 gone, then dispatch the 11 engine specs one at a time with no other runner active anywhere on the host, from this
 suite or from any other module's sweep, and hold every other suite's sweep until the last engine spec has returned:
@@ -227,7 +229,7 @@ the canonical fan-out shape and measured timings.
 5. The object store is reachable at `http://localhost:9070`, because every successful reading writes its result
    there. `docker logs ascend-ocr 2>&1 | grep "Result store"` should show the endpoint with `[answered]`; a
    `[did NOT answer]` line means every job will finish with `RESULT_STORE_UNAVAILABLE`.
-6. For test 6: the ascend-ocr container's `MCP_ALLOWED_HOSTS` includes `host.docker.internal` (the MCP tool fetches
+6. For test 6: the ascend-ocr container's `ALLOWED_PRIVATE_HOSTS` includes `host.docker.internal` (the MCP tool fetches
    the fixture back out over HTTP after the spec uploads it, rather than reading a container-mounted path).
 
 If the ascend-ocr startup log shows the warmup step failed for the default language, fix that before running the suite,
@@ -277,14 +279,14 @@ Numbered by setup cost. Easiest first.
 
 | #  | Spec | What it proves |
 | :- | :--- | :--- |
-| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /v1/ocr/jobs` without the required `file` multipart part is rejected with HTTP 422 before anything is queued, and a submission with `lang=korean`, a language the service no longer reads, is refused with HTTP 400 `UNSUPPORTED_LANGUAGE` and no identifier. The listing is empty afterwards. |
+| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /v1/ocr/jobs` without the required `file` multipart part is rejected with HTTP 400 and the `validation` code before anything is queued, and a submission with `lang=korean`, a language the service no longer reads, is refused with HTTP 400 `UNSUPPORTED_LANGUAGE` and no identifier. The listing is empty afterwards. |
 | 2  | [testing/2-ocr-english-test.md](testing/2-ocr-english-test.md) | Submitting `argent-saga-chronicles-page1.png` with `lang=en` answers 202 with an identifier, the state reaches `succeeded`, and the Markdown in the bucket carries `Argent Saga`, `Aenaria`, or `Halen Veyr` under a `## Page 1` heading. |
 | 3  | [testing/3-ocr-polish-test.md](testing/3-ocr-polish-test.md) | The same path with `argent-saga-chronicles-page1-polish.png` and `lang=pl`: the Markdown carries `Saga Świetlna`, `Aenaria`, or `Eklipsą`, plus at least one Polish-specific accented character (`ś`, `ż`, `ą`, `ę`, `ć`, `ó`, `ł`, `ń`, `ź`). |
 | 4  | [testing/4-ocr-default-language-test.md](testing/4-ocr-default-language-test.md) | The same path with NO `lang` part: the record carries the server's `DEFAULT_LANGUAGE` (`en` out of the box) and the Markdown carries the canary substring. |
 | 5  | [testing/5-mcp-tools-list-test.md](testing/5-mcp-tools-list-test.md) | `tools/list` advertises exactly `ocr_submit`, `ocr_job_status`, `ocr_list_jobs` and `ocr_cancel_job`, `ocr_submit` advertises `quality` (`normal` or `high`, default `high`) and `straighten` (default `false`), and the removed `ocr_process` is not advertised under any name. |
 | 6  | [testing/6-mcp-ocr-test.md](testing/6-mcp-ocr-test.md) | `ocr_submit` with `file_uri` set to an object-store URL answers with a job record, `ocr_job_status` reaches `succeeded`, and the stored Markdown carries the canary substring. The fixture is uploaded to the object store's `e2e-fixtures` bucket during Reset state, and ascend-ocr fetches it over HTTP, no container mount involved. |
-| 7  | [testing/7-ready-endpoint-test.md](testing/7-ready-endpoint-test.md) | `GET /ready` returns HTTP 200 with `status="ready"`, `engine_warm=true` once lifespan warm-up has completed, and reports `jobs_queued` and `jobs_running`. Distinct from `/health` per ADR-004. |
-| 8  | [testing/8-mcp-ssrf-rejection-test.md](testing/8-mcp-ssrf-rejection-test.md) | The MCP SSRF guard rejects a link-local IMDS target (`169.254.169.254`) unless it is on `MCP_ALLOWED_HOSTS`, without any outbound connection attempt. |
+| 7  | [testing/7-ready-endpoint-test.md](testing/7-ready-endpoint-test.md) | `GET /ready` returns HTTP 200 with `status="ready"`, `checks.engine.warm` true once lifespan warm-up has completed, and reports `checks.jobs.queued` and `checks.jobs.running`. Distinct from `/health` per ADR-004. |
+| 8  | [testing/8-mcp-ssrf-rejection-test.md](testing/8-mcp-ssrf-rejection-test.md) | The MCP SSRF guard rejects a link-local IMDS target (`169.254.169.254`) unless it is on `ALLOWED_PRIVATE_HOSTS`, without any outbound connection attempt. |
 | 9  | [testing/9-mcp-bad-scheme-test.md](testing/9-mcp-bad-scheme-test.md) | The MCP tool rejects an `ftp://` URI, a `data:` URI and a bare Windows path (read as the scheme `c`) with `UNSAFE_URI`, the scheme guard naming each scheme, and queues nothing. |
 | 10 | [testing/10-mcp-credentials-rejection-test.md](testing/10-mcp-credentials-rejection-test.md) | The MCP tool rejects URIs carrying `user:pass@` userinfo before any DNS lookup or fetch, and the credentials never reach the logs. |
 | 11 | [testing/11-mcp-file-uri-jail-test.md](testing/11-mcp-file-uri-jail-test.md) | `file://` URIs are rejected when `MCP_FILE_URI_ROOT` is unset (default secure posture) and nothing is queued. On a throwaway `ascend-ocr-jail` container started with the root set, a path that `realpath` resolves outside the root is refused by the jail itself, and the container is removed afterwards. |
@@ -297,6 +299,33 @@ Numbered by setup cost. Easiest first.
 | 18 | [testing/18-ocr-straighten-crumpled-photo-test.md](testing/18-ocr-straighten-crumpled-photo-test.md) | A crumpled page photo submitted with `straighten=true` is read with all 21 lines of the test page present and at least 15 of its 21 canary phrases found word for word, the canaries avoiding the inverted exclamation mark the engine never outputs and the `ź` and `ż` it may swap. The state echoes `straighten` `true`. |
 | 19 | [testing/19-ocr-crumpled-photo-default-test.md](testing/19-ocr-crumpled-photo-default-test.md) | The same crumpled photo submitted with `quality=normal` and no `straighten` part is read to one page of Markdown, and the state echoes `straighten` `false` and `quality` `normal`, proving the service does not straighten unless asked. |
 | 20 | [testing/20-mcp-unsupported-language-test.md](testing/20-mcp-unsupported-language-test.md) | `ocr_submit` with a well-formed URI and `lang` `korean` is refused with `UNSUPPORTED_LANGUAGE` and `Supported languages:`, never echoing the language, before the URI is fetched, and nothing is queued. |
+| 21 | [testing/21-platform-contract-test.md](testing/21-platform-contract-test.md) | The shared platform contract holds end to end: health and readiness bodies, the 404, 405 and 400 problem bodies, the `traceparent` and `x-request-id` echo, the security headers, the errors counter that grows by one, and the MCP runtime checks: a stateless `initialize` for 2025-06-18 and 2025-11-25 with no `mcp-session-id`, an `ocr_list_jobs` tool call in the session and sessionless forms, the foreign `Host` and `Origin` refusals, the 5 MiB body 413, one refused tool call, the `job-not-found` 404 with its `type` and `instance`, and the `http_requests_total` series under the `/v1/ocr/jobs/{job_id}` route template. Every request is refused or reads only, so the job listing is unchanged by the run. |
+
+## What is not tested end to end
+
+The platform contract is tested end to end by spec 21. A few library behaviours stay in the unit and integration
+tests on purpose, because they are not observable from outside the service, or the e2e contract never passes or fails
+on a log line. Each is covered by the test task named.
+
+- The log level, the log format, the refusal log lines, the MCP session digest in log lines, the empty
+  `mcp_session_id` of a sessionless call and the startup banner. Each is a log line, and the e2e contract never passes
+  or fails on a log line. The library and service tests of tasks 1.4, 1.5 and 1.12, the library tests of tasks 6.2 and
+  6.4 of `add-python-runtime-upgrades`, and the service banner tests cover them.
+- One HTTP server span per request and no second exporter, no span sent anywhere with `OTEL_EXPORTER_OTLP_ENDPOINT`
+  unset or `OTEL_SDK_DISABLED=true`, no OpenTelemetry log record carrying the exception text, and no MCP session id on
+  any span. The trace export to Tempo is tested end to end by the trace specs of `add-observability`, and one HTTP
+  server span per request and no second exporter are covered by the library test of task 6.3 of
+  `add-python-runtime-upgrades`. The tracing tests of tasks 1.6 and 1.16 cover the rest, which is not observable from
+  outside the service.
+- The rate limit refusal and the one budget shared by REST, MCP and several containers of one service. The library
+  tests of tasks 1.7 and 1.18 and the service tests of task 5.5 cover them, so the end-to-end rate limit specs were
+  dropped by owner decision 91.3 of 2026-10-08.
+- The invalid settings that stop start-up. The settings tests of task 1.3 cover them.
+- The `file://` jail and the second lookup pinning. They need a file root and a resolver that answers differently on
+  each lookup, which the live stack does not have. The guard tests of task 1.13 cover them.
+- The 401 `unauthorized` body. Raised only once `add-keycloak-login` adds the token check, whose service token specs of
+  tasks 10.9 to 10.13 then test it end to end in all four suites.
+- The trace export to Tempo. Tested end to end by `add-observability`.
 
 ## Adding a new test
 

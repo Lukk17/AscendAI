@@ -1,63 +1,8 @@
-import sys
 from importlib.metadata import version as get_package_version
-from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
-from src.main import _configure_otel, app
-
-
-def _otel_sys_modules() -> dict[str, MagicMock]:
-    """Return mocked OTel sub-modules for sys.modules injection.
-
-    All parent packages must also be present so Python's import machinery
-    resolves dotted names without touching the real (absent) SDK packages.
-    """
-    base = MagicMock()
-    sdk = MagicMock()
-    sdk_trace = MagicMock()
-    sdk_trace_export = MagicMock()
-    sdk_resources = MagicMock()
-    exporter = MagicMock()
-    exporter_otlp = MagicMock()
-    exporter_otlp_proto = MagicMock()
-    exporter_otlp_proto_grpc = MagicMock()
-    exporter_otlp_proto_grpc_trace = MagicMock()
-    instrumentation = MagicMock()
-    instrumentation_fastapi = MagicMock()
-
-    return {
-        "opentelemetry": base,
-        "opentelemetry.sdk": sdk,
-        "opentelemetry.sdk.trace": sdk_trace,
-        "opentelemetry.sdk.trace.export": sdk_trace_export,
-        "opentelemetry.sdk.resources": sdk_resources,
-        "opentelemetry.exporter": exporter,
-        "opentelemetry.exporter.otlp": exporter_otlp,
-        "opentelemetry.exporter.otlp.proto": exporter_otlp_proto,
-        "opentelemetry.exporter.otlp.proto.grpc": exporter_otlp_proto_grpc,
-        "opentelemetry.exporter.otlp.proto.grpc.trace_exporter": exporter_otlp_proto_grpc_trace,
-        "opentelemetry.instrumentation": instrumentation,
-        "opentelemetry.instrumentation.fastapi": instrumentation_fastapi,
-    }
-
-
-def test_configure_otel_noop_when_env_var_absent(monkeypatch: pytest.MonkeyPatch) -> None:
-    # given
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-
-    # when / then
-    _configure_otel()
-
-
-def test_configure_otel_activates_when_endpoint_set(monkeypatch: pytest.MonkeyPatch) -> None:
-    # given
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel:4317")
-
-    # when / then
-    with patch.dict(sys.modules, _otel_sys_modules()):
-        _configure_otel()
+from src.main import app
 
 
 def test_health_returns_200() -> None:
@@ -69,6 +14,7 @@ def test_health_returns_200() -> None:
         # then
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
+        assert response.json()["service"] == "ascend-audio-scribe"
 
 
 def test_app_version_matches_installed_package_metadata() -> None:
@@ -78,6 +24,10 @@ def test_app_version_matches_installed_package_metadata() -> None:
 
 def test_metrics_returns_prometheus_payload() -> None:
     # given
+    from src.observability import metrics as service_metrics
+
+    service_metrics.TRANSCRIPTION_DURATION_SECONDS.labels(provider="local", outcome="ok").observe(1.0)
+    service_metrics.TRANSCRIPTION_AUDIO_DURATION_SECONDS.labels(provider="local").observe(60.0)
     with TestClient(app) as client:
         # when
         response = client.get("/metrics")
@@ -86,7 +36,8 @@ def test_metrics_returns_prometheus_payload() -> None:
         assert response.status_code == 200
         body = response.text
         assert "process_" in body or "python_" in body
-        assert "ascendaudioscribe_transcription_duration_seconds" in body
+        assert "transcription_duration_seconds" in body
+        assert "transcription_audio_duration_seconds" in body
 
 
 def test_request_id_echoed_back() -> None:

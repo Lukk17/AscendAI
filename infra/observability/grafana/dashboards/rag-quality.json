@@ -52,7 +52,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Last recorded top similarity score from the most recent RAG query per embedding provider. Metric: rag_last_top_score (gauge).",
+      "description": "95th percentile of the RAG top score histogram per provider over the last 5 minutes. Query: 0.95 quantile of sum by (provider, le) (rate(rag_top_score_bucket[5m])), see the panel expression.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -77,7 +77,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rag_last_top_score",
+          "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(rag_top_score_bucket[5m])))",
           "legendFormat": "{{provider}}",
           "refId": "A"
         }
@@ -168,7 +168,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "loki" },
-      "description": "WARN-level log lines from ascend-ai-agent matching retrieval keywords. Useful for diagnosing why miss rate spiked. Source: Loki, service=ascend-ai-agent.",
+      "description": "WARN-level log lines from ascend-agent matching retrieval keywords. Query: {service=\"ascend-agent\"} |~ \"(?i)(retrieval|rag|threshold|embedding)\" | logfmt | level=~\"warn|error\". Useful for diagnosing why miss rate spiked. Source: Loki, service=ascend-agent.",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
       "id": 9,
       "options": {
@@ -184,7 +184,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=\"ascend-ai-agent\"} |~ \"(?i)(retrieval|rag|threshold|embedding)\" | logfmt | level=~\"warn|error\"",
+          "expr": "{service=\"ascend-agent\"} |~ \"(?i)(retrieval|rag|threshold|embedding)\" | logfmt | level=~\"warn|error\"",
           "legendFormat": "",
           "refId": "A"
         }

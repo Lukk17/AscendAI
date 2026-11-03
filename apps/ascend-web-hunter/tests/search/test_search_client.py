@@ -22,7 +22,7 @@ def _build_html_with_articles(count: int = 1) -> str:
 
 
 @pytest.mark.asyncio
-async def test_search_returns_results_for_async_client():
+async def test_search_returns_results_for_async_client() -> None:
     # given
     html = _build_html_with_articles(1)
 
@@ -47,7 +47,7 @@ async def test_search_returns_results_for_async_client():
 
 
 @pytest.mark.asyncio
-async def test_search_limits_results():
+async def test_search_limits_results() -> None:
     # given
     html = _build_html_with_articles(5)
 
@@ -68,7 +68,7 @@ async def test_search_limits_results():
 
 
 @pytest.mark.asyncio
-async def test_search_skips_article_without_title():
+async def test_search_skips_article_without_title() -> None:
     # given
     html = """
     <html><body>
@@ -100,7 +100,7 @@ async def test_search_skips_article_without_title():
 
 
 @pytest.mark.asyncio
-async def test_search_with_categories_forwards_param():
+async def test_search_with_categories_forwards_param() -> None:
     # given
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -120,7 +120,7 @@ async def test_search_with_categories_forwards_param():
 
 
 @pytest.mark.asyncio
-async def test_search_raises_on_http_status_error():
+async def test_search_raises_on_http_status_error() -> None:
     # given
     request = httpx.Request("GET", "http://searxng/search")
     response = httpx.Response(500, request=request)
@@ -136,7 +136,7 @@ async def test_search_raises_on_http_status_error():
 
 
 @pytest.mark.asyncio
-async def test_search_raises_on_timeout():
+async def test_search_raises_on_timeout() -> None:
     # given
     mock_get = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
 
@@ -150,7 +150,7 @@ async def test_search_raises_on_timeout():
 
 
 @pytest.mark.asyncio
-async def test_search_raises_on_transport_error():
+async def test_search_raises_on_transport_error() -> None:
     # given
     mock_get = AsyncMock(side_effect=httpx.ConnectError("nope"))
 
@@ -176,4 +176,42 @@ async def test_search_fails_fast_when_breaker_open() -> None:
             await client.search("q")
 
     # when / then
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_search_observes_results_returned_histogram() -> None:
+    # given
+    import re
+
+    from prometheus_client import generate_latest
+
+    html = _build_html_with_articles(3)
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = html
+    mock_response.raise_for_status = MagicMock()
+
+    client = SearxngClient()
+    labels = 'engine="searxng",outcome="ok"'
+
+    def _observed() -> tuple[float, float]:
+        payload = generate_latest().decode()
+        count = re.search(rf"^search_results_returned_count\{{{labels}\}} (\S+)$", payload, re.MULTILINE)
+        total = re.search(rf"^search_results_returned_sum\{{{labels}\}} (\S+)$", payload, re.MULTILINE)
+        assert count is not None
+        assert total is not None
+        return float(count.group(1)), float(total.group(1))
+
+    before_count, before_sum = _observed()
+
+    # when
+    with patch.object(client.client, "get", new=AsyncMock(return_value=mock_response)):
+        results = await client.search("query")
+
+    # then
+    assert len(results) == 3
+    after_count, after_sum = _observed()
+    assert after_count - before_count == 1.0
+    assert after_sum - before_sum == 3.0
     await client.aclose()

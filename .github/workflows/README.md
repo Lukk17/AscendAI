@@ -255,6 +255,10 @@ Some `ascend-web-hunter` specs (tiered scraping, the real-world URL matrix, clea
 
 The workflow has `contents: read` only. It uses `cancel-in-progress: false` with one group per ref, so a new push to `master` waits for the running e2e run instead of cancelling it.
 
+### Why `docs/E2E_RUN_SCENARIOS.md` names no CI or release run
+
+The `add-github-actions-pipeline` verification runs start on GitHub (a pull request from a `ci-verify/*` branch, or a `Release` workflow dispatch), not through an end-to-end runner on the host, so no run scenario in `docs/E2E_RUN_SCENARIOS.md` reaches them and that document gets no entry from this change.
+
 ---
 
 ## Trigger matrix

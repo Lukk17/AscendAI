@@ -1,3 +1,5 @@
+NEVER ARCHIVE: this living end-to-end suite change is never archived (owner decision 2026-10-08, answer 12). It stays open with its run artifact unchecked by design. No future agent run may archive it or propose archiving it.
+
 # Web-scraping e2e capability tests proposal: tiered (#6) + authenticated/real-world (#7)
 
 ## Why
@@ -168,3 +170,7 @@ This proposal covers specs 6 and 7. The suite that shipped around them holds twe
 exposed and the e2e coverage they had, 11 is the human hCaptcha spec carved out of spec 7, and 12 proves a stored
 Cloudflare clearance is reused on a second read. `design.md` records what shipped differently from this proposal,
 and `apps/ascend-web-hunter/e2e/README.md` states the contract the whole suite now holds to.
+
+## Build order
+
+Build order (owner build order of 2026-10-04, which supersedes the earlier orders): build group 1 (finish started work), position 3. It needs no earlier change: the suite runs against today's ascend-web-hunter. Later changes that plug into it: every web-hunter change of build group 2 adds its specs to this suite, and `add-ascend-python-common` (build group 2, position 1) carries the parts of the shared end-to-end work that need its library: the URL guard allow list for the fake site and the problem body check (design D12 and D13, former tasks 7.4, 7.7 and 7.8, dependency fix of 2026-10-05).

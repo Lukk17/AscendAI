@@ -1,0 +1,28 @@
+info:
+  name: metrics-challenge
+  type: http
+  seq: 80
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/metrics"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("challenge metrics are present", function () {
+            const body = String(res.getBody());
+            expect(body).to.include("challenge_verdicts_total");
+            expect(body).to.include("challenge_signals_fired_total");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

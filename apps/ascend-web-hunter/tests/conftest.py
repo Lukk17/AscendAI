@@ -1,6 +1,7 @@
 import sys
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 from contextlib import asynccontextmanager
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlparse
 
@@ -8,7 +9,6 @@ import anyio
 import httpx
 import pytest
 import pytest_asyncio
-from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 
@@ -32,14 +32,27 @@ async def _blocked_handle_async_request(*_args: object, **_kwargs: object) -> No
 # `ASGITransport` class. A real `httpx.Client`/`AsyncClient` reaching this default
 # transport means a mock is missing. Fail immediately and loudly instead of
 # actually dialing out and eating the network's real latency.
-httpx.HTTPTransport.handle_request = _blocked_handle_request  # type: ignore[method-assign]
-httpx.AsyncHTTPTransport.handle_async_request = _blocked_handle_async_request  # type: ignore[method-assign]
+httpx.HTTPTransport.handle_request = _blocked_handle_request  # type: ignore[method-assign, assignment]
+httpx.AsyncHTTPTransport.handle_async_request = _blocked_handle_async_request  # type: ignore[method-assign, assignment]
 
 mock_fastmcp = MagicMock()
 mock_instance = MagicMock()
 
+# The library (ascend_python_common) imports the real FastMCP middleware and
+# ToolError for its log config, rate limit and refusal mapping, so keep the
+# real submodules importable while the top-level FastMCP class stays mocked
+# for the service's own MCP server below.
+import fastmcp.exceptions as _real_fastmcp_exceptions  # noqa: E402, F401
+import fastmcp.server.middleware as _real_fastmcp_middleware  # noqa: E402, F401
 
-async def mock_asgi_app(_scope, _receive, _send):
+_real_fastmcp_submodules = {
+    name: module
+    for name, module in sys.modules.items()
+    if name == "fastmcp.server" or name.startswith("fastmcp.server.") or name == "fastmcp.exceptions"
+}
+
+
+async def mock_asgi_app(_scope: Any, _receive: Any, _send: Any) -> None:
     """Stub ASGI application - discards every call. The FastMCP HTTP mount
     needs *something* with the ASGI signature even though we never invoke it
     in tests."""
@@ -47,7 +60,7 @@ async def mock_asgi_app(_scope, _receive, _send):
 
 class MockRouter:
     @asynccontextmanager
-    async def lifespan_context(self, _app):
+    async def lifespan_context(self, _app: Any) -> AsyncIterator[None]:
         """No-op lifespan; the real MCP lifespan is patched per session."""
         yield
 
@@ -61,22 +74,69 @@ mock_instance.tool.return_value = lambda f: f
 mock_fastmcp.FastMCP.return_value = mock_instance
 sys.modules["mcp.server.fastmcp"] = mock_fastmcp
 sys.modules["fastmcp"] = mock_fastmcp
+sys.modules.update(_real_fastmcp_submodules)
 
 
 from src.main import app  # noqa: E402
-from src.reader.cloudflare.cookie_manager import CookieManager  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def reset_cookie_manager_singleton():
-    """Cookie singleton bleeds state across tests. Reset before every test."""
-    CookieManager._instance = None
+@pytest_asyncio.fixture(autouse=True)
+async def reset_cookie_manager_singleton() -> AsyncIterator[None]:
+    """Cookie state bleeds across tests. Reset the shared global in place
+    before every test: every strategy holds a reference to that object, so
+    replacing it would leave the old state reachable."""
+    await _reset_global_cookie_manager()
+    _clear_rate_limit_budgets()
     yield
-    CookieManager._instance = None
+    await _reset_global_cookie_manager()
+    _clear_rate_limit_budgets()
+
+
+async def _reset_global_cookie_manager() -> None:
+    import redis.asyncio as async_redis
+
+    import src.reader.cloudflare.cookie_manager as cookie_module
+    from src.config.config import settings as service_settings
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+
+    manager = cookie_module.cookie_manager
+    old_client = manager.redis_client
+    manager._memory_store.clear()
+    if old_client is not None:
+        await old_client.aclose()
+    manager.redis_client = (
+        async_redis.Redis.from_url(service_settings.REDIS_URL, decode_responses=True)
+        if service_settings.REDIS_URL
+        else None
+    )
+    cookie_module.CookieManager._instance = manager
+    novnc_flow_registry._local.clear()
+    _delete_redis_keys(("novnc_flow:*", "session:*", "tier_memory:*"))
+
+
+def _clear_rate_limit_budgets() -> None:
+    _delete_redis_keys(("*LIMITER*", "LIMITER*"))
+
+
+def _delete_redis_keys(patterns: tuple[str, ...]) -> None:
+    import redis as sync_redis
+
+    from src.config.config import settings as service_settings
+
+    client = sync_redis.Redis.from_url(service_settings.REDIS_URL, socket_connect_timeout=2)
+    try:
+        keys: list[str] = []
+        for pattern in patterns:
+            found = client.keys(pattern)
+            keys.extend(key.decode() if isinstance(key, bytes) else key for key in found)
+        if keys:
+            client.delete(*keys)
+    finally:
+        client.close()
 
 
 @pytest.fixture(autouse=True)
-def stub_browser_pool(monkeypatch):
+def stub_browser_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     """Replace the real BrowserPool with mocks; no Chromium launched in unit tests."""
     from src.runtime import browser_pool as bp_module
 
@@ -90,64 +150,65 @@ def stub_browser_pool(monkeypatch):
     monkeypatch.setattr(bp, "get_browser", AsyncMock(return_value=mock_browser))
 
 
-@pytest.fixture(autouse=True)
-def stub_startup_banner(monkeypatch):
-    """`log_startup_banner()` probes SearXNG, FlareSolverr and Redis over real
-    sockets during app startup. Stub it so tests never depend on those
-    services being reachable, and never spend the 2s-per-probe timeout."""
-    monkeypatch.setattr("src.main.log_startup_banner", AsyncMock())
-
-
 @pytest.fixture(scope="session", autouse=True)
-def mock_mcp_lifespan_global():
+def mock_mcp_lifespan_global() -> Iterator[None]:
     import src.main as main_module
 
-    if not hasattr(main_module, "mcp"):
+    mcp_server: Any = getattr(main_module, "mcp", None)
+    if mcp_server is None:
         yield
         return
 
-    original_run = main_module.mcp.session_manager.run
+    original_run = mcp_server.session_manager.run
 
     @asynccontextmanager
-    async def _mock_run():
+    async def _mock_run() -> AsyncIterator[Any]:
         async with anyio.create_task_group() as tg:
-            main_module.mcp.session_manager._task_group = tg
+            mcp_server.session_manager._task_group = tg
             try:
                 yield tg
             finally:
                 tg.cancel_scope.cancel()
-                if hasattr(main_module.mcp.session_manager, "_task_group"):
-                    delattr(main_module.mcp.session_manager, "_task_group")
+                if hasattr(mcp_server.session_manager, "_task_group"):
+                    delattr(mcp_server.session_manager, "_task_group")
 
-    main_module.mcp.session_manager.run = _mock_run
+    mcp_server.session_manager.run = _mock_run
 
     yield
 
-    main_module.mcp.session_manager.run = original_run
+    mcp_server.session_manager.run = original_run
 
 
 @pytest.fixture
-def pinned_public_host():
-    """Stub the curl_cffi tier's connect-time pin so unit tests resolve no real name.
+def pinned_public_host() -> Iterator[None]:
+    """Stub the URI fetch guard so unit tests resolve no real name.
 
-    Every host is pinned to one public address. Tests that exercise the pin
-    itself patch `socket.getaddrinfo` instead and do not take this fixture.
+    Every host passes with one public address. Tests that exercise the
+    guard itself patch `check_fetch_uri` instead and do not take this fixture.
     """
-    from src.validator.url_validator import PinnedHost
+    from ascend_python_common.uri_guard import FetchTarget
 
-    def _pin(url: str) -> PinnedHost:
-        parsed = urlparse(url)
+    async def _allow(uri: str, policy: object) -> FetchTarget:
+        parsed = urlparse(uri)
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
-        return PinnedHost(host=parsed.hostname or "", port=port, addresses=("93.184.216.34",))
+        return FetchTarget(url=uri, host=parsed.hostname or "", port=port, addresses=("93.184.216.34",))
 
-    with patch("src.reader.strategies.curl_cffi_fetcher.pin_safe_host", side_effect=_pin):
+    with (
+        patch(
+            "src.reader.strategies.curl_cffi_fetcher.check_fetch_uri",
+            side_effect=_allow,
+        ),
+        patch("ascend_python_common.uri_guard.check_fetch_uri", side_effect=_allow),
+    ):
         yield
 
 
 @pytest_asyncio.fixture(scope="function")
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    async with LifespanManager(app):
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
-            yield ac
+    # raise_app_exceptions=False lets the registered catch-all Exception
+    # handler produce its problem 500 envelope instead of bubbling the
+    # exception out of the ASGI app and failing the test client.
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac

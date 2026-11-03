@@ -1,25 +1,301 @@
 {
-  "waf_script_signatures": [
-    "arkoselabs.com",
-    "recaptcha/api.js",
-    "hcaptcha.com/1/api.js",
-    "perimeterx.net"
-  ],
-  "waf_strict_phrases": [
-    "Prove your humanity",
-    "Pardon Our Interruption",
-    "Please verify you are a human",
-    "Checking if the site connection is secure",
-    "Just a moment...",
-    "Attention Required!",
-    "DataDome CAPTCHA",
-    "Please enable JS and disable any ad blocker",
-    "Sorry, we just need to make sure you're not a robot",
-    "Potwierdź, że nie jesteś robotem"
-  ],
-  "waf_structural_markers": [
-    "/errors_page/validateCaptcha"
-  ],
+  "vendors": {
+    "cloudflare": {
+      "markers": [
+        {"signal": "definitive_header", "match": {"header": "cf-mitigated: challenge"}, "source": "https://developers.cloudflare.com/cloudflare-challenges/challenge-types/challenge-pages/detect-response/", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "cf-challenge-running"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "cf-please-wait"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "challenge-spinner"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "trk_jschal_js"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "turnstile-wrapper"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "attack-box"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "ray_id"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "Ray ID:"}, "source": "https://raw.githubusercontent.com/FlareSolverr/FlareSolverr/master/src/flaresolverr_service.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "challenges.cloudflare.com/turnstile/v0/api.js"}, "source": "https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/", "verified_on": "2026-09-10"},
+        {"signal": "captcha_element", "match": {"attribute": "cf-turnstile"}, "source": "https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"header": "cf-ray"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/cloudflare.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"header": "server: cloudflare"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/cloudflare.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "cf_clearance"}, "source": "https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "__cf_bm"}, "source": "https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/", "verified_on": "2026-09-10"}
+      ]
+    },
+    "datadome": {
+      "markers": [
+        {"signal": "interstitial_structure", "match": {"prefix": "captcha-delivery.com"}, "source": "https://docs.datadome.co/docs/javascript-tag", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "geo.captcha-delivery.com"}, "source": "https://docs.datadome.co/docs/javascript-tag", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "js.datadome.co/tags.js"}, "source": "https://docs.datadome.co/docs/javascript-tag", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "js.datadome.co/"}, "source": "https://docs.datadome.co/docs/javascript-tag", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "datadome"}, "source": "https://docs.datadome.co/reference/validate-request", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"header": "x-dd-b"}, "source": "https://docs.datadome.co/reference/validate-request", "verified_on": "2026-09-10"}
+      ]
+    },
+    "geetest": {
+      "markers": [
+        {"signal": "vendor_script", "match": {"prefix": "static.geetest.com/v4/gt4.js"}, "source": "https://docs.geetest.com/BehaviorVerification/deploy/client/web", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "gcaptcha4.geetest.com"}, "source": "https://docs.geetest.com/BehaviorVerification/deploy/client/web", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "static.geetest.com"}, "source": "https://docs.geetest.com/BehaviorVerification/deploy/client/web", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "gcaptcha4.geevisit.com"}, "source": "https://docs.geetest.com/BehaviorVerification/deploy/client/web", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "gcaptcha4.gsensebot.com"}, "source": "https://docs.geetest.com/BehaviorVerification/deploy/client/web", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "static.geevisit.com"}, "source": "https://docs.geetest.com/BehaviorVerification/deploy/client/web", "verified_on": "2026-09-10"},
+        {"signal": "captcha_element", "match": {"attribute": "geetest_"}, "source": "https://docs.geetest.com/BehaviorVerification/deploy/client/web", "verified_on": "2026-09-10"}
+      ]
+    },
+    "akamai": {
+      "markers": [
+        {"signal": "vendor_presence", "match": {"header": "server: akamaighost"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/kona.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "_abck"}, "source": "https://scrapfly.io/blog/posts/akamai-bot-manager-understanding-abck-cookies-and-sensor-data", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "bm_sz"}, "source": "https://blog.crawlex.net/blog/akamai-bot-manager-abck-cookie/", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "ak_bmsc"}, "source": "https://blog.crawlex.net/blog/akamai-bot-manager-abck-cookie/", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "reference #18."}, "source": "https://www.aethyn.io/blog/what-is-akamai-reference-18-access-denied", "verified_on": "2026-09-10", "note": "fires only on a 403"}
+      ]
+    },
+    "imperva": {
+      "markers": [
+        {"signal": "interstitial_structure", "match": {"prefix": "/_incapsula_resource"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/incapsula.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "incapsula incident id"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/incapsula.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "powered by incapsula"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/incapsula.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "incap_ses_"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/incapsula.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "visid_incap_"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/incapsula.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"header": "x-iinfo"}, "source": "https://www.aethyn.io/solutions/imperva-incapsula-which-engine-blocked-you", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"header": "x-cdn: incapsula"}, "source": "https://www.aethyn.io/solutions/imperva-incapsula-which-engine-blocked-you", "verified_on": "2026-09-10"}
+      ]
+    },
+    "kasada": {
+      "markers": [
+        {"signal": "vendor_presence", "match": {"header": "x-kpsdk-ct"}, "source": "https://blog.crawlex.net/blog/kasada-kpsdk-token-vm/", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"header": "x-kpsdk-cd"}, "source": "https://www.roolink.io/products/kasada", "verified_on": "2026-09-10"}
+      ]
+    },
+    "mtcaptcha": {
+      "markers": [
+        {"signal": "vendor_script", "match": {"prefix": "service.mtcaptcha.com/mtcv1/client/mtcaptcha.min.js"}, "source": "https://docs.mtcaptcha.com/dev-guide-quickstart", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "service2.mtcaptcha.com"}, "source": "https://docs.mtcaptcha.com/dev-guide-quickstart", "verified_on": "2026-09-10"},
+        {"signal": "captcha_input", "match": {"attribute": "mtcaptcha-verifiedtoken"}, "source": "https://docs.mtcaptcha.com/dev-guide-validate-token", "verified_on": "2026-09-10"}
+      ]
+    },
+    "friendly_captcha": {
+      "markers": [
+        {"signal": "vendor_script", "match": {"prefix": "widget.module.min.js"}, "source": "https://developer.friendlycaptcha.com/docs/v1/sdk/", "verified_on": "2026-09-10"},
+        {"signal": "captcha_element", "match": {"attribute": "frc-captcha"}, "source": "https://developer.friendlycaptcha.com/docs/v1/sdk/", "verified_on": "2026-09-10"},
+        {"signal": "captcha_input", "match": {"attribute": "frc-captcha-solution"}, "source": "https://developer.friendlycaptcha.com/docs/v1/sdk/", "verified_on": "2026-09-10"}
+      ]
+    },
+    "arkose": {
+      "markers": [
+        {"signal": "vendor_script", "match": {"prefix": "arkoselabs.com"}, "source": "https://arkoselabs.atlassian.net/wiki/pages/viewpage.action?pageId=819905", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "arkoselabs.com/v2/"}, "source": "https://arkoselabs.atlassian.net/wiki/pages/viewpage.action?pageId=819905", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "client-api.arkoselabs.com"}, "source": "https://arkoselabs.atlassian.net/wiki/pages/viewpage.action?pageId=819905", "verified_on": "2026-09-10"}
+      ]
+    },
+    "hcaptcha": {
+      "markers": [
+        {"signal": "vendor_script", "match": {"prefix": "js.hcaptcha.com/1/api.js"}, "source": "https://docs.hcaptcha.com/", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "hcaptcha.com/1/api.js"}, "source": "https://docs.hcaptcha.com/", "verified_on": "2026-09-10"},
+        {"signal": "captcha_element", "match": {"attribute": "h-captcha"}, "source": "https://docs.hcaptcha.com/configuration", "verified_on": "2026-09-10"},
+        {"signal": "captcha_input", "match": {"attribute": "h-captcha-response"}, "source": "https://docs.hcaptcha.com/configuration", "verified_on": "2026-09-10"}
+      ]
+    },
+    "recaptcha": {
+      "markers": [
+        {"signal": "vendor_script", "match": {"prefix": "www.google.com/recaptcha/api.js"}, "source": "https://developers.google.com/recaptcha/docs/display", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "www.google.com/recaptcha/enterprise.js"}, "source": "https://developers.google.com/recaptcha/docs/display", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "recaptcha.net/recaptcha/"}, "source": "https://docs.cloud.google.com/recaptcha/docs/instrument-web-pages", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "recaptcha/api.js"}, "source": "https://developers.google.com/recaptcha/docs/display", "verified_on": "2026-09-10"},
+        {"signal": "captcha_element", "match": {"attribute": "g-recaptcha"}, "source": "https://developers.google.com/recaptcha/docs/display", "verified_on": "2026-09-10"},
+        {"signal": "captcha_input", "match": {"attribute": "g-recaptcha-response"}, "source": "https://developers.google.com/recaptcha/docs/display", "verified_on": "2026-09-10"}
+      ]
+    },
+    "perimeterx": {
+      "markers": [
+        {"signal": "interstitial_structure", "match": {"prefix": "px-captcha"}, "source": "https://docs.humansecurity.com/applications/about-enforcers", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "perimeterx.net/whywasiblocked"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/perimeterx.py", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "perimeterx.com/whywasiblocked"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/perimeterx.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "client.perimeterx.net"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/perimeterx.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "client.perimeterx.com"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/perimeterx.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_script", "match": {"prefix": "perimeterx.net"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/perimeterx.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "_px3"}, "source": "https://docs.humansecurity.com/applications/about-enforcers", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "_px2"}, "source": "https://docs.humansecurity.com/applications/about-enforcers", "verified_on": "2026-09-10"}
+      ]
+    },
+    "ddos_guard": {
+      "markers": [
+        {"signal": "vendor_presence", "match": {"header": "server: ddos-guard"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/ddosguard.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "__ddg1"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/ddosguard.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "__ddg2"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/ddosguard.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "__ddgid"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/ddosguard.py", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "__ddgmark"}, "source": "https://raw.githubusercontent.com/EnableSecurity/wafw00f/master/wafw00f/plugins/ddosguard.py", "verified_on": "2026-09-10"}
+      ]
+    },
+    "amazon": {
+      "notes": "Form action measured live on 2026-10-19 with curl against /errors/validateCaptcha on nine marketplaces (amazon.com, amazon.de, amazon.fr, amazon.it, amazon.es, amazon.co.uk, amazon.se, amazon.pl, amazon.co.jp): every marketplace answered the captcha page with action=\"/errors_page/validateCaptcha\". Both paths stay matched per owner decision 65.27 of 2026-10-04.",
+      "markers": [
+        {"signal": "interstitial_structure", "match": {"prefix": "/errors/validateCaptcha"}, "source": "https://github.com/a-maliarov/amazoncaptcha/issues/40", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "/errors_page/validateCaptcha"}, "source": "https://github.com/a-maliarov/amazoncaptcha/issues/40", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "opfcaptcha-prod.s3.amazonaws.com"}, "source": "https://github.com/a-maliarov/amazoncaptcha/issues/40", "verified_on": "2026-09-10"},
+        {"signal": "interstitial_structure", "match": {"prefix": "captchacharacters"}, "source": "https://github.com/a-maliarov/amazoncaptcha/issues/40", "verified_on": "2026-09-10"}
+      ]
+    },
+    "aws_waf": {
+      "markers": [
+        {"signal": "definitive_header", "match": {"header": "x-amzn-waf-action: challenge"}, "source": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-and-challenge-actions.html", "verified_on": "2026-09-10"},
+        {"signal": "definitive_header", "match": {"header": "x-amzn-waf-action: captcha"}, "source": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-and-challenge-actions.html", "verified_on": "2026-09-10"},
+        {"signal": "vendor_presence", "match": {"cookie": "aws-waf-token"}, "source": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-and-challenge-actions.html", "verified_on": "2026-09-10"}
+      ]
+    }
+  },
+  "phrases": {
+    "cf_just_a_moment": {
+      "en": "Just a moment...",
+      "match": ["title"],
+      "provenance": {"source": "legacy-dictionary and FlareSolverr CHALLENGE_TITLES", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {
+        "pl": {
+          "text": "Cierpliwości...",
+          "provenance": {"source": "https://www.scrapingcourse.com/cloudflare-challenge", "via": "playwright locale=pl", "on": "2026-10-19"}
+        },
+        "de": {
+          "text": "Nur einen Moment…",
+          "provenance": {"source": "https://www.scrapingcourse.com/cloudflare-challenge", "via": "playwright locale=de", "on": "2026-10-19"}
+        },
+        "fr": {
+          "text": "Un instant…",
+          "provenance": {"source": "https://www.scrapingcourse.com/cloudflare-challenge", "via": "playwright locale=fr", "on": "2026-10-19"}
+        },
+        "ja": {
+          "text": "しばらくお待ちください...",
+          "provenance": {"source": "https://www.scrapingcourse.com/cloudflare-challenge", "via": "playwright locale=ja", "on": "2026-10-19"}
+        },
+        "ar": {
+          "text": "لحظة…",
+          "provenance": {"source": "https://www.scrapingcourse.com/cloudflare-challenge", "via": "playwright locale=ar", "on": "2026-10-19"}
+        }
+      }
+    },
+    "cf_checking_connection": {
+      "en": "Checking if the site connection is secure",
+      "match": ["body"],
+      "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "cf_attention_required": {
+      "en": "Attention Required!",
+      "match": ["title"],
+      "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "cf_verify_human": {
+      "en": "Verify you are human",
+      "match": ["body"],
+      "provenance": {"source": "Cloudflare managed challenge heading, English text per design Decision 4; the Turnstile variant measured 2026-10-19 serves 'Performing security verification' instead", "via": "design-decision-4", "on": "2026-10-19"},
+      "translations": {}
+    },
+    "generic_prove_humanity": {
+      "en": "Prove your humanity",
+      "match": ["body"],
+      "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "generic_verify_you_are_human": {
+      "en": "Please verify you are a human",
+      "match": ["body"],
+      "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "generic_not_a_robot": {
+      "en": "Sorry, we just need to make sure you're not a robot",
+      "match": ["body"],
+      "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {
+        "pl": {
+          "text": "Potwierdź, że nie jesteś robotem",
+          "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"}
+        }
+      }
+    },
+    "generic_enable_js_adblock": {
+      "en": "Please enable JS and disable any ad blocker",
+      "match": ["body"],
+      "provenance": {"source": "legacy-dictionary, the Allegro block page", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "datadome_captcha": {
+      "en": "DataDome CAPTCHA",
+      "match": ["title", "body"],
+      "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "imperva_pardon_interruption": {
+      "en": "Pardon Our Interruption",
+      "match": ["title", "body"],
+      "provenance": {"source": "legacy-dictionary", "via": "legacy-dictionary", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "amazon_type_characters": {
+      "en": "Type the characters you see in this image",
+      "match": ["body"],
+      "provenance": {"source": "measured interstitial markers in the spec 7 Bruno rows v, w, x, y", "via": "spec-7-bruno-rows", "on": "2026-09-04"},
+      "translations": {}
+    },
+    "amazon_enter_characters": {
+      "en": "Enter the characters you see below",
+      "match": ["body"],
+      "provenance": {"source": "measured interstitial markers in the spec 7 Bruno rows v, w, x, y", "via": "spec-7-bruno-rows", "on": "2026-09-04"},
+      "translations": {}
+    },
+    "amazon_continue_shopping": {
+      "en": "Click the button below to continue shopping",
+      "match": ["body"],
+      "provenance": {"source": "measured interstitial markers in the spec 7 Bruno rows v, w, x, y", "via": "spec-7-bruno-rows", "on": "2026-09-04"},
+      "translations": {
+        "de": {
+          "text": "Klicke auf die Schaltfläche unten, um mit dem Einkauf fortzufahren",
+          "provenance": {"source": "https://www.amazon.de/errors/validateCaptcha", "via": "curl", "on": "2026-10-19"}
+        },
+        "fr": {
+          "text": "Cliquez sur le bouton ci-dessous pour continuer vos achats",
+          "provenance": {"source": "https://www.amazon.fr/errors/validateCaptcha", "via": "curl", "on": "2026-10-19"}
+        },
+        "it": {
+          "text": "Fai clic sul pulsante qui sotto per continuare a fare acquisti",
+          "provenance": {"source": "https://www.amazon.it/errors/validateCaptcha", "via": "curl", "on": "2026-10-19"}
+        },
+        "es": {
+          "text": "Haz clic en el botón de abajo para seguir comprando",
+          "provenance": {"source": "https://www.amazon.es/errors/validateCaptcha", "via": "curl", "on": "2026-10-19"}
+        },
+        "ja": {
+          "text": "下のボタンをクリックしてショッピングを続けてください",
+          "provenance": {"source": "https://www.amazon.co.jp/errors/validateCaptcha", "via": "curl", "on": "2026-10-19"}
+        },
+        "pl": {
+          "text": "Kliknij poniższy przycisk, aby kontynuować zakupy",
+          "provenance": {"source": "measured interstitial markers in the spec 7 Bruno rows v, w, x, y", "via": "spec-7-bruno-rows", "on": "2026-09-04"}
+        },
+        "sv": {
+          "text": "Klicka på knappen nedan för att fortsätta handla",
+          "provenance": {"source": "measured interstitial markers in the spec 7 Bruno rows v, w, x, y", "via": "spec-7-bruno-rows", "on": "2026-09-04"}
+        }
+      }
+    },
+    "akamai_access_denied": {
+      "en": "Access Denied",
+      "match": ["title"],
+      "provenance": {"source": "wafw00f kona.py and ERROR_KEYWORDS", "via": "wafw00f-kona", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "perimeterx_automation_tools": {
+      "en": "denied because we believe you are using automation tools",
+      "match": ["body"],
+      "provenance": {"source": "wafw00f perimeterx.py", "via": "wafw00f-perimeterx", "on": "2026-09-10"},
+      "translations": {}
+    },
+    "ddosguard_title": {
+      "en": "DDoS-Guard",
+      "match": ["title"],
+      "provenance": {"source": "FlareSolverr CHALLENGE_TITLES", "via": "flaresolverr-challenge-titles", "on": "2026-09-10"},
+      "translations": {}
+    }
+  },
   "login_title_patterns": [
     "sign in",
     "log in",

@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_9-session-status-tasks.md` before sta
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] Redis reachable: `docker exec redis redis-cli PING` returns `PONG`
 
 ### Reset state

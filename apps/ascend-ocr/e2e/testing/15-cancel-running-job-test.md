@@ -82,7 +82,7 @@ Confirm the service is idle before starting.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"status":"ready"`, `"jobs_queued":0` and `"jobs_running":0`.
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`.
 
 ## Run
 
@@ -188,8 +188,8 @@ Step 6:
 
 Step 7:
 
-- Within 60 seconds of the cancel, `status` reads `ready` with `jobs_queued` 0 and `jobs_running` 0. The cancelled
-  document is not running any more.
+- Within 60 seconds of the cancel, `status` reads `ready` with `checks.jobs` reporting zero `queued` and zero
+  `running`. The cancelled document is not running any more.
 
 Step 8:
 

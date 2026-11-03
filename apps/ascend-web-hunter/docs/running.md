@@ -89,23 +89,31 @@ Build the image:
 docker build -t ascend-web-hunter:latest .
 ```
 
-Run the container standalone. Inside the Compose network use `http://searxng:8080`; for a single container
-against a host-network SearXNG use `host.docker.internal`:
+Run the container standalone. SearXNG publishes its port on `127.0.0.1` only, so a
+standalone container never reaches it through the host gateway. Join the network of the running stack
+(`ascend-ai_default` for the main stack, `ascend-scrapper_default` for the scraping file alone) and call SearXNG
+by name. The host's Redis is reached through `host.docker.internal` with the host gateway mapping
+(`redis://redis:6379/0` instead when the bundled Redis of the scraping file runs). Remove the compose container
+of the same name and port first, also before the IDE run configuration starts:
 
 ```bash
-docker run -d --name ascend-web-hunter -p 7021:7021 -e SEARXNG_BASE_URL="http://host.docker.internal:9020" ascend-web-hunter:latest
+docker compose rm -sf ascend-web-hunter
+```
+
+```bash
+docker run -d --name ascend-web-hunter --network ascend-ai_default --add-host=host.docker.internal:host-gateway -p 7021:7021 -e SEARXNG_BASE_URL="http://searxng:8080" -e REDIS_URL="redis://host.docker.internal:6379/0" ascend-web-hunter:latest
 ```
 
 Publishing is done by the [Release workflow](../../../.github/workflows/README.md) rather than by hand. It builds
 multi-arch and pushes `v<version>` and `latest` to both `lukk17/ascend-ai-ascend-web-hunter` and
 `ghcr.io/lukk17/ascend-ai-ascend-web-hunter`. The version comes from `[project].version` in `pyproject.toml`.
 
-The Compose-orchestrated path (recommended) brings up SearXNG, FlareSolverr and the Ngrok bridge in one shot. Run it
+The Compose-orchestrated path (recommended) brings up SearXNG and the Ngrok bridge in one shot. Run it
 from the repository root so it goes into the `ascend-ai` project rather than creating a second project that fights over
 the same container names:
 
 ```bash
-docker compose up -d --build searxng flaresolverr ascend-web-hunter ngrok-ascend-web-hunter
+docker compose up -d --build searxng ascend-web-hunter ngrok-ascend-web-hunter
 ```
 
 Redis is not part of that stack. It has to be running separately on port 6379, which is what `REDIS_URL` points at.
@@ -138,8 +146,9 @@ Tools advertised:
 - `web_search(query, limit)`: search the web through SearXNG
 - `web_read(url, include_links?, link_filter?, heavy_mode?, profile?, output_format?, tier?)`: extract content from a URL
 
-When the response carries `status: "human_intervention_required"`, the agent should display the `vnc_url` to
-the user and re-call `web_read` once they confirm the challenge is solved. The cached Redis session will let
+When the response carries `status: "human_intervention_required"` (MCP tool result), the agent should display the `vnc_url` to
+the user and re-call `web_read` once they confirm the challenge is solved. On REST the same outcome is HTTP 428
+with a problem body carrying `code: "human_intervention_required"` plus `intervention_type` and `vnc_url`. The cached Redis session will let
 the second call succeed without escalating again.
 
 When it carries `status: "session_expired"`, the stored login for that domain and profile has lapsed and no tier
@@ -148,15 +157,15 @@ then re-call `web_read`.
 
 `output_format` is `text` (the flat `content` field, the default) or `structured` (adds `title`, `author`, `date`
 and `sitename`), and `structured` is refused together with `include_links`. `tier` names where the chain starts,
-one of `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive` or
-`6-novnc`, and escalation continues through the tiers after it.
+one of `1-beautifulsoup`, `2-trafilatura`, `4-playwright_stealth`, `4a-patchright`, `4b-camoufox`,
+`5-crawlee_adaptive` or `6-novnc`, and escalation continues through the tiers after it.
 
 ---
 
 ### Startup readiness banner
 
 On startup the service logs one multi-line INFO record. It contains an ASCII banner, the bound access URLs,
-parallel 2-second probes for SearXNG / FlareSolverr / Redis, and the full list of REST and observability
+parallel 2-second probes for SearXNG / Redis, and the full list of REST and observability
 endpoints. Implementation in [src/config/startup_banner.py](../src/config/startup_banner.py).
 
 ---
@@ -166,7 +175,7 @@ endpoints. Implementation in [src/config/startup_banner.py](../src/config/startu
 | Endpoint | Purpose |
 | :--- | :--- |
 | `GET /health` | Liveness (always 200 when the process is alive) |
-| `GET /ready` | Readiness: probes Redis, SearXNG, FlareSolverr; 200 only when all upstreams respond |
+| `GET /ready` | Readiness: probes Redis and SearXNG; 200 only when all upstreams respond |
 | `GET /metrics` | Prometheus counters and histograms (strategy outcomes, durations, intervention rate) |
 | `GET /docs` | Swagger UI |
 | `GET /redoc` | Redoc |

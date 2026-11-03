@@ -1,10 +1,12 @@
 """Tests for ProxyProvider seam (task 4.3)."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.proxy.proxy_provider import ProxyProvider
+from tests.reader.crawlee_test_support import final_statistics
 
 
 def test_proxy_disabled_by_default() -> None:
@@ -16,7 +18,6 @@ def test_proxy_disabled_by_default() -> None:
     assert not p.enabled
     assert p.for_curl_cffi() is None
     assert p.for_playwright() is None
-    assert p.for_flaresolverr() is None
 
 
 def test_proxy_enabled_when_url_set() -> None:
@@ -28,11 +29,10 @@ def test_proxy_enabled_when_url_set() -> None:
     assert p.enabled
     assert p.for_curl_cffi() == {"http": "socks5://proxy:1080", "https": "socks5://proxy:1080"}
     assert p.for_playwright() == {"server": "socks5://proxy:1080"}
-    assert p.for_flaresolverr() == {"url": "socks5://proxy:1080"}
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_host: Any) -> None:
     """When proxy_provider.for_curl_cffi() returns a dict, it is passed to the HTTP session."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -79,7 +79,7 @@ async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_hos
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_host: Any) -> None:
     """When a redirect occurs, the proxy dict is forwarded to the hop request too."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -133,64 +133,6 @@ async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_hos
 
 
 @pytest.mark.asyncio
-async def test_flaresolverr_strategy_injects_proxy_into_payload() -> None:
-    """When proxy_provider.for_flaresolverr() returns a dict, it is added to the POST payload."""
-    # given
-    from src.reader.strategies.flaresolverr_strategy import FlareSolverrStrategy
-
-    fs_proxy = {"url": "http://proxy:8080"}
-    payload_sent: dict = {}
-
-    response = MagicMock()
-    response.json = MagicMock(
-        return_value={
-            "status": "ok",
-            "solution": {"response": "<html>ok</html>", "cookies": [], "userAgent": "UA"},
-        }
-    )
-    response.raise_for_status = MagicMock()
-    session = MagicMock()
-    session.__aenter__ = AsyncMock(return_value=session)
-    session.__aexit__ = AsyncMock(return_value=False)
-
-    async def capture_post(url, *, json, **_kwargs):
-        payload_sent.update(json)
-        return response
-
-    session.post = capture_post
-
-    mock_breaker = MagicMock()
-    mock_breaker.is_open = False
-
-    # when
-    with (
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.proxy_provider.for_flaresolverr",
-            return_value=fs_proxy,
-        ),
-        patch("src.reader.strategies.flaresolverr_strategy.requests.AsyncSession", return_value=session),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.cookie_manager.get_flat_cookies",
-            new=AsyncMock(return_value={}),
-        ),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.cookie_manager.get_user_agent",
-            new=AsyncMock(return_value=None),
-        ),
-        patch("src.reader.strategies.flaresolverr_strategy.flaresolverr_breaker", mock_breaker),
-        patch(
-            "src.reader.strategies.flaresolverr_strategy.ChallengeDetector.is_login_required",
-            return_value=False,
-        ),
-        patch("src.reader.strategies.flaresolverr_strategy.ChallengeDetector.is_blocked", return_value=False),
-    ):
-        await FlareSolverrStrategy().get_html("https://example.com")
-
-    # then
-    assert payload_sent.get("proxy") == fs_proxy
-
-
-@pytest.mark.asyncio
 async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
     """When proxy_provider.for_playwright() returns a dict, it is added to browser_new_context_options."""
     # given
@@ -202,13 +144,13 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
     rules.should_block.return_value = False
     url_validator = URLValidator(rules)
 
-    captured_ctx_options: dict = {}
+    captured_ctx_options: dict[str, Any] = {}
 
-    def fake_with_beautifulsoup(*args, **kwargs):
+    def fake_with_beautifulsoup(*args: Any, **kwargs: Any) -> Any:
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
         captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()
-        mock_crawler.run = AsyncMock()
+        mock_crawler.run = AsyncMock(return_value=final_statistics(1))
         mock_crawler.router.default_handler = lambda f: f
         mock_crawler.pre_navigation_hook = lambda f: f
         return mock_crawler
@@ -219,6 +161,10 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
         patch(
             "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
             new=AsyncMock(return_value=None),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+            new=AsyncMock(return_value=MagicMock()),
         ),
         patch(
             "src.reader.strategies.crawlee_strategy.proxy_provider.for_playwright", return_value=proxy_dict
@@ -234,7 +180,7 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_host: Any) -> None:
     """When there is no proxy and a redirect occurs, the hop request is made without proxies."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -284,7 +230,7 @@ async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_ho
 
 
 @pytest.mark.asyncio
-async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location(pinned_public_host) -> None:
+async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location(pinned_public_host: Any) -> None:
     """When a redirect response has no Location header, the loop breaks immediately."""
     # given
     from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
@@ -339,13 +285,13 @@ async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
     rules.should_block.return_value = False
     url_validator = URLValidator(rules)
 
-    captured_ctx_options: dict = {}
+    captured_ctx_options: dict[str, Any] = {}
 
-    def fake_with_beautifulsoup(*args, **kwargs):
+    def fake_with_beautifulsoup(*args: Any, **kwargs: Any) -> Any:
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
         captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()
-        mock_crawler.run = AsyncMock()
+        mock_crawler.run = AsyncMock(return_value=final_statistics(1))
         mock_crawler.router.default_handler = lambda f: f
         mock_crawler.pre_navigation_hook = lambda f: f
         return mock_crawler
@@ -356,6 +302,10 @@ async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
         patch(
             "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
             new=AsyncMock(return_value=stored_state),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+            new=AsyncMock(return_value=MagicMock()),
         ),
         patch("src.reader.strategies.crawlee_strategy.proxy_provider.for_playwright", return_value=None),
         patch("src.reader.strategies.crawlee_strategy.trafilatura.extract", return_value=None),

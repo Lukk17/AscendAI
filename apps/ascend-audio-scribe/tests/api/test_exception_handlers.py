@@ -1,74 +1,60 @@
-from typing import cast
-
-from starlette.requests import Request
-from starlette.types import Scope
+from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, VALIDATION, resolve_detail
 
 from src.api.exception_handlers import (
-    PROBLEM_JSON,
+    FILE_TOO_LARGE,
+    UPSTREAM_PROVIDER,
     FileSizeExceededError,
     UpstreamProviderError,
-    file_size_error_handler,
-    global_exception_handler,
-    upstream_provider_error_handler,
-    value_error_handler,
+    error_registry,
 )
 
 
-def _make_request(path: str = "/") -> Request:
-    scope = cast(
-        "Scope",
-        {"type": "http", "method": "POST", "path": path, "headers": [], "query_string": b""},
-    )
-    return Request(scope)
-
-
-def test_value_error_handler_returns_400_problem_json() -> None:
-    # when
-    response = value_error_handler(_make_request(), ValueError("oops"))
-
-    # then
-    assert response.status_code == 400
-    assert response.media_type == PROBLEM_JSON
-    body = bytes(response.body).decode()
-    assert "oops" in body
-    assert "/validation" in body
-
-
-def test_file_size_error_handler_returns_413_problem_json() -> None:
-    # when
-    response = file_size_error_handler(_make_request(), FileSizeExceededError("too big"))
-
-    # then
-    assert response.status_code == 413
-    assert response.media_type == PROBLEM_JSON
-    body = bytes(response.body).decode()
-    assert "too big" in body
-    assert "/file-too-large" in body
-
-
-def test_upstream_provider_error_handler_returns_502_problem_json() -> None:
-    # when
-    response = upstream_provider_error_handler(
-        _make_request(), UpstreamProviderError("Hugging Face upstream call failed for model 'x'.")
-    )
-
-    # then
-    assert response.status_code == 502
-    assert response.media_type == PROBLEM_JSON
-    body = bytes(response.body).decode()
-    assert "Hugging Face upstream call failed" in body
-    assert "/upstream-provider" in body
-
-
-def test_global_exception_handler_redacts_detail() -> None:
+def test_registry_maps_value_error_to_validation_400() -> None:
     # given
-    sentinel = "UPSTREAM_LEAK_MARKER"
-
+    exc = ValueError("oops")
     # when
-    response = global_exception_handler(_make_request("/x"), RuntimeError(sentinel))
-
+    entry = error_registry.lookup(exc)
     # then
-    assert response.status_code == 500
-    body = bytes(response.body).decode()
-    assert sentinel not in body
-    assert "/x" in body
+    assert entry is not None
+    assert entry.code == VALIDATION
+    assert entry.code.status == 400
+    assert entry.code.type_uri() == "https://ascend.ai/errors/validation"
+    assert resolve_detail(entry, exc) == "oops"
+
+
+def test_registry_maps_file_size_error_to_413_with_unchanged_type() -> None:
+    # given
+    exc = FileSizeExceededError("too big")
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code == FILE_TOO_LARGE
+    assert entry.code.status == 413
+    assert entry.code.type_uri() == "https://ascend.ai/errors/file-too-large"
+    assert resolve_detail(entry, exc) == "too big"
+
+
+def test_registry_maps_upstream_error_to_502_with_unchanged_type() -> None:
+    # given
+    exc = UpstreamProviderError("Hugging Face upstream call failed for model 'x'.")
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is not None
+    assert entry.code == UPSTREAM_PROVIDER
+    assert entry.code.status == 502
+    assert entry.code.type_uri() == "https://ascend.ai/errors/upstream-provider"
+    assert "Hugging Face upstream call failed" in resolve_detail(entry, exc)
+
+
+def test_unregistered_error_falls_to_internal_with_fixed_detail() -> None:
+    # given
+    exc = RuntimeError("UPSTREAM_LEAK_MARKER")
+    # when
+    entry = error_registry.lookup(exc)
+    # then
+    assert entry is None
+    assert INTERNAL.status == 500
+    assert INTERNAL.type_uri() == "https://ascend.ai/errors/internal"
+    assert INTERNAL_FIXED_DETAIL == "An unexpected error occurred. Check server logs for details."

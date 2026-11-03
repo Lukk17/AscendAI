@@ -254,3 +254,12 @@ The related code: `request_worker_replacement_for_cancel`, `wait_for_worker_repl
 `TestJobMetrics::test_the_wait_is_measured_only_in_the_job_queue` in `tests/observability/test_metrics.py`,
 `TestCancellation::test_a_cancel_while_the_submitted_bytes_are_read_is_kept` in `tests/service/test_job_runner.py`,
 and the three `test_starting_*` tests in `TestTerminalWriters` in `tests/service/test_job_store.py`.
+
+## Amendment (2026-10-08): `/ready` moves to the shared readiness aggregator
+
+`add-ascend-python-common` moved the readiness shape every Python service shares into `libs/ascend-python-common`.
+`/health` still answers 200 without touching a dependency. `/ready` runs the `engine`, `worker_pool` and `jobs`
+probes in `apps/ascend-ocr/src/api/readiness.py` at once and answers 200 `ready` or 503 `not-ready`, with a `checks`
+object naming each probe. `ReadinessResponse` and `HealthResponse` are deleted. What each probe reports is unchanged:
+a cold engine, an unusable pool, a rebuild in progress, or a cancel that killed the worker still reports `not-ready`
+for the duration, and a busy service with work queued stays `ready`.

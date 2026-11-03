@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -16,7 +17,7 @@ from src.validator.url_validator import url_validator
 
 
 @pytest.fixture
-def restore_url_validator_rules():
+def restore_url_validator_rules() -> Any:
     """The refresh endpoint mutates the process-wide `url_validator` singleton in
     place; restore it after any test that exercises a real (non-error) refresh so
     the swap does not leak into unrelated tests."""
@@ -26,19 +27,20 @@ def restore_url_validator_rules():
 
 
 @pytest.mark.asyncio
-async def test_status_returns_current_rule_count_and_age(client: AsyncClient):
+async def test_status_returns_current_rule_count_and_age(client: AsyncClient) -> None:
     # when
     resp = await client.get("/api/v1/blocklist/status")
 
     # then
     assert resp.status_code == 200
     body = resp.json()
+    assert real_blocklist_loader.state is not None
     assert body["rule_count"] == real_blocklist_loader.state.rule_count
     assert body["age_seconds"] >= 0
 
 
 @pytest.mark.asyncio
-async def test_status_returns_503_when_not_loaded(client: AsyncClient):
+async def test_status_returns_503_when_not_loaded(client: AsyncClient) -> None:
     # when
     with patch.object(real_blocklist_loader, "_state", None):
         resp = await client.get("/api/v1/blocklist/status")
@@ -48,7 +50,9 @@ async def test_status_returns_503_when_not_loaded(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_refresh_success_returns_new_rule_count(client: AsyncClient, restore_url_validator_rules):
+async def test_refresh_success_returns_new_rule_count(
+    client: AsyncClient, restore_url_validator_rules: Any
+) -> None:
     # given
     new_state = BlocklistState(rule_count=42, loaded_at=datetime.now(UTC))
     new_rules = AdblockRules(["||fresh.example^"])
@@ -69,7 +73,9 @@ async def test_refresh_success_returns_new_rule_count(client: AsyncClient, resto
 
 
 @pytest.mark.asyncio
-async def test_refresh_swaps_the_shared_url_validator_rules(client: AsyncClient, restore_url_validator_rules):
+async def test_refresh_swaps_the_shared_url_validator_rules(
+    client: AsyncClient, restore_url_validator_rules: Any
+) -> None:
     # given
     new_state = BlocklistState(rule_count=1, loaded_at=datetime.now(UTC))
     new_rules = AdblockRules(["||fresh.example^"])
@@ -88,7 +94,7 @@ async def test_refresh_swaps_the_shared_url_validator_rules(client: AsyncClient,
 
 
 @pytest.mark.asyncio
-async def test_refresh_network_failure_returns_503(client: AsyncClient):
+async def test_refresh_network_failure_returns_503(client: AsyncClient) -> None:
     # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",
@@ -102,7 +108,7 @@ async def test_refresh_network_failure_returns_503(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_refresh_validation_failure_returns_502(client: AsyncClient):
+async def test_refresh_validation_failure_returns_502(client: AsyncClient) -> None:
     # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",
@@ -116,7 +122,7 @@ async def test_refresh_validation_failure_returns_502(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_refresh_throttled_returns_429_with_retry_after(client: AsyncClient):
+async def test_refresh_throttled_returns_429_with_retry_after(client: AsyncClient) -> None:
     # when
     with patch(
         "src.api.rest.blocklist_endpoints.blocklist_loader.refresh",

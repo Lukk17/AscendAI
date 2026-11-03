@@ -21,23 +21,24 @@ runtime:
         test("status is ready", function () {
             expect(res.getBody().status).to.equal("ready");
         });
-        test("engine_warm true", function () {
-            expect(res.getBody().engine_warm).to.equal(true);
+        test("service is ascend-ocr", function () {
+            expect(res.getBody().service).to.equal("ascend-ocr");
         });
         test("version is a non-empty string", function () {
             expect(res.getBody().version).to.be.a("string").and.not.empty;
         });
-        test("accepting_work true", function () {
-            expect(res.getBody().accepting_work).to.equal(true);
+        test("engine probe is ok and warm", function () {
+            expect(res.getBody().checks.engine.status).to.equal("ok");
+            expect(res.getBody().checks.engine.warm).to.equal("true");
         });
-        test("an idle service reports nothing queued", function () {
-            expect(res.getBody().jobs_queued).to.equal(0);
+        test("worker pool probe is ok and accepting work", function () {
+            expect(res.getBody().checks.worker_pool.status).to.equal("ok");
+            expect(res.getBody().checks.worker_pool.accepting_work).to.equal("true");
         });
-        test("an idle service reports nothing running", function () {
-            expect(res.getBody().jobs_running).to.equal(0);
-        });
-        test("queue_depth is no longer reported", function () {
-            expect(res.getBody()).to.not.have.property("queue_depth");
+        test("an idle service reports nothing queued or running", function () {
+            expect(res.getBody().checks.jobs.status).to.equal("ok");
+            expect(res.getBody().checks.jobs.queued).to.equal("0");
+            expect(res.getBody().checks.jobs.running).to.equal("0");
         });
 
 settings:

@@ -1,0 +1,53 @@
+info:
+  name: tool-call-session
+  type: http
+  seq: 104
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 104,
+        "method": "tools/call",
+        "params": {
+          "name": "session_interventions",
+          "arguments": {}
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("no mcp-session-id response header in stateless mode", function () {
+            expect(res.getHeader("mcp-session-id")).to.equal(undefined);
+        });
+        test("content and structured content match the pin", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const result = envelope.result;
+            expect(JSON.parse(result.content[0].text).active_flows).to.equal(0);
+            expect(JSON.parse(result.content[0].text).flows).to.eql([]);
+            expect(result.structuredContent.active_flows).to.equal(0);
+            expect(result.structuredContent.flows).to.eql([]);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

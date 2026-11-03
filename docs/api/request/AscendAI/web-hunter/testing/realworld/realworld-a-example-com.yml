@@ -26,10 +26,10 @@ runtime:
         test("status is success", function () {
             expect(res.getBody().status).to.equal("success");
         });
-        test("content contains canary 'example domain'", function () {
+        test("content contains canary 'documentation examples'", function () {
             const b = res.getBody();
             const c = (b.content || b.text || b.markdown || "").toLowerCase();
-            expect(c).to.include("example domain");
+            expect(c).to.include("documentation examples");
         });
 
 settings:

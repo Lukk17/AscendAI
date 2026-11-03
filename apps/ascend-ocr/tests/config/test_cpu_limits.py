@@ -1,11 +1,15 @@
+import os
+from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from src.config import cpu_limits
 from src.config.cpu_limits import apply_cpu_thread_limit, detect_cpu_limit
 
 
 class TestDetectCpuLimitCgroupV2:
-    def test_reads_quota_and_period(self, tmp_path, monkeypatch):
+    def test_reads_quota_and_period(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         cgroup_file = tmp_path / "cpu.max"
         cgroup_file.write_text("400000 100000")
@@ -14,7 +18,7 @@ class TestDetectCpuLimitCgroupV2:
         # When / Then
         assert detect_cpu_limit() == 4
 
-    def test_rounds_down_partial_cpu(self, tmp_path, monkeypatch):
+    def test_rounds_down_partial_cpu(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         cgroup_file = tmp_path / "cpu.max"
         cgroup_file.write_text("250000 100000")
@@ -23,7 +27,9 @@ class TestDetectCpuLimitCgroupV2:
         # When / Then
         assert detect_cpu_limit() == 2
 
-    def test_never_returns_zero_for_sub_one_cpu_quota(self, tmp_path, monkeypatch):
+    def test_never_returns_zero_for_sub_one_cpu_quota(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         cgroup_file = tmp_path / "cpu.max"
         cgroup_file.write_text("50000 100000")
@@ -32,7 +38,7 @@ class TestDetectCpuLimitCgroupV2:
         # When / Then
         assert detect_cpu_limit() == 1
 
-    def test_unlimited_quota_falls_through(self, tmp_path, monkeypatch):
+    def test_unlimited_quota_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         cgroup_file = tmp_path / "cpu.max"
         cgroup_file.write_text("max 100000")
@@ -44,7 +50,7 @@ class TestDetectCpuLimitCgroupV2:
         with patch("src.config.cpu_limits.os.cpu_count", return_value=8):
             assert detect_cpu_limit() == 8
 
-    def test_missing_file_falls_through(self, tmp_path, monkeypatch):
+    def test_missing_file_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(cpu_limits, "_CGROUP_V2_MAX_PATH", tmp_path / "does-not-exist")
         monkeypatch.setattr(cpu_limits, "_CGROUP_V1_QUOTA_PATH", tmp_path / "missing-v1-quota")
@@ -54,7 +60,7 @@ class TestDetectCpuLimitCgroupV2:
         with patch("src.config.cpu_limits.os.cpu_count", return_value=6):
             assert detect_cpu_limit() == 6
 
-    def test_malformed_content_falls_through(self, tmp_path, monkeypatch):
+    def test_malformed_content_falls_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         cgroup_file = tmp_path / "cpu.max"
         cgroup_file.write_text("not-a-number")
@@ -68,7 +74,7 @@ class TestDetectCpuLimitCgroupV2:
 
 
 class TestDetectCpuLimitCgroupV1:
-    def test_reads_quota_and_period(self, tmp_path, monkeypatch):
+    def test_reads_quota_and_period(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(cpu_limits, "_CGROUP_V2_MAX_PATH", tmp_path / "no-v2-file")
         quota_file = tmp_path / "cpu.cfs_quota_us"
@@ -81,7 +87,9 @@ class TestDetectCpuLimitCgroupV1:
         # When / Then
         assert detect_cpu_limit() == 2
 
-    def test_unlimited_quota_falls_back_to_cpu_count(self, tmp_path, monkeypatch):
+    def test_unlimited_quota_falls_back_to_cpu_count(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(cpu_limits, "_CGROUP_V2_MAX_PATH", tmp_path / "no-v2-file")
         quota_file = tmp_path / "cpu.cfs_quota_us"
@@ -95,7 +103,7 @@ class TestDetectCpuLimitCgroupV1:
         with patch("src.config.cpu_limits.os.cpu_count", return_value=12):
             assert detect_cpu_limit() == 12
 
-    def test_missing_period_file_falls_back(self, tmp_path, monkeypatch):
+    def test_missing_period_file_falls_back(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given
         monkeypatch.setattr(cpu_limits, "_CGROUP_V2_MAX_PATH", tmp_path / "no-v2-file")
         quota_file = tmp_path / "cpu.cfs_quota_us"
@@ -109,7 +117,7 @@ class TestDetectCpuLimitCgroupV1:
 
 
 class TestDetectCpuLimitNoCgroup:
-    def test_falls_back_to_cpu_count(self, tmp_path, monkeypatch):
+    def test_falls_back_to_cpu_count(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given no cgroup files at all
         monkeypatch.setattr(cpu_limits, "_CGROUP_V2_MAX_PATH", tmp_path / "no-v2-file")
         monkeypatch.setattr(cpu_limits, "_CGROUP_V1_QUOTA_PATH", tmp_path / "no-v1-quota")
@@ -119,7 +127,9 @@ class TestDetectCpuLimitNoCgroup:
         with patch("src.config.cpu_limits.os.cpu_count", return_value=16):
             assert detect_cpu_limit() == 16
 
-    def test_falls_back_to_one_when_cpu_count_unknown(self, tmp_path, monkeypatch):
+    def test_falls_back_to_one_when_cpu_count_unknown(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(cpu_limits, "_CGROUP_V2_MAX_PATH", tmp_path / "no-v2-file")
         monkeypatch.setattr(cpu_limits, "_CGROUP_V1_QUOTA_PATH", tmp_path / "no-v1-quota")
@@ -131,7 +141,7 @@ class TestDetectCpuLimitNoCgroup:
 
 
 class TestApplyCpuThreadLimit:
-    def test_caps_opencv_and_returns_the_limit(self):
+    def test_caps_opencv_and_returns_the_limit(self) -> None:
         # When
         with (
             patch("src.config.cpu_limits.detect_cpu_limit", return_value=4),
@@ -143,7 +153,9 @@ class TestApplyCpuThreadLimit:
         assert result == 4
         mock_cv2.setNumThreads.assert_called_once_with(4)
 
-    def test_leaves_the_paddle_env_var_alone_because_paddle_never_reads_it(self, monkeypatch):
+    def test_leaves_the_paddle_env_var_alone_because_paddle_never_reads_it(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.delenv("PADDLE_PDX_CPU_NUM_THREADS", raising=False)
 
@@ -155,4 +167,4 @@ class TestApplyCpuThreadLimit:
             apply_cpu_thread_limit()
 
         # Then
-        assert "PADDLE_PDX_CPU_NUM_THREADS" not in cpu_limits.os.environ
+        assert "PADDLE_PDX_CPU_NUM_THREADS" not in os.environ

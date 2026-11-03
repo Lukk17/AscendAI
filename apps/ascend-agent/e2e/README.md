@@ -216,7 +216,9 @@ specs need:
       "Bash(curl -fsS http://localhost:7020/*)",
       "Bash(bru --version)",
       "Bash(bru run *)",
-      "Bash(cd docs/api/request/AscendAI && bru run *)"
+      "Bash(cd docs/api/request/AscendAI && bru run *)",
+      "Bash(WEB_HUNTER_ALLOWED_PRIVATE_HOSTS=e2e-fake-site docker compose up -d ascend-web-hunter)",
+      "Bash(docker compose up -d ascend-web-hunter)"
     ]
   }
 }

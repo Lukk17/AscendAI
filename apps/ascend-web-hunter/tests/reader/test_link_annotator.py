@@ -3,7 +3,7 @@ from src.reader.link_annotator import annotate_links
 BASE_URL = "https://example.com"
 
 
-def test_annotate_links_returns_numbered_map():
+def test_annotate_links_returns_numbered_map() -> None:
     # given
     html = """
     <html><body>
@@ -23,7 +23,7 @@ def test_annotate_links_returns_numbered_map():
     assert "[2]" in content
 
 
-def test_annotate_links_strips_noise_tags():
+def test_annotate_links_strips_noise_tags() -> None:
     # given
     html = """
     <html><body>
@@ -41,7 +41,7 @@ def test_annotate_links_strips_noise_tags():
     assert links[1] == "https://example.com/content"
 
 
-def test_annotate_links_filter_by_substring():
+def test_annotate_links_filter_by_substring() -> None:
     # given
     html = """
     <html><body>
@@ -60,7 +60,7 @@ def test_annotate_links_filter_by_substring():
     assert links[2] == "https://example.com/job-offer/mid-dev"
 
 
-def test_annotate_links_resolves_relative_urls():
+def test_annotate_links_resolves_relative_urls() -> None:
     # given
     html = """
     <html><body>
@@ -75,7 +75,7 @@ def test_annotate_links_resolves_relative_urls():
     assert links[1] == "https://example.com/relative/path"
 
 
-def test_annotate_links_skips_invalid_hrefs():
+def test_annotate_links_skips_invalid_hrefs() -> None:
     # given
     html = """
     <html><body>
@@ -95,7 +95,7 @@ def test_annotate_links_skips_invalid_hrefs():
     assert links[1] == "https://example.com/valid"
 
 
-def test_annotate_links_empty_html_returns_empty():
+def test_annotate_links_empty_html_returns_empty() -> None:
     # when
     content, links = annotate_links("", BASE_URL)
 
@@ -104,7 +104,7 @@ def test_annotate_links_empty_html_returns_empty():
     assert links == {}
 
 
-def test_annotate_links_no_anchors_returns_empty_map():
+def test_annotate_links_no_anchors_returns_empty_map() -> None:
     # given
     html = "<html><body><p>No links here.</p></body></html>"
 

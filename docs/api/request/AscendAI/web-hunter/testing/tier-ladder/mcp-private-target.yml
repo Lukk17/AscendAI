@@ -1,0 +1,56 @@
+info:
+  name: mcp-private-target
+  type: http
+  seq: 51
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    # MCP web_read refusal for the blocked-name article on 4a-patchright.
+    # The dummy session id travels in --env-var mcp_session_id.
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+          "name": "web_read",
+          "arguments": {
+            "url": "http://e2e-fake-site-blocked:7031/article",
+            "tier": "4a-patchright"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("MCP web_read refusal starts with unsafe_uri", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const result = envelope.result;
+            expect(result.isError).to.equal(true);
+            const textEntry = result.content.find(function (entry) { return entry.type === "text"; });
+            expect(textEntry.text.indexOf("unsafe_uri: ")).to.equal(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

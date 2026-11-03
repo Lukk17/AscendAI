@@ -1,3 +1,4 @@
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -5,7 +6,7 @@ import pytest
 from src.runtime.browser_pool import BrowserPool
 
 
-def _make_playwright_factory(mock_browser):
+def _make_playwright_factory(mock_browser: Any) -> Any:
     pw = MagicMock()
     pw.stop = AsyncMock()
     pw.chromium.launch = AsyncMock(return_value=mock_browser)
@@ -17,7 +18,7 @@ def _make_playwright_factory(mock_browser):
 
 
 @pytest.mark.asyncio
-async def test_start_launches_chromium_once():
+async def test_start_launches_chromium_once() -> None:
     # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
@@ -36,7 +37,7 @@ async def test_start_launches_chromium_once():
 
 
 @pytest.mark.asyncio
-async def test_get_browser_returns_existing_when_connected():
+async def test_get_browser_returns_existing_when_connected() -> None:
     # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
@@ -55,7 +56,7 @@ async def test_get_browser_returns_existing_when_connected():
 
 
 @pytest.mark.asyncio
-async def test_get_browser_relaunches_when_disconnected():
+async def test_get_browser_relaunches_when_disconnected() -> None:
     # given
     disconnected = MagicMock()
     disconnected.is_connected = MagicMock(return_value=False)
@@ -80,7 +81,7 @@ async def test_get_browser_relaunches_when_disconnected():
 
 
 @pytest.mark.asyncio
-async def test_get_browser_relaunches_when_browser_is_none():
+async def test_get_browser_relaunches_when_browser_is_none() -> None:
     # given
     fresh = MagicMock()
     fresh.is_connected = MagicMock(return_value=True)
@@ -98,7 +99,7 @@ async def test_get_browser_relaunches_when_browser_is_none():
 
 
 @pytest.mark.asyncio
-async def test_stop_is_noop_when_never_started():
+async def test_stop_is_noop_when_never_started() -> None:
     # given
     pool = BrowserPool()
 
@@ -107,7 +108,7 @@ async def test_stop_is_noop_when_never_started():
 
 
 @pytest.mark.asyncio
-async def test_stop_closes_browser_and_playwright():
+async def test_stop_closes_browser_and_playwright() -> None:
     # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
@@ -127,7 +128,7 @@ async def test_stop_closes_browser_and_playwright():
 
 
 @pytest.mark.asyncio
-async def test_stop_tolerates_browser_close_error():
+async def test_stop_tolerates_browser_close_error() -> None:
     # given
     browser = MagicMock()
     browser.is_connected = MagicMock(return_value=True)
@@ -144,7 +145,7 @@ async def test_stop_tolerates_browser_close_error():
 
 
 @pytest.mark.asyncio
-async def test_relaunch_tolerates_prior_playwright_stop_failure():
+async def test_relaunch_tolerates_prior_playwright_stop_failure() -> None:
     """When a relaunch happens, the prior playwright instance is stopped. If that
     stop raises, the relaunch must still succeed."""
     # given
@@ -180,7 +181,7 @@ async def test_relaunch_tolerates_prior_playwright_stop_failure():
 
 
 @pytest.mark.asyncio
-async def test_get_browser_double_check_inside_lock():
+async def test_get_browser_double_check_inside_lock() -> Any:
     """First caller acquires the lock and relaunches; the second caller (also
     inside the lock) sees a now-connected browser and short-circuits without
     calling _launch_locked. We simulate this by populating self._browser inside
@@ -192,14 +193,14 @@ async def test_get_browser_double_check_inside_lock():
     connected_after_lock.is_connected = MagicMock(return_value=True)
 
     class _SeedingLock:
-        async def __aenter__(self):
+        async def __aenter__(self) -> None:
             pool._browser = connected_after_lock
             return
 
-        async def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> Any:
             return False
 
-    pool._lock = _SeedingLock()
+    pool._lock = cast("Any", _SeedingLock())
     pool._browser = None  # outer check fails → fall through to lock
 
     # when

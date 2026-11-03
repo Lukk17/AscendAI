@@ -1,0 +1,41 @@
+info:
+  name: wall-login-turkish
+  type: http
+  seq: 71
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/wall-tr",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 428", function () {
+            expect(res.getStatus()).to.equal(428);
+        });
+        test("turkish login wall answers login with a vnc_url", function () {
+            const b = res.getBody();
+            expect(b.code).to.equal("human_intervention_required");
+            expect(b.status).to.equal(428);
+            expect(b.intervention_type).to.equal("login");
+            expect(b.vnc_url).to.be.a("string").and.not.empty;
+            expect(b.type).to.be.a("string").and.not.empty;
+            expect(b.instance).to.be.a("string").and.not.empty;
+            expect(b.traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

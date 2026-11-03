@@ -176,7 +176,10 @@ final class AscendOcrJobFixtures {
 
     static String queueFullBody() {
         return """
-                {"code": "QUEUE_FULL", "detail": "Queue is full, retry later"}
+                {"type": "https://ascend.ai/errors/queue-full", "title": "Service Unavailable",
+                 "status": 503, "detail": "Queue is full, retry later",
+                 "instance": "/v1/ocr/jobs", "code": "QUEUE_FULL",
+                 "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"}
                 """;
     }
 

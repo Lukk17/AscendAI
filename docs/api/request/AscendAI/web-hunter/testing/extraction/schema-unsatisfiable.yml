@@ -1,0 +1,44 @@
+info:
+  name: schema-unsatisfiable
+  type: http
+  seq: 34
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/product",
+        "include_links": false,
+        "heavy_mode": false,
+        "output_format": "schema",
+        "extraction_schema": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 4
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 502", function () {
+            expect(res.getStatus()).to.equal(502);
+        });
+        test("unsatisfiable schema answers the extraction_failed problem body", function () {
+            const b = res.getBody();
+            expect(b.code).to.equal("extraction_failed");
+            expect(b.type).to.equal("https://ascend.ai/errors/extraction-failed");
+            expect(b.instance).to.equal("/api/v2/web/read");
+            expect(b.traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

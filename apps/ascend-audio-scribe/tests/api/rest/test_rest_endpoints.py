@@ -935,3 +935,39 @@ def _blocking_transcription_side_effect() -> object:
         return "done"
 
     return _inner
+
+
+def test_successful_local_transcription_increments_duration_count(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    # given
+    import re
+
+    from prometheus_client import generate_latest
+
+    import src.api.rest.rest_endpoints as rest
+
+    def _ok_count() -> float:
+        payload = generate_latest().decode()
+        match = re.search(
+            r'^transcription_duration_seconds_count\{outcome="ok",provider="local"\} (\S+)$',
+            payload,
+            re.MULTILINE,
+        )
+        if match is None:
+            return 0.0
+        return float(match.group(1))
+
+    before = _ok_count()
+    monkeypatch.setattr(
+        rest,
+        "local_speech_transcription",
+        _AsyncIterOver([{"text": "hi", "start": 0.0, "end": 1.0}]),
+    )
+
+    # when
+    response = client.post("/api/v1/transcribe/local", files=_multipart(), data={"stream": "false"})
+
+    # then
+    assert response.status_code == 200
+    assert _ok_count() - before == 1.0

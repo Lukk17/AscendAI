@@ -2,8 +2,7 @@ import os
 from pathlib import Path
 
 import cv2
-
-from src.config.logging_config import get_logger
+from ascend_python_common.log_config import get_logger
 
 logger = get_logger(__name__)
 

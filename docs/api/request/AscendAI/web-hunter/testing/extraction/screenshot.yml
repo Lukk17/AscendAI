@@ -1,0 +1,38 @@
+info:
+  name: screenshot
+  type: http
+  seq: 24
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/article",
+        "include_links": false,
+        "heavy_mode": false,
+        "output_format": "screenshot",
+        "tier": "4-playwright_stealth"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("screenshot is base64 starting with the PNG signature", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.content.substring(0, 5)).to.equal("iVBOR");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

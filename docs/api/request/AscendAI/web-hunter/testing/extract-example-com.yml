@@ -31,7 +31,7 @@ runtime:
             const contentField = ["content", "text", "markdown"].find(function (field) { return typeof data[field] === "string"; });
             expect(contentField, "content-carrying string field").to.be.a("string");
             expect(data[contentField].length).to.be.at.least(50);
-            expect(data[contentField].toLowerCase()).to.include("example domain");
+            expect(data[contentField].toLowerCase()).to.include("this domain is for use in documentation examples");
         });
 
 settings:

@@ -1,8 +1,8 @@
-import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from anyio import Path as AsyncPath
 
 from src.adapters import file_service
 from src.api.exception_handlers import FileSizeExceededError
@@ -51,7 +51,7 @@ def test_cleanup_temp_file_swallows_oserror(tmp_path: Path) -> None:
     path.write_text("y", encoding="utf-8")
 
     # when / then
-    with patch.object(os, "remove", side_effect=OSError("nope")):
+    with patch.object(Path, "unlink", side_effect=OSError("nope")):
         file_service.cleanup_temp_file(str(path))
 
 
@@ -73,8 +73,8 @@ async def test_save_upload_streams_and_succeeds(tmp_path: Path) -> None:
     path = await file_service.save_upload_to_temp_async(upload)
 
     # then
-    written = Path(path).read_bytes()
-    Path(path).unlink()
+    written = await AsyncPath(path).read_bytes()
+    await AsyncPath(path).unlink()
     assert written == reads[0] + reads[1]
 
 

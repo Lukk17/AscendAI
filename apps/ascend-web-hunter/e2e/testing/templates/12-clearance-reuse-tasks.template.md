@@ -10,8 +10,7 @@ go. Record both calls' `mode` and `responseTime` under Additional tasks I did.
 ### Prerequisites
 
 - [ ] `bru --version` returns a version string.
-- [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
-- [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable).
+- [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 - [ ] `docker exec redis redis-cli PING` returns `PONG`.
 
 ### Reset state
@@ -22,9 +21,9 @@ go. Record both calls' `mode` and `responseTime` under Additional tasks I did.
 ### Run
 
 - [ ] `cd docs/api/request/AscendAI`.
-- [ ] Call 1 (cold): `clearance-cold.yml` answered HTTP 200, JSON report written.
+- [ ] Call 1 (cold): `clearance-cold.yml` answered HTTP 200 with a solved page, or HTTP 428/409 as an environment gate, JSON report written.
 - [ ] Step 2: read back Call 1's `mode` and `responseTime` from the report and recorded both.
-- [ ] Capture check: `docker exec redis redis-cli GET "session:scrapingcourse.com:default"` returned JSON whose `waf` entry contains a `cf_clearance` cookie.
+- [ ] Capture check: `docker exec redis redis-cli GET "session:scrapingcourse.com:default"` returned JSON whose `waf` entry contains a `cf_clearance` cookie (skipped when Call 1 was gated).
 - [ ] Call 2 (warm): `clearance-reuse.yml` sent against the `?reuse=1` address with no profile, JSON report written.
 - [ ] Step 5: read back Call 2's `mode` and `responseTime` from the report and recorded both.
 

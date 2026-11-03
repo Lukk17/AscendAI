@@ -29,7 +29,7 @@ sequenceDiagram
     Lifespan-->>Uvicorn: yield (service ready)
     Docker->>Uvicorn: GET /ready
     Uvicorn->>Uvicorn: is_engine_warm("en") and is_accepting_work()
-    Uvicorn-->>Docker: 200 {"status":"ready","engine_warm":true,"accepting_work":true,"jobs_queued":0,"jobs_running":0}
+    Uvicorn-->>Docker: 200 {"status":"ready","service":"ascend-ocr","version":"...","checks":{"engine":{"warm":"true"},"worker_pool":{"accepting_work":"true"},"jobs":{"queued":"0","running":"0"}}}
 ```
 
 Both the bucket check and the recovery pass run **before** the runner takes its first document. Recovery is what
@@ -171,7 +171,7 @@ sequenceDiagram
 
     Agent->>MCP: tools/call ocr_submit(file_uri="http://host.docker.internal:9070/e2e-fixtures/img.png", lang="en")
     MCP->>Guard: _validate_host("host.docker.internal")
-    Guard->>Guard: "host.docker.internal" in MCP_ALLOWED_HOSTS → allow
+    Guard->>Guard: "host.docker.internal" in ALLOWED_PRIVATE_HOSTS → allow
     MCP->>ObjectStore: GET http://host.docker.internal:9070/e2e-fixtures/img.png (allow_redirects=False)
     ObjectStore-->>MCP: 200 image bytes (streamed, size checked)
     MCP->>MCP: JobService.submit - byte cap, pixel ceiling, page ceiling (header only)
@@ -183,7 +183,7 @@ sequenceDiagram
 ```
 
 The `host.docker.internal` hostname resolves to a private address inside the docker-compose network. Without
-`MCP_ALLOWED_HOSTS=host.docker.internal`, the SSRF guard would reject it. See
+`ALLOWED_PRIVATE_HOSTS=host.docker.internal`, the SSRF guard would reject it. See
 [ADR-001](../decisions/ADR-001-mcp-file-transport-uri-only.md).
 
 ---

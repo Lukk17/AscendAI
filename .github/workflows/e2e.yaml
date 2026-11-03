@@ -102,8 +102,33 @@ jobs:
   ascend-ocr:
     name: e2e / ascend-ocr (12 of 16 free specs)
     runs-on: ubuntu-latest
+    services:
+      # The object store is an external prerequisite in every AscendAI environment,
+      # not a docker-compose service. Provide it as a job-level service container
+      # instead; ascend-ocr already reaches host-bound services via
+      # host.docker.internal (extra_hosts: host-gateway is already set in the
+      # compose file), so no compose edit is needed to wire it up.
+      object-store:
+        image: floci/floci:2.0.1@sha256:4e451c39c7bb88e3cd4f87e8fc0c25d5b47695a51185d521e2241fa00486e8eb
+        ports:
+          - 9070:4566
     steps:
       - uses: actions/checkout@v4
+
+      - name: Wait for the object store and seed the e2e fixture
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:9070/_floci/health; then
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "::error::object store did not answer in time"
+              exit 1
+            fi
+            sleep 2
+          done
+          curl -fsS -X PUT "http://localhost:9070/e2e-fixtures"
+          curl -fsS -X PUT -H "Content-Type: image/png" --data-binary "@apps/ascend-ocr/e2e/fixtures/argent-saga-chronicles-page1.png" "http://localhost:9070/e2e-fixtures/argent-saga-chronicles-page1.png"
 
       # First build is 5-15 minutes: the PaddlePaddle wheels are heavy and
       # the model cache is prefetched in the builder stage (see ascend-ocr

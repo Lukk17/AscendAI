@@ -79,6 +79,8 @@ apps/ascend-audio-scribe/e2e/testing/runs/*
 !apps/ascend-audio-scribe/e2e/testing/runs/README.md
 apps/ascend-ocr/e2e/testing/runs/*
 !apps/ascend-ocr/e2e/testing/runs/README.md
+e2e/platform/testing/runs/*.md
+!e2e/platform/testing/runs/README.md
 
 # Bruno CLI run-output dump. Bruno writes the report next to the collection
 # root when invoked with `--output` (the file is named after the format -
@@ -150,5 +152,7 @@ MANIFEST
 # Crawlee runtime state - request queues and key-value stores are ephemeral
 # artifacts produced at scrape time. They contain scraped URLs and responses
 # and must not be committed.
-apps/ascend-web-hunter/src/storage/
+apps/ascend-web-hunter/src/storage/request_queues/
+apps/ascend-web-hunter/src/storage/key_value_stores/
+apps/ascend-web-hunter/src/storage/datasets/
 apps/ascend-web-hunter/.crawlee_storage/

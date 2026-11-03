@@ -5,7 +5,7 @@
 Two things, both against the real democaptcha hCaptcha demo form (no mocks), with a human in the loop between them:
 
 1. Human intervention contract. A read of `https://democaptcha.com/demo-form-eng/hcaptcha.html` with no stored
-   session answers HTTP 428, `status="human_intervention_required"` and a non-empty `vnc_url`. The page's
+   session answers HTTP 428, `code="human_intervention_required"` and a non-empty `vnc_url`. The page's
    `hcaptcha.com/1/api.js` script is one of the block signatures in `src/reader/cloudflare/challenge_dictionary.json`,
    so every automated tier reports a challenge (measured on 2026-09-10: 26 seconds from the request to the NoVNC
    monitor starting) and the scraper escalates to NoVNC for a human to act.
@@ -29,16 +29,16 @@ it proved nothing about a human.
 ### Contract (how the service signals each verdict)
 
 - success: HTTP `200`, body `status="success"`, non-empty content.
-- intervention: HTTP `428 Precondition Required`, body `status="human_intervention_required"` and a non-empty
+- intervention: HTTP `428 Precondition Required`, body `code="human_intervention_required"` and a non-empty
   `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
-- busy, not a verdict: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
+- busy, not a verdict: HTTP `409`, body `code="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
   meaning another intervention still holds the single shared browser. This spec runs alone, so a 409 on Call 1 means
   a monitor from an earlier run is still open. Wait the `Retry-After` seconds and re-run Call 1, up to 3 attempts in
   total, recording each attempt and the `holder_url` in the run record.
 
 ### Human-intervention forwarding (mandatory)
 
-Any call in this test that returns `status="human_intervention_required"` returns a `vnc_url` that a human must
+Any call in this test that returns `code="human_intervention_required"` returns a `vnc_url` that a human must
 open. The agent driving the test must print that `vnc_url` verbatim into the chat the moment it is received, then
 wait for the human to confirm they solved it before the capture check.
 
@@ -64,15 +64,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
-
-Check FlareSolverr is reachable (Call 1 walks every automated tier before it escalates to NoVNC).
-
-```bash
-curl -fsS http://localhost:8191/
-```
-
-Expect HTTP 200.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 Check Redis is reachable from the host's Docker context (the capture check reads the key the monitor writes).
 
@@ -98,6 +90,20 @@ Expect `0` or `1`. Then confirm the key is gone.
 
 ```bash
 docker exec redis redis-cli EXISTS "session:democaptcha.com:default"
+```
+
+Expect `0`.
+
+Part 2 uses two more profiles, so start it with both of their keys absent too.
+
+```bash
+docker exec redis redis-cli DEL "session:democaptcha.com:e2e-h1" "session:democaptcha.com:e2e-h2"
+```
+
+Expect `0`, `1` or `2` in total. Then confirm both keys are gone.
+
+```bash
+docker exec redis redis-cli EXISTS "session:democaptcha.com:e2e-h1" "session:democaptcha.com:e2e-h2"
 ```
 
 Expect `0`.
@@ -134,13 +140,90 @@ docker exec redis redis-cli GET "session:democaptcha.com:default"
 
 Expect a JSON value whose `auth` entry contains an `hmt_id` cookie.
 
+### Part 2 - Two windows solved out of order
+
+Part 1 proved one window and its capture under the default profile. Part 2 proves two windows at once,
+cleared in the opposite order they were opened: the runner opens the `e2e-h1` window first and the `e2e-h2`
+window second, the human solves `e2e-h2` first and `e2e-h1` second, and after each solve the runner asserts
+the listing freed exactly that flow's slot and the solved profile's session holds the `hmt_id` cookie while
+the other profile's key is unchanged.
+
+4. Call 2, blocked under `e2e-h1`. Send the same demo-form read with `"profile": "e2e-h1"` added to the
+   `captcha-clearance-blocked.yml` body (an alternative payload is an edit of the request file, per "Bruno is
+   the source of truth" in [testing/README.md](README.md), not a new file).
+
+```bash
+bru run "web-hunter/testing/captcha-clearance-blocked.yml" --env ascend-local
+```
+
+Expect HTTP 428 with a new `flow_id` and its own `window.slot`. Record both.
+
+5. Call 3, blocked under `e2e-h2`. Send the same read with `"profile": "e2e-h2"`.
+
+```bash
+bru run "web-hunter/testing/captcha-clearance-blocked.yml" --env ascend-local
+```
+
+Expect HTTP 428 with a second new `flow_id` and a different `window.slot`. Print both `vnc_url` values
+and both slots verbatim in the chat.
+
+6. Human solves the `e2e-h2` window first, then confirms. After the confirmation, check the listing freed
+   exactly that flow's slot while the `e2e-h1` flow is still open.
+
+```bash
+curl -fsS http://localhost:7021/api/v2/session/interventions
+```
+
+Expect the `flows` array to hold the Call 2 `flow_id` with its slot and no entry with the Call 3 slot.
+
+7. Capture check for `e2e-h2`, after the human confirms.
+
+```bash
+docker exec redis redis-cli GET "session:democaptcha.com:e2e-h2"
+```
+
+Expect a JSON value whose `auth` entry contains an `hmt_id` cookie. Then confirm the `e2e-h1` key is
+unchanged (still absent, nobody solved that window yet).
+
+```bash
+docker exec redis redis-cli EXISTS "session:democaptcha.com:e2e-h1"
+```
+
+Expect `0`.
+
+8. Human solves the `e2e-h1` window second, then confirms. Check the listing holds neither flow any
+   longer.
+
+```bash
+curl -fsS http://localhost:7021/api/v2/session/interventions
+```
+
+Expect no entry with the Call 2 `flow_id` and none with the Call 3 `flow_id`.
+
+9. Capture check for `e2e-h1`, after the human confirms.
+
+```bash
+docker exec redis redis-cli GET "session:democaptcha.com:e2e-h1"
+```
+
+Expect a JSON value whose `auth` entry contains an `hmt_id` cookie. Re-read the `e2e-h2` key and confirm
+it still holds the record step 7 saw, unchanged by the second solve.
+
 ## Expected
 
-- Call 1: HTTP `428`, `status="human_intervention_required"`, `vnc_url` is a non-empty string. The main agent
+- Call 1: HTTP `428`, `code="human_intervention_required"`, `vnc_url` is a non-empty string. The main agent
   printed the `vnc_url` verbatim in the chat.
 - Capture check: `session:democaptcha.com:default` exists and its `auth` entry carries a cookie named `hmt_id`. On
   the 2026-09-10 solve the `auth` entry also carried `evod95wg4` (democaptcha.com) and `__cflb` (api.hcaptcha.com),
   and the `waf` entry carried `__cf_bm` (.hcaptcha.com), none of which are asserted.
+- Part 2, open: Call 2 under `e2e-h1` and Call 3 under `e2e-h2` each answer HTTP `428` with their own `flow_id`
+  and their own `window.slot`, the two slots different. Both `vnc_url` values and both slots were printed verbatim
+  in the chat.
+- Part 2, `e2e-h2` solved first: the listing holds the Call 2 `flow_id` with its slot and no entry with the Call
+  3 slot; `session:democaptcha.com:e2e-h2` exists with an `hmt_id` cookie in its `auth` entry; and
+  `session:democaptcha.com:e2e-h1` is still absent.
+- Part 2, `e2e-h1` solved second: the listing holds neither `flow_id`; `session:democaptcha.com:e2e-h1` exists
+  with an `hmt_id` cookie in its `auth` entry; and the `e2e-h2` record is unchanged.
 - Clean up the record this test created, so the next run starts blocked again. The command is identical in
   PowerShell and Unix shells.
 
@@ -154,16 +237,30 @@ Expect a JSON value whose `auth` entry contains an `hmt_id` cookie.
 
   Expect `0`.
 
+- Clean up the Part 2 records too.
+
+  ```bash
+  docker exec redis redis-cli DEL "session:democaptcha.com:e2e-h1" "session:democaptcha.com:e2e-h2"
+  ```
+
+  ```bash
+  docker exec redis redis-cli EXISTS "session:democaptcha.com:e2e-h1" "session:democaptcha.com:e2e-h2"
+  ```
+
+  Expect `0`.
+
 ## Fixtures
 
 None, and no secrets: the captcha is human-solved. The URL is hardcoded in the Bruno request.
 
 ## Concurrency
 
-- Mutates: Redis, the ascend-web-hunter session store, key `session:democaptcha.com:default`, plus the single shared
-  NoVNC browser for as long as the human window is open (`NOVNC_TIMEOUT_SECONDS`, 600 s by default, if nobody
-  solves it).
-- Conflicts with: any spec that opens the human window (test 7's row u, test 10, and any read that escalates to
-  NoVNC), because the service holds one shared browser and answers `409` `novnc_busy` while it is held, and any test
+- Mutates: Redis, the ascend-web-hunter session store, keys `session:democaptcha.com:default`,
+  `session:democaptcha.com:e2e-h1` and `session:democaptcha.com:e2e-h2`, plus up to two NoVNC
+  window slots for as long as the human windows are open (`NOVNC_TIMEOUT_SECONDS`, 600 s by default, if nobody
+  solves them).
+- Conflicts with: any spec that opens a NoVNC flow (test 7's row u, test 10, spec 20
+  ([20-concurrent-interventions-test.md](20-concurrent-interventions-test.md)), and any read that escalates to
+  NoVNC), because the service answers `409` `novnc_busy` while every window slot is held, and any test
   that flushes `session:*` (test 7's reset), which would wipe the capture before the capture check.
 - Serial: true. Runs alone, last in the sweep, and only on a human's go, with the human on the main session.

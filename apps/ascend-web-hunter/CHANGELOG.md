@@ -9,6 +9,196 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
+## [0.0.15] - <release date>
+
+### Added
+- Polling crawl jobs (`POST /api/v1/crawl/jobs`, status, list, cancel, plus the `crawl_submit`,
+  `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` MCP tools) over a shared Redis
+  frontier, recorded as ADR-019 (design D14): several instances share one crawl through Lua claim
+  scripts with per-domain politeness, results land in Floci under `tenant/<tenantId>/`, recrawls
+  copy unchanged pages forward server-side.
+
+### Fixed
+- The `5-crawlee_adaptive` tier reads a URL again on every call. Each read now opens its own
+  in-memory Crawlee request queue and drops it when the crawl ends, because the shared default
+  queue on disk came back with the URL already handled, so the crawl processed zero requests and
+  answered an empty page. The reader treats an empty page as "escalate", so a navigation the guard
+  refused (the 302 to a non-allowlisted host) could open a NoVNC window instead of answering
+  `400 unsafe_uri`. A crawl that handles no request now raises `ExtractionFailedError`
+  (`502 extraction_failed`) on both the read and the read-with-links path, and the tier always
+  takes the browser path, where the navigation guard is installed, never the unguarded static
+  sub-crawler.
+
+## [0.0.14] - <release date>
+
+### Added
+- `POST /api/v2/web/session/import` stores a captured Playwright storage state for the URL's
+  registrable domain under `session:{domain}:{profile}` with provenance value `import`, dropping
+  cookies of other domains and purging the domain read cache on every instance, so the next read
+  uses the new session. Refusals are problem bodies with codes `invalid_profile` and
+  `no_cookies_for_domain`. The e2e harness `seed_authenticated_session.py` now seeds over HTTP
+  through this endpoint and no longer imports service code (design D5).
+
+## [0.0.13] - <release date>
+
+### Removed
+- The `3-flaresolverr` tier, its strategy, its `FLARESOLVERR_URL` and `FLARESOLVERR_ENABLED`
+  settings, its `flaresolverr` container in both compose files, and its readiness probes, banner
+  entry, circuit breaker, proxy branch and cookie producer constant. Passing `3-flaresolverr`
+  is refused like any value outside the allowed set, and no future tier reuses the name or the
+  number 3 (ADR-018).
+
+## [0.0.12] - <release date>
+
+### Added
+- Structured extraction on `output_format` `structured`: JSON-LD, OpenGraph and microdata parsed by
+  `extruct` into a `metadata` object; a parse error leaves it empty and never fails the read.
+- Scored ensemble: trafilatura and readability-lxml both run on every extraction and the higher scoring
+  result wins, ties to trafilatura (ADR-016, superseding the ADR-009 recall pass).
+- Schema-guided extraction on `output_format` `schema` with `extraction_schema`, produced by a
+  configurable OpenAI-compatible endpoint (`EXTRACTION_LLM_*`), with per-domain self-healing CSS
+  selector recipes in Redis (ADR-017).
+- Non-HTML routing: PDFs convert through docling-serve, images read through the ascend-ocr job API and
+  audio transcribes through ascend-audio-scribe, every file fetched by the shared `stream_to_file`
+  capped at `DOCUMENT_MAX_BYTES`. A routing failure returns the HTML extraction with a `routing_error`.
+- Two more output formats: `tables` (HTML tables as rows) and `screenshot` (base64 PNG from the
+  browser tier that served the read). Four new problem codes: `extraction_not_configured`,
+  `screenshot_unavailable`, `bad_request` (for `include_links` with any format but `text`) and the
+  expected upstream `extraction_failed`.
+- Cross-container read-cache purge: clearing a session publishes the domain on the `read_cache_purge`
+  Redis channel and every container's subscriber drops that domain's cached reads.
+
+## [0.0.11] - <release date>
+
+### Added
+- Two automated browser tiers in the ladder, both free and self-hosted: `4a-patchright` drives a
+  patched Chromium through the Patchright drop-in for the Playwright API, and `4b-camoufox` drives a
+  hardened Firefox, tried when `4a-patchright` is detected or fails and only while `CAMOUFOX_ENABLED`
+  is true (default `true`). The ladder is `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr` (only
+  while enabled), `4-playwright_stealth`, `4a-patchright`, `4b-camoufox`, `5-crawlee_adaptive` and
+  `6-novnc`, and both new values are accepted by the REST `tier` field and the MCP `web_read` `tier`
+  argument.
+- Per-domain tier memory: the tier that last succeeded for a registrable domain is kept in Redis and
+  the next read starts there, decaying back to the start of the ladder after `TIER_MEMORY_TTL_SECONDS`
+  (default `86400`). A caller-selected `tier` always wins over the memory.
+- The guarded route handler every browser tier installs: each page load, redirect hop and subresource
+  request is checked against the shared URI guard before the browser connects, and a request that
+  fails is blocked (ADR-015, with a dated amendment to ADR-011 listing the two new public values).
+
+### Changed
+- FlareSolverr stays for one release behind `FLARESOLVERR_ENABLED` (default `false`). While it is off
+  the `3-flaresolverr` tier is skipped by the ladder, a caller that names it gets `409`
+  `tier_disabled`, readiness does not probe it, and a session it produced earlier is replayed by the
+  browser tiers.
+- The two waits `playwright_strategy.py` held as code are settings now, `NETWORKIDLE_POLL_MS`
+  (default `1000`) and `SCROLL_PAUSE_MS` (default `200`), read by every browser tier.
+- Image size grew from 5.6 GB to 10.4 GB with the two patched browser tiers, measured on
+  linux/amd64 on 2026-11-02 by building the commit before this change and the current tree.
+
+## [0.0.10] - <release date>
+
+### Added
+- One scored challenge verdict in place of four booleans: `ChallengeDetector.assess(status_code,
+  headers, html)` returns a `ChallengeVerdict` carrying the score, every signal that fired with its
+  weight, the vendor the signals point at when they point at one, and the intervention type, while
+  `is_blocked`, `has_real_content` and `is_content_accepted` keep their names as thin readers of it.
+- Wall detection that does not depend on language. The evidence is what a wall cannot translate: a
+  definitive vendor response header, vendor script, cookie and header signatures, the HTTP status,
+  the shape of the page, and the ratio of extracted words to bytes, links and article structure. A
+  page is a wall at `CHALLENGE_SCORE_THRESHOLD` (default `100`) or on a definitive signal, which
+  carries twice the threshold so no guard can cancel it, and a page carrying
+  `CHALLENGE_RICH_CONTENT_WORDS` of extracted article text is pulled back below the threshold unless
+  a definitive signal says otherwise.
+- `challenge_dictionary.json` as the one maintained catalogue file, holding each vendor marker and
+  each phrase translation with the source it was taken from, so a marker with no source or a
+  translation with no provenance fails a test. Phrases are normalised before matching and stay a
+  supplement only, sixteen canonical phrases over thirty BCP 47 languages.
+- A counter per signal and per verdict, a histogram of scores, and one log line per verdict at or
+  above half the threshold carrying the score, the signals, the vendor, the tier and the URL. The
+  exception carries the verdict, so the line a tier writes when it escalates says why (ADR-014, with
+  a dated amendment to ADR-001).
+
+## [0.0.9] - <release date>
+
+### Added
+- Concurrent NoVNC intervention windows. Each flow owns its own Chromium process, browser context,
+  page and monitor task, nothing is shared except the X display and the Redis the session store lives
+  in, and every launch uses `--remote-debugging-port=0` with `--remote-debugging-address=127.0.0.1`,
+  so the operating system assigns a free port and two launches never contend for one.
+- `NOVNC_MAX_CONCURRENT_FLOWS` (default `4`) replaces the global single-flow lock. Each window sits at
+  its own deterministic cascade position on the shared display, a second request for a site and
+  profile that already has a live window joins that window and receives the same `vnc_url` and flow
+  identifier, and a flow's lease runs from its own start for `NOVNC_TIMEOUT_SECONDS` plus
+  `NOVNC_FLOW_LEASE_GRACE_SECONDS` (default `30.0`), with a sweep every
+  `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS` (default `30.0`) that cancels a dead flow and takes its window
+  off the display.
+- `GET /api/v2/session/interventions` on REST and `session_interventions` on MCP list the live flows
+  of every container with their windows and remaining lease. The 428 answer gains `flow_id`, `joined`
+  and `window` (slot index and pixel rectangle), and the 409 answer gains `active_flows`,
+  `max_concurrent_flows` and a `flows` array, with `holder_url` and `holder_profile` now describing
+  the oldest live flow (ADR-013, with a dated amendment to ADR-003).
+
+### Changed
+- A 409 is answered only when the cap is reached. A flow that raises, times out, is cancelled or loses
+  its browser closes its own browser, frees its own slot and records its own outcome without touching
+  a sibling, shutdown cancels every live monitor and waits bounded for each to close, and setting
+  `NOVNC_MAX_CONCURRENT_FLOWS` to `1` restores one window at a time without a code change.
+
+## [0.0.8] - <release date>
+
+### Changed
+- The service follows the shared library version set through `ascend-python-common==2.0.0`
+  (FastAPI 0.147.0, Starlette 1.9.0, uvicorn 0.54.0, FastMCP 4.1.1, MCP SDK 2.3.0,
+  httpx2 2.14.0).
+- The MCP server reports the service name and version in `initialize`.
+- The `/mcp` endpoint accepts only allowed `Host` headers (`ascend-web-hunter,localhost,127.0.0.1`)
+  and no `Origin` header; a refused `Host` answers 421, a refused `Origin` answers 403.
+
+## [0.0.7]
+
+### Changed
+- The service is built on `ascend-python-common==1.0.0` via `create_service_app`: shared problem bodies, settings
+  base, logging, request correlation, tracing, readiness aggregation, rate limiting, security headers, and the
+  startup banner frame. `Settings` subclasses `ServiceSettings`; the error registry maps `ValueError` to
+  `validation`, `UnsafeUriError` to `unsafe_uri`, and everything unexpected to `internal`.
+- REST errors are problem bodies (`application/problem+json`) with `code` and `traceId`. Request validation
+  failures answer `400` with code `validation` and an `errors` array sorted by `field`. A refused URL answers
+  `400` with code `unsafe_uri`, including URIs with user info. The 428 and 409 answers are problem bodies too:
+  code `human_intervention_required` with `intervention_type` and `vnc_url`, and code `novnc_busy` with
+  `holder_url`, `holder_profile` and the `Retry-After` header. Unknown paths answer a problem `404` and wrong
+  methods a problem `405` with `Allow`. Unexpected failures answer `500` with code `internal` and a fixed generic
+  detail.
+- MCP refusals are tool errors whose text starts with `<code>: ` (`validation: `, `unsafe_uri: `, `internal: `).
+  The MCP status objects (`human_intervention_required`, `novnc_busy`, `session_expired`) are successful tool
+  results, not errors, and keep their `status`-keyed shape.
+- `/health` answers `{"status": "ok", "service": "ascend-web-hunter", "version": ...}`. `/ready` aggregates the
+  `redis`, `searxng`, `flaresolverr`, `searxng_breaker` and `flaresolverr_breaker` probes and answers `200`
+  `{"status": "ready", ...}` or `503` `{"status": "not-ready", ...}`.
+- Logging comes from the library: `LOG_LEVEL` is honoured, `LOG_FORMAT` selects `json` or `color`, lines start
+  with `[ascend-web-hunter]`. `src/config/logging_config.py` and `src/observability/request_context.py` are
+  deleted.
+- `RATE_LIMIT_DEFAULT` defaults to `1200/minute` on REST routes and MCP tools, with no stricter limit;
+  `/health`, `/ready`, `/metrics` and `tools/list` are never limited.
+- OpenTelemetry comes from the library (1.45.0 and 0.66b0); the service's own 1.42.1 and 0.63b1 pins are gone.
+- The URL guard lives in the library: the REST endpoints and MCP tools call `check_fetch_uri` with the
+  `ALLOWED_PRIVATE_HOSTS` policy (empty by default, only an e2e sweep sets it), and the curl_cffi tier follows
+  redirects through `follow_guarded_redirects` with address pinning. `is_safe_external_url`, `pin_safe_host`
+  and their helpers left `src/validator/url_validator.py`, which keeps `URLValidator` and the `url_validator`
+  singleton for the ad blocklist.
+- `Dockerfile` installs the library from the `ascend-python-common` named build context before the service; the
+   compose service declares `additional_contexts` and sets `LOG_FORMAT=json` and `OTEL_EXPORTER_OTLP_ENDPOINT` with no rate
+   limit line, so the code default applies.
+- Docs updated: `AGENTS.md`, `README.md`, `docs/configuration.md`, `docs/api-examples.md`, `docs/running.md`,
+  arc42 pages 04, 05, 06, 08, 10 and 12, the container diagram, the ADR-003 amendment (428 and 409 body shape
+  superseded), and e2e specs 7, 11 and 12 with their Bruno requests and the spec 11 template now asserting `code`.
+- The shared library is cut at `1.0.0` now that all four services are migrated. The service pin moves to
+  `ascend-python-common==1.0.0`; this entry stays the one version of this change.
+
+### Fixed
+- The standalone `docker run` in `docs/running.md` joins the stack network and calls SearXNG by name, with the host gateway mapping for the host's Redis. `fix-linux-docker-host-access`.
+- The IDE Docker run configuration sets `SEARXNG_BASE_URL` and `REDIS_URL` and joins the stack network with the host gateway mapping. `fix-linux-docker-host-access`.
+- The configuration reference names `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, `BREAKER_FAILURE_THRESHOLD`, `BREAKER_RECOVERY_TIMEOUT_SECONDS`, `CHALLENGE_CLEAR_WAIT_SECONDS`, `CHALLENGE_DETECTION_MAX_BYTES`, `CHALLENGE_WALL_MAX_BYTES`, `CRAWLEE_MEMORY_MBYTES`, `CRAWLEE_STORAGE_DIR`, `DOMAIN_METRIC_CARDINALITY_CAP`, `NOVNC_COOKIE_SYNC_POLL_SECONDS`, `PROXY_URL`, `READ_CACHE_TTL_SECONDS`, `SESSION_AUTH_TTL_SECONDS`, `SESSION_DEFAULT_PROFILE` and `SESSION_WAF_TTL_SECONDS`. `fix-linux-docker-host-access`.
+
 ## [0.0.6] - 2026-10-01
 
 ### Fixed

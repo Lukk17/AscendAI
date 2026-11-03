@@ -15,7 +15,6 @@ graph TB
     subgraph "ascend-scrapper compose network"
         WebHunter["ascend-web-hunter<br/>:7021"]
         SearXNG["searxng<br/>:9020"]
-        FlareSolverr["flaresolverr<br/>:8191"]
         Ngrok["ngrok-ascend-web-hunter<br/>(tunnel)"]
     end
 
@@ -27,7 +26,6 @@ graph TB
     Agent -->|"MCP POST /mcp"| WebHunter
     Agent -->|"REST GET/POST"| WebHunter
     WebHunter -->|"search HTML"| SearXNG
-    WebHunter -->|"Cloudflare bypass"| FlareSolverr
     WebHunter -->|"session cookies"| Redis
     Ngrok -->|"public tunnel"| WebHunter
 ```
@@ -39,11 +37,15 @@ host bridge network or a shared Docker network depending on deployment configura
 
 ### Healthcheck wiring
 
-The `GET /health` endpoint (`src/main.py:56-58`) returns `{"status": "ok"}` as long as the process is alive.
-There is no separate readiness probe. The blocklist loads from the vendored `src/assets/fanboy-annoyance.txt`
-eagerly at module import time, before the process can even reach the point of serving `/health`; a missing or
-corrupt vendored file is a packaging defect that prevents the process from starting at all, not something the
-health check needs to model. See [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).
+The `GET /health` endpoint returns `{"status": "ok", "service": "ascend-web-hunter", "version": "..."}` as long as the
+process is alive, and the compose healthcheck probes that path.
+`GET /ready` is the separate readiness probe. It runs three checks through the shared library, Redis, SearXNG and the
+SearXNG circuit breaker, and answers 200 with `status` `ready` only when every check reports `ok` or `skipped`,
+otherwise 503 with `status` `not-ready` and the failing check named. The blocklist is not one of those checks: it loads
+from the vendored `src/assets/fanboy-annoyance.txt` eagerly at module import time, before the process can even reach
+the point of serving either path, so a missing or corrupt vendored file is a packaging defect that prevents the
+process from starting at all, not something a probe needs to model. See
+[ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).
 
 ---
 
@@ -56,7 +58,6 @@ health check needs to model. See [ADR-008](../decisions/ADR-008-blocklist-vendor
 | `LOG_LEVEL` | `INFO` | Logging level. |
 | `SEARXNG_BASE_URL` | `http://localhost:9020` | SearXNG endpoint. Docker Compose overrides to `http://searxng:8080`. |
 | `SEARXNG_USER_AGENT` | `ascend-web-hunter/1.0` | User-Agent sent to SearXNG. |
-| `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr endpoint. |
 | `REDIS_URL` | `redis://127.0.0.1:6379/0` | Redis connection for session cookie store. |
 | `BLOCKLIST_URL` | `https://secure.fanboy.co.nz/fanboy-annoyance.txt` | Source `POST /api/v1/blocklist/refresh` downloads from. Never fetched automatically. |
 | `BLOCKLIST_PATH` | `src/assets/fanboy-annoyance.txt` | Path to the vendored blocklist file; also where a refresh writes. |

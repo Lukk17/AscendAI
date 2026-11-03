@@ -1,0 +1,37 @@
+info:
+  name: realworld-aa-amazon-de-captcha
+  type: http
+  seq: 27
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://www.amazon.de/errors/validateCaptcha",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 428", function () {
+            expect(res.getStatus()).to.equal(428);
+        });
+        test("code is human_intervention_required", function () {
+            expect(res.getBody().code).to.equal("human_intervention_required");
+        });
+        test("vnc_url is a non-empty string", function () {
+            expect(res.getBody().vnc_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

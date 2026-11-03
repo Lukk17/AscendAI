@@ -1,0 +1,31 @@
+info:
+  name: request-id-echo
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/health"
+  headers:
+    - name: accept
+      value: application/json
+    - name: x-request-id
+      value: e2e-canary-req-0001
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("the request id is echoed in the response header", function () {
+            expect(res.getHeader("x-request-id")).to.equal("e2e-canary-req-0001");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

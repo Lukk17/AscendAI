@@ -43,8 +43,8 @@ class OpenAiPromptCacheStrategyMetricsTest {
     }
 
     @Test
-    @DisplayName("recordOutcome registers prompt_cache.tokens.total counter with provider=openai tag")
-    void recordOutcome_RegistersTokensTotalCounter() {
+    @DisplayName("recordOutcome grows gen_ai input usage by the stub prompt tokens")
+    void recordOutcome_RegistersGenAiInputUsage() {
         // given
         MeterRegistry registry = new SimpleMeterRegistry();
         OpenAiPromptCacheStrategy strategy = new OpenAiPromptCacheStrategy("openai", registry);
@@ -60,11 +60,12 @@ class OpenAiPromptCacheStrategyMetricsTest {
         strategy.recordOutcome("user", response);
 
         // then
-        Counter counter = registry.find("prompt_cache.tokens.total")
-                .tag("provider", "openai")
+        Counter counter = registry.find("gen_ai.client.token.usage")
+                .tag("gen_ai_system", "openai")
+                .tag("gen_ai_token_type", "input")
                 .counter();
         assertThat(counter).isNotNull();
-        assertThat(counter.count()).isGreaterThan(0.0);
+        assertThat(counter.count()).isEqualTo(1024.0);
     }
 
     @Test

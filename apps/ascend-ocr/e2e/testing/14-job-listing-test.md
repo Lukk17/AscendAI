@@ -83,7 +83,7 @@ Confirm the service is idle before starting.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"jobs_queued":0` and `"jobs_running":0`.
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`.
 
 ## Run
 
@@ -139,7 +139,7 @@ to land inside the same window as steps 3 to 5. Opening it before step 2 is fine
 curl -isS -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"1\"}}}"
 ```
 
-Expect HTTP 200 and an `mcp-session-id` response header. Complete the handshake: the MCP protocol requires the
+Expect HTTP 200 with no `mcp-session-id` response header: the service is stateless HTTP, so pass the session id empty. Complete the handshake: the MCP protocol requires the
 `notifications/initialized` notification after `initialize` and before any other request on the session.
 
 ```bash
@@ -202,7 +202,7 @@ Step 3:
 
 Step 4:
 
-- `jobs_running` is 1 and `jobs_queued` is 2.
+- `checks.jobs.running` is 1 and `checks.jobs.queued` is 2.
 - `status` is still `ready`. A queue with work in it is busy, and busy stays ready.
 
 Step 5:

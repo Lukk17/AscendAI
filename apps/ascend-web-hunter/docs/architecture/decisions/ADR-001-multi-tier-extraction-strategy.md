@@ -4,6 +4,14 @@
 
 Accepted - 2026-05-31
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+The `3-flaresolverr` tier is removed: `src/reader/strategies/flaresolverr_strategy.py`
+is deleted and the value leaves `TierName` and `TIER_ORDER`. A request that
+passes it is refused like any value outside the allowed set, and no future
+tier takes the name or the number 3. The rest of this record is unchanged.
+See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
 ## Context
 
 Web content extraction fails for different reasons depending on the target site. A plain HTTP client (curl_cffi /
@@ -88,6 +96,7 @@ continuing the loop.
 - `src/reader/web_reader.py` - `WebReader.read`, `WebReader._execute_strategy`.
 - `src/reader/strategies/` - all six strategy implementations.
 - `src/reader/cloudflare/challenge_detector.py` - `ChallengeDetector.is_blocked`, `is_login_required`,
-  `is_login_redirect_url`.
+  `is_login_redirect_url`, all three reading the scored `assess` verdict since 2026-10-19
+  (`detect-challenge-walls-in-any-language`).
 - `src/validator/content_validator.py` - `ContentValidator.validate` governs whether a strategy result is accepted.
 - [ADR-003](ADR-003-novnc-ngrok-captcha-intervention.md) - covers the NoVNC end of the chain.

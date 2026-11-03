@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM mcr.microsoft.com/playwright/python:v1.60.0-noble
 
 WORKDIR /app
@@ -30,12 +32,22 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install python dependencies strictly within the venv
 COPY pyproject.toml .
+COPY --from=ascend-python-common . /opt/ascend-python-common
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install /opt/ascend-python-common && \
     pip install .
+
+# Fetch both browser builds at image build time, pinned to the pyproject
+# versions. A missing browser binary is a startup error, never a download
+# at request time. The base image already carries the system libraries
+# Chromium needs, so no --with-deps here.
+RUN python -m patchright install chromium && \
+    python -m camoufox fetch
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV DISPLAY=:99
+ENV NOVNC_DISPLAY_SIZE=1920x1080
 ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 
 # Expose ports (API and NoVNC)

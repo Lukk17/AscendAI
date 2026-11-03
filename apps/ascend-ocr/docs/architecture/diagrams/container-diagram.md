@@ -71,7 +71,7 @@ sequenceDiagram
 
     Agent->>MCP: tools/call ocr_submit(file_uri="http://host.docker.internal:9070/bucket/img.png", lang="en")
     MCP->>Guard: hostname="host.docker.internal"
-    Guard->>Guard: "host.docker.internal" in MCP_ALLOWED_HOSTS → skip IP check
+    Guard->>Guard: "host.docker.internal" in ALLOWED_PRIVATE_HOSTS → skip IP check
     MCP->>ObjectStore: GET http://host.docker.internal:9070/bucket/img.png (allow_redirects=False)
     ObjectStore-->>MCP: 200 image bytes (streamed in 64 KB chunks, size checked)
     MCP->>Runner: JobService.submit → record written, job queued
@@ -86,6 +86,6 @@ sequenceDiagram
     Agent->>ObjectStore: GET ocr-results/{job_id}.md
 ```
 
-If `host.docker.internal` is not in `MCP_ALLOWED_HOSTS`, `_validate_host` resolves it to a private RFC1918 address and
+If `host.docker.internal` is not in `ALLOWED_PRIVATE_HOSTS`, `_validate_host` resolves it to a private RFC1918 address and
 raises `UnsafeUriError`, returning `{"code":"UNSAFE_URI","detail":"URI is not permitted"}` to the agent. See
 [ADR-001](../decisions/ADR-001-mcp-file-transport-uri-only.md).

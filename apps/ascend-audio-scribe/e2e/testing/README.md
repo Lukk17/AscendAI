@@ -63,6 +63,9 @@ be run on its own.
 5. [5-mcp-transcribe-test.md](5-mcp-transcribe-test.md). MCP `tools/call` `transcribe_openai` against an
    object-store URL. **Requires the fixture uploaded to the `e2e-fixtures` bucket during Reset state, no container
    mount.**
+6. [6-platform-contract-test.md](6-platform-contract-test.md). The shared platform contract: health, readiness,
+   problem bodies, the errors counter, security headers, the MCP `initialize` plus refusal, and the two guard
+   refusals (user info, redirect to a private address). **No transcription and no provider call.**
 
 ## Cross-cutting conventions
 

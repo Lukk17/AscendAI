@@ -1,51 +1,11 @@
-import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
 
 
-def _otel_sys_modules() -> dict[str, MagicMock]:
-    m = MagicMock()
-    return {
-        "opentelemetry": m,
-        "opentelemetry.sdk": m,
-        "opentelemetry.sdk.trace": m,
-        "opentelemetry.sdk.trace.export": m,
-        "opentelemetry.sdk.resources": m,
-        "opentelemetry.exporter": m,
-        "opentelemetry.exporter.otlp": m,
-        "opentelemetry.exporter.otlp.proto": m,
-        "opentelemetry.exporter.otlp.proto.grpc": m,
-        "opentelemetry.exporter.otlp.proto.grpc.trace_exporter": m,
-        "opentelemetry.instrumentation": m,
-        "opentelemetry.instrumentation.fastapi": m,
-    }
-
-
-def test_configure_otel_noop_when_env_var_absent(monkeypatch: pytest.MonkeyPatch) -> None:
-    # given
-    from src.main import _configure_otel
-
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-
-    # when / then
-    _configure_otel()
-
-
-def test_configure_otel_activates_when_endpoint_set(monkeypatch: pytest.MonkeyPatch) -> None:
-    # given
-    from src.main import _configure_otel
-
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel:4317")
-
-    # when / then
-    with patch.dict(sys.modules, _otel_sys_modules()):
-        _configure_otel()
-
-
 @pytest.mark.asyncio
-async def test_health_check(client: AsyncClient):
+async def test_health_check(client: AsyncClient) -> None:
     # when
     resp = await client.get("/health")
 
@@ -55,7 +15,15 @@ async def test_health_check(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_metrics_endpoint_serves_prometheus(client: AsyncClient):
+async def test_metrics_endpoint_serves_prometheus(client: AsyncClient) -> None:
+    # given
+    from src.observability import metrics as service_metrics
+
+    service_metrics.SEARCH_RESULTS_RETURNED.labels(engine="searxng", outcome="ok").observe(2)
+    service_metrics.STRATEGY_ATTEMPTS_TOTAL.labels(
+        strategy="1-beautifulsoup", outcome="success", domain="example.com"
+    ).inc()
+
     # when
     resp = await client.get("/metrics")
 
@@ -64,11 +32,13 @@ async def test_metrics_endpoint_serves_prometheus(client: AsyncClient):
     assert "text/plain" in resp.headers["content-type"]
     body = resp.text
     assert "process_" in body or "python_" in body
-    assert "ascendwebhunter_search_results_total" in body
+    assert "search_results_returned" in body
+    assert "strategy_attempts_total" in body
+    assert "ascendwebhunter_search_results_total" not in body
 
 
 @pytest.mark.asyncio
-async def test_request_id_middleware_echoes_inbound_header(client: AsyncClient):
+async def test_request_id_middleware_echoes_inbound_header(client: AsyncClient) -> None:
     # when
     resp = await client.get("/health", headers={"X-Request-ID": "fixed-id-123"})
 
@@ -77,7 +47,7 @@ async def test_request_id_middleware_echoes_inbound_header(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_request_id_middleware_generates_when_missing(client: AsyncClient):
+async def test_request_id_middleware_generates_when_missing(client: AsyncClient) -> None:
     # when
     resp = await client.get("/health")
 
@@ -87,7 +57,7 @@ async def test_request_id_middleware_generates_when_missing(client: AsyncClient)
 
 
 @pytest.mark.asyncio
-async def test_search_endpoint(client: AsyncClient):
+async def test_search_endpoint(client: AsyncClient) -> None:
     # given
     from src.api.rest.rest_endpoints import search_client
 
@@ -104,14 +74,14 @@ async def test_search_endpoint(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_read_endpoint(client: AsyncClient):
+async def test_read_endpoint(client: AsyncClient) -> None:
     # given
     from src.api.rest.rest_endpoints import web_reader
 
     mock_res = {"status": "success", "content": "Read Content", "mode": "1-beautifulsoup"}
     with (
         patch.object(web_reader, "read", new_callable=AsyncMock) as mock_read,
-        patch("src.api.rest.rest_endpoints.is_safe_external_url", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
     ):
         mock_read.return_value = mock_res
 

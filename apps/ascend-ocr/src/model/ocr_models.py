@@ -151,17 +151,3 @@ class JobListEntry(BaseModel):
 
 class JobListResponse(BaseModel):
     jobs: list[JobListEntry]
-
-
-class HealthResponse(BaseModel):
-    status: Literal["ok", "warming-up"] = "ok"
-    version: str
-
-
-class ReadinessResponse(BaseModel):
-    status: Literal["ready", "not-ready"]
-    version: str
-    engine_warm: bool
-    accepting_work: bool
-    jobs_queued: int = Field(ge=0)
-    jobs_running: int = Field(ge=0)

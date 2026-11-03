@@ -10,8 +10,7 @@ Add anything you did beyond the spec under **Additional tasks I did**.
 ### Prerequisites
 
 - [ ] `bru --version` returns a version string.
-- [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `{"status":"ok"}`.
-- [ ] `curl -fsS http://localhost:8191/` returns HTTP 200 (FlareSolverr reachable, needed for row 2).
+- [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 - [ ] `curl -fsS https://en.wikipedia.org/wiki/Web_scraping` returns HTTP 200 (host outbound HTTPS works).
 - [ ] The `<script>`-stripped raw markup of `https://quotes.toscrape.com/js/` does NOT contain
   `The world as we have created it` (the spec's `Invoke-WebRequest` one-liner prints `False`), confirming row 3's
@@ -28,7 +27,7 @@ Add anything you did beyond the spec under **Additional tasks I did**.
 
 - [ ] `cd docs/api/request/AscendAI`.
 - [ ] Step 1 - `bru run "web-hunter/testing/extract-tier-static-wikipedia.yml" --env ascend-local` returned HTTP 200.
-- [ ] Step 2 - `bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local` returned HTTP 200.
+- [ ] Step 2 - `bru run "web-hunter/testing/extract-tier-cloudflare.yml" --env ascend-local` returned HTTP 200, or HTTP 428 with the human-help body when the address is rated.
 - [ ] Step 3 - `bru run "web-hunter/testing/extract-tier-js-quotes.yml" --env ascend-local -o "$env:TEMP\js-quotes-run.json" -f json` returned HTTP 200.
 - [ ] Step 4. Printed the served `mode` from the captured JSON output.
 
@@ -38,9 +37,9 @@ Add anything you did beyond the spec under **Additional tasks I did**.
 - [ ] Each body's `url` equals the requested URL and `status` equals `"success"`.
 - [ ] Each body has a content field (`content` / `text` / `markdown`) of length ≥ 50.
 - [ ] Row 1: the content field, lowercased, contains `"web scraping"`.
-- [ ] Row 2: `status="success"` with content length ≥ 50 (Cloudflare challenge solved, not the block page).
+- [ ] Row 2: either `status="success"` with content length ≥ 50 and the challenge sentence, or the 428 human-help body with a non-empty `vnc_url`; never the block page as content.
 - [ ] Row 3: content contains `"The world as we have created it"`, and the `mode` from step 4 is one of
-  `3-flaresolverr`, `4-playwright_stealth`, `5-crawlee_adaptive`, or the NoVNC tier, never `1-beautifulsoup` or
+  `4-playwright_stealth`, `4a-patchright`, `4b-camoufox`, `5-crawlee_adaptive`, or the NoVNC tier, never `1-beautifulsoup` or
   `2-trafilatura` (proves a browser executed the page JS).
 
 ### Verdict

@@ -6,9 +6,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from crawlee.statistics import FinalStatistics
 
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.validator.url_validator import URLValidator
+from tests.reader.crawlee_test_support import final_statistics
 
 
 def _mock_url_validator() -> URLValidator:
@@ -25,8 +27,8 @@ def _mock_crawler(html: str = "<html><body>content</body></html>") -> MagicMock:
     crawler.run = AsyncMock()
 
     # Simulate the result container being populated by the handler
-    async def fake_run(urls: list[str]) -> None:
-        pass
+    async def fake_run(urls: list[str]) -> FinalStatistics:
+        return final_statistics(1)
 
     crawler.run = AsyncMock(side_effect=fake_run)
     return crawler
@@ -37,8 +39,18 @@ _CRAWLER_FACTORY_PATH = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _seed_url_check_passes() -> Any:
+    """The seed-URL guard check is unit-tested separately; keep these tests hermetic."""
+    with patch(
+        "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+        new=AsyncMock(return_value=MagicMock()),
+    ):
+        yield
+
+
 @pytest.mark.asyncio
-async def test_crawlee_uses_playwright_headless_setting():
+async def test_crawlee_uses_playwright_headless_setting() -> Any:
     """headless kwarg passed to AdaptivePlaywrightCrawler must equal settings.PLAYWRIGHT_HEADLESS."""
     # given
     captured: dict[str, Any] = {}
@@ -49,7 +61,7 @@ async def test_crawlee_uses_playwright_headless_setting():
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when
@@ -77,7 +89,7 @@ async def test_crawlee_uses_playwright_headless_setting():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_headless_false_when_setting_false():
+async def test_crawlee_headless_false_when_setting_false() -> Any:
     """headless=False must be passed when PLAYWRIGHT_HEADLESS=False."""
     # given
     captured: dict[str, Any] = {}
@@ -88,7 +100,7 @@ async def test_crawlee_headless_false_when_setting_false():
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when
@@ -116,7 +128,9 @@ async def test_crawlee_headless_false_when_setting_false():
 
 
 @pytest.mark.asyncio
-async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(monkeypatch: pytest.MonkeyPatch):
+async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """A crawler.run() that never returns (e.g. Crawlee's autoscaler permanently reports the
     system as memory-overloaded, so no request is ever dequeued) must not hang this tier
     forever: get_html() must raise TimeoutError within the configured budget instead."""
@@ -149,7 +163,7 @@ async def test_crawlee_get_html_raises_timeout_error_when_crawler_hangs(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatch: pytest.MonkeyPatch):
+async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatch: pytest.MonkeyPatch) -> Any:
     """Crawlee's BasicCrawler.run() catches CancelledError internally and can return
     normally after being cancelled (see asyncio.wait_for docs: a task that suppresses
     the cancellation and returns a value has that value returned, not TimeoutError).
@@ -188,7 +202,7 @@ async def test_crawlee_get_html_raises_when_cancellation_is_swallowed(monkeypatc
 @pytest.mark.asyncio
 async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
     monkeypatch: pytest.MonkeyPatch,
-):
+) -> None:
     """CRAWLEE_MEMORY_MBYTES, when configured, must be propagated to the environment
     variable Crawlee itself reads before the crawler is constructed: Crawlee's service
     locator lazily builds and caches its Configuration singleton the first time any
@@ -206,7 +220,7 @@ async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when / then
@@ -229,7 +243,7 @@ async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
 @pytest.mark.asyncio
 async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch
-):
+) -> None:
     """CRAWLEE_STORAGE_DIR must be propagated to the environment variable Crawlee itself
     reads before the crawler is constructed, for the same reason as CRAWLEE_MEMORY_MBYTES
     above: Crawlee's service locator caches its Configuration singleton on first crawler
@@ -249,7 +263,7 @@ async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when / then
@@ -267,3 +281,60 @@ async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
         assert seen_at_construction["value"] == str(storage_dir.resolve())
     finally:
         os.environ.pop("CRAWLEE_STORAGE_DIR", None)
+
+
+@pytest.mark.asyncio
+async def test_crawlee_seed_url_refusal_aborts_before_crawl() -> None:
+    """A seed URL the guard refuses never reaches the crawler: UnsafeUriError propagates."""
+    # given
+    from ascend_python_common.uri_guard import UnsafeUriError
+
+    # when / then
+    with (
+        patch(_CRAWLER_FACTORY_PATH, return_value=_mock_crawler()),
+        patch(
+            "src.reader.strategies.crawlee_strategy.check_fetch_uri",
+            new=AsyncMock(side_effect=UnsafeUriError("URI resolves to a non-public address")),
+        ),
+    ):
+        with pytest.raises(UnsafeUriError):
+            await CrawleeStrategy(_mock_url_validator()).get_html("http://169.254.169.254/")
+
+
+@pytest.mark.asyncio
+async def test_crawlee_refused_navigation_raises_unsafe_uri() -> None:
+    """A navigation the guard refused fails the tier even when the crawl ran."""
+    # given
+    from ascend_python_common.uri_guard import UnsafeUriError
+
+    captured: dict[str, Any] = {}
+    fake_context = MagicMock()
+    fake_context.page.context.route = AsyncMock()
+    fake_context.page.context.route_web_socket = None
+    fake_context.page.on = MagicMock()
+
+    async def fake_run(urls: list[str]) -> FinalStatistics:
+        await captured["pre_nav"](fake_context)
+        return final_statistics(1)
+
+    def fake_crawler_factory(**kwargs: Any) -> MagicMock:
+        crawler = MagicMock()
+        crawler.router.default_handler = lambda f: f
+        crawler.pre_navigation_hook = lambda f: captured.setdefault("pre_nav", f)
+        crawler.run = AsyncMock(side_effect=fake_run)
+        return crawler
+
+    # when / then
+    with (
+        patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory),
+        patch(
+            "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
+            "src.reader.strategies.crawlee_strategy.install_browser_guard",
+            new=AsyncMock(return_value=["http://169.254.169.254/"]),
+        ),
+    ):
+        with pytest.raises(UnsafeUriError):
+            await CrawleeStrategy(_mock_url_validator()).get_html("https://example.com/article")

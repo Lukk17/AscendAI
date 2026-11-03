@@ -60,7 +60,7 @@
             </DockerPortBindingImpl>
           </list>
         </option>
-        <option name="commandLineOptions" value="--env OPENAI_API_KEY --env GEMINI_API_KEY" />
+        <option name="commandLineOptions" value="--add-host=host.docker.internal:host-gateway --env OPENAI_API_KEY --env GEMINI_API_KEY" />
         <option name="sourceFilePath" value="apps/ascend-memory/Dockerfile" />
       </settings>
     </deployment>

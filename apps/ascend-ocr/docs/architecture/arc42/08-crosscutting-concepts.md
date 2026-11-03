@@ -77,14 +77,10 @@ imports the app, since the container starts it with `python3.11 -m uvicorn src.m
 `setup_logging` runs when the app is imported and treats `fastmcp`, `uvicorn`, `uvicorn.error` and `uvicorn.access`
 the same way: it removes their handlers, sets their level to `NOTSET` and turns propagation on. Their lines, access
 lines and the startup banner included, pass through the root handler with its format and both filters under
-`LOG_LEVEL`, and uvicorn's `--log-level` and `--no-access-log` have no effect. With tracing on, FastMCP puts the raw id
-on every server span as `mcp.session.id`, and `McpSessionDigestSpanExporter` in `src/observability/tracing.py`
-replaces it with the digest before the OTLP exporter sends the span. It does the same for
-`http.request.header.mcp_session_id` and `http.response.header.mcp_session_id`, the keys a captured `mcp-session-id`
-header would get if header capture were turned on, and the span it sends keeps the original's events, links, status,
-resource, scope and dropped counts. The digest, the redaction and the exporter all use
-`digest_of_mcp_session_id` in `src/api/middleware/correlation_id.py`. See the fourth 2026-09-25 amendment to
-[ADR-002](../decisions/ADR-002-mcp-error-catalog.md).
+`LOG_LEVEL`, and uvicorn's `--log-level` and `--no-access-log` have no effect. With tracing on, the library drops
+the attribute `mcp.session.id` from every span at span start, so no exported span carries the session id, raw or as
+a digest, and the service turns on no capture of the `mcp-session-id` HTTP header. See the fifth 2026-10-08
+amendment to [ADR-002](../decisions/ADR-002-mcp-error-catalog.md).
 
 ---
 
@@ -93,8 +89,8 @@ resource, scope and dropped counts. The digest, the redaction and the exporter a
 The eight domain exception classes (`OcrProcessingError`, `FileSizeExceededError`, `UnsupportedFileTypeError`,
 `UnsafeUriError`, `DownloadFailedError`, `QueueFullError`, `JobNotFoundError`, `UnsupportedLanguageError`) and the
 `INTERNAL_ERROR` fallback are all defined in `src/api/exception_handlers.py`. The mapping from exception to HTTP
-status is in the handler registration (`register_exception_handlers` in that file). Every handler returns
-`{"code": "...", "detail": "..."}`: a stable code string and a generic English phrase. A refusal that worked as
+status is in the error registry in that file. Every refusal answers the RFC 7807 problem body
+(`application/problem+json`) with `code` and `traceId` on REST, and `CODE: detail` on MCP. A refusal that worked as
 designed, `UNSAFE_URI`, `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `UNSUPPORTED_LANGUAGE`, `QUEUE_FULL`,
 `JOB_NOT_FOUND` or the upstream `DOWNLOAD_FAILED`, is logged by `log_refusal` as one WARNING line naming its code,
 with no traceback and never the userinfo of a URI, on the MCP surface as well as the REST one. `OCR_FAILED` is logged
@@ -109,11 +105,9 @@ job surface. See the 2026-09-24 amendment to [ADR-002](../decisions/ADR-002-mcp-
 This catalog is shared between the REST and MCP surfaces. Adding a new failure mode requires one exception class,
 one handler, one catalog entry, and tests. See [ADR-002](../decisions/ADR-002-mcp-error-catalog.md).
 
-Every handler counts its error in `ascendocr_ocr_errors_total{error_code, surface}`. `surface` has two values. It is
-`mcp` for a request whose path is exactly `MCP_ENDPOINT_PATH` (`/mcp`, in `src/config/config.py`), the same rule the
-correlation middleware applies, and `rest` for every other path: the `/v1` job operations and the operational
-endpoints `/health`, `/ready` and `/metrics`, which the endpoint table in the README lists beside them. A 500 from
-`/ready` is therefore counted as `rest`, never as `mcp`.
+Every refusal is counted by the library as `ascend_service_errors_total{code,surface,operation}`: the route
+template on REST, the tool name on MCP, `unmatched` for an unknown path. Two tools refused with the same code count
+under two `operation` values. A 500 from `/ready` is therefore counted as `rest`, never as `mcp`.
 
 ---
 

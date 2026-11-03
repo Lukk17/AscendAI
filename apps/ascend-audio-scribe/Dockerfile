@@ -24,6 +24,9 @@ COPY pytorch-requirements.txt ./
 RUN python3.11 -m pip install --upgrade pip \
     && python3.11 -m pip install -r pytorch-requirements.txt
 
+COPY --from=ascend-python-common . /opt/ascend-python-common
+RUN python3.11 -m pip install /opt/ascend-python-common
+
 COPY pyproject.toml ./
 COPY src/ src/
 RUN python3.11 -m pip install .

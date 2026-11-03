@@ -1,0 +1,35 @@
+info:
+  name: job-cancel
+  type: http
+  seq: 33
+
+http:
+  method: DELETE
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/crawl/jobs/{{job_id}}"
+  headers:
+    - name: X-Ascend-Tenant
+      value: "{{tenant}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("cancel answers the job cancelled", function () {
+            const b = res.getBody();
+            // bru 4.2.1 does not interpolate --env-var values inside test
+            // scripts, so the exact id equality (job_id === requested id)
+            // is proven by the DELETE url itself carrying that id; here the
+            // file pins the id shape and the cancelled state.
+            expect(b.job_id).to.be.a("string").and.not.empty;
+            expect(b.state).to.equal("cancelled");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

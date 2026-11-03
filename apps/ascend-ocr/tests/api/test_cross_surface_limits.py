@@ -1,4 +1,5 @@
 import io
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
@@ -7,8 +8,8 @@ from httpx import ASGITransport, AsyncClient
 from PIL import Image
 
 from src.api.exception_handlers import FileSizeExceededError, UnsupportedFileTypeError
-from src.api.mcp.mcp_server import ocr_submit
-from src.api.middleware.rate_limit import limiter
+from src.api.mcp.mcp_server import mcp, ocr_submit
+from src.api.rest.rest_endpoints import limiter
 from src.config.config import QualityMode, settings
 from src.main import create_app
 from src.service.job_runner import JobRunner
@@ -24,7 +25,7 @@ JOBS_PATH = "/v1/ocr/jobs"
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limiter():
+def reset_rate_limiter() -> None:
     limiter.reset()
 
 
@@ -51,7 +52,7 @@ def store_of(runner: JobRunner) -> JobStore:
 
 
 @pytest.fixture
-async def rest_client():
+async def rest_client() -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=create_app())
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
@@ -74,8 +75,12 @@ GUARD_CASES = [
         "FILE_TOO_LARGE",
         id="source-pixel-ceiling",
     ),
-    pytest.param("bomb_guard", VALID_PNG_BYTES, "scan.png", "image/png", 400, "FILE_TOO_LARGE", id="bomb-guard"),
-    pytest.param("byte_cap", VALID_PNG_BYTES * 200, "scan.png", "image/png", 400, "FILE_TOO_LARGE", id="byte-cap"),
+    pytest.param(
+        "bomb_guard", VALID_PNG_BYTES, "scan.png", "image/png", 400, "FILE_TOO_LARGE", id="bomb-guard"
+    ),
+    pytest.param(
+        "byte_cap", VALID_PNG_BYTES * 200, "scan.png", "image/png", 400, "FILE_TOO_LARGE", id="byte-cap"
+    ),
     pytest.param(
         "type_check",
         b"plain text, not a document",
@@ -138,15 +143,23 @@ class TestBothSurfacesApplyEveryInputGuardIdentically:
         )
 
         # When - MCP, through a jailed file:// URI
-        expected_error = UnsupportedFileTypeError if code == "UNSUPPORTED_FILE_TYPE" else FileSizeExceededError
+        expected_error = (
+            UnsupportedFileTypeError if code == "UNSUPPORTED_FILE_TYPE" else FileSizeExceededError
+        )
         with pytest.raises(ToolError) as mcp_exc_info:
-            await ocr_submit(source.as_uri(), lang="en")
+            await mcp.call_tool("ocr_submit", {"file_uri": source.as_uri(), "lang": "en"})
 
         # Then - the same code from both, and neither queued anything
         assert rest_response.status_code == status
         assert rest_response.json()["code"] == code
         assert str(mcp_exc_info.value).startswith(f"{code}: ")
-        assert isinstance(mcp_exc_info.value.__cause__, expected_error)
+        chain: list[BaseException] = []
+        current: BaseException | None = mcp_exc_info.value
+        while current is not None:
+            chain.append(current)
+            cause = current.__cause__
+            current = cause if cause is not None else current.__context__
+        assert any(isinstance(link, expected_error) for link in chain)
         assert runner.documents_waiting() == 0
 
     async def test_a_document_both_surfaces_accept_reaches_the_queue_from_either(

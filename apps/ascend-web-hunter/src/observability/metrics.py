@@ -1,10 +1,13 @@
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
-# outcome label values: "success" | "timeout" | "http_error" | "transport_error"
-SEARCH_RESULTS_TOTAL = Counter(
-    "ascendwebhunter_search_results_total",
-    "Number of search results returned per SearXNG call",
-    ["outcome"],
+from src.config.config import settings
+
+# outcome label value "ok", observed once per completed search
+SEARCH_RESULTS_RETURNED = Histogram(
+    "search_results_returned",
+    "Number of search results returned per search",
+    ["engine", "outcome"],
+    buckets=(1, 2, 3, 5, 10, 20, 50),
 )
 
 STRATEGY_ATTEMPTS_TOTAL = Counter(
@@ -25,7 +28,7 @@ STRATEGY_DURATION_SECONDS = Histogram(
 HUMAN_INTERVENTION_TOTAL = Counter(
     "human_intervention_total",
     "HumanInterventionRequiredException surfaces (428 responses)",
-    ["intervention_type"],
+    ["intervention_type", "joined"],
 )
 
 SEARXNG_REQUESTS_TOTAL = Counter(
@@ -65,4 +68,43 @@ CIRCUIT_BREAKER_OPEN_TOTAL = Counter(
 NOVNC_FLOW_BUSY_TOTAL = Counter(
     "novnc_flow_busy_total",
     "Requests rejected because a NoVNC intervention was already holding the shared browser/display",
+)
+
+NOVNC_ACTIVE_FLOWS = Gauge(
+    "novnc_active_flows",
+    "Live human-intervention flows of this container",
+)
+
+NOVNC_FLOWS_RECLAIMED_TOTAL = Counter(
+    "novnc_flows_reclaimed_total",
+    "Intervention flows reclaimed by reason",
+    ["reason"],
+)
+
+_CHALLENGE_SCORE_BUCKETS_BASE = (0, 20, 40, 60, 80, 100, 120, 160, 200, 300)
+
+
+def challenge_score_buckets(threshold: int) -> tuple[int, ...]:
+    """Histogram boundaries for the scored verdict: one boundary at each score
+    that matters at the default weights, plus the configured threshold when an
+    override moves it off the list, so near misses on both sides stay visible."""
+    return tuple(sorted(set(_CHALLENGE_SCORE_BUCKETS_BASE) | {threshold}))
+
+
+CHALLENGE_SIGNALS_FIRED_TOTAL = Counter(
+    "challenge_signals_fired_total",
+    "Fired challenge signals per verdict",
+    ["signal", "vendor"],
+)
+
+CHALLENGE_VERDICTS_TOTAL = Counter(
+    "challenge_verdicts_total",
+    "Challenge verdicts per tier",
+    ["verdict", "tier"],
+)
+
+CHALLENGE_SCORE = Histogram(
+    "challenge_score",
+    "Scored challenge verdict totals",
+    buckets=tuple(float(bound) for bound in challenge_score_buckets(settings.CHALLENGE_SCORE_THRESHOLD)),
 )

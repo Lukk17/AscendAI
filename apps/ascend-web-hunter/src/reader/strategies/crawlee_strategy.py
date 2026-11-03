@@ -1,27 +1,76 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 import trafilatura
+from ascend_python_common.uri_guard import UnsafeUriError, check_fetch_uri
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
+    RenderingTypePrediction,
+    RenderingTypePredictor,
 )
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import RequestQueue
 
-from src.api.exceptions import ChallengeDetectedException
+from src.api.exceptions import ChallengeDetectedException, ExtractionFailedError
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
+from src.reader.browser_guard import install_browser_guard, web_hunter_fetch_policy
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
+from src.reader.cloudflare.challenge_signals import (
+    as_login_verdict,
+    assess,
+    log_verdict,
+    record_verdict,
+)
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
 from src.reader.strategies.base_strategy import BaseStrategy
-from src.validator.url_validator import URLValidator
+
+if TYPE_CHECKING:
+    from bs4 import BeautifulSoup, Tag
+    from crawlee import Request
+    from crawlee.crawlers import ParsedHttpCrawlingContext, RenderingType
+    from crawlee.statistics import FinalStatistics
+    from playwright.async_api import Response as PlaywrightResponse
+
+    from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
+
+_CRAWLEE_TIER = "crawlee"
+
+
+class _ClientOnlyRenderingTypePredictor(RenderingTypePredictor):
+    """Predict the browser rendering type for every request, so the static sub-crawler is never used."""
+
+    def predict(self, request: Request) -> RenderingTypePrediction:  # noqa: ARG002
+        return RenderingTypePrediction("client only", 0.0)
+
+    def store_result(self, request: Request, rendering_type: RenderingType) -> None:  # noqa: ARG002
+        return None
+
+
+def _response_summary(response: PlaywrightResponse) -> dict[str, Any]:
+    """Final status and headers of one Playwright response for the container."""
+    try:
+        headers = dict(response.headers)
+    except Exception:
+        headers = {}
+    try:
+        status = response.status
+    except Exception:
+        status = 200
+
+    return {"status": status, "headers": headers}
 
 
 class CrawleeStrategy(BaseStrategy):
@@ -42,7 +91,9 @@ class CrawleeStrategy(BaseStrategy):
         return extracted or ""
 
     async def get_html(self, url: str) -> str:
-        result_container: dict[str, str] = {"html": ""}
+        await check_fetch_uri(url, web_hunter_fetch_policy())
+        result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
+        last_response: dict[str, Any] = {}
 
         storage_state = await cookie_manager.get_storage_state(url, self.profile)
         fp = self.fingerprint
@@ -52,6 +103,7 @@ class CrawleeStrategy(BaseStrategy):
             "timezone_id": fp.timezone_id,
             "geolocation": fp.geolocation,
             "permissions": ["geolocation"],
+            "service_workers": "block",
         }
         if storage_state is not None:
             browser_new_context_options["storage_state"] = storage_state
@@ -77,31 +129,72 @@ class CrawleeStrategy(BaseStrategy):
         storage_dir = await asyncio.to_thread(self._prepare_storage_dir, settings.CRAWLEE_STORAGE_DIR)
         os.environ["CRAWLEE_STORAGE_DIR"] = storage_dir
 
-        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-            max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
-            playwright_crawler_specific_kwargs=playwright_kwargs,
+        request_manager = await RequestQueue.open(
+            name=f"read-{uuid4().hex}",
+            storage_client=MemoryStorageClient(),
         )
+        try:
+            crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+                max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
+                rendering_type_predictor=_ClientOnlyRenderingTypePredictor(),
+                request_manager=request_manager,
+                playwright_crawler_specific_kwargs=playwright_kwargs,
+            )
 
-        @crawler.router.default_handler
-        async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-            await self._handle_crawlee_request(context, result_container)
+            @crawler.router.default_handler
+            async def request_handler(
+                context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag],
+            ) -> None:
+                await self._handle_crawlee_request(context, result_container, last_response)
 
-        @crawler.pre_navigation_hook
-        async def enable_adblock(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-            await context.page.route("**/*", self.url_validator.route_handler)
+            @crawler.pre_navigation_hook
+            async def install_guard(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+                result_container["refused_navigations"] = await install_browser_guard(
+                    context.page.context, self.url_validator
+                )
+                context.page.on(
+                    "response", lambda response: last_response.update(_response_summary(response))
+                )
 
-        await self._run_crawler_bounded(crawler, url)
-        html = result_container.get("html", "")
+            final_statistics = await self._run_crawler_bounded(crawler, url)
+        finally:
+            await request_manager.drop()
+        refused_navigations: list[str] = result_container.get("refused_navigations", [])
+        if refused_navigations:
+            logger.warning("CrawleeStrategy: Blocked navigation detected post-render on %s", url)
+
+            raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}")
+        if final_statistics.requests_finished < 1:
+            logger.warning(
+                "CrawleeStrategy: the crawl handled no request for %s (failed %d of %d)",
+                url,
+                final_statistics.requests_failed,
+                final_statistics.requests_total,
+            )
+
+            raise ExtractionFailedError(
+                f"CrawleeStrategy: the crawl handled no request for {url} "
+                f"(failed {final_statistics.requests_failed} of {final_statistics.requests_total})"
+            )
+        html: str = result_container.get("html", "")
+        status: int = result_container.get("status", 200)
+        headers: dict[str, str] = result_container.get("headers", {})
+        stored_cookies = (storage_state or {}).get("cookies", [])
+        cookie_names = [str(cookie.get("name", "")) for cookie in stored_cookies]
+
+        verdict = assess(status, html, headers, cookie_names)
+        record_verdict(verdict, _CRAWLEE_TIER)
+        log_verdict(verdict, _CRAWLEE_TIER, url)
 
         if ChallengeDetector.is_login_required(html):
             logger.warning("CrawleeStrategy: Login wall detected on %s", url)
 
-            raise ChallengeDetectedException(intervention_type="login")
+            raise ChallengeDetectedException(as_login_verdict(verdict))
 
-        if ChallengeDetector.is_blocked(200, html):
+        if verdict.wall:
             logger.warning("CrawleeStrategy: WAF/Cloudflare block detected on %s", url)
 
-            raise ChallengeDetectedException(intervention_type="captcha")
+            raise ChallengeDetectedException(verdict)
 
         return html
 
@@ -114,7 +207,10 @@ class CrawleeStrategy(BaseStrategy):
         return str(p)
 
     @staticmethod
-    async def _run_crawler_bounded(crawler: AdaptivePlaywrightCrawler, url: str) -> None:
+    async def _run_crawler_bounded(
+        crawler: AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag],
+        url: str,
+    ) -> FinalStatistics:
         """Run the crawler with a hard wall-clock bound so this tier can never hang forever.
 
         Crawlee's autoscaler blocks all work indefinitely whenever it considers the
@@ -125,11 +221,17 @@ class CrawleeStrategy(BaseStrategy):
         returned". Elapsed time is therefore checked explicitly after the call returns,
         so a permanently-overloaded autoscaler still fails this tier instead of silently
         returning empty content after burning the whole read budget.
+
+        Returns:
+            The final statistics of the crawl.
+
+        Raises:
+            TimeoutError: when the crawl exceeded its wall-clock budget.
         """
         crawl_timeout = settings.EXTRACT_TIMEOUT * 2
         started = time.perf_counter()
         try:
-            await asyncio.wait_for(crawler.run([url]), timeout=crawl_timeout)
+            final_statistics = await asyncio.wait_for(crawler.run([url]), timeout=crawl_timeout)
         except TimeoutError as exc:
             raise TimeoutError(
                 f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {url}"
@@ -143,12 +245,19 @@ class CrawleeStrategy(BaseStrategy):
                 "permanently memory-overloaded)"
             )
 
+        return final_statistics
+
     @staticmethod
     async def _handle_crawlee_request(
-        context: AdaptivePlaywrightCrawlingContext, result_container: dict[str, str]
+        context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag],
+        result_container: dict[str, Any],
+        last_response: dict[str, Any],
     ) -> None:
         try:
             result_container["html"] = await context.page.content()
         except Exception:
             snapshot = await context.get_snapshot()
             result_container["html"] = snapshot.html or ""
+        if last_response:
+            result_container["status"] = last_response.get("status", 200)
+            result_container["headers"] = last_response.get("headers", {})

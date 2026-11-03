@@ -10,7 +10,7 @@ from unittest.mock import patch
 from src.validator.content_validator import ContentValidator
 
 
-def test_quality_metrics_exception_returns_false():
+def test_quality_metrics_exception_returns_false() -> None:
     """When textstat raises, the validator must fail closed (return False)."""
     # given
     # Build content that passes length/keyword checks but trips textstat.
@@ -27,7 +27,7 @@ def test_quality_metrics_exception_returns_false():
     assert result is False
 
 
-def test_quality_metrics_flesch_exception_returns_false():
+def test_quality_metrics_flesch_exception_returns_false() -> None:
     """Flesch score raising must also fail closed."""
     # given
     content = " ".join([f"word{i}" for i in range(20)])

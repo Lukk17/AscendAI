@@ -7,10 +7,9 @@ automated, against the real `https://www.scrapingcourse.com/cloudflare-challenge
 
 1. Cold read. A read of `https://www.scrapingcourse.com/cloudflare-challenge` with no stored session answers HTTP
    200, `status="success"` and a content-carrying field of at least 50 characters. The curl tier is blocked by the
-   Cloudflare challenge, FlareSolverr solves it, and the reader stores the site's session under
-   `session:scrapingcourse.com:default` with the `cf_clearance` cookie in its `waf` entry (measured on 2026-09-10:
-   HTTP 200 through `3-flaresolverr` in 25.2 seconds). The run record captures the `mode` and the duration of this
-   call.
+   Cloudflare challenge, a browser tier solves it, and the reader stores the site's session under
+   `session:scrapingcourse.com:default` with the `cf_clearance` cookie in its `waf` entry. The run record captures
+   the `mode` and the duration of this call.
 2. Capture. Between the two calls, `session:scrapingcourse.com:default` exists and its `waf` entry holds a cookie
    named `cf_clearance`.
 3. Warm read. A read of `https://www.scrapingcourse.com/cloudflare-challenge?reuse=1`, the same page under a
@@ -20,6 +19,11 @@ automated, against the real `https://www.scrapingcourse.com/cloudflare-challenge
    exact address is answered from that cache in a fraction of a second without touching the stored session, which
    proves nothing about reuse. A different address on the same site misses the cache and has to go through the site
    again, so a success there that is faster than the cold read is the stored clearance doing its job.
+
+When Call 1 is answered by the human-help tier (HTTP 428) or by the busy refusal (HTTP 409), the site has rated
+this address and refused the automated tiers. The run then records an environment gate, skips the capture check and
+Call 2, and passes without exercising reuse. A 428 on Call 2 is still a FAIL, because there the cold read already
+succeeded and the stored clearance was expected to be reused.
 
 A 428 on Call 2 is a FAIL. It is register defect A61 in
 [../../../../docs/DEFECT_REGISTER.md](../../../../docs/DEFECT_REGISTER.md) until its fix lands: a stored session
@@ -35,11 +39,11 @@ disappears when the clearance is reused, and the whole test runs with nobody at 
 ### Contract (how the service signals each verdict)
 
 - success: HTTP `200`, body `status="success"`, non-empty content, `mode` naming the tier that served it.
-- intervention: HTTP `428 Precondition Required`, body `status="human_intervention_required"` and a non-empty
+- intervention: HTTP `428 Precondition Required`, body `code="human_intervention_required"` and a non-empty
   `vnc_url`. Never a valid verdict on either call of this spec. On Call 2 it is the A61 failure. On Call 1 it means
-  FlareSolverr did not solve the challenge, so re-check the FlareSolverr prerequisite and record the body before
+  no automated tier solved the challenge, so record the body before
   deciding the verdict, since the reuse property was never reached.
-- busy, not a verdict on its own: HTTP `409`, body `status="novnc_busy"` with a `holder_url`, and a `Retry-After`
+- busy, not a verdict on its own: HTTP `409`, body `code="novnc_busy"` with a `holder_url`, and a `Retry-After`
   header, meaning the read escalated past every automated tier and found the single shared browser held by an
   earlier intervention. For this spec that carries the same meaning as a 428 on the same call, since the read did
   not succeed through an automated tier. Record the `holder_url` in the run record.
@@ -60,15 +64,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
-
-Check FlareSolverr is reachable (Call 1 needs it to solve the Cloudflare challenge and store the clearance).
-
-```bash
-curl -fsS http://localhost:8191/
-```
-
-Expect HTTP 200 with a JSON body announcing FlareSolverr.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 Check Redis is reachable from the host's Docker context (the reset and the capture check use the session key).
 
@@ -101,7 +97,7 @@ Expect `0`.
 
 Empty the reader's in-process read cache for the domain. Spec 6 reads Call 1's exact address, and this spec runs
 after it, so within `READ_CACHE_TTL_SECONDS` (300 s) of that read Call 1 would be answered from the cache without
-going through FlareSolverr and would store no session, failing the capture check for a reason that is not the
+going through a browser tier and would store no session, failing the capture check for a reason that is not the
 product. The Redis delete above cannot reach that cache. The session clear endpoint drops both the Redis record and
 the cached reads for the domain.
 
@@ -197,8 +193,10 @@ Unix:
 ## Expected
 
 - Call 1: HTTP `200`, `status="success"`, and one of `content`, `text` or `markdown` is a string of at least 50
-  characters. The `mode` and the `responseTime` from step 2 are recorded in the run record (2026-09-10 measurement:
-  `3-flaresolverr`, 25.2 seconds). A duration in the tens of seconds is normal for the FlareSolverr tier.
+  characters. The `mode` and the `responseTime` from step 2 are recorded in the run record. A duration in the tens
+  of seconds is normal for a browser-tier solve. Alternatively HTTP `428` with `code`
+  `human_intervention_required` and a non-empty `vnc_url`, or HTTP `409` with `code` `novnc_busy`: that is the
+  environment gate, and steps 3 to 5 are skipped with the body recorded.
 - Capture check: `session:scrapingcourse.com:default` exists and its `waf` entry carries a cookie named
   `cf_clearance`. On the 2026-09-10 read the `auth` entry also carried six site cookies, none of which are asserted.
 - Call 2: HTTP `200`, `status="success"`, one of `content`, `text` or `markdown` is a string of at least 50
@@ -226,10 +224,12 @@ None, and no secrets. The two URLs are hardcoded in the two Bruno requests.
 ## Concurrency
 
 - Mutates: Redis, the ascend-web-hunter session store, key `session:scrapingcourse.com:default`, and the reader's
-  in-process read cache for `scrapingcourse.com`. On the A61 failure path Call 2 also opens the single shared NoVNC
-  browser for `NOVNC_TIMEOUT_SECONDS` (600 s by default).
+  in-process read cache for `scrapingcourse.com`. On the A61 failure path Call 2 also holds one NoVNC window
+  slot for `NOVNC_TIMEOUT_SECONDS` (600 s by default).
 - Conflicts with: test 6, which reads the same site and stores under the same session key, so a concurrent run
   would hand this spec a clearance it did not obtain or wipe the one it did. Tests 8 and 10, which compare or
   extend the `session:*` key scan, since this spec's key would appear in it. Test 7's reset flushes every
-  `session:*` key and would wipe the capture between the two calls.
+  `session:*` key and would wipe the capture between the two calls, and spec 20
+  ([20-concurrent-interventions-test.md](20-concurrent-interventions-test.md)) fills every window slot on
+  purpose, so never beside it.
 - Serial: false against tests 1, 2, 3, 4, 5 and 9. Runs after test 6. No human.

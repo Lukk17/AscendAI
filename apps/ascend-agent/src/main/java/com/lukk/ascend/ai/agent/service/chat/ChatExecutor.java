@@ -32,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 @Service
 @Slf4j
@@ -41,6 +42,7 @@ public class ChatExecutor {
     private static final String METRIC_MCP_TOOL_DURATION = "mcp.tool.duration";
     private static final String OUTCOME_OK = "ok";
     private static final String OUTCOME_ERROR = "error";
+    private static final String OUTCOME_TIMEOUT = "timeout";
 
     private final ChatModelResolver chatModelResolver;
     private final ToolCallbackProvider toolCallbackProvider;
@@ -76,31 +78,38 @@ public class ChatExecutor {
         PromptCacheStrategy strategy = cacheStrategyResolver.resolve(provider);
         ChatOptions decoratedOptions = strategy.buildOptions(model);
 
-        ChatResponse chatResponse;
+        Timer.Sample toolSample = Timer.start(meterRegistry);
         try {
-            chatResponse = invoke(userId, systemMessages, userText, history, image, provider, model, decoratedOptions);
-        } catch (RuntimeException e) {
-            if (!strategy.isCacheConfigError(e)) {
-                throw e;
+            ChatResponse chatResponse;
+            try {
+                chatResponse = invoke(userId, systemMessages, userText, history, image, provider, model, decoratedOptions);
+            } catch (RuntimeException e) {
+                if (!strategy.isCacheConfigError(e)) {
+                    throw e;
+                }
+                log.warn("[PromptCache] provider={} cache call failed, retrying without cache: {}",
+                        strategy.providerName(), e.getMessage());
+                ChatOptions fallbackOptions = StringUtils.hasText(model)
+                        ? ChatOptions.builder().model(model).build() : null;
+                chatResponse = invoke(userId, systemMessages, userText, history, image, provider, model, fallbackOptions);
             }
-            log.warn("[PromptCache] provider={} cache call failed, retrying without cache: {}",
-                    strategy.providerName(), e.getMessage());
-            ChatOptions fallbackOptions = StringUtils.hasText(model)
-                    ? ChatOptions.builder().model(model).build() : null;
-            chatResponse = invoke(userId, systemMessages, userText, history, image, provider, model, fallbackOptions);
+
+            if (chatResponse == null) {
+                recordToolMetrics(toolCallTracker.drain(), OUTCOME_ERROR, toolSample);
+                throw new AiGenerationException("Received null response from ChatClient");
+            }
+
+            strategy.recordOutcome(userId, chatResponse);
+
+            String content = chatResponseContentResolver.resolveContent(chatResponse);
+            List<String> toolsUsed = toolCallTracker.drain();
+            recordToolMetrics(toolsUsed, OUTCOME_OK, toolSample);
+
+            return new AiResponse(content, new CustomMetadata(chatResponse.getMetadata(), toolsUsed));
+        } catch (RuntimeException e) {
+            recordToolMetrics(toolCallTracker.drain(), classifyToolOutcome(e), toolSample);
+            throw e;
         }
-
-        if (chatResponse == null) {
-            throw new AiGenerationException("Received null response from ChatClient");
-        }
-
-        strategy.recordOutcome(userId, chatResponse);
-
-        String content = chatResponseContentResolver.resolveContent(chatResponse);
-        List<String> toolsUsed = toolCallTracker.drain();
-        recordToolMetrics(toolsUsed, OUTCOME_OK);
-
-        return new AiResponse(content, new CustomMetadata(chatResponse.getMetadata(), toolsUsed));
     }
 
     private ChatResponse invoke(String userId, AssembledSystemMessages systemMessages, String userText,
@@ -220,13 +229,47 @@ public class ChatExecutor {
         return filename.substring(dot + 1).toLowerCase();
     }
 
-    private void recordToolMetrics(List<String> toolsUsed, String outcome) {
+    private void recordToolMetrics(List<String> toolsUsed, String outcome, Timer.Sample sample) {
         for (String tool : toolsUsed) {
-            Timer.builder(METRIC_MCP_TOOL_DURATION)
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
                     .tag("tool", tool)
                     .tag("outcome", outcome)
-                    .register(meterRegistry)
-                    .record(java.time.Duration.ZERO);
+                    .register(meterRegistry));
+        }
+    }
+
+    static String classifyToolOutcome(Throwable e) {
+        Throwable current = e;
+        while (current != null) {
+            if (current instanceof java.util.concurrent.TimeoutException
+                    || current instanceof java.net.SocketTimeoutException) {
+                return OUTCOME_TIMEOUT;
+            }
+            current = current.getCause();
+        }
+        String message = e.getMessage();
+        if (message != null) {
+            String lower = message.toLowerCase();
+            if (lower.contains("timeout") || lower.contains("timed out")) {
+                return OUTCOME_TIMEOUT;
+            }
+        }
+        return OUTCOME_ERROR;
+    }
+
+    public <T> T invokeToolWithMetrics(String toolName, Callable<T> toolAction) throws Exception {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = OUTCOME_OK;
+        try {
+            return toolAction.call();
+        } catch (Exception e) {
+            outcome = classifyToolOutcome(e);
+            throw e;
+        } finally {
+            sample.stop(Timer.builder(METRIC_MCP_TOOL_DURATION)
+                    .tag("tool", toolName)
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
         }
     }
 

@@ -34,7 +34,7 @@ not mark the container healthy until the process is responsive.
 Runtime pins live in [pyproject.toml](pyproject.toml). The shape is:
 
 - Python 3.11 (the only version with full PaddlePaddle wheel coverage today)
-- FastAPI 0.136.3, Uvicorn 0.48.0, FastMCP 3.3.1
+- FastAPI 0.147.0, Uvicorn 0.54.0, FastMCP 4.1.1 (via `ascend-python-common`)
 - PaddlePaddle 3.3.1, PaddleOCR 3.7.0, Pillow 12.2.0
 - aiohttp 3.13.5 + aiofiles 25.1.0 for the MCP URL fetch
 - slowapi 0.1.9 for per-IP rate limiting
@@ -202,7 +202,7 @@ records the family, the member, and why the choice is explicit.
 | Method | Path                    | Purpose                                                                 |
 | :----- | :---------------------- | :---------------------------------------------------------------------- |
 | GET    | /health                 | Liveness probe. Always 200 when the process is up.                      |
-| GET    | /ready                  | Readiness probe. 200 with `status=ready` once the default lang is warm and the service is accepting work (`accepting_work`, `jobs_queued` and `jobs_running` in the body - see [ADR-004](docs/architecture/decisions/ADR-004-liveness-readiness-split.md)). |
+| GET    | /ready                  | Readiness probe. 200 with `status=ready` once the `engine`, `worker_pool` and `jobs` probes all pass, else 503 with `status=not-ready` and a `checks` object naming each probe (see [ADR-004](docs/architecture/decisions/ADR-004-liveness-readiness-split.md)). |
 | GET    | /metrics                | Prometheus exposition for the counters in [src/observability/metrics.py](src/observability/metrics.py). |
 | POST   | /v1/ocr/jobs            | Multipart upload with optional `lang`, `quality` (`high`, the default, or `normal`) and `straighten` (`false`, the default, or `true`, see below). 202 with a job identifier and a relative `Location` header, never with page content. |
 | GET    | /v1/ocr/jobs            | Everything queued or running, in submission order.                      |
@@ -210,7 +210,8 @@ records the family, the member, and why the choice is explicit.
 | DELETE | /v1/ocr/jobs/{job_id}   | Stop work that has not finished, or forget work that has, along with its stored result. 204. |
 | POST   | /mcp                    | FastMCP Streamable HTTP transport. Tools `ocr_submit` (`file_uri`, `lang`, `quality`, `straighten`), `ocr_job_status`, `ocr_list_jobs` and `ocr_cancel_job`. |
 
-The error body shape across both surfaces is `{"code": "...", "detail": "..."}`. The nine-code catalog is in
+Refusals are RFC 7807 problem bodies (`application/problem+json`) carrying `type`, `title`, `status`,
+`detail`, `instance`, `code` and `traceId` on REST, and `CODE: detail` tool errors on MCP. The nine-code catalog is in
 [ADR-002](docs/architecture/decisions/ADR-002-mcp-error-catalog.md), together with the three record-level reasons a
 failed job carries, which are never HTTP statuses.
 

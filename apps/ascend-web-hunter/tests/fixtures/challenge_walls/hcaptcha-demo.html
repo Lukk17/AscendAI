@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>hCaptcha demo form | AntiCaptcha plugin demo forms</title>
+	<meta name="description" content="">
+	<!-- --> <base href="https://democaptcha.com/" /> <!-- -->
+
+	
+	
+	<meta name="HandheldFriendly" content="true" />
+  	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0;" name="viewport" />
+	
+	<link rel="stylesheet" href="/css/style.css" />
+	<link rel="stylesheet" href="/css/code_lines.css" />
+	
+	<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+	<link rel="icon" href="/favicon.ico" type="image/x-icon">
+	
+	<link href="https://fonts.googleapis.com/css?family=Megrim|Roboto" rel="stylesheet">
+	
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+	
+	<script src="/js/js.cookie.min.js"></script>
+	<script src="/js/main.js"></script>
+</head>
+<body>
+	
+	
+	<div class="topnav-wrap">
+	<div class="topnav wlimit mobile-menu-open" style="padding-bottom: 8px;">
+		<nav role="navigation">
+	<ul class="navlinks" aria-label="Main menu">
+		<li>
+			<a href="/" title="Go Home">Democaptcha.com</a>
+			<!--
+			<script>
+				if (window.name == 'window-opened') {
+					document.write('<a href="javascript: void(0);" onclick="window.close();" title="Go Back to AntCpt.com">&larr;&nbsp;Go Back</a>');
+				}
+			</script>
+			-->
+		</li>
+	</ul>
+</nav>
+		
+		<a href="https://antcpt.com" class="logo" title="AntiCaptcha plugin — automatic captcha solver">
+	Provided by AntiCaptcha plugin solver
+	<br />
+	<span>AntCpt.com</span>
+</a>
+		
+		
+		
+	</div>
+</div>
+	
+	<main role="main" class="wlimit">
+		<article role="article">
+			<header>
+				<h1>hCaptcha demo form</h1>
+				
+			</header>
+			<div class="section article">
+				<html>
+  <head>
+    <title>hCaptcha Demo</title>
+  </head>
+  <body>
+	  <style>
+	  	.h-captcha {
+	  		width: 100%;
+    		text-align: center;
+	  	}
+	  </style>
+	  <script src="https://hcaptcha.com/1/api.js" async defer></script>
+<link rel="stylesheet" href="/css/feedback.css" />
+
+<form action="" name="hcaptcha_demo_form" class="recaptcha_demo_form" method="POST">
+	Text demo input here<br />
+	<input type="text" name="demo_text" placeholder="Something you wanna tell the world" />
+	<br /><br />
+
+	Hcaptcha box
+	<div class="h-captcha" data-sitekey="338af34c-7bcb-4c7c-900b-acbec73d7d43" data-callback="solvedCallback"></div>
+	<br/>
+	<input type="submit" class="btn btn-install" value="Submit">
+</form>
+
+<script>
+	function solvedCallback(hash) {
+		console.log('Solved with hash', hash);
+	}
+</script>
+
+<script src="js/hcaptcha_visible_form.js" async defer></script>
+  </body>
+</html>
+			</div>
+		</article>
+		
+	</main>
+</body>
+</html>

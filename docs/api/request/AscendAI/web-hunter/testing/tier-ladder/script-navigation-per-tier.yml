@@ -1,0 +1,40 @@
+info:
+  name: script-navigation-per-tier
+  type: http
+  seq: 54
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Allowed page whose script navigates to the blocked name: every tier answers 400 unsafe_uri. The crawlee
+    # tier used to answer 428 when its static path swallowed the redirect, fixed 2026-10-28.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/script-nav",
+        "include_links": false,
+        "heavy_mode": false,
+        "tier": "{{tier}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("script navigation to the blocked name is refused", function () {
+            expect(res.getStatus()).to.equal(400);
+            const b = res.getBody();
+            expect(b.code).to.equal("unsafe_uri");
+            expect(b.status).to.equal(400);
+            expect(b.type).to.be.a("string").and.not.empty;
+            expect(b.instance).to.be.a("string").and.not.empty;
+            expect(b.traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -20,7 +21,7 @@ def _make_loader(tmp_path: Path, content: str | None = "||example.com^\n! commen
     return BlocklistLoader(blocklist_path=str(path))
 
 
-def test_load_rules_reads_the_vendored_file(tmp_path):
+def test_load_rules_reads_the_vendored_file(tmp_path: Any) -> None:
     # given
     loader = _make_loader(tmp_path, "||example.com^\n! comment\n\n||other.com^\n")
     rules = loader.load_rules()
@@ -31,7 +32,7 @@ def test_load_rules_reads_the_vendored_file(tmp_path):
     assert loader.state.rule_count == 2
 
 
-def test_load_rules_raises_file_not_found_when_missing(tmp_path):
+def test_load_rules_raises_file_not_found_when_missing(tmp_path: Any) -> None:
     # given
     loader = _make_loader(tmp_path, content=None)
 
@@ -40,7 +41,7 @@ def test_load_rules_raises_file_not_found_when_missing(tmp_path):
         loader.load_rules()
 
 
-def test_load_rules_raises_runtime_error_on_corrupt_file(tmp_path):
+def test_load_rules_raises_runtime_error_on_corrupt_file(tmp_path: Any) -> None:
     # given
     loader = _make_loader(tmp_path)
 
@@ -58,7 +59,7 @@ def _mock_response(content: bytes) -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_refresh_success_swaps_file_and_state(tmp_path):
+async def test_refresh_success_swaps_file_and_state(tmp_path: Any) -> None:
     # given
     loader = _make_loader(tmp_path)
     new_content = b"||fresh.example^\n! comment\n||another.example^\n"
@@ -73,7 +74,7 @@ async def test_refresh_success_swaps_file_and_state(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_refresh_raises_httpx_error_and_leaves_file_untouched(tmp_path):
+async def test_refresh_raises_httpx_error_and_leaves_file_untouched(tmp_path: Any) -> None:
     # given
     loader = _make_loader(tmp_path)
     original_content = loader.blocklist_path.read_bytes()
@@ -89,7 +90,9 @@ async def test_refresh_raises_httpx_error_and_leaves_file_untouched(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_refresh_raises_validation_error_on_empty_ruleset_and_leaves_file_untouched(tmp_path):
+async def test_refresh_raises_validation_error_on_empty_ruleset_and_leaves_file_untouched(
+    tmp_path: Any,
+) -> None:
     # given
     loader = _make_loader(tmp_path)
     original_content = loader.blocklist_path.read_bytes()
@@ -105,7 +108,7 @@ async def test_refresh_raises_validation_error_on_empty_ruleset_and_leaves_file_
 
 
 @pytest.mark.asyncio
-async def test_refresh_raises_throttled_error_within_cooldown(tmp_path):
+async def test_refresh_raises_throttled_error_within_cooldown(tmp_path: Any) -> None:
     # given
     loader = _make_loader(tmp_path)
 
@@ -117,7 +120,7 @@ async def test_refresh_raises_throttled_error_within_cooldown(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_refresh_allows_retry_after_cooldown_elapses(tmp_path, monkeypatch):
+async def test_refresh_allows_retry_after_cooldown_elapses(tmp_path: Any, monkeypatch: Any) -> None:
     # given
     loader = _make_loader(tmp_path)
     fake_clock = [1000.0]
@@ -135,7 +138,7 @@ async def test_refresh_allows_retry_after_cooldown_elapses(tmp_path, monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_refresh_serialises_concurrent_calls(tmp_path):
+async def test_refresh_serialises_concurrent_calls(tmp_path: Any) -> Any:
     # given
     loader = _make_loader(tmp_path)
     call_order: list[str] = []

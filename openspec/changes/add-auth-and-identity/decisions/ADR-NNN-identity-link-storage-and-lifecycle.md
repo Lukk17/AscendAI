@@ -4,11 +4,11 @@ Draft. The number is assigned at implementation time: it takes the next free num
 
 ## Status
 
-Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `apps/ascend-agent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
+Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This draft is not installed into `apps/ascend-agent/docs/architecture/decisions/`: it stays in the change's `decisions/` folder, which the archive keeps under `openspec/changes/archive/`, next to the Deferred section of the design (owner answer 93 of 2026-10-08).
 
 ## Deferral, 2026-09-04
 
-The link joins a person's login identity to their file-store identity across two providers. In this version there is one provider, Keycloak, and one subject, and group principals come from Keycloak realm groups rather than from either directory. There is nothing to join, so the `identity_link` table, the three-state lifecycle, and the administrator API that corrects a link are all out of scope. No Liquibase changelog and no `/api/v1/admin/identity-links` surface ship.
+The link joins a person's login identity to their file-store identity across two providers. In this version there is one provider, Keycloak, and one subject, and group principals come from Keycloak realm groups rather than from either directory. There is nothing to join, so the `identity_link` table, the three-state lifecycle, and the administrator API that corrects a link are all out of scope. No Flyway migration and no `/api/v1/admin/identity-links` surface ship.
 
 Nothing below was found to be wrong, and three parts of it are worth more than the table they describe. The three-state lifecycle, where a detected discrepancy and an administrator's deliberate switch-off need different names because they need different responses. The email normalization function, and specifically the refusal to strip dots, because dot-insensitivity is one provider's local-part behaviour rather than an email rule and applying it generally merges two genuinely different corporate addresses into one person. And the deletion of the cached principal set on a successful correction, without which an administrator fixes a link, the affected person still finds nothing for minutes, and the obvious conclusion is that the fix did not take.
 
@@ -26,7 +26,7 @@ Three of them matter enough to record. The store has to survive a cache flush an
 
 ## Decision
 
-The link is a PostgreSQL table, `identity_link`, created by a Liquibase changelog like every other schema change in this module. It holds the normalized email, the login issuer, the login provider's directory subject, the file provider's directory subject where known, the status, the creation and last-confirmation timestamps, and the conflicting subject recorded at detection time. It is unique on normalized email within a tenant and indexed on each subject.
+The link is a PostgreSQL table, `identity_link`, created by a Flyway versioned SQL migration (`V<n>__identity_link.sql` under `apps/ascend-agent/src/main/resources/db/migration/`, with `<n>` taken at implementation time) like every other schema change in this module. It holds the normalized email, the login issuer, the login provider's directory subject, the file provider's directory subject where known, the status, the creation and last-confirmation timestamps, and the conflicting subject recorded at detection time. It is unique on normalized email within a tenant and indexed on each subject.
 
 The lifecycle has exactly three states:
 

@@ -29,8 +29,8 @@ login redirect before any HTTP request is made.
 ### 428 human-intervention protocol
 
 When no automated strategy can extract content, `NoVNCStrategy` raises `HumanInterventionRequiredException`. The
-`human_intervention_exception_handler` (`src/api/exception_handlers.py:35`) converts this to HTTP 428 with a
-structured body containing `status`, `intervention_type`, and `vnc_url`. The MCP tool docstring instructs the
+service's error registry (`src/api/exception_handlers.py`) answers HTTP 428 with a problem body carrying `code`
+`human_intervention_required` and extension members `intervention_type` and `vnc_url`. The MCP tool docstring instructs the
 agent to display `vnc_url` to the user. This makes human CAPTCHAs a first-class protocol outcome rather than an
 opaque failure. See [ADR-003](../decisions/ADR-003-novnc-ngrok-captcha-intervention.md).
 
@@ -38,10 +38,11 @@ opaque failure. See [ADR-003](../decisions/ADR-003-novnc-ngrok-captcha-intervent
 
 ### SSRF guard on user-supplied URLs
 
-Both `POST /api/v2/web/read` and the `web_read` MCP tool call `is_safe_external_url(url)` from
-`src/validator/url_validator.py:28` before passing the URL to `WebReader`. This function resolves the hostname
-and rejects private, loopback, link-local, multicast, and reserved IP addresses. Pydantic's `HttpUrl` validates
-structure but does not resolve DNS; the explicit guard closes the gap.
+Both `POST /api/v2/web/read` and the `web_read` MCP tool check the URL with the shared `check_fetch_uri`
+(`ascend_python_common.uri_guard`) before passing it to `WebReader`. The guard resolves the hostname
+and rejects private, loopback, link-local, multicast, reserved, and unspecified addresses, as well as URIs with
+user info. Pydantic's `HttpUrl` validates structure but does not resolve DNS; the explicit guard closes the gap.
+A refused URL answers `400` with code `unsafe_uri`.
 
 ---
 

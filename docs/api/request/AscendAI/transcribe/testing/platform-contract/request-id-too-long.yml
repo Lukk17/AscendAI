@@ -1,0 +1,32 @@
+info:
+  name: request-id-too-long
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7017/health"
+  headers:
+    - name: x-request-id
+      value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("an overlong id is replaced by an id of 1 to 128 allowed characters", function () {
+            var echoed = res.getHeader("x-request-id");
+            expect(echoed).to.be.a("string").and.not.empty;
+            expect(echoed).to.not.equal("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+            expect(echoed).to.match(/^[A-Za-z0-9._:-]{1,128}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

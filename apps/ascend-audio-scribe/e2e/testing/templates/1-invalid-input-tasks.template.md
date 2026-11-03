@@ -21,12 +21,13 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 ### Expected
 
-- [ ] HTTP status code is 422
-- [ ] Response `Content-Type` starts with `application/json`
+- [ ] HTTP status code is 400 with `Content-Type: application/problem+json`
+- [ ] Response `Content-Type` starts with `application/problem+json`
 - [ ] Response body parses as JSON
-- [ ] Response body has a non-empty `detail` array
-- [ ] At least one `detail` entry has `loc` containing `"file"`
-- [ ] At least one `detail` entry has `type` containing the substring `"missing"`
+- [ ] Response body `code` equals `"validation"`
+- [ ] Response body has a non-empty `errors` array sorted by `field`
+- [ ] At least one `errors` entry has `field` containing `"file"`
+- [ ] `traceId` matches `^[0-9a-f]{32}$`
 - [ ] Run duration < 1 s (proxy for "FastAPI short-circuited; OpenAI was not called")
 
 ### Verdict

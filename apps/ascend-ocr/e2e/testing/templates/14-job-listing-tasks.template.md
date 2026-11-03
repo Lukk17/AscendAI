@@ -20,7 +20,7 @@ authentication that identifier is the credential for the result. Treat the run r
 
 - [ ] Job records dropped from the container's jobs directory
 - [ ] `ocr-results` bucket emptied
-- [ ] `/ready` reports `jobs_queued=0` and `jobs_running=0`
+- [ ] `/ready` reports `checks.jobs.queued=0` and `checks.jobs.running=0`
 
 ### Run
 
@@ -29,7 +29,7 @@ authentication that identifier is the credential for the result. Treat the run r
 - [ ] Step 3: listing read while the first is being read
 - [ ] Step 4: `/ready` read in the same window
 - [ ] Step 5: second document's own state read
-- [ ] Step 6: `initialize` returns an `mcp-session-id` header, `ocr/testing/mcp-initialized.yml` answers HTTP 202, MCP listing read
+- [ ] Step 6: `initialize` returns HTTP 200 with no `mcp-session-id` header (stateless service), `ocr/testing/mcp-initialized.yml` answers HTTP 202, MCP listing read
 - [ ] Step 7: all three polled to a terminal state, waiting `poll_after_seconds` between reads, then the listing read
 - [ ] Step 8: a finished identifier read directly
 - [ ] Step 9: all three deleted
@@ -44,7 +44,7 @@ authentication that identifier is the credential for the result. Treat the run r
 - [ ] Step 3: the first is `running` (or `waiting` if not yet picked up), the rest `waiting` with `pages_done=0`
 - [ ] Step 3: the running entry's `pages_done` is between 0 and 25
 - [ ] Step 3: every entry carries a non-negative `elapsed_seconds`
-- [ ] Step 4: `jobs_running=1`, `jobs_queued=2`, `status="ready"`
+- [ ] Step 4: `checks.jobs.running=1`, `checks.jobs.queued=2`, `status="ready"`
 - [ ] Step 5: the document's own `queue_position` matches the listing's
 - [ ] Step 6: the MCP listing matches the REST listing exactly
 - [ ] Step 7: the listing is empty again

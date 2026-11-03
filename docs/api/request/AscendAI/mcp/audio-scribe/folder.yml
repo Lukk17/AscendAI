@@ -5,10 +5,8 @@ info:
 
 request:
   variables:
-    - name: audio_uri
-      value: http://localhost:9071/api/v1/buckets/public-audio/objects/download?prefix=test%2F15minRecording.flac
     - name: audio_uri_docker
-      value: ""
+      value: "http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav"
     - name: mcp_session_id
       value: ""
   auth: inherit

@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_10-session-establish-tasks.md` before
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] Redis reachable: `docker exec redis redis-cli PING` returns `PONG`
 - [ ] NoVNC flow lock free: `docker exec ascend-web-hunter pgrep -fa "remote-debugging-port=9222"` printed nothing
       and exited non-zero (re-checked every 30 seconds until it did, before starting the Run section)

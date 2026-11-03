@@ -10,7 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
-- [ ] `/ready` reports `jobs_queued` 0 and `jobs_running` 0
+- [ ] `/ready` reports `checks.jobs.queued` 0 and `checks.jobs.running` 0
 
 ### Reset state
 
@@ -24,8 +24,8 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 
 ### Expected
 
-- [ ] Step 1: HTTP 422
-- [ ] Step 1: the body carries FastAPI's validation detail, not a job record
+- [ ] Step 1: HTTP 400
+- [ ] Step 1: the body is the problem body with `code` `validation` and an `errors` array naming the missing `file` field
 - [ ] Step 1: no `job_id` in the body
 - [ ] Step 2: HTTP 400 with `code="UNSUPPORTED_LANGUAGE"`
 - [ ] Step 2: `detail` contains `Supported languages:` and not `korean`

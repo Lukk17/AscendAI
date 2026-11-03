@@ -1,5 +1,4 @@
 import asyncio
-import os
 import string
 import threading
 import time
@@ -51,7 +50,7 @@ TRAVERSAL_CANDIDATES = [
 
 
 class TestIdentifier:
-    def test_identifier_is_url_safe_and_fixed_length(self):
+    def test_identifier_is_url_safe_and_fixed_length(self) -> None:
         # When
         job_id = new_job_id()
 
@@ -59,7 +58,7 @@ class TestIdentifier:
         assert len(job_id) == JOB_ID_LENGTH
         assert set(job_id) <= set(string.ascii_letters + string.digits + "-_")
 
-    def test_identifier_carries_at_least_128_bits_of_randomness(self):
+    def test_identifier_carries_at_least_128_bits_of_randomness(self) -> None:
         # Given — 22 base64url characters encode 16 bytes, and none of them repeats
         # across a batch, so the source is not a counter or a hash of the input
 
@@ -70,12 +69,12 @@ class TestIdentifier:
         assert len(identifiers) == 500
 
     @pytest.mark.parametrize("candidate", TRAVERSAL_CANDIDATES)
-    def test_candidate_that_is_not_an_identifier_is_refused(self, candidate):
+    def test_candidate_that_is_not_an_identifier_is_refused(self, candidate: str) -> None:
         # When / Then
         with pytest.raises(JobNotFoundError):
             validate_job_id(candidate)
 
-    def test_a_refused_identifier_never_reaches_the_filesystem(self):
+    def test_a_refused_identifier_never_reaches_the_filesystem(self) -> None:
         # When
         with (
             patch("src.service.job_store.jobs_dir") as mock_jobs_dir,
@@ -86,7 +85,7 @@ class TestIdentifier:
         # Then
         mock_jobs_dir.assert_not_called()
 
-    def test_a_valid_identifier_is_returned_unchanged(self):
+    def test_a_valid_identifier_is_returned_unchanged(self) -> None:
         # Given
         job_id = new_job_id()
 
@@ -153,7 +152,9 @@ class TestRecordLifecycle:
         assert store.exists(record.job_id) is True
         assert store.exists(new_job_id()) is False
 
-    async def test_delete_removes_the_record_the_bytes_and_the_progress(self, store: JobStore, jobs_dir: Path) -> None:
+    async def test_delete_removes_the_record_the_bytes_and_the_progress(
+        self, store: JobStore, jobs_dir: Path
+    ) -> None:
         # Given
         record = make_record()
         await store.create(record, b"payload")
@@ -210,7 +211,9 @@ class TestRecordLifecycle:
 
 
 class TestAtomicWrites:
-    def test_a_failed_replace_leaves_the_previous_content_intact(self, store: JobStore, jobs_dir: Path) -> None:
+    def test_a_failed_replace_leaves_the_previous_content_intact(
+        self, store: JobStore, jobs_dir: Path
+    ) -> None:
         # Given
         record = make_record(page_count=3)
         store.write(record)
@@ -218,7 +221,7 @@ class TestAtomicWrites:
         # When — the replace fails part-way through a second write
         record.page_count = 9
         with (
-            patch("src.service.job_store.os.replace", side_effect=OSError("replace failed")),
+            patch("pathlib.Path.replace", side_effect=OSError("replace failed")),
             pytest.raises(OSError, match="replace failed"),
         ):
             store.write(record)
@@ -230,14 +233,14 @@ class TestAtomicWrites:
         # Given
         target = tmp_path / "record.json"
         seen: list[list[str]] = []
-        real_replace = os.replace
+        real_replace = Path.replace
 
-        def capture(source, destination):
+        def capture(source: Path, destination: Path) -> None:
             seen.append(sorted(path.name for path in tmp_path.iterdir()))
             real_replace(source, destination)
 
         # When
-        with patch("src.service.job_store.os.replace", side_effect=capture):
+        with patch("pathlib.Path.replace", side_effect=capture, autospec=True):
             atomic_write_bytes(target, b"content")
 
         # Then
@@ -276,7 +279,9 @@ class TestProgress:
 
 
 class TestTerminalWriters:
-    async def test_failing_a_job_records_the_reason_and_drops_the_bytes(self, store: JobStore, jobs_dir: Path) -> None:
+    async def test_failing_a_job_records_the_reason_and_drops_the_bytes(
+        self, store: JobStore, jobs_dir: Path
+    ) -> None:
         # Given
         record = make_record()
         await store.create(record, b"payload")
@@ -314,7 +319,9 @@ class TestTerminalWriters:
         # Then
         assert store.read(record.job_id).retryable is retryable
 
-    @pytest.mark.parametrize("reason", [FAILURE_SERVICE_RESTARTED, FAILURE_LIFETIME_EXCEEDED, ERROR_CODE_OCR_FAILED])
+    @pytest.mark.parametrize(
+        "reason", [FAILURE_SERVICE_RESTARTED, FAILURE_LIFETIME_EXCEEDED, ERROR_CODE_OCR_FAILED]
+    )
     def test_a_job_failed_after_some_pages_reports_the_pages_it_read(
         self, store: JobStore, jobs_dir: Path, reason: str
     ) -> None:
@@ -364,7 +371,9 @@ class TestTerminalWriters:
         assert stored.error_code is None
         assert stored.result is None
 
-    def test_a_job_cancelled_after_some_pages_reports_the_pages_it_read(self, store: JobStore, jobs_dir: Path) -> None:
+    def test_a_job_cancelled_after_some_pages_reports_the_pages_it_read(
+        self, store: JobStore, jobs_dir: Path
+    ) -> None:
         # Given
         record = make_record(state="running", page_count=5, started_at=time.time())
         write_progress(record.job_id, 3)
@@ -440,7 +449,9 @@ class TestTerminalWriters:
 
 
 class TestStartupRecovery:
-    def test_waiting_and_running_work_is_failed_and_finished_work_is_left_alone(self, store: JobStore) -> None:
+    def test_waiting_and_running_work_is_failed_and_finished_work_is_left_alone(
+        self, store: JobStore
+    ) -> None:
         # Given — one of every state the store can hold
         waiting = make_record(state="waiting")
         running = make_record(state="running", started_at=time.time())
@@ -461,7 +472,9 @@ class TestStartupRecovery:
         assert store.read(cancelled.job_id).state == "cancelled"
         assert all(record.is_terminal for record in store.records())
 
-    async def test_recovery_drops_the_submitted_bytes_of_work_in_flight(self, store: JobStore, jobs_dir: Path) -> None:
+    async def test_recovery_drops_the_submitted_bytes_of_work_in_flight(
+        self, store: JobStore, jobs_dir: Path
+    ) -> None:
         # Given
         record = make_record(state="running")
         await store.create(record, b"payload")
@@ -518,7 +531,9 @@ class TestRetentionSweep:
         assert results.deleted == [f"{record.job_id}.md"]
         assert store.exists(record.job_id) is False
 
-    async def test_a_record_inside_its_window_is_kept(self, store: JobStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_a_record_inside_its_window_is_kept(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_JOB_RETENTION_SECONDS", 3600.0)
         record = make_record(state="succeeded", finished_at=time.time() - 60.0)
@@ -606,7 +621,9 @@ class TestLifetimeSweep:
         self, store: JobStore, jobs_dir: Path
     ) -> None:
         # Given
-        record = make_record(state="running", submitted_at=time.time() - settings.OCR_JOB_MAX_LIFETIME_SECONDS - 1.0)
+        record = make_record(
+            state="running", submitted_at=time.time() - settings.OCR_JOB_MAX_LIFETIME_SECONDS - 1.0
+        )
         await store.create(record, b"payload")
 
         # When
@@ -650,7 +667,9 @@ class TestLifetimeSweep:
     async def test_sweep_runs_both_passes(self, store: JobStore, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given — one wedged record and one expired one
         monkeypatch.setattr(settings, "OCR_JOB_RETENTION_SECONDS", 1.0)
-        wedged = make_record(state="running", submitted_at=time.time() - settings.OCR_JOB_MAX_LIFETIME_SECONDS - 1.0)
+        wedged = make_record(
+            state="running", submitted_at=time.time() - settings.OCR_JOB_MAX_LIFETIME_SECONDS - 1.0
+        )
         expired = make_record(state="succeeded", finished_at=time.time() - 60.0)
         for record in (wedged, expired):
             store.write(record)
@@ -671,7 +690,7 @@ class TestOffLoopWrites:
         released = threading.Event()
         original = atomic_write_bytes
 
-        def blocking_write(path, payload):
+        def blocking_write(path: Path, payload: bytes) -> None:
             released.wait(timeout=5.0)
             original(path, payload)
 
@@ -697,7 +716,11 @@ class TestOffLoopWrites:
 class TestRetainedCount:
     def test_only_finished_records_are_counted(self, store: JobStore) -> None:
         # Given
-        for record in (make_record(state="waiting"), make_record(state="succeeded"), make_record(state="failed")):
+        for record in (
+            make_record(state="waiting"),
+            make_record(state="succeeded"),
+            make_record(state="failed"),
+        ):
             store.write(record)
 
         # When / Then

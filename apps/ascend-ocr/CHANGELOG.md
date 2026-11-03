@@ -8,6 +8,55 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.3.2] - <release date>
+
+### Changed
+- The service follows the shared library version set through `ascend-python-common==2.0.0`
+  (FastAPI 0.147.0, Starlette 1.9.0, uvicorn 0.54.0, FastMCP 4.1.1, MCP SDK 2.3.0,
+  httpx2 2.14.0). The service's own `fastapi`, `fastmcp`, `mcp`, `uvicorn` and `httpx2`
+  pins are gone.
+- The MCP server reports the service name and version in `initialize`.
+- The `/mcp` endpoint accepts only allowed `Host` headers (`ascend-ocr,localhost,127.0.0.1`)
+  and no `Origin` header; a refused `Host` answers 421, a refused `Origin` answers 403.
+
+## [0.3.1] - <release date>
+
+### Changed
+- Breaking for REST callers: refusals are RFC 7807 problem bodies (`application/problem+json`) carrying
+  `type`, `title`, `status`, `detail`, `instance`, `code` and `traceId`. A request that fails validation
+  answers 400 with code `validation` and an `errors` list sorted by `field`, an unknown path answers 404 with
+  code `not_found`, and a wrong method answers 405 with code `method_not_allowed` and an `Allow` header. On
+  MCP a refusal is FastMCP's `ToolError` reading `CODE: detail`. Every code and status of the ADR-002
+  catalogue is unchanged.
+- Breaking for operators: `/ready` runs the `engine`, `worker_pool` and `jobs` probes through the shared
+  readiness aggregator and answers 200 `ready` or 503 `not-ready` with a `checks` object naming each probe.
+  `ReadinessResponse` and `HealthResponse` are deleted.
+- Breaking for operators: `RATE_LIMIT_DEFAULT` moves from `60/minute` to `600/minute` and `RATE_LIMIT_OCR`
+  from `20/minute` to `60/minute`. Both are flood protection, not a throughput cap, and the windows live in
+  the shared Redis (`REDIS_URL`, default `redis://127.0.0.1:6379/0`), so every container of the service draws
+  one caller's REST and MCP calls from one budget under the key prefix `ascend-ocr`.
+- Breaking for operators: trace export follows `OTEL_EXPORTER_OTLP_ENDPOINT` whenever it is set, and
+  OpenTelemetry's standard `OTEL_SDK_DISABLED=true` switches the SDK off. The service `OTEL_ENABLED` is
+  gone. With tracing on, the library drops `mcp.session.id` from every span, so no exported span carries
+  the session id, raw or as a digest.
+- Logging, correlation ids, rate limiting, security headers and the URI fetch guard come from
+  `ascend-python-common`. The service deletes `src/config/logging_config.py`,
+  `src/api/middleware/correlation_id.py`, `src/api/mcp/request_log_context.py`,
+  `src/api/middleware/rate_limit.py` and `src/api/middleware/security_headers.py`, and its own guard tests.
+  Worker process tracing and the trace-context carry helpers stay in `src/observability/tracing.py` and
+  build their tracer provider through the library's builder.
+- The image installs `ascend-python-common` from a named build context before the service itself, and the
+  compose service passes `REDIS_URL` through.
+- The shared library is cut at `1.0.0` now that all four services are migrated. The service pin moves to
+  `ascend-python-common[fetch]==1.0.0`; this entry stays the one version of
+  this change.
+- The allow list setting is now `ALLOWED_PRIVATE_HOSTS`, renamed on 2026-10-04 (owner answer 68.2, see ADR-001);
+  the service refuses to start while the old name is set.
+
+### Fixed
+- The IDE Docker run configuration declares `--add-host=host.docker.internal:host-gateway`, sets `OCR_RESULT_S3_ENDPOINT` and `OCR_RESULT_S3_PUBLIC_ENDPOINT`, reads the store credentials from the repository `.env` through `--env-file`, and drops the deleted `OCR_REQUEST_TIMEOUT`. `fix-linux-docker-host-access`.
+- The configuration reference names `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. `fix-linux-docker-host-access`.
+
 ## [0.3.0] - 2026-10-01
 
 ### Changed
