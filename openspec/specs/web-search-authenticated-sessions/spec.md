@@ -8,7 +8,7 @@ Defines how ascend-web-hunter captures a browser session for a site, stores it u
 
 ### Requirement: Captured session includes full browser storage state
 
-When a session is captured by the NoVNC login monitor, the service SHALL persist the full Playwright `storage_state`, meaning cookies including httpOnly cookies AND per-origin localStorage, not only `context.cookies()`. The persisted blob SHALL be sufficient to reconstruct an authenticated browser context. The FlareSolverr tier, which never holds a browser context of its own, SHALL persist the flat cookie set that tier returns. The Playwright tier replays a stored session and does not write one back.
+When a session is captured by the NoVNC login monitor, the service SHALL persist the full Playwright `storage_state`, meaning cookies including httpOnly cookies AND per-origin localStorage, not only `context.cookies()`. The persisted blob SHALL be sufficient to reconstruct an authenticated browser context. The Playwright, Patchright and Camoufox tiers replay a stored session and do not write one back.
 
 #### Scenario: Human logs in to a site via NoVNC
 
@@ -18,13 +18,18 @@ When a session is captured by the NoVNC login monitor, the service SHALL persist
 
 ### Requirement: Stored session is replayed into every fetch tier
 
-Every fetch tier that can carry a session SHALL load the stored session for the target domain/profile and inject it before fetching: curl_cffi via request cookies, FlareSolverr via its request `cookies` array, Playwright and Crawlee via `new_context(storage_state=...)`. A tier MUST NOT start an anonymous context when a session exists for the target.
+Every fetch tier that can carry a session SHALL load the stored session for the target domain/profile and inject it before fetching: curl_cffi via request cookies, Playwright, Patchright, Camoufox and Crawlee via `new_context(storage_state=...)`. A tier MUST NOT start an anonymous context when a session exists for the target.
 
 #### Scenario: Authenticated headless read after login
 
 - **WHEN** a session exists for `linkedin.com` and a read for a `linkedin.com` URL escalates to the Playwright tier
 - **THEN** the Playwright context is created with the stored `storage_state`
 - **AND** the response is the authenticated page, not the logged-out/anonymous version
+
+#### Scenario: Authenticated read on a patched-browser tier
+
+- **WHEN** a session exists for `linkedin.com` and a read for a `linkedin.com` URL reaches `4a-patchright` or `4b-camoufox`
+- **THEN** that tier's context is created with the stored `storage_state`
 
 #### Scenario: No session present
 
@@ -41,15 +46,6 @@ A stored session SHALL separate long-lived auth state from short-lived WAF clear
 - **WHEN** more than the WAF TTL but less than the auth TTL has elapsed since login
 - **THEN** the auth cookies are still returned by the session store
 - **AND** the expired WAF cookies are not returned
-
-### Requirement: FlareSolverr persists returned cookies unconditionally
-
-The FlareSolverr tier SHALL persist the cookies returned by FlareSolverr whenever the cookie set is non-empty, regardless of whether a Cloudflare `cf_clearance` cookie is present.
-
-#### Scenario: FlareSolverr returns auth cookies for a non-Cloudflare site
-
-- **WHEN** FlareSolverr returns a non-empty cookie set with no `cf_clearance`
-- **THEN** the returned cookies are saved to the session store for the domain/profile
 
 ### Requirement: Single-user named session profiles
 
@@ -147,20 +143,6 @@ session decide where the chain starts, unchanged. Both fields SHALL be part of t
 - **WHEN** a read is requested over REST or MCP with neither `output_format` nor `tier`
 - **THEN** the response is the flat content shape and the chain starts where it started before those fields existed
 
-### Requirement: A stored session is replayed by the tier that earned it
-
-The store SHALL record which tier produced a session, and the orchestrator SHALL use that producer to choose where the chain restarts. A session produced by FlareSolverr SHALL be replayed through FlareSolverr before any browser tier is tried, because a WAF clearance is bound to the fingerprint that earned it. A session produced by a browser tier SHALL send the read to the browser tiers.
-
-#### Scenario: Stored WAF clearance from FlareSolverr
-
-- **WHEN** a read targets a domain whose stored session was produced by the FlareSolverr tier
-- **THEN** the FlareSolverr tier runs first, ahead of the browser tiers
-
-#### Scenario: Stored login captured by a browser
-
-- **WHEN** a read targets a domain whose stored session was produced by a browser tier
-- **THEN** the read starts at the browser tiers
-
 ### Requirement: An expired stored session is reported, not used blindly
 
 When a read targets a domain and profile whose stored record carries auth cookies and validation fails, the read
@@ -187,3 +169,69 @@ whether an earlier read of the same URL is still cached.
 
 - **WHEN** a read whose result is still cached is repeated after its stored session has lapsed
 - **THEN** the caller receives the `session_expired` outcome rather than the cached content
+
+### Requirement: Import a captured browser storage state through the REST API
+
+ascend-web-hunter SHALL expose `POST /api/v2/web/session/import` accepting `url`, an optional `profile`, a Playwright `storage_state` (`cookies` and `origins`) and an optional `user_agent`. Before storing anything it SHALL refuse, with no address lookup because the import makes no request to the URL, a URL whose host has no registrable domain (an IP address literal or a name with no public suffix) with `400 unsafe_uri`, a profile outside `^[A-Za-z0-9_-]{1,64}$` with `400 invalid_profile` and a storage state with no cookie for the URL's registrable domain with `400 no_cookies_for_domain`. On success it SHALL drop cookies of other domains, store the rest under the URL's registrable domain and the effective profile with provenance `import` in the same record shape a NoVNC capture produces, clear the read cache for that domain on every running ascend-web-hunter instance through the same purge a session clear runs, and answer `200` with the domain, the profile and the counts of stored and dropped cookies. The endpoint SHALL NOT refuse a storage state for its size or for its number of cookies. Every later request that uses the imported session SHALL still pass the `check_fetch_uri` guard of the `ascend-python-common` library when it is made.
+
+#### Scenario: The read cache of every instance is cleared
+
+- **WHEN** two ascend-web-hunter instances hold a cached anonymous read of `https://www.example.net/` and a caller imports a session for that URL through the first instance
+- **THEN** the import triggers the same domain purge a session clear triggers
+- **AND** a following read of that URL on the second instance is not answered from its cache
+
+#### Scenario: Imported session is replayed on the next read
+
+- **WHEN** a caller imports a storage state holding a valid `saucedemo.com` login cookie for `https://www.saucedemo.com/inventory.html` with profile `e2e`
+- **THEN** the answer is `200` with `domain` `saucedemo.com` and `profile` `e2e`
+- **AND** a following read of `https://www.saucedemo.com/inventory.html` with `profile=e2e` returns the logged-in page instead of the login wall
+
+#### Scenario: Private address is refused
+
+- **WHEN** a caller imports a storage state for `http://127.0.0.1/admin`
+- **THEN** the answer is `400` with code `unsafe_uri`
+- **AND** nothing is written to the session store
+- **AND** no address lookup is made
+
+#### Scenario: Every refusal is a problem body
+
+- **WHEN** an import is refused with `unsafe_uri`, `invalid_profile` or `no_cookies_for_domain`
+- **THEN** the answer has media type `application/problem+json`, `type` `https://ascend.ai/errors/` followed by the code with every `_` replaced by `-`, the `code` and a `traceId` of 32 lower case hex characters
+
+#### Scenario: Imported session is reported active
+
+- **WHEN** a caller imports a storage state for `https://www.example.net/` with profile `e2e-import` and then asks `POST /api/v2/web/session/status` for that URL and profile
+- **THEN** the status answer is `active`
+- **AND** the stored record names `import` as its provenance
+
+#### Scenario: Large storage state is accepted
+
+- **WHEN** a caller imports a storage state holding 1000 cookies for the URL's registrable domain
+- **THEN** the answer is `200`
+- **AND** all 1000 cookies are stored
+
+#### Scenario: Cookies for another site only
+
+- **WHEN** every cookie in the storage state belongs to `example.org` and the URL is on `saucedemo.com`
+- **THEN** the answer is `400` with code `no_cookies_for_domain`
+- **AND** nothing is written to the session store
+
+#### Scenario: Foreign cookies are dropped
+
+- **WHEN** the storage state holds two `saucedemo.com` cookies and one `example.org` cookie
+- **THEN** the answer is `200` with `dropped_cookies` equal to `1`
+- **AND** the stored record holds no `example.org` cookie
+
+#### Scenario: Invalid profile is refused
+
+- **WHEN** a caller imports with profile `../work`
+- **THEN** the answer is `400` with code `invalid_profile`
+
+### Requirement: A stored session is replayed by the browser family that earned it
+
+The store SHALL record which tier produced a session, and the orchestrator SHALL use that producer to choose where the chain restarts. A session produced by a browser tier SHALL send the read to the browser tiers, and SHALL be replayed only by a tier of the same browser family.
+
+#### Scenario: Stored login captured by a browser
+
+- **WHEN** a read targets a domain whose stored session was produced by a browser tier
+- **THEN** the read starts at the browser tiers

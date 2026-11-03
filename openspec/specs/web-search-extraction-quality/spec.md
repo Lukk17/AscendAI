@@ -6,16 +6,6 @@ Defines what ascend-web-hunter returns from a fetched page: the structured artic
 
 ## Requirements
 
-### Requirement: Readability fallback for thin extractions
-
-When the primary extractor (trafilatura) returns content below a configurable quality threshold, the service SHALL attempt a `readability-lxml` extraction and return whichever result scores higher by content length/density.
-
-#### Scenario: Primary extractor yields thin content
-
-- **WHEN** trafilatura returns content below the quality threshold for a page that has substantial main content
-- **THEN** the readability fallback runs
-- **AND** the higher-scoring extraction is returned
-
 ### Requirement: Dynamic-page scroll handling
 
 The Playwright tier SHALL drive scrolling for lazy-loaded / infinite-scroll pages using the existing `SCROLL_*` settings (iterations and step), which are currently defined but unused. Scrolling SHALL be bounded by the configured iteration count and the per-read wall-clock budget.
@@ -29,14 +19,15 @@ The Playwright tier SHALL drive scrolling for lazy-loaded / infinite-scroll page
 ### Requirement: Structured article extraction, selectable by the caller
 
 The orchestrator SHALL support an `output_format` of `structured` that returns extracted article metadata, at least
-title, author, publication date, and site name, alongside the main text, using the extractor's metadata capability.
-When `output_format` is absent or `text`, the response shape SHALL be the flat content field, unchanged from
-before.
+title, author, publication date, and site name, plus the embedded structured data in `metadata`, alongside the main
+text. When `output_format` is absent or `text`, the response shape SHALL be the flat content field, unchanged from
+before. `output_format` SHALL be one of `text`, `structured`, `schema`, `tables` and `screenshot`.
 
 The REST and MCP read operations SHALL accept `output_format` and SHALL default it to `text`, so a caller that
 omits it receives the flat shape it receives today. Because the annotated-links response carries the flat content
-plus a link map and cannot carry the structured shape, `output_format=structured` combined with `include_links`
-SHALL be rejected at the API boundary rather than accepted and ignored.
+plus a link map and cannot carry any other shape, `include_links` SHALL be accepted only with `output_format`
+`text`, and every other format combined with `include_links` SHALL be rejected at the API boundary rather than
+accepted and ignored.
 
 #### Scenario: Structured output requested from the orchestrator
 
@@ -56,5 +47,11 @@ SHALL be rejected at the API boundary rather than accepted and ignored.
 #### Scenario: Structured output asked for with links
 
 - **WHEN** a read is requested with `output_format=structured` and `include_links=true`
+- **THEN** the request is rejected at the boundary naming the unsupported combination
+- **AND** no read runs
+
+#### Scenario: Non-text format asked for with links
+
+- **WHEN** a read is requested with `include_links=true` and any `output_format` other than `text`
 - **THEN** the request is rejected at the boundary naming the unsupported combination
 - **AND** no read runs
