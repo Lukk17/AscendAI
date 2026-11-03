@@ -8,6 +8,7 @@ import asyncio
 import logging
 import shutil
 import tempfile
+import time
 from importlib.metadata import version as package_version
 from typing import Any, NoReturn
 
@@ -19,12 +20,17 @@ from src.adapters.download_service import download_to_temp_async
 from src.adapters.file_service import cleanup_temp_file
 from src.api.exception_handlers import error_registry
 from src.config.config import settings
+from src.observability.metrics import record_transcription
 from src.scribe import (
     hf_speech_transcription,
     local_speech_transcription,
     openai_speech_transcription,
 )
-from src.transcription.audacity_parser import extract_tracks_from_aup
+from src.transcription.audacity_parser import (
+    extract_tracks_from_aup,
+    probe_audio_duration_seconds,
+    total_audio_duration_seconds,
+)
 from src.transcription.conversation_merger import transcribe_and_merge_tracks
 
 logger = logging.getLogger(__name__)
@@ -104,18 +110,23 @@ async def transcribe_local(
     # Empty-string sentinel rather than None so the variable's type stays
     # `str` for downstream call sites (no narrowing dance required).
     temp_file_path = ""
+    audio_duration_s: float | None = None
+    started = time.monotonic()
     try:
         temp_file_path = await download_to_temp_async(audio_uri)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         lang = _resolve_language(language)
 
         segments = await _collect_local_segments(temp_file_path, model, lang)
         transcription = _format_local_transcription(segments, with_timestamps)
 
         payload = {"source": "local", "model": model, "language": lang, "transcription": transcription}
+        record_transcription("local", "ok", time.monotonic() - started, audio_duration_s)
         return _success_envelope(payload)
     except ToolError:
         raise
     except Exception as exc:
+        record_transcription("local", "error", time.monotonic() - started, audio_duration_s)
         _raise_mapped_error("transcribe_local", exc)
     finally:
         cleanup_temp_file(temp_file_path)
@@ -138,8 +149,11 @@ async def transcribe_openai(
         _raise_mapped_error("transcribe_openai", ValueError(URI_NOT_PROVIDED))
 
     temp_file_path = ""
+    audio_duration_s: float | None = None
+    started = time.monotonic()
     try:
         temp_file_path = await download_to_temp_async(audio_uri)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         lang = _resolve_language(language)
         response_text = await asyncio.to_thread(
             openai_speech_transcription,
@@ -148,10 +162,12 @@ async def transcribe_openai(
             language=lang,
         )
         payload = {"source": "openai", "model": model, "language": lang, "transcription": response_text}
+        record_transcription("openai", "ok", time.monotonic() - started, audio_duration_s)
         return _success_envelope(payload)
     except ToolError:
         raise
     except Exception as exc:
+        record_transcription("openai", "error", time.monotonic() - started, audio_duration_s)
         _raise_mapped_error("transcribe_openai", exc)
     finally:
         cleanup_temp_file(temp_file_path)
@@ -172,8 +188,11 @@ async def transcribe_hf(
         _raise_mapped_error("transcribe_hf", ValueError(URI_NOT_PROVIDED))
 
     temp_file_path = ""
+    audio_duration_s: float | None = None
+    started = time.monotonic()
     try:
         temp_file_path = await download_to_temp_async(audio_uri)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         response_text = await asyncio.to_thread(
             hf_speech_transcription,
             audio_file_path=temp_file_path,
@@ -186,10 +205,12 @@ async def transcribe_hf(
             "provider": hf_provider,
             "transcription": response_text,
         }
+        record_transcription("huggingface", "ok", time.monotonic() - started, audio_duration_s)
         return _success_envelope(payload)
     except ToolError:
         raise
     except Exception as exc:
+        record_transcription("huggingface", "error", time.monotonic() - started, audio_duration_s)
         _raise_mapped_error("transcribe_hf", exc)
     finally:
         cleanup_temp_file(temp_file_path)
@@ -213,6 +234,8 @@ async def transcribe_audacity(
         _raise_mapped_error("transcribe_audacity", ValueError(URI_NOT_PROVIDED))
 
     temp_zip_path = ""
+    audio_duration_s: float | None = None
+    started = time.monotonic()
     extraction_dir = tempfile.mkdtemp(prefix="mcp_audacity_")
     try:
         temp_zip_path = await download_to_temp_async(audio_uri)
@@ -224,6 +247,7 @@ async def transcribe_audacity(
                 ValueError("No usable audio tracks found in the uploaded Audacity project."),
             )
 
+        audio_duration_s = total_audio_duration_seconds(list(tracks.values()))
         transcription_text = await transcribe_and_merge_tracks(
             tracks=tracks, provider=provider, model=model, language=lang, hf_provider=hf_provider
         )
@@ -233,10 +257,12 @@ async def transcribe_audacity(
             "language": lang,
             "transcription": transcription_text,
         }
+        record_transcription(provider, "ok", time.monotonic() - started, audio_duration_s)
         return _success_envelope(payload)
     except ToolError:
         raise
     except Exception as exc:
+        record_transcription(provider, "error", time.monotonic() - started, audio_duration_s)
         _raise_mapped_error("transcribe_audacity", exc)
     finally:
         cleanup_temp_file(temp_zip_path)

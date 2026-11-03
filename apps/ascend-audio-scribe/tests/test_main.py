@@ -24,6 +24,10 @@ def test_app_version_matches_installed_package_metadata() -> None:
 
 def test_metrics_returns_prometheus_payload() -> None:
     # given
+    from src.observability import metrics as service_metrics
+
+    service_metrics.TRANSCRIPTION_DURATION_SECONDS.labels(provider="local", outcome="ok").observe(1.0)
+    service_metrics.TRANSCRIPTION_AUDIO_DURATION_SECONDS.labels(provider="local").observe(60.0)
     with TestClient(app) as client:
         # when
         response = client.get("/metrics")
@@ -32,7 +36,8 @@ def test_metrics_returns_prometheus_payload() -> None:
         assert response.status_code == 200
         body = response.text
         assert "process_" in body or "python_" in body
-        assert "ascendaudioscribe_transcription_duration_seconds" in body
+        assert "transcription_duration_seconds" in body
+        assert "transcription_audio_duration_seconds" in body
 
 
 def test_request_id_echoed_back() -> None:

@@ -1,28 +1,34 @@
 from prometheus_client import Counter, Histogram
 
-# Outcome label values: "success" | "error" | "validation_error"
-MEMORY_INSERT_TOTAL = Counter(
-    "memory_insert_total",
-    "memory_insert outcomes",
-    ["provider", "outcome"],
-)
+# Outcome label values follow the closed set of the `service-metrics`
+# capability: "ok" | "error" | "timeout" | "rate_limited" | "not_found".
 
-MEMORY_SEARCH_TOTAL = Counter(
-    "memory_search_total",
-    "memory_search outcomes",
-    ["provider", "outcome"],
-)
 
-MEMORY_DELETE_TOTAL = Counter(
-    "memory_delete_total",
-    "memory_delete outcomes",
-    ["provider", "outcome"],
-)
+def outcome_for_exception(exc: BaseException) -> str:
+    """Map a handler failure onto the closed outcome set.
 
-MEMORY_WIPE_TOTAL = Counter(
-    "memory_wipe_total",
-    "memory_wipe outcomes",
-    ["provider", "outcome"],
+    TimeoutError (asyncio.TimeoutError is its alias since 3.11) maps to
+    "timeout". Rate-limit refusals, either the middleware text or a 429
+    from upstream, map to "rate_limited". A missing memory maps to
+    "not_found". Everything else maps to "error".
+    """
+
+    if isinstance(exc, TimeoutError):
+        return "timeout"
+    text = f"{type(exc).__name__}: {exc}".lower()
+    if "rate_limited" in text or "rate limit" in text or "429" in text:
+        return "rate_limited"
+    if "not_found" in text or "not found" in text:
+        return "not_found"
+    if isinstance(exc, (KeyError, FileNotFoundError, LookupError)):
+        return "not_found"
+    return "error"
+
+
+MEMORY_OPERATIONS_TOTAL = Counter(
+    "memory_operations_total",
+    "memory operation outcomes",
+    ["operation", "outcome"],
 )
 
 # Bucket choices target the realistic latency spread: LM Studio embed
@@ -38,7 +44,7 @@ MEMORY_INSERT_DURATION_SECONDS = Histogram(
 MEMORY_SEARCH_DURATION_SECONDS = Histogram(
     "memory_search_duration_seconds",
     "Wall-clock duration of search operations",
-    ["provider"],
+    ["embedding_provider"],
     buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30),
 )
 

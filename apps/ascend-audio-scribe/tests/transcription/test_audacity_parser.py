@@ -576,3 +576,43 @@ def test_extract_tracks_handles_missing_root(tmp_path: Path, monkeypatch: pytest
     # when / then
     with pytest.raises(ValueError, match="no root element"):
         ap.extract_tracks_from_aup(str(zip_path), str(out))
+
+
+def _write_silence_wav(path: Path, seconds: float = 1.0) -> None:
+    import wave
+
+    frames = int(16000 * seconds)
+    with wave.open(str(path), "wb") as fh:
+        fh.setnchannels(1)
+        fh.setsampwidth(2)
+        fh.setframerate(16000)
+        fh.writeframes(b"\x00\x00" * frames)
+
+
+def test_probe_audio_duration_returns_none_for_missing_file(tmp_path: Path) -> None:
+    # when / then
+    assert ap.probe_audio_duration_seconds(str(tmp_path / "nope.wav")) is None
+
+
+def test_probe_audio_duration_reads_wav_length(tmp_path: Path) -> None:
+    # given
+    wav = tmp_path / "tone.wav"
+    _write_silence_wav(wav)
+
+    # when
+    duration = ap.probe_audio_duration_seconds(str(wav))
+
+    # then
+    assert duration == pytest.approx(1.0, abs=0.05)
+
+
+def test_total_audio_duration_sums_known_and_skips_unknown(tmp_path: Path) -> None:
+    # given
+    wav = tmp_path / "tone.wav"
+    _write_silence_wav(wav)
+    missing = str(tmp_path / "nope.wav")
+
+    # when / then
+    assert ap.total_audio_duration_seconds([]) is None
+    assert ap.total_audio_duration_seconds([missing]) is None
+    assert ap.total_audio_duration_seconds([str(wav), missing]) == pytest.approx(1.0, abs=0.05)

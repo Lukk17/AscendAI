@@ -23,13 +23,15 @@ apps/ascend-audio-scribe/e2e/
     ├── 3-transcribe-hf-test.md
     ├── 4-mcp-tools-list-test.md
     ├── 5-mcp-transcribe-test.md
+    ├── 6-platform-contract-test.md
     ├── templates/                       # run-record templates (immutable), one per spec
     │   ├── README.md
     │   ├── 1-invalid-input-tasks.template.md
     │   ├── 2-transcribe-openai-tasks.template.md
     │   ├── 3-transcribe-hf-tasks.template.md
     │   ├── 4-mcp-tools-list-tasks.template.md
-    │   └── 5-mcp-transcribe-tasks.template.md
+    │   ├── 5-mcp-transcribe-tasks.template.md
+    │   └── 6-platform-contract-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<feature>-tasks.md   # one per executed test (gitignored)
@@ -103,6 +105,7 @@ constraints:
 | :--- | :--- | :--- |
 | **External API quota** | 2, 3, 5 | Each call consumes paid OpenAI or Hugging Face quota. Run sequentially if the project is on a low rate-limit tier; otherwise parallel is fine. |
 | **No cross-test interference** | 1-5 | Each test owns its own `.md` file in `/tmp` (random UUID). Two tests cannot collide on the same transcript download URL even running in parallel. |
+| **Read-only platform contract** | 6 | Health, readiness, the problem bodies, the MCP `initialize`, the refused tool call and the two guard refusals are all reads or request-boundary refusals. No transcription, no provider call and no `/tmp` write. Safe in parallel with everything. |
 
 Recommended layout: run test 1 first (offline, fail-fast on validator bugs without burning quota), then tests 2-3 in
 parallel or sequential, then tests 4-5 (MCP). Test 4 must run before test 5 within an MCP sweep because test 5 reuses
@@ -160,6 +163,33 @@ Numbered by setup cost. Easiest first.
 | 3  | [testing/3-transcribe-hf-test.md](testing/3-transcribe-hf-test.md) | Same as test 2 for `POST /api/v1/transcribe/hf` with `meeting-clip.wav`. Requires `HF_TOKEN`. |
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | MCP `tools/list` over Streamable HTTP at `POST /mcp` advertises the four transcribe tools (`transcribe_local`, `transcribe_openai`, `transcribe_hf`, `transcribe_audacity`) plus `health`, each with the documented argument schema. |
 | 5  | [testing/5-mcp-transcribe-test.md](testing/5-mcp-transcribe-test.md) | MCP `tools/call` for `transcribe_openai` with `audio_uri="http://host.docker.internal:9070/e2e-fixtures/meeting-clip.wav"` returns a JSON-RPC `result.content[0].text` whose parsed JSON body has `source="openai"`, the canary phrase substring in `transcription`. Requires `OPENAI_API_KEY` and the object store's `e2e-fixtures` bucket seeded during Reset state. |
+| 6  | [testing/6-platform-contract-test.md](testing/6-platform-contract-test.md) | The shared platform contract holds end to end: health and readiness bodies, the 404, 405 and 400 problem bodies, the `traceparent` and `x-request-id` echo, the security headers, the errors counter that grows by one, and the MCP runtime checks: a stateless `initialize` for 2025-06-18 and 2025-11-25 with no `mcp-session-id`, a `health` tool call in the session and sessionless forms, the foreign `Host` and `Origin` refusals, the 5 MiB body 413, one refused tool call, and the two guard refusals (a URI with user info and a public URI that redirects to a private address). Every request is refused or reads only, so no transcription and no provider call occur. |
+
+## What is not tested end to end
+
+The platform contract is tested end to end by spec 6. A few library behaviours stay in the unit and integration
+tests on purpose, because they are not observable from outside the service, or the e2e contract never passes or fails
+on a log line. Each is covered by the test task named.
+
+- The log level, the log format, the refusal log lines, the MCP session digest in log lines, the empty
+  `mcp_session_id` of a sessionless call and the startup banner. Each is a log line, and the e2e contract never passes
+  or fails on a log line. The library and service tests of tasks 1.4, 1.5 and 1.12, the library tests of tasks 6.2 and
+  6.4 of `add-python-runtime-upgrades`, and the service banner tests cover them.
+- One HTTP server span per request and no second exporter, no span sent anywhere with `OTEL_EXPORTER_OTLP_ENDPOINT`
+  unset or `OTEL_SDK_DISABLED=true`, no OpenTelemetry log record carrying the exception text, and no MCP session id on
+  any span. The trace export to Tempo is tested end to end by the trace specs of `add-observability`, and one HTTP
+  server span per request and no second exporter are covered by the library test of task 6.3 of
+  `add-python-runtime-upgrades`. The tracing tests of tasks 1.6 and 1.16 cover the rest, which is not observable from
+  outside the service.
+- The rate limit refusal and the one budget shared by REST, MCP and several containers of one service. The library
+  tests of tasks 1.7 and 1.18 and the service tests of task 3.5 cover them, so the end-to-end rate limit specs were
+  dropped by owner decision 91.3 of 2026-10-08.
+- The invalid settings that stop start-up. The settings tests of task 1.3 cover them.
+- The `file://` jail and the second lookup pinning. They need a file root and a resolver that answers differently on
+  each lookup, which the live stack does not have. The guard tests of task 1.13 cover them.
+- The 401 `unauthorized` body. Raised only once `add-keycloak-login` adds the token check, whose service token specs of
+  tasks 10.9 to 10.13 then test it end to end in all four suites.
+- The trace export to Tempo. Tested end to end by `add-observability`.
 
 ## Adding a new test
 

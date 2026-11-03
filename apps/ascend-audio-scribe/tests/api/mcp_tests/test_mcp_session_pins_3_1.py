@@ -146,8 +146,8 @@ async def test_call_transcribe_audacity_pins_content_and_structured() -> None:
     async def _fake_download(uri: str) -> str:
         return "/tmp/project.zip"
 
-    def _two_tracks(zip_path: str, extraction_dir: str) -> list[str]:
-        return ["track1.wav", "track2.wav"]
+    def _two_tracks(zip_path: str, extraction_dir: str) -> dict[str, str]:
+        return {"track1": "track1.wav", "track2": "track2.wav"}
 
     async def _fake_merge(
         *,

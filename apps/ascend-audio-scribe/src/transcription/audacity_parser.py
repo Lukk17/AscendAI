@@ -185,6 +185,18 @@ def _get_audio_duration(file_path: str) -> float:
     return float(result.stdout.decode().strip())
 
 
+def probe_audio_duration_seconds(file_path: str) -> float | None:
+    try:
+        return _get_audio_duration(file_path)
+    except Exception:
+        return None
+
+
+def total_audio_duration_seconds(paths: list[str]) -> float | None:
+    known = [duration for path in paths if (duration := probe_audio_duration_seconds(path)) is not None]
+    return sum(known) if known else None
+
+
 _VALID_AUDIO_EXTS = frozenset({".au", ".flac", ".wav", ".ogg", ".mp3", ".m4a"})
 
 

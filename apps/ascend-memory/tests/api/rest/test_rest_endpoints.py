@@ -3,7 +3,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from httpx import AsyncClient
 
-from src.observability.metrics import MEMORY_SEARCH_TOTAL
+from src.observability.metrics import (
+    MEMORY_DELETE_DURATION_SECONDS,
+    MEMORY_OPERATIONS_TOTAL,
+    MEMORY_WIPE_DURATION_SECONDS,
+)
 
 
 @pytest.mark.asyncio
@@ -157,7 +161,7 @@ async def test_search_memory_upstream_failure_maps_to_500_and_records_error_outc
     mock_service = override_dependencies
     mock_service.search.side_effect = RuntimeError("qdrant connection refused")
 
-    before = MEMORY_SEARCH_TOTAL.labels(provider="lmstudio", outcome="error")._value.get()
+    before = MEMORY_OPERATIONS_TOTAL.labels(operation="search", outcome="error")._value.get()
 
     # when
     response = await client.get(
@@ -171,7 +175,7 @@ async def test_search_memory_upstream_failure_maps_to_500_and_records_error_outc
     assert body["status"] == 500
     assert body["type"].endswith("/internal")
 
-    after = MEMORY_SEARCH_TOTAL.labels(provider="lmstudio", outcome="error")._value.get()
+    after = MEMORY_OPERATIONS_TOTAL.labels(operation="search", outcome="error")._value.get()
     assert after == before + 1
 
 
@@ -296,3 +300,148 @@ async def test_request_id_malformed_replaced_with_uuid(
     assert "\r" not in rid
     assert "\n" not in rid
     assert len(rid) >= 16  # UUID4
+
+
+@pytest.mark.asyncio
+async def test_delete_memory_success_records_delete_ok(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    before_counter = MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="ok")._value.get()
+    before_duration = MEMORY_DELETE_DURATION_SECONDS.labels(provider="openai")._sum.get()
+
+    # when
+    response = await client.delete("/api/v1/memory", params={"memory_id": "m1", "provider": "openai"})
+
+    # then
+    assert response.status_code == 200
+    assert MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="ok")._value.get() == before_counter + 1
+    assert MEMORY_DELETE_DURATION_SECONDS.labels(provider="openai")._sum.get() > before_duration
+
+
+@pytest.mark.asyncio
+async def test_delete_memory_failure_records_delete_error(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    mock_service = override_dependencies
+    mock_service.delete.side_effect = RuntimeError("qdrant connection refused")
+    before = MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="error")._value.get()
+
+    # when
+    response = await client.delete("/api/v1/memory", params={"memory_id": "m1"})
+
+    # then
+    assert response.status_code == 500
+    assert MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="error")._value.get() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_delete_memory_timeout_records_delete_timeout(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    mock_service = override_dependencies
+    mock_service.delete.side_effect = TimeoutError("qdrant timed out")
+    before = MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="timeout")._value.get()
+
+    # when
+    response = await client.delete("/api/v1/memory", params={"memory_id": "m1"})
+
+    # then
+    assert response.status_code == 500
+    assert MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="timeout")._value.get() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_delete_memory_missing_records_delete_not_found(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    mock_service = override_dependencies
+    mock_service.delete.side_effect = KeyError("m1")
+    before = MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="not_found")._value.get()
+
+    # when
+    response = await client.delete("/api/v1/memory", params={"memory_id": "m1"})
+
+    # then
+    assert response.status_code == 500
+    assert MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome="not_found")._value.get() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_wipe_memory_success_records_wipe_ok(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    before_counter = MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="ok")._value.get()
+    before_duration = MEMORY_WIPE_DURATION_SECONDS.labels(provider="all")._sum.get()
+
+    # when
+    with patch("src.api.rest.rest_endpoints.wipe_user_all_collections") as mock_wipe_all:
+        response = await client.post("/api/v1/memory/wipe", params={"user_id": "u1"})
+
+    # then
+    assert response.status_code == 200
+    mock_wipe_all.assert_called_once_with(user_id="u1")
+    assert MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="ok")._value.get() == before_counter + 1
+    assert MEMORY_WIPE_DURATION_SECONDS.labels(provider="all")._sum.get() > before_duration
+
+
+@pytest.mark.asyncio
+async def test_wipe_memory_with_explicit_provider_success_records_provider_label(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    before_duration = MEMORY_WIPE_DURATION_SECONDS.labels(provider="openai")._sum.get()
+
+    # when
+    response = await client.post(
+        "/api/v1/memory/wipe",
+        params={"user_id": "u1", "provider": "openai"},
+    )
+
+    # then
+    assert response.status_code == 200
+    assert MEMORY_WIPE_DURATION_SECONDS.labels(provider="openai")._sum.get() > before_duration
+
+
+@pytest.mark.asyncio
+async def test_wipe_memory_failure_records_wipe_error(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    mock_service = override_dependencies
+    mock_service.wipe_user.side_effect = RuntimeError("qdrant connection refused")
+    before = MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="error")._value.get()
+
+    # when
+    response = await client.post(
+        "/api/v1/memory/wipe",
+        params={"user_id": "u1", "provider": "openai"},
+    )
+
+    # then
+    assert response.status_code == 500
+    assert MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="error")._value.get() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_wipe_memory_rate_limited_records_wipe_rate_limited(
+    client: AsyncClient, override_dependencies: MagicMock
+) -> None:
+    # given
+    mock_service = override_dependencies
+    mock_service.wipe_user.side_effect = Exception("upstream answered 429")
+    before = MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="rate_limited")._value.get()
+
+    # when
+    response = await client.post(
+        "/api/v1/memory/wipe",
+        params={"user_id": "u1", "provider": "openai"},
+    )
+
+    # then
+    assert response.status_code == 500
+    assert MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="rate_limited")._value.get() == before + 1

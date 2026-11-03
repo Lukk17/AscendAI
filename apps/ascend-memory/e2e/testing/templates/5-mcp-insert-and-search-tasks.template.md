@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_5-mcp-insert-and-search-tasks.md` bef
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] AscendMemory `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] AscendMemory `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-memory` and a non-empty `version`
 - [ ] Qdrant `:6333/readyz` returns HTTP 200
 
 ### Reset state

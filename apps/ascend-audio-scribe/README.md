@@ -104,6 +104,10 @@ local development, set these in your OS environment so they survive shell restar
   See [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
 - `HF_HOME`. Local directory where Hugging Face caches downloaded models. Prevents re-downloading large models
   every restart.
+- `ALLOWED_PRIVATE_HOSTS`. Comma separated host names the URI fetch guard may reach even at a private address
+  (default: empty, so only public addresses are fetched). `compose.yaml` sets `host.docker.internal,localhost,127.0.0.1`
+  so an MCP `audio_uri` can reach the host-published S3-compatible object store. It is the outbound direction and a
+  different setting from the inbound `MCP_ALLOWED_HOST_HEADERS`.
 
 When you POST a transcription request you still pass the public model identifier in the `model` field; the
 `transformers` library transparently maps it to the cached files under `HF_HOME`.

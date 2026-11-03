@@ -68,6 +68,8 @@ be run on its own.
    Resets/cleans `frostyMemoryMcpInsertSearchTest`.
 6. [6-user-isolation-test.md](6-user-isolation-test.md). A memory inserted for user A never surfaces in user B's
    search. Resets/cleans `frostyMemoryIsolationUserA`; user B is never written to.
+7. [7-platform-contract-test.md](7-platform-contract-test.md). The shared platform contract: health, readiness,
+   problem bodies, the errors counter, security headers, and the MCP `initialize` plus refusal. **No state writes.**
 
 ## Cross-cutting conventions
 

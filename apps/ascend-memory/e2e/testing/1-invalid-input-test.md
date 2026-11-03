@@ -24,8 +24,9 @@ Check the AscendMemory server is reachable and ready.
 curl -fsS http://localhost:7020/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`. HTTP 503 with `{"status":"starting"}` means the warmup is still running -
-wait and retry.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-memory` and a non-empty `version`. `/health` answers 200 as soon
+as the process serves. During warmup the readiness probe `/ready` answers HTTP 503 with `status` `not-ready`, so wait
+until `/ready` reads `ready` before starting.
 
 ## Reset state
 

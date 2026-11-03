@@ -1175,8 +1175,8 @@ async def test_transcribe_audacity_success(
     async def _fake_download(uri: str) -> str:
         return temp_audio_file
 
-    def _two_tracks(zip_path: str, extraction_dir: str) -> list[str]:
-        return ["track1.wav", "track2.wav"]
+    def _two_tracks(zip_path: str, extraction_dir: str) -> dict[str, str]:
+        return {"track1": "track1.wav", "track2": "track2.wav"}
 
     async def _fake_merge(
         *, tracks: dict[str, str], provider: str, model: str, language: str, hf_provider: str

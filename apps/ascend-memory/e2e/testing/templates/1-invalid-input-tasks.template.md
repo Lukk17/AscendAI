@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] AscendMemory `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] AscendMemory `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-memory` and a non-empty `version`
 
 ### Reset state
 
