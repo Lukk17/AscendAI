@@ -18,7 +18,7 @@ Copy this file to `../runs/<UTC-timestamp>_15-cancel-running-job-tasks.md` befor
 
 - [ ] Job records dropped from the container's jobs directory
 - [ ] `ocr-results` bucket emptied
-- [ ] `/ready` reports `status="ready"`, `jobs_queued=0` and `jobs_running=0`
+- [ ] `/ready` reports `status="ready"`, `checks.jobs.queued=0` and `checks.jobs.running=0`
 
 ### Run
 
@@ -42,7 +42,7 @@ Copy this file to `../runs/<UTC-timestamp>_15-cancel-running-job-tasks.md` befor
 - [ ] Steps 4 and 5: `state="cancelled"`, `error_code` null, `result` null, no `poll_after_seconds` key, a `finished_at`
 - [ ] Steps 4 and 5: `pages_done` identical on both reads, never above 25
 - [ ] Step 6: HTTP 404, no `<cancelled job_id>.md` in `ocr-results`
-- [ ] Step 7: `status="ready"`, `jobs_queued=0`, `jobs_running=0` within 60 seconds of the cancel
+- [ ] Step 7: `status="ready"`, `checks.jobs.queued=0`, `checks.jobs.running=0` within 60 seconds of the cancel
 - [ ] Step 8: HTTP 202 with `queue_position=0` and `pages_ahead=0`
 - [ ] Step 9: terminal state `succeeded`, queue wait (`started_at` minus `submitted_at`) less than 5 seconds
 - [ ] Step 10: HTTP 200, a canary under `## Page 1`

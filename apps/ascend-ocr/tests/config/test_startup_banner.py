@@ -69,6 +69,7 @@ class TestBuildServiceBanner:
         monkeypatch.setattr(settings, "OCR_RESULT_S3_ENDPOINT", "http://host.docker.internal:9070")
         monkeypatch.setattr(settings, "OCR_RESULT_S3_PUBLIC_ENDPOINT", "http://host.docker.internal:9070")
         monkeypatch.setattr(settings, "OCR_RESULT_S3_BUCKET", "ocr-results")
+        monkeypatch.setattr(settings, "ALLOWED_PRIVATE_HOSTS", ("internal-store.example",))
 
         # When
         joined = "\n".join(build_service_banner())
@@ -81,6 +82,8 @@ class TestBuildServiceBanner:
         assert "http://host.docker.internal:9070" in joined
         assert "Result bucket" in joined
         assert "ocr-results" in joined
+        assert "Allowed private hosts" in joined
+        assert "internal-store.example" in joined
         assert "Result store (public)" not in joined
         assert "none, ascend-ocr runs models locally" not in joined
         assert "Page allowance" in joined
@@ -120,6 +123,19 @@ class TestBuildServiceBanner:
         # Then
         assert "Result store (public)" in joined
         assert "http://localhost:9070" in joined
+
+    def test_an_empty_private_host_allow_list_says_only_public_hosts_are_reached(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Given
+        monkeypatch.setattr(settings, "ALLOWED_PRIVATE_HOSTS", ())
+
+        # When
+        joined = "\n".join(build_service_banner())
+
+        # Then
+        assert "Allowed private hosts" in joined
+        assert "(none - public hosts only)" in joined
 
     def test_never_prints_the_secret_value(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given

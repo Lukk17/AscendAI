@@ -54,16 +54,18 @@ Install Bruno CLI once with `npm install -g @usebruno/cli`.
 
 ## Execution order
 
-The twenty specs fall into two execution classes. Mixing them in the wrong shape causes false failures from CPU
+The twenty one specs fall into two execution classes. Mixing them in the wrong shape causes false failures from CPU
 contention, not from real defects, so the fan-out shape matters as much as the spec content.
 
-**Reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12, 20).** These return before anything is queued: spec 1 covers the
+**Reject-fast specs (1, 5, 7, 8, 9, 10, 11, 12, 20, 21).** These return before anything is queued: spec 1 covers the
 validation refusal and the unsupported-language refusal, spec 5 is a `tools/list` lookup,
 spec 7 reads `/ready`, specs 8 to 11 are rejected by the SSRF guard / scheme guard / credentials guard / `file://` jail
-before any fetch, spec 12 is rejected by the magic-byte sniffer, spec 20 by the language allowlist. Each finishes in well under 2 seconds except spec 11,
+before any fetch, spec 12 is rejected by the magic-byte sniffer, spec 20 by the language allowlist, and spec 21 runs the
+shared platform contract (health, readiness, the problem bodies, the MCP `initialize` and refusal, the errors counter
+and the `job-not-found` read), submitting nothing. Each finishes in well under 2 seconds except spec 11,
 whose jail steps start a throwaway `ascend-ocr-jail` container on `127.0.0.1:7023` with `MCP_FILE_URI_ROOT` set and
-remove it again, up to about two minutes. Safe to run all nine in parallel up to the runner cap of 5 concurrent, and the
-rest queue and pick up as slots free. Specs 1, 9, 11, 12 and 20 assert an empty job listing, so nothing may be queued or
+remove it again, up to about two minutes. Safe to run all ten in parallel up to the runner cap of 5 concurrent, and the
+rest queue and pick up as slots free. Specs 1, 9, 11, 12, 20 and 21 assert an empty job listing, so nothing may be queued or
 running when they start.
 
 **Engine-bound specs (2, 3, 4, 6, 13, 14, 15, 16, 17, 18, 19).** Each puts at least one document through the single
@@ -95,7 +97,7 @@ loaded one.
 
 Canonical fan-out shape for the full suite from a fresh container:
 
-1. Dispatch all 9 reject-fast specs in parallel (runner default cap of 5, queue 4).
+1. Dispatch all 10 reject-fast specs in parallel (runner default cap of 5, queue 5).
 2. Once those settle (4 minutes 35 seconds in the sweep of 2026-09-25, the longest of them being spec 1) and
    `ascend-ocr-jail` is gone, dispatch the 11 engine specs sequentially, one at a time, with nothing else running
    anywhere on the host and every other module's sweep held until the last one returns: 2, 3, 4, 6, 17, 18 and 19
@@ -134,6 +136,7 @@ engine-bound order above. The only hard constraint is "no two engine specs at th
 18. [18-ocr-straighten-crumpled-photo-test.md](18-ocr-straighten-crumpled-photo-test.md). A crumpled page photo read with `straighten=true`, all 21 lines present and at least 15 of 21 canaries found word for word.
 19. [19-ocr-crumpled-photo-default-test.md](19-ocr-crumpled-photo-default-test.md). The same photo in `normal` mode, not straightened by default.
 20. [20-mcp-unsupported-language-test.md](20-mcp-unsupported-language-test.md). `ocr_submit` refuses `lang` `korean` with `UNSUPPORTED_LANGUAGE` before fetching. **No OCR call.**
+21. [21-platform-contract-test.md](21-platform-contract-test.md). The shared platform contract: health, readiness, the problem bodies, the errors counter, security headers, the MCP `initialize` plus refusal, and the `job-not-found` read. **No OCR call.**
 
 ## Cross-cutting conventions
 

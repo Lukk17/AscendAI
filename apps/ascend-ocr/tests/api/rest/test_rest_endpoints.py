@@ -739,7 +739,10 @@ class TestDeleteJob:
         async def slow_replacement() -> None:
             await replacement_may_finish.wait()
 
-        with patch("src.service.ocr_service.replace_worker_for_cancel", slow_replacement):
+        with (
+            patch("src.service.ocr_service.replace_worker_for_cancel", slow_replacement),
+            patch("src.api.readiness.is_engine_warm", return_value=True),
+        ):
             # When
             response = await asyncio.wait_for(client.delete(f"{JOBS_PATH}/{job_id}"), timeout=2.0)
             during = (await client.get("/ready")).json()

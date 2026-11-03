@@ -200,14 +200,16 @@ def _estimate_call_peak_mib() -> float:
 
 
 def _result_store_entries() -> list[BannerLine]:
-    """Describe the one external service this module has, and never its credentials."""
+    """Describe the one external service this module has and the hosts the fetch guard may reach."""
     reachable = result_store.bucket_reachable
     status = (
         "unknown (not checked yet)" if reachable is None else ("answered" if reachable else "did NOT answer")
     )
+    allowed_hosts = ", ".join(settings.ALLOWED_PRIVATE_HOSTS) or "(none - public hosts only)"
     entries = [
         BannerLine("Result store", f"{settings.OCR_RESULT_S3_ENDPOINT} [{status}]"),
         BannerLine("Result bucket", settings.OCR_RESULT_S3_BUCKET),
+        BannerLine("Allowed private hosts", allowed_hosts),
     ]
 
     if settings.OCR_RESULT_S3_PUBLIC_ENDPOINT != settings.OCR_RESULT_S3_ENDPOINT:

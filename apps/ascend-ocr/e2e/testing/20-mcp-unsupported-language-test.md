@@ -50,7 +50,7 @@ response header, and every `tools/call` in this spec carries it back.
 curl -isS -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"1\"}}}"
 ```
 
-Expect HTTP 200 and an `mcp-session-id` response header. Use that value as the `mcp_session_id` env-var below.
+Expect HTTP 200 with no `mcp-session-id` response header: the service is stateless HTTP, so pass `mcp_session_id` empty in the commands below.
 
 ```bash
 cd docs/api/request/AscendAI

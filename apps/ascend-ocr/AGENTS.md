@@ -188,9 +188,11 @@ carry `retryable: true`, because nothing was learned about the document.
 
 An expected refusal (`UNSAFE_URI`, `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `UNSUPPORTED_LANGUAGE`, `QUEUE_FULL`,
 `JOB_NOT_FOUND`, and the upstream `DOWNLOAD_FAILED`) is logged as one WARNING line naming its code, with no traceback
-and never a URI's userinfo, on both surfaces. On MCP it is raised as FastMCP's `ToolError` reading `CODE: detail`, so
-FastMCP adds no ERROR line of its own. An unexpected exception is still logged at ERROR with its traceback. See the
-third 2026-09-25 amendment to ADR-002.
+and never a URI's userinfo, on both surfaces. On MCP it is raised as FastMCP's `ToolError` reading `CODE: detail`. The
+FastMCP version installed today also writes one ERROR line with the exception traceback while it turns that tool error
+into the `isError` result; the traceback carries the code and the fixed detail only, never the refused value. An
+unexpected exception is still logged at ERROR with its traceback. See the
+third 2026-09-25 amendment to ADR-002, amended again 2026-11-03 for the FastMCP line.
 
 Logging, correlation and tracing come from `ascend-python-common` (`configure_logging`, the request-context
 middleware, the tracer provider builder), wired in `src/main.py` with `create_service_app`. There is no service

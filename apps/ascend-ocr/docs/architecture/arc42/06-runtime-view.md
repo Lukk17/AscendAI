@@ -29,7 +29,7 @@ sequenceDiagram
     Lifespan-->>Uvicorn: yield (service ready)
     Docker->>Uvicorn: GET /ready
     Uvicorn->>Uvicorn: is_engine_warm("en") and is_accepting_work()
-    Uvicorn-->>Docker: 200 {"status":"ready","engine_warm":true,"accepting_work":true,"jobs_queued":0,"jobs_running":0}
+    Uvicorn-->>Docker: 200 {"status":"ready","service":"ascend-ocr","version":"...","checks":{"engine":{"warm":"true"},"worker_pool":{"accepting_work":"true"},"jobs":{"queued":"0","running":"0"}}}
 ```
 
 Both the bucket check and the recovery pass run **before** the runner takes its first document. Recovery is what

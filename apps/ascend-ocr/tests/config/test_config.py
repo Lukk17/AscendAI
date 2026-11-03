@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from src.config.config import (
     DEFAULT_QUALITY,
@@ -144,6 +145,17 @@ class TestSettingsEnvOverride:
 
         # When / Then. Empty entries dropped, whitespace stripped from each.
         assert Settings().ALLOWED_PRIVATE_HOSTS == ("host.docker.internal", "localhost", "127.0.0.1")
+
+    def test_legacy_allow_list_name_refuses_startup(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Given: a leftover value under the setting's old name
+        monkeypatch.setenv("MCP_ALLOWED_HOSTS", "host.docker.internal")
+
+        # When / Then: start-up stops and the error names the setting to use instead
+        with pytest.raises(ValidationError) as exc_info:
+            Settings()
+
+        assert "MCP_ALLOWED_HOSTS" in str(exc_info.value)
+        assert "ALLOWED_PRIVATE_HOSTS" in str(exc_info.value)
 
     def test_override_supported_languages_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Given

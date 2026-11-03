@@ -45,8 +45,9 @@ Check nothing is in flight, because step 3 asserts an empty listing.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"jobs_queued":0` and `"jobs_running":0`. Anything else means an earlier run left work behind: wait for it to
-finish or reset per [`../README.md`](../README.md) "Resetting between runs" before starting.
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`. Anything else means an earlier
+run left work behind: wait for it to finish or reset per [`../README.md`](../README.md) "Resetting between runs"
+before starting.
 
 Check the image the throwaway container is started from exists.
 
@@ -79,14 +80,14 @@ bucket of either container, and the throwaway container is removed by the spec's
 
 ## Run
 
-Step 1. Open an MCP session on the suite's container and keep the session id. FastMCP answers the `initialize` call
+Step 1. Open an MCP session on the suite's container. FastMCP answers the `initialize` call
 with an `Mcp-Session-Id` response header, and every `tools/call` in this spec carries it back.
 
 ```bash
 curl -isS -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"1\"}}}"
 ```
 
-Expect HTTP 200 and an `mcp-session-id` response header. Use that value as the `mcp_session_id` env-var below.
+Expect HTTP 200 with no `mcp-session-id` response header: the service is stateless HTTP, so pass `mcp_session_id` empty in the commands below.
 
 ```bash
 cd docs/api/request/AscendAI
@@ -140,14 +141,14 @@ Then create the root inside it, so the jail guards a directory that exists, as i
 docker exec ascend-ocr-jail mkdir -p /tmp/ocr-jail
 ```
 
-Step 6. Open an MCP session on the throwaway container and keep that session id. It is a different server, so the
+Step 6. Open an MCP session on the throwaway container. It is a different server, so the
 session from step 1 is not valid there.
 
 ```bash
 curl -isS -X POST http://localhost:7023/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"1\"}}}"
 ```
 
-Complete the handshake on the throwaway container with the step 6 session id.
+Complete the handshake on the throwaway container, passing the session id empty.
 
 ```bash
 bru run "ocr/testing/mcp-initialized-jail.yml" --env ascend-local --env-var "mcp_session_id=<session id from step 6>"
@@ -199,10 +200,22 @@ Steps 4 to 6:
 Step 7:
 
 - HTTP 200 at the transport, with a JSON-RPC error frame or an `isError` result.
-- The message carries `UNSAFE_URI` and `escapes MCP_FILE_URI_ROOT`, and does not carry `MCP_FILE_URI_ROOT is unset`,
-  which proves the root was set and the jail itself refused the path.
+- The message carries `UNSAFE_URI`, the shared platform refusal, and never names `MCP_FILE_URI_ROOT` or its state, so
+  a caller cannot tell from the answer whether the jail is on. The jail's activity is proven by the probe in step 7a:
+  a missing file inside the root answers `DOWNLOAD_FAILED` on the throwaway container, while the same URI on the main
+  container answers `UNSAFE_URI`.
 - The message carries no line of `/etc/passwd` (no `root:x:0:0`).
 - No `job_id` anywhere in the answer.
+
+Step 7a. Prove the throwaway container's jail is active, so the escape refusal above is the jail and not the setting
+being off. Submit a missing file inside the jail root, which is a permitted path that cannot be read.
+
+```bash
+curl -fsS -X POST http://localhost:7023/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":70,"method":"tools/call","params":{"name":"ocr_submit","arguments":{"file_uri":"file:///tmp/ocr-jail/does-not-exist.png"}}}'
+```
+
+Expect an `isError` result whose text carries `DOWNLOAD_FAILED`, never `UNSAFE_URI`: the root is set and the jail lets
+the path through to the fetch, which then fails because the file is absent.
 
 Step 8:
 

@@ -36,7 +36,7 @@ the first real request would make it appear to hang, and doing it in the main pr
 copy of the model (~316 MiB) for the container's whole life, since inference always runs in the separate OCR worker
 process (see the next section). Instead, `ocr_service.warm_up_engine(settings.DEFAULT_LANGUAGE)` runs as the worker
 pool's initializer, inside that worker process, and `start_worker_pool()` (`src/main.py`'s lifespan) blocks at
-startup until it completes. The `/ready` endpoint reflects `engine_warm` by reading the worker's own warm-up signal
+startup until it completes. The `/ready` endpoint reflects `checks.engine.warm` by reading the worker's own warm-up signal
 across the process boundary, not by warming anything itself. Until the worker reports warm, `/ready` returns
 `{"status": "not-ready"}` and a load balancer can hold traffic. See
 [ADR-004](../decisions/ADR-004-liveness-readiness-split.md).

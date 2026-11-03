@@ -17,7 +17,7 @@ Copy this file to `../runs/<UTC-timestamp>_10-mcp-credentials-rejection-tasks.md
 
 ### Run
 
-- [ ] `initialize` handshake returns an `mcp-session-id` header
+- [ ] `initialize` handshake returns HTTP 200 with no `mcp-session-id` header (stateless service)
 - [ ] `notifications/initialized` sent with `ocr/testing/mcp-initialized.yml` and that session id, HTTP 202 with an empty body
 - [ ] Send `ocr/testing/mcp-credentials-in-uri.yml` with that session id
 

@@ -31,8 +31,9 @@ Check nothing is in flight, because step 4 asserts an empty listing.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"jobs_queued":0` and `"jobs_running":0`. Anything else means an earlier run left work behind: wait for it to
-finish or reset per [`../README.md`](../README.md) "Resetting between runs" before starting.
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`. Anything else means an earlier
+run left work behind: wait for it to finish or reset per [`../README.md`](../README.md) "Resetting between runs"
+before starting.
 
 ## Reset state
 
@@ -48,7 +49,7 @@ Open an MCP session and keep the session id. FastMCP answers the `initialize` ca
 curl -isS -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"1\"}}}"
 ```
 
-Expect HTTP 200 and an `mcp-session-id` response header. Use that value as the `mcp_session_id` env-var below.
+Expect HTTP 200 with no `mcp-session-id` response header: the service is stateless HTTP, so pass `mcp_session_id` empty in the commands below.
 
 ```bash
 cd docs/api/request/AscendAI
@@ -97,15 +98,15 @@ Steps 1 to 3:
 
 Step 1:
 
-- The message carries `Unsupported URI scheme: 'ftp'`.
+- The message carries `UNSAFE_URI: URI is not permitted`, the shared platform refusal, which does not echo the caller's scheme.
 
 Step 2:
 
-- The message carries `Unsupported URI scheme: 'data'`.
+- The message carries `UNSAFE_URI: URI is not permitted`, the shared platform refusal, which does not echo the caller's scheme.
 
 Step 3:
 
-- The message carries `Unsupported URI scheme: 'c'`.
+- The message carries `UNSAFE_URI: URI is not permitted`, the shared platform refusal, which does not echo the caller's scheme.
 
 Step 4:
 

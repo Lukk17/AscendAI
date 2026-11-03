@@ -11,7 +11,7 @@ Copy this file to `../runs/<UTC-timestamp>_12-ocr-unsupported-mime-tasks.md` bef
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
 - [ ] `apps/ascend-ocr/e2e/fixtures/not-an-image.txt` exists
-- [ ] `/ready` reports `jobs_queued` 0 and `jobs_running` 0
+- [ ] `/ready` reports `checks.jobs.queued` 0 and `checks.jobs.running` 0
 
 ### Reset state
 

@@ -60,7 +60,7 @@ service by name inside the compose network.
 The Dockerfile `HEALTHCHECK` is deliberately pointed at `/health`, not `/ready`
 (`apps/ascend-ocr/Dockerfile:58` sets no explicit `HEALTHCHECK` instruction - the base image default applies, or the
 compose `healthcheck` stanza should be set). The operator should configure the load balancer or Kubernetes
-`readinessProbe` to poll `/ready` so traffic is held until `engine_warm=true`. See
+`readinessProbe` to poll `/ready` so traffic is held until `checks.engine.warm` is true. See
 [ADR-004](../decisions/ADR-004-liveness-readiness-split.md).
 
 ---

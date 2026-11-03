@@ -81,7 +81,7 @@ Confirm the service is idle and the bucket is empty.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"jobs_queued":0` and `"jobs_running":0`.
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`.
 
 ```bash
 curl -fsS "http://localhost:9070/ocr-results?list-type=2"
