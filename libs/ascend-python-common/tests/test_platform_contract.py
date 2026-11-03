@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import socket
+import sys
 import tomllib
 from dataclasses import replace
 from importlib.metadata import version as package_version
@@ -561,6 +562,55 @@ def test_a_leftover_old_allow_list_name_stops_start_up(
     # then
     assert "MCP_ALLOWED_HOSTS" in str(exc_info.value)
     assert "ALLOWED_PRIVATE_HOSTS" in str(exc_info.value)
+
+
+def _free_loopback_port() -> int:
+    with socket.create_server(("127.0.0.1", 0)) as server:
+        return int(server.getsockname()[1])
+
+
+def _port_accepts_connections(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(1)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+
+
+def test_a_leftover_old_allow_list_name_with_an_empty_value_stops_start_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    monkeypatch.setenv("MCP_ALLOWED_HOSTS", "")
+    # when
+    with pytest.raises(ValidationError, match="MCP_ALLOWED_HOSTS") as exc_info:
+        _SampleSettings()
+    # then
+    assert "MCP_ALLOWED_HOSTS" in str(exc_info.value)
+    assert "ALLOWED_PRIVATE_HOSTS" in str(exc_info.value)
+
+
+def test_a_leftover_old_allow_list_name_exits_before_the_app_is_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    port = _free_loopback_port()
+    monkeypatch.setenv("API_PORT", str(port))
+    monkeypatch.setenv("MCP_ALLOWED_HOSTS", "internal.example")
+    built: list[str] = []
+    real_create_service_app = create_service_app
+
+    def _spy(definition: ServiceDefinition) -> FastAPI:
+        built.append(definition.name)
+        return real_create_service_app(definition)
+
+    monkeypatch.setattr(sys.modules[__name__], "create_service_app", _spy)
+    # when
+    with pytest.raises(ValidationError, match="MCP_ALLOWED_HOSTS") as exc_info:
+        _client(_definition())
+    # then
+    assert "MCP_ALLOWED_HOSTS" in str(exc_info.value)
+    assert "ALLOWED_PRIVATE_HOSTS" in str(exc_info.value)
+    assert built == []
+    assert not _port_accepts_connections(port)
 
 
 def test_an_invalid_log_level(monkeypatch: pytest.MonkeyPatch) -> None:

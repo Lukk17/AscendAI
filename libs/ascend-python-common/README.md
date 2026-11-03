@@ -217,7 +217,7 @@ Services that fetch caller URIs add the `McpFetchSettings` mixin:
 
 | Setting | Type and bounds | Default |
 |---|---|---|
-| `ALLOWED_PRIVATE_HOSTS` | comma separated tuple | empty |
+| `ALLOWED_PRIVATE_HOSTS` | comma separated tuple of outbound hosts the URI fetch guard may reach even at a private address. It replaced `MCP_ALLOWED_HOSTS` on 2026-10-04. It is a different setting from the inbound `MCP_ALLOWED_HOST_HEADERS` | empty |
 | `MCP_FILE_URI_ROOT` | absolute path or unset | unset, so `file://` is refused |
 | `MCP_DOWNLOAD_TIMEOUT_SECONDS` | positive float | set by the service subclass |
 | `FETCH_MAX_REDIRECT_HOPS` | integer, 0 or more | no default in the mixin, each service subclass sets its own |
